@@ -31,7 +31,7 @@ EA Code comprehension (disk report `20260423_023220_ea_code_comprehension_v1.md`
 
 ## Findings
 
-- Sizing (~45 tests planned vs 20-test floor) is substantive and aligned with "mature not minimal" motto.
+- Sizing (\~45 tests planned vs 20-test floor) is substantive and aligned with "mature not minimal" motto.
 - WI-11 encoder-test count (6) matches queue prompt source section exactly.
 - Deliverable table in Section F enumerates test classes with counts — exceeds L-12 verbatim-recitation requirement and gives a clean gate-check target.
 - Ledger predecessor `20260422_210246_sprint8_ea3_ui-hardening` correctly identified per Q1-1.

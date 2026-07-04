@@ -4,7 +4,7 @@ sprint_name: "The Automation Wave — Production-Parity Test Lane + Gate-Critica
 predecessor_sprint_id: 15
 vikunja_tracking_task_id: 624
 start_date: "2026-06-07"
-target_completion_date: "2026-06-09"   # ~1-2 days agent wall-clock; LA estimate, not a hard deadline
+target_completion_date: "2026-06-09"   # \~1-2 days agent wall-clock; LA estimate, not a hard deadline
 sdv_version: 2
 status: "SIGNED — LA-approved 2026-06-07 (Gate:Approved); v2 (LA-review additions folded)"
 orchestrator_drafted_on: "2026-06-07"
@@ -129,7 +129,7 @@ through Sprints 17–18; the #598 gate audit stays a manual marathon; and two ga
    stub signer). The on-chip ceremony + the live flip to `true` are a later batched LA step (§5.2).*
 4. **Manifest-ceremony novice runbook (B / D-3, NON-OPTIONAL).** A non-developer runbook
    (`docs/runbooks/` or `docs/sprints/sprint_16/`) for provisioning `BlarAI-Manifest-Signing` + signing
-   the manifest: ≤ ~3 copy-paste full-path commands, public-only output (fingerprints/hashes),
+   the manifest: ≤ \~3 copy-paste full-path commands, public-only output (fingerprints/hashes),
    idempotent + clobber-guarded, fail-closed, "you never edit code," low-stakes framing — same standard
    as `EA4_ceremony_runbook.md`. *Verification: the runbook exists and the ceremony is one-command +
    idempotent; the Orchestrator can drive it line-by-line.*
@@ -334,15 +334,15 @@ reading code; the lane's first green run is the real test.
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| **LA** | This SDV sign-off; CAR adjudication; SCR + SWAGR read. **No on-chip ceremony this sprint** (staged). | ~30–60 min interactive |
+| **LA** | This SDV sign-off; CAR adjudication; SCR + SWAGR read. **No on-chip ceremony this sprint** (staged). | \~30–60 min interactive |
 | **Orchestrator** | EA prompt authoring; serial merge-gate (diff + re-run); the novice-runbook standard enforced on B; SCR | Autonomous within the merge gate |
 | **Builder subagents (A–D)** | Stream execution in isolated worktrees (model sonnet) | Per-stream, merge-gated |
 | **Audit agents (E, F)** | Read-mostly reconciliation + coverage map | Per-stream |
 | **Auditor** | Independent SWAGR at close (manual spawn; fleet paused) | Autonomous per DEC-15 |
 
 ## 12. Estimated effort
-- **Duration:** ~1–2 days agent wall-clock (6 concurrent streams; serial merge-gate is the pacing item).
-- **LA active-time:** ~30–60 min (sign-off + any CARs + SWAGR read). **Zero on-chip terminal time this
+- **Duration:** \~1–2 days agent wall-clock (6 concurrent streams; serial merge-gate is the pacing item).
+- **LA active-time:** \~30–60 min (sign-off + any CARs + SWAGR read). **Zero on-chip terminal time this
   sprint** — the one ceremony is staged for a later batched session (a deliberate novice-friendly property
   of this wave).
 - **Confidence:** Medium-High — the working sets are verified-disjoint and most pieces are extend-not-build

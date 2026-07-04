@@ -65,5 +65,5 @@ Phase 6 (Phases 1–5 nothing to do). Clean exit.
 
 ## Next firing
 
-- Normal ~15-min co_lead_architect cadence.
+- Normal \~15-min co_lead_architect cadence.
 - Fleet remains blocked on LA merge decisions for #134 + #148. M13 action blocks embedded in both. Sustained no-op until LA acts — SDO cannot author EA-2 with EA-1 unmerged.

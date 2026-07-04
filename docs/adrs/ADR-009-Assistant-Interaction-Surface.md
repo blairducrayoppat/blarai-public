@@ -110,7 +110,7 @@ Desktop Shell (PyQt6 or Tkinter)**, not Web UI. Migration strategy:
    the desktop shell can deserialize and render in Qt dialog boxes.
 4. **Migration gate:** Phase 4+ migration to PyQt6 requires a new ADR evaluating:
    (a) GPL v3 license implications for distribution, (b) Qt/asyncio event loop bridging
-   (`qasync`), (c) high-DPI rendering on target hardware, (d) memory impact (~100–200MB
+   (`qasync`), (c) high-DPI rendering on target hardware, (d) memory impact (\~100–200MB
    delta). Tkinter is the stdlib fallback if GPL is unacceptable.
 
 ---
@@ -344,8 +344,8 @@ The "Fail-Closed-gated anonymous utility calls" carve-out in UC-004 is documente
 
 | Package | Version | License | Size | Purpose |
 |---------|---------|---------|------|---------|
-| textual | ≥0.89 | MIT | ~5 MB | TUI framework |
-| rich | (transitive) | MIT | ~3 MB | Terminal rendering |
+| textual | ≥0.89 | MIT | \~5 MB | TUI framework |
+| rich | (transitive) | MIT | \~3 MB | Terminal rendering |
 
 No additional dependencies beyond the existing Python 3.11.9 venv.
 

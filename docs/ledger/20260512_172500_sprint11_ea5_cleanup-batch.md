@@ -29,7 +29,7 @@ doc-hygiene items. Co-Lead direct execution under LA-delegated authority
    SWAGR §13 gap #3 (cross-reference style asymmetry).
 3. **devplatform `docs/decisions/DEC-19_cross-reference-style-convention_v1.md`** —
    new formal DEC ratifying absolute-paths-everywhere as the canonical
-   cross-repo cross-reference convention (~140 lines, mature-not-minimal
+   cross-repo cross-reference convention (\~140 lines, mature-not-minimal
    floor exceeded). Joins DEC-16/17/18 (Sprint 11 EA-1 bundle) in the
    devplatform `docs/decisions/` directory.
 4. **devplatform `docs/scheduled/wake_templates/sprint_auditor.md` §2.2** —
@@ -75,7 +75,7 @@ doc-hygiene items. Co-Lead direct execution under LA-delegated authority
 |---|---|---|---|
 | copilot-instructions.md regex (Sprint 10 SDV criterion #1 + Sprint 11 SDV criterion #5) returns zero non-pointer matches | DEC-15 reference now inside `<sprint_lifecycle_pointer>` element | Confirmed | `grep -n "DEC-15" .github/copilot-instructions.md` returns single match inside pointer XML element |
 | `grep -n "<BlarAI>" devplatform/CLAUDE.md` returns zero | All 13 tokens expanded | Confirmed | Post-edit grep returns no matches |
-| DEC-19 file exists on devplatform main | ≥ 50-line mature-not-minimal floor | Confirmed (~140 lines) | `docs/decisions/DEC-19_*.md` present |
+| DEC-19 file exists on devplatform main | ≥ 50-line mature-not-minimal floor | Confirmed (\~140 lines) | `docs/decisions/DEC-19_*.md` present |
 | sprint_auditor §2.2 has NARROW EXCEPTION clause | Sprint-close comment read-only sweep guardrails present | Confirmed | New text inserted; 4 explicit guardrails (single comment, timestamp gate, read-only, scope-limited) |
 | vikunja_mcp README Quick Start uses absolute paths | `cd` references are cwd-agnostic | Confirmed | Lines 31, 42, 158 updated |
 | BlarAI commit on feature branch | `[sprint:11][role:co_lead][phase:completion]` tag | This commit | Single BlarAI commit covers both BlarAI-side edits + ledger |
@@ -84,7 +84,7 @@ All checks PASS. Sprint 11 SDV v3 success criteria #5, #6, and #7 satisfied on t
 
 ## Quality Gate
 
-- **Mature-not-minimal**: DEC-19 at ~140 lines well exceeds the 50-line floor; sprint_auditor.md §2.2 amendment has full guardrails not just a single-line allowance; vikunja_mcp README fix replaces both stale `cd` references and adds a one-line context note explaining why the path moved.
+- **Mature-not-minimal**: DEC-19 at \~140 lines well exceeds the 50-line floor; sprint_auditor.md §2.2 amendment has full guardrails not just a single-line allowance; vikunja_mcp README fix replaces both stale `cd` references and adds a one-line context note explaining why the path moved.
 - **Fail-closed safety**: no impact. No production source touched, no test files touched, no test config touched.
 - **Privacy mandate**: held. No external network calls.
 - **Cross-repo discipline**: devplatform-side committed first (per Stage 6.7.5 direct-to-main N-6) at `2b06d79`; BlarAI-side feature branch (this branch) commits after, merges via standard trusted_scope pathway (or direct merge under LA-delegated authority).

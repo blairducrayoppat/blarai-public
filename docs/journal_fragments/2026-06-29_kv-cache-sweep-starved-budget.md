@@ -3,7 +3,7 @@
 A sibling perf agent ran a long-context KV-cache precision sweep and got
 numbers that looked like data but weren't: time-to-first-token of 47 seconds at
 16K context and 310 seconds at 32K, two repeats apart by the better part of a
-minute, and a memory column that sat flat at ~20.85 GB no matter whether the KV
+minute, and a memory column that sat flat at \~20.85 GB no matter whether the KV
 cache was FP16, INT8, or INT4. A sweep built to measure the precision lever was
 measuring nothing of the sort. It surfaced to me as "is this being tracked?" —
 and the honest answer was that it shouldn't be *published*, because every number
@@ -52,7 +52,7 @@ erased, and the community dataset must never harvest it.
 
 Then the full sweep tried to teach me the wrong lesson twice, and both times the
 operator or the data caught me. The first full run came in with the browser open
-— a few tabs sharing the same iGPU inflated TTFT ~31% and blew variance up 25x.
+— a few tabs sharing the same iGPU inflated TTFT \~31% and blew variance up 25x.
 The operator flagged it; a cleanliness gate (compare the first combo to the
 isolated smoke) confirmed it and the re-run cleaned up. The second was subtler and
 entirely mine: a clean sweep still showed 16K times *climbing* with run-order

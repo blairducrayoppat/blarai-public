@@ -7,7 +7,7 @@ spin its own worktree and model-swap. So the ruler drops atomic over-splits and 
 fewest coherent feature tasks. What it had no opinion about was the OTHER error: a whole app
 crammed into one task. And that error is the more expensive one, because the local 30B's
 success on an autonomous run falls roughly p^N with the step count (Toby Ord, arXiv:2505.05115)
-and METR measures ~100% on tasks under ~4 minutes against <10% past ~4 hours. A coder asked to
+and METR measures \~100% on tasks under \~4 minutes against <10% past \~4 hours. A coder asked to
 build add, list, complete, and delete in one eight-minute run is being set up to fall off the
 cliff. #691 is the UPPER bound: the dispatch unit is one coherent deliverable sized for one
 short gated run, and a goal the 14B under-split gets broken into gated increments instead.
@@ -52,7 +52,7 @@ written down (Vikunja #699) rather than discovered in production.
 into several short gated tasks, the case for running best-of-N candidates concurrently (and
 measuring the real OVMS continuous-batching ceiling on the integrated Arc 140V) is stronger, not
 weaker: more, smaller tasks is more parallelism to harvest. And as local models climb the horizon
-curve (METR: the 50%-task length doubles ~every 7 months) this same envelope rides it for free —
+curve (METR: the 50%-task length doubles \~every 7 months) this same envelope rides it for free —
 a bigger coherent unit simply stops tripping the upper bound.
 
 **Proposed lesson:** *Bound the work from both sides, and let the cheapest lever lead.* A ruler

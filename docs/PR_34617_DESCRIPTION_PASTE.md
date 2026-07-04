@@ -11,7 +11,7 @@
             → "to_shape was called on a dynamic shape"
   ```
 - The existing internal option `NPU_DYNAMIC_SHAPE_TO_STATIC` does not help — it would apply `INT64_MAX` as a static dimension, which is meaningless.
-- **Fix**: ~25-line guard inserted after batch handling (which may resolve batch-axis dynamics) and before `compiler->compile()`. It checks parameters and results for dimensions where `dim.get_interval().has_upper_bound()` returns `false`, and throws an actionable error message directing users to `model.reshape()`.
+- **Fix**: \~25-line guard inserted after batch handling (which may resolve batch-axis dynamics) and before `compiler->compile()`. It checks parameters and results for dimensions where `dim.get_interval().has_upper_bound()` returns `false`, and throws an actionable error message directing users to `model.reshape()`.
 - **Error message improvement**:
   Before: `RuntimeError: to_shape was called on a dynamic shape.`
   After:

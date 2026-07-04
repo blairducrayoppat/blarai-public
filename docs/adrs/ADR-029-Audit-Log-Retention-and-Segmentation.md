@@ -12,7 +12,7 @@
 1. **Unbounded RAM.** Construction loaded the ENTIRE history into `self._records` (`AuditLog._load_existing` → append every line). On a decades-use system this grows without bound — the in-RAM working set is proportional to total history, not to recent activity.
 2. **Unbounded active file + O(n) boot.** A single ever-growing `audit.jsonl` is re-read in full on every startup, so boot cost also grows with total history.
 
-The remaining open question for the #598 gate (carried as #607) was the **retention policy**: what do we do as the audit history grows? The choices ranged from "delete old records" (various purge schemes) to "keep everything but fix the unboundedness." The records are **metadata-only** (no prompt/response content — adjudication seq, decision, hashes, agent/verb/resource, timestamps), the data volume is tiny (single user, air-gapped), and the documented history *is* the User-Operator's IAPP AIGP portfolio evidence. Destroying any of it has real governance cost and ~no storage benefit.
+The remaining open question for the #598 gate (carried as #607) was the **retention policy**: what do we do as the audit history grows? The choices ranged from "delete old records" (various purge schemes) to "keep everything but fix the unboundedness." The records are **metadata-only** (no prompt/response content — adjudication seq, decision, hashes, agent/verb/resource, timestamps), the data volume is tiny (single user, air-gapped), and the documented history *is* the User-Operator's IAPP AIGP portfolio evidence. Destroying any of it has real governance cost and \~no storage benefit.
 
 ## Decision
 

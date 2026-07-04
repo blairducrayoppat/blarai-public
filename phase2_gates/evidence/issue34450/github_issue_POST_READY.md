@@ -294,6 +294,6 @@ Windows Event ID 1000: faulting module openvino.dll v2026.0.0.20965, offset 0x00
 GPU control (succeeds, same IR):
 
 READY device=GPU ir=exports\cell_i
-CONSTRUCT_OK elapsed=~6s
+CONSTRUCT_OK elapsed=\~6s
 GENERATE_OK tokens=16 elapsed=0.33s output='<think> | Okay, the user is asking about the capital of France. Let me'
 GPU exit=0

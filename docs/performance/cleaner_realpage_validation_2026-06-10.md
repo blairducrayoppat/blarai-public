@@ -46,7 +46,7 @@ numbers are the re-measured values).
 | Determinism | Re-runs byte-identical (`CleanResult` equality holds across repeated invocations) |
 
 The page lands comfortably clear of every conservative v1 floor (80-word minimum,
-0.2% ratio alarm, 0.5 confidence floor): a typical real article page is ~1–5%
+0.2% ratio alarm, 0.5 confidence floor): a typical real article page is \~1–5%
 text-to-raw, and this one sits mid-range at 4.86%.
 
 ## Known imperfection (tracked)
@@ -70,6 +70,6 @@ the content is still untrusted, datamarked, and operator-reviewed at approval.
   real page against them but does not recalibrate. Recalibration against a real-page
   corpus is named in the journal fragment's Next.
 - **Latency/throughput.** No timing was captured on this run; the synthetic-corpus
-  timings (~2.1 ms/article, fixtures far smaller than real pages) live in the JSON
+  timings (\~2.1 ms/article, fixtures far smaller than real pages) live in the JSON
   record above and do not transfer to 92 KB real pages.
 - **Co-resident cost** (run standalone, no model loaded).

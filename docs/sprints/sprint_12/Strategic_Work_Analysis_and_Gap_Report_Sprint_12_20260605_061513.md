@@ -77,7 +77,7 @@ the verification *method*** the sprint contracted for.
   `has_untrusted_content` (`:369-372`) treats anything not in the two trusted tiers as untrusted.
   Tested: `test_unrecognized_source_fails_closed_to_untrusted`, `test_untrusted_provenance_trips_gate`,
   `test_has_untrusted_content_false_on_unknown_session` (`test_context_manager.py` `TestProvenanceFoundation`,
-  ~lines 599-703). I ran these — green.
+  \~lines 599-703). I ran these — green.
 - Evidence on disk matches the SDV verification clause exactly (per-tier unit tests; enum threaded
   through ContextManager and read by the gate + validator; unknown ⇒ untrusted).
 
@@ -89,7 +89,7 @@ the verification *method*** the sprint contracted for.
 - **Amendment 1** is appended in the same document (§A1.1–A1.8) and is internally consistent.
 - `docs/DECISION_REGISTER.md:32` carries the ADR-023 row including the Amendment-1 clause and the
   #558 supersession. Verified.
-- One nit (not a gap): the LA "~20-minute-ratifiable" intent is contradicted by the document's actual
+- One nit (not a gap): the LA "\~20-minute-ratifiable" intent is contradicted by the document's actual
   size (Amendment 1 roughly doubled it). Defensible — the amendment was an in-session design pivot —
   but the "tight, 20-min" framing in the SDV no longer describes the artifact. Documentation, not
   substance.

@@ -38,7 +38,7 @@ Maps to the "Synthesis (Prioritized Gap Report + Pre-existing Skip Analysis) —
 
 ### Scope discipline — ✓
 - DOCS-ONLY: outputs are exactly `docs/TEST_AUDIT_FINDINGS.md` and `docs/POST_OPERATIONAL_MATURATION_LEDGER.md`.
-- Skip-site scope locked to two `shared/tests/test_runtime_config.py` symlink-privilege sites (lines ~78 and ~98).
+- Skip-site scope locked to two `shared/tests/test_runtime_config.py` symlink-privilege sites (lines \~78 and \~98).
 - Out-of-scope block excludes re-reading services/, shared/, launcher/, tests/ and running pytest/coverage tooling.
 - Negative constraints capture all four L-12 corrective-action patterns (no numbered prefixes, no extra sections, no renames, no populating deferred stubs).
 - `DO NOT git add .` and `DO NOT touch unrelated pre-existing untracked files` included (protects the scheduled-tasks/ and fleet_observability/ worktree cruft).

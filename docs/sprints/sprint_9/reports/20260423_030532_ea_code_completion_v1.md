@@ -36,7 +36,7 @@ preserved).
 | WI-4 | `docs/ledger/20260423_030132_sprint9_ea4_ops-deployment-rules.md` | — | — | — |
 
 All three docs exceed the 150-line floor. `observability.md` came in
-under the prompt's ~400-line suggestion (340) because standard Python
+under the prompt's \~400-line suggestion (340) because standard Python
 `logging` semantics and the `build_failure_fingerprint` shape carry
 much of the governance weight on their own — the content is
 substantive and source-anchored throughout, not truncated.

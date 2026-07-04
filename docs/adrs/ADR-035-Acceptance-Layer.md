@@ -10,7 +10,7 @@ on-hardware Phase-B shakedown. **Amendment 2 (2026-06-23, #670 Problem 3 — the
 right-sizing refinement): `compile_prompts` now FOLDS the behavior/smoke criteria into the lone feature
 task when a goal right-sizes to exactly ONE feature** (e.g. `is_palindrome`), instead of appending a
 separate `acceptance-tests` fleet task that would spin its own worktree + model-swap cycle WITHOUT the
-implementation in it (the live shakedown had that sibling run ~24 min failing). The dedicated final task
+implementation in it (the live shakedown had that sibling run \~24 min failing). The dedicated final task
 is RETAINED for ≥2-feature goals (its duplicate-test-file rationale only applies there); the anti-mirror
 "assert the REQUIRED behavior" header is preserved verbatim in the folded prompt. Still **DORMANT**.
 **Deciders:** Lead Architect (blarai); the build (this session).

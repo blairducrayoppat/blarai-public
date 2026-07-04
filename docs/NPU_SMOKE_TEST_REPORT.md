@@ -119,8 +119,8 @@ GPU average (208ms) is within budget for 2/3 test cases.
 
 ### First-Compile Latency
 
-The NPU requires ~102s for first-time blob compilation. Subsequent loads use
-cached blobs (~2.7s). This is acceptable for production: compile once at boot,
+The NPU requires \~102s for first-time blob compilation. Subsequent loads use
+cached blobs (\~2.7s). This is acceptable for production: compile once at boot,
 cache persists across restarts (`.npucache/` directory).
 
 ---

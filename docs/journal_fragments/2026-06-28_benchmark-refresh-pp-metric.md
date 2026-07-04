@@ -12,16 +12,16 @@ and it firmly fills the datapoint the community simply does not have (there is n
 the same 0.6B draft to 27.4 tok/s. Nice, but expected.
 
 The interesting result was the shape, not any single number, and it only became visible because
-pp now sits next to generation throughput. The 30B-A3B is a mixture-of-experts model: ~30B total
-parameters, ~3B active per token. It posted the fastest decode of anything I measured (38 tok/s,
+pp now sits next to generation throughput. The 30B-A3B is a mixture-of-experts model: \~30B total
+parameters, \~3B active per token. It posted the fastest decode of anything I measured (38 tok/s,
 roughly double the dense 14B) and the fastest time-to-first-token (214 ms) — and the *slowest*
-prefill of anything, pp ~480 against the dense models' ~1960. That is the MoE bargain stated in
-two measured numbers: decode only wakes ~3B of active params, so tokens are cheap; but prefill
-routes every prompt token across all 128 experts, so reading the prompt pays the full ~30B. The
+prefill of anything, pp \~480 against the dense models' \~1960. That is the MoE bargain stated in
+two measured numbers: decode only wakes \~3B of active params, so tokens are cheap; but prefill
+routes every prompt token across all 128 experts, so reading the prompt pays the full \~30B. The
 dense 14B and 8B are the mirror image — heavier per-token decode, featherweight prefill. I have
 been describing MoE this way in the abstract for weeks; it is a different thing to have it fall
 out of a benchmark you can hand to someone. I was careful not to oversell it: the in-process pp
-is measured over ~970 chat-formatted tokens and the OVMS pp over ~421 bare ones, on two different
+is measured over \~970 chat-formatted tokens and the OVMS pp over \~421 bare ones, on two different
 OpenVINO versions, so I wrote the comparison up as directional and named every confound rather
 than implying a clean A/B. The 4x prefill gap is far larger than the confounds, so the finding
 stands, but the honest framing is the one that compounds.

@@ -42,8 +42,8 @@ Note: function is `resume_fleet`, NEVER `unpause_fleet` (AttributeError).
 |---|---|---|---|
 | 1 | Single work item failed | Test fails mid-stage | Minutes |
 | 2 | Single stage needs reverting | Stage exit criteria unmet | Minutes |
-| 3 | Post-cutover regression (Stage 4+) | Fleet misbehaves on devplatform | ~30 min |
-| 4 | Full disaster | Vikunja DB corrupted, MCP broken, can't start fleet | ~1 hour from bundle/zip |
+| 3 | Post-cutover regression (Stage 4+) | Fleet misbehaves on devplatform | \~30 min |
+| 4 | Full disaster | Vikunja DB corrupted, MCP broken, can't start fleet | \~1 hour from bundle/zip |
 
 ---
 

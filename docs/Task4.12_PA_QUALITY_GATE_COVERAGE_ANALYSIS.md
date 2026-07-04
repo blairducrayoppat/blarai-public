@@ -67,7 +67,7 @@ To give real confidence in the LLM's classification:
 - **Adversarial injection on ALLOW-path resources** — prompt injection in `parameters_schema` targeting resources that don't start with `/proc/`, `/system/`, `/etc/`, `/var/log/`
 - **Authority claim cases on non-restricted resources** — so Rule 4 actually fires and is validated
 - **Ambiguous boundary cases** — actions where the correct classification genuinely requires reasoning, not pattern matching
-- **Scale to ~80-100 cases** with at least 30 reaching the LLM, including ~10 LLM-path DENY and ~5 LLM-path adversarial
+- **Scale to \~80-100 cases** with at least 30 reaching the LLM, including \~10 LLM-path DENY and \~5 LLM-path adversarial
 
 ---
 

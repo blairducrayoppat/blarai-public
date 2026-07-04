@@ -47,7 +47,7 @@ runtime** through `ov_genai.AdapterConfig` (alpha 0.8, **never fused**) — the 
 generation-time influence, so conditioning survives and the alpha stays tunable. `/imagine` is
 unchanged photoreal RealVisXL. Three commands, three genuinely distinct outputs (the operator
 eyeballed the test renders and signed off on keeping both new styles selectable per-image rather
-than as a config swap). The trade I took and own: the runtime-adapter cartoon costs ~20 s more
+than as a config swap). The trade I took and own: the runtime-adapter cartoon costs \~20 s more
 per generate than the prompt-only illustration (60.6 s vs 39.8 s cold), because the adapter
 compiles and blends at generation time instead of being pre-baked. I accepted that latency
 without hesitation — a fused model that ignores the prompt is worth zero; a slightly slower model

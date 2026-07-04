@@ -183,7 +183,7 @@ LLM latency is consistent with 4.9a baselines — no regression from pre-filter 
 | ADR-012 §2.2 | DEC-10 LOCKED: Deterministic pre-filter is mandatory in PA classify_car() |
 | ADR-012 §4 | Evidence reference added |
 | IMPLEMENTATION_PLAN.md | §1.20 added (Task 4.9c) |
-| POST_OPERATIONAL_MATURATION_LEDGER.md | Entry 26 (~150 lines) |
+| POST_OPERATIONAL_MATURATION_LEDGER.md | Entry 26 (\~150 lines) |
 
 ## 10. Decision Record
 

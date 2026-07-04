@@ -149,7 +149,7 @@ Each of the three docs ≥ 150 lines of substantive content. `gpu-runtime.md` fl
 ### O. RISKS AND AMBIGUITIES
 
 - **ANCHOR-FILE NAMING DRIFT (HIGH — SCOPE IMPACT)**: Prompt references `services/assistant_orchestrator/src/model_loader.py` and `services/assistant_orchestrator/src/error_handling.py` but **neither exists** at HEAD `97c5d98`. Current AO files: `circuit_breaker.py`, `context_manager.py`, `__init__.py`, `pgov.py`, `constants.py`, `entrypoint.py`, `gpu_inference.py`. Substitute: read `gpu_inference.py` for model-load surface, and `entrypoint.py` + `pgov.py` for error-handling surface. Cite actual files. Commit-message `Anchor sources:` line will be updated. No file renames / no invented modules.
-- **Parallel-with-Sprint-8 (L-16)**: Sprint 8 EA-2 comprehension posted ~7 min prior (Task 82 comment 289). Sprint 8 writes `**/tests/` only; mine confined to `docs/governance/**` + ledger.
+- **Parallel-with-Sprint-8 (L-16)**: Sprint 8 EA-2 comprehension posted \~7 min prior (Task 82 comment 289). Sprint 8 writes `**/tests/` only; mine confined to `docs/governance/**` + ledger.
 - **Phantom boot-sequence temptation (L-17)**: Cite `launcher/__main__.py` + startup entry points; NEVER cite `boot-sequence.md`.
 - **Weight-integrity broken link**: Sanctioned.
 - **Ledger entry drift**: Highest `### Entry N` is 52 at this firing; Sprint 8 EA-2 may land first and consume 53; re-scan at commit.
@@ -180,7 +180,7 @@ Prompt snapshot: `29cea32` (SDO authoring 2026-04-22). Current main HEAD: **`97c
 3. Read anchor sources: `gpu_inference.py`, `entrypoint.py`, `pgov.py`, `circuit_breaker.py`, `context_manager.py`, `constants.py`, `launcher/__main__.py`, `shared/ipc/protocol.py`, `shared/schemas/car.py`, `services/ui_shell/src/streaming.py`, PA startup/error paths.
 4. Read EA-1 peer governance docs + STYLE.md.
 5. Read Vikunja Tasks 18/19/20 Scattered Sources.
-6. **WI-1** `gpu-runtime.md` (largest; ~400+ lines). Per STYLE.md Doc Template. All 10 required_coverage items. Keep Recovery standalone.
+6. **WI-1** `gpu-runtime.md` (largest; \~400+ lines). Per STYLE.md Doc Template. All 10 required_coverage items. Keep Recovery standalone.
 7. **WI-2** `error-recovery.md`. All 12 required_coverage items. Forward-reference circuit-breaker.md + weight-integrity.md. Merge Recovery (omit stub).
 8. **WI-3** `circuit-breaker.md`. Cite MAX_OUTPUT_TOKENS=4096 + MAX_TOOL_CALL_DEPTH=5 by path+constant-name. All 12 required_coverage items. Merge Recovery (omit stub).
 9. MARKDOWN-LINT gate.

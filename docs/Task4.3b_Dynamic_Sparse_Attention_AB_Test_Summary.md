@@ -27,7 +27,7 @@ Confirmed available in OpenVINO 2026.0. Intel demonstrated 2.6× TTFT reduction 
 ## Key Measurements
 
 - TPS with sparse vs dense at each band
-- Acceptance rate with sparse vs dense — specifically whether AR collapse point shifts from ~12K
+- Acceptance rate with sparse vs dense — specifically whether AR collapse point shifts from \~12K
 - TTFT impact per band
 - Peak RSS under sparse eviction
 - Per-step acceptance rate arrays to detect if sparse changes the draft rejection pattern

@@ -63,7 +63,7 @@ Co-Lead-audit verification commands embedded for line-count + section-heading pr
 
 ### Trusted_scope eligibility
 
-EA-4 working set = 2 doc files; aggregate ~115–200 LOC of new prose; well under DEC-18 thresholds (3000 LOC / 100 files); both paths under `docs/sprints/sprint_11/` + `docs/ledger/` (doctrine surfaces inside `trusted_scope` allowlist). Methodology-execution overhead is the budget risk, not merge-policy risk. Phase 2 should auto-merge under `trusted_scope` carve-outs barring CRITICAL exit. ✓
+EA-4 working set = 2 doc files; aggregate \~115–200 LOC of new prose; well under DEC-18 thresholds (3000 LOC / 100 files); both paths under `docs/sprints/sprint_11/` + `docs/ledger/` (doctrine surfaces inside `trusted_scope` allowlist). Methodology-execution overhead is the budget risk, not merge-policy risk. Phase 2 should auto-merge under `trusted_scope` carve-outs barring CRITICAL exit. ✓
 
 ## Observations (non-blocking)
 

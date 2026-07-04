@@ -202,15 +202,15 @@ Only rebase installations that are **standard MSYS layouts AND low blast-radius 
 
 **In scope** (rebase these):
 
-1. **Git for Windows** at `C:\Program Files\Git\usr\bin\`. Standard MSYS (~3.36 MB). Most likely collision source — exercised frequently and installed at the MSYS-default layout. Reversible via the Git-for-Windows installer.
-2. **AI Playground portable-git** at `C:\Users\mrbla\AppData\Local\Programs\AI Playground\resources\portable-git\usr\bin\`. Near-identical MSYS build (~3.36 MB, same upstream family as Git for Windows per matching byte sizes). Not on BlarAI's critical path. Reversible via AI Playground reinstall.
+1. **Git for Windows** at `C:\Program Files\Git\usr\bin\`. Standard MSYS (\~3.36 MB). Most likely collision source — exercised frequently and installed at the MSYS-default layout. Reversible via the Git-for-Windows installer.
+2. **AI Playground portable-git** at `C:\Users\mrbla\AppData\Local\Programs\AI Playground\resources\portable-git\usr\bin\`. Near-identical MSYS build (\~3.36 MB, same upstream family as Git for Windows per matching byte sizes). Not on BlarAI's critical path. Reversible via AI Playground reinstall.
 
 **Out of scope** (do NOT rebase these):
 
-3. **PyCharm bundled** at `C:\Program Files\JetBrains\PyCharm 2025.3.2\plugins\cwm-plugin\msys-ssh-agent\`. Non-standard MSYS (~19.57 MB — significantly larger than stock, indicating a patched/embedded build). Lives inside JetBrains's Code With Me plugin's ssh-agent subsystem. `rebaseall`'s DLL database may not match this non-standard layout; a failed rebase could break PyCharm's Code With Me SSH connectivity and require a targeted plugin reinstall to recover.
-4. **GitHub Desktop bundled** at `C:\Users\mrbla\AppData\Local\GitHubDesktop\app-3.5.3\resources\app\git\usr\bin\`. Non-standard MSYS (~19.88 MB, Electron-app-embedded). GitHub Desktop auto-updates frequently; a `rebaseall`-modified msys-2.0.dll could fail the next update's DLL integrity check and leave GitHub Desktop unable to launch.
+3. **PyCharm bundled** at `C:\Program Files\JetBrains\PyCharm 2025.3.2\plugins\cwm-plugin\msys-ssh-agent\`. Non-standard MSYS (\~19.57 MB — significantly larger than stock, indicating a patched/embedded build). Lives inside JetBrains's Code With Me plugin's ssh-agent subsystem. `rebaseall`'s DLL database may not match this non-standard layout; a failed rebase could break PyCharm's Code With Me SSH connectivity and require a targeted plugin reinstall to recover.
+4. **GitHub Desktop bundled** at `C:\Users\mrbla\AppData\Local\GitHubDesktop\app-3.5.3\resources\app\git\usr\bin\`. Non-standard MSYS (\~19.88 MB, Electron-app-embedded). GitHub Desktop auto-updates frequently; a `rebaseall`-modified msys-2.0.dll could fail the next update's DLL integrity check and leave GitHub Desktop unable to launch.
 
-**Distinguishing criterion**: **~3.36 MB** msys-2.0.dll = standard MSYS layout, safe for `rebaseall`. **~19 MB** msys-2.0.dll = patched/embedded build bundled into a host app, safer to recover via the app's own reinstall path if it's ever implicated. If a future incident log entry needs PyCharm or GitHub Desktop rebased, use each app's native reinstall first; `rebaseall` on their DLLs is a last resort.
+**Distinguishing criterion**: **\~3.36 MB** msys-2.0.dll = standard MSYS layout, safe for `rebaseall`. **\~19 MB** msys-2.0.dll = patched/embedded build bundled into a host app, safer to recover via the app's own reinstall path if it's ever implicated. If a future incident log entry needs PyCharm or GitHub Desktop rebased, use each app's native reinstall first; `rebaseall` on their DLLs is a last resort.
 
 ### 8.2 Procedure
 
@@ -221,9 +221,9 @@ Only rebase installations that are **standard MSYS layouts AND low blast-radius 
    cd /d "C:\Program Files\Git\usr\bin"
    bash.exe /usr/bin/rebaseall -v
    ```
-   Historical note: older MSYS2/Cygwin references used `ash.exe` here because `ash` is statically linked and couldn't self-lock `msys-2.0.dll` during rebase. Modern Git for Windows (~2022+) omits `ash.exe` entirely; `bash.exe` runs the same `rebaseall` script fine because modern `rebase.exe` writes to disk rather than locking the in-memory DLL. Using `bash.exe` is the canonical invocation on current installs.
+   Historical note: older MSYS2/Cygwin references used `ash.exe` here because `ash` is statically linked and couldn't self-lock `msys-2.0.dll` during rebase. Modern Git for Windows (\~2022+) omits `ash.exe` entirely; `bash.exe` runs the same `rebaseall` script fine because modern `rebase.exe` writes to disk rather than locking the in-memory DLL. Using `bash.exe` is the canonical invocation on current installs.
 
-   ~30 seconds. Each DLL's new base address prints as `/path/dll: new base = 0xNNNNNNNN, new size = 0xNN`. No errors = success. Capture any errors to §12.
+   \~30 seconds. Each DLL's new base address prints as `/path/dll: new base = 0xNNNNNNNN, new size = 0xNN`. No errors = success. Capture any errors to §12.
 4. **Then rebase AI Playground's portable-git**:
    ```cmd
    cd /d "C:\Users\mrbla\AppData\Local\Programs\AI Playground\resources\portable-git\usr\bin"
@@ -272,7 +272,7 @@ R4 rolls Windows system state (registry, drivers, OS files) back to a snapshot p
 2. Start menu → type **"Create a restore point"** → Enter. Opens System Properties → System Protection tab.
 3. Click **"System Restore..."** → Next. Check **"Show more restore points"** (bottom-left) to reveal auto-generated ones.
 4. Select the most recent restore point **dated before the last known-good D3 pass**. For the 2026-04-19 incident, that means before today's R2 reboot (ideally a restore point from 2026-04-18 or earlier).
-5. Next → Finish → Yes. Windows reboots and restores (~5–15 minutes).
+5. Next → Finish → Yes. Windows reboots and restores (\~5–15 minutes).
 6. After reboot, verify host MSYS is healthy via `cmd.exe`:
    ```cmd
    bash.exe -c "echo parent-ok; bash -c 'echo child-ok'"
@@ -357,7 +357,7 @@ Start a new Claude Code session and paste this hand-off prompt, filling the `[..
 - Host Git Bash fork test (D3): **PASSED** (parent-ok / child-ok / exit 0). Host MSYS healthy.
 - MSYS DLL inventory (D2): 4 non-Claude installs present; none implicated.
 - Claude install (D4): MSIX `Claude_1.3109.0.0_x64__pzs8sxrjxfjjc`, sideloaded from Anthropic direct (not Store).
-- Transient sub-folder `%APPDATA%\Claude\claude-code\2.1.111\` present in an early process-list diagnostic, then absent ~10 minutes later. Consistent with an auto-update that cleaned the old staging folder but did not fully activate the new version. Strongest single evidence pointing at MSIX-bundled-bash as the fault site.
+- Transient sub-folder `%APPDATA%\Claude\claude-code\2.1.111\` present in an early process-list diagnostic, then absent \~10 minutes later. Consistent with an auto-update that cleaned the old staging folder but did not fully activate the new version. Strongest single evidence pointing at MSIX-bundled-bash as the fault site.
 
 **Hypotheses considered and ruled out**:
 - *"Git for Windows reinstall will fix it"* — the Lead Architect had reinstalled Git for Windows prior to this session (3/23/2026), believing it resolved F-3. Not so: Git for Windows and Claude Desktop bundle separate MSYS DLLs. Host MSYS was healthy per D3, but Claude's bundled MSYS was broken.
@@ -367,7 +367,7 @@ Start a new Claude Code session and paste this hand-off prompt, filling the `[..
 **Resolution attempted**:
 1. Procedure R1 (full cold reboot) — **did NOT fix**. Fork errors persisted unchanged after a complete power cycle.
 2. Procedure R2 (clean MSIX reinstall) — **did NOT fix**. MSIX uninstalled per R2.3, system rebooted, Claude Desktop reinstalled from Anthropic direct download per R2.4. A fresh Claude Code session launched post-reinstall exhibits the identical `dofork child -1 / 0xC0000142 / errno 11` signature on a trivial `echo test` invocation (verified by the successor Configuration Agent session's Bash tool test, immediately before this amendment). The "MSIX-bundled-bash is itself malformed" hypothesis is therefore refuted — the fault survives a full package reinstall. Failure mode is driven by something at host level (DLL address collision, Defender hook injection, or an unrelated bundled MSYS install claiming overlapping load addresses) that the reinstalled Claude-bundled bash still meets on fork.
-3. Procedure R3 (host `rebaseall` across Git for Windows + AI Playground per §8.1 scope) — first command attempt 2026-04-19 used `ash.exe` per legacy runbook guidance, which is not present in this machine's Git for Windows install (`'ash.exe' is not recognized as an internal or external command`). Runbook §8.2 corrected mid-session to specify `bash.exe` as the canonical runner — modern Git for Windows (~2022+) omits `ash.exe` entirely because modern `rebase.exe` writes new preferred addresses to disk rather than locking DLLs in memory, so the static-shell requirement no longer applies. §8.2.1 added to cover the edge case where `bash.exe` is also missing (MinGit or corrupt install).
+3. Procedure R3 (host `rebaseall` across Git for Windows + AI Playground per §8.1 scope) — first command attempt 2026-04-19 used `ash.exe` per legacy runbook guidance, which is not present in this machine's Git for Windows install (`'ash.exe' is not recognized as an internal or external command`). Runbook §8.2 corrected mid-session to specify `bash.exe` as the canonical runner — modern Git for Windows (\~2022+) omits `ash.exe` entirely because modern `rebase.exe` writes new preferred addresses to disk rather than locking DLLs in memory, so the static-shell requirement no longer applies. §8.2.1 added to cover the edge case where `bash.exe` is also missing (MinGit or corrupt install).
 4. R3 retry 2026-04-19 with `bash.exe /usr/bin/rebaseall -v` — **BOTH Git for Windows AND AI Playground exhibited the IDENTICAL `dofork child -1 / 0xC0000142 / errno 11` signature as Claude-bundled bash.** `rebaseall` itself could not fork, so no DLL was actually rebased. This is a **scope-change finding**: host MSYS fork has gone from D3-PASSED earlier the same day to D3-FAILED system-wide. **F-3 is no longer a Claude-bundled-bash-only failure; every MSYS bash on the machine now fails to fork.** Between the D3 pass and this attempt, the only system-state change was R2's reboot cycle — Windows likely applied an Update or toggled a security mitigation during reboot. All subsequent runbook procedures (R3 rebase, Defender exclusion at §11.1, PyCharm/GitHub Desktop rebase) were designed for Claude-bundled-only scope and no longer apply as-written.
 5. Procedure R4 (System Restore to a pre-R2-reboot snapshot) — **PENDING Lead Architect execution.** See §8.4 below.
 
@@ -404,7 +404,7 @@ This **supersedes** the §2 "single-DLL collision" hypothesis and the §8.1 "reb
 1. Stopped the Claude VS Code extension process (PID 10444 on this incident).
 2. Elevated PowerShell: `Set-ProcessMitigation -System -Disable ForceRelocateImages` → verified `ForceRelocateImages: OFF`.
 3. **Cold reboot.** Post-reboot bash fork stability climbed from 0/10 to 9/10 (one residual `child_copy: cygheap read copy failed`).
-4. Attempted elevated `dash.exe /usr/bin/rebaseall -v` to consolidate. Run rebased ~150 DLLs successfully, then dash itself hit a fork failure mid-run; on retry hit `rebase: Too many DLLs for available address space: Cannot allocate memory` — the default rebase address window is exhausted by Git for Windows' DLL count. Partial rebase persisted to disk regardless.
+4. Attempted elevated `dash.exe /usr/bin/rebaseall -v` to consolidate. Run rebased \~150 DLLs successfully, then dash itself hit a fork failure mid-run; on retry hit `rebase: Too many DLLs for available address space: Cannot allocate memory` — the default rebase address window is exhausted by Git for Windows' DLL count. Partial rebase persisted to disk regardless.
 5. Stability snapshot post-partial-rebase: 12/20 PASS (60%) — confirming `BottomUp` ASLR is still randomizing per-process bases.
 6. Elevated PowerShell: `Set-ProcessMitigation -System -Disable BottomUp` → verified `BottomUp: OFF`. (Mitigation only takes effect for new process trees post-reboot.)
 7. Stability snapshot pre-reboot, BottomUp OFF: 22/30 PASS (73%) — improvement from inherited mitigation policy in some new processes.

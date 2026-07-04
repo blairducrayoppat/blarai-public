@@ -77,5 +77,5 @@ Exit criterion: Phase 6 (Phases 1–5 nothing to do). Clean exit.
 
 ## Next firing
 
-- Normal ~15-min co_lead_architect wake cadence.
+- Normal \~15-min co_lead_architect wake cadence.
 - If LA acts on Fleet Reports #134 or #148 (APPROVE via `la_merge_approve.ps1`) before the next wake, the next firing will see merges landed on main and Phase 3b should then return a `NextTaskContinuation` for the next milestone authoring (Task 82 EA-2 via SDO, not a Co-Lead continuation transition yet — succession only fires at sprint boundaries, not EA boundaries).

@@ -35,21 +35,21 @@ This analysis cross-references five data sources (OpenVINO GenAI supported model
 | CPU | Intel Core Ultra 7 258V (Lunar Lake) |
 | iGPU | Arc 140V (Xe2 Battlemage), 8 Xe Cores, 1950 MHz boost |
 | Memory | 32 GB LPDDR5X-8533, dual-channel, **unified** (shared CPU/GPU) |
-| Memory Bandwidth | ~136.5 GB/s theoretical, ~62-73 GB/s effective GPU utilization (derived from 7B benchmarks) |
+| Memory Bandwidth | \~136.5 GB/s theoretical, \~62-73 GB/s effective GPU utilization (derived from 7B benchmarks) |
 | Effective Ceiling | 31,323 MB (32,074.8 MB - 693 MB firmware) per ADR-005 |
 | NPU | Intel AI Boost — **DEPRIORITIZED** for LLM inference |
 
 ### Memory Budget (Production Runtime)
 | Tier | Value (MB) | Notes |
 |------|-----------|-------|
-| OS + Services (production) | ~13,000 | Dev-time 18,006 minus IDE/browser/editor |
+| OS + Services (production) | \~13,000 | Dev-time 18,006 minus IDE/browser/editor |
 | Hyper-V Root Partition | 512 | Hypervisor overhead |
 | BlarAI-Orchestrator VM | 2,048 | 2 GB assigned RAM |
 | VM Management Overhead | 256 | Per-VM overhead |
-| **Subtotal (fixed)** | **~15,816** | |
-| **Available for LLM Agents** | **~15,507** | Ceiling - fixed overhead |
+| **Subtotal (fixed)** | **\~15,816** | |
+| **Available for LLM Agents** | **\~15,507** | Ceiling - fixed overhead |
 
-**Critical Constraint:** On a unified memory iGPU, there is no separate VRAM budget. All model weights, KV-caches, and runtime buffers consume system memory directly. The ~15.5 GB available budget is the **hard ceiling** for all agent memory combined.
+**Critical Constraint:** On a unified memory iGPU, there is no separate VRAM budget. All model weights, KV-caches, and runtime buffers consume system memory directly. The \~15.5 GB available budget is the **hard ceiling** for all agent memory combined.
 
 ---
 
@@ -125,9 +125,9 @@ OpenVINO INT4_ASYM with `group_size=128` (per notebook reference for Qwen3):
 - 4 bits per weight
 - FP16 scale per group: 16 bits / 128 weights = 0.125 bits/weight
 - u4 zero-point per group: 4 bits / 128 = 0.03125 bits/weight
-- **Total: ~4.16 bits/weight ≈ 0.52 bytes/weight**
+- **Total: \~4.16 bits/weight ≈ 0.52 bytes/weight**
 
-Cross-validated against: Qwen3-1.7B measured at 1,014 MB (from ADR-006 addendum). 1.7B × 0.52 = 884 MB weights + ~130 MB overhead → 1,014 MB. ✅ Consistent.
+Cross-validated against: Qwen3-1.7B measured at 1,014 MB (from ADR-006 addendum). 1.7B × 0.52 = 884 MB weights + \~130 MB overhead → 1,014 MB. ✅ Consistent.
 
 ### 5.2 KV-Cache Estimation
 
@@ -150,14 +150,14 @@ Formula: **Weight_file + 3 × KV_cache(4K) + Runtime_overhead**
 
 | Model | Weights (MB) | 3× KV @ 4K (MB) | Runtime (MB) | **Total (MB)** | Available (MB) | **Headroom** | **Feasible?** |
 |-------|-------------|-----------------|-------------|---------------|---------------|-------------|--------------|
-| Qwen3-30B-A3B | ~16,100 | 1,152 | 500 | **17,752** | 15,507 | **-2,245** | ❌ **NO** |
-| Qwen3-14B | ~7,700 | 1,920 | 400 | **10,020** | 15,507 | **5,487 (35%)** | ✅ YES |
-| Qwen3-8B | ~4,260 | 1,728 | 300 | **6,288** | 15,507 | **9,219 (59%)** | ✅ YES |
-| Qwen2.5-14B-Inst | ~7,700 | 1,920 | 400 | **10,020** | 15,507 | **5,487 (35%)** | ✅ YES |
-| Qwen2.5-7B-Inst | ~3,950 | 672 | 300 | **4,922** | 15,507 | **10,585 (68%)** | ✅ YES |
-| Phi-4 | ~7,600 | 2,400 | 400 | **10,400** | 15,507 | **5,107 (33%)** | ✅ YES |
-| DS-R1-D-14B | ~7,700 | 1,920 | 400 | **10,020** | 15,507 | **5,487 (35%)** | ✅ YES |
-| GLM-4-9B | ~4,900 | 480 | 350 | **5,730** | 15,507 | **9,777 (63%)** | ✅ YES |
+| Qwen3-30B-A3B | \~16,100 | 1,152 | 500 | **17,752** | 15,507 | **-2,245** | ❌ **NO** |
+| Qwen3-14B | \~7,700 | 1,920 | 400 | **10,020** | 15,507 | **5,487 (35%)** | ✅ YES |
+| Qwen3-8B | \~4,260 | 1,728 | 300 | **6,288** | 15,507 | **9,219 (59%)** | ✅ YES |
+| Qwen2.5-14B-Inst | \~7,700 | 1,920 | 400 | **10,020** | 15,507 | **5,487 (35%)** | ✅ YES |
+| Qwen2.5-7B-Inst | \~3,950 | 672 | 300 | **4,922** | 15,507 | **10,585 (68%)** | ✅ YES |
+| Phi-4 | \~7,600 | 2,400 | 400 | **10,400** | 15,507 | **5,107 (33%)** | ✅ YES |
+| DS-R1-D-14B | \~7,700 | 1,920 | 400 | **10,020** | 15,507 | **5,487 (35%)** | ✅ YES |
+| GLM-4-9B | \~4,900 | 480 | 350 | **5,730** | 15,507 | **9,777 (63%)** | ✅ YES |
 
 ---
 
@@ -210,22 +210,22 @@ MoE models trade compute efficiency for memory capacity. On discrete GPUs with 2
 - Apache-2.0 license, 1.2M+ monthly downloads
 
 ### Memory Fit
-- INT4 weight file: ~7,700 MB
+- INT4 weight file: \~7,700 MB
 - Unified scenario (3 × 4K KV): **10,020 MB total, 35% headroom**
-- Headroom supports context expansion study (4K → 8K adds ~1,920 MB → still fits at ~11,940 MB, 23% headroom)
+- Headroom supports context expansion study (4K → 8K adds \~1,920 MB → still fits at \~11,940 MB, 23% headroom)
 
 ### Throughput Estimation
 From benchmark CSV extrapolation (7B INT4 models achieve 17-20 tps on this hardware):
-- 14.8B is ~2× the 7B parameter count → ~2× per-token memory read
+- 14.8B is \~2× the 7B parameter count → \~2× per-token memory read
 - Per-token read: 14.8B × 0.52 bytes ≈ 7.7 GB
-- Effective GPU bandwidth: ~62-73 GB/s (derived from 7B benchmark data)
+- Effective GPU bandwidth: \~62-73 GB/s (derived from 7B benchmark data)
 - **Extrapolated throughput: 8.0-9.5 tps**
 - Meets USE-CASE-005 requirement of ≥8 tps, but at the **lower bound**
 
 ### Throughput Enhancement: EAGLE-3 Speculative Decoding
 - OV 2026.0 validated for Qwen3-8B; **not yet validated for Qwen3-14B** (risk factor)
 - If validated: 2-3× improvement → **16-28 tps** (comfortable margin)
-- Draft model (e.g., Qwen3-0.6B at ~400 MB) + small KV overhead → ~10,500-11,000 MB total → still fits
+- Draft model (e.g., Qwen3-0.6B at \~400 MB) + small KV overhead → \~10,500-11,000 MB total → still fits
 - Recommendation: validate EAGLE-3 for Qwen3-14B empirically after model acquisition
 
 ### Quality Assessment (from HuggingFace benchmarks)
@@ -308,18 +308,18 @@ USE-CASE-005 specification (from Use Cases_FINAL.md, lines 253-380):
 |--------|-------|-------------------------|------|
 | Model class | 14B dense | 14B-class dense | ✅ |
 | Quantization | INT4_ASYM | Q4_K_M equivalent | ✅ |
-| Weight memory | ~7,700 MB | 8-9 GB VRAM | ✅ |
-| Total memory (unified, 3× 4K KV) | ~10,020 MB | 12-14 GB total during active synthesis | ✅ |
+| Weight memory | \~7,700 MB | 8-9 GB VRAM | ✅ |
+| Total memory (unified, 3× 4K KV) | \~10,020 MB | 12-14 GB total during active synthesis | ✅ |
 | Throughput | 8-9.5 tps (extrapolated) | ≥8 tok/s | ✅ (lower bound) |
-| Cold-start | ~8-12s (estimated for 7.7 GB model load) | ≤15s | ✅ |
+| Cold-start | \~8-12s (estimated for 7.7 GB model load) | ≤15s | ✅ |
 | Warm-start (mmap hot) | <1s | ≤3s | ✅ |
 
 **Advantages of Unified Approach:**
-1. **Zero-copy mmap weight sharing** — one weight file serves all three agents. Only KV-caches are separate (~640 MB each at 4K context). This is the most memory-efficient architecture possible.
+1. **Zero-copy mmap weight sharing** — one weight file serves all three agents. Only KV-caches are separate (\~640 MB each at 4K context). This is the most memory-efficient architecture possible.
 2. **Operational simplicity** — one model to acquire, quantize, validate, and maintain.
 3. **No degradation cascade complexity** — PA and AO continue operating while Code Agent processes. No model swapping needed.
-4. **Context expansion headroom** — ~5,487 MB remaining supports future expansion from 4K to 8K context (adds ~1,920 MB → 23% headroom remains).
-5. **EAGLE-3 path** — if validated for 14B, a single draft model (Qwen3-0.6B) serves all agents → ~16-28 tps.
+4. **Context expansion headroom** — \~5,487 MB remaining supports future expansion from 4K to 8K context (adds \~1,920 MB → 23% headroom remains).
+5. **EAGLE-3 path** — if validated for 14B, a single draft model (Qwen3-0.6B) serves all agents → \~16-28 tps.
 
 **Risks:**
 - Throughput at lower bound (8-9.5 tps) without EAGLE-3. May feel sluggish for interactive code synthesis.
@@ -332,10 +332,10 @@ USE-CASE-005 specification (from Use Cases_FINAL.md, lines 253-380):
 
 | Phase | Model Loaded | Memory | Throughput |
 |-------|-------------|--------|------------|
-| Normal ops (PA + AO active) | Qwen3-8B (shared weights, 2× KV) | ~5,412 MB | 14-17 tps |
-| Code synthesis (exclusive) | Qwen3-14B (1× KV) | ~8,740 MB | 8-9.5 tps |
-| Transition (cold swap) | Qwen3-8B evicted, 14B loaded | ~10-15s | — |
-| Transition (warm/mmap) | mmap page-in | ~3-5s | — |
+| Normal ops (PA + AO active) | Qwen3-8B (shared weights, 2× KV) | \~5,412 MB | 14-17 tps |
+| Code synthesis (exclusive) | Qwen3-14B (1× KV) | \~8,740 MB | 8-9.5 tps |
+| Transition (cold swap) | Qwen3-8B evicted, 14B loaded | \~10-15s | — |
+| Transition (warm/mmap) | mmap page-in | \~3-5s | — |
 
 **Advantages:**
 - PA+AO get higher throughput (14-17 tps vs 8-9.5) during normal operation
@@ -401,7 +401,7 @@ The ≥8 tps requirement for USE-CASE-005 is extrapolated, not measured. Before 
 | Framework | OpenVINO 2026.0 GPU plugin |
 | Weight sharing | Zero-copy mmap across all agent instances |
 | KV-caches | 3 separate (one per agent), 4,096 tokens each |
-| Est. total memory | ~10,020 MB (35% headroom) |
+| Est. total memory | \~10,020 MB (35% headroom) |
 | Est. throughput | 8-9.5 tps baseline; 16-28 tps with EAGLE-3 |
 | Context | 4,096 initially, expandable to 8K with remaining headroom |
 
@@ -412,7 +412,7 @@ Activate if Qwen3-14B empirical throughput < 8 tps OR memory exceeds projections
 | Decision | Value |
 |----------|-------|
 | Model | Qwen3-8B |
-| Est. total memory | ~6,288 MB (59% headroom) |
+| Est. total memory | \~6,288 MB (59% headroom) |
 | Est. throughput | 14-17 tps baseline; 28-50 tps with EAGLE-3 (validated) |
 | Trade-off | Noticeable quality reduction in coding tasks. Excellent throughput headroom. |
 
@@ -427,7 +427,7 @@ Activate if Qwen3-14B empirical throughput < 8 tps OR memory exceeds projections
 | R3 | EAGLE-3 not validated for Qwen3-14B | Medium | Medium | Test empirically. If incompatible, accept 8-9.5 tps baseline or fall back to 8B with validated EAGLE-3. |
 | R4 | Memory exceeds estimate due to OV runtime overhead | Low | High | Empirical measurement during validation. 35% headroom provides buffer. |
 | R5 | Model swap time for Code Agent exclusive tier (Angle 2 only) | N/A (Angle 1 selected) | — | Not applicable under unified model recommendation. |
-| R6 | Future context expansion (>4K) exceeds memory budget | Low | Medium | At 8K: 11,940 MB (23% headroom). At 16K: ~13,860 MB (10% headroom — marginal). |
+| R6 | Future context expansion (>4K) exceeds memory budget | Low | Medium | At 8K: 11,940 MB (23% headroom). At 16K: \~13,860 MB (10% headroom — marginal). |
 
 ---
 
@@ -442,7 +442,7 @@ The P5-FEASIBILITY-004 session recommended **Qwen2.5-7B-Instruct** as the unifie
 | Agentic/tool-calling | Basic | ✅ Native, BFCL-validated |
 | Coding quality (LiveCodeBench) | Moderate | Strong |
 | General quality | Good (7B-class) | Excellent (matches 72B-class on some tasks) |
-| Memory | ~4,922 MB (68% headroom) | ~10,020 MB (35% headroom) |
+| Memory | \~4,922 MB (68% headroom) | \~10,020 MB (35% headroom) |
 | Throughput | 17-20 tps | 8-9.5 tps (meets minimum) |
 | USE-CASE-005 suitability | ≥8 tps at 7B quality | ≥8 tps at 14B quality |
 

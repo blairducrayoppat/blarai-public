@@ -218,7 +218,7 @@ You start each active burst at the **Fleet Dashboard** (Vikunja Project 7). Summ
    - The option's script updates Vikunja labels + comments automatically; no manual relabeling required.
 6. Return to the dashboard. Refresh. The Pending-Human count should have decremented.
 
-Target cadence: ~30 seconds per one-click decision. If something needs strategic deliberation, use the `defer` action to punt to your next active burst.
+Target cadence: \~30 seconds per one-click decision. If something needs strategic deliberation, use the `defer` action to punt to your next active burst.
 
 ---
 
@@ -269,7 +269,7 @@ Co-Lead produces these after the EA→SDO→Co-Lead ladder reaches consensus.
    - One-click: **APPROVE** / **REJECT** / **DEFER** / **HALT**.
 3. Paste your chosen action. APPROVE runs the merge immediately and closes the gate.
 
-Target budget: ≤ 5 merge reviews per week, ~15 min each per DEC-11 §1.1 Lead Architect row.
+Target budget: ≤ 5 merge reviews per week, \~15 min each per DEC-11 §1.1 Lead Architect row.
 
 ---
 
@@ -648,7 +648,7 @@ Either ask Claude in English (*"show me agent status"*, *"pause the agents"*, *"
 |---|---|---|
 | Mechanism | Disables the scheduled tasks themselves | Sets `fleet_paused=true` flag in `state.json` |
 | Wake-up sessions fire? | No — scheduler never launches them | Yes — session launches, reads flag, exits |
-| API token cost while paused | Zero | ~1 tiny firing-exit per 15-min per agent (non-zero) |
+| API token cost while paused | Zero | \~1 tiny firing-exit per 15-min per agent (non-zero) |
 | Records a reason string? | No | Yes (`state.json` captures caller + reason) |
 | Generates firing-exit reports? | No | Yes (each skipped firing emits a report) |
 | Best for | Vacation, off-hours, between sprints | Mid-sprint pause where you want auditable reason + firing-exit trail |

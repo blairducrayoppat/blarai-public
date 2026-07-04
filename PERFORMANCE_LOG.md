@@ -141,11 +141,11 @@ Harness: `scripts/benchmark_embedding_device.py` (reproducible, committed).
 | case | CPU (ORT, prior default) | GPU (OV dynamic) | NPU (OV static) |
 |------|-------------------------:|-----------------:|----------------:|
 | single short @128 | 7.0 | 1.5 | 5.6 |
-| single long (~420 words) @512 | 168.9 | 7.5 | 12.4 |
+| single long (\~420 words) @512 | 168.9 | 7.5 | 12.4 |
 | batch-8 @128 | 49.4 | 3.2 | 23.1 |
 | batch-32 @128 | 186.0 | 6.9 | 85.6 |
 | batch-8 short-texts @512 | 52.0 | 2.9 | 78.2 |
-| load/compile (s) | 8.5 | 2.2 | 12.1 cold / ~2.5 blob-cached |
+| load/compile (s) | 8.5 | 2.2 | 12.1 cold / \~2.5 blob-cached |
 | load RSS delta (MB) | 522 | 408 | 228 |
 | min cosine parity vs CPU | — | 1.000000 | 0.999996 |
 
@@ -158,7 +158,7 @@ CPU numerics carry over). Its one loss — short texts padded to the 512
 window (78 vs 52 ms) — is a padding artifact; real 512-window inputs are
 long chunks, where the NPU wins 13.6x. The static-compile boot cost (12.1 s
 cold) is amortized by a compiled-blob cache under
-`%LOCALAPPDATA%/BlarAI/ov_cache/embeddings` (~2.5 s warm, measured; the 14B
+`%LOCALAPPDATA%/BlarAI/ov_cache/embeddings` (\~2.5 s warm, measured; the 14B
 deliberately runs uncached because its 9 GB blob cold-reads as slowly as a
 fresh compile — a 128 MB encoder is the opposite case).
 
@@ -188,7 +188,7 @@ variant, corpus-level Whisper WER, sustained/thermal behaviour.
 First long-context (16K/32K) **KV-cache precision** sweep for the 14B on the Arc
 140V, and the entry that a broken first attempt (Vikunja #709) forced us to earn.
 The original sweep copied the production `SchedulerConfig` (`cache_size = 3` GB),
-which starves the KV cache at long context — Qwen3-14B needs ~160 KiB/token of KV
+which starves the KV cache at long context — Qwen3-14B needs \~160 KiB/token of KV
 at FP16 (2 x 40 layers x 8 KV-heads x 128 head_dim x 2 bytes), so 32K needs 5.0
 GiB and does not fit in 3, forcing block eviction + prefill recompute (TTFT 310s,
 wild variance). The new harness (`scripts/benchmark_kv_cache_sweep.py`) sizes
@@ -226,13 +226,13 @@ duration).
 **The memory lever** is the KV footprint itself: INT8 halves it, INT4 quarters it
 (5.0 / 2.5 / 1.25 GiB at 32K) — measured analytically from geometry; the reserved
 KV pool shows as `cl_mem` in `GPU_MEMORY_STATISTICS` (tracking `cache_size` to the
-byte), model weights as `usm_host` (~7.9 GiB). On this shared-LPDDR5X iGPU
-`usm_device` stays ~0; host system-RAM is only a coarse whole-footprint proxy.
+byte), model weights as `usm_host` (\~7.9 GiB). On this shared-LPDDR5X iGPU
+`usm_device` stays \~0; host system-RAM is only a coarse whole-footprint proxy.
 
 **Two fanless-chip thermal tells, documented honestly:**
 1. **Cold-start ramp** — from idle the iGPU downclocks hard; the first 1-2 heavy
-   prefills run slow (~131s at 16K) while the clock ramps and first-run kernels
-   compile, then it snaps to the warm plateau (~46s). This is why the harness
+   prefills run slow (\~131s at 16K) while the clock ramps and first-run kernels
+   compile, then it snaps to the warm plateau (\~46s). This is why the harness
    warms to plateau before measuring. (An earlier hypothesis that a slow first
    combo was *residual heat* was wrong — the warm-up ramp gets *faster*, not
    slower, which only fits a cold-clock/first-run effect.)
@@ -268,16 +268,16 @@ First community-grade numbers for the **dispatch asset generator** — the base-
 
 | metric | value |
 |---|---|
-| model load (est.) | ~34.8 s |
-| generate / image (1024²/30 steps) | ~59.9 s |
-| load + first generate | ~94.7 s |
+| model load (est.) | \~34.8 s |
+| generate / image (1024²/30 steps) | \~59.9 s |
+| load + first generate | \~94.7 s |
 | RAM used before | 8.8 GiB |
 | RAM peak (standalone, no 14B) | 18.7 GiB |
-| output PNG | 1024×1024, ~812 KB |
+| output PNG | 1024×1024, \~812 KB |
 
-**Not measured here (named honestly):** 14B co-residence — this standalone generate runs WITHOUT the resident 14B. The 14B+SDXL **co-resident** peak (~26.0 GB, 5.3 GB headroom) is the ADR-033 §Memory Phase-0 record (`docs/performance/image_gen_phase0_2026-06-16.json`); SEAM A runs in that envelope (base 1024² keeps the 14B). VLM/voice co-residence not measured. The image-model + 30B-coder co-residence is FORBIDDEN by design (32.5 GB breach) — which is why SEAM A generates pre-swap. Machine-readable: `docs/performance/uc010_dispatch_asset_gen_2026-06-30.json`.
+**Not measured here (named honestly):** 14B co-residence — this standalone generate runs WITHOUT the resident 14B. The 14B+SDXL **co-resident** peak (\~26.0 GB, 5.3 GB headroom) is the ADR-033 §Memory Phase-0 record (`docs/performance/image_gen_phase0_2026-06-16.json`); SEAM A runs in that envelope (base 1024² keeps the 14B). VLM/voice co-residence not measured. The image-model + 30B-coder co-residence is FORBIDDEN by design (32.5 GB breach) — which is why SEAM A generates pre-swap. Machine-readable: `docs/performance/uc010_dispatch_asset_gen_2026-06-30.json`.
 
-**Read:** 30 steps at ~2 s/step is the honest cost of the quality-tuned EULER_ANCESTRAL config; a draft-quality dispatch asset can drop steps (the config knob) to trade fidelity for speed. The generated cartoon elephant — a real raster, coherent subject on a clean solid background — is the SEAM-A "after" that replaces the hand-drawn inline `<svg>`.
+**Read:** 30 steps at \~2 s/step is the honest cost of the quality-tuned EULER_ANCESTRAL config; a draft-quality dispatch asset can drop steps (the config knob) to trade fidelity for speed. The generated cartoon elephant — a real raster, coherent subject on a clean solid background — is the SEAM-A "after" that replaces the hand-drawn inline `<svg>`.
 
 ### 2026-06-29 — Co-residency on 2026.2.1: the pattern holds — a resident 14B still loses its iGPU to a generating roommate
 
@@ -293,21 +293,21 @@ sustained contention, with foreground Intel UT. All four pairings **fit** under 
 | SDXL photoreal | 18.5 → 18.4 → **0.1 tok/s (1%)** | 27.05 GiB | 4.27 |
 | SDXL illustration | 19.0 → 18.4 → **0.1 (1%)** | 26.91 GiB | 4.42 |
 | SDXL cartoon (LoRA) | 17.7 → 19.0 → **2.5 (14%)** | 28.82 GiB | 2.50 |
-| Qwen3-VL-8B | ~18 → ~18 → **2.0 (10%)** | 25.00 GiB | 6.32 |
+| Qwen3-VL-8B | \~18 → \~18 → **2.0 (10%)** | 25.00 GiB | 6.32 |
 
-The story is unchanged: **idle co-residence is ~free** (the resident 14B keeps full
+The story is unchanged: **idle co-residence is \~free** (the resident 14B keeps full
 throughput while a partner sits loaded), but **concurrent generation saturates the
 iGPU and starves the 14B.** The mechanism, from the UT telemetry (photoreal): under
 contention GPU-busy → **99.99%** while memory-read bandwidth *drops* (66 → 18.9
 GB/s) — the exhausted resource is **compute scheduling, not bandwidth or clock**
-(core stays ~1948 MHz). Compute-bound SDXL diffusion stalls the 14B to ~1%; the
-bandwidth-bound VLM leaves it ~10%; the cartoon LoRA's CPU-side overhead leaves
-scheduling gaps so the 14B retains ~14% (read as "mildest pressure," partly a
+(core stays \~1948 MHz). Compute-bound SDXL diffusion stalls the 14B to \~1%; the
+bandwidth-bound VLM leaves it \~10%; the cartoon LoRA's CPU-side overhead leaves
+scheduling gaps so the 14B retains \~14% (read as "mildest pressure," partly a
 fixed-window spin-up artifact — a steady-state re-run is the cleaner number, open
-follow-up). GT-rail power ~9.3 W and SoC temp ~78 °C under contention; NPU 0 W.
+follow-up). GT-rail power \~9.3 W and SoC temp \~78 °C under contention; NPU 0 W.
 
 **Bandwidth unit caveat (unchanged, stated plainly):** UT reports
-`GPU_MEMORY_BYTE_*_RATE` with unit N/A; idle ~66, peak ~103–107 vs the ~136 GB/s
+`GPU_MEMORY_BYTE_*_RATE` with unit N/A; idle \~66, peak \~103–107 vs the \~136 GB/s
 LPDDR5X ceiling strongly implies GB/s but it is UNCONFIRMED. Per-run UT metrics:
 `docs/performance/coresident/ut_hardened/ut_{photoreal,illustration,cartoon,vlm}_r1.*`;
 harness JSONs `benchmark_coresident_*_2026-06-29_*.json`.
@@ -331,7 +331,7 @@ both versions back-to-back (pp = tokens/sec the model READS input at):
 | INT4 model | length | 2026.1.0 | 2026.2.1 | change |
 |---|---|---|---|---|
 | 14B | 512 | 595 | 761 | **+28%** (tight, std<10) |
-| 14B | 2048 | 426 | 747 | +75% (noisier, std ~60) |
+| 14B | 2048 | 426 | 747 | +75% (noisier, std \~60) |
 | 14B | 8192 | 277 | 388 | +40% |
 | 8B | 512 | 1086 | 1477 | **+36%** (tight) |
 | 8B | 2048 | 716 | 1106 | +54% (noisier) |
@@ -345,8 +345,8 @@ noisy sample; the dedicated harness confirms a real, if smaller, win. This is wh
 the prefill harness is now a standing companion measurement.)
 
 **The VLM is faster too (PR #3640).** Qwen3-VL-8B-Instruct INT4 on a fixed
-image+prompt: TTFT 201 → 162 ms (**~19% faster** on 2026.2.1), TPOT 63 → 47 ms,
-load ~7.8 → 7.4 s. The 2026.1.0 run was noisier on TPOT, so TTFT is the solid
+image+prompt: TTFT 201 → 162 ms (**\~19% faster** on 2026.2.1), TPOT 63 → 47 ms,
+load \~7.8 → 7.4 s. The 2026.1.0 run was noisier on TPOT, so TTFT is the solid
 claim. `vlm_perf_ov*_*.json`.
 
 **The 30B MoE accuracy flag has a real throughput price.** OVMS 2026.2 is unchanged
@@ -360,7 +360,7 @@ cost only" label:
 | flag ON (=0, accuracy) | 31.3 tok/s | 236 ms | 4/5 |
 | flag OFF (default) | 38.6 tok/s | 184 ms | 4/5 |
 
-The flag costs **~19% generation throughput AND ~28% TTFT**, and on a defined,
+The flag costs **\~19% generation throughput AND \~28% TTFT**, and on a defined,
 ground-truth coding eval at 2.2K-token context the two arms scored **identically
 (4/5, same answers)** — no measurable accuracy benefit at that scale (its documented
 benefit is on much longer repo-scale prompts this eval did not reach). Net: a
@@ -372,8 +372,8 @@ context to probe the regime where the flag is meant to help — a follow-up.)
 **KV-cache precision (u8 / u4) — the memory lever could NOT be quantified this way
 (honest null).** The GPU plugin accepts `u4` (confirmed) and `u8`. But sweeping
 {FP16, u8, u4} × {16K, 32K} on the 14B, peak shared-RAM (In-Use = Total − Available)
-was **flat at ~20.85 GB across every precision AND both context lengths**. If the
-KV cache were visible to host-RAM sampling, 32K would be ~2× the KV of 16K and u4
+was **flat at \~20.85 GB across every precision AND both context lengths**. If the
+KV cache were visible to host-RAM sampling, 32K would be \~2× the KV of 16K and u4
 well below FP16 — it wasn't. That is the signature of a load-time GPU memory pool
 that system "Available" sampling cannot resolve on this unified-memory iGPU. So the
 headline hypothesis (INT4-KV freeing RAM for the hires-SDXL path) is **unconfirmed**
@@ -389,8 +389,8 @@ the 14B at temp 0.8 already repeats little. A reasonable default IF sampling is 
 enabled. `minp_ab_*.json`.
 
 **SDXL (1024², 20 steps, 2026.2.1):** photoreal 30.0 s / 15.4 GB peak, illustration
-31.3 s / 15.2 GB, cartoon (DD-vector LoRA) 37.4 s / 16.8 GB (the LoRA adds ~6 s gen,
-~1.5 GB, ~17 s load). `sdxl_latency_2026-06-29_*.json`.
+31.3 s / 15.2 GB, cartoon (DD-vector LoRA) 37.4 s / 16.8 GB (the LoRA adds \~6 s gen,
+\~1.5 GB, \~17 s load). `sdxl_latency_2026-06-29_*.json`.
 
 **What is NOT measured / open:** the KV memory lever (method limitation, above); the
 MoE flag's accuracy benefit at 8K–32K context (eval too short); EAGLE-3 (conversion
@@ -419,7 +419,7 @@ Qwen3-14B INT4.** Median generation throughput, holding everything else constant
 |---|---|---|---|
 | spec-off (autoregressive) | 11.13 tok/s | 10.92 | flat (within run-to-run noise) |
 | spec-on (GPU draft, 0.6B-pruned-6L) | 17.07 tok/s | 17.20 | flat |
-| spec-on prefill (pp) | ~1308 | ~1881* | (pp is a single-token timing, high variance) |
+| spec-on prefill (pp) | \~1308 | \~1881* | (pp is a single-token timing, high variance) |
 | spec-on TTFT (median) | 470 ms | 468 ms | flat |
 
 Per-prompt medians are near-identical (e.g. spec-on p1/p2/p3 = 15.7/18.7/21.3
@@ -431,7 +431,7 @@ vs baseline 15.7/18.7/21.4). The comparable 2026.2.1 14B run is
 regression — but the cause was a couple of **browser windows open on the box**
 during that run. Speculative decoding is **compute-scheduling-bound**: the draft
 and target both contend for the iGPU's Xe scheduling, so a background GPU consumer
-(a browser compositor) knocks ~14% off spec-on while leaving the steady
+(a browser compositor) knocks \~14% off spec-on while leaving the steady
 autoregressive path untouched. Re-running on a quiet, dedicated machine restored
 spec-on to 17.20. The contaminated run is excluded from the comparable, but it is
 a clean little demonstration of *how* scheduling-sensitive spec-decode is — a free
@@ -449,7 +449,7 @@ num_assistant_tokens=3):
 
 | 14B spec-on | GPU draft | CPU draft |
 |---|---|---|
-| gen median (spine methodology) | 17.20 tok/s | 14.88 tok/s (~13% slower) |
+| gen median (spine methodology) | 17.20 tok/s | 14.88 tok/s (\~13% slower) |
 | draft acceptance (accepted/proposed) | 45.0 % | 45.1 % (identical) |
 | accepted / generated | 59.8 % | 59.8 % |
 | GT (graphics) rail power, decode | 6.8 W | 5.3 W |
@@ -459,8 +459,8 @@ num_assistant_tokens=3):
 **Acceptance is identical** because the draft device doesn't change *which* tokens
 a greedy draft+target pair propose and accept — only how fast the draft produces
 them; this is a useful consistency check (and it validates the acceptance probe).
-The CPU draft is ~13% slower with no acceptance benefit, and the telemetry shows
-why it's a *lose-lose*: it shifts ~1.5 W of draft compute off the graphics rail
+The CPU draft is \~13% slower with no acceptance benefit, and the telemetry shows
+why it's a *lose-lose*: it shifts \~1.5 W of draft compute off the graphics rail
 onto the CPU/package (package power up, SoC temp up) for *less* throughput. The
 bottleneck was never GPU-compute availability, so offloading the draft just adds
 CPU power and heat. **CPU-draft is a net loss on Arc 140V / Lunar Lake — keep the
@@ -476,9 +476,9 @@ accumulate per-run iGPU power / frequency / GPU-busy % / bandwidth over time. Th
 UT pass is *not* the comparable number (its capture overhead + shorter run lower
 throughput slightly — e.g. 16.8 vs 17.2 for the 14B); it is a labelled new
 series. **14B spec-on decode steady-state (GPU draft):** GT rail 6.8 W avg / 9.2 W
-1 s-peak, package 23.8 W / 30.5, GPU-busy ~89 %, core clock ~1925 MHz (peak 1949),
-GPU memory read ~67 GB/s (peak ~107 — unit reported N/A by UT, almost certainly
-GB/s vs the ~136 GB/s ceiling, **unconfirmed**), SoC temp 67.6 °C. NPU 0 W
+1 s-peak, package 23.8 W / 30.5, GPU-busy \~89 %, core clock \~1925 MHz (peak 1949),
+GPU memory read \~67 GB/s (peak \~107 — unit reported N/A by UT, almost certainly
+GB/s vs the \~136 GB/s ceiling, **unconfirmed**), SoC temp 67.6 °C. NPU 0 W
 (pure-GPU, ADR-011). Per-phase JSON: `ut_14b_specon_clean.{socwatch,l0}.metrics.json`.
 
 **What is NOT measured here:** answer-quality deltas (none expected — greedy
@@ -487,9 +487,9 @@ min_p knobs (separate entries); co-resident cost (separate study); a same-proces
 2026.1.0 A/B — the 2026.1.0 side is the committed baseline run under identical
 methodology, not a back-to-back A/B. N=5 (spine) / N=2 (UT pass), single machine.
 
-\* The spec-on prefill pp jumped from ~1308 (baseline) to ~1881 (2026.2.1) — but
+\* The spec-on prefill pp jumped from \~1308 (baseline) to \~1881 (2026.2.1) — but
 prefill pp is measured from a single `max_new_tokens=1` generation and is
-high-variance; spec-off pp is steady (~1960 → ~1870). Treat pp as indicative, not
+high-variance; spec-off pp is steady (\~1960 → \~1870). Treat pp as indicative, not
 a precise version delta.
 
 ---
@@ -516,19 +516,19 @@ Per-prompt medians near-identical. Comparable run: `benchmark_2026-06-29_11-51-3
 
 | 8B spec-on | GPU draft | CPU draft |
 |---|---|---|
-| gen median (spine) | 27.09 tok/s | 23.48 tok/s (~13% slower) |
+| gen median (spine) | 27.09 tok/s | 23.48 tok/s (\~13% slower) |
 | draft acceptance (accepted/proposed) | 48.3 % | 48.1 % (identical) |
 
 Acceptance is identical across device (as expected) and **higher than the 14B's
 45%** — the 0.6B draft is a closer approximation to the 8B than to the 14B, so
-more of its speculated tokens are accepted. CPU-draft is again ~13% slower for no
+more of its speculated tokens are accepted. CPU-draft is again \~13% slower for no
 acceptance benefit → net loss; keep the draft on the GPU. Data:
 `benchmark_2026-06-29_12-22-22.json` (CPU-draft spine),
 `draft_device_accept_8b_{gpu,cpu}_*.json`.
 
 **UT Pass B (telemetry track) — 8B spec-on decode steady-state (GPU draft):**
-GT rail 5.8 W avg / 8.7 peak, package 21.9 W / 28.8, GPU-busy ~85 %, core clock
-~1929 MHz, GPU memory read ~66 GB/s (peak ~107, unit unconfirmed), SoC 63.8 °C,
+GT rail 5.8 W avg / 8.7 peak, package 21.9 W / 28.8, GPU-busy \~85 %, core clock
+\~1929 MHz, GPU memory read \~66 GB/s (peak \~107, unit unconfirmed), SoC 63.8 °C,
 NPU 0 W. Slightly below the 14B across the board (smaller, faster model = less
 sustained compute). `ut_8b_specon.{socwatch,l0}.metrics.json`.
 
@@ -565,26 +565,26 @@ window — a sustained probe that kills the overlap-timing noise of the first pa
 | cartoon — SDXL + DD-vector LoRA `/cartoon` | 5.77 | **27.59** | **3.73** |
 | vlm — Qwen3-VL-8B INT4 (vision) | 5.31 | 24.55 | 6.77 |
 
-(14B alone resident ~9.2 GiB; the second model adds ~5.3–5.8 GiB; peak co-resident during a real 1024²
+(14B alone resident \~9.2 GiB; the second model adds \~5.3–5.8 GiB; peak co-resident during a real 1024²
 generate / vision op stays 24.5–27.6 GiB against the 31.323 ceiling. cartoon is tightest. HIRES image
 gen is **not** in this table — it evicts the 14B by design, ADR-033 Am.2.)
 
-**Throughput — idle co-residence is ~free; concurrent generation is brutal, but how brutal depends on the partner:**
+**Throughput — idle co-residence is \~free; concurrent generation is brutal, but how brutal depends on the partner:**
 
 | pairing | 14B baseline gen | 14B idle gen (tax) | 14B contention gen | contention TTFT |
 |---|---|---|---|---|
-| photoreal | 19.82 tok/s | 19.89 (~0%) | **0.22 (1.1%)** | 13.6 s |
-| illustration | 19.81 | 19.60 (~1%) | **0.19 (1.0%)** | 14.9 s |
-| cartoon | 19.46 | 19.39 (~0%) | **3.27 (16.8%)** | 0.87 s |
+| photoreal | 19.82 tok/s | 19.89 (\~0%) | **0.22 (1.1%)** | 13.6 s |
+| illustration | 19.81 | 19.60 (\~1%) | **0.19 (1.0%)** | 14.9 s |
+| cartoon | 19.46 | 19.39 (\~0%) | **3.27 (16.8%)** | 0.87 s |
 | vlm | 19.13 | 18.10 (**5.4%**) | **2.58 (13.5%)** | 1.08 s |
 
 (means of N=3; full ± std in the dataset. Baseline gen drifts 18.9–19.9 run-to-run, so the SDXL idle
-"tax" is within noise — effectively free; the VLM's ~5% idle tax is the one consistent resident cost. The
-14B cold-prefill baseline is ~1140 pp tok/s; the idle-state pp figure in the dataset is cache-warm and
+"tax" is within noise — effectively free; the VLM's \~5% idle tax is the one consistent resident cost. The
+14B cold-prefill baseline is \~1140 pp tok/s; the idle-state pp figure in the dataset is cache-warm and
 **not** a clean prefill measure.)
 
 **The mechanism — what's exhausted under contention is GPU *compute scheduling*, not bandwidth and not the
-clock.** Across all pairings the GPU goes to ~99% busy and stays pinned at ~1.95 GHz with **zero throttle**
+clock.** Across all pairings the GPU goes to \~99% busy and stays pinned at \~1.95 GHz with **zero throttle**
 (`IGFX-THROT-RSN` = 0 every run) — the starvation is occupancy, not frequency or thermal. The *bandwidth*
 signature, though, splits by partner type:
 
@@ -597,7 +597,7 @@ signature, though, splits by partner type:
 
 - **SDXL diffusion (photoreal, illustration) is compute-bound** and monopolizes the EU scheduler so
   completely that the 14B can't even finish its *prefill* inside the 15 s window — TTFT blows out to 13–15 s
-  and only 4 tokens emerge → a near-total stall (~1%). Aggregate memory-read *drops* (≈70→22 GB/s) because
+  and only 4 tokens emerge → a near-total stall (\~1%). Aggregate memory-read *drops* (≈70→22 GB/s) because
   the bandwidth-bound 14B decode can't get the compute slots to *issue* its reads. These two also draw the
   most iGPU-rail power under load (11+ W) — the heaviest pure-GPU pressure.
 - **The VLM is itself a bandwidth-bound transformer**, so contention keeps memory-read high (67→61 GB/s) and
@@ -607,8 +607,8 @@ signature, though, splits by partner type:
   (98.8%), higher retained bandwidth (47 GB/s), lower rail power (8.6 W): the DD-vector LoRA's CPU-side
   application leaves GPU scheduling gaps the 14B slips through. (Caveat below.)
 
-**Power / thermal / NPU:** package power ~24–26.5 W throughout; iGPU rail peaks (1 s-windowed) 10–13.5 W. SoC
-peaks ~80–82 °C, CPU ~90–95 °C under contention, **no GPU throttle** any run. **`PMT-NPU-PWR` = 0.0 W in
+**Power / thermal / NPU:** package power \~24–26.5 W throughout; iGPU rail peaks (1 s-windowed) 10–13.5 W. SoC
+peaks \~80–82 °C, CPU \~90–95 °C under contention, **no GPU throttle** any run. **`PMT-NPU-PWR` = 0.0 W in
 every phase of every pairing** — a clean, twelve-times-repeated confirmation that BlarAI is pure-GPU
 (ADR-011); the NPU is never touched.
 
@@ -616,22 +616,22 @@ every phase of every pairing** — a clean, twelve-times-repeated confirmation t
 - **Sustained-contention is a fixed-15 s-window probe.** cartoon's milder figure partly reflects partner
   spin-up/overlap landing inside that window (hence its higher variance); a follow-up that warms the partner
   to steady-state first would isolate steady-state diffusion contention.
-- **`GPU_MEMORY_BYTE_*_RATE` unit is reported N/A by UT** — almost certainly GB/s (idle ~67–72, peak ~108 vs
-  the ~136 GB/s LPDDR5X ceiling) but UNCONFIRMED; marked `*` above.
+- **`GPU_MEMORY_BYTE_*_RATE` unit is reported N/A by UT** — almost certainly GB/s (idle \~67–72, peak \~108 vs
+  the \~136 GB/s LPDDR5X ceiling) but UNCONFIRMED; marked `*` above.
 - **level-zero per-phase via a validated linear clock-remap.** UT flags a "timestamp-units" driver issue, so
-  l0 sample timestamps aren't Unix-epoch (measured ~27.7 h offset from socwatch in-session); per-phase l0 is
+  l0 sample timestamps aren't Unix-epoch (measured \~27.7 h offset from socwatch in-session); per-phase l0 is
   recovered by anchoring the l0 range linearly onto socwatch's Unix window from the same capture session
   (`extract_ut_metrics.py --remap-from`). Validated 2026-06-28 — remapped contention samples show the
   expected busy spike and the freq/busy/bandwidth split is physically coherent. socwatch power/thermal is
   natively Unix-epoch (no remap needed).
 - **Power** = socwatch energy (mJ/sample) → W; avg = total mJ / total ms; peak = max over 1 s windows (raw
-  per-sample peak is meaningless — sub-ms samples produce spurious ~kW glitches).
+  per-sample peak is meaningless — sub-ms samples produce spurious \~kW glitches).
 
 **Next:** the dataset is ready for OpenVINO-community contribution. Open follow-ups: (1) a steady-state
 cartoon/LoRA contention run to remove the spin-up confound; (2) confirm the `GPU_MEMORY_BYTE_*_RATE` GB/s
 unit against a known-bandwidth microbench; (3) optional system-wide DDR bandwidth via emon EDP (deferred —
 emon's stop-phase hangs UT finalization). The headline for the operator's question stands: any one of these
-models can sit resident beside the 14B for ~free; running two generators at once on the single iGPU is the
+models can sit resident beside the 14B for \~free; running two generators at once on the single iGPU is the
 real cost, and the 14B is the one that yields.
 
 *(Co-residency study; 12 runs, Intel-UT instrumented; commit `<this>`. Supersedes the noisy first-pass
@@ -665,9 +665,9 @@ Result JSONs: `docs/performance/benchmark_2026-06-28_00-27-22.json` (14B),
 | Prefill pp (tok/s) | **1960** (mean 1877, P95 2005) | 1308 (backend artifact — see notes) |
 | TTFT (ms) | 466 | 471 |
 
-Spec-on is a **~1.54x generation speedup** (the 252-token prompt sustained 21.5 tok/s), and it is
+Spec-on is a **\~1.54x generation speedup** (the 252-token prompt sustained 21.5 tok/s), and it is
 **up from the stale 2026-05-22 figure of 13.6 tok/s** — the tuned pruned-6L draft on the current
-stack. `speculative_decoding_active=True` confirmed. Load ~8.6 s (warm).
+stack. `speculative_decoding_active=True` confirmed. Load \~8.6 s (warm).
 
 #### Qwen3-8B INT4 — OpenVINO GenAI 2026.1.0, GPU (+ the same 0.6B draft)
 
@@ -677,8 +677,8 @@ stack. `speculative_decoding_active=True` confirmed. Load ~8.6 s (warm).
 | Prefill pp (tok/s) | **1968** (mean 1978, P95 2028) | 1748 (backend artifact) |
 | TTFT (ms) | 264 | 313 |
 
-The 0.6B draft accelerates the 8B too (shared Qwen3 vocab) — **~1.38x**. First spec-on number on
-record for the 8B. Cold first-load ~22 s (uncached compile); warm reload ~9 s.
+The 0.6B draft accelerates the 8B too (shared Qwen3 vocab) — **\~1.38x**. First spec-on number on
+record for the 8B. Cold first-load \~22 s (uncached compile); warm reload \~9 s.
 
 #### Qwen3-Coder-30B-A3B INT4 — OVMS 2026.2, GPU (continuous batching)
 
@@ -689,31 +689,31 @@ record for the 8B. Cold first-load ~22 s (uncached compile); warm reload ~9 s.
 | TTFT (ms) | **214** | 226 | 323 |
 
 OVMS flags: `target_device GPU, kv_cache_precision u8, enable_prefix_caching true, tool_parser
-qwen3coder, enable_tool_guided_generation true, cache_size 4`. Confirms the prior ~37-39 single-stream
+qwen3coder, enable_tool_guided_generation true, cache_size 4`. Confirms the prior \~37-39 single-stream
 baseline. Bench: `scripts/benchmark_ovms_http.py` over the loopback OpenAI-compatible endpoint.
 
 #### Observations
 
 - **The MoE profile, now measured both ways.** The 30B-A3B has the **fastest decode** (38 tok/s,
-  ~2x the dense 14B spec-on) and the **fastest TTFT** (214 ms), but the **slowest prefill** (pp ~480,
-  ~1/4 the dense 14B/8B ~1960). MoE decode touches only ~3B active params; MoE *prefill* routes every
-  prompt token across all 128 experts, paying ~30B compute. Dense models are the mirror image —
+  \~2x the dense 14B spec-on) and the **fastest TTFT** (214 ms), but the **slowest prefill** (pp \~480,
+  \~1/4 the dense 14B/8B \~1960). MoE decode touches only \~3B active params; MoE *prefill* routes every
+  prompt token across all 128 experts, paying \~30B compute. Dense models are the mirror image —
   heavier decode, lighter prefill. This is the single most useful shape in the dataset.
 - **Read each pp in its own context — it is not a clean cross-model A/B.** The in-process pp is over
-  ~970 *formatted* tokens (BlarAI's chat template + system prompt); the OVMS pp over ~421
+  \~970 *formatted* tokens (BlarAI's chat template + system prompt); the OVMS pp over \~421
   *bare-message* tokens (no system prompt); and the runtimes differ (2026.1 vs 2026.2). Each pp is
-  internally valid for that model. The MoE-vs-dense prefill gap (~4x) is far larger than those
+  internally valid for that model. The MoE-vs-dense prefill gap (\~4x) is far larger than those
   confounds could account for, so the directional finding stands.
 - **spec-on pp is a backend artifact, not a regression.** The pp probe (`max_new_tokens=1`) on the
   speculative ContinuousBatching backend reads low (1308/1748) because that single token still pays
-  draft+target overhead. The **spec-off pp (~1960) is the true prefill rate** — prefill is
+  draft+target overhead. The **spec-off pp (\~1960) is the true prefill rate** — prefill is
   config-independent, so the two should match; the spec-off number is the one to cite.
 - **Greedy-path divergence between backends.** At temperature 0, spec-on occasionally produced a
   different token count than spec-off for the same prompt (e.g. 14B P1: 48 vs 62 tokens). The standard
   pipeline and the ContinuousBatching/spec engine take slightly different greedy paths; it does not
   affect the tok/s measurement, but it means spec-on is not bit-identical output here.
 - **vs community (the 2026-06-27 entry).** pp closes the prefill gap the analysis flagged: BlarAI's
-  dense prefill **~1960 tok/s is ~3.7x the community llama.cpp/SYCL 7B pp512 (~536)** on the same Arc
+  dense prefill **\~1960 tok/s is \~3.7x the community llama.cpp/SYCL 7B pp512 (\~536)** on the same Arc
   140V silicon. Generation: 14B spec-on 17.1 firmly fills the community's missing 14B-on-GPU datapoint.
 
 **Methodology:** `scripts/benchmark_gpu_inference.py` (14B/8B) + `scripts/benchmark_ovms_http.py`
@@ -748,29 +748,29 @@ of the run** (see **Next**).
 
 | Model (role) | Precision | Generation (tok/s) | TTFT | Source entry |
 |---|---|---|---|---|
-| Qwen3-14B (assistant), standard | INT4 | ~10.6 median (P95 11.5) | ~0.77 s | 2026-05-22 |
-| Qwen3-14B, spec-decode ON | INT4 | ~13.6 median (P95 16.8; 16.5 on a 252-tok prompt); by context 12.2@2K / 9.6@8K / 4.9@16K | n/a (no stream) | 2026-05-22, 06-05 |
-| Qwen3-Coder-30B-A3B (coder, MoE ~3B active) | INT4 / OVMS | ~37–39 single; ~93 aggregate @ 8-way | — | 2026-06-21, 06-27 |
-| Qwen3-VL-8B (vision) | INT4 | ~8–16 decode | — | 2026-06-03/04 |
+| Qwen3-14B (assistant), standard | INT4 | \~10.6 median (P95 11.5) | \~0.77 s | 2026-05-22 |
+| Qwen3-14B, spec-decode ON | INT4 | \~13.6 median (P95 16.8; 16.5 on a 252-tok prompt); by context 12.2@2K / 9.6@8K / 4.9@16K | n/a (no stream) | 2026-05-22, 06-05 |
+| Qwen3-Coder-30B-A3B (coder, MoE \~3B active) | INT4 / OVMS | \~37–39 single; \~93 aggregate @ 8-way | — | 2026-06-21, 06-27 |
+| Qwen3-VL-8B (vision) | INT4 | \~8–16 decode | — | 2026-06-03/04 |
 
 **Community llama.cpp / SYCL (Arc 140V, pulled 2026-06-27):**
 
 | Model (size, quant) | Runtime | pp512 (prefill) | tg128 (gen) | Source / quality |
 |---|---|---|---|---|
-| 7B dense Q4_0 | llama.cpp SYCL | ~536 | ~24.6 | forum llama-bench, Jun 2026 |
+| 7B dense Q4_0 | llama.cpp SYCL | \~536 | \~24.6 | forum llama-bench, Jun 2026 |
 | 7B dense Q4_0 | IPEX-LLM (archived) | 708 | 24.4 | llm-tracker, Nov 2024 |
 | 7B dense Q4_0 | llama.cpp Vulkan | 45 | 5.5 | llm-tracker, Nov 2024 (weak on iGPU) |
 | 8B dense Q4_K_M | IPEX-LLM/Ollama | — | 17–18 | gist, n=1, Jun 2026 |
-| 8B dense INT4 | OpenVINO | — | ~12 | Julien Simon, Apr 2025 |
-| 14B dense Q4 | llama.cpp | — | ~4.3 | LocalScore, **likely CPU** |
+| 8B dense INT4 | OpenVINO | — | \~12 | Julien Simon, Apr 2025 |
+| 14B dense Q4 | llama.cpp | — | \~4.3 | LocalScore, **likely CPU** |
 
-**Findings.** (1) **BlarAI's 14B is competitive AND fills a real gap** — a 7B at ~24.6 tg scaling to a
-14B (2× params) at ~13 tg is the ~half-speed a memory-bandwidth-bound doubling predicts, and the
-community has *no* trustworthy 14B-on-GPU number (the only one, ~4.3, is almost certainly CPU). BlarAI's
-~13 tok/s spec-on is the datapoint the web couldn't produce. (2) **The 30B-A3B is the standout** —
-~38 tok/s beats every community dense-7B, because mixture-of-experts active-params (~3B) drive speed.
+**Findings.** (1) **BlarAI's 14B is competitive AND fills a real gap** — a 7B at \~24.6 tg scaling to a
+14B (2× params) at \~13 tg is the \~half-speed a memory-bandwidth-bound doubling predicts, and the
+community has *no* trustworthy 14B-on-GPU number (the only one, \~4.3, is almost certainly CPU). BlarAI's
+\~13 tok/s spec-on is the datapoint the web couldn't produce. (2) **The 30B-A3B is the standout** —
+\~38 tok/s beats every community dense-7B, because mixture-of-experts active-params (\~3B) drive speed.
 (3) **OpenVINO quietly beats the runtime hobbyists default to** — IPEX-LLM (their fastest turnkey path)
-is archived/security-flagged (2026-01-28); Vulkan is ~5.5 tok/s on this iGPU. (4) **BlarAI's numbers are
+is archived/security-flagged (2026-01-28); Vulkan is \~5.5 tok/s on this iGPU. (4) **BlarAI's numbers are
 the more rigorous side** — 5 runs + 2 warmup + thermal cooldown, vs the community's mostly single-run
 blog/forum figures.
 
@@ -784,7 +784,7 @@ same window, so BlarAI's may have moved too). Prefill is not yet apples-to-apple
 **Next:** the (a) refresh — re-run **Qwen3-14B + Qwen3-8B (`models/qwen3-8b/openvino-int4-gpu`) +
 Qwen3-Coder-30B-A3B**, **≥5 measured runs each** (+2 warmup, `--run-cooldown 30` for thermal fairness),
 on the current OpenVINO 2026.2 + driver 32.0.101.8826, **with the new pp (prompt-processing) tok/s
-metric** so prefill compares directly to community pp512. The pp metric (a fixed ~450-token probe →
+metric** so prefill compares directly to community pp512. The pp metric (a fixed \~450-token probe →
 `max_new_tokens=1` prefill timing → `pp = input_tokens / prefill_s`, probe `pp-v1`) plus a model-name
 de-hardcode (`--model-name` / `_derive_model_name`) are **now implemented + unit-tested**
 (`test_benchmark_helpers.py`, 49 passed) ahead of the run; only the on-hardware execution remains. 14B/8B
@@ -801,7 +801,7 @@ build frees the GPU/OVMS.** Then fold the fresh numbers into this comparison and
 The question #695 had to answer on the box, not predict: can headless-coding best-of-N candidates
 run CONCURRENTLY through OVMS continuous batching on the *integrated* Arc 140V (shared LPDDR5X, no
 discrete VRAM), and what is the real ceiling? Measured against the resident coder — **Qwen3-Coder-30B-A3B**
-(qwen3_moe, 30B total / ~3B active), INT4 weights (16.3 GB IR), OVMS **2026.2**, `--task text_generation`
+(qwen3_moe, 30B total / \~3B active), INT4 weights (16.3 GB IR), OVMS **2026.2**, `--task text_generation`
 (continuous batching), `--target_device GPU`, `--cache_size 4` GB, `--kv_cache_precision u8`,
 `--enable_prefix_caching true`. GPU driver 32.0.101.8826 (2026-05-28). Method: N identical
 `POST /v3/chat/completions` requests fired simultaneously (thread pool), temperature=0, max_tokens=200,
@@ -825,10 +825,10 @@ Three findings. **(1) Continuous batching engages** — OVMS scheduled up to 7-8
 aggregate throughput rose 1.87x (N=4) and 2.37x (N=8). **(2) The KV cache is NOT the constraint for
 best-of-N** — eight 6.7K-token contexts cost only 10.5% of the pool, because `enable_prefix_caching`
 stores the SHARED best-of-N prompt once and `u8` halves the KV bytes; the cache could hold far more.
-**(3) The binding constraint is COMPUTE** — the integrated GPU saturates (~40-90 tok/s aggregate), so the
+**(3) The binding constraint is COMPUTE** — the integrated GPU saturates (\~40-90 tok/s aggregate), so the
 concurrency speedup is real but SUB-LINEAR and per-request latency grows with N (5.1 s → 17.2 s at N=8).
-Net: running candidates concurrently cuts wall-clock to the best result ~1.9x (N=4) to ~2.4x (N=8),
-cache-cheap, with C beyond ~4 buying little.
+Net: running candidates concurrently cuts wall-clock to the best result \~1.9x (N=4) to \~2.4x (N=8),
+cache-cheap, with C beyond \~4 buying little.
 
 **NOT measured (named):** full multi-minute `opencode` agent-run concurrency (only raw single-request
 batching — an agent run is many sequential requests, so candidate-concurrency ≈ one in-flight request per
@@ -859,7 +859,7 @@ Machine-readable sidecar: `docs/performance/uc010_image_styles_arc140v_2026-06-2
 **Methodology — the load-bearing caveat.** These are **cold** numbers. The harness configures a style,
 generates ONE 1024×1024 image (30 steps, EULER_ANCESTRAL_DISCRETE, guidance 7.0), then `unload()`s before
 the next style — so each latency is *lazy pipeline load + INT8 GPU compile + generate*, single run (n=1),
-**not** the steady-state generate-only figure (prior UC-010 entries measured generate-only ~10.7 s at
+**not** the steady-state generate-only figure (prior UC-010 entries measured generate-only \~10.7 s at
 1024px). Runtime: OpenVINO **2026.1.0** + GenAI 2026.1.0 on the Arc 140V; driver 32.0.101.8826 (last
 recorded 2026-06-24, not re-verified this run). Memory not sampled this run.
 
@@ -888,7 +888,7 @@ Machine-readable: `docs/performance/playground-v2.5-int8-cpu-assetgen-2026-06-25
 diffusers 0.37.1, torch 2.12.1, `rembg[cpu]` (u2net), isolated Python 3.11.9 venv
 (`blarai-build/img-convert/venv311`), `OVStableDiffusionXLPipeline`, guidance 3.0, model-default scheduler.
 
-**Measurements (CPU, single-run):** model load **~9 s**; text2image **512²/20 steps = 141 s**,
+**Measurements (CPU, single-run):** model load **\~9 s**; text2image **512²/20 steps = 141 s**,
 **768²/28 steps ≈ 473–485 s** (3 samples); rembg cutout **< 1 s/image** (u2net).
 
 **Not measured:** GPU latency (Phase-3 swap-sequence path), co-resident memory cost, multi-run variance,
@@ -898,11 +898,11 @@ diffusers 0.37.1, torch 2.12.1, `rembg[cpu]` (u2net), isolated Python 3.11.9 ven
 second **when the generation yields a distinct subject**. Generation prompt/setting tuning is the quality
 lever (over-emphasising "empty white space" pales the subject; under-constraining lets the SDXL mosaic
 clutter fill the whole frame, leaving nothing to isolate), and it iterates far faster on the GPU — the
-Phase-3 path. CPU is usable for a proof but slow (~8 min at 768²/28).
+Phase-3 path. CPU is usable for a proof but slow (\~8 min at 768²/28).
 
 ---
 
-### 2026-06-24 — Playground v2.5 illustration model (OV-INT8) on Arc 140V: resident footprint ~8.4 GB + 1024px speed
+### 2026-06-24 — Playground v2.5 illustration model (OV-INT8) on Arc 140V: resident footprint \~8.4 GB + 1024px speed
 
 **What:** the SECOND UC-010 image model — Playground v2.5 (`playgroundai/playground-v2.5-1024px-aesthetic`),
 an SDXL-architecture aesthetic model chosen for illustration assets — converted to OpenVINO INT8 and
@@ -911,24 +911,24 @@ swap-budget math behind the planned image-gen + VLM-design-loop dispatch phases.
 `docs/performance/playground-v2.5-int8-arc140v-2026-06-24.json`.
 
 **Setup:** OpenVINO **2026.2.1-21919**, Arc 140V driver **32.0.101.8826**, optimum-intel 2.2.0 export
-(`--weight-format int8`), isolated Python 3.11 venv, `OVStableDiffusionXLPipeline`. INT8 model is ~3.3 GB
+(`--weight-format int8`), isolated Python 3.11 venv, `OVStableDiffusionXLPipeline`. INT8 model is \~3.3 GB
 on disk. RAM sampled with `psutil.virtual_memory().used` (system in-use) as deltas; generation device=GPU.
 
 **Resident footprint (delta-isolated from a co-resident 30B coder):** loading Playground added **+8.16 GB**;
 the peak during a 1024×1024 generation reached **+8.42 GB**. So the illustration model's real residency is
-~8.2 GB loaded / ~8.4 GB at peak — well above a naïve ~5–7 GB guess; measuring beat estimating.
+\~8.2 GB loaded / \~8.4 GB at peak — well above a naïve \~5–7 GB guess; measuring beat estimating.
 
 **Speed (GPU, Arc 140V):** 1024×1024 at 30 steps (guidance 3.0, model-default scheduler) rendered in
-**~36 s** (~1.2 s/step). A CPU smoke at 512×512 / 20 steps took **157 s** (~7.85 s/step) — sub-minute on
-the iGPU, ~13× slower on CPU.
+**\~36 s** (\~1.2 s/step). A CPU smoke at 512×512 / 20 steps took **157 s** (\~7.85 s/step) — sub-minute on
+the iGPU, \~13× slower on CPU.
 
 **Co-residence finding (load-bearing for the design):** baseline with the 30B coder loaded was 24.12 GB;
-adding Playground pushed the system to a **32.54 GB peak — over the 31.32 GB ceiling by ~1.2 GB**, i.e. it
+adding Playground pushed the system to a **32.54 GB peak — over the 31.32 GB ceiling by \~1.2 GB**, i.e. it
 only "fit" by paging to disk. **The image model and the 30B coder cannot truly co-reside;** the UC-010
-dispatch design must swap one model resident per phase (Playground alone, ~8.4 GB, fits comfortably).
+dispatch design must swap one model resident per phase (Playground alone, \~8.4 GB, fits comfortably).
 
 **Not measured / caveats:** the footprint was captured WITH the 30B co-resident, so the 8.42 GB peak ran
-under ~1.2 GB paging pressure (the 8.16 GB load delta is clean); a clean ALONE re-measure (30B stopped)
+under \~1.2 GB paging pressure (the 8.16 GB load delta is clean); a clean ALONE re-measure (30B stopped)
 would give a publication-clean peak. Image quality not benchmarked here (subjectively: good flat subjects,
 cluttered/painterly backgrounds — flat-vector needs background-removal or a LoRA). INT8-vs-FP16 and GPU
 power/thermal not captured this run.
@@ -945,37 +945,37 @@ this is the *sustained build* power, a workload milestone-1 did not cover. Machi
 `docs/performance/dispatch_swap_telemetry_2026-06-24.json`.
 
 **Hardware/SW:** Core Ultra 7 258V / Arc 140V (Xe2), 31.32 GB LPDDR5X, Shared-GPU override
-~87% (window ~27 GB); OpenVINO 2026.1 (driver version NOT captured this run — recorded as a
+\~87% (window \~27 GB); OpenVINO 2026.1 (driver version NOT captured this run — recorded as a
 gap). **Model:** Qwen3-Coder-30B-A3B INT4 (the coder, OVMS native-Windows GPU via qwen-proxy
 :8099); the resident Qwen3-14B was SWAPPED OUT for the build.
 
 **Method:** a REAL `/dispatch` build (`rocket-calc`, a full themed WinUI goal), not a
-synthetic benchmark — it ran ~60 min and PARKED after 2 build passes (the park is a
+synthetic benchmark — it ran \~60 min and PARKED after 2 build passes (the park is a
 build-framework result, recorded in the dispatch journal + #676, not a perf result).
 Telemetry: Intel Unified Telemetry 0.2.0-beta1.1 (socwatch + emon, `--config-level low`)
-over the build-TAIL + swap-back window (13:05–13:30, ~25 min, ~650k samples); a 5 s
+over the build-TAIL + swap-back window (13:05–13:30, \~25 min, \~650k samples); a 5 s
 `FreePhysicalMemory` sampler (Tier-0) over the build. The swap/30B-LOAD window was NOT
 cleanly captured this run (see the lesson) — the load-trough figures below are cited from
 the milestone-1 measurement, not re-measured here.
 
 **Numbers (build-tail window, averaged; per-sample peaks are counter-rollover artifacts and are excluded):**
-- **NPU: ~0 W** — idle the entire build (a known offload opportunity, not a new finding).
-- **Package: ~20.9 W avg**; **iGPU: ~5.8 W avg**; **CPU cores: ~9.6 W avg**.
-- Tier-0 build-phase min free RAM **~2.2 GB** (steady, post-load — NOT the load trough).
+- **NPU: \~0 W** — idle the entire build (a known offload opportunity, not a new finding).
+- **Package: \~20.9 W avg**; **iGPU: \~5.8 W avg**; **CPU cores: \~9.6 W avg**.
+- Tier-0 build-phase min free RAM **\~2.2 GB** (steady, post-load — NOT the load trough).
 
-**The no-OOM mechanism (the headline) — why a ~29 GB load survives a 31 GB box:** OOM fires
+**The no-OOM mechanism (the headline) — why a \~29 GB load survives a 31 GB box:** OOM fires
 on **commit charge > commit LIMIT**, not on working-set > physical RAM — and those are
-different numbers here. Commit limit = physical RAM + pagefile = **31.32 + ~11 = 42.32 GB**
-(measured this session; pagefile peak-ever-used 3.36 GB). The 30B load is a **~29 GB
+different numbers here. Commit limit = physical RAM + pagefile = **31.32 + \~11 = 42.32 GB**
+(measured this session; pagefile peak-ever-used 3.36 GB). The 30B load is a **\~29 GB
 committed transient** — under 42.32 GB, so **no OOM**. What DID happen (measured at
-milestone-1, corroborated here): physical headroom exhausts — Available RAM craters to **~67
-MB** while Committed peaks **~29.1 GB**, and the overflow modified-pages spill to the
-pagefile (the ~180–206k pages/s storm milestone-1 caught; the 3.36 GB pagefile peak is that
+milestone-1, corroborated here): physical headroom exhausts — Available RAM craters to **\~67
+MB** while Committed peaks **\~29.1 GB**, and the overflow modified-pages spill to the
+pagefile (the \~180–206k pages/s storm milestone-1 caught; the 3.36 GB pagefile peak is that
 spill). Three things make the too-big-for-physical-RAM load survive: (1) **swap-first** —
-releasing the 14B frees ~11 GB before the 30B loads, lowering the baseline; (2) the **commit
-limit > the transient** — the ~11 GB pagefile lifts the ceiling 31→42 GB, so ~3.3 GB lives
+releasing the 14B frees \~11 GB before the 30B loads, lowering the baseline; (2) the **commit
+limit > the transient** — the \~11 GB pagefile lifts the ceiling 31→42 GB, so \~3.3 GB lives
 on disk briefly instead of OOM-killing; (3) the **87% Shared-GPU-Memory-Override** gives the
-iGPU a ~27 GB window into the unified pool. After the storm the working set settles and the
+iGPU a \~27 GB window into the unified pool. After the storm the working set settles and the
 build runs with a few GB free.
 
 **Not measured (named, per community-grade discipline):** this run's EXACT load-trough
@@ -999,7 +999,7 @@ Server), and does the integrated-GPU shared-memory carve-out physically return o
 idle)? Machine-readable: `docs/performance/milestone1_14b_release_2026-06-21.json`.
 
 **Hardware/SW:** Core Ultra 7 258V / Arc 140V (Xe2), 31.323 GB LPDDR5X, Shared-GPU
-override ~87% (window ~27 GB); driver 32.0.101.8826; OpenVINO + GenAI 2026.1.0.
+override \~87% (window \~27 GB); driver 32.0.101.8826; OpenVINO + GenAI 2026.1.0.
 **Model:** Qwen3-14B INT4 + Qwen3-0.6B-pruned-6L INT8 draft (spec-decode), prefix
 caching on, device=GPU — built via `build_shared_pipeline` (same as production boot).
 
@@ -1013,55 +1013,55 @@ standby inflation). A process kill was deliberately NOT used — it always frees
 GPU and would prove nothing about the in-process path the swap performs.
 
 **Numbers (B2, live, per cycle, stable):**
-- per-PID GPU Local Usage: **10,774 → 677 MB** (~10.1 GB returned), settles in **~1 s**, stays down (zero residue across cycles).
-- `unload()` returns in **~1.0 s**; reload (fresh build) **~18.5 s**, coherent (not garbled).
-- Available RAM **~11.6 → ~22.0 GB**; Committed Bytes drops ~11.3 GB and Free&Zero rises ~11 GB in lockstep → the free is **genuine**, not standby cache.
+- per-PID GPU Local Usage: **10,774 → 677 MB** (\~10.1 GB returned), settles in **\~1 s**, stays down (zero residue across cycles).
+- `unload()` returns in **\~1.0 s**; reload (fresh build) **\~18.5 s**, coherent (not garbled).
+- Available RAM **\~11.6 → \~22.0 GB**; Committed Bytes drops \~11.3 GB and Free&Zero rises \~11 GB in lockstep → the free is **genuine**, not standby cache.
 - The 2nd `gc.collect()` (diagnostic) frees nothing — one collect suffices.
 
 **Finding:** **#33896 does NOT manifest on this stack** — the in-process release
 returns the full carve-out without a restart; the swap's release mechanism is sound.
-RAM clearance CLEARS the 30B's ~21 GB peak gate (lands ~22 GB) but by a **thin ~1 GB
-margin** that is ambient- and KV-state-dependent (idle 14B frees ~8.7 GB; a heavier
-ambient lands ~18 GB, short).
+RAM clearance CLEARS the 30B's \~21 GB peak gate (lands \~22 GB) but by a **thin \~1 GB
+margin** that is ambient- and KV-state-dependent (idle 14B frees \~8.7 GB; a heavier
+ambient lands \~18 GB, short).
 
 **Step 2 — 30B load CERTIFIED (same day):** with BlarAI down (lean ambient, 23.2 GB
-free) the Qwen3-Coder-30B INT4 (OVMS, `--target_device GPU`) loaded in ~30 s and ran
-at **37.4 tok/s** (≥ 35 → the ~87% Shared-GPU override is effective; brief §9 step 2
-satisfied). Footprint **15.3 GB per-PID iGPU**, ~13.6 GB net pool, leaving ~9.6 GB
+free) the Qwen3-Coder-30B INT4 (OVMS, `--target_device GPU`) loaded in \~30 s and ran
+at **37.4 tok/s** (≥ 35 → the \~87% Shared-GPU override is effective; brief §9 step 2
+satisfied). Footprint **15.3 GB per-PID iGPU**, \~13.6 GB net pool, leaving \~9.6 GB
 steady headroom; stops clean (RAM fully returns to 25.5 GB). The fleet's
 `start-llm.ps1 -Force` was correctly **denied by the safety classifier** for skipping
 the 21 GB gate; loaded via the gate-respecting non-`-Force` path with an explicit pre-check.
 
 **The honest result is three cases, not a viable/not-viable binary:**
 
-**(1) 14B release — SOUND.** #33896 doesn't bite; ~10 GB back in ~1 s, genuine, reversible,
+**(1) 14B release — SOUND.** #33896 doesn't bite; \~10 GB back in \~1 s, genuine, reversible,
 coherent reload. Directly measured (B2, live process).
 
 **(2) 30B standalone load on a leaned box — WORKS BUT MARGINAL.** The operator's daily
-case: loads + runs at 37.4 tok/s from ~25 GB, but *barely* — Available hit 67 MB (19 MB
-AV-off), Committed peaked 29.1 GB, a ~6 s page-storm (~180–206k pages/s; AV-off unchanged,
+case: loads + runs at 37.4 tok/s from \~25 GB, but *barely* — Available hit 67 MB (19 MB
+AV-off), Committed peaked 29.1 GB, a \~6 s page-storm (\~180–206k pages/s; AV-off unchanged,
 so it's the dual CPU+GPU weight staging, not antivirus). **Correction:** the earlier
 "Committed 29.1 < 31.3 ceiling so RAM never exhausted" was wrong — 31.3 GB is *physical*
 RAM; the commit *limit* is higher (pagefile). There was no OOM (commit limit not hit), but
-**physical headroom DID exhaust** (Available → ~0), and that exhaustion *is* the page-storm.
+**physical headroom DID exhaust** (Available → \~0), and that exhaustion *is* the page-storm.
 Marginal, not benign.
 
 **(3) The actual swap — MEASURED.** Live BlarAI → release the 14B in-process → measure the
-resulting headroom, from a real un-leaned ~19.9 GB cold ambient: the **bare swap** (BlarAI
+resulting headroom, from a real un-leaned \~19.9 GB cold ambient: the **bare swap** (BlarAI
 stays alive) lands at **20.1 GB** Available (releasing the 14B freed +11.3 GB; backend GPU
 8.7 → 0.65 GB; unload 1.4 s). **20.1 < 23.1 GB** (lowest measured successful 30B load) →
 **sub-threshold**: the 30B load was correctly **not attempted** (it would death-spiral) and
 the gate **aborts**. The swap-**back** leg is proven — the 14B reloads fresh in the live
-process in ~21 s, coherent (GPU back to 11 GB). So the **bare swap is NOT viable**: BlarAI
-staying resident keeps it ~2 GB below even the cold baseline, and from this ambient a full
-BlarAI teardown (~19.9 GB cold) is *still* sub-threshold unless non-BlarAI apps are trimmed.
+process in \~21 s, coherent (GPU back to 11 GB). So the **bare swap is NOT viable**: BlarAI
+staying resident keeps it \~2 GB below even the cold baseline, and from this ambient a full
+BlarAI teardown (\~19.9 GB cold) is *still* sub-threshold unless non-BlarAI apps are trimmed.
 
 **Conditional verdict:** release proven; standalone load proven-but-marginal; the **bare
 swap is not viable** (measured 20.1 GB, sub-threshold). The swap is viable **only if** it
-*actively* reaches ≥~23–25 GB before the 30B load — full BlarAI step-aside **and** ambient
+*actively* reaches ≥\~23–25 GB before the 30B load — full BlarAI step-aside **and** ambient
 trim — and **verifies** it. The pre-load headroom check is the **load-bearing gate**: from a
 real ambient it **aborts** (as it correctly did here), which is the point. **Surfaced:** the
-21 GB gate is too low (peak 29.1 GB) *and* a leaner-ambient bare swap (~22 GB) would *pass*
+21 GB gate is too low (peak 29.1 GB) *and* a leaner-ambient bare swap (\~22 GB) would *pass*
 the 21 GB gate yet still sit below the 23.1 GB it needs; `-Force` skips the gate; the 14B is
 host-side on the Arc. **Milestone-2** dispatch stays gated on the swap reaching a viable
 headroom — the active-trim path's 30B load was deferred (it would reproduce the marginal
@@ -1083,7 +1083,7 @@ proceeded.
 - GPU driver version: read from Device Manager / dxdiag at the on-chip session — NOT introspectable here
 - Models co-resident: Qwen3-14B INT4 (target) + Qwen3-0.6B pruned-6L INT8 (draft) + RealVisXL V5.0 SDXL INT8 (nncf weight-only, diffusers-OV layout)
 
-**Methodology:** with the 14B resident and a ~3k-token KV-cache populated, the §E
+**Methodology:** with the 14B resident and a \~3k-token KV-cache populated, the §E
 eviction path was exercised (`unload_vlm()` + the substrate `unload_embed_cache()`),
 then the SDXL pipeline was loaded on-demand and a single 1024² image generated at
 6 few-step (Lightning) steps; `log_memory` deltas were taken across load → generate →
@@ -1092,8 +1092,8 @@ unload. One generate, one config — a feasibility spike, not a throughput sweep
 **Measured:**
 | Metric | Value |
 |--------|-------|
-| Co-resident peak (14B + ~3k KV + SDXL INT8 + 1024² generate) | **~26.0 GB** |
-| Headroom vs the 31.323 GB ceiling | **~5.3 GB** |
+| Co-resident peak (14B + \~3k KV + SDXL INT8 + 1024² generate) | **\~26.0 GB** |
+| Headroom vs the 31.323 GB ceiling | **\~5.3 GB** |
 | SDXL load (cold, on-demand) | **18.7 s** |
 | 1024² generate (6 Lightning steps) | **10.7 s** |
 | Swap-thrash / OOM | none observed |
@@ -1171,7 +1171,7 @@ surface (`VoiceEngine.with_paths` → `load_stt`/`unload_stt`/`load_tts`/
 
 | Half | Load Δ (RSS) | Reclaim Δ (RSS) | % of load returned | Co-resident-with-14B load Δ | Verdict |
 |------|--------------|-----------------|--------------------|-----------------------------|---------|
-| STT (Whisper) | +752–875 MB | ~−80 MB | **~10%** | pending (step 2) | **WEAK / NO RECLAIM** → killable-subprocess pivot (#660 follow-up) |
+| STT (Whisper) | +752–875 MB | \~−80 MB | **\~10%** | pending (step 2) | **WEAK / NO RECLAIM** → killable-subprocess pivot (#660 follow-up) |
 | TTS (Kokoro) | +378 MB | −426 MB | **113%** | pending (step 2) | **RECLAIM CONFIRMED** — ships in-process |
 
 **Acceptance gate:** a half "reclaims" if a clear majority (the harness flags
@@ -1187,7 +1187,7 @@ step 2 is run — the co-residency cost against the resident 14B + on-demand VLM
 
 **Finding (isolated run, 3× reproducible including with BlarAI closed / GPU free):**
 Kokoro/ONNX (TTS) releases cleanly on in-process `del` + `gc.collect()` (113% of
-the load returned); OpenVINO Whisper (STT) does NOT (~10% returned, ~680 MB
+the load returned); OpenVINO Whisper (STT) does NOT (\~10% returned, \~680 MB
 pinned). → TTS ships in-process; the STT half pivots to a killable subprocess
 (#660 follow-up). **Caveat:** all three runs logged reproducible oneDNN
 `no opencl gpu device available` errors *even with BlarAI closed* → Whisper may be
@@ -1195,7 +1195,7 @@ running a CPU fallback rather than the Arc GPU — a separate performance concer
 worth a look (relevant to the OpenVINO upstream work), tracked apart from #660.
 JSONs: `docs/performance/voice_ram_2026-06-14_*.json` (3 runs).
 
-### 2026-06-13 — Right-sizing the parser VM: Dynamic Memory reclaims ~1.5 GB; parser peak demand is 256 MB (#661)
+### 2026-06-13 — Right-sizing the parser VM: Dynamic Memory reclaims \~1.5 GB; parser peak demand is 256 MB (#661)
 
 Not an inference benchmark — a Hyper-V **VM memory** measurement. The
 `BlarAI-Orchestrator` guest homes *only* the NIC-less trafilatura parser
@@ -1212,19 +1212,19 @@ footprint measured to confirm the sizing is safe.
   `make_health_probe` / `parse_round_trip` harness — no live `/ingest <url>`;
   the egress door stays welded).
 - **Methodology** (reproducible: `scripts/measure_guest_parser_memory.py`,
-  deterministic ~248 KB synthetic article near the 256 KiB channel cap): cold
+  deterministic \~248 KB synthetic article near the 256 KiB channel cap): cold
   boot → await parser READY → sample `Get-VM` MemoryDemand/MemoryAssigned across
-  rest, a **60 s sustained burst** of near-cap parses, and settle (~1.5 s
+  rest, a **60 s sustained burst** of near-cap parses, and settle (\~1.5 s
   cadence). The burst — not a single parse — is deliberate: a 248 KB parse
-  finishes in ~0.2 s but Hyper-V's demand metric updates on a multi-second
+  finishes in \~0.2 s but Hyper-V's demand metric updates on a multi-second
   cadence, so only a sustained load registers the true working set.
 - **Cold boot → parser READY: 34.5 s** (the `health_timeout_s = 120` cold-boot
   budget covers it comfortably).
-- **Memory:** the balloon engages ~60 s after boot and reclaims `MemoryAssigned`
+- **Memory:** the balloon engages \~60 s after boot and reclaims `MemoryAssigned`
   from the 1 GB startup down to the **512 MB floor**, held through both burst and
-  idle-settle. Idle demand **~199 MB**; **sustained-load peak demand ~256 MB** —
+  idle-settle. Idle demand **\~199 MB**; **sustained-load peak demand \~256 MB** —
   both far below the 512 MB floor, so assigned floats at 512 MB regardless of the
-  2 GB max. **Reclaim ≈ 2048 → 512 MB = ~1.5 GB** returned to the host.
+  2 GB max. **Reclaim ≈ 2048 → 512 MB = \~1.5 GB** returned to the host.
 - **Throughput / correctness:** **195 near-cap parses in 60 s, 0 failures**
   (no OOM, fail-closed never tripped). Near-cap 248,096 B → status `clean`,
   0.222 s, 223,974 chars out. Real fixture (`news_quantum.html`, 2,885 B) →
@@ -1241,7 +1241,7 @@ footprint measured to confirm the sizing is safe.
   in-guest process RSS (host MemoryDemand used as the proxy); spread across
   multiple cold boots (n=1 boot, n=195 parses); and — the load-bearing one —
   **hot-add growth above the 1 GB startup toward the 2 GB max**, never exercised
-  here because demand never reached even the 512 MB floor (peak 256 MB, ~half the
+  here because demand never reached even the 512 MB floor (peak 256 MB, \~half the
   floor, by deliberate headroom choice). The ceiling's protective value therefore
   rests on the *assumed* `hv_balloon` hot-add path (the reclaim/shrink direction
   IS proven, 1024 → 512 MB; the grow direction is not), not a measured one.
@@ -1280,7 +1280,7 @@ Vikunja #655 + the gitignored
 
 ---
 
-### 2026-06-10 — Cleaner v1 `clean_html`: ~15 ms per 7-fixture corpus pass, CPU-only (UC-003, #655)
+### 2026-06-10 — Cleaner v1 `clean_html`: \~15 ms per 7-fixture corpus pass, CPU-only (UC-003, #655)
 
 First performance record for the UC-003 Cleaner v1 extraction pipeline
 (`services/cleaner/src/pipeline.py` `clean_html`: trafilatura `bare_extraction`
@@ -1362,7 +1362,7 @@ family differs; the mTLS code path is the production one).
 
 ---
 
-### 2026-06-06 — AES-256-GCM substrate encryption overhead: ~0.1ms per query, 1.5ms boot-cache (Sprint 14 EA-3)
+### 2026-06-06 — AES-256-GCM substrate encryption overhead: \~0.1ms per query, 1.5ms boot-cache (Sprint 14 EA-3)
 
 **Date:** 2026-06-06
 **Triggered by:** Sprint 14 EA-3 — substrate.db at-rest encryption wiring (ADR-025 criterion #5)
@@ -1391,7 +1391,7 @@ the in-RAM cache (same path as the unencrypted store), then decrypts only the to
 | GPU | Intel Arc 140V — **NOT used** (AES-NI on CPU, not GPU) |
 | Python | 3.11.9 |
 | `cryptography` | 46.0.5 (AES-256-GCM + HKDF-SHA256) |
-| Fixture | ~107 chunks synthetic (50 doc + 57 turns); fake bag-of-words embedder |
+| Fixture | \~107 chunks synthetic (50 doc + 57 turns); fake bag-of-words embedder |
 | Queries | 6 representative memory-style queries |
 
 #### Results — pre-encryption baseline (SubstrateStore, plaintext)
@@ -1418,14 +1418,14 @@ the in-RAM cache (same path as the unencrypted store), then decrypts only the to
 
 - GPU/OpenVINO 14B inference (not on this path)
 - Real bge-small-en-v1.5 ONNX embedder load (fake embedder used to isolate crypto overhead)
-- Memory footprint of the in-RAM embedding cache (~164 KB for 107 × 384 × float32)
+- Memory footprint of the in-RAM embedding cache (\~164 KB for 107 × 384 × float32)
 - Disk I/O timing for the SQLite file open itself
 
 #### Interpretation
 
-The boot-cache decrypt (1.45 ms for 107 embeddings) is negligible vs. LLM model load (~10 s).
-At 10k embeddings the projection is ~130 ms — still well under 1 s. The per-query overhead of
-~0.1 ms is immaterial relative to TTFT (~940 ms measured on this hardware at spec-decode on).
+The boot-cache decrypt (1.45 ms for 107 embeddings) is negligible vs. LLM model load (\~10 s).
+At 10k embeddings the projection is \~130 ms — still well under 1 s. The per-query overhead of
+\~0.1 ms is immaterial relative to TTFT (\~940 ms measured on this hardware at spec-decode on).
 The encrypted-at-rest + plaintext-in-RAM design (decrypt embeddings once at boot, search over
 plaintext, decrypt only top-k text on retrieval) provides full at-rest protection — including
 closing the embedding-inversion/vec2text semantic-shadow leak — at essentially zero runtime cost.
@@ -1452,10 +1452,10 @@ was inert there anyway. That measurement predates two May changes: the ISS-1 fix
 | 8K (8211) | 0.575 | 9.56 | 12,713 MB |
 | **16K (16403)** | **0.457** | **4.94** | 12,715 MB |
 
-**Verdict:** Speculative decoding **does not collapse at 16K** with the current draft — acceptance holds **~46–57%** across all bands (vs **0.000** at 16K in March). At 16K, throughput is **4.94 TPS — ~2.3× the ~2.13 TPS** Task 4.3 recorded. So 16K now delivers *both* the memory headroom DEC-03 was chosen for *and* a working spec-decode speedup — strictly better than the locked record implied. **DEC-03 (16K) stands, reaffirmed on current data.**
+**Verdict:** Speculative decoding **does not collapse at 16K** with the current draft — acceptance holds **\~46–57%** across all bands (vs **0.000** at 16K in March). At 16K, throughput is **4.94 TPS — \~2.3× the \~2.13 TPS** Task 4.3 recorded. So 16K now delivers *both* the memory headroom DEC-03 was chosen for *and* a working spec-decode speedup — strictly better than the locked record implied. **DEC-03 (16K) stands, reaffirmed on current data.**
 
 **Two caveats surfaced:**
-1. **Footprint grew:** peak RSS at 16K is now **~12.7 GB** (vs 3,562 MB in March — OV 2026.1 + INT8-draft accounting differs). Still within the 15,507 MB AO budget, but headroom is far tighter than March showed.
+1. **Footprint grew:** peak RSS at 16K is now **\~12.7 GB** (vs 3,562 MB in March — OV 2026.1 + INT8-draft accounting differs). Still within the 15,507 MB AO budget, but headroom is far tighter than March showed.
 2. **The "20K is safe" March conclusion is now suspect** — at 12.7 GB already at 16K, 20K's footprint must be re-verified before assuming it fits. Not pursued (16K is the locked, sufficient choice).
 
 **Not measured:** the 20K band, NAT values other than 3, co-resident cost (PA + Substrate loaded), end-to-end TTFT under the real UI path. Single-session GPU, no other model co-resident during the run.
@@ -1494,28 +1494,28 @@ Embedder load (CPU, one run):
 
 Per-turn retrieval:
 
-| Corpus | p50 | p95 | mean | p95 as % of ~0.8 s first-token |
+| Corpus | p50 | p95 | mean | p95 as % of \~0.8 s first-token |
 |---|---|---|---|---|
-| 100 chunks | 5.1 ms | 6.2 ms | 5.3 ms | ~0.8% |
-| 1 000 chunks | 9.0 ms | 10.7 ms | 9.2 ms | ~1.3% |
-| 5 000 chunks | 26.3 ms | 28.4 ms | 26.6 ms | ~3.5% |
+| 100 chunks | 5.1 ms | 6.2 ms | 5.3 ms | \~0.8% |
+| 1 000 chunks | 9.0 ms | 10.7 ms | 9.2 ms | \~1.3% |
+| 5 000 chunks | 26.3 ms | 28.4 ms | 26.6 ms | \~3.5% |
 
-**Reading:** the "5–8 s embedder first-prompt tax" (#553) is ~92% the one-time
+**Reading:** the "5–8 s embedder first-prompt tax" (#553) is \~92% the one-time
 `transformers` import, which the 14B path (`gpu_inference`, module-level import via
 `entrypoint.py:45`) already pays at boot before the Substrate builds. The embedder's
-marginal load in the running AO is **~0.3 s**, paid at boot inside the 4.6 s
+marginal load in the running AO is **\~0.3 s**, paid at boot inside the 4.6 s
 AO-entrypoint slice (see the 2026-06-03 boot-attribution entry, #546). There is no
 separate first-prompt tax — #546 measured the embedder *isolated*, where nothing
 pre-imports transformers. **#553 closes as no-op (premise invalid).** Per-turn
-retrieval is **immaterial to TTFT** (~0.8–1.3% at realistic single-user scale, <5%
-even at 5 000 chunks; against a ~0.8 s measured first-token latency — standard-decoding TTFT ~0.77 s, spec-on streaming TTFT reported n/a, cold spec-on first-token ~1.5 s, see the harness chat entry below) — no retrieval-optimization
+retrieval is **immaterial to TTFT** (\~0.8–1.3% at realistic single-user scale, <5%
+even at 5 000 chunks; against a \~0.8 s measured first-token latency — standard-decoding TTFT \~0.77 s, spec-on streaming TTFT reported n/a, cold spec-on first-token \~1.5 s, see the harness chat entry below) — no retrieval-optimization
 follow-up; the brute-force cosine holds well past realistic scale.
 
 **Not measured:** real-AO end-to-end boot+first-prompt trace with the 14B on the GPU
 (avoided to not contend with the parallel security session); co-resident memory cost;
 true cold-disk (post-reboot) transformers import (measured warm-disk — the import
 varied 4.8–8.5 s across runs under system load, while the marginal load stayed
-~0.3–0.4 s); GPU driver version; ingest latency (corpus setup, not the measured path).
+\~0.3–0.4 s); GPU driver version; ingest latency (corpus setup, not the measured path).
 
 ---
 
@@ -1542,7 +1542,7 @@ BlarAI launcher not running.
 | chat | Qwen3-14B / INT4 (spec-decode on) | GPU | `generate_text` (64 tok), cold first turn | first-token **1 500 ms**; total 6 123 ms (engine) / 6 138 ms wall; cold load 19 333 ms |
 
 **What the numbers say:** the image and chat waits are dominated by **cold model
-load** (~13 s VLM, ~19 s 14B), not the pipeline — exactly the lever the keep-warm /
+load** (\~13 s VLM, \~19 s 14B), not the pipeline — exactly the lever the keep-warm /
 eviction follow-up (ADR-015 / Vikunja #550) and the VLM-memory options (#565)
 target. The freeze the User-Operator hit on 2026-06-03 was those seconds running
 *on the event loop*; the harness's Layer A regression lock now keeps them off it.
@@ -1567,7 +1567,7 @@ asked whether it would bloat startup — answered with the instrument, not infer
 via the Windows CNG *Microsoft Platform Crypto Provider* (Pluton present but not the
 active TPM; ISS-4 / `docs/TPM_CAPABILITY_FINDINGS.md`).
 **Method:** `shared.security.tpm_signer` on the real chip, single-session, otherwise-idle.
-ECDSA P-256 (ES256), ~126-byte signing-input. provision/export = 1 run; key_exists = 10;
+ECDSA P-256 (ES256), \~126-byte signing-input. provision/export = 1 run; key_exists = 10;
 sign = 30. `python -c` probe, `time.perf_counter()`.
 
 | Operation | When | median | mean | min–max |
@@ -1577,9 +1577,9 @@ sign = 30. `python -c` probe, `time.perf_counter()`.
 | `key_exists` | per boot (at most) | 3.25 ms | — | –6.81 ms |
 | **`sign` (one JWT)** | **per authorization (runtime)** | **93.6 ms** | 88.4 ms | 78.1–111.5 ms |
 
-**Reading:** boot impact is ~3 ms (a key-existence check) — the 14B GPU compile (13.5 s,
+**Reading:** boot impact is \~3 ms (a key-existence check) — the 14B GPU compile (13.5 s,
 53% of boot; see the boot-attribution entry below) dwarfs it, so startup is unaffected.
-The real cost is ~94 ms per minted token at runtime — ~900× software ES256 (~0.1 ms),
+The real cost is \~94 ms per minted token at runtime — \~900× software ES256 (\~0.1 ms),
 which is the price of a key that never leaves the chip — comfortably under the ≤750 ms
 human-approval budget. Only a concern under high-frequency *autonomous* actioning; a
 tiered signing path (software for low-sensitivity, TPM for sensitive) is the lever if so.
@@ -1607,15 +1607,15 @@ fresh-process loads (harness + raw JSON: `docs/performance/whisper_cache_probe_2
 | Shared LLMPipeline compile (14B INT4 + 0.6B draft) | 13.7 s | 53% |
 | Policy Agent measured-boot gate | 3.7 s | 14% |
 | Assistant Orchestrator entrypoint | 4.6 s | 18% |
-| Session DB + transport gateway + handshake | ~0.0 s | <1% |
+| Session DB + transport gateway + handshake | \~0.0 s | <1% |
 | Voice engine (Whisper + Kokoro) | 2.6 s | 10% |
-| **Total → WinUI app launch** | **~25.8 s** | |
+| **Total → WinUI app launch** | **\~25.8 s** | |
 
 Boot is **compile-dominated**: the 14B+draft GPU compile is 53% of it. #545 already
 established that compile is not cacheable for a net win (9 GB blob, cold read ≈
-fresh compile once integrity-hashed). A second consecutive boot measured ~26.8 s —
+fresh compile once integrity-hashed). A second consecutive boot measured \~26.8 s —
 same shape. **Honesty:** these are *warm-disk* boots (weights already in the OS
-page cache from earlier in the day); a cold first-boot reads ~8.7 GB from cold
+page cache from earlier in the day); a cold first-boot reads \~8.7 GB from cold
 disk and will be slower on the compile slice. The operator's perceived "30–40 s"
 also includes the WinUI app's own init (XAML / WinAppSDK) *after* the launcher
 hands off — not in `launcher.log`, not measured here.
@@ -1629,9 +1629,9 @@ hands off — not in `launcher.log`, not measured here.
 | warm1 / warm2 | cache (read) | 0.75 / 0.76 s |
 
 Fresh compile 1.72 s; warm read 0.75 s; + the mandatory integrity-hash of the
-496 MB blob 0.29 s → warm total **1.04 s vs 1.72 s fresh = net save ~0.67 s**. So
-unlike the 14B, caching Whisper *does* net a small positive — but it is ~0.67 s on
-a ~26 s boot (≈2.6%), Whisper being only ~10% of boot, at the cost of a permanent
+496 MB blob 0.29 s → warm total **1.04 s vs 1.72 s fresh = net save \~0.67 s**. So
+unlike the 14B, caching Whisper *does* net a small positive — but it is \~0.67 s on
+a \~26 s boot (≈2.6%), Whisper being only \~10% of boot, at the cost of a permanent
 496 MB blob that must be recompiled+rewritten on any OpenVINO / driver / model
 change. **Output identity was NOT verified** — the synthetic-audio transcription
 probe failed (`skip:Runtime`), so warm-cache-vs-fresh transcript equivalence (the
@@ -1642,12 +1642,12 @@ cold-GPU/cold-disk first load) — itself a warm-vs-cold reminder.
 **Substrate embedder (bge-small-en-v1.5 ONNX, CPU):** previously unmeasured (#542).
 Standalone load **5.0–8.1 s** (warm/cold disk, two fresh processes). The boot
 AO-entrypoint slice (4.6 s) is *shorter* than this, indicating the embedder loads
-**lazily on first prompt**, not at boot — a ~5–8 s first-prompt latency cost,
-outside the ~26 s boot budget. (Inferred from the timing gap; pinning the exact
+**lazily on first prompt**, not at boot — a \~5–8 s first-prompt latency cost,
+outside the \~26 s boot budget. (Inferred from the timing gap; pinning the exact
 load point would need step instrumentation.)
 
-**Decision (governance default — keep `CACHE_DIR=""` for Whisper):** the ~0.67 s
-net win is imperceptible against a ~26 s boot, costs 496 MB + a cache-invalidation
+**Decision (governance default — keep `CACHE_DIR=""` for Whisper):** the \~0.67 s
+net win is imperceptible against a \~26 s boot, costs 496 MB + a cache-invalidation
 maintenance surface, and rests on unverified output identity. Not worth enabling.
 The real startup lever remains the 14B compile (53%), already settled. Path-not-
 taken: a future GO would need (a) boot speed to become a real priority and (b)
@@ -1666,10 +1666,10 @@ device GPU. (The only INT4 OV-org Qwen3-VL — 4B/2B int4-ov repos do not exist.
 |-------|-------------|-------|
 | VLMPipeline load (GPU, cold) | **12.9 s** | one-time; pipeline cached after first image |
 | Image describe (120 new tokens, 1 image @ 1600×2560) | **16.2 s** | greedy; standalone probe |
-| End-to-end `load_document` (image → 256-token description) | **~30 s** | first image (load + describe) |
+| End-to-end `load_document` (image → 256-token description) | **\~30 s** | first image (load + describe) |
 
 **Measured STANDALONE — the 14B was NOT co-resident.** The load-bearing number for
-trend analysis is therefore **UNMEASURED**: VLM + 14B (~5 GB + ~8.7 GB) on the
+trend analysis is therefore **UNMEASURED**: VLM + 14B (\~5 GB + \~8.7 GB) on the
 31.3 GB shared ceiling — load/inference cost with both resident, and whether it OOMs
 (fail-soft falls back to a placeholder; load-on-demand 14B eviction is the planned
 mitigation — ADR-015 / Vikunja #550). **A future entry must measure co-resident vision.**
@@ -1705,17 +1705,17 @@ cache does NOT change generated output.
 **Startup — no reliable win.** prod (fresh) mean 10.80 s; warm mean 9.36 s (raw
 −1.44 s / −13%). That 13% is an OS-page-cache artifact: warm2's 6.90 s only
 happened because warm1 had just pulled the 9 GB blob into RAM. warm1 — the
-realistic first read from cold disk — was 11.83 s, ~1 s **slower** than a fresh
+realistic first read from cold disk — was 11.83 s, \~1 s **slower** than a fresh
 compile. On a real post-reboot launch the blob is not RAM-resident, so the
-representative warm load (~12 s) does not beat the ~11 s fresh compile. Enabling
+representative warm load (\~12 s) does not beat the \~11 s fresh compile. Enabling
 the cache costs a one-time **+42 s** blob write, **+9.0 GB disk** per {OV version,
 device, model, shape} key, and a re-write on every OV upgrade / driver update /
 model swap.
 
-**Reframe of the ~30–40 s startup:** the 14B+draft compile is only ~11 s of it;
+**Reframe of the \~30–40 s startup:** the 14B+draft compile is only \~11 s of it;
 the rest is Whisper-small load (5.87 s, see the 2026-06-02 entry) + Kokoro +
 service/pipe bring-up + Substrate embedder. The compile cache addresses only the
-~11 s model slice and saves ~0 of it — a red herring for total startup. A future
+\~11 s model slice and saves \~0 of it — a red herring for total startup. A future
 entry should profile full boot and test caching **Whisper** (a much smaller blob).
 
 **Decision status:** evidence only — the `CACHE_DIR` governance re-decision is the
@@ -1737,11 +1737,11 @@ exposes no GPU execution provider — see ADR-017 §2.3).
 | Whisper-small load (GPU) | **5.87 s** | one-time at surface startup; fail-soft |
 | Whisper-small transcribe | **0.53 s** | for a 2.67 s utterance; exact round-trip |
 | Kokoro-82M load (CPU) | **0.89 s** | one-time at surface startup; fail-soft |
-| Kokoro-82M synthesis | **0.90 s** for 3.01 s audio | real-time-factor **0.30** (~3.3× faster than playback) |
+| Kokoro-82M synthesis | **0.90 s** for 3.01 s audio | real-time-factor **0.30** (\~3.3× faster than playback) |
 | Kokoro streaming first-chunk | **1.42 s** | first sentence of a multi-sentence reply |
 
-**Derived first-spoken-token budget ≈ 2.6 s** (Whisper 0.53 + Qwen3 TTFT ~0.7
-from the 14B entries below + Kokoro first-chunk ~1.4) — inside the <3 s target.
+**Derived first-spoken-token budget ≈ 2.6 s** (Whisper 0.53 + Qwen3 TTFT \~0.7
+from the 14B entries below + Kokoro first-chunk \~1.4) — inside the <3 s target.
 
 **Measurement honesty / still pending live:** the figures above are component
 timings from synthetic audio (TTS→STT round-trip), not an end-to-end live-mic
@@ -1852,11 +1852,11 @@ Model load time: 13708 ms · 20 generations, 0 errors · incremental streaming: 
 
 *Speculative decoding now engages* (`achieved: true`) for the first time — it was silently falling back to standard decoding before the fix `b699ad1`. This is the first valid spec-off vs spec-on comparison.
 
-*Speedup: ~1.25x median, ~1.45x on long generations.* The 252-token prompt went 11.4 → 16.5 tok/s, with total latency 22.0 s → 15.3 s. Short generations benefit less, and the trivial 8-token prompt is marginally *slower* under speculative decoding (the per-step draft+verify overhead is not amortised over so few tokens). For substantive conversational answers — the case that matters — it is a clear win.
+*Speedup: \~1.25x median, \~1.45x on long generations.* The 252-token prompt went 11.4 → 16.5 tok/s, with total latency 22.0 s → 15.3 s. Short generations benefit less, and the trivial 8-token prompt is marginally *slower* under speculative decoding (the per-step draft+verify overhead is not amortised over so few tokens). For substantive conversational answers — the case that matters — it is a clear win.
 
-*An earlier "~2x" figure was an overstatement.* It compared a cool-GPU speculative run against a thermally-disadvantaged baseline. This entry — measured with the thermal cooldown — is the methodology-corrected figure: ~1.4x.
+*An earlier "\~2x" figure was an overstatement.* It compared a cool-GPU speculative run against a thermally-disadvantaged baseline. This entry — measured with the thermal cooldown — is the methodology-corrected figure: \~1.4x.
 
-*Live token streaming does NOT occur under speculative decoding.* The stream callback never fires on the speculative / ContinuousBatching backend, so TTFT is unmeasurable here and the response is delivered all-at-once rather than token-by-token. Standard decoding streams normally (TTFT ~760 ms). This is a UX trade-off; whether it is fixable is being investigated.
+*Live token streaming does NOT occur under speculative decoding.* The stream callback never fires on the speculative / ContinuousBatching backend, so TTFT is unmeasurable here and the response is delivered all-at-once rather than token-by-token. Standard decoding streams normally (TTFT \~760 ms). This is a UX trade-off; whether it is fixable is being investigated.
 
 *Standard-decoding throughput here (median 10.6) is higher than the initial-baseline entry (8.0).* The initial baseline was measured on an already-warm GPU; this run's pre-run idle plus the cooldown make this the more accurate standard-decoding figure.
 
@@ -1907,11 +1907,11 @@ Model load time: 12296 ms · 20 generations, 0 errors
 
 *Finding 1 — speculative decoding does not engage on this stack.* Both configs ran **standard decoding**. The spec-on config tried to construct the speculative pipeline and OpenVINO threw `Option not found: num_assistant_tokens` (`runtime/plugin_config.hpp:214`); the engine caught it and fell back. So the two result blocks above are the *same* engine path measured twice — not an A/B of speculative vs standard. This confirms empirically that BlarAI currently runs standard decoding only, despite `speculative_decoding_enabled = true` in config and the `qwen3-0.6b` draft model being present on disk. Fixing this is the next performance task.
 
-*Finding 2 — thermal throttling under sustained load.* Throughput falls monotonically run-over-run within a config. Standard decoding, the 252-token prompt: run 1 = 9.4 tok/s → run 5 = 8.1 tok/s, with TTFT climbing in step. The Arc 140V is an integrated GPU in a thin laptop; sustained generation heats it and it clocks down. A separate cool-GPU smoke run (1 pass, no warmup) hit 11.5 tok/s on the same prompt — the cold-start ceiling, ~40 % above the warmed-up steady state.
+*Finding 2 — thermal throttling under sustained load.* Throughput falls monotonically run-over-run within a config. Standard decoding, the 252-token prompt: run 1 = 9.4 tok/s → run 5 = 8.1 tok/s, with TTFT climbing in step. The Arc 140V is an integrated GPU in a thin laptop; sustained generation heats it and it clocks down. A separate cool-GPU smoke run (1 pass, no warmup) hit 11.5 tok/s on the same prompt — the cold-start ceiling, \~40 % above the warmed-up steady state.
 
-*Why "spec-on" reads ~16 % slower.* It is **not** a config effect — speculative decoding never engaged. The benchmark runs spec-off then spec-on back-to-back with no cooldown, so the spec-on block always measures an already-hot GPU. The gap is the thermal-ordering artifact of Finding 2, nothing more.
+*Why "spec-on" reads \~16 % slower.* It is **not** a config effect — speculative decoding never engaged. The benchmark runs spec-off then spec-on back-to-back with no cooldown, so the spec-on block always measures an already-hot GPU. The gap is the thermal-ordering artifact of Finding 2, nothing more.
 
-*Methodology limitation (carry-forward).* Until speculative decoding actually engages, the spec-off / spec-on columns are not a real comparison; and even once it does, the back-to-back ordering needs a cooldown (or a cold per-config process) before the A/B is trustworthy. **The reference number to track from this entry is the standard-decoding column: ~8 tok/s median throughput, ~940 ms median TTFT.**
+*Methodology limitation (carry-forward).* Until speculative decoding actually engages, the spec-off / spec-on columns are not a real comparison; and even once it does, the back-to-back ordering needs a cooldown (or a cold per-config process) before the A/B is trustworthy. **The reference number to track from this entry is the standard-decoding column: \~8 tok/s median throughput, \~940 ms median TTFT.**
 
 ---
 
@@ -1934,7 +1934,7 @@ Model load time: 12296 ms · 20 generations, 0 errors
 | `turns.content` (long) | 963 B | 1.0 µs | 1.2 µs | 0.9 µs | 1.0 µs |
 | `sessions.title` | 55 B | 0.8 µs | 0.9 µs | 0.7 µs | 0.8 µs |
 
-AES-GCM is throughput-dominant for short fields; single-call latency is dominated by nonce generation and HMAC overhead, not data length.  Sub-microsecond decrypts up to ~1 KB.
+AES-GCM is throughput-dominant for short fields; single-call latency is dominated by nonce generation and HMAC overhead, not data length.  Sub-microsecond decrypts up to \~1 KB.
 
 #### List and turn-fetch overhead (encrypted vs. plaintext store, 50 sessions / 10 turns)
 
@@ -1943,9 +1943,9 @@ AES-GCM is throughput-dominant for short fields; single-call latency is dominate
 | `list_sessions` (50 sessions) | 0.19 ms median, 0.20 ms P95 | 0.09 ms median, 0.10 ms P95 | +0.10 ms (2.1x SQL baseline) |
 | `get_session_turns` (10 turns) | 0.048 ms median, 0.053 ms P95 | not measured separately | — |
 
-The 2x overhead on `list_sessions` is expected: 50 AES-GCM decrypts (one per title, ~0.7 µs each) plus unchanged SQLite query cost. Absolute latency (0.19 ms) is imperceptible in any UX context — the LLM response dominates by 3–5 orders of magnitude.
+The 2x overhead on `list_sessions` is expected: 50 AES-GCM decrypts (one per title, \~0.7 µs each) plus unchanged SQLite query cost. Absolute latency (0.19 ms) is imperceptible in any UX context — the LLM response dominates by 3–5 orders of magnitude.
 
-**Notes:** The encryption overhead is noise relative to the GPU inference loop (~1–8 s per turn). No performance concern for BlarAI's current usage profile (single user, interactive). Community-grade note for OpenVINO ecosystem: this measures only app-layer Python/PyCA overhead — the Intel AES-NI hardware path is used transparently by `cryptography`.
+**Notes:** The encryption overhead is noise relative to the GPU inference loop (\~1–8 s per turn). No performance concern for BlarAI's current usage profile (single user, interactive). Community-grade note for OpenVINO ecosystem: this measures only app-layer Python/PyCA overhead — the Intel AES-NI hardware path is used transparently by `cryptography`.
 
 ---
 

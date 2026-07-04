@@ -121,7 +121,7 @@ Test key deleted (cleanup ok)
 4. **Practical constraints:** No Windows Hello requirement for CNG provider keys.
    Secure Boot + measured boot are active (PCR7 bound). Crypto ops do **not**
    require elevation. Operation latency was sub-second in the PoC — well inside
-   the ~200–500 ms per-adjudication budget (GOV-10); per-op TPM signing is the
+   the \~200–500 ms per-adjudication budget (GOV-10); per-op TPM signing is the
    item to benchmark before it lands on the adjudication hot path.
 
 ## 4. Implementation path

@@ -43,14 +43,14 @@ All language-model inference runs on the Arc 140V GPU via **OpenVINO GenAI**
 an Intel/OpenVINO-native stack tuned for Lunar Lake.
 
 - **Primary model — Qwen3-14B, INT4 (GPU).** 40 layers, 5120 hidden, 8 KV heads
-  (GQA), ~9.1 GB of INT4-symmetric weights. A single shared model instance backs
+  (GQA), \~9.1 GB of INT4-symmetric weights. A single shared model instance backs
   both the Policy Agent (classification) and the Assistant Orchestrator
   (conversation) — one weight load, distinct KV-caches — so the security gate and
   the conversational agent never double the RAM cost.
 - **Speculative decoding.** A Qwen3-0.6B draft, pruned to 6 layers and quantized
   INT8, drives speculative decoding for roughly 2× throughput. The pruned draft
   was chosen over a full 0.6B draft specifically because it *streams* token by
-  token — a deliberate trade of ~20% peak throughput for a responsive, live-typing
+  token — a deliberate trade of \~20% peak throughput for a responsive, live-typing
   feel on every reply.
 - **Embeddings — bge-small-en-v1.5, NPU-offloaded.** The shared 384-dim encoder
   (substrate retrieval, knowledge bank, and leakage detection all ride one
@@ -70,8 +70,8 @@ an Intel/OpenVINO-native stack tuned for Lunar Lake.
   cannot always co-reside under the 31.323 GB ceiling, generation is choreographed
   against memory: the diffusion pipeline is evicted after every generate, and a
   high-resolution refine will evict the shared 14B and lazily reload it. The
-  Phase-0 memory gate measured a **~26.0 GB co-resident peak (5.3 GB headroom)**;
-  base 1024² generation completes in ~10.7 s.
+  Phase-0 memory gate measured a **\~26.0 GB co-resident peak (5.3 GB headroom)**;
+  base 1024² generation completes in \~10.7 s.
 
 ---
 

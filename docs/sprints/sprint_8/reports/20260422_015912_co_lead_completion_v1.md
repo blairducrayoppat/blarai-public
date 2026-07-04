@@ -29,7 +29,7 @@ The prior sprint kickoff (2026-04-22T00:12:56-05:00, commit `25ac435`) signed th
 ## What was authored
 
 **File**: `docs/P5_TASK8_SDO_CONTINUATION_v1.0.xml`
-**Size**: 11 sections, ~300 lines
+**Size**: 11 sections, \~300 lines
 **Committed**: `bfb7d55` — `[agent:co_lead] Sprint 8: SDO continuation XML authored — Task 8 fleet bootstrap`
 
 ### Coverage per section
@@ -37,7 +37,7 @@ The prior sprint kickoff (2026-04-22T00:12:56-05:00, commit `25ac435`) signed th
 | Section | Content |
 |---|---|
 | 1 — Agent Role | SDO responsibilities in DEC-12 autonomous mode; gate flow; staging-queue workflow; constraints including production-file prohibition |
-| 2 — User Context | LA profile; autonomous fleet workflow; minimal LA touchpoints (~20 min total) |
+| 2 — User Context | LA profile; autonomous fleet workflow; minimal LA touchpoints (\~20 min total) |
 | 3 — Project Overview | Hardware, model, environment (condensed) |
 | 4 — Current State | HEAD `1ce1fe0`; test baseline 755/2-skipped; ledger Entry 50; no active feature branches |
 | 5 — Task 8 Context | Success criteria; sprint governance (DEC-12/DEC-15); EA decomposition (all 5 EAs) with per-EA scope, branch names, ledger reservations 51-55, ORACLE specs, and sizing notes |

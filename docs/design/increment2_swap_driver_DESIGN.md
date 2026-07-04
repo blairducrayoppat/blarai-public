@@ -24,7 +24,7 @@ dormant + cancel-granularity confirmations (§9).
 ## 0. Comprehension (one paragraph)
 
 Increment 2 automates the 14B⇄30B model swap so a coding dispatch can run the fleet's 30B,
-which cannot co-reside with BlarAI's 14B in ~31 GB. The 14B does its one intelligent job —
+which cannot co-reside with BlarAI's 14B in \~31 GB. The 14B does its one intelligent job —
 decomposing the request into validated fleet tasks — while still resident, then BlarAI
 enqueues them, persists `{run_id, session_id, tasks, phase}` (NOT conversation content) to
 disk, hands off to a **detached host driver** (spawned breakaway so it outlives BlarAI), and
@@ -34,7 +34,7 @@ RunId for the whole queue, then **disarms the watchdog and stops OVMS**, and res
 backend with a bounded retry — always converging to "14B up, 30B down," and signalling loudly
 out-of-band if the backend won't come back. The restarted AO reloads the conversation from the
 encrypted `sessions.db`, reads the RunId's `SUMMARY.txt`, and reports into the session. The
-single biggest design fact: milestone 1 showed a bare in-process unload frees only ~20.1 GB
+single biggest design fact: milestone 1 showed a bare in-process unload frees only \~20.1 GB
 (below the 30B's load need), so a **full process step-aside** is required, which is why a
 detached driver (not the AO) runs the swap.
 
@@ -42,11 +42,11 @@ detached driver (not the AO) runs the swap.
 
 ## 1. Core design decision — full step-aside ⇒ a detached driver (RATIFIED divergence from brief §4.2)
 
-Brief §4.2 keeps the **AO process alive**, unloads the 14B in-process, gates ~21 GiB, and has
+Brief §4.2 keeps the **AO process alive**, unloads the 14B in-process, gates \~21 GiB, and has
 the alive AO drive the swap. **Milestone 1 measured the bare in-process unload reaches only
-~20.1 GB** — below the brief's own gate and the 30B's ~22–23 GB load need. The ~6 GB gap is the
+\~20.1 GB** — below the brief's own gate and the 30B's \~22–23 GB load need. The \~6 GB gap is the
 AO process's non-model residency (Python heap, INT8 draft, Level-Zero context, KV/embedding
-caches) that only a **process exit** frees; an idle box with BlarAI gone sits at ~26 GB.
+caches) that only a **process exit** frees; an idle box with BlarAI gone sits at \~26 GB.
 
 **Therefore (LA-ratified):** UNLOAD is a **full backend-process step-aside (exit)**, and because
 the AO is then gone for the run, a **detached host driver** (spawned breakaway, the increment-1
@@ -211,13 +211,13 @@ brief §4.2 UNLOAD trigger verbatim ("decomposed it AND enqueued the tasks") and
 VALIDATE (never self-certified); a failed ruler aborts before any swap, 14B untouched.
 
 ### (3) Pre-load headroom gate — **21 GiB** (LA-set), tunable + graceful
-- **Measured reality:** 30B load peak ~22–23 GB; bare unload-only reached only ~20.1 GB; full
-  step-aside → ~26 GB idle.
+- **Measured reality:** 30B load peak \~22–23 GB; bare unload-only reached only \~20.1 GB; full
+  step-aside → \~26 GB idle.
 - **Gate: abort the load if post-step-aside `Available < 21 GiB`** (LA directive). 21 matches
   start-llm's own coder-30b gate and aborts only on a genuinely-too-low ambient; after a full
-  step-aside (~26 GB) it rarely binds. **Trade-off on record:** milestone-1 put the load peak at
-  ~22–23 GB, so 21 can sit right at the margin — the milestone-1-margin recommendation was 24
-  (~1–2 GB above the peak). The LA chose 21 (fewer false-aborts; consistency with start-llm),
+  step-aside (\~26 GB) it rarely binds. **Trade-off on record:** milestone-1 put the load peak at
+  \~22–23 GB, so 21 can sit right at the margin — the milestone-1-margin recommendation was 24
+  (\~1–2 GB above the peak). The LA chose 21 (fewer false-aborts; consistency with start-llm),
   accepting the marginal-load case — safe here because the gate is GRACEFUL: a load at 21–23 GB
   thrashes-then-loads rather than hard-failing, and a true abort restores the 14B.
 - **(a) Graceful + recoverable** (LA): gate-fail (8) and pre-guard (5b) restore the 14B + return
@@ -263,7 +263,7 @@ banner) for the nicer backend-only UX (window stays up across the swap).
   PROCESS exits and the driver relaunches `python -m launcher --winui` (the launcher passes its own
   `sys.executable` + argv + cwd to the driver so the relaunch is identical). The reconciler hook is
   `AssistantOrchestratorService.start()` (entrypoint.py), after config load, BEFORE the 14B GPU load.
-- **Watchdog:** a **scheduled-task** script (`scripts/watchdog.ps1`, ~2-min cadence), **NOT currently
+- **Watchdog:** a **scheduled-task** script (`scripts/watchdog.ps1`, \~2-min cadence), **NOT currently
   registered** on this box — so nothing auto-restarts OVMS today (crash or reboot). If registered it
   has `-AtLogOn` + repetition ⇒ would survive reboot and could re-arm the 30B; the reconciler's
   **disarm-first** (`rm server-should-run.txt`) is the defense and the documented contract.

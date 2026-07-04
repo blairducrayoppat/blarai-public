@@ -97,7 +97,7 @@ harness. nncf-reported weight scheme is taken verbatim from each cell's
 
 | Cell | Export args | nncf-reported scheme | NPUW outcome | Compile time |
 |---|---|---|---|---|
-| G   | `--weight-format int4 --group-size 128 --ratio 1.0`             | `int4_asym, group size 128` | **FAIL** — `StopLocationVerifierPass: 40 duplicated names` | ~6 s to fail |
+| G   | `--weight-format int4 --group-size 128 --ratio 1.0`             | `int4_asym, group size 128` | **FAIL** — `StopLocationVerifierPass: 40 duplicated names` | \~6 s to fail |
 | G-H | `--weight-format int4 --group-size -1`                          | `int4_asym, per-channel`    | **OK** | 19.30 s |
 | G-I | `--weight-format int8`                                          | (INT8 weight-only)           | **OK** | 16.45 s |
 | G-C | `--weight-format int4 --group-size 128 --ratio 1.0 --disable-stateful` | `int4_asym, group size 128` (stateless) | **N/A** — fails before NPUW: `Stateful models without 'beam_idx' input are not supported in StatefulToStateless transformation`. `--disable-stateful` is incompatible with `LLMPipeline`. |

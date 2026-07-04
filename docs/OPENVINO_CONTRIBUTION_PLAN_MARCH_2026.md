@@ -41,7 +41,7 @@ Confirmed two bugs on Arc 140V (Xe2 iGPU):
 - **Issue**: [openvino#34617](https://github.com/openvinotoolkit/openvino/issues/34617)
 - **PR**: [openvino#34651](https://github.com/openvinotoolkit/openvino/pull/34651)
 - **Status**: Open, no reviews yet, assigned to Munesh-Intel + YuChern-Intel
-- **What it does**: ~25-line early validation guard in `Plugin::compile_model()` to detect unbounded dynamic dimensions before they reach the VPUX compiler
+- **What it does**: \~25-line early validation guard in `Plugin::compile_model()` to detect unbounded dynamic dimensions before they reach the VPUX compiler
 - **Action needed**: Engage in PR comments, address CI feedback, ping reviewers
 - **Impact**: Closes #34617 plus relates to 4 historical NPU dynamic-shape bugs (#32466, #24619, #26375, #26357)
 
@@ -60,7 +60,7 @@ Confirmed two bugs on Arc 140V (Xe2 iGPU):
 - **URL**: https://github.com/openvinotoolkit/openvino/issues/33946
 - **Status**: UNASSIGNED, last activity Feb 2026, no Intel engineer response
 - **What's needed**: Two users with Arc 140V report only 8 tok/s on Qwen VL 8B INT4. No diagnosis posted.
-- **Effort**: Low (~30 min benchmarking)
+- **Effort**: Low (\~30 min benchmarking)
 - **Impact**: Medium — establishes you as the go-to Arc 140V diagnostic resource
 
 #### D. Issue #32791 — INT4 gpt-oss-20b Garbage Output on GPU
@@ -68,7 +68,7 @@ Confirmed two bugs on Arc 140V (Xe2 iGPU):
 - **Status**: UNASSIGNED, last activity Nov 2025
 - **What's needed**: INT4 MoE model produces all-zeros on GPU. Fix targeted for OV 2025.4. LNL Xe2 is in the optimized tier. Test if fix landed in 2026.0.0.
 - **Effort**: Low (testing)
-- **Impact**: Low-medium — revives stale issue. RISK: model needs ~13GB RSS (tight on 32GB shared)
+- **Impact**: Low-medium — revives stale issue. RISK: model needs \~13GB RSS (tight on 32GB shared)
 - **Recommendation**: SKIP for now due to memory pressure risk
 
 #### E. Issue #33776 — GLM-4.7-Flash + Qwen3.5 Model Support Tracking
@@ -140,7 +140,7 @@ Confirmed two bugs on Arc 140V (Xe2 iGPU):
 
 **Issue**: [openvinotoolkit/openvino#33946](https://github.com/openvinotoolkit/openvino/issues/33946)
 **Status**: OPEN, UNASSIGNED, no Intel engineer has responded
-**Reporters**: Two users with Arc 140V report only 8 tok/s on Qwen VL 8B INT4 — expected ~21-24 tok/s
+**Reporters**: Two users with Arc 140V report only 8 tok/s on Qwen VL 8B INT4 — expected \~21-24 tok/s
 **Model**: `Qwen/Qwen2.5-VL-7B-Instruct` (confirmed — "Qwen3-VL-8B" does not exist on HuggingFace)
 
 ### Why This Is a Good Fit
@@ -148,7 +148,7 @@ Confirmed two bugs on Arc 140V (Xe2 iGPU):
 1. **Same GPU** — Arc 140V, identical to the reporters
 2. **Newer OpenVINO** — 2026.0.0 vs their 2025.3.0 — if perf improved, that's useful data
 3. **Qwen expertise** — VLM architecture knowledge from Qwen3.5 work
-4. **Low effort** — ~30 min of benchmarking, no code changes needed
+4. **Low effort** — \~30 min of benchmarking, no code changes needed
 5. **Community visibility** — Unassigned issue with no Intel response
 
 ### What the Reporters Likely Got Wrong
@@ -163,7 +163,7 @@ Based on community diagnosis (krgkaushik's comments):
 
 #### Step 1: Identify the exact model
 
-Confirmed: `Qwen/Qwen2.5-VL-7B-Instruct` (4.78M downloads, the latest official ~8B VL model from Qwen).
+Confirmed: `Qwen/Qwen2.5-VL-7B-Instruct` (4.78M downloads, the latest official \~8B VL model from Qwen).
 
 #### Step 2: Export the model to OpenVINO IR (INT4)
 
@@ -178,7 +178,7 @@ Uses BlarAI `.venv` (full openvino + genai + optimum stack):
 ```
 
 **Memory**: INT4 8B model ≈ 4-5GB. Fits comfortably on Arc 140V.
-**Time**: ~10-20 min for export + download.
+**Time**: \~10-20 min for export + download.
 
 #### Step 3: Run controlled `benchmark_app` tests
 
@@ -196,8 +196,8 @@ benchmark_app -m models/qwen25-vl-7b-int4/openvino_vision_encoder.xml -d GPU -hi
 ```
 
 **Expected results** (based on official qwen3-8b benchmarks for 7-258V):
-- Language model GPU: ~21-24 tok/s
-- Language model CPU: ~10-15 tok/s
+- Language model GPU: \~21-24 tok/s
+- Language model CPU: \~10-15 tok/s
 - Vision encoder GPU: Slower (this is normal, not the bottleneck)
 
 #### Step 4: Run end-to-end VLM inference with timing
@@ -241,8 +241,8 @@ cd C:\Users\mrbla\BlarAI
 .\scripts\run_issue33946_benchmark.ps1
 ```
 
-**First run**: ~20+ min (downloads ~16GB model, then exports to INT4 IR)
-**Subsequent runs**: ~2 min (skips export, runs benchmarks only)
+**First run**: \~20+ min (downloads \~16GB model, then exports to INT4 IR)
+**Subsequent runs**: \~2 min (skips export, runs benchmarks only)
 
 ---
 
@@ -250,11 +250,11 @@ cd C:\Users\mrbla\BlarAI
 
 | Risk | Mitigation |
 |------|-----------|
-| Model download is large (~16GB for full VL model) | INT4 export reduces to ~4-5GB on disk |
+| Model download is large (\~16GB for full VL model) | INT4 export reduces to \~4-5GB on disk |
 | Export may fail (VLM export is complex) | Use standard `optimum-cli` path, not PR #1634 branch |
 | GPU driver issues on Windows | Check Intel driver version in diagnostic output |
 | 8 tok/s reproduces even on 2026.0.0 | That's valuable data — confirms a real bug, not a user error |
-| gpt-oss-20b memory pressure (~13GB RSS) | SKIP this issue — too close to memory limit |
+| gpt-oss-20b memory pressure (\~13GB RSS) | SKIP this issue — too close to memory limit |
 | Bash shell broken (MSYS2 0xC0000142) | Use PowerShell scripts with direct venv Python paths |
 
 ---

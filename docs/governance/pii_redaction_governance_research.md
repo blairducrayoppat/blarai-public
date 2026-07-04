@@ -237,12 +237,12 @@ filtering).
 
 ## 6. AIGP body-of-knowledge alignment (v2.1, effective 2026-02-02)
 
-| Domain | Title | ~Questions | ~% of exam |
+| Domain | Title | \~Questions | \~% of exam |
 |---|---|---|---|
-| I | Foundations of AI Governance | 16–20 | ~21% |
-| II | Laws, Standards and Frameworks for AI | 19–23 | ~25% |
-| III | Governance of AI Development | 21–25 | ~27% |
-| IV | Governance of AI Deployment and Use | 21–25 | ~27% |
+| I | Foundations of AI Governance | 16–20 | \~21% |
+| II | Laws, Standards and Frameworks for AI | 19–23 | \~25% |
+| III | Governance of AI Development | 21–25 | \~27% |
+| IV | Governance of AI Deployment and Use | 21–25 | \~27% |
 
 **How the provenance-aware redaction capability maps:**
 

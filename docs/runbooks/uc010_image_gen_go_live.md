@@ -19,7 +19,7 @@ the ONLY thing that flips `[image_generation].enabled`. Reuses the
    `vae_decoder/`, `vae_encoder/`, `text_encoder*/`, `tokenizer*/`, `scheduler/`,
    `model_index.json`). `models/` is gitignored — the capability ships ABSENT, so
    this is a provisioning step done on the box.
-2. The Phase-0 memory gate is PASSED (recorded — ~26.0 GB co-resident peak vs the
+2. The Phase-0 memory gate is PASSED (recorded — \~26.0 GB co-resident peak vs the
    31.323 GB ceiling, 5.3 GB headroom). If the model checkpoint changed since,
    re-run the Phase-0 spike first.
 3. A TPM 2.0 / Windows CNG provider is available (the `BlarAI-Manifest-Signing`

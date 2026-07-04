@@ -116,7 +116,7 @@
 
 ## 3. Dry-Run Rollback Drill (Do This Before Stage 4)
 
-**Why:** Practising restore on disposable data costs ~15 minutes and eliminates 90% of the panic-induced errors that cause real data loss.
+**Why:** Practising restore on disposable data costs \~15 minutes and eliminates 90% of the panic-induced errors that cause real data loss.
 
 **Setup (5 min):**
 ```powershell

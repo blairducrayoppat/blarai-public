@@ -200,7 +200,7 @@ The "no decades of data on disk" correction is applied consistently across ADR-0
 §1/§3 (the corrected "born encrypted / well-timed, not urgent / disposable dev scaffolding" framing
 appears 5× in each). My own live count (substrate 5 active chunks; sessions 2 sessions / 8 turns —
 note these are *fresh* born-encrypted rows after the LA wiped the legacy dev data per SCR §4, smaller
-than the pre-wipe ~107/376 figures) is consistent with the premise: this is disposable build-phase
+than the pre-wipe \~107/376 figures) is consistent with the premise: this is disposable build-phase
 data, not decades of secrets. The premise-verification journal lesson (verify on disk, don't inherit
 through the review chain) is well-founded.
 

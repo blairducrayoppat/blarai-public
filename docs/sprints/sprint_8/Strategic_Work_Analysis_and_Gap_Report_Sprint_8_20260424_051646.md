@@ -215,7 +215,7 @@ Every SDV §5.2 deferred item remained deferred:
 |---|---|---|---|---|
 | Q1-1 ledger format flip (dir-per-entry) | Sprint 8 EA-1 + Sprint 9 EA-1 collided on Entry 51 | N/A — infrastructure, not test scope | AGREE | Orthogonal to test-authoring mandate; unavoidable |
 | EA-2 covered all 13 AO config constraints (SDV floored at 6) | "mature not minimal" directive (LA 2026-04-22) | YES | AGREE | Clean in-policy expansion; each is a parameterized case |
-| EA-3 landed 65 tests vs. rough ~30 SDV expectation | Same | YES | AGREE | Adjacent test expansions in app.py action handlers |
+| EA-3 landed 65 tests vs. rough \~30 SDV expectation | Same | YES | AGREE | Adjacent test expansions in app.py action handlers |
 | Per-EA-session git worktrees (Pattern B) | Parallel-sprint execution required isolation | N/A — infrastructure | AGREE | Commit `d574e4b`; out of scope but orthogonal |
 | Fleet-hygiene §4 rewrite | Standing-rule maturation | N/A — governance | AGREE | Commit `80de21d`; orthogonal |
 
@@ -226,13 +226,13 @@ Systematic review of 4c97ce2..cac99bd (252 commits). Categories:
 | Commit class | Count | Classification |
 |---|---|---|
 | Sprint 8 EA test authoring | 9 (EA-1 through EA-5 including fixup + rename) | In-scope, matches SDV |
-| Sprint 8 agent-role narration commits (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]` reports) | ~30 | Expected DEC-13 flow artifacts |
+| Sprint 8 agent-role narration commits (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]` reports) | \~30 | Expected DEC-13 flow artifacts |
 | Sprint 8 merge commits on main | 5 (EA-1..EA-5 sprint-merge or la-merge commits) | Expected |
-| **Sprint 9 parallel work** (task121 / sprint9 tags) | ~20 commits | Not Sprint 8 scope — Sprint 9 EA-1..EA-5 ran in parallel; not flagged as drift here because Sprint 9 has its own tracking task |
-| Infrastructure / fleet-hygiene / ISS-5/6/7 fixes | ~60 commits | Not SDV-scoped; recognized as orthogonal infrastructure workstream; SCR §2.3 acknowledges some |
+| **Sprint 9 parallel work** (task121 / sprint9 tags) | \~20 commits | Not Sprint 8 scope — Sprint 9 EA-1..EA-5 ran in parallel; not flagged as drift here because Sprint 9 has its own tracking task |
+| Infrastructure / fleet-hygiene / ISS-5/6/7 fixes | \~60 commits | Not SDV-scoped; recognized as orthogonal infrastructure workstream; SCR §2.3 acknowledges some |
 | Ledger format flip `dc768b1` | 1 | Acknowledged unplanned addition (§5.3) |
-| `chore(ops): pause/unpause fleet` pair commits | ~40 | Governance-SOP-mandated; not scope drift |
-| Governance doc / wake-template / DEC-14.5-helper maturation | ~15 | Infrastructure, orthogonal |
+| `chore(ops): pause/unpause fleet` pair commits | \~40 | Governance-SOP-mandated; not scope drift |
+| Governance doc / wake-template / DEC-14.5-helper maturation | \~15 | Infrastructure, orthogonal |
 | SCR + SCR-backfill commits | 3 (`117142b`, `5025a10`, `cac99bd`) | Expected Phase 3 artifacts |
 
 **Substantive ghost commit concern**: `e895fac feat(governance): Sprint Auditor maturity
@@ -304,8 +304,8 @@ semantic change to the new tests.
 |---|---|---|---|---|
 | Regression suite (passed / skipped) | 755 / 2 | 962+ (per EA-3 commit msg; further additions from EA-4/EA-5 not re-stated) | +207+ | +133 documented across EA-1/3/4 |
 | Full suite (passed / skipped) | 835 / 2 (per CLAUDE.md pre-sprint) | not explicitly restated in SCR; commit msgs track regression only | UNVERIFIABLE without re-execution | — |
-| New test files added | — | ~12 (new test_*.py files under services/** and shared/**) | +12 | SCR does not count files, only tests |
-| Test files moved | — | ~5 (23 live-TCP tests relocated; P114 tests redistributed; test_p114_ui_end_to_end.py removed) | +5 relocations | — |
+| New test files added | — | \~12 (new test_*.py files under services/** and shared/**) | +12 | SCR does not count files, only tests |
+| Test files moved | — | \~5 (23 live-TCP tests relocated; P114 tests redistributed; test_p114_ui_end_to_end.py removed) | +5 relocations | — |
 
 Auditor note: The SCR's "+133 documented" conservatively omits EA-2's addition. Commit
 `dfb5c9c` does not state a net-count, but adds 992 insertions across 10 files in new and
@@ -453,7 +453,7 @@ privacy posture with zero regressions.
 
 | Document | Accurate post-sprint? | Stale section if not |
 |---|---|---|
-| CLAUDE.md | PARTIALLY STALE — §"Active State" still reads "Test baseline: 755 passed" and "Task 7 (Test Quality Audit): IN PROGRESS" | Active State section is pre-Sprint-8; should reflect Sprint 8 closure + new baseline (~962 regression) + Task 7 derived artifact closure. Also mentions HEAD `be52ef4` which is multiple sprints behind. |
+| CLAUDE.md | PARTIALLY STALE — §"Active State" still reads "Test baseline: 755 passed" and "Task 7 (Test Quality Audit): IN PROGRESS" | Active State section is pre-Sprint-8; should reflect Sprint 8 closure + new baseline (\~962 regression) + Task 7 derived artifact closure. Also mentions HEAD `be52ef4` which is multiple sprints behind. |
 | IMPLEMENTATION_PLAN.md | NOT RE-VERIFIED — auditor did not open file | Likely needs Sprint 8 closure note |
 | TEST_GOVERNANCE.md | NOT RE-VERIFIED | Should be current; EA-5 was executed against its marker taxonomy |
 | ADR-010 / ADR-011 / ADR-012 | NOT RE-VERIFIED for content; contents were reinforced, not changed | OK |
@@ -548,12 +548,12 @@ Appropriate triggering: yes. Nothing surfaced that should have been a CAR but wa
 
 ### 11.5 DEC-11 autonomy budget compliance
 
-- **Fleet pause/unpause discipline**: ~40 pause/unpause commit pairs in window. Per
+- **Fleet pause/unpause discipline**: \~40 pause/unpause commit pairs in window. Per
   `docs/governance/fleet-hygiene.md` §4, this is high-discipline operation — LA and
   fleet pausing for multi-commit git work.
 - **Role-level budgets**: no evident breach. SCR §11 claims no LA breach; auditor
   observed LA was active on the EA-5 approval path + fleet-hygiene §4 edit — consistent
-  with SCR's ~25–30 min actual claim (vs. 20-min SDV budget).
+  with SCR's \~25–30 min actual claim (vs. 20-min SDV budget).
 - **SOFT/HARD breaches**: 0 evidenced in merge ancestry.
 
 ### 11.6 DEC-15 sprint lifecycle health (first-time check)
@@ -594,7 +594,7 @@ with reduced regression risk.
 **First-baseline observation** (no predecessor SWAGR exists). Data points at this
 baseline:
 
-- Test count trajectory: pre-sprint 755 regression / 835 full → post-sprint ~962+
+- Test count trajectory: pre-sprint 755 regression / 835 full → post-sprint \~962+
   regression (full not restated).
 - Ledger entries (pre-Q1-1 monolithic + per-file dir): >43 at sprint start; +5 Sprint 8
   entries (1 monolithic, 4 per-file) post-sprint.
@@ -647,7 +647,7 @@ would prevent the accumulation bullets above from compounding.
 | 2 | §4 #1, §5.1 #6 | Consolidated 45-item disposition comment on Vikunja #82 not authored as specified in SDV §6 | MINOR | SCR §14.2 self-flags; task #82 comments not scanned but SCR concedes | Add a single summary comment or skip; LA may choose to accept SCR's "consolidated" framing |
 | 3 | §9.2 | No DEC recorded for Q1-1 ledger format flip or `trusted_scope` diff-size carve-out | MINOR | SCR §10 flags DEC candidate; no DEC-16 located | Land a DEC codifying both |
 | 4 | §5.4 ghost commit | Sprint Auditor wake template edited mid-sprint (`e895fac`) without SDV/SCR acknowledgment | MINOR | Commit in merge ancestry; not referenced in SDV/SCR | Note-only; first live SWAGR operated under edited rules, outcome self-consistent |
-| 5 | §9.5 | CLAUDE.md Active State is stale (references Task 7 IN PROGRESS, HEAD `be52ef4`, 755 baseline) | MINOR | CLAUDE.md §"Active State" text vs. actual HEAD `cac99bd` and ~962+ baseline | Refresh on next sprint transition; Co-Lead or LA |
+| 5 | §9.5 | CLAUDE.md Active State is stale (references Task 7 IN PROGRESS, HEAD `be52ef4`, 755 baseline) | MINOR | CLAUDE.md §"Active State" text vs. actual HEAD `cac99bd` and \~962+ baseline | Refresh on next sprint transition; Co-Lead or LA |
 | 6 | §10.3 | Sprint 8 / Sprint 9 cross-sprint parallelism had no design-time audit of shared mutable artifacts; surfaced ledger collision mid-sprint | MINOR | SCR §14.3 admits; Q1-1 flip was reactive | Next SDV authorizing parallel sprints should audit shared artifacts (ledger, Vikunja label space, roster entries, fleet-state files) at design time |
 | 7 | §4 #5 | Collection-integrity claim (criterion 5) unverifiable in auditor environment | MINOR | No pytest available; indirect evidence only (merge landed, `900f7b0` fixed a caught issue) | Next SWAGR cycle: enable auditor to run `pytest --co -q` (toolchain provisioning) |
 

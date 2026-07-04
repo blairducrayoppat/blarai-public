@@ -162,7 +162,7 @@ The Textual TUI then takes over the terminal with:
 | Step | Action | Expected Result | Pass? |
 |------|--------|-----------------|-------|
 | 1 | Type "hello" in input, press Enter | User message appears in chat | ☐ |
-| 2 | Observe response | Tokens stream in word-by-word (~30ms/token) | ☐ |
+| 2 | Observe response | Tokens stream in word-by-word (\~30ms/token) | ☐ |
 | 3 | Response completes | Full greeting message visible | ☐ |
 | 4 | PGOV footer | Shows PERMIT status with reason codes | ☐ |
 

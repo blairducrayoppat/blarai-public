@@ -319,15 +319,15 @@ silently-dropped scope.
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| LA (Lead Architect) | SDV visibility read; the batched on-chip ceremonies + one production-posture live-verify per tier; #598 sign-off | ~10–15 min |
+| LA (Lead Architect) | SDV visibility read; the batched on-chip ceremonies + one production-posture live-verify per tier; #598 sign-off | \~10–15 min |
 | Orchestrator (Co-Lead) | This SDV; dispatch + adversarial review + merge of the 3 builders; journal-fragment fold; SCR | Autonomous (LA-delegated) |
 | Builder subagents (×3) | Execute EA-1/2/3 in isolated worktrees (model sonnet); Layer-A teeth tests; report journal text; never merge / never touch BUILD_JOURNAL | Autonomous, per dispatch |
 | Sprint Auditor | Independent SWAGR after the SCR | Autonomous per DEC-15 |
 
 ## 12. Estimated effort
 
-- Rough duration: **~1 day fleet-time**, 3 parallel EA milestones + merge + journal fold + SCR.
-- LA active-time expectation: **~10–15 min** now (SDV visibility), plus a later **batched** hardware
+- Rough duration: **\~1 day fleet-time**, 3 parallel EA milestones + merge + journal fold + SCR.
+- LA active-time expectation: **\~10–15 min** now (SDV visibility), plus a later **batched** hardware
   session (ceremonies + per-tier live-verify) shared across tiers.
 - Confidence: **high** — deterministic, audit-mapped, well-bounded, disjoint working sets.
 

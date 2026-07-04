@@ -122,7 +122,7 @@ With only 5 post-think tokens (8 - 3 think), the model can produce `DECISION: AL
 | G-04 | Think overhead characterization (100% present, 3 tokens) | **PASS** |
 | G-05 | Latency budget (P95 < 2000ms) | **LATENCY_WARNING** (P95@2048 = 6,616 ms) |
 
-G-05 warning is expected — the 2048-band P95 is high because TTFT at 2048 input tokens dominates (~5,800 ms). This is inherent to the model size and input length, not a `max_new_tokens` issue.
+G-05 warning is expected — the 2048-band P95 is high because TTFT at 2048 input tokens dominates (\~5,800 ms). This is inherent to the model size and input length, not a `max_new_tokens` issue.
 
 ## 8. Calibration
 

@@ -46,7 +46,7 @@ Per-goal verdict with citation evidence. All 4 WI commits are on BlarAI main; th
 | G2 | Pure-function parser module | **PASS** | `services/ui_shell/src/think_parser.py` (132 lines) exports `parse_think_segments(text: str) -> list[tuple[str, bool]]`; `tests/test_think_parser.py` (214 lines) with **18 unit tests** covering complete, multiple, stream-boundary partial, buffer-start, buffer-end, nested rejection, empty, unclosed, non-think, and extended-whitespace cases; WI-2 commit `729d86f3`; all 18 pass. Exceeds EDD §8.2 G2 ≥10 test case minimum. |
 | G3 | StreamingDisplay think-rendering integration | **PASS** | `services/ui_shell/src/streaming.py` `_render_buffer` calls `parse_think_segments`; think segments wrapped with Rich `[dim italic]...[/dim italic]` markup per EDD §8.1 architecture sketch; 4 integration tests in `tests/test_streaming.py`; WI-3 commit `13483616`. WI-1 baseline xfail-marked to record pre-integration baseline honestly (option b of EDD §11 Risk #5 documented resolution path). |
 | G4 | Snapshot test for think-rendered output | **PASS** | New `tests/test_think_rendering.py` (107 lines) feeds think-tag-containing streaming sequence through integrated `StreamingDisplay`; golden SVG at `tests/__snapshots__/test_think_rendering/test_think_rendering_snapshot.svg` (182 lines); WI-4 commit `ea2aec9d`; test passes on second invocation (zero diff). |
-| G5 | Full services/ui_shell pytest suite — no regression | **PASS** | `pytest services/ui_shell/tests/` → **111 passed + 1 xfailed (intentional)** in ~4s; zero regressions; WI-4 commit message cites this count; all pre-sprint test files (`test_app.py`, `test_session_panel.py`, `test_streaming.py`, `test_pgov_display.py`, `test_constants_ui_shell.py`) pass. The 1 xfail is WI-3's intentional marking of WI-1 baseline (documents pre-think-rendering state; not a hidden failure). |
+| G5 | Full services/ui_shell pytest suite — no regression | **PASS** | `pytest services/ui_shell/tests/` → **111 passed + 1 xfailed (intentional)** in \~4s; zero regressions; WI-4 commit message cites this count; all pre-sprint test files (`test_app.py`, `test_session_panel.py`, `test_streaming.py`, `test_pgov_display.py`, `test_constants_ui_shell.py`) pass. The 1 xfail is WI-3's intentional marking of WI-1 baseline (documents pre-think-rendering state; not a hidden failure). |
 | G6 | EDD §10.10 verification commands all observable | **PARTIAL** | G2 / G3 / G4 / G5 verification commands all observable cleanly with documented expected output. G1 literal verification command (`pip install -e services/ui_shell[dev]`) raises `BackendUnavailable: setuptools.backends._legacy` in isolated build environment (setuptools 65 / 75 / 82 all lack `backends` subpackage in wheel layout). G1 goal substance is achieved via direct pip install workaround; the verification-command literal text is not cleanly executable as written. Per memory `feedback_qualify_verification_verdict_scope`: this PARTIAL is scoped to G1's literal-command gap only — it does not indicate a sprint-wide observability failure. G2/G3/G4/G5 commands clean. |
 | G7 | Sprint-close cadence: 3 LA touchpoint commits | **PENDING (LA action at sprint close)** | Touchpoint 1 (EDD sign-off): `cfe5304` (`[la-via-guide-proxy] sprint iss-2 -- EDD v1 ACCEPTED sign-off (LA touchpoint 1)`). Touchpoint 2 (CR sign-off): pending — LA reads this CR + Auditor SWAGR jointly, then signs off. Touchpoint 3 (sprint-close commit): pending — `chore(blarai): close iss-2 sprint -- think-tag rendering shipped`. |
 
@@ -209,16 +209,16 @@ Per memory `feedback_doc_cleanup_non_optional` (Stage 6.7.5-pattern carry-overs 
 
 ## 12. Timeline actuals
 
-- **EDD §13 estimated agent wall-clock**: 1-2 hours for 4 WIs + ~30-60 min CR + SWAGR.
-- **Actual WI wall-clock**: ~30 minutes for all 4 WIs (WI-1 + WI-2 parallel dispatch; WI-3 + WI-4 serial per dependency graph). Significantly faster than estimate, consistent with `feedback_calibrate_time_estimates_against_actuals` (cf-program sprints run faster than a-priori estimates).
-- **CR authoring**: ~10-15 minutes (this session, after WI-4 mark-done).
+- **EDD §13 estimated agent wall-clock**: 1-2 hours for 4 WIs + \~30-60 min CR + SWAGR.
+- **Actual WI wall-clock**: \~30 minutes for all 4 WIs (WI-1 + WI-2 parallel dispatch; WI-3 + WI-4 serial per dependency graph). Significantly faster than estimate, consistent with `feedback_calibrate_time_estimates_against_actuals` (cf-program sprints run faster than a-priori estimates).
+- **CR authoring**: \~10-15 minutes (this session, after WI-4 mark-done).
 - **Actual WI count**: 4/4 — zero variance vs plan.
 - **First-attempt success rate**: 4/4 = 100%.
-- **EDD §13 estimated LA active-time**: ~15-30 min total.
-- **Actual LA active-time at CR-authoring time**: EDD sign-off (~5-10 min) + sprint monitoring. Remaining: CR + SWAGR read (~20-30 min) + 2 typed sign-offs (touchpoints 2 + 3). **Well inside EDD estimate.**
-- **Calendar**: Sprint began at EDD sign-off `cfe5304` (2026-05-20T07:43:09Z); all WI commits landed on 2026-05-20; CR authored same day. Total fleet wall-clock ~45 minutes for 4 WIs + CR.
+- **EDD §13 estimated LA active-time**: \~15-30 min total.
+- **Actual LA active-time at CR-authoring time**: EDD sign-off (\~5-10 min) + sprint monitoring. Remaining: CR + SWAGR read (\~20-30 min) + 2 typed sign-offs (touchpoints 2 + 3). **Well inside EDD estimate.**
+- **Calendar**: Sprint began at EDD sign-off `cfe5304` (2026-05-20T07:43:09Z); all WI commits landed on 2026-05-20; CR authored same day. Total fleet wall-clock \~45 minutes for 4 WIs + CR.
 
-Per memory `feedback_calibrate_time_estimates_against_actuals`: the EDD's "1-2 hours for 4 WIs" overestimated by ~2-4×. The autonomous fleet's first BlarAI-product sprint ran faster than the conservative EDD estimate. Future ISS-shape sprint estimates should calibrate toward 20-40 min for 4 small-scope WIs.
+Per memory `feedback_calibrate_time_estimates_against_actuals`: the EDD's "1-2 hours for 4 WIs" overestimated by \~2-4×. The autonomous fleet's first BlarAI-product sprint ran faster than the conservative EDD estimate. Future ISS-shape sprint estimates should calibrate toward 20-40 min for 4 small-scope WIs.
 
 ## 13. Verdict-discipline statement
 

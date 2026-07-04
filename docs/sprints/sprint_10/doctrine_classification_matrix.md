@@ -15,10 +15,10 @@ devplatform_parent_head: 544eb0921af8441c68ab85bd3c03cf0b082a0656
 
 | File | Lines | Notes |
 |---|---:|---|
-| `C:\Users\mrbla\BlarAI\CLAUDE.md` | 216 | SDV §1.2/§5.1 baseline cited ~283; current shorter (see §4 Finding F-1). |
-| `C:\Users\mrbla\BlarAI\.github\copilot-instructions.md` | 240 | SDV baseline cited ~265; current within drift band. |
-| `C:\Users\mrbla\BlarAI\AGENTS.md` | 18 | SDV baseline cited ~24; current 18 — pointer stub. |
-| **BlarAI total** | **474** | SDV baseline ~572; -98 drift (see §4 F-1). |
+| `C:\Users\mrbla\BlarAI\CLAUDE.md` | 216 | SDV §1.2/§5.1 baseline cited \~283; current shorter (see §4 Finding F-1). |
+| `C:\Users\mrbla\BlarAI\.github\copilot-instructions.md` | 240 | SDV baseline cited \~265; current within drift band. |
+| `C:\Users\mrbla\BlarAI\AGENTS.md` | 18 | SDV baseline cited \~24; current 18 — pointer stub. |
+| **BlarAI total** | **474** | SDV baseline \~572; -98 drift (see §4 F-1). |
 | `C:\Users\mrbla\devplatform\CLAUDE.md` | 4 | Placeholder stub — Stage 6 pre-population (see §4 F-2 + §5). |
 | `C:\Users\mrbla\devplatform\.github\copilot-instructions.md` | 2 | Placeholder stub. |
 | `C:\Users\mrbla\devplatform\AGENTS.md` | 2 | Placeholder stub. |
@@ -181,7 +181,7 @@ Doctrine-file defects, contradictions, or staleness discovered during audit. Per
 
 ### F-1 — Line-count drift from SDV baseline
 
-SDV §1.2 baseline cited BlarAI doctrine surface as ~283 + ~265 + ~24 = ~572 lines. Audit-time measurement: 216 + 240 + 18 = 474. Net drift -98 lines (-17%). Most drift is in `CLAUDE.md` (-67) — likely accumulated trimming since SDV authoring (2026-05-09); does not change the partition scope; flagged for completeness. Sprint 10 success-criteria thresholds (e.g. EA-3's devplatform doctrine ≥100 lines per file) are independent of BlarAI surface area, so no scope impact.
+SDV §1.2 baseline cited BlarAI doctrine surface as \~283 + \~265 + \~24 = \~572 lines. Audit-time measurement: 216 + 240 + 18 = 474. Net drift -98 lines (-17%). Most drift is in `CLAUDE.md` (-67) — likely accumulated trimming since SDV authoring (2026-05-09); does not change the partition scope; flagged for completeness. Sprint 10 success-criteria thresholds (e.g. EA-3's devplatform doctrine ≥100 lines per file) are independent of BlarAI surface area, so no scope impact.
 
 ### F-2 — devplatform doctrine paths are NOT absent — placeholder stubs exist
 

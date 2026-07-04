@@ -2,9 +2,9 @@
 
 **Purpose**: You run this once to confirm Claude Cowork's built-in `/schedule` feature actually fires on schedule during an idle stretch, the same way Domain 8's autonomous-fleet design assumes it will.
 
-**Total time you'll spend**: ~30 minutes of wall-clock, most of it passive waiting.
+**Total time you'll spend**: \~30 minutes of wall-clock, most of it passive waiting.
 
-**Total active-attention you'll need**: ~5 minutes of clicking / pasting / noting.
+**Total active-attention you'll need**: \~5 minutes of clicking / pasting / noting.
 
 **One action per step below**. Don't skip ahead.
 
@@ -84,7 +84,7 @@ Simulates you walking away. The machine must stay awake — if your laptop is on
 ## Wait (about 20–30 minutes)
 
 ### 11. Don't touch Claude Desktop until at least 3 firings have elapsed.
-That's ~45 minutes of wall-clock. Do other things.
+That's \~45 minutes of wall-clock. Do other things.
 
 ---
 
@@ -110,7 +110,7 @@ Get-Content 'C:\Users\mrbla\BlarAI\tools\vikunja_mcp\bridge\spike4_cowork.log'
 |---|---|---|
 | i | Did the schedule fire at least once during your idle stretch? | That `/schedule` works at all when you're not actively using Cowork. |
 | ii | Did firings produce distinct timestamp entries (not duplicates)? | That each scheduled run is a fresh invocation. |
-| iii | How many total firings did you observe in the ~30 min window? | Sanity-check against the 4-run limit. Expected: 1–3 depending on timing. |
+| iii | How many total firings did you observe in the \~30 min window? | Sanity-check against the 4-run limit. Expected: 1–3 depending on timing. |
 | iv | Anything unexpected in Claude Desktop's UI during the wait? | E.g. popups, session prompts, errors. |
 | v | Does the log show 4 lines, fewer, or none? | Gives us fleet-reliability signal. |
 

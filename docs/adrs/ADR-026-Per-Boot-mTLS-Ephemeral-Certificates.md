@@ -84,7 +84,7 @@ nine, asserted by `test_ipc_transport.py::test_provision_writes_nine_pem_files`.
 ### 2.2 Launcher wiring site (confirmed trace)
 
 The mint step fires at `launcher/__main__.py` **after the dev_mode + network_facing
-interlock** (~:476) and **before `PolicyAgentService.from_runtime_mode()` (~:616)**:
+interlock** (\~:476) and **before `PolicyAgentService.from_runtime_mode()` (\~:616)**:
 
 ```
 :458  _dev_mode = resolve_dev_mode(runtime_mode)

@@ -39,8 +39,8 @@ Author three governance documents completing the Sprint 9 ops/deployment/rule-en
 
 ### Work Items (4 WIs, one sentence each)
 
-- **WI-1** (HIGH): Author `docs/governance/observability.md` (GOV-12) — log level taxonomy, event classification per subsystem (PA / AO / IPC / lifecycle), error-fingerprinting taxonomy, audit trail; ~400+ lines expected.
-- **WI-2** (HIGH): Author `docs/governance/deployment-verification.md` (GOV-13) — pre-deployment checks (vsock topology + guest runtime config), evidence artifacts, smoke-test preflight, automatic + manual rollback, ADR-012 §5 model fallback; ~200-300 lines with substantive Recovery section.
+- **WI-1** (HIGH): Author `docs/governance/observability.md` (GOV-12) — log level taxonomy, event classification per subsystem (PA / AO / IPC / lifecycle), error-fingerprinting taxonomy, audit trail; \~400+ lines expected.
+- **WI-2** (HIGH): Author `docs/governance/deployment-verification.md` (GOV-13) — pre-deployment checks (vsock topology + guest runtime config), evidence artifacts, smoke-test preflight, automatic + manual rollback, ADR-012 §5 model fallback; \~200-300 lines with substantive Recovery section.
 - **WI-3** (HIGH): Author `docs/governance/rule-engine.md` (GOV-14) — enumerate rules from `deterministic_policy_checker.py`, deterministic-before-LLM ordering, fail-closed semantics, CAR schema enforcement via `is_complete()`, semantic-distance threshold, example CARs; ≥150 lines.
 - **WI-4** (MEDIUM): Author per-file ledger entry `docs/ledger/<ts>_sprint9_ea4_ops-deployment-rules.md` with frontmatter + Summary/Deliverables/Files Changed/Quality Gate/Notes body (≥ 50 substantive lines).
 
@@ -75,9 +75,9 @@ I will author three governance docs closing the Sprint 9 triad for operations, d
 
 ### C. FILES TO CREATE
 
-- `docs/governance/observability.md` (GOV-12, ~400+ lines)
-- `docs/governance/deployment-verification.md` (GOV-13, ~200-300 lines, Recovery section required)
-- `docs/governance/rule-engine.md` (GOV-14, ~150-200 lines)
+- `docs/governance/observability.md` (GOV-12, \~400+ lines)
+- `docs/governance/deployment-verification.md` (GOV-13, \~200-300 lines, Recovery section required)
+- `docs/governance/rule-engine.md` (GOV-14, \~150-200 lines)
 - `docs/ledger/<YYYYMMDD_HHMMSS>_sprint9_ea4_ops-deployment-rules.md`
 
 ### D. FILES TO READ (source research)

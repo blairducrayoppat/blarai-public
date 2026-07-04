@@ -103,7 +103,7 @@ Git tags alone are insufficient because the move touches state git doesn't track
 | 5 | Cleanup (delete platform tools from BlarAI, move to `.platform/`) | MED | Yes | [06_STAGE5_CLEANUP.xml](06_STAGE5_CLEANUP.xml) |
 | 6 | Hardening (split CLAUDE.md, split copilot-instructions, 24h soak) | LOW | Across ≥2 sessions | [07_STAGE6_HARDENING.xml](07_STAGE6_HARDENING.xml) |
 
-**Total realistic schedule**: 5–7 distinct sessions over ~1–2 weeks.
+**Total realistic schedule**: 5–7 distinct sessions over \~1–2 weeks.
 
 ## 7. Hard Rule — Bake Into Stage 2
 
@@ -162,19 +162,19 @@ This section catalogues the post-v1 infrastructure each stage must absorb. **Sou
 
 ### 11.1 New infrastructure (must be copied / migrated)
 
-- `docs/governance/` — 7 governance docs (~2377 LOC). MOVE to devplatform.
+- `docs/governance/` — 7 governance docs (\~2377 LOC). MOVE to devplatform.
 - `docs/scheduled/wake_templates/` — 6 wake templates (cron-fired wake prompts). MOVE to devplatform.
-- `tools/fleet_ops/blarai_next_task_resolver.py` (~154 LOC). MOVE to devplatform; gains `--blarai-root` flag.
-- `tools/fleet_ops/diff_builder.py` (~168 LOC). MOVE to devplatform.
-- `tools/fleet_observability/escalation_notify.ps1` (~103 LOC). MOVE to devplatform.
-- `tools/scheduled-tasks/escalation-watchdog.xml` and matching `.ps1` (~213 + 43 LOC). MOVE to devplatform. **Tool files are new in v2; the matching scheduled task `Escalation Watchdog` is ALREADY part of the live 13-task fleet — not a new 14th task.**
-- `tools/scheduled-tasks/test_async_post_gate.ps1` (~233 LOC). MOVE to devplatform.
+- `tools/fleet_ops/blarai_next_task_resolver.py` (\~154 LOC). MOVE to devplatform; gains `--blarai-root` flag.
+- `tools/fleet_ops/diff_builder.py` (\~168 LOC). MOVE to devplatform.
+- `tools/fleet_observability/escalation_notify.ps1` (\~103 LOC). MOVE to devplatform.
+- `tools/scheduled-tasks/escalation-watchdog.xml` and matching `.ps1` (\~213 + 43 LOC). MOVE to devplatform. **Tool files are new in v2; the matching scheduled task `Escalation Watchdog` is ALREADY part of the live 13-task fleet — not a new 14th task.**
+- `tools/scheduled-tasks/test_async_post_gate.ps1` (\~233 LOC). MOVE to devplatform.
 - `docs/sprints/_templates/` (SDV / SCR / SWAGR). STAY in BlarAI (per-project artifact).
 - `docs/ledger/` (per-entry directory format, Q1-1 onwards). STAY in BlarAI.
 
 ### 11.2 Changed behavior (must be re-tested)
 
-- `tools/scheduled-tasks/wake_launcher.ps1` — grew by ~655 LOC. Stage 4 must do a line-by-line path-rewrite scan (not just regex). **Correct path: `tools/scheduled-tasks/wake_launcher.ps1`** (NOT `tools/fleet_ops/wake_launcher.ps1` — the file has never lived there; earlier drafts mis-referenced it).
+- `tools/scheduled-tasks/wake_launcher.ps1` — grew by \~655 LOC. Stage 4 must do a line-by-line path-rewrite scan (not just regex). **Correct path: `tools/scheduled-tasks/wake_launcher.ps1`** (NOT `tools/fleet_ops/wake_launcher.ps1` — the file has never lived there; earlier drafts mis-referenced it).
 - `tools/autonomy_budget/state.json` — schema_version=1 with fields: `fleet_paused`, `fleet_paused_reason`, `last_digest_utc`, `last_la_action_utc`, `last_updated_by`, `last_updated_utc`, `last_welcome_back_utc`, `role_paused` (5-role dict), `schema_version`.
 - `tools/autonomy_budget/active_tasks.py` — +127 LOC, schema-validated, parallel-sprint authorization. Gains `--blarai-root`.
 - Bridge: still single `inbox.json` (NOT `inbox.d/` — v1 assumption corrected).

@@ -13,7 +13,7 @@ disposition: COMPLETE
 
 ## Summary
 
-Sprint 11 EA-4 root-caused the `~981 passed, 22 skipped → 1001 passed,
+Sprint 11 EA-4 root-caused the `\~981 passed, 22 skipped → 1001 passed,
 2 skipped` baseline-string drift observed between Sprint 8 SWAGR and
 Sprint 10 SWAGR. **Verdict: BENIGN — environmental, not source-
 attributable, no fail-closed regression.** Source-pinning at the
@@ -71,7 +71,7 @@ All checks PASS.
 - **Mature-not-minimal**: report at 200+ lines well exceeds the 80-line
   floor; methodology is a stronger result than the SDV's "bisect or
   equivalent" target (source-pinning produces non-attribution proof in
-  2 runs vs ~7 for naïve bisect).
+  2 runs vs \~7 for naïve bisect).
 - **Fail-closed safety**: NO regression. Investigation explicitly
   verified that no fail-closed assertion shape changed in the bisect
   window via path-filtered git log over `services/policy_agent/`,
@@ -103,7 +103,7 @@ investigation report §7):
    candidate: `ea_number` disambiguation in state machine OR per-EA
    sub-tasks for parallel windows.
 2. **Vikunja label-revert phenomenon** on tracking task #410. Some
-   unknown background agent or hook reverts gate labels within ~5 min
+   unknown background agent or hook reverts gate labels within \~5 min
    of SDO writes; observed across six independent SDO firings during
    EA-4 dispatch. Sprint 12 fix candidate: identify the reverter
    (background reconciler? Fleet Reports automation? gate-stale-cleaner

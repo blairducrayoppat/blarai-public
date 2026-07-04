@@ -142,7 +142,7 @@ gap #5).
 | ISS-3 (PA classification misses) | open | open | Out of scope |
 | ISS-4 (Pluton investigation) | open | open | Unblocking GOV-01/10; still open |
 | ISS-5/6/7 (fleet-hygiene, surfaced during Sprint 8) | resolved during Sprint 8 | resolved | Out of Sprint 9 scope |
-| ISS-8 / ISS-239 (merge-gate allowlist path bug) | surfaced mid-sprint | resolved (`ef6d975`) | SCR §9.3 item 1; Sprint 9 absorbed ~1 firing of EA-4 cycle-time cost |
+| ISS-8 / ISS-239 (merge-gate allowlist path bug) | surfaced mid-sprint | resolved (`ef6d975`) | SCR §9.3 item 1; Sprint 9 absorbed \~1 firing of EA-4 cycle-time cost |
 
 New Vikunja tickets opened at sprint close per SDV §4 #7: GOV-MIGRATE (#123,
 labeled `Blocked`) and GOV-15 (#124). Both present on project 3.
@@ -238,12 +238,12 @@ Systematic review of `2195d8e..e89504d` (252 commits). Categorization:
 | Commit class | Count | Classification |
 |---|---|---|
 | Sprint 9 EA content commits | 6 (`0b43012`, `d8678ae`, `1b78d77`, `4173204`, `9d12e0d`, `1b5e04a`) | In-scope, all docs-only |
-| Sprint 9 agent-narration commits (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]` reports) | ~45 | Expected DEC-13 flow |
+| Sprint 9 agent-narration commits (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]` reports) | \~45 | Expected DEC-13 flow |
 | Sprint 9 merge commits | 5 (one per EA) | Expected |
 | Sprint 9 SCR-related | 3 (`488602b`, `a9c56a5`, `3c6e021`) | Expected |
-| Sprint 8 parallel work (task82 / sprint8) | ~50 | Out of Sprint 9 scope; independently tracked and audited in Sprint 8 SWAGR |
-| Fleet-hygiene / ISS-5/6/7 / ISS-239 fixes | ~40 | Orthogonal infrastructure |
-| Pause/unpause fleet-ops commits | ~30 | Governance-mandated |
+| Sprint 8 parallel work (task82 / sprint8) | \~50 | Out of Sprint 9 scope; independently tracked and audited in Sprint 8 SWAGR |
+| Fleet-hygiene / ISS-5/6/7 / ISS-239 fixes | \~40 | Orthogonal infrastructure |
+| Pause/unpause fleet-ops commits | \~30 | Governance-mandated |
 | Governance-doc maturation (`fleet-hygiene.md` edits) | 4 | Acknowledged §5.3 |
 | Qwen3.5 copilot work (post-Sprint-9-close) | 5 (`0e40d78`, `9bee90a`, `cdbcb2c`, `6e6aefd`, `e89504d`) | Post-sprint; does not retroactively affect Sprint 9 audit |
 | Sprint Auditor SWAGR (Sprint 8) | 1 (`b8204c4`) | Orthogonal |
@@ -322,7 +322,7 @@ throughout — no observed style drift per §6 fitness spot-check.
 
 | Metric | Before sprint | After sprint | Delta | SCR claimed delta |
 |---|---|---|---|---|
-| Regression suite | per Sprint 8 SWAGR ~962+ at sprint overlap | Unchanged (no Sprint 9 test touches) | +0 | N/A (SCR correctly claims criterion #4 zero-test-touch PASS) |
+| Regression suite | per Sprint 8 SWAGR \~962+ at sprint overlap | Unchanged (no Sprint 9 test touches) | +0 | N/A (SCR correctly claims criterion #4 zero-test-touch PASS) |
 | Full suite | Unchanged | Unchanged | +0 | N/A |
 | New test files added | — | 0 | +0 | +0 |
 | Test files moved | — | 0 | +0 | +0 |
@@ -444,7 +444,7 @@ process-action at §15.3.
 |---|---|---|---|---|
 | Parallel-execution git conflict with Sprint 8 | NO | N/A | YES | Working sets held disjoint (`docs/governance/**` vs `**/tests/`) |
 | Governance-doc style drift across EAs | NO (minor) | YES — STYLE.md established EA-1, referenced by EA-2..EA-4 | YES | Independent fitness check §6 shows consistent tone |
-| Runaway doc length (over ~800 lines) | NO | YES — max doc 376 lines (observability.md), well under ceiling | YES | — |
+| Runaway doc length (over \~800 lines) | NO | YES — max doc 376 lines (observability.md), well under ceiling | YES | — |
 | Thin docs below 150-line floor | NO — min doc 245 lines (pgov-validation.md, streaming-output.md) | YES | YES | — |
 | Source file renamed / missing | NO reported findings | YES | YES | — |
 | Phantom `boot-sequence.md` citations propagate as if it exists | PARTIAL — 12 docs DO reference it, but all with "(forthcoming — GOV-15)" markers per STYLE.md policy | YES — STYLE.md codified the deferral pattern | YES | Independent grep confirms no doc treats the phantom as authoritative |
@@ -540,8 +540,8 @@ unfixed.
 
 ### 11.5 DEC-11 autonomy budget compliance
 
-- Fleet pause/unpause discipline: high (~30 pause/unpause pairs in sprint window).
-- Role-level budgets: no evident breach. LA actual ~25 min (per SCR §11) vs 20 min
+- Fleet pause/unpause discipline: high (\~30 pause/unpause pairs in sprint window).
+- Role-level budgets: no evident breach. LA actual \~25 min (per SCR §11) vs 20 min
   SDV budget — trivial over-estimate, within tolerance.
 - SOFT/HARD breaches: 0 evidenced.
 - `trusted_scope` merge behavior: all 5 EAs auto-merged (EA-4 after ISS-239 fix;

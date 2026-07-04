@@ -262,7 +262,7 @@ ISS-2 used the cf-2-shape autonomous fleet topology (Orchestrator + specialist s
 |---|---|---|---|---|
 | Regression suite (`pytest shared/ services/ launcher/`) | 1001 passed, 2 skipped | **1026 passed, 1 xfailed in 42.14s** | +25 passed / -2 skipped / +1 xfailed (net +24 collected) | 111+1 xfailed on `services/ui_shell/tests/` alone (CR cites ui_shell scope; full BlarAI scope not in CR — verified herein) |
 | Collection-only (`shared/ services/ launcher/ tests/`) | 1003 / 1087 (84 deselected) | 1027 / 1111 (84 deselected, 12.81s) | +24 collected / +24 total / 84 deselected (unchanged) | implicit |
-| `services/ui_shell/tests/` (sprint-scope suite) | ~87 passed (back-computed: 111 - 18 parser - 4 integration - 1 baseline - 1 think_rendering = 87; matches "Full suite (services/ui_shell/tests/): 107 passed" line in WI-1 commit body if 18+1+1=20 was added pre-WI-1 → 107; that math closes too) | **111 passed + 1 xfailed in 3.93s** | +24 collected / +24 net tests / 1 of new tests intentionally xfailed | "111 passed + 1 xfailed (intentional)" — confirmed |
+| `services/ui_shell/tests/` (sprint-scope suite) | \~87 passed (back-computed: 111 - 18 parser - 4 integration - 1 baseline - 1 think_rendering = 87; matches "Full suite (services/ui_shell/tests/): 107 passed" line in WI-1 commit body if 18+1+1=20 was added pre-WI-1 → 107; that math closes too) | **111 passed + 1 xfailed in 3.93s** | +24 collected / +24 net tests / 1 of new tests intentionally xfailed | "111 passed + 1 xfailed (intentional)" — confirmed |
 | New test files added | — | **3** (`test_think_parser.py`, `test_baseline_streaming_snapshot.py`, `test_think_rendering.py`) | +3 | implicit (4 WI commits each add tests; 2 WIs add new test files + 2 WIs modify existing) |
 | Test files modified | — | **1** (`test_streaming.py` +121 LOC; `test_baseline_streaming_snapshot.py` xfail mark in WI-3) | +1 | implicit |
 
@@ -457,11 +457,11 @@ Per cf-1.5 ADR-026 §11 (DEC-11 AMENDED): per-subagent budgets apply via ADR-023
 
 | Touchpoint | Expected timing | Observed timing | Status |
 |---|---|---|---|
-| 1 — EDD sign-off | At EDD authoring + LA review | `cfe5304` at 2026-05-20T00:43:09-07:00 (~6 min after EDD PROPOSED at `47a9494` T00:37:13) | COMPLETE |
+| 1 — EDD sign-off | At EDD authoring + LA review | `cfe5304` at 2026-05-20T00:43:09-07:00 (\~6 min after EDD PROPOSED at `47a9494` T00:37:13) | COMPLETE |
 | 2 — CR sign-off | Post-SWAGR (LA reads CR + SWAGR jointly) | Pending — this SWAGR is the gating artifact | PENDING (structurally correct) |
 | 3 — Sprint-close commit | Post-touchpoint-2 | Pending — sequenced after touchpoint 2 | PENDING (structurally correct) |
 
-Per EDD §10.11 + cf-post-3 EDD §10.11 precedent: 3-touchpoint cadence is on-track. Touchpoint-1 latency (~6 min) is at the fast end of cf-program LA-active-time observations.
+Per EDD §10.11 + cf-post-3 EDD §10.11 precedent: 3-touchpoint cadence is on-track. Touchpoint-1 latency (\~6 min) is at the fast end of cf-program LA-active-time observations.
 
 ---
 

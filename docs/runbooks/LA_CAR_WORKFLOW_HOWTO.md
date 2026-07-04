@@ -217,7 +217,7 @@ You have three options:
 
 | Decision | How to act | What happens next |
 |---|---|---|
-| **Approve as-is** | Click the checkbox (marks Done) OR add comment `[CAR-APPROVED]` | Fleet executes the plan on next SDO wake (~15 min) |
+| **Approve as-is** | Click the checkbox (marks Done) OR add comment `[CAR-APPROVED]` | Fleet executes the plan on next SDO wake (\~15 min) |
 | **Reject / ask for revision** | Add a comment starting with `[CAR]` explaining what's wrong with THE PLAN | Co-Lead re-drafts the plan on next wake |
 | **Defer** | Do nothing; leave task open | Plan stays in queue. Fleet does not execute until you approve |
 
@@ -375,7 +375,7 @@ posted as a comment on the tracking task.
 
 Submit. Leave task open.
 
-### Stage 2 — Co-Lead plans (~7 minutes later, autonomous)
+### Stage 2 — Co-Lead plans (\~7 minutes later, autonomous)
 
 Co-Lead fires on its 15:50 wake. Finds your CAR. Reads the prompt + the commit + your reason. Writes a plan:
 
@@ -393,7 +393,7 @@ Plan looks reasonable. Root cause matches what you observed. Remediation is prop
 
 You click the checkbox → task closed → approval signaled to fleet.
 
-### Stage 4 — Fleet executes (~40 minutes, autonomous)
+### Stage 4 — Fleet executes (\~40 minutes, autonomous)
 
 - 16:00 SDO authors a small corrective EA prompt to staging/.
 - 16:05 Co-Lead reviews the prompt — APPROVED.
@@ -403,7 +403,7 @@ You click the checkbox → task closed → approval signaled to fleet.
 - 16:25 EA executes: reverts the file, commits, posts completion.
 - 16:30 SDO reviews completion — APPROVED, commit hash matches acceptance check.
 
-You see ~5 new Fleet Reports tasks appear during this window.
+You see \~5 new Fleet Reports tasks appear during this window.
 
 ### Stage 5 — You verify (5 minutes)
 
@@ -413,7 +413,7 @@ Open the final `[SDO Completion-Review]` from 16:30. Read it:
 
 Looks good. Close that task. Go back to the original EA-4 Completion task and close it too (leaving a comment: "Resolved via CAR plan, see task `<CAR plan task id>`").
 
-CAR cycle complete. Your total active time: ~17 minutes. Fleet did the rest.
+CAR cycle complete. Your total active time: \~17 minutes. Fleet did the rest.
 
 ---
 

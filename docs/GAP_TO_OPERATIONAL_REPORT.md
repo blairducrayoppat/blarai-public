@@ -263,7 +263,7 @@ completed on `feature/p1-uat1-launcher`:
 
 Empirical benchmark evidence (ADR-010):
 - PA classification on GPU: **78ms mean / 125ms P95** (within 230ms budget)
-- PA classification on NPU: **~543ms mean** (outside budget)
+- PA classification on NPU: **\~543ms mean** (outside budget)
 
 Implication: GAP-2 ("Real Model Never Loaded") is materially reduced for the
 Policy Agent path because real model loading/inference has now been validated in
@@ -678,21 +678,21 @@ Files present for Qwen2.5-1.5B-Instruct: `openvino_model.xml`, `openvino_model.b
 | Scope | Count | Mock Strategy |
 |-------|-------|---------------|
 | PA NPU inference | 31 | `MagicMock` for OpenVINO Core, CompiledModel, InferRequest, tokenizer |
-| PA adjudicator | ~50 | `MagicMock` for `classify_car()` return values |
-| PA rule engine | ~40 | Pure logic (no mocks needed) |
-| PA CAR/JWT/IPC | ~60 | `MagicMock` for crypto keys, sockets |
-| PA integration (car pipeline) | ~15 | `MagicMock` for NPU, stub adjudicator |
-| Orchestrator NPU inference | ~40 | `MagicMock` for OpenVINO GenAI LLMPipeline and tokenizer |
-| Orchestrator PGOV | ~50 | `MagicMock` for `LeakageDetector` |
-| Orchestrator circuit breaker | ~20 | Pure logic |
-| Semantic Router | ~40 | `MagicMock` for BGE embedding model |
-| UI Gateway transport | ~60 | TCP loopback (real asyncio sockets, but no real vsock) |
-| UI Gateway sessions | ~20 | Real in-memory SQLite |
-| UI Shell app/streaming/pgov | ~50 | `MagicMock` for gateway, Textual `run_test()` |
-| Shared (IPC, schemas, crypto) | ~50 | `MagicMock` for sockets, keys |
-| Launcher (vm_manager, main) | ~30 | `@patch` for PowerShell calls, ctypes |
-| End-to-end integration (P1.10) | ~80 | Full pipeline mocked at NPU + socket boundaries |
-| End-to-end UI (P1.14) | ~50 | `MagicMock` for gateway, real Textual compositor |
+| PA adjudicator | \~50 | `MagicMock` for `classify_car()` return values |
+| PA rule engine | \~40 | Pure logic (no mocks needed) |
+| PA CAR/JWT/IPC | \~60 | `MagicMock` for crypto keys, sockets |
+| PA integration (car pipeline) | \~15 | `MagicMock` for NPU, stub adjudicator |
+| Orchestrator NPU inference | \~40 | `MagicMock` for OpenVINO GenAI LLMPipeline and tokenizer |
+| Orchestrator PGOV | \~50 | `MagicMock` for `LeakageDetector` |
+| Orchestrator circuit breaker | \~20 | Pure logic |
+| Semantic Router | \~40 | `MagicMock` for BGE embedding model |
+| UI Gateway transport | \~60 | TCP loopback (real asyncio sockets, but no real vsock) |
+| UI Gateway sessions | \~20 | Real in-memory SQLite |
+| UI Shell app/streaming/pgov | \~50 | `MagicMock` for gateway, Textual `run_test()` |
+| Shared (IPC, schemas, crypto) | \~50 | `MagicMock` for sockets, keys |
+| Launcher (vm_manager, main) | \~30 | `@patch` for PowerShell calls, ctypes |
+| End-to-end integration (P1.10) | \~80 | Full pipeline mocked at NPU + socket boundaries |
+| End-to-end UI (P1.14) | \~50 | `MagicMock` for gateway, real Textual compositor |
 | **TOTAL** | **749** | **All hardware boundaries mocked** |
 
 **What the tests prove:**
@@ -909,12 +909,12 @@ service can start in any order. No attestation occurs.
 
 | Category | Description | Count (approx.) |
 |----------|-------------|-----------------|
-| **Pure logic** | No hardware dependency; tests Python algorithms (rule engine, CAR hashing, PGOV checks, circuit breakers, config parsing) | ~250 |
-| **Mocked hardware** | Tests correct code paths around NPU inference, but `MagicMock` replaces all OpenVINO calls | ~200 |
-| **Mocked IPC** | Tests vsock framing, message dispatch, connection lifecycle — but against `MagicMock` sockets or TCP loopback | ~100 |
-| **Mocked crypto** | Tests JWT minting/validation, weight integrity — but with `MagicMock` keys | ~50 |
-| **Real I/O (limited)** | Session store tests use real in-memory SQLite; TUI tests use real Textual compositor | ~80 |
-| **Integration (fully mocked boundaries)** | End-to-end pipeline tests that wire multiple modules but mock all hardware boundaries | ~70 |
+| **Pure logic** | No hardware dependency; tests Python algorithms (rule engine, CAR hashing, PGOV checks, circuit breakers, config parsing) | \~250 |
+| **Mocked hardware** | Tests correct code paths around NPU inference, but `MagicMock` replaces all OpenVINO calls | \~200 |
+| **Mocked IPC** | Tests vsock framing, message dispatch, connection lifecycle — but against `MagicMock` sockets or TCP loopback | \~100 |
+| **Mocked crypto** | Tests JWT minting/validation, weight integrity — but with `MagicMock` keys | \~50 |
+| **Real I/O (limited)** | Session store tests use real in-memory SQLite; TUI tests use real Textual compositor | \~80 |
+| **Integration (fully mocked boundaries)** | End-to-end pipeline tests that wire multiple modules but mock all hardware boundaries | \~70 |
 
 **Conclusion:** The test suite validates internal software correctness — it does NOT
 validate any hardware interaction, real model behavior, or inter-service connectivity.

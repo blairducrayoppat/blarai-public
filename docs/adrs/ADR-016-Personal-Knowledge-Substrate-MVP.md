@@ -36,7 +36,7 @@ detector.
 ### 2.2 What is indexed
 
 - **Documents** — every loaded PDF/txt/md (and the picker/drag-drop path),
-  chunked (~512 tokens ≈ 2048 chars, ~64-token ≈ 256-char overlap) and embedded.
+  chunked (\~512 tokens ≈ 2048 chars, \~64-token ≈ 256-char overlap) and embedded.
   Re-loading a filename replaces its prior chunks.
 - **Conversation turns** — every **PGOV-approved** user+assistant pair, embedded
   as one unit, keyed idempotently by `(session_id, turn_index)`. This is what
@@ -75,7 +75,7 @@ dependency**, which is more in keeping with BlarAI's minimal-surface, no-network
 posture than a compiled extension would be. The search is isolated behind a
 private method (`_search_kind`), so an approximate-nearest-neighbour index can
 replace it unchanged if the corpus ever grows past the point where brute force is
-adequate (rule of thumb: ~100K vectors). **Trade-off accepted:** O(N) query cost
+adequate (rule of thumb: \~100K vectors). **Trade-off accepted:** O(N) query cost
 vs. a build dependency and added surface; for the realistic horizon, brute force
 wins.
 

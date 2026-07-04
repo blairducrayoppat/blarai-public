@@ -315,9 +315,9 @@ optimum-cli export openvino \
   ./qwen3-0.6b-int4-sym-g128
 ```
 
-`LLMPipeline(ir, "NPU")` then compiles in ~8.5 s on real NPU and generates
+`LLMPipeline(ir, "NPU")` then compiles in \~8.5 s on real NPU and generates
 end-to-end (`pipe.generate("The capital of France is", max_new_tokens=16)`
-returns sensible Qwen3 output in ~1 s).
+returns sensible Qwen3 output in \~1 s).
 
 Channel-wise asym (`--group-size -1`) also works end-to-end on NPU even
 though it's not in Intel's documented recipe. INT8 weight-only constructs
@@ -358,7 +358,7 @@ above and removed from this list.)
    in NPUW that names ZP/scale subgraphs in a way that collides 40 times for
    a 28-layer model with 4 attention sub-projections? (Per-channel asym, by
    contrast, doesn't trip the verifier — channel-wise has no per-group ZP
-   tensor naming, which is consistent with a 40 = 28 × ~1.4 collision count.)
+   tensor naming, which is consistent with a 40 = 28 × \~1.4 collision count.)
 3. **Stateful escape hatch.** Is there a recommended user-side workaround
    for stateful LLM IRs that NPUW can't partition (e.g., an `optimum-cli`
    flag to expose KV-cache as explicit inputs so `Model.reshape` reaches

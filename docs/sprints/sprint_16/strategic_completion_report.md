@@ -120,7 +120,7 @@ slip.
 | **Measured-boot attestation scope** | forward LA decision | Stream E surfaced: the boot's `_phase_attestation` validates key/manifest material, not PCR-based hardware attestation. Whether PCR attestation is in scope for #598 is a gate-scoping decision (queue alongside egress-policy + fidelity-2 + audit-retention #607). Does not change any Sprint-16 working set. |
 | **SECURITY_ROADMAP §5 header reads "#787 GO/NO-GO criteria"** | verify + reconcile | The gate is #598 everywhere else; the §5 header (pre-existing, untouched by E's criteria rewrite) cites #787. Verify whether #787 is a real sub-ticket or a stale reference; reconcile in the close-sweep. |
 | **Dependency hash-pinning (lock file)** | Tier-3 — Sprint-17 | C's pins are version-containment, not supply-chain integrity (lesson 71). A `uv lock` / `pip-compile --generate-hashes` committed lock file is the named next step. |
-| **Stale-worktree + branch cleanup** | LA, post-wave | 7 new worktrees from this wave add to the pre-existing ~26 (now ~33) + 217 local branches. Inventory only — the LA schedules an approved cleanup (no destructive git this session). |
+| **Stale-worktree + branch cleanup** | LA, post-wave | 7 new worktrees from this wave add to the pre-existing \~26 (now \~33) + 217 local branches. Inventory only — the LA schedules an approved cleanup (no destructive git this session). |
 
 **Campaign → #598 (remaining gate-critical after Sprint 16):** #615 (guest-boundary AF_HYPERV) + Tier-3
 egress (runtime mediation + exfil-screen + kill-switch arming) — the **Sprint-17 Boot Cluster** (serial on
@@ -156,8 +156,8 @@ ceremony); the production-posture gate SWAGR + the #598 GO/NO-GO + #612 capstone
 
 ## 7. State hygiene (inventory — for the LA to action, NOT to delete unilaterally)
 
-- **~33 worktrees** under `.claude/worktrees/`, `.worktrees/`, `C:/Users/mrbla/blarai-*` (the pre-existing
-  ~26 + 7 from this wave) and **217 local branches**. They clutter `git worktree list` and worsen the
+- **\~33 worktrees** under `.claude/worktrees/`, `.worktrees/`, `C:/Users/mrbla/blarai-*` (the pre-existing
+  \~26 + 7 from this wave) and **217 local branches**. They clutter `git worktree list` and worsen the
   cwd-branch hazard. **Recommend** the LA approve a `git worktree remove` of the merged ones (verify each is
   merged first; do **not** delete the branches — destructive). Inventory, then ask.
 - **Pre-existing dirty `docs/guide-workstreams/README.md`** + untracked perf/benchmark JSONs under

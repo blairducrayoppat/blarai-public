@@ -646,7 +646,7 @@ Sprint 16's answer is **a real partial pay-down that is honestly named as reloca
 | 4 pre-existing `tools/tests/` collection errors | MINOR-5 | Tracking ticket recommended (per the non-optional-followups rule) |
 | SECURITY_ROADMAP "#787" header reconcile | MINOR-3 | Stale conceptual ref; #787≡#598 already documented at line 275 |
 | Measured-boot PCR-attestation scope | (forward LA decision) | E surfaced it; queue alongside egress-policy + audit-retention #607 |
-| Stale worktree + branch inventory | (LA, post-wave) | ~33 worktrees + 217 branches; inventory only — no destructive git |
+| Stale worktree + branch inventory | (LA, post-wave) | \~33 worktrees + 217 branches; inventory only — no destructive git |
 
 ---
 

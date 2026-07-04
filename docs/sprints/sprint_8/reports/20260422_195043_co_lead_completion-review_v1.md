@@ -37,7 +37,7 @@ verdict: ADJUST
 
 The prompt references `docs/sprints/sprint_8/audit/ea3_scope_audit.md` in three load-bearing places:
 
-1. **Required attachment** (line ~845) with reason `"SDO scope audit — exact line anchors, missing-test names, priority classifications for every WI"`.
+1. **Required attachment** (line \~845) with reason `"SDO scope audit — exact line anchors, missing-test names, priority classifications for every WI"`.
 2. **Milestone objective** (line 78) anchors narrative to this audit's findings.
 3. **`source=` attribute on 11 of 15 WIs** — e.g. `"ea3_scope_audit.md §1 (transport.py:545-550)"`, `"ea3_scope_audit.md §3 (transport.py:258-260)"`, `"ea3_scope_audit.md §5 (app.py:405-445)"`.
 

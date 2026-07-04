@@ -122,8 +122,8 @@ Measured on the reference TPM (recorded in `PERFORMANCE_LOG.md` /
 `docs/performance/tpm_signing_latency_2026-06-03.json`): a signature ≈ **94 ms**,
 a key-existence check ≈ **3 ms**, one-time provisioning ≈ **248 ms**. The
 boot-attributable cost is the 3 ms check — negligible beside the 14B compile that
-owns ~53% of boot. The 94 ms is a *runtime, per-authorization* cost, one token
-per gated action, well under ADR-012's 750 ms approval budget. It is ~900× slower
+owns \~53% of boot. The 94 ms is a *runtime, per-authorization* cost, one token
+per gated action, well under ADR-012's 750 ms approval budget. It is \~900× slower
 than signing in software, and that slowness *is* the property being bought: a key
 that never leaves the chip.
 

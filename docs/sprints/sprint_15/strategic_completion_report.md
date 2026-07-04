@@ -77,7 +77,7 @@ tests are part of "done." That mandate seeded the Sprint-16 coverage initiative 
   decrypt #618 + routing #620 + closing re-run → 2172. The skip count fell 20 → 2 (the additional
   Sprint-8-era skips were environment-driven, per the CLAUDE.md baseline-drift note; not source drift).
 - **Open Vikunja `Gate:Pending-Human`**: 0.
-- **Branches**: all EA feature branches merged `--no-ff`; kept (no destructive git). ~26 stale merged
+- **Branches**: all EA feature branches merged `--no-ff`; kept (no destructive git). \~26 stale merged
   worktrees under `.claude/worktrees/`, `.worktrees/`, `C:/Users/mrbla/blarai-*` are inventoried for the
   LA to action (§7) — not deleted unilaterally.
 
@@ -161,7 +161,7 @@ The LA ran the EA-4 ceremony + production live-verify on the real hardware this 
 | **Production-parity test lane** (boot cascade + key-transition in CI, software-sealer stand-ins) | **#619** — Sprint-16 | The systemic fix so prod-only bugs hit CI, not the LA's terminal. Seeded by the #620 round-trip test. |
 | **WinUI GUI automation harness** (critical-path list + model-loaded tier) | **#621** — Sprint-16, urgent | **Extend the existing `tests/harness/` Layer-C pywinauto harness (#563)** — NOT build from scratch (see §6 honest-failure). Title still reads "FlaUI"; corrected in-ticket. |
 | **Comprehensive automated test coverage** (umbrella; coverage audit is step 1) | **#622** — INITIATIVE | Folds the §2.7 mandate into a standing requirement; burns down across Sprints 16+. |
-| **Rename gateway `check_pa_status`/`_attempt_pa_handshake`** (they handshake the AO post-#620, not the PA) | **#623** — low priority | Pure naming/doc; ~35 files; deliberately kept out of the #620 diff. |
+| **Rename gateway `check_pa_status`/`_attempt_pa_handshake`** (they handshake the AO post-#620, not the PA) | **#623** — low priority | Pure naming/doc; \~35 files; deliberately kept out of the #620 diff. |
 | **Guest-boundary AF_HYPERV handshake** (fidelity-3) | **#615** — VM-occupant sprint | Remaining #598 criterion; guest deploy channel unproven (`priority5_guest_deploy.json` FAIL, stale). |
 | **Full FUT-04 weight integrity** (`require_signed_manifest=true` + verify all weights) | **#106** — Tier-3 | Remaining #598 criterion; Sprint 15 staged only a minimal boot manifest (Condition 3). |
 | **The Cleaner (UC-003)** | **#613** | **Removed from this roadmap** to a separate/future project (LA 2026-06-06); `SECURITY_ROADMAP_air_gap_removal.md` §1/§3/§4 + Decision-1 inline refs still read "post-#598 fast-follow" — reconcile per #613. |
@@ -210,7 +210,7 @@ verified), and #612 (capstone post-hardening security presentation, the closing 
 
 ## 7. State hygiene (inventory — for the LA to action, NOT to delete unilaterally)
 
-- **~26 stale merged worktrees** under `.claude/worktrees/`, `.worktrees/`, and `C:/Users/mrbla/blarai-*`
+- **\~26 stale merged worktrees** under `.claude/worktrees/`, `.worktrees/`, and `C:/Users/mrbla/blarai-*`
   (Sprint-14/15 feature branches, all merged). They clutter `git worktree list` and worsen the cwd-quirk
   hazard. **Recommend** the LA approve `git worktree remove` of the merged ones (verify each is merged
   first; do **not** delete the branches — destructive). Inventory, then ask.

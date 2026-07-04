@@ -21,9 +21,9 @@ verdict: APPROVED
 
 All items from `docs/P5_TASK9_SDO_CONTINUATION_v1.0.xml` §5 EA-4 are present:
 
-- **WI-1**: `docs/governance/observability.md` — GOV-12 (Vikunja #25), ~400+ lines, 9 content requirements, 8 source files anchored
-- **WI-2**: `docs/governance/deployment-verification.md` — GOV-13 (Vikunja #26), ~200-300 lines, 10 content requirements, 4 source files anchored
-- **WI-3**: `docs/governance/rule-engine.md` — GOV-14 (Vikunja #27), ~200 lines, 10 content requirements, 4 source files anchored
+- **WI-1**: `docs/governance/observability.md` — GOV-12 (Vikunja #25), \~400+ lines, 9 content requirements, 8 source files anchored
+- **WI-2**: `docs/governance/deployment-verification.md` — GOV-13 (Vikunja #26), \~200-300 lines, 10 content requirements, 4 source files anchored
+- **WI-3**: `docs/governance/rule-engine.md` — GOV-14 (Vikunja #27), \~200 lines, 10 content requirements, 4 source files anchored
 - **WI-4**: Per-file ledger entry — predecessor `20260422_203647_sprint9_ea3_operational-state`
 
 ## Protocol Compliance Checks
@@ -37,7 +37,7 @@ All items from `docs/P5_TASK9_SDO_CONTINUATION_v1.0.xml` §5 EA-4 are present:
 | L-17 phantom reference | PASS | WI-1 and WI-3 carry boot-sequence.md warnings; NC-4 prohibits creating it |
 | STYLE.md dependency | PASS | Listed in required_attachments |
 | Oracle gate | PASS | `grep -vE "^docs/"` → EMPTY |
-| Line floor quality gate | PASS | LINE-FLOOR gate: ≥150 lines per doc; GOV-12 ~400+ noted |
+| Line floor quality gate | PASS | LINE-FLOOR gate: ≥150 lines per doc; GOV-12 \~400+ noted |
 | ADR citations per doc | PASS | ADR-010 (GOV-14), ADR-011+ADR-012 (GOV-13), ADR-010/ADR-011 + ADR-absence note (GOV-12) |
 | NC-4 (no phantom creation) | PASS | boot-sequence.md explicitly prohibited |
 | NC-5 (no TEST_GOVERNANCE.md) | PASS | |

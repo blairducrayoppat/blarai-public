@@ -143,7 +143,7 @@ P50=0.0 across all bands reflects 62.5% prefilter coverage (instant responses sk
 | Model compile | 27.7s |
 | Harness start | 2026-03-05 20:56:31 UTC |
 | Harness end | 2026-03-05 21:00:56 UTC |
-| Total wall time | ~4m 25s |
+| Total wall time | \~4m 25s |
 
 ## Artifacts
 

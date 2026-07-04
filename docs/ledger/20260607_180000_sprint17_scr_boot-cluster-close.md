@@ -87,7 +87,7 @@ every merge; independently reproduced by the Auditor.
   automation → the **#612 Capstone phase (gate-phase 6, §5.13)** → the **#598
   §5.12 sign-off (phase 7)**. The air-gap stays UP throughout.
 - #607 audit retention (LA decision); MINOR-4 (#787); #626; the dependency
-  hash-pinning lockfile; the ~33-worktree state-hygiene cleanup.
+  hash-pinning lockfile; the \~33-worktree state-hygiene cleanup.
 
 ## Decisions of record
 

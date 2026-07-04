@@ -36,7 +36,7 @@ verdict: null
 
 - Role: `co_lead_architect`
 - `may_proceed`: True
-- Session cap: 45 min (DEC-11 v3 A1.1) — used ~3 min this firing
+- Session cap: 45 min (DEC-11 v3 A1.1) — used \~3 min this firing
 - Warnings: none
 
 ## Exit

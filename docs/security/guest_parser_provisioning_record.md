@@ -29,7 +29,7 @@ so every interaction uses Hyper-V's own channels:
 | Channel | Direction | Status |
 |---|---|---|
 | **Copy-VMFile** (Guest Service Interface + in-guest `hv_fcopy_daemon`) | host → guest files | **CONFIRMED DEAD** — kernel 6.12.74 removed the legacy fcopy device; error `0x800710DF` at the 2026-06-11 controlled session. `hv_fcopy_daemon` has no device node to bind on this kernel. Non-revivable without a kernel rebuild. **Do not attempt.** |
-| **CD ISO** (IMAPI2 ISO built at `build/guest_cd/build_iso.ps1`; attached as VM DVD) | host → guest parser tree | **PROVEN** — actual channel used at 2026-06-11 provisioning. In-guest: `mount /dev/cdrom /mnt && sh /mnt/provision.sh` (idempotent, ~30 s). Re-provisions use the same channel (§3). |
+| **CD ISO** (IMAPI2 ISO built at `build/guest_cd/build_iso.ps1`; attached as VM DVD) | host → guest parser tree | **PROVEN** — actual channel used at 2026-06-11 provisioning. In-guest: `mount /dev/cdrom /mnt && sh /mnt/provision.sh` (idempotent, \~30 s). Re-provisions use the same channel (§3). |
 | **AF_HYPERV vsock** (GUID-pair addressing, #615) | host ↔ guest frames | **PROVEN** — transport (`phase2_gates/evidence/vsock_validation.json`, echo round-trip PASS) and application level (2026-06-12 round-trip: GUID `0000c351-facb-11e6-bd58-64006a7986d3`, port 50001, health probe PASS). |
 | **Host → guest command execution** | — | **DOES NOT EXIST** — PowerShell Direct is Windows-guest-only; no SSH (no NIC); vsock carries parse frames only. Provisioning eliminates the need for remote exec: the `blarai-parser` service auto-starts on boot; code updates ship via CD ISO. |
 
@@ -89,7 +89,7 @@ installed at the 2026-06-11 controlled session:
 ## 3. The re-provision runbook (CD ISO channel)
 
 This is the repeating procedure for every future guest code update. Estimated operator time:
-~5 min. Add a VHDX backup step before destructive or structural changes; a code-only
+\~5 min. Add a VHDX backup step before destructive or structural changes; a code-only
 re-provision via the idempotent `provision.sh` does not require one.
 
 **Agent-side (autonomous, before the ceremony):**
@@ -118,7 +118,7 @@ re-provision via the idempotent `provision.sh` does not require one.
    the build machine, which is also the Hyper-V host, so they are already where the
    ceremony needs them (no transfer step).
 
-**LA ceremony (~5 min at Hyper-V console):**
+**LA ceremony (\~5 min at Hyper-V console):**
 
 1. **Re-attach the ISO while the VM is Off** (re-grants the Hyper-V read ACL — see the §3
    agent-side ACL warning). Hyper-V Manager → VM Settings → DVD Drive → re-select
@@ -132,7 +132,7 @@ re-provision via the idempotent `provision.sh` does not require one.
    CD filesystem, so a bare `mount /dev/cdrom /mnt` fails `Invalid argument` (EINVAL). Use
    `/dev/sr0` (the Gen-2 SCSI DVD); if it reports no such device, substitute `/dev/cdrom`.
    The script stops `blarai-parser`, copies updated files, verifies `SHA256SUMS`, restarts
-   the service. Version lines + `OK` from sha256sum confirm success (~30 s).
+   the service. Version lines + `OK` from sha256sum confirm success (\~30 s).
 3. Verify the service: `rc-service blarai-parser status` → `started`.
 4. **Verify the change is live (off the egress path):** from the host, run
    `./.venv/Scripts/python.exe scripts/uc003_markdown_verify.py` (or the analogous

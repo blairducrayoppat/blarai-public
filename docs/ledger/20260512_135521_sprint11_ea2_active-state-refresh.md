@@ -34,7 +34,7 @@ Cross-repo ordering: the BlarAI feature branch lands first (via Co-Lead trusted_
 |---|---|---|
 | `docs/runbooks/active_state_refresh.md` | new | 124 |
 | `tools/active_state_refresh.ps1` | new | 199 |
-| `docs/ledger/20260512_135521_sprint11_ea2_active-state-refresh.md` | new | ~60 |
+| `docs/ledger/20260512_135521_sprint11_ea2_active-state-refresh.md` | new | \~60 |
 
 Feature-branch commit hash recorded post-commit: see `[agent:ea_code][phase:completion]` comment on Vikunja task #410. Merge to main via Co-Lead trusted_scope at Phase 3.
 
@@ -68,7 +68,7 @@ Expected shape (3 input True / 1 output False) — confirmed; runbook directory 
 
 ### Post-edit verification
 
-`Select-String -Pattern 'active_state_refresh'` on the post-edit template returns 4 matches across 2 distinct insertion sites (lines ~207–210 and ~302–305) — well above the EA prompt's ">= 2 matches" floor.
+`Select-String -Pattern 'active_state_refresh'` on the post-edit template returns 4 matches across 2 distinct insertion sites (lines \~207–210 and \~302–305) — well above the EA prompt's ">= 2 matches" floor.
 
 ### Parent-head verify (L-13)
 

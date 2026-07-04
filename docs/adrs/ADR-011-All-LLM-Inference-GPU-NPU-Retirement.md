@@ -63,7 +63,7 @@ with speculative decoding. Configuration optimization in progress — see ADR-01
 | PA model | Qwen2.5-1.5B-Instruct INT4-MIXED | PENDING | **Qwen3-14B INT4** |
 | AO model | Qwen2.5-1.5B-Instruct INT4-MIXED | PENDING | **Qwen3-14B INT4** |
 | Model family | Qwen2.5 (NPU-compatible) | Qwen3 (preferred) | **Qwen3 (locked)** |
-| Max model size | ~1.5B (NPU limit) | ~14B (GPU budget) | **14B (confirmed)** |
+| Max model size | \~1.5B (NPU limit) | \~14B (GPU budget) | **14B (confirmed)** |
 | Quantization | INT4-MIXED (NPU-optimized) | INT4 symmetric (GPU) | **INT4 symmetric (locked)** |
 | Draft model | N/A | TBD (Qwen3-0.6B/1.7B) | **Evaluating** (see ADR-012 §2.3) |
 | Speculative decoding | N/A | Candidate | **Confirmed (mandatory)** |
@@ -231,9 +231,9 @@ With both PA and AO on the same GPU, a new contention model applies:
 
 | Factor | Assessment |
 |--------|-----------|
-| PA + AO simultaneous inference | LOW RISK — PA is a ~78ms burst classification; AO is streaming generation. They are sequentially gated by the boot ordering and JWT lifecycle (PA must ALLOW before AO generates). |
+| PA + AO simultaneous inference | LOW RISK — PA is a \~78ms burst classification; AO is streaming generation. They are sequentially gated by the boot ordering and JWT lifecycle (PA must ALLOW before AO generates). |
 | DWM compositing contention | LOW — Same as ADR-010 assessment. PA is a short burst. |
-| Shared LPDDR5X memory pressure | MEDIUM — Both models' weights in VRAM simultaneously. Budget: PA weights (~1 GB) + AO weights (TBD, up to ~8 GB for 14B INT4) + KV caches. Must fit within 15,507 MB available (ADR-006). P5-005a will validate. |
+| Shared LPDDR5X memory pressure | MEDIUM — Both models' weights in VRAM simultaneously. Budget: PA weights (\~1 GB) + AO weights (TBD, up to \~8 GB for 14B INT4) + KV caches. Must fit within 15,507 MB available (ADR-006). P5-005a will validate. |
 | Model compilation time | LOW — GPU compilation is faster than NPU. Both models compile at boot. |
 
 ### 3.4 Residual Risks

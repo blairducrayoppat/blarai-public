@@ -43,7 +43,7 @@ ADR-012 §2.5 addendum content committed in `task4-1-adr-addendum` (c4b6d4c), me
 **Key decisions locked from Task 4.3 (SDO resolved 2026-03-03):**
 - **NAT (`num_assistant_tokens`)**: 3 globally — **LOCKED** (DEC-01: wins weighted TPS across 512–8K production range; 12K penalty is USE-CASE-005-only, not yet in production; adaptive NAT deferred as post-Task-5 optimization opportunity)
 - **Speculative decoding collapse at ≥16K**: **ACCEPTED AS-IS** (DEC-02: AR=0.000 for all NAT values; system degrades gracefully to autoregressive; no code change; Task 4.3b confirmed sparse attention does NOT shift boundary — thesis REFUTED)
-- **Max context window**: 16,384 tokens — **LOCKED** (DEC-03: proven safe, RSS 3,562 MB; speculative decoding inert above ~12K but system functional)
+- **Max context window**: 16,384 tokens — **LOCKED** (DEC-03: proven safe, RSS 3,562 MB; speculative decoding inert above \~12K but system functional)
 - **Task 4.5 (Context Band Extension)**: **RETIRED** (DEC-04: fully subsumed by Task 4.3's 7-band × 6-NAT matrix)
 - **Sparse attention (SchedulerConfig)**: OFF — **DEFERRED** (Task 4.3b: TRISHAPE suppresses spec-decode universally, AR=0.000 at all bands; XATTENTION incompatible with Arc 140V / Qwen3-14B INT4. Re-evaluate post-Task-5 if OV GenAI fixes XATTENTION or TRISHAPE+spec-decode interaction)
 
@@ -73,7 +73,7 @@ prompt (docs/Task4.3_v1.xml, 2026-03-02) expanded the scope to:
 - NAT values: [1, 2, 3, 5, 7, 10] (added NAT=1,2 lower bounds; NAT=10 upper bound)
 - Context bands: [512, 2048, 4096, 8192, 12288, 16384, 20480] (full production range — not 4K only)
 - Draft model: Draft-A only (Draft-B eliminated)
-- Total: 42 configs × 7 runs (2 warmup + 5 measured) = 294 generate() calls, ~2 hours
+- Total: 42 configs × 7 runs (2 warmup + 5 measured) = 294 generate() calls, \~2 hours
 
 Task 4.5 (Context Band Extension) scope will be reviewed after Task 4.3 data is available, as Task 4.3
 now covers the full context range. The remaining unique contribution of Task 4.5 will be determined
@@ -258,7 +258,7 @@ search over the already-in-memory prompt.
   variable names, and patterns from the input codebase context
 - Conversational AO (USE-CASE-004): LOW (5–20%) — conversational output rarely duplicates
   input verbatim
-- PA classification (USE-CASE-001): VERY LOW (~0–5%) — classification output is novel by design
+- PA classification (USE-CASE-001): VERY LOW (\~0–5%) — classification output is novel by design
 
 **Combined approach (Code Agent):** Enable both draft model (quality coverage for novel logic)
 AND prompt lookup (free coverage for identifier/pattern reuse). Controlled via:
@@ -293,7 +293,7 @@ limited to the remaining budget. This must be accounted for when setting `max_ne
 Code Agent with thinking enabled.
 
 **max_new_tokens is a hard ceiling, not a target.** The model stops at whichever comes first:
-EOS token, `stop_token_ids` match, or `max_new_tokens`. For PA, EOS fires at ~5–10 tokens in
+EOS token, `stop_token_ids` match, or `max_new_tokens`. For PA, EOS fires at \~5–10 tokens in
 normal operation. The `max_new_tokens` ceiling is a security/budget guarantee, not a generation
 target.
 
@@ -438,7 +438,7 @@ confirmed provisional-off but not locked because 16K was not tested.
 | Value | Expected TPS delta | Primary quality signal |
 |-------|-------------------|----------------------|
 | `f16` | Baseline | — |
-| `bf16` | ~0–3% (same bandwidth) | Adversarial PA classification sub-rate |
+| `bf16` | \~0–3% (same bandwidth) | Adversarial PA classification sub-rate |
 
 **Scope:** Test across all three use case workload prompts. Run the PA adversarial subset
 (Task 4.9) at both FP16 and BF16 and report whether any classification decisions change on the
@@ -456,7 +456,7 @@ data alone.
 - **PA prefix cache:** System prompt ≈ 600 tokens. All three PA calls use identical system
   prompt, varying only the CAR payload (new 200-token payload each call). Measure TTFT reduction
   % from cold to warm-1. Hypothesis: high benefit — system prompt is stable across every PA call.
-- **AO prefix cache:** Session prefix (system prompt ~280 tokens). Measure TTFT at 4K and 12K
+- **AO prefix cache:** Session prefix (system prompt \~280 tokens). Measure TTFT at 4K and 12K
   input with and without prefix cache. Hypothesis: moderate benefit — system prompt is stable
   within session but turns add new tokens each call.
 
@@ -499,13 +499,13 @@ Test at 512-token and 2K-token PA input bands (covers typical + near-worst-case 
 **Input characteristics:**
 - Structure: `[system_prompt (~600 tokens)] + [CAR payload (variable)]`
 - Expected CAR payload range: 200–2,000 tokens
-- Realistic worst-case total: ~4,096 tokens (matches quality gate Band 4)
+- Realistic worst-case total: \~4,096 tokens (matches quality gate Band 4)
 - Inputs at 8K+ tokens indicate an upstream architectural violation — PA should not receive them
 
 **Latency budget:**
 - P95 flat: **2,000ms** (replaces invalid 230ms — see §2.2)
-- Prefix cache warm typical: ~800ms (500ms decode at max_new_tokens=8 + ~300ms TTFT)
-- Cold first call: up to 2,000ms (no prefix cache, ~500ms TTFT + ~500ms decode)
+- Prefix cache warm typical: \~800ms (500ms decode at max_new_tokens=8 + \~300ms TTFT)
+- Cold first call: up to 2,000ms (no prefix cache, \~500ms TTFT + \~500ms decode)
 - Fail-closed timeout: still enforced at budget ceiling — returns DENY
 
 **Security constraints (immutable):**
@@ -520,7 +520,7 @@ Test at 512-token and 2K-token PA input bands (covers typical + near-worst-case 
 
 **Output format:**
 - Expected: `DECISION: ALLOW`, `DECISION: DENY: <reason_code>`, or `DECISION: ESCALATE: <reason_code>`
-- Maximum expected token count: ~12–14 tokens including formatting
+- Maximum expected token count: \~12–14 tokens including formatting
 - EOS fires before `max_new_tokens` in normal operation — ceiling is a safety net only
 
 **Quality gate:** Minimum decision_agreement_rate ≥ 0.90 across all bands (Task 4.9). Below
@@ -690,7 +690,7 @@ Context band extension folded into this task from original Task 4.5 scope.
 
 **Pre-condition:** Requires Task 4.3 COMPLETE (locked NAT needed as baseline). ✅ MET — NAT=3 LOCKED.
 **Status:** COMPLETE — Branch `feature/p5-task4-3b-sparse-attention` (HEAD: eb2df43). Commit: eb2df43.
-LEDGER Entry 18. Execution prompt: `docs/Task4.3b_v1.xml`. Runtime: ~47 minutes.
+LEDGER Entry 18. Execution prompt: `docs/Task4.3b_v1.xml`. Runtime: \~47 minutes.
 Disposition: **INSUFFICIENT_EVIDENCE** (G-01 FAIL from XATTENTION) / **SPARSE_DEFERRED** (TRISHAPE alone).
 Elevation rationale: Task 4.3 AR=0.000 collapse at ≥16K is the most consequential finding. Sparse
 attention changes KV cache contents and may shift the collapse boundary. Running before DEC-02
@@ -699,7 +699,7 @@ re-evaluation provides data for potential future optimization.
 **Execution summary (2026-03-03):**
 - TRISHAPE: 5/5 bands completed. TTFT improvement +27–54% (12K: 100,776→46,129ms = 2.2× faster prefill).
   BUT AR=0.000 at ALL bands including 4K (spec-decode universally suppressed). TPS regression at 4K
-  (ratio 0.687) and 8K (0.840); net TPS win at 12K (1.459) and 16K (1.239). RSS ~12.2 GB at all bands.
+  (ratio 0.687) and 8K (0.840); net TPS win at 12K (1.459) and 16K (1.239). RSS \~12.2 GB at all bands.
 - XATTENTION: ALL_FAILED (5/5 bands). Arc 140V + Qwen3-14B INT4 model export missing XAttention kernel.
   Compile succeeds, inference fails (`CHECK_GETPORT` error). NOT_SUPPORTED on this hardware/model combo.
 - AR collapse boundary thesis REFUTED: TRISHAPE does NOT shift 16K boundary — it moves collapse to ALL bands.
@@ -720,7 +720,7 @@ re-evaluation provides data for potential future optimization.
   Pipeline kwargs → Task 4.6 + 4.10. No orphaned rows. Task 4.10 is the finalization gate.
 
 **Background:** Intel technical article (2026-05-06) demonstrates "dynamic sparse attention" on exact
-BlarAI hardware (Core Ultra 7 258V / Arc 140V) reducing TTFT at 32K from ~88s to ~34s (2.6×).
+BlarAI hardware (Core Ultra 7 258V / Arc 140V) reducing TTFT at 32K from \~88s to \~34s (2.6×).
 Their config used OpenVINO 2025.2.0-dev. BlarAI runs OV 2026.0.0 — feature is already GA.
 
 **API (confirmed OV 2026.0):**
@@ -746,7 +746,7 @@ scheduler.sparse_attention_config.xattention_threshold = 0.80
 - `SparseAttentionMode.XATTENTION`: sparse XAttention blocks only (no tri-shape wrapper)
 
 **PA SECURITY CONSTRAINT (immutable):**
-NEVER enable sparse attention on the Policy Agent. Rationale: the PA system prompt is ~600 tokens.
+NEVER enable sparse attention on the Policy Agent. Rationale: the PA system prompt is \~600 tokens.
 With `num_retained_start_tokens_in_cache = 128`, only the first 128 tokens are guaranteed as
 attention sinks. Tokens 129–600 of the system prompt (the critical policy rules) may be evicted
 at long context. A policy rule that is evicted from the KV cache cannot influence the classification

@@ -2,7 +2,7 @@
 
 **For:** #612 must-cover #8 (explain-to-a-13-year-old). **Audience:** technically literate but new to *this*
 system; the spoken version should land for a non-technical interviewer.
-**Status:** draft seed (2026-06-08); refine at deck-build. Target: ~2 slides, ≥1 a diagram.
+**Status:** draft seed (2026-06-08); refine at deck-build. Target: \~2 slides, ≥1 a diagram.
 **Grounding:** ADR-028 (Measured-Boot Attestation Scope); `shared/models/weight_integrity.py`,
 `shared/models/manifest_signer.py` (read 2026-06-08); ADR-018 (TPM trust root); §5.9; #627.
 
@@ -82,7 +82,7 @@ rehearsing (ADR-028):
 
 ## 5. Why it's a strong interview topic
 
-In ~2 minutes you can speak to:
+In \~2 minutes you can speak to:
 1. **Root of trust / hardware-backed security** — keys that *cannot* be exported from a TPM, so signatures
    can't be forged even with full disk write access.
 2. **Integrity verification** — fingerprints (hashes) + a signed manifest; signature-checked *before* content.

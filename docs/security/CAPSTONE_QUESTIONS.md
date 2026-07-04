@@ -37,7 +37,7 @@ depth underneath, never dumbed-down-wrong.
   **summary scorecard** for the whole set + a compact **per-domain** before→after, with a **dedicated card/slide
   ONLY for the findings that earn it** — every Critical, the significant Highs, and **every still-open/residual
   gap** (the ones the LA most needs for the gate decision). Cleanly-closed minor findings get a matrix line, not
-  a slide. (Avoids a ~30-slide table-read; spends the time where it matters.)
+  a slide. (Avoids a \~30-slide table-read; spends the time where it matters.)
 - **Card-style per-issue treatment** for those that earn one: what it was (+ severity) → what we did (mitigation
   + evidence) OR why it's still open (+ ticket). Self-contained, plain-language.
 - **Attestation gets 2 dedicated slides, at least one a strong diagram/illustration** (LA-directed). Explain what
@@ -151,8 +151,8 @@ residual-risk register.*
 (what it was · severity · status · mitigation+evidence OR gap+ticket) at a calibrated detail level — not buried in dense
 table rows. Audience = technically literate but NOT familiar with this domain, so define domain terms; per-issue depth
 where warranted, grouped/summarized where not (no slide-per-trivial-finding). Plus two 13-yo-level explainers w/ diagrams
-(must-cover #8): the **attestation** process (~2 slides, ≥1 diagram) and **host↔guest isolation + secure data flow**
-(~2 slides, ≥1 diagram) — see #612 deck-design comment.*
+(must-cover #8): the **attestation** process (\~2 slides, ≥1 diagram) and **host↔guest isolation + secure data flow**
+(\~2 slides, ≥1 diagram) — see #612 deck-design comment.*
 
 ---
 

@@ -7,7 +7,7 @@
 ## tl;dr
 - On OpenVINO **2026.0.0**, the original SIGABRT now surfaces as a structured Python `RuntimeError` with a clean stack into `npuw/compiled_model.cpp:516`. Failure signature: **`StopLocationVerifierPass: Found 40 duplicated names after full verification`**. Reproducible without the speculative-decoding wrapper — plain `LLMPipeline(ir, "NPU")` is sufficient.
 - The IR is structurally valid: same artifact compiles fine on CPU (1.6 s) and GPU (6.9 s). The failure is NPUW-side.
-- **The trigger correlates with weight-compression scheme.** Per-group INT4 sym (`group_size=128`, the standard Optimum default) fails NPUW. Channel-wise INT4 (`group_size=-1`) and INT8 both **succeed** through NPUW (~16-19 s compile). Per-group INT4 asym not yet tested through NPUW.
+- **The trigger correlates with weight-compression scheme.** Per-group INT4 sym (`group_size=128`, the standard Optimum default) fails NPUW. Channel-wise INT4 (`group_size=-1`) and INT8 both **succeed** through NPUW (\~16-19 s compile). Per-group INT4 asym not yet tested through NPUW.
 - The documented "reshape to static shapes" workaround does not apply to optimum-intel stateful LLM IRs — `model.reshape({...})` constrains only the four visible inputs; KV-cache lives in 56 internal `ReadValue`/`Assign` Variables that `reshape()` does not reach.
 
 ## Environment
@@ -45,7 +45,7 @@ This matches the cause @dmatveev posted on Apr 24. Reproducing without the spec-
 
 | Cell | Weight scheme | Export args | NPUW outcome | Compile time |
 |---|---|---|---|---|
-| G   | per-group INT4 sym | `--weight-format int4 --group-size 128 --ratio 1.0 --sym` | **FAIL** — `StopLocationVerifierPass: 40 duplicated names` | ~6 s to fail |
+| G   | per-group INT4 sym | `--weight-format int4 --group-size 128 --ratio 1.0 --sym` | **FAIL** — `StopLocationVerifierPass: 40 duplicated names` | \~6 s to fail |
 | G-H | channel-wise INT4  | `--weight-format int4 --group-size -1`                   | **OK** | 19.30 s |
 | G-I | INT8               | `--weight-format int8`                                   | **OK** | 16.45 s |
 | G-C | per-group INT4 asym (no `--sym`) | `--weight-format int4 --group-size 128 --ratio 1.0` | not yet tested through NPUW | — |

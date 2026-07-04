@@ -6,7 +6,7 @@
 
 **Target**: https://github.com/openvinotoolkit/npu_compiler/pull/266 (PR — comment goes on the PR conversation thread)
 
-**Word count**: ~135 words. Intentionally short. The original technical content from 2026-04-17 is already in the thread; this comment exists only to re-surface the two open threads, not to re-litigate them.
+**Word count**: \~135 words. Intentionally short. The original technical content from 2026-04-17 is already in the thread; this comment exists only to re-surface the two open threads, not to re-litigate them.
 
 **@-mentions**: two — `@andrey-golubev` (re-surface the IR-dumping question), `@DariaMityagina` (confirm the LIT test). Each is contextual.
 
@@ -46,7 +46,7 @@ For clean copy/paste with no markdown rendering artifacts, use
 ## Authoring choices (LA-facing notes — do NOT post)
 
 1. **Two @-mentions, each addressing a specific pending thread.** Not a generic ping. Andrey gets the IR-dumping question re-surfaced; Daria gets a confirmation request on the LIT test.
-2. **Short.** ~135 words. The technical content from the April 17 exchange is already in the thread; this comment doesn't re-explain it.
+2. **Short.** \~135 words. The technical content from the April 17 exchange is already in the thread; this comment doesn't re-explain it.
 3. **No mention of the 25-day delay.** Not a complaint vehicle.
 4. **"Happy to wait if other items have priority"** — explicitly de-escalates urgency. Common Intel-engagement etiquette.
 5. **"I'd like to follow your direction toward a root-cause fix"** — affirms Andrey's architectural framing rather than relitigating "defense-in-depth is OK."

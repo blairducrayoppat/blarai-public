@@ -21,7 +21,7 @@ Sprint 8 SWAGR (gap #1, MAJOR) flagged this discontinuity: a reader browsing `do
 
 ## Where to read the real entry
 
-**Authoritative content**: `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` → **Entry 51 — Task 8/EA-1: Policy Agent Test Hardening (COMPLETE)**. Line ~3374 at the time this stub was authored.
+**Authoritative content**: `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` → **Entry 51 — Task 8/EA-1: Policy Agent Test Hardening (COMPLETE)**. Line \~3374 at the time this stub was authored.
 
 ## One-paragraph summary (for browsers who don't click through)
 

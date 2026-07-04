@@ -68,7 +68,7 @@ Python's `keyring` library abstracts over platform secret stores. On Windows, it
 
 **Security:** Equivalent to Option B (DPAPI under the hood). Marginally better UX: secrets are visible in the Credential Manager GUI for operator review and deletion.
 
-**Complexity:** Adds `keyring` as a new dependency (not yet in the BlarAI stack). `keyring` is well-maintained (active releases through 2025) but adds ~15 KB of code and a dependency chain. The `WinCred` backend is the Windows-specific adapter; the abstraction adds cross-platform compatibility that BlarAI does not need (this is a single-user Windows system by design for the foreseeable future).
+**Complexity:** Adds `keyring` as a new dependency (not yet in the BlarAI stack). `keyring` is well-maintained (active releases through 2025) but adds \~15 KB of code and a dependency chain. The `WinCred` backend is the Windows-specific adapter; the abstraction adds cross-platform compatibility that BlarAI does not need (this is a single-user Windows system by design for the foreseeable future).
 
 **Rejected because** it adds a dependency (`keyring`) whose only benefit over Option B is GUI discoverability in Credential Manager. BlarAI's operator is technical (the Lead Architect builds the system); he does not need a GUI credential browser. The `pywin32` + blob approach is already present and auditable with fewer moving parts. If BlarAI later moves to a multi-platform deployment or needs to manage many secrets, `keyring` becomes attractive — that is a named future trigger for reconsidering this decision.
 

@@ -31,7 +31,7 @@ All HIGH and MEDIUM items from `docs/P5_TASK8_SDO_CONTINUATION_v1.0.xml` §5 EA-
 - `shared/schemas/car.py`: dedicated test file — canonical_hash, is_complete, DecisionArtifact, enums (WI-10)
 - IPC message type convenience encoders × 6 (WI-11)
 
-**Projected test count**: ~42 (2+3+3+2+8+3+2+5+2+6+6 per WI decomposition). Quality floor: 982 (962 EA-3 baseline + 20 minimum).
+**Projected test count**: \~42 (2+3+3+2+8+3+2+5+2+6+6 per WI decomposition). Quality floor: 982 (962 EA-3 baseline + 20 minimum).
 
 ## Protocol Compliance Checks
 
@@ -46,7 +46,7 @@ All HIGH and MEDIUM items from `docs/P5_TASK8_SDO_CONTINUATION_v1.0.xml` §5 EA-
 | Risks I.1–I.8 | PASS | All technically sound |
 | Negative constraints (NC-1 through NC-8) | PASS | Complete set |
 | Required attachments | PASS | Continuation XML, SDV, ledger, all source files listed |
-| Mature-not-minimal | PASS | ~42 full tests > 20 minimum; adjacent-scope rules encoded |
+| Mature-not-minimal | PASS | \~42 full tests > 20 minimum; adjacent-scope rules encoded |
 
 ## Minor Observation (non-blocking)
 

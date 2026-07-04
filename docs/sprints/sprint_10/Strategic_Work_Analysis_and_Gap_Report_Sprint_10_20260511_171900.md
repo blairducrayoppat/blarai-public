@@ -114,7 +114,7 @@ documented in SDV §2.1.
 Zero runtime behavior change. BlarAI binary unchanged. The capability delta is
 **meta-operational**: future Claude / Codex / Copilot sessions initializing in BlarAI
 read 341 lines of single-concern runtime doctrine instead of 572 lines of mixed
-runtime+fleet content, saving ~30–40% of initial-context budget per SDV §3 framing.
+runtime+fleet content, saving \~30–40% of initial-context budget per SDV §3 framing.
 Future devplatform sessions get a 633-line substrate where there was none.
 
 ### 3.3 User / operator experience impact
@@ -155,7 +155,7 @@ ISS status.
 | 2 | devplatform doctrine files exist (≥100 lines, `[sprint:10][role:ea_code]` commit) | PASS | PASS | devplatform `9e5555c`: `CLAUDE.md` 185, `AGENTS.md` 105, `.github/copilot-instructions.md` 343 — all ≥ 100. Commit subject `[sprint:10][role:ea_code][phase:completion] EA-3 devplatform doctrine authorship + SOP portability fix` | NONE |
 | 3 | Cross-references resolve both directions | PASS | PASS (with style asymmetry) | BlarAI→devplatform: 4 explicit `*See also: C:\Users\mrbla\devplatform\... §<section>*` pointers (CLAUDE.md L68, L91, L126; AGENTS.md L8) + 2 XML pointers in copilot-instructions.md (L134-136 `<fleet_pause_sop_pointer>`, L165 `<fleet_responsibilities_pointer>`). All resolve to authored §sections in devplatform. devplatform→BlarAI uses `<BlarAI>\path\file` convention (informational/template-like, not literal pointers) — different style than SDV §5.3 prescribed for BlarAI side. Functionally adequate; style asymmetry only | MINOR (style) |
 | 4 | SOP import portability bug fixed (3 cwds, no ModuleNotFoundError) | PASS | PASS | `tools/autonomy_budget/cli.py` (66 lines on disk; SCR/ledger says 67 — off-by-one trailing-newline discrepancy, immaterial). Independent invocation from BlarAI cwd returns `usage: autonomy_budget.cli [-h] {pause,resume}` with zero error. SCR §4 #4 acknowledges that EA-3 verification matrix targeted isolated tmp `state.json` rather than live `state.json` due to harness denial of 6 live toggles; the import-resolution path is the same regardless | MINOR (verification path used isolated state; live round-trip later exercised at unpause commit `290a2f4`) |
-| 5 | BlarAI §"Active State" current | PASS | PASS-AS-WRITTEN / DRIFT-AT-AUDIT | EA-2 `ec2d09a` refreshed §"Active State" content per SDV criterion #5 verbatim (HEAD reference, ~981 baseline note, Task 7 COMPLETE, Sprints 7/8/9 COMPLETE, Sprint 10 ACTIVE, Domain 6 COMPLETE). **But at audit time, live pytest is 1001 passed / 2 skipped, not 981 / 22.** CLAUDE.md text is faithful to the SDV-anchored baseline string; the underlying baseline has drifted +20 passes / -20 skips since Sprint 8 close | MINOR (criterion text met; baseline drift recurs) |
+| 5 | BlarAI §"Active State" current | PASS | PASS-AS-WRITTEN / DRIFT-AT-AUDIT | EA-2 `ec2d09a` refreshed §"Active State" content per SDV criterion #5 verbatim (HEAD reference, \~981 baseline note, Task 7 COMPLETE, Sprints 7/8/9 COMPLETE, Sprint 10 ACTIVE, Domain 6 COMPLETE). **But at audit time, live pytest is 1001 passed / 2 skipped, not 981 / 22.** CLAUDE.md text is faithful to the SDV-anchored baseline string; the underlying baseline has drifted +20 passes / -20 skips since Sprint 8 close | MINOR (criterion text met; baseline drift recurs) |
 | 6 | Post-split BlarAI ≥ 30% line reduction | PASS | PASS (40.4%) | `wc -l CLAUDE.md AGENTS.md .github/copilot-instructions.md` → 156 + 10 + 175 = 341. (572 − 341) / 572 = 40.4%. Exceeds 30% floor; near the 50% soft target | NONE |
 | 7 | Stage 6 v1 items 6.1/6.2/6.3/6.6 recorded CLOSED in SCR | PASS | PASS | SCR §13 enumerates all 4 with closing commits: 6.1 → EA-2 `1b1614e` + EA-3 `9e5555c`; 6.2 → same; 6.3 → same; 6.6 → EA-3 `9e5555c` (`cli.py`) + 5/5 cross-references RESOLVED | NONE |
 
@@ -221,7 +221,7 @@ Systematic categorization of `647b52d..90db41f` (44 non-merge commits):
 |---|---|---|
 | Sprint 10 EA content commits (BlarAI) | 3 (`1a90673`, `ec2d09a`, `4b2dfa0`) | In-scope, all properly tagged `[sprint:10][role:ea_code]` |
 | Sprint 10 kickoff commits | 2 (`191a677` SDV, `42a365c` roster) | Expected DEC-15 flow |
-| Sprint 10 agent-narration / DEC-13 reports | ~25 (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]`) | Expected |
+| Sprint 10 agent-narration / DEC-13 reports | \~25 (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]`) | Expected |
 | `chore(ops)` pause/unpause pairs | 6 (one pair per EA) | Per fleet pause SOP |
 | Co-Lead archive cleanups | 3 | Routine |
 | LA / Co-Lead bootstrap (`d9e4064`, `9263eb2`) | 2 | Sprint kickoff Phase 3a |
@@ -303,7 +303,7 @@ only after EA-2 merge. The serial cadence per SDV §7 held.
 
 | Metric | Before sprint (SDV-anchored Sprint 8 EA-5 baseline) | After sprint (live at `90db41f`) | Delta | SCR claimed delta |
 |---|---|---|---|---|
-| Regression suite (`pytest shared/ services/ launcher/`) | 981 passed, 22 skipped | **1001 passed, 2 skipped** (40.99s) | +20 pass / −20 skip | "~981 baseline retained" (criterion #5) |
+| Regression suite (`pytest shared/ services/ launcher/`) | 981 passed, 22 skipped | **1001 passed, 2 skipped** (40.99s) | +20 pass / −20 skip | "\~981 baseline retained" (criterion #5) |
 | Collection-only (`shared/ services/ launcher/ tests/`) | 1003 items (per CLAUDE.md) | 1003 collected, 84 deselected (1087 total) | = collection unchanged | — |
 | New test files added | — | 0 | +0 | +0 (criterion implicitly held) |
 | Test files moved | — | 0 | +0 | +0 |
@@ -314,7 +314,7 @@ The +20 pass / −20 skip delta therefore cannot be attributed to Sprint 10 work
 something else previously-skipped is now running and passing (most likely conditional
 markers / environment changes since Sprint 8 close 2026-04-24). The criterion #5 success
 condition refreshed §"Active State" text to the SDV-anchored 981/22 string but the
-underlying baseline has already drifted independently. The Co-Lead claim "~981 baseline
+underlying baseline has already drifted independently. The Co-Lead claim "\~981 baseline
 retained" reflects the text refresh, not live state.
 
 ### 8.2 Per-service coverage change
@@ -534,7 +534,7 @@ rather than 6 separate ones — efficient.
 
 - Fleet pause/unpause discipline: high. 3 pause/unpause pairs (one per EA): `4bd24ad`/`71bdd2d`,
   `c053d1a`/`6630bc4`, `e151777`/`290a2f4`. Each EA executed inside a paused window.
-- Role budgets: SDV §11 budgeted LA ~30 min; actual ~30–40 min per SCR §11 (wake-template
+- Role budgets: SDV §11 budgeted LA \~30 min; actual \~30–40 min per SCR §11 (wake-template
   fix cluster pushed marginally over). Co-Lead, SDO, EA Code all autonomous per DEC-11.
 - SOFT/HARD breaches: 0 evidenced.
 - `trusted_scope` operation: correctly identified EA-1 and EA-2 as exceeding LOC threshold;

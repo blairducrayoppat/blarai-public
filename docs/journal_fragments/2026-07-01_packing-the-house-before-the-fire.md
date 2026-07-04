@@ -42,7 +42,7 @@ measurement to the thing you think you're measuring.
 
 What was deliberately left behind: 124 GB of `oss/` OpenVINO upstream clones
 (clean, pushed, re-cloneable — a 900-byte patch file preserves the one local
-tweak), the 15 GB coder-30b (one HuggingFace download), ~34 GB of compiled
+tweak), the 15 GB coder-30b (one HuggingFace download), \~34 GB of compiled
 model caches, every `.venv`, and the graveyard of fleet test projects. A
 backup that includes everything is a backup nobody audits.
 

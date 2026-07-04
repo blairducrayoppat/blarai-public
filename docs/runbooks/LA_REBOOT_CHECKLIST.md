@@ -25,7 +25,7 @@
 On a normal reboot:
 
 1. Log in to Windows.
-2. Wait ~30 seconds for startup apps to finish loading.
+2. Wait \~30 seconds for startup apps to finish loading.
 3. Open a browser and go to `http://localhost:3456` — Vikunja should load.
 4. You're done. Fleet is operational.
 

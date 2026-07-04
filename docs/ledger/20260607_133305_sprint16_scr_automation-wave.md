@@ -71,7 +71,7 @@ Journal fold (7 fragments → arc entry + lessons 67-71) `1a7b92c`; SCR `560b6ad
   key-material, surfaced by E); fidelity-2 vs #615-before-gate; audit retention (#607); dependency
   hash-pinning lockfile.
 - **`#787` vs `#598`** in the `SECURITY_ROADMAP §5` header (documented alias; doc-currency close-sweep).
-- **State hygiene** — ~33 worktrees + 217 branches inventoried; LA-scheduled cleanup (no destructive git
+- **State hygiene** — \~33 worktrees + 217 branches inventoried; LA-scheduled cleanup (no destructive git
   this session).
 
 ## Lessons earned (folded into BUILD_JOURNAL)

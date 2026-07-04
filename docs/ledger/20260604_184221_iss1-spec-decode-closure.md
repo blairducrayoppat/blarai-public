@@ -20,10 +20,10 @@ SWAGR (Sprints 8, 9, 10, 11, and the ISS-2 sprint) and in both CLAUDE.md
 and `.github/copilot-instructions.md`.
 
 The underlying defect was fixed on **2026-05-21** by commit `b699ad1`
-("Fix speculative decoding — it now actually engages (~2x throughput)"),
+("Fix speculative decoding — it now actually engages (\~2x throughput)"),
 which is on `main`. The issue-tracking layer was never reconciled because
 the last SWAGR to list ISS-1 (the ISS-2 sprint, signed off **2026-05-20
-09:08**) predated the fix by ~38 hours. This entry is the formal closure
+09:08**) predated the fix by \~38 hours. This entry is the formal closure
 record; the doctrine files are updated to match in the same change.
 
 ## Root cause and fix
@@ -50,7 +50,7 @@ reader would otherwise re-introduce it.
 - **Functional**: `speculative_decoding_active` reflects the *achieved*
   state (True only when the draft pipeline actually initialises), not the
   requested state — so a silent fallback can no longer masquerade as success.
-- **Performance**: ~2x throughput reported at fix time (BUILD_JOURNAL.md
+- **Performance**: \~2x throughput reported at fix time (BUILD_JOURNAL.md
   entry "Speculative decoding now actually works"). Benchmark artifacts under
   `docs/performance/benchmark_2026-05-22_*.json`.
 

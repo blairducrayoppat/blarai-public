@@ -53,4 +53,4 @@ So what am I actually offering a team? Not a tenth-times engineer — you have t
 Here's the whole talk in two sentences. The machine writes the code now — that part is real, and it's wonderful. But judgment — what to build, what to trust, what to verify, what a human must still decide — that's the job, and it's a job you can be good at, with evidence. Thank you. I'd love your questions.
 
 ---
-**Total: 1882 words ≈ 13.0–14.5 min at 145–130 wpm (+ ~1 min transitions).**
+**Total: 1882 words ≈ 13.0–14.5 min at 145–130 wpm (+ \~1 min transitions).**

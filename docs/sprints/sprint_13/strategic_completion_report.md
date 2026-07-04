@@ -24,7 +24,7 @@ campaign, executed as the campaign's **first fleet wave**: three disjoint builde
 parallel worktrees (model sonnet), with the Orchestrator holding the merge gate. Each finisher
 closes a specific, verified finding from the 2026-06-03 audit, and each landed on `main` under a
 recorded merge-gate review verdict. Full Layer-A suite on the integrated tree: **1883 passed, 0
-failed** (up from the 1797 kickoff baseline; ~+86 from the finishers' own tests, zero regressions).
+failed** (up from the 1797 kickoff baseline; \~+86 from the finishers' own tests, zero regressions).
 
 The three:
 - **EA-1 / #601 — PII credit-card Luhn fix** (audit Domain 5). The `CREDIT_CARD` detector claimed

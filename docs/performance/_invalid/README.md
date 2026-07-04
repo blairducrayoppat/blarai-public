@@ -38,5 +38,5 @@ quarantined original in place referencing the superseding run.
 
 - `kv_cache_sweep_2026-06-29_13-11-56.json` — long-context (16K/32K) KV-precision
   sweep. `cache_size=3` KV starvation produced pathological TTFT (310s @ 32K) and
-  the host-RAM instrument was blind to the GPU KV pool (flat ~20.85 GB).
+  the host-RAM instrument was blind to the GPU KV pool (flat \~20.85 GB).
   Superseded by **Vikunja #709** (harness fix + GPU-mem instrumentation).

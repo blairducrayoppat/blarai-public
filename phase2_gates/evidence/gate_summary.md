@@ -68,7 +68,7 @@
 | Total committed | ≤ 32,074.8 MB | 30,615.6 MB | **PASS** |
 | Headroom | ≥ 5% | 4.5% | **WARNING** |
 
-**Disposition:** Headroom 4.5% marginally under 5% threshold due to inflated dev workloads (VS Code ~2.6 GB, Firefox ~1.9 GB). Production headroom estimated ~20% with background processes removed. See ADR-006.
+**Disposition:** Headroom 4.5% marginally under 5% threshold due to inflated dev workloads (VS Code \~2.6 GB, Firefox \~1.9 GB). Production headroom estimated \~20% with background processes removed. See ADR-006.
 
 ---
 
@@ -105,7 +105,7 @@
 | Trust boundary | Software fallback (Hyper-V+vsock+mTLS) | ADR-007 |
 | TDX/TDISP | Absent (expected for client Lunar Lake) | ADR-007 |
 | Total committed memory | 30,615.6 MB | ADR-006 |
-| Production headroom (est.) | ~20% | ADR-006 |
+| Production headroom (est.) | \~20% | ADR-006 |
 
 ---
 

@@ -6,7 +6,7 @@
 
 ## Objective
 
-Determine the lowest safe `max_new_tokens` ceiling for the Policy Agent that still achieves 100% label extraction. The PA classifier outputs a short label (e.g., `ALLOW`, `DENY`) but the `max_new_tokens` ceiling must account for Qwen3's think block overhead — even with `/no_think`, the model emits ~3 think tokens before the classification label, consuming effective budget.
+Determine the lowest safe `max_new_tokens` ceiling for the Policy Agent that still achieves 100% label extraction. The PA classifier outputs a short label (e.g., `ALLOW`, `DENY`) but the `max_new_tokens` ceiling must account for Qwen3's think block overhead — even with `/no_think`, the model emits \~3 think tokens before the classification label, consuming effective budget.
 
 - **Candidates (PA-T1 through PA-T4):** [32, 15, 10, 8]
 - **PA bands:** [512, 2048]

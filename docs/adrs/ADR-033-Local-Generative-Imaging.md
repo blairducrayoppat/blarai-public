@@ -22,8 +22,8 @@ separate diffusion model. UC-010 builds that track with an **uncensored** genera
 the Arc 140V iGPU via OpenVINO GenAI, with **zero external network**, **fail-closed**, and
 **born-encrypted** at rest.
 
-The capability is **memory-hostile**: the diffusion model (~4.4 GB INT8) cannot co-reside with the
-always-resident 14B (~8.7 GB) + KV-cache + draft + embedder + voice on the 31.323 GB shared ceiling
+The capability is **memory-hostile**: the diffusion model (\~4.4 GB INT8) cannot co-reside with the
+always-resident 14B (\~8.7 GB) + KV-cache + draft + embedder + voice on the 31.323 GB shared ceiling
 without eviction discipline. A Phase-0 memory spike was run as a build-or-no-build gate *before* this
 build (see §Memory posture).
 
@@ -97,27 +97,27 @@ RESERVED config knob (validated + plumbed, NOT yet consumed by a daemon — the 
 makes one unnecessary here; a timer mirroring substrate #611 is a documented future option, not a shipped
 backstop). GPU compile props
 deliberately OMIT `MODEL_PRIORITY="HIGH"` — the diffusion model yields to the always-resident 14B, never
-the reverse. Before loading, the AO evicts the OTHER large resident caches: `unload_vlm()` (~5 GB) +
+the reverse. Before loading, the AO evicts the OTHER large resident caches: `unload_vlm()` (\~5 GB) +
 the substrate embed cache + the knowledge-bank caches. **The 14B is NEVER evicted.** (The AO process
 holds no voice engine — STT/TTS live on the gateway/backend side — so there is no AO-side voice unload;
 named honestly, not silently skipped.)
 
 **Amendment 2 (2026-06-17, #666 go-live — hires-fix eviction):** the "14B is NEVER evicted" invariant
 above is RELAXED for the hires-fix path ONLY. A hires-fix refine (1536² img2img — see §quality, the fix
-for soft faces in wide shots) measured **~26 GB standalone** and does NOT co-reside with the resident 14B
-in 31.323 GB — it thrashed the 14B out to disk (`proc_rss` collapsed to 142 MB; ~2 min). So for a HIRES
+for soft faces in wide shots) measured **\~26 GB standalone** and does NOT co-reside with the resident 14B
+in 31.323 GB — it thrashed the 14B out to disk (`proc_rss` collapsed to 142 MB; \~2 min). So for a HIRES
 generate the AO evicts the shared 14B for the duration via `SharedInferencePipeline.unload()`, and the
-14B is **lazily reloaded** on the next PA/AO `generate()` (~15-30 s, paid once). The 14B is shared by the
+14B is **lazily reloaded** on the next PA/AO `generate()` (\~15-30 s, paid once). The 14B is shared by the
 Policy Agent AND the AO through one `SharedInferencePipeline` wrapper; both route `.generate()` through it
 and neither caches pipeline-instance state (the AO tokenizer is disk-loaded; the PA passes string
 prompts), so the reload is transparent to both. **BASE (non-hires) 1024² generates still fit co-resident
 and KEEP the 14B** (no reload cost) — the eviction is gated to `[image_generation].hires_enabled`. The
 imagine-path IPC fail-safe is raised 90→175 s (under the 180 s socket cap) for the longer two-pass.
-Measured even with the 14B evicted, a 1536² hires peaks at ~294 MB free — it fits, but `hires_factor` can
+Measured even with the 14B evicted, a 1536² hires peaks at \~294 MB free — it fits, but `hires_factor` can
 be lowered (1.25) for margin. Fail-Soft: any hires-refine failure (incl. OOM) returns the base image.
 
 **Phase-0 spike (build-or-no-build GATE — PASSED, real Arc 140V, 2026-06-16):** with the 14B resident +
-~3k-token KV-cache, an SDXL INT8 co-resident load + a 1024² generate peaked at **~26.0 GB** vs the
+\~3k-token KV-cache, an SDXL INT8 co-resident load + a 1024² generate peaked at **\~26.0 GB** vs the
 **31.323 GB** ceiling (**5.3 GB headroom**); SDXL load 18.7 s; 1024² generate 10.7 s; no swap-thrash, no
 OOM. The budget closes WITH the 14B held resident — so the "14B never evicted" invariant holds and the
 build proceeded. (NOT measured: VLM + voice co-residency during a generate — the eviction sequence
@@ -278,7 +278,7 @@ the audit chain; community-grade PERFORMANCE_LOG live numbers recorded; (5) a sa
 ## UX cost (named)
 
 Generation holds the AO's diffusion-pipeline lock, so **the assistant is blocked for the generate
-window** (a few seconds for few-step SDXL; ~10.7 s at 1024² per the Phase-0 spike). This is a deliberate
+window** (a few seconds for few-step SDXL; \~10.7 s at 1024² per the Phase-0 spike). This is a deliberate
 trade-off: running generation in the AO process keeps the GPU + eviction + cipher in one place (decision
 6); the cost is that a generate is not concurrent with a chat turn. A separate-process generator was
 rejected (it would contend for the GPU and split eviction across two owners — §Rejected alternatives).
@@ -347,7 +347,7 @@ governance posture for those dispatch-generated assets, which differs from the o
    invariant holds; nothing is fetched — the asset is born on-box). **No PA adjudication-logic change.**
 
 3. **Memory: base-resolution only, the 14B is KEPT.** Dispatch generation FORCES `hires_enabled=false`, so
-   it stays in the proven base-1024² co-resident envelope (§Memory Phase-0, ~26 GB) and never evicts the
+   it stays in the proven base-1024² co-resident envelope (§Memory Phase-0, \~26 GB) and never evicts the
    about-to-be-swapped 14B. (Amendment 2's hires 14B-eviction is not used on the dispatch path.) The
    image-model + 30B co-residence remains forbidden (32.5 GB breach) — which is WHY SEAM A generates
    *before* the swap (14B-resident), not during it. A driver-side "SEAM B" `PHASE_ASSETS` is documented as

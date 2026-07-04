@@ -58,7 +58,7 @@ All Qwen3.5 models are natively multimodal (`Qwen3_5ForConditionalGeneration`) w
 
 1. **OpenVINO core ops:** Does the `RecurrentAttentionCellOp` conversion in optimum-intel#1634 decompose cleanly into existing OpenVINO operations, or are new GPU/CPU kernel implementations needed?
 
-2. **GPU ScatterUpdate blocker:** Issue #34532 reports that the GPU plugin's ScatterUpdate kernel has precision loss (~0.001 per op) that accumulates across 24+ layers of iterative state updates, producing garbled output. Inside a Loop body it crashes entirely. This directly blocks Qwen3.5's recurrent attention on GPU.
+2. **GPU ScatterUpdate blocker:** Issue #34532 reports that the GPU plugin's ScatterUpdate kernel has precision loss (\~0.001 per op) that accumulates across 24+ layers of iterative state updates, producing garbled output. Inside a Loop body it crashes entirely. This directly blocks Qwen3.5's recurrent attention on GPU.
 
 3. **openvino.genai pipeline:** The GenAI C++ inference pipeline currently has no support for hybrid cache formats (conv_state + recurrent_state + KV-cache). This is needed for optimized inference with continuous batching, speculative decoding, etc.
 

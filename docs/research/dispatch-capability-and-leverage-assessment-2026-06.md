@@ -13,8 +13,8 @@ the LLM/VLM as a SIGNAL is exactly the asset that makes a weak local model usabl
 side** (three review surfaces — 30B self-review, cross-model 14B critic, VLM design loop), which the
 evidence says is **saturated** (more reviewers ≈ +0), while leaving the **single highest-leverage local
 lever — best-of-N parallel sampling with the gate as selector — entirely unpulled**. Underneath that,
-the models **are** a real ceiling: a ~30B local coder autonomously building a working app end-to-end
-succeeds ~**15-35%** for a simple app and **single digits** for multi-feature, and it **degrades steeply
+the models **are** a real ceiling: a \~30B local coder autonomously building a working app end-to-end
+succeeds \~**15-35%** for a simple app and **single digits** for multi-feature, and it **degrades steeply
 with task length** (the best-evidenced finding in the field). So it's *all three* of your hypotheses at
 once — but in a specific, fixable ratio: **route around the model's worst weakness (long-horizon
 self-correction) by spending your retry budget on parallel independent samples, not more reviewers.**
@@ -25,26 +25,26 @@ self-correction) by spending your retry budget on parallel independent samples, 
 
 | Model | size | SWE-bench Verified | note |
 |---|---|---|---|
-| Devstral-Small-24B (v2) | 24B dense, INT4 ~13 GB | **~47-68%** (vendor, best-scaffold) | purpose-built for agentic harnesses (OpenHands) |
-| Qwen3-Coder-30B-A3B | 30B/3.3B-active MoE, INT4 ~17 GB | **~51.6%** (100-turn OpenHands) | fast, low active-param |
-| Qwen2.5-Coder-32B | 32B dense, INT4 ~18-20 GB | **32.5%** (third-party) | base is non-agentic |
+| Devstral-Small-24B (v2) | 24B dense, INT4 \~13 GB | **\~47-68%** (vendor, best-scaffold) | purpose-built for agentic harnesses (OpenHands) |
+| Qwen3-Coder-30B-A3B | 30B/3.3B-active MoE, INT4 \~17 GB | **\~51.6%** (100-turn OpenHands) | fast, low active-param |
+| Qwen2.5-Coder-32B | 32B dense, INT4 \~18-20 GB | **32.5%** (third-party) | base is non-agentic |
 
 Sources: [mistral.ai/devstral-2](https://mistral.ai/news/devstral-2-vibe-cli/),
 [HF Qwen3-Coder-30B](https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct),
 [llm-stats Qwen2.5-Coder](https://llm-stats.com/models/qwen-2.5-coder-32b-instruct).
 
-**The frontier:** ~**80-88%** single-issue SWE-bench Verified (Opus 4.5 80.9%, Opus 4.8 ~88.6%, GPT-5.1-Codex-Max
+**The frontier:** \~**80-88%** single-issue SWE-bench Verified (Opus 4.5 80.9%, Opus 4.8 \~88.6%, GPT-5.1-Codex-Max
 77.9%) — benchmark is *saturating* at the top ([anthropic Opus 4.5](https://www.anthropic.com/news/claude-opus-4-5),
-[Vals.ai](https://www.vals.ai/benchmarks/swebench)). **Gap = ~15-35 points single-issue, and it WIDENS on
-hard long-horizon suites:** SWE-bench Pro (standardized scaffold, less inflation) = frontier ~59% vs even
+[Vals.ai](https://www.vals.ai/benchmarks/swebench)). **Gap = \~15-35 points single-issue, and it WIDENS on
+hard long-horizon suites:** SWE-bench Pro (standardized scaffold, less inflation) = frontier \~59% vs even
 *giant* open MoEs ≤39%, GLM-4.6 just 9.7% ([Scale SWE-bench Pro](https://labs.scale.com/leaderboard/swe_bench_pro_public)).
 The near-frontier open scores all belong to 100B-1T MoEs that **do not fit in 31 GB** — they are off the table.
 
 **The decisive finding — degradation with task length (this is what "star not rocket" and "spun 60 min" actually were):**
-- METR: ~**100% success on tasks under 4 min, <10% over ~4 hours**; the reliable-task-horizon scales with model
+- METR: \~**100% success on tasks under 4 min, <10% over \~4 hours**; the reliable-task-horizon scales with model
   capability, so a small model's horizon is *structurally short* ([metr.org](https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/), [arXiv 2503.14499](https://arxiv.org/abs/2503.14499)).
 - Error compounding is **mathematical**: constant per-step failure → success ≈ p^N. A 97%/step model finishes a
-  50-step task ~22% of the time; 90%/step → ~0.5% — same one-shot "quality," wildly different long-horizon outcome
+  50-step task \~22% of the time; 90%/step → \~0.5% — same one-shot "quality," wildly different long-horizon outcome
   ([Toby Ord, arXiv 2505.05115](https://arxiv.org/abs/2505.05115)).
 - Open-weight matches **GPT-5 on single-tool use** but collapses on long-horizon planning (GPT-5 10% vs best
   open-weight **0%**) — AgentFloor ([arXiv 2605.00334](https://arxiv.org/abs/2605.00334)).
@@ -52,17 +52,17 @@ The near-frontier open scores all belong to 100B-1T MoEs that **do not fit in 31
   models recover; recovery rate *declines* with horizon ([SciAgentGym arXiv 2602.12984](https://arxiv.org/html/2602.12984),
   ["Beyond pass@1" arXiv 2603.29231](https://arxiv.org/abs/2603.29231)).
 
-**End-to-end app build (direct measurements):** E2EDev — best framework ~30-50% requirement accuracy, Qwen2.5-70B
+**End-to-end app build (direct measurements):** E2EDev — best framework \~30-50% requirement accuracy, Qwen2.5-70B
 35.8%, Qwen2.5-7B 22.4% ([arXiv 2510.14509](https://arxiv.org/abs/2510.14509)); Commit0 — best 15% tests, 0 libraries
 fully ([arXiv 2412.01769](https://arxiv.org/html/2412.01769v1)); BaxBench — 62% of even the best model's solutions
-incorrect/insecure ([baxbench.com](https://baxbench.com/)). **Interpolated ~30B end-to-end "app that runs" ≈ 15-35%
+incorrect/insecure ([baxbench.com](https://baxbench.com/)). **Interpolated \~30B end-to-end "app that runs" ≈ 15-35%
 simple, single digits multi-feature.**
 
 **Quantization makes the agent loop worse than the single-shot number suggests:** INT4 long-context drop up to **59%
-vs 0.8% at INT8** ([arXiv 2505.20276](https://arxiv.org/abs/2505.20276)); INT4 ~doubles per-step "flips" vs INT8
+vs 0.8% at INT8** ([arXiv 2505.20276](https://arxiv.org/abs/2505.20276)); INT4 \~doubles per-step "flips" vs INT8
 ([arXiv 2407.09141](https://arxiv.org/abs/2407.09141)); OpenVINO itself treats INT8 as the accuracy-safe default and
 INT4 as data-aware-recovery-only ([OV docs](https://docs.openvino.ai/2025/openvino-workflow/model-optimization-guide/weight-compression/4-bit-weight-quantization.html)).
-**Implication: prefer INT8 for the CODER in the agent loop where 31 GB allows** (24B INT8 ~25 GB fits; 30B-A3B INT8 ~31 GB is tight).
+**Implication: prefer INT8 for the CODER in the agent loop where 31 GB allows** (24B INT8 \~25 GB fits; 30B-A3B INT8 \~31 GB is tight).
 *Caveat: no published study runs a quantized model through a full agent trajectory; this is assembled from adjacent evidence.*
 
 ## 2. Is there a fundamental flaw? — Not in the philosophy; yes in the allocation
@@ -95,7 +95,7 @@ entirely: take N fresh attempts, let the gate pick the winner.
    not feeding it N diverse candidates.** Spend the *existing* retry budget on independent samples, not correlated re-fixes.
 2. **Gold/spec tests FIRST, fed to the coder — PARTIAL.** Lifts weak models most: Llama-3-70B MBPP **46.4% → 75.9% (+29.6pp)**,
    *"more pronounced for less performant models"* ([arXiv 2402.13521](https://arxiv.org/html/2402.13521)). **Hard caveat: the 30B
-   must NOT author its own oracle** — self-generated valid reproduction tests only ~8-12% on hard cases
+   must NOT author its own oracle** — self-generated valid reproduction tests only \~8-12% on hard cases
    ([arXiv 2412.02883](https://arxiv.org/abs/2412.02883)). Use spec-derived/human gold tests as coder *input*; it also sharpens
    best-of-N selection precision (synergy with #1).
 3. **Fixed structured decomposition (Agentless-style), NOT free-form self-planning — LIKELY ALREADY HAVE (the seeded scaffold).**
@@ -111,10 +111,10 @@ entirely: take N fresh attempts, let the gate pick the winner.
 
 ## 4. Model & precision choices to evaluate
 
-- **Coder model:** if not already on one, evaluate **Devstral-Small-24B** (purpose-built for agentic harnesses, ~47-68%)
-  or **Qwen3-Coder-30B-A3B** (~51%, fast MoE). Model choice is itself a lever; a generic 30B is not the same as an
+- **Coder model:** if not already on one, evaluate **Devstral-Small-24B** (purpose-built for agentic harnesses, \~47-68%)
+  or **Qwen3-Coder-30B-A3B** (\~51%, fast MoE). Model choice is itself a lever; a generic 30B is not the same as an
   agentic-tuned one.
-- **Precision in the agent loop:** prefer **INT8** for the coder where the 31 GB budget allows (24B INT8 ~25 GB fits) — INT4
+- **Precision in the agent loop:** prefer **INT8** for the coder where the 31 GB budget allows (24B INT8 \~25 GB fits) — INT4
   bites hardest exactly on the long trajectories this system runs.
 
 ## 5. The reframe that makes the whole thing work
@@ -126,7 +126,7 @@ this (scaffold seeding, bounded iteration) — lean harder into it.
 
 **Why this compounds (the portfolio/decades framing):** the levers that compound are **generation coverage + verification**
 (the gate, the acceptance tests, best-of-N), because as local models climb the capability/horizon curve (METR: the reliable
-horizon **doubles ~every 7 months**), a harness built to extract maximum coverage from whatever model is resident *rides that
+horizon **doubles \~every 7 months**), a harness built to extract maximum coverage from whatever model is resident *rides that
 curve automatically*. The review surfaces don't compound — they're already saturated. So the recent critic/VLM work isn't
 wasted (they're real, cheap signals for things the gate can't judge — cross-model de-bias, visual quality), but the **next**
 marginal build should go to generation coverage, not a fourth reviewer.
@@ -155,5 +155,5 @@ Re-weight the roadmap from review-side to generation-side:
 - Vendor SWE-bench numbers are *best-scaffold upper bounds*; independent runs are 5+ points lower.
 - The quantization→agentic conclusion is *assembled* from long-context + flip-doubling + error-compounding evidence; no
   single study measures an INT4-vs-FP16 *agent-trajectory* delta.
-- The specific ~30B end-to-end figure is *interpolated* from 7B/24B/70B points, not directly measured.
+- The specific \~30B end-to-end figure is *interpolated* from 7B/24B/70B points, not directly measured.
 - Best-of-N's coverage curve assumes *diverse* samples (temperature/seed/prompt variation); correlated samples flatten it.

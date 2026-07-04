@@ -182,10 +182,10 @@ P5-005b (Extended Context + Optimization Characterization) completed on
 ADR-012 enacted: Qwen3-14B (INT4, GPU) locked as unified target model for PA, AO, and
 USE-CASE-005. Speculative decoding with a draft model is mandatory.
 
-- **Model:** Qwen3-14B — 40 layers, 5120 hidden, 8 KV heads (GQA), ~9.1 GB INT4 symmetric
+- **Model:** Qwen3-14B — 40 layers, 5120 hidden, 8 KV heads (GQA), \~9.1 GB INT4 symmetric
 - **Path:** `models/qwen3-14b/openvino-int4-gpu/`
 - **Consumers:** Policy Agent (M2), Assistant Orchestrator (M3), USE-CASE-005 Code Agent
-- **Draft model (operational):** Qwen3-0.6B INT4 — 28 layers, 1024 hidden, ~367 MB
+- **Draft model (operational):** Qwen3-0.6B INT4 — 28 layers, 1024 hidden, \~367 MB
 - **Configuration optimization in progress:** draft model selection, context window cap,
   num_assistant_tokens, runtime properties (see ADR-012 §2.2)
 - **Previous model demoted:** Qwen2.5-1.5B-Instruct → legacy reference
@@ -253,7 +253,7 @@ ADR-012 §2.5 PA latency budget locked at 2,000ms P95 flat (replaces invalid 125
   - `.github/copilot-instructions.md` — v3.2 update
 - **PA latency budget locked:** 2,000ms P95 flat (ADR-012 §2.5). Derivation: 10.72 tps
   empirical + TTFT 408ms at 4K + overhead + P95 variance headroom. Worst-case at
-  max_new_tokens=32 (~2,987ms) EXCEEDS budget — Task 4.8 must reduce max_new_tokens.
+  max_new_tokens=32 (\~2,987ms) EXCEEDS budget — Task 4.8 must reduce max_new_tokens.
 - **UAT gate opened:** UAT-4a (AO /think toggle — Qwen3-14B/GPU prerequisite)
 - **Test baseline:** 786 collected / 755 passed (31 deferred p114 asyncio — pre-existing)
 
@@ -313,7 +313,7 @@ boundary regression) and case 27 (RISK-1 /certs/ substring -> prefilter DENY ins
   - M-3 prefilter_coverage: 23 cases (DENY_RESTRICTED_PATH:19, DENY_EXTERNAL_NETWORK:1, DENY_EXFILTRATION:3)
   - M-4 label_extraction_rate: 40/40
   - M-5 delta_from_4_9a: +8 resolved, -2 regressed (net +6)
-  - M-6 latency: prefilter P50=0ms, LLM band-512 P50~2450ms, band-4096 P50~13500ms
+  - M-6 latency: prefilter P50=0ms, LLM band-512 P50\~2450ms, band-4096 P50\~13500ms
 - **Decision:** DEC-10 LOCKED. DR-02 resolved. Task 4.10 UNBLOCKED.
 - **Evidence:** `phase2_gates/evidence/p5_task4_9c_deterministic_prefilter.json`
 
@@ -823,10 +823,10 @@ Validation evidence (session):
 |------|-------|--------|--------|-----------------|------|
 | Semantic Router (M1) | BAAI/bge-small-en-v1.5 | ONNX FP16 | CPU | 127.8 MB | `models/bge-small-en-v1.5/onnx-fp16/` |
 | Semantic Router (M1 NPU) | BAAI/bge-small-en-v1.5 | OpenVINO INT8 | NPU | 33.5 MB | `models/bge-small-en-v1.5/openvino-int8/` |
-| Policy Agent (M2) | Qwen3-14B + draft model | OpenVINO INT4 | GPU (Arc 140V) | ~9.1 GB (target) + draft TBD | `models/qwen3-14b/openvino-int4-gpu/` |
-| Orchestrator (M3) | Qwen3-14B + draft model | OpenVINO INT4 | GPU (Arc 140V) | ~9.1 GB (target) + draft TBD | `models/qwen3-14b/openvino-int4-gpu/` |
-| Draft Model (speculative decoding) | EVALUATING — see ADR-012 §2.3 | OpenVINO INT4/INT8 | GPU (Arc 140V) | ~300–400 MB | TBD (candidates below) |
-| USE-CASE-005 Code Agent | Qwen3-14B + draft model | OpenVINO INT4 | GPU (Arc 140V) | ~9.1 GB (shared) | `models/qwen3-14b/openvino-int4-gpu/` |
+| Policy Agent (M2) | Qwen3-14B + draft model | OpenVINO INT4 | GPU (Arc 140V) | \~9.1 GB (target) + draft TBD | `models/qwen3-14b/openvino-int4-gpu/` |
+| Orchestrator (M3) | Qwen3-14B + draft model | OpenVINO INT4 | GPU (Arc 140V) | \~9.1 GB (target) + draft TBD | `models/qwen3-14b/openvino-int4-gpu/` |
+| Draft Model (speculative decoding) | EVALUATING — see ADR-012 §2.3 | OpenVINO INT4/INT8 | GPU (Arc 140V) | \~300–400 MB | TBD (candidates below) |
+| USE-CASE-005 Code Agent | Qwen3-14B + draft model | OpenVINO INT4 | GPU (Arc 140V) | \~9.1 GB (shared) | `models/qwen3-14b/openvino-int4-gpu/` |
 | Substrate Bi-encoder (M4) | BAAI/bge-small-en-v1.5 | OpenVINO INT8 | TBD (future) | 33.5 MB | `models/bge-small-en-v1.5/openvino-int8/` |
 
 **Model selection confirmed (2026-02-28, ADR-012):** Qwen3-14B (INT4, GPU) is the locked target
@@ -843,9 +843,9 @@ pattern are all under active empirical evaluation (see ADR-012 §2.2).
 **KV cache precision locked (2026-02-28, ADR-012 §2.2):** FP16 (default). INT8 ruled out empirically.
 
 Draft model candidates under evaluation:
-- **Qwen3-0.6B** (INT4, 28 layers, ~367 MB) — operational, validated in P5-005a/005b
-- **Qwen3-pruned-6L-from-0.6B** (INT8_ASYM, 22 layers, ~300 MB est.) — acquisition in progress (P5-005c)
-- **Qwen3-1.7B** (INT4, 28 layers, ~1 GB est.) — not yet tested
+- **Qwen3-0.6B** (INT4, 28 layers, \~367 MB) — operational, validated in P5-005a/005b
+- **Qwen3-pruned-6L-from-0.6B** (INT8_ASYM, 22 layers, \~300 MB est.) — acquisition in progress (P5-005c)
+- **Qwen3-1.7B** (INT4, 28 layers, \~1 GB est.) — not yet tested
 
 **Previous model history:**
 - 2026-02-27 (ADR-011): Model selection reopened, NPU retired.
@@ -1020,8 +1020,8 @@ Test count at completion: 398/398 passing.
 ### 4.9 P1.8 — Orchestrator NPU Inference + Context Management
 
 **Files:**
-- `services/assistant_orchestrator/src/npu_inference.py` — Full OpenVINO autoregressive generation engine (~580 lines)
-- `services/assistant_orchestrator/src/context_manager.py` — Enhanced with 5 new methods (~80 lines added)
+- `services/assistant_orchestrator/src/npu_inference.py` — Full OpenVINO autoregressive generation engine (\~580 lines)
+- `services/assistant_orchestrator/src/context_manager.py` — Enhanced with 5 new methods (\~80 lines added)
 - `services/assistant_orchestrator/src/constants.py` — 8 new generation/preemption constants
 - `services/assistant_orchestrator/config/default.toml` — Generation + preemption config sections (v0.2.0)
 - `services/assistant_orchestrator/tests/test_npu_inference.py` — 24 new tests (mirrors PA test pattern)
@@ -1052,7 +1052,7 @@ Test count at completion: 440/440 passing.
 ### 4.10 P1.9 — PGOV (Post-Generation Output Validator)
 
 **Files:**
-- `services/assistant_orchestrator/src/pgov.py` — Full 6-stage output validation pipeline (~430 lines, complete rewrite from ~134-line partial stub)
+- `services/assistant_orchestrator/src/pgov.py` — Full 6-stage output validation pipeline (\~430 lines, complete rewrite from \~134-line partial stub)
 - `services/assistant_orchestrator/src/constants.py` — 4 new PGOV feature-toggle constants
 - `services/assistant_orchestrator/config/default.toml` — v0.3.0, expanded `[pgov]` section
 - `services/assistant_orchestrator/tests/test_pgov.py` — 44 tests (complete rewrite from 5 tests)
@@ -1481,7 +1481,7 @@ BlarAI/
 | `d2ef3fa` | P1.6 | vsock IPC — protocol, transport, PA listener (372/372 tests) |
 | `dc43a90` | Models | Model Acquisition — programmatic API, 3/3 conversions, 3/3 inference tests |
 | `698a95e` | — | Constants backfill — replace assumed values with measured evidence |
-| `5a6a8e5` | — | Audit: purge stale model references (BERT-mini, 66MB, ~1GB) |
+| `5a6a8e5` | — | Audit: purge stale model references (BERT-mini, 66MB, \~1GB) |
 | `352fb21` | P1.7 | Semantic Router CPU fast-path — bge-small-en-v1.5, 31 tests (398/398 total) |
 | `d2e4c2e` | P1.8 | Orchestrator NPU inference + context management (440/440 tests) |
 | `fdc829f` | P1.9 | PGOV 6-stage output validator — leakage detection, delimiter echo, tool allowlist (484/484 tests) |

@@ -268,7 +268,7 @@ These 15 cases require actual Qwen3-14B inference — they are ALLOW (12) and ES
 | Model compile | 27.7s |
 | Harness start | 2026-03-05 20:56:31 UTC |
 | Harness end | 2026-03-05 21:00:56 UTC |
-| Total wall time | ~4m 25s |
+| Total wall time | \~4m 25s |
 | Total generate() calls | 120 (40 cases × 3 determinism runs) |
 | Of which prefiltered | 75 (25 cases × 3 runs — no GPU inference needed) |
 | Of which LLM | 45 (15 cases × 3 runs) |

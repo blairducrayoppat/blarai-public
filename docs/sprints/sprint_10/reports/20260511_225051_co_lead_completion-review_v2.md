@@ -32,7 +32,7 @@ verdict: ESCALATE
 
 | File | Status | Purpose |
 |---|---|---|
-| `CLAUDE.md` | M (−~178 net) | BlarAI doctrine strip per SDV §4 — remove fleet-infra rows, keep runtime-only doctrine. |
+| `CLAUDE.md` | M (−\~178 net) | BlarAI doctrine strip per SDV §4 — remove fleet-infra rows, keep runtime-only doctrine. |
 | `.github/copilot-instructions.md` | M | Same strip applied to VS Code Copilot doctrine. |
 | `AGENTS.md` | M | Same strip applied to Codex doctrine; per SDV may also gain pointer to devplatform side. |
 | `docs/ledger/20260511_222928_sprint10_ea2_blarai-strip.md` | A | Q1-1 ledger entry for the EA-2 work. |

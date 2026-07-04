@@ -63,7 +63,7 @@ Matches baseline exactly. **PASS.**
 
 ## Active State refresh confirmation
 
-CLAUDE.md §"Active State" now correctly reflects post-Sprint-9-close baseline: Sprint 10 ACTIVE (task #369, sprint_id 10), Sprints 7/8/9 COMPLETE, test baseline ~981/22, Task 7 COMPLETE, Domain 6 COMPLETE, ISS-1/2/3 still open + ISS-4-7 resolved, ledger frozen at Entry 52 → `docs/ledger/` Q1-1, HEAD reference advice prefers `git log --oneline main` over pinned hash. **Resolves Sprint 8 SWAGR gap #5 + Sprint 9 SWAGR gap #4.**
+CLAUDE.md §"Active State" now correctly reflects post-Sprint-9-close baseline: Sprint 10 ACTIVE (task #369, sprint_id 10), Sprints 7/8/9 COMPLETE, test baseline \~981/22, Task 7 COMPLETE, Domain 6 COMPLETE, ISS-1/2/3 still open + ISS-4-7 resolved, ledger frozen at Entry 52 → `docs/ledger/` Q1-1, HEAD reference advice prefers `git log --oneline main` over pinned hash. **Resolves Sprint 8 SWAGR gap #5 + Sprint 9 SWAGR gap #4.**
 
 Also refreshed `<phase name="Phase_5_...">` XML element per matrix F-4 (in-scope; bundled into the strip).
 

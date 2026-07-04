@@ -210,10 +210,10 @@ Per cf-post-3 EDD §10.11 precedent + LA preference for minimal sign-offs:
 
 ## 13. Timeline / estimates
 
-- **Agent wall-clock estimate**: 1-2 hours for the 4 WIs (WI-1 setup ~20 min; WI-2 parser ~30-40 min including 10+ tests; WI-3 integration ~15-20 min; WI-4 snapshot test ~15-20 min). Plus CR + SWAGR ~30-60 min.
-- **LA active-time estimate**: ~15-30 min total (EDD review + CR + SWAGR read + 3 typed sign-offs).
-- **Aggregate**: ~2-3 hour fleet wall-clock + ~30 min LA-time. Comparable to cf-post-3's ~2-hour fleet + ~30-min LA pattern (per `feedback_calibrate_time_estimates_against_actuals` recalibration).
-- **Calendar**: dispatch begins at next `\\DevPlatform\\Wake orchestrator` firing post-EDD-sign-off (every 15 min). First WI commits expected within ~30-45 min of EDD sign-off.
+- **Agent wall-clock estimate**: 1-2 hours for the 4 WIs (WI-1 setup \~20 min; WI-2 parser \~30-40 min including 10+ tests; WI-3 integration \~15-20 min; WI-4 snapshot test \~15-20 min). Plus CR + SWAGR \~30-60 min.
+- **LA active-time estimate**: \~15-30 min total (EDD review + CR + SWAGR read + 3 typed sign-offs).
+- **Aggregate**: \~2-3 hour fleet wall-clock + \~30 min LA-time. Comparable to cf-post-3's \~2-hour fleet + \~30-min LA pattern (per `feedback_calibrate_time_estimates_against_actuals` recalibration).
+- **Calendar**: dispatch begins at next `\\DevPlatform\\Wake orchestrator` firing post-EDD-sign-off (every 15 min). First WI commits expected within \~30-45 min of EDD sign-off.
 
 ## 14. Version log
 

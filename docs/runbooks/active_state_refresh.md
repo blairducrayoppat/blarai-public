@@ -13,7 +13,7 @@ The `CLAUDE.md` §Active State block is the single human-readable snapshot of fl
 
 **Drift recurrence (3-sprint chain)**. The §Active State block has drifted from operational reality in three consecutive sprints:
 
-- **Sprint 8 SWAGR gap #5** (2026-04-24) — §Active State referenced Sprint 7 figures after Sprint 8 closed; pytest baseline stale by ~226 tests.
+- **Sprint 8 SWAGR gap #5** (2026-04-24) — §Active State referenced Sprint 7 figures after Sprint 8 closed; pytest baseline stale by \~226 tests.
 - **Sprint 9 SWAGR gap #4** (2026-04-24) — recurrence; §Active State referenced Sprint 8 SCR after Sprint 9 closed.
 - **Sprint 10 SWAGR §15.3** (2026-05-11) — third recurrence; §Active State pointed at Sprint 9 figures, sprint id, and HEAD reference well after Sprint 10 was OPERATIONAL.
 
@@ -103,7 +103,7 @@ The script is fail-closed: any failed step (pytest collection error, git not on 
 
 ## SS4 — Worked example (Sprint 11 kickoff state, captured 2026-05-12 UTC)
 
-The values below are from an actual run against the Sprint 11 kickoff state. A Co-Lead re-running the procedure against the same snapshot (worktree at commit `60d59eb`, devplatform at `0dbd4a6`, Vikunja state at 2026-05-12 ~14:00 UTC) obtains the same shape of output (numbers may drift if Vikunja state or git state advances).
+The values below are from an actual run against the Sprint 11 kickoff state. A Co-Lead re-running the procedure against the same snapshot (worktree at commit `60d59eb`, devplatform at `0dbd4a6`, Vikunja state at 2026-05-12 \~14:00 UTC) obtains the same shape of output (numbers may drift if Vikunja state or git state advances).
 
 ### (a) pytest baseline
 
@@ -113,7 +113,7 @@ $ .\.venv\Scripts\pytest shared/ services/ launcher/ --tb=no -q | Select-Object 
 ================ 1001 passed, 2 skipped, 2 warnings in 46.78s =================
 ```
 
-Extracted: `1001 passed, 2 skipped`. (Captured 2026-05-12 ~13:55 UTC, BlarAI HEAD `60d59eb`.)
+Extracted: `1001 passed, 2 skipped`. (Captured 2026-05-12 \~13:55 UTC, BlarAI HEAD `60d59eb`.)
 
 ### (b) BlarAI main HEAD log
 

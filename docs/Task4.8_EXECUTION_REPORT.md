@@ -33,7 +33,7 @@ Lowest ceiling with 100% label extraction at both input bands.
 
 2. **PRODUCTION stop config confirmed at scale.** 120/120 PRODUCTION runs: token 151668 fires before any label is emitted (0% label extraction). This is a known architectural property — the dual-stop defense-in-depth functions as designed but suppresses label emission entirely. The `MAX_CLASSIFICATION_TOKENS=32` constant in `gpu_inference.py` line 80 is dead budget under current wiring.
 
-3. **PA-T4 (8) fails.** At max_new_tokens=8, only 5 tokens remain post-think. DENY (~6t) and ESCALATE (~7t) labels are truncated. Extraction rate: 60% at band 512, 33% at band 2048.
+3. **PA-T4 (8) fails.** At max_new_tokens=8, only 5 tokens remain post-think. DENY (\~6t) and ESCALATE (\~7t) labels are truncated. Extraction rate: 60% at band 512, 33% at band 2048.
 
 4. **PA-T3 (10) passes clean.** 7 effective tokens — sufficient for all three label variants. 100% extraction at both bands, 15/15 runs each.
 
@@ -68,7 +68,7 @@ Lowest ceiling with 100% label extraction at both input bands.
 
 | File | Status |
 |------|--------|
-| `phase2_gates/scripts/run_p5_task4_8_pa_max_tokens_study.py` | Created (~1642 lines) |
+| `phase2_gates/scripts/run_p5_task4_8_pa_max_tokens_study.py` | Created (\~1642 lines) |
 | `phase2_gates/evidence/p5_task4_8_pa_max_tokens_study.json` | Created (240-run evidence) |
 | `docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md` | §2.2 GenConfig row (DEC-08 note) + §4 evidence ref |
 | `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` | Entry 22 appended |

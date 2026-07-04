@@ -53,7 +53,7 @@ EA-2 commit `ec2d09a` on `feature/p5-task10-ea2-blarai-strip` (parent `33f70d9`)
 
 ## Next fleet step
 
-Co-Lead merge-gate. Diff stats: 232 insertions / 267 deletions / -35 net / 4 files. Net negative, but combined adds + removes (~499) sits at the edge of the trusted_scope 500-LOC threshold. SDV §9.1 risk-row 8 anticipated ESCALATE — Co-Lead may invoke `la_merge_approve.ps1` if borderline. Either route is acceptable.
+Co-Lead merge-gate. Diff stats: 232 insertions / 267 deletions / -35 net / 4 files. Net negative, but combined adds + removes (\~499) sits at the edge of the trusted_scope 500-LOC threshold. SDV §9.1 risk-row 8 anticipated ESCALATE — Co-Lead may invoke `la_merge_approve.ps1` if borderline. Either route is acceptable.
 
 ## Cross-reference
 

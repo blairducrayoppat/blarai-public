@@ -78,5 +78,5 @@ Exit criterion: Phase 6 (Phases 1–5 nothing to do). Clean exit.
 
 ## Next firing
 
-- Normal ~15-min co_lead_architect wake cadence.
+- Normal \~15-min co_lead_architect wake cadence.
 - Fleet remains blocked on LA merge decisions for Fleet Reports #134 (Sprint 8 EA-1) and #148 (Sprint 9 EA-1). Both have M13 APPROVE/REJECT/DEFER/HALT action blocks embedded. Until LA acts, the fleet is in sustained no-op mode — SDO cannot author EA-2 because EA-1 is not yet on main.

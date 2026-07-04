@@ -29,7 +29,7 @@ IR fingerprints for verification:
 - `openvino_model.bin`: SHA256 `3fdde9ac20058bbdf364c98dbe3508b8eddffd1d33a0d213d111159f826dc939` (597,735,053 bytes)
 - NNCF bitwidth distribution: 100% `int8_asym, per-channel` across 197/197 layers (matches the 2026.0.0 export's distribution).
 
-One observation different from the original 2026.0.0 report: on 2026.1.0, the `CONSTRUCT_OK` line prints in ~17–18s before the process exits, so on this version the failure appears to occur after pipeline construction completes rather than during it. The actual call site for the access violation is for the team to determine.
+One observation different from the original 2026.0.0 report: on 2026.1.0, the `CONSTRUCT_OK` line prints in \~17–18s before the process exits, so on this version the failure appears to occur after pipeline construction completes rather than during it. The actual call site for the access violation is for the team to determine.
 
 Could you share which NPU hardware family was tested in your no-repro runs (Meteor Lake, Lunar Lake, Arrow Lake, etc.)? That would help me understand whether what we're seeing on Lunar Lake is silicon-specific or environment-specific.
 

@@ -8,8 +8,8 @@ Critical risk: Speculative decoding (which must remain enabled) involves a draft
 
 2. Two Profiles Under Test and Their System Prompt Strategies
 Profile	System Prompt Strategy	max_new_tokens	Stop Tokens	Expected Prefix Fraction
-PA (Policy Agent)	Classification instruction + /no_think. Estimated ~130 tokens. Fixed across all calls in a session.	32	[151645, 151668] (<|im_end|> + <|think|>)	4K: ~3.2% / 12K: ~1.1%
-AO (Assistant Orchestrator)	Minimal conversational prompt + /no_think. Estimated ~30 tokens. Fixed per session.	128	[151645] (<|im_end|> only)	4K: ~0.75% / 12K: ~0.25%
+PA (Policy Agent)	Classification instruction + /no_think. Estimated \~130 tokens. Fixed across all calls in a session.	32	[151645, 151668] (<|im_end|> + <|think|>)	4K: \~3.2% / 12K: \~1.1%
+AO (Assistant Orchestrator)	Minimal conversational prompt + /no_think. Estimated \~30 tokens. Fixed per session.	128	[151645] (<|im_end|> only)	4K: \~0.75% / 12K: \~0.25%
 Both profiles use the same system prompt text across all 3 sequential calls within a group, but vary user content per call (seeded CALL_1/2/3), ensuring only the system prompt constitutes the shared prefix.
 
 Implication: The shared prefix fractions are small (<5% in all cases). Absolute TTFT savings will be modest in wall-clock terms. The task is measuring whether the feature is functional with speculative decoding active, and whether any measurable benefit exists as signal for Task 4.10's lock decision.
@@ -87,7 +87,7 @@ Secondary metrics per call: combined_tps, acceptance_rate (speculative decode he
 Calibration check: After Pipeline A completes, PA 4K cold TTFT is compared to the Task 4.4 reference (7,216ms). Acceptable range ±30%. If outside: flag CALIBRATION_WARNING but proceed — relative cold/warm deltas within Pipeline B are the primary result regardless.
 
 5. PA Budget Gate and PREFIX_CACHE_MANDATORY_PA Trigger
-From ADR-012 §2.5, the PA P95 budget is 2,000ms. The budget was derived from empirical baseline TTFT of ~300–408ms at 2K–4K context.
+From ADR-012 §2.5, the PA P95 budget is 2,000ms. The budget was derived from empirical baseline TTFT of \~300–408ms at 2K–4K context.
 
 Gate G-04 (pa_budget_gate):
 

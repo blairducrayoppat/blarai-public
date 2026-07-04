@@ -269,7 +269,7 @@ Scoping rules:
 
 - ONE gate per EA session. Do not combine independent concerns.
 - Target 1-3 production files. More than 3 signals over-scoping.
-- If an EA needs to read more than ~5 files for context, scope is too broad.
+- If an EA needs to read more than \~5 files for context, scope is too broad.
 - Measurement tasks: define exact run counts, thresholds, disposition logic
   in the prompt.
 - Always include rollback instructions (`git checkout HEAD -- files`).
@@ -283,7 +283,7 @@ branching. Out-of-date parent_head forces corrective re-execution.
 
 ## Content handoff pattern — SDO output file production
 
-The SDO operates in Claude Chat with **read-only filesystem MCP** (per §Filesystem-MCP-policy). Any deliverable longer than ~20 lines (EA prompts, continuation prompts, consolidated task plans) must be written to the workspace via Claude Code, not pasted into chat. This section formalizes that handoff so it is reliable and auditable.
+The SDO operates in Claude Chat with **read-only filesystem MCP** (per §Filesystem-MCP-policy). Any deliverable longer than \~20 lines (EA prompts, continuation prompts, consolidated task plans) must be written to the workspace via Claude Code, not pasted into chat. This section formalizes that handoff so it is reliable and auditable.
 
 ### The pattern
 
@@ -318,7 +318,7 @@ The SDO operates in Claude Chat with **read-only filesystem MCP** (per §Filesys
 - Every EA prompt file (`docs/P*_TASK*_EA*_*.xml`).
 - Every SDO continuation prompt file (`docs/P*_TASK*_SDO_CONTINUATION_v*.xml`).
 - Every consolidated task plan (`docs/P*_TASK*_PLAN.md`).
-- Any structured artifact the SDO produces that exceeds ~20 lines.
+- Any structured artifact the SDO produces that exceeds \~20 lines.
 
 ### When NOT to use
 

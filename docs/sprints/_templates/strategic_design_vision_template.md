@@ -208,7 +208,7 @@ How this sprint advances the project at the largest scale.
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| LA (Lead Architect) | SDV sign-off, CAR adjudication, SWAGR read, occasional merge approval on carve-out miss | ~20 min / week |
+| LA (Lead Architect) | SDV sign-off, CAR adjudication, SWAGR read, occasional merge approval on carve-out miss | \~20 min / week |
 | Co-Lead Architect | SDO continuation authoring, milestone peer review, SCR | Autonomous per DEC-11 §1.1 |
 | SDO | EA prompt authoring, EA work peer review | Autonomous per DEC-11 §1.2 |
 | EA Code | Milestone execution | Autonomous per DEC-11 §1.3 |

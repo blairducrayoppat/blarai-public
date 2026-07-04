@@ -66,8 +66,8 @@ User ↔ [TUI Shell (host)] ↔ [Transport Gateway (vsock+mTLS)] ↔ [Orchestrat
 
 | Package | Version | Size | License |
 |---------|---------|------|---------|
-| textual | 8.0.0 | ~5MB | MIT |
-| pytest-asyncio | 1.3.0 | ~50KB | Apache-2.0 |
+| textual | 8.0.0 | \~5MB | MIT |
+| pytest-asyncio | 1.3.0 | \~50KB | Apache-2.0 |
 
 ## Commits
 

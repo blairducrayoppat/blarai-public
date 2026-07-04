@@ -112,7 +112,7 @@ The User-Operator's standing instruction: *"One of the main attack vectors for c
 
 ### 3.2 Token Budget
 
-- Each grounded chunk gains: a self-describing header line (~30 tokens) + per-line marker prefix (~5 tokens per line). For a 50-line 4 KB document, this is roughly 30 + 5×50 = 280 additional tokens. The existing 4096-token context budget absorbs it; for documents near the existing 16 KB load cap, datamarking pressure increases ~5–10% of the chunk size.
+- Each grounded chunk gains: a self-describing header line (\~30 tokens) + per-line marker prefix (\~5 tokens per line). For a 50-line 4 KB document, this is roughly 30 + 5×50 = 280 additional tokens. The existing 4096-token context budget absorbs it; for documents near the existing 16 KB load cap, datamarking pressure increases \~5–10% of the chunk size.
 
 ### 3.3 Test Surface (Amendment 1)
 
@@ -142,5 +142,5 @@ The `userdata/README.md` warning ("load only documents you trust") is therefore 
 - **Overnight report** with four defense options + recommendation: [`devplatform/claude-workspace/overnight-report.md`](../../../devplatform/claude-workspace/overnight-report.md) §"The prompt-injection problem."
 - **Governance doc** (updated alongside this ADR): [`docs/governance/context-spotlighting.md`](../governance/context-spotlighting.md) — adds §10 Datamarking + §11 Privilege Separation.
 - **USE-CASE-003** (the full Cleaner this is the MVP slice of): [`Use Cases_FINAL.md`](../../Use%20Cases_FINAL.md).
-- **Implementation**: `services/assistant_orchestrator/src/context_manager.py` (datamarking + `has_grounded_context`); `services/assistant_orchestrator/src/entrypoint.py` (Layer 3 gate at the tool-call loop, ~line 955).
+- **Implementation**: `services/assistant_orchestrator/src/context_manager.py` (datamarking + `has_grounded_context`); `services/assistant_orchestrator/src/entrypoint.py` (Layer 3 gate at the tool-call loop, \~line 955).
 - **Commit**: `e8723ef` (feat(security): Layer 3 privilege separation + per-load datamarking).

@@ -31,7 +31,7 @@ failed, which blocked the entire 10-test benchmark matrix.
    The execution agent patched this with a compatibility shim in `ensure_optimum_openvino_compatibility()`.
 2. After the shim, Qwen3-14B conversion began but **OOM during CPU-side data-aware quantization**:
    `Failed to allocate 178421760 bytes of memory` at `FullyConnected node ...layers.28.mlp.gate_proj`.
-   The FP16 14B model (~30 GB) + calibration dataset + quantization working set exceeds the 32 GB
+   The FP16 14B model (\~30 GB) + calibration dataset + quantization working set exceeds the 32 GB
    system RAM.
 3. The acquisition script may have subsequently attempted 8B and 0.6B — check process state.
 

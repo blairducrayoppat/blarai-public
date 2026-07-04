@@ -13,7 +13,7 @@ AIGP connection in his own words before they were shown — a unit can be
 and short; this is a study record, not a transcript.
 
 **The core path** (v2, 2026-06-11): the deck opens on the curated 31-lesson
-core track (`core_path.json`) — the default study plan, ~2-3 hours across
+core track (`core_path.json`) — the default study plan, \~2-3 hours across
 sittings. Core lessons are marked ◆ below. The full 126-unit deck stays one
 keypress away (`c`); Act VIII and the non-core lessons are the archive/deep
 track.

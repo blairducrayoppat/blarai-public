@@ -23,7 +23,7 @@ DEFERRED with rationale, or MEASURED (informational).
 
 | Current | Proposed Lock | Rationale |
 |---------|--------------|-----------|
-| ~12,288 input / ~4,096 output | LOCK as ADVISORY GUIDELINE | No empirical study performed (no Task allocated). Value is a heuristic derived from max context window = 16,384. For PA: irrelevant (output is 3-10 tokens). For AO: conversational output naturally varies. For USE-CASE-005: ~75/25 split is industry standard for code completion. Lock as advisory with note: "Not empirically tuned — revisit if output truncation observed in production." |
+| \~12,288 input / \~4,096 output | LOCK as ADVISORY GUIDELINE | No empirical study performed (no Task allocated). Value is a heuristic derived from max context window = 16,384. For PA: irrelevant (output is 3-10 tokens). For AO: conversational output naturally varies. For USE-CASE-005: \~75/25 split is industry standard for code completion. Lock as advisory with note: "Not empirically tuned — revisit if output truncation observed in production." |
 
 **SDO recommendation:** Lock as advisory guideline with explicit "not empirically optimized" caveat. Alternatively, retire the row entirely (PA doesn't use it, AO/CODE haven't needed it). Lead Architect to decide: LOCK_ADVISORY vs RETIRE_ROW.
 

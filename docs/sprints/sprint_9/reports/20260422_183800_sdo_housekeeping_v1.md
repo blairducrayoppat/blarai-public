@@ -22,7 +22,7 @@ Prior SDO firing (commit `e0694e4`, Vikunja comment #302) produced **VERDICT: AP
 > `Gate:Approved` on Task 121 remains (unchanged — re-affirmed by this completion-review).
 > `Gate:Pending-SDO` never applied; nothing to remove.
 
-Reality at that moment: EA Code's completion comment (#300, 18:15 UTC) **had** applied `Gate:Pending-SDO` ~9 minutes before the SDO review ran. The SDO review read label state incorrectly (or missed the transition) and therefore did not call `add_label_to_task(Gate:Approved)` / `remove_label_from_task(Gate:Pending-SDO)`. Verdict was correct; label state was not.
+Reality at that moment: EA Code's completion comment (#300, 18:15 UTC) **had** applied `Gate:Pending-SDO` \~9 minutes before the SDO review ran. The SDO review read label state incorrectly (or missed the transition) and therefore did not call `add_label_to_task(Gate:Approved)` / `remove_label_from_task(Gate:Pending-SDO)`. Verdict was correct; label state was not.
 
 ## State after correction
 
@@ -32,7 +32,7 @@ Reality at that moment: EA Code's completion comment (#300, 18:15 UTC) **had** a
 
 ## Fleet-events trigger
 
-Attempted `schtasks /Run /TN "Wake Co-Lead Architect"` per Q2-1 event-driven wake protocol (commit `12b1b58`). The trigger returned `ERROR: The system cannot find the file specified.` — the scheduled task is already in a "Running" state (visible via `schtasks /Query`), so schtasks refuses to re-run the same task while a prior instance is active. Falling back to the 15-minute cron tick — Co-Lead will observe `Gate:Approved` on Task 121 on the next scheduled fire (~18:53 UTC). Per the wake template: "If unsure → skip the trigger; the cron is the fallback." Not a merit issue — Q2-1 is an optimization, not a correctness requirement.
+Attempted `schtasks /Run /TN "Wake Co-Lead Architect"` per Q2-1 event-driven wake protocol (commit `12b1b58`). The trigger returned `ERROR: The system cannot find the file specified.` — the scheduled task is already in a "Running" state (visible via `schtasks /Query`), so schtasks refuses to re-run the same task while a prior instance is active. Falling back to the 15-minute cron tick — Co-Lead will observe `Gate:Approved` on Task 121 on the next scheduled fire (\~18:53 UTC). Per the wake template: "If unsure → skip the trigger; the cron is the fallback." Not a merit issue — Q2-1 is an optimization, not a correctness requirement.
 
 ## Not a re-review
 

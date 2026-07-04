@@ -29,7 +29,7 @@ Extended the Sprint 8 test suite to cover coverage gaps in `shared/` and `launch
 - **WI-10 test_car.py** (9 tests) — TestCanonicalHash (2), TestIsComplete (3), TestDecisionArtifact (1), TestEnums (3).
 - **WI-11 test_ipc_message_types.py** (6 tests) — one encoder roundtrip per UI-Gateway message type: HANDSHAKE_REQUEST, HANDSHAKE_RESPONSE, PROMPT_REQUEST, STREAM_TOKEN, PGOV_RESULT, GENERATION_COMPLETE.
 
-**Total new tests:** 46 (over the 20-test floor; within the ~42-test WI decomposition estimate).
+**Total new tests:** 46 (over the 20-test floor; within the \~42-test WI decomposition estimate).
 
 ## Quality gates
 

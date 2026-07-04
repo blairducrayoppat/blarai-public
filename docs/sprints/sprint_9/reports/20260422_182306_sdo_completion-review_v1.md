@@ -73,7 +73,7 @@ All five files under authorized paths (`docs/governance/**`, `docs/ledger/**`, `
 
 ## SDO-authored prompt drift — acknowledged and dispositioned
 
-The EA-2 prompt (commit `28aeb76`, 2026-04-22 12:59 EDT) instructs the EA to append to `docs/POST_OPERATIONAL_MATURATION_LEDGER.md`. Fleet commit `dc768b1` (Q1-1 ledger-directory migration, 13:50 EDT) froze that file and mandated per-file entries under `docs/ledger/`. The EA-2 prompt pre-dates the freeze by ~51 minutes.
+The EA-2 prompt (commit `28aeb76`, 2026-04-22 12:59 EDT) instructs the EA to append to `docs/POST_OPERATIONAL_MATURATION_LEDGER.md`. Fleet commit `dc768b1` (Q1-1 ledger-directory migration, 13:50 EDT) froze that file and mandated per-file entries under `docs/ledger/`. The EA-2 prompt pre-dates the freeze by \~51 minutes.
 
 EA Code honored the **current** authoritative convention (`docs/ledger/README.md`) over the stale prompt instruction. This is the correct call:
 

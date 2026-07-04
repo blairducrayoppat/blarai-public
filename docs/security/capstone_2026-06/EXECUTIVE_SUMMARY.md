@@ -39,7 +39,7 @@ that make "online" safe have not yet been exercised.**
 
 ## The strong base — what is already done, by construction (not by environment)
 
-This is not a weak posture. Of ~55 audit findings + 12 headline attack paths, **24 are fixed by
+This is not a weak posture. Of \~55 audit findings + 12 headline attack paths, **24 are fixed by
 construction** and both of the audit's Critical issues are closed:
 
 - **The forgeable-authorization Critical is closed** — the signing key was rotated off-disk onto the

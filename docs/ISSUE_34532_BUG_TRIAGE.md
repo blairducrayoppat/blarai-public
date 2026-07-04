@@ -14,7 +14,7 @@ OpenVINO's GPU plugin has two distinct bugs in its `ScatterUpdate` kernel, repor
 
 ### Bug 1: Standalone ScatterUpdate — Silent FP16 Precision Loss
 
-- **What**: When a simple `ScatterUpdate` model with all FP32 tensors is compiled for GPU, the GPU plugin silently down-casts intermediate computations to FP16, introducing ~5e-4 max absolute error.
+- **What**: When a simple `ScatterUpdate` model with all FP32 tensors is compiled for GPU, the GPU plugin silently down-casts intermediate computations to FP16, introducing \~5e-4 max absolute error.
 - **Impact on Qwen3.5**: The recurrent state update `state = g * state + beta * (k^T @ v)` runs across 24 linear attention layers per token. Precision errors compound and produce garbled output.
 - **Workaround**: `{"INFERENCE_PRECISION_HINT": "f32"}` fixes standalone case.
 
@@ -81,7 +81,7 @@ OpenVINO's GPU plugin has two distinct bugs in its `ScatterUpdate` kernel, repor
 
 **Path**: `c:\Users\mrbla\BlarAI\scripts\test_issue34532_scatterupdate.py`
 **Dependencies**: `openvino`, `numpy` (both already in the venv)
-**Runtime**: ~10 seconds (synthetic tensors, no model download)
+**Runtime**: \~10 seconds (synthetic tensors, no model download)
 
 **What it does**:
 1. Collects environment metadata (OpenVINO version, GPU name, driver, OS, Python)
@@ -191,7 +191,7 @@ Qwen3.5 model
 
 Until #34532 is fixed, Qwen3.5 is **CPU-only** on OpenVINO. The FP32 workaround
 (if it works for Loop bodies) would provide a temporary path at the cost of
-performance (~2x slower on GPU).
+performance (\~2x slower on GPU).
 
 ---
 

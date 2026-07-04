@@ -21,7 +21,7 @@ stop did or did not happen on the same line.
 
 | Value | Behaviour | When to use |
 |-------|-----------|-------------|
-| `always` | **(DEFAULT)** Stop the VM whenever it is currently `Running`, regardless of whether this launcher started it. No spurious `Stop-VM` when the VM is already `Off`/`Saved`. | Normal single-user operation — the assistant releases its memory assignment (Dynamic Memory, ~512 MB–1 GB; see §5) on every close. |
+| `always` | **(DEFAULT)** Stop the VM whenever it is currently `Running`, regardless of whether this launcher started it. No spurious `Stop-VM` when the VM is already `Off`/`Saved`. | Normal single-user operation — the assistant releases its memory assignment (Dynamic Memory, \~512 MB–1 GB; see §5) on every close. |
 | `if_started` | Stop the VM **only** if this launcher started it this boot (legacy behaviour). | Parallel-dev: another session/tool owns the VM and this launcher must not yank it out from under that session. |
 | `never` | Never stop the VM; leave it `Running` on exit. | Deliberately keeping the VM warm across launches. |
 
@@ -44,7 +44,7 @@ The log lines to look for in `%LOCALAPPDATA%\BlarAI\launcher.log`:
 - `Cleanup: leaving VM running (policy=if_started, VM was already running at boot)`
 - `Cleanup: leaving VM running (policy=never)`
 
-If `stop_vm()` does not confirm the VM reached `Off` within its ~30s timeout (a
+If `stop_vm()` does not confirm the VM reached `Off` within its \~30s timeout (a
 slow shutdown, or `Stop-VM` itself failing), cleanup logs a WARNING and still
 completes — the exit path never crashes on a slow stop. The WARNING includes the
 manual one-liner below.
@@ -93,7 +93,7 @@ Before the 2026-06-10 fix, the launcher only marked the VM "mine to stop" if it
 was **not** already running at boot (`_vm_was_started`), and `_cleanup` stopped
 it only under that flag. The consequence was an ownership **ratchet**: once the
 VM was *ever* left `Running` across a launcher start — a crash, a hard console
-close that killed the process before the ~30s `Stop-VM` completed, a host reboot
+close that killed the process before the \~30s `Stop-VM` completed, a host reboot
 that resurrected it (via the old `StartIfRunning`), or another tool starting it —
 every subsequent *clean* exit then skipped the stop, and the leak
 self-perpetuated forever. The signature in `launcher.log` was a cleanup that ran
@@ -120,16 +120,16 @@ taken straight from the host's 31.323 GB budget.
 | Startup | 1 GB |
 | Maximum | 2 GB |
 
-**Measured behaviour** (cold boot, parser idle + a 60 s sustained ~248 KB-parse
+**Measured behaviour** (cold boot, parser idle + a 60 s sustained \~248 KB-parse
 burst; `scripts/measure_guest_parser_memory.py`; see `PERFORMANCE_LOG.md`
-2026-06-13): the balloon engages ~60 s after boot and reclaims `MemoryAssigned`
-to the **512 MB floor**, held through both load and idle. Idle demand is ~199 MB
-and the sustained-parse peak demand is ~256 MB — both far below the floor, so the
-assignment floats at 512 MB regardless of the 2 GB maximum. Net: **~1.5 GB
+2026-06-13): the balloon engages \~60 s after boot and reclaims `MemoryAssigned`
+to the **512 MB floor**, held through both load and idle. Idle demand is \~199 MB
+and the sustained-parse peak demand is \~256 MB — both far below the floor, so the
+assignment floats at 512 MB regardless of the 2 GB maximum. Net: **\~1.5 GB
 returned to the host** versus the old static 2 GiB, while the 2 GB max preserves
 spike headroom (never worse than the old static ceiling under load). **The hot-add direction —
 growth above the 1 GB startup toward the 2 GB ceiling — was NOT exercised here:**
-demand never reached even the 512 MB floor (peak 256 MB, ~half the floor, a
+demand never reached even the 512 MB floor (peak 256 MB, \~half the floor, a
 deliberate headroom choice), so the ceiling's protective value rests on the
 *assumed* `hv_balloon` hot-add path, not a measured one (the reclaim/shrink
 direction is proven by the 1024 → 512 MB drop). 195
@@ -137,7 +137,7 @@ consecutive near-cap parses ran with zero OOM; the parser reached READY 34.5 s
 into a cold boot (well inside the `health_timeout_s = 120` budget).
 
 **Why Dynamic Memory and not a smaller static value:** a static 1 GB would
-reclaim only ~1 GB and leave the parser no spike headroom; DM reclaims ~1.5 GB at
+reclaim only \~1 GB and leave the parser no spike headroom; DM reclaims \~1.5 GB at
 rest *and* can still grow to 2 GB if a future heavier parse needs it. The balloon
 driver (`hv_balloon`) is present in the Alpine guest — proven by the assigned
 1024 → 512 MB reclaim, since only ballooning can drop the assignment below the

@@ -40,7 +40,7 @@ unaffected.**
 
 ### 2.1 Why Whisper-small (STT)
 
-Whisper-small (~240 M params) is the sweet spot for short conversational
+Whisper-small (\~240 M params) is the sweet spot for short conversational
 utterances: it converts to OpenVINO IR and runs on the same OpenVINO/GPU stack
 the 14B already uses (ADR-011), so STT adds no new runtime — just another
 pipeline on the device already in play. The probe measured 0.53 s to transcribe
@@ -66,7 +66,7 @@ local export becomes an *option*, not a requirement.
 and would also run locally, but it sounds robotic enough to kill the "wow" of a
 daily-driver assistant; the portfolio value of this surface is in it feeling
 alive. Kokoro-82M is the considered-and-chosen alternative at +275 MB over
-Piper — nothing against the ~10 GB headroom the shared-pipeline merge banked.
+Piper — nothing against the \~10 GB headroom the shared-pipeline merge banked.
 
 **The trade-off taken, named: voice quality and portfolio aesthetics over
 model size.** Piper is the rejected path, on the record.
@@ -85,7 +85,7 @@ The probe found this venv's `onnxruntime` is CPU-only (`AzureExecutionProvider`,
 — was **rejected for the first ship**: it means swapping the onnxruntime package
 the working stack depends on, a real blast radius for a model that is already
 fast enough. Measured CPU real-time-factor is **0.30** (3.3× faster than
-real-time); streaming first-chunk latency ~1.4 s. The `ONNX_PROVIDER`
+real-time); streaming first-chunk latency \~1.4 s. The `ONNX_PROVIDER`
 environment variable is honored by `kokoro-onnx`, so a future GPU execution
 provider is a one-line override, noted here as a deferred optimization, not a
 prerequisite.
@@ -97,12 +97,12 @@ length-prefixed JSON frames. This reuses the entire codec on both sides — the
 C# `System.Text.Json` client and the Python `json` path — with zero new
 transport, no second pipe, and no binary framing to get wrong across the
 language boundary. A short utterance or a single TTS sentence-chunk is small:
-30 s of 16 kHz mono `s16le` is ~960 KB raw → ~1.28 MB base64, inside the
+30 s of 16 kHz mono `s16le` is \~960 KB raw → \~1.28 MB base64, inside the
 existing `MAX_FRAME_BYTES = 4 MB` cap. Longer captures are chunked rather than
 sent whole.
 
 A type-tagged raw-binary frame (1-byte discriminator + length-prefixed bytes
-alongside JSON) would shave the ~33 % base64 overhead and is the obvious later
+alongside JSON) would shave the \~33 % base64 overhead and is the obvious later
 optimization. It is **deliberately not built first**: the base64 path is correct,
 symmetric, and reuses tested code; the binary path is a performance refinement
 to take only if frame size or throughput becomes a measured problem.
@@ -145,16 +145,16 @@ wiring exactly.
 - Voice selection is a first-class settings affordance from day one.
 - Fail-soft: a model that will not load degrades to text-only chat, never a
   crash — same posture as the Substrate.
-- Measured first-spoken-token budget ≈ 2.6 s (Whisper 0.53 + Qwen3 TTFT ~0.7 +
-  Kokoro first-chunk ~1.4), inside the <3 s target, on real hardware.
+- Measured first-spoken-token budget ≈ 2.6 s (Whisper 0.53 + Qwen3 TTFT \~0.7 +
+  Kokoro first-chunk \~1.4), inside the <3 s target, on real hardware.
 
 ### Negative / accepted trade-offs
 - **Kokoro on CPU**, not GPU, for the first ship — accepted because measured RTF
   0.30 meets the budget and a GPU execution-provider swap would disturb the
   working onnxruntime. Deferred behind `ONNX_PROVIDER` (§2.3).
-- **base64 over the pipe** carries ~33 % overhead vs raw binary — accepted for
+- **base64 over the pipe** carries \~33 % overhead vs raw binary — accepted for
   codec reuse and symmetry; binary framing deferred (§2.4).
-- **+~525 MB** resident for the two model stacks (whisper-small + Kokoro-82M) —
+- **+\~525 MB** resident for the two model stacks (whisper-small + Kokoro-82M) —
   accepted against the banked headroom; quality-over-size is the named trade-off
   (§2.2).
 - The C# audio path (mic capture, incremental playback) cannot be driven

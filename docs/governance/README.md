@@ -254,7 +254,7 @@ to honor L-17.
   Sprint 8 (which references it from its signed SDV and from
   in-flight EA prompts). The migration unblocks once Sprint 8
   closes (Vikunja task #82 marked done). Migration scope: rename
-  the file, update ~101 inbound references across 34 files
+  the file, update \~101 inbound references across 34 files
   (key active surfaces include `../../CLAUDE.md`,
   `../../.github/copilot-instructions.md`, several
   `../claude_projects/*.md` files, and the Sprint 9 governance

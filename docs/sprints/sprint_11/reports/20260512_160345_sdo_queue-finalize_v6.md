@@ -12,7 +12,7 @@ verdict: null
 
 ## Summary
 
-Sixth firing of Phase 3 finalization for Sprint 11 EA-4. v5 (commit `3161af1`) ran the same MCP writes back-to-back with in-session verification and claimed success. By the start of this session, Task #410 labels had reverted to `[Active, Architecture, Documentation, Gate:Pending-SDO]` with `updated: 2026-05-12T11:00:39-05:00` — i.e., ~3 min after v5's verified write. Disk state (EA-4 prompt in `ea_queue/` root, staging empty) confirms Phase 3 file move is durable; only the Vikunja gate-label state is regressing.
+Sixth firing of Phase 3 finalization for Sprint 11 EA-4. v5 (commit `3161af1`) ran the same MCP writes back-to-back with in-session verification and claimed success. By the start of this session, Task #410 labels had reverted to `[Active, Architecture, Documentation, Gate:Pending-SDO]` with `updated: 2026-05-12T11:00:39-05:00` — i.e., \~3 min after v5's verified write. Disk state (EA-4 prompt in `ea_queue/` root, staging empty) confirms Phase 3 file move is durable; only the Vikunja gate-label state is regressing.
 
 ## Pre-firing observed state
 
@@ -32,7 +32,7 @@ End-of-firing labels: `[Active, Architecture, Documentation, Gate:Pending-Execut
 
 ## Hardening followup — widen scope
 
-v4 opened a Stage-6.7.5 hardening ticket for "Vikunja gate-label writes silently rolled back". v5 claimed to have resolved that by adding immediate post-write verification. v6 demonstrates a new failure mode: **post-verify revert** — a successful, verified write is subsequently reverted by an unknown agent or background reconciliation ~3 minutes later. Recommend the existing investigation ticket be widened to cover this case (or a sibling ticket opened) before EA-5 lands.
+v4 opened a Stage-6.7.5 hardening ticket for "Vikunja gate-label writes silently rolled back". v5 claimed to have resolved that by adding immediate post-write verification. v6 demonstrates a new failure mode: **post-verify revert** — a successful, verified write is subsequently reverted by an unknown agent or background reconciliation \~3 minutes later. Recommend the existing investigation ticket be widened to cover this case (or a sibling ticket opened) before EA-5 lands.
 
 ## Outbound trigger
 

@@ -29,7 +29,7 @@ serial cross-repo profile:
 
 - **Section 1** — agent role + constraints + behavioral directives (mature-not-
   minimal, evidence-first, source-anchoring to SWAGR-chain).
-- **Section 2** — LA workflow context (~20-30 min total expected; no escalation
+- **Section 2** — LA workflow context (\~20-30 min total expected; no escalation
   predicted).
 - **Section 3** — condensed project overview (BlarAI runtime; Sprint 11 is
   fifth consecutive hardening sprint; cf-1 dormant per LA confirmation).

@@ -141,7 +141,7 @@ undetected and reach the operational system.
 2. **Assistant Orchestrator + Semantic Router cluster (EA-2)**: PGOV leakage threshold exact
    boundary test (cosine_similarity == 0.85); SR dual-gate threshold exact-point tests
    (similarity == 0.50, margin == 0.04, margin == 0.03) via mock-controlled centroids and
-   embeddings; AO `entrypoint.py` config-validation coverage (≥ 6 of the ~13 uncovered
+   embeddings; AO `entrypoint.py` config-validation coverage (≥ 6 of the \~13 uncovered
    constraints, all 13 preferred under "mature not minimal"); AO `entrypoint.py` HEARTBEAT
    message handling + `stop()` isolation; `circuit_breaker.py` over-limit-token,
    simultaneous-trip, and `new_request()` reset tests; `pgov.py` CREDIT_CARD + HEX_SECRET
@@ -208,7 +208,7 @@ undetected and reach the operational system.
   a new test. The sprint-close comment will list them by name with the disposition.
 - **constants.py gap per cluster**: Each EA addresses the `constants.py` gap for its own
   service cluster(s). No shared constants EA; ownership follows the service-cluster boundary.
-- **AO entrypoint config validation floor**: EA-2 must cover ≥ 6 of the ~13 uncovered
+- **AO entrypoint config validation floor**: EA-2 must cover ≥ 6 of the \~13 uncovered
   constraints. Covering all 13 is encouraged under "mature not minimal" if each additional
   test is a straightforward parameterized case. EA-2 notes residual uncovered constraints
   in its completion report.
@@ -276,7 +276,7 @@ this priority ordering in EA-4's prompt.
 |---|---|---|---|
 | EA-5 file moves break test collection (missing `__init__.py`, wrong conftest, marker gap) | Medium | High | EA-5 comprehension gate must enumerate every move before proceeding; `pytest --co` is exit gate |
 | EA-4 HIGH items (launcher UAC elevation, prompt-flow preflight) require complex isolation patterns that push EA-4 to L size | Medium | Medium | SDO flags sizing concern at comprehension gate; Co-Lead upgrades EA-4 to L if confirmed |
-| AO entrypoint config validation has ~13 constraints — EA-2 may address fewer than all under M sizing | Low | Low | SDV §5.3 floors at ≥ 6; EA-2 completion report notes residual uncovered constraints |
+| AO entrypoint config validation has \~13 constraints — EA-2 may address fewer than all under M sizing | Low | Low | SDV §5.3 floors at ≥ 6; EA-2 completion report notes residual uncovered constraints |
 | Sprint Auditor first live firing identifies SWAGR gap mid-sprint | Low | Low | SWAGR is non-blocking by design (DEC-15); LA reads post-sprint |
 | "Mature not minimal" adjacent scope causes EA to expand unexpectedly | Low | Medium | Hard 1-hour cap per new item enforced via SDO comprehension gate; excess flagged, not absorbed |
 
@@ -320,7 +320,7 @@ that exceed an EA's authority.
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| LA (Lead Architect) | SDV sign-off, CAR adjudication if scope exceptions arise, SWAGR read at sprint end | ~20 min total: 15 min SDV, 5 min SWAGR read |
+| LA (Lead Architect) | SDV sign-off, CAR adjudication if scope exceptions arise, SWAGR read at sprint end | \~20 min total: 15 min SDV, 5 min SWAGR read |
 | Co-Lead Architect | SDO continuation XML authoring, EA prompt review via DEC-12 gate, SCR authoring at sprint end | Autonomous per DEC-11 §1.1 |
 | SDO | EA prompt authoring (5 prompts, with tighter EA-5 gate), EA work peer review | Autonomous per DEC-11 §1.2 |
 | EA Code | Milestone execution (5 EAs) | Autonomous per DEC-11 §1.3 |
@@ -330,7 +330,7 @@ that exceed an EA's authority.
 
 - Rough duration: 3–5 calendar days (fleet-time), 5 EA milestones. L-sized EA-1 is the
   longest; M-sized EA-4 carries the most structural complexity and may prove L in practice.
-- LA active-time expectation: ~20 min total across the sprint (SDV sign-off, SWAGR read at
+- LA active-time expectation: \~20 min total across the sprint (SDV sign-off, SWAGR read at
   sprint end). EA merges are auto-merged by Co-Lead under `trusted_scope` mode (DEC-11 §3.4);
   no per-merge LA gate fires unless a merge fails the trusted-scope criteria.
 - Confidence in estimate: **medium** — EA-4 (launcher isolation patterns) and EA-5 (42 file

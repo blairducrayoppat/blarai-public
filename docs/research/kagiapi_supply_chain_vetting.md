@@ -35,7 +35,7 @@ That step is W2 proper.
 
 All methods use a single persistent `requests.Session`. Authentication: API key passed via constructor argument or the `KAGI_API_KEY` environment variable; transmitted as the HTTP header `Authorization: Bot {api_key}`. No async, no heavy framework, no ML inference, no local database.
 
-The wheel is **3,703 bytes** (unzipped source ~8 KB). This is a thin client by any measure.
+The wheel is **3,703 bytes** (unzipped source \~8 KB). This is a thin client by any measure.
 
 ---
 
@@ -139,7 +139,7 @@ GitHub's "Releases" page shows "No releases published" despite three PyPI upload
 
 ### 5.5 Dependency Chain — PASS
 
-`requests` is one of the most downloaded Python packages (~300M downloads/week, depended upon by 4M+ repos). Its transitive deps (`charset-normalizer`, `idna`, `urllib3`, `certifi`) are equally canonical. No unexpected packages appear in the tree. No package in the tree is a cloud SDK, telemetry library, or network-calling framework beyond HTTP.
+`requests` is one of the most downloaded Python packages (\~300M downloads/week, depended upon by 4M+ repos). Its transitive deps (`charset-normalizer`, `idna`, `urllib3`, `certifi`) are equally canonical. No unexpected packages appear in the tree. No package in the tree is a cloud SDK, telemetry library, or network-calling framework beyond HTTP.
 
 ### 5.6 Egress Interaction — NOTE
 

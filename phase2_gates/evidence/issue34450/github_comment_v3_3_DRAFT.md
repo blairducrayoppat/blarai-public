@@ -195,7 +195,7 @@ optimum-cli export openvino \
   ./qwen3-0.6b-int4-sym-g128
 ```
 
-`LLMPipeline(ir, "NPU")` then compiles in ~8.5 s on real NPU. Same is true if you
+`LLMPipeline(ir, "NPU")` then compiles in \~8.5 s on real NPU. Same is true if you
 keep asym but switch to channel-wise (`--group-size -1`) or to `--weight-format int8`.
 
 ## Artifacts

@@ -19,7 +19,7 @@ document text + 384-dim embeddings) and `sessions.db` (every conversation turn +
 session titles) — are **plaintext SQLite by design**, with no at-rest protection. Critically, this is a
 gap to close **before** real data exists, not an active exposure of it: verified on disk (2026-06-05),
 the stores today hold only build-phase **dev/test scaffolding** — `substrate.db` ≈ 107 chunks
-(~400 KB), `sessions.db` ≈ 59 sessions / 376 turns (~250 KB) — and BlarAI has **never been used in a
+(\~400 KB), `sessions.db` ≈ 59 sessions / 376 turns (\~250 KB) — and BlarAI has **never been used in a
 daily setting**. There is no "decades of exposed private data on disk" (an earlier premise this ADR,
 the SDV, the roadmap, and the review chain all inherited without checking; corrected here).
 
@@ -215,7 +215,7 @@ Both items were ruled by the LA at the design-gate checkpoint:
   production. **Placement: folded into the #605 / audit work (EA-5), not the cipher EA.**
 - **(b) RSA seal key size — RULED: RSA-2048 in code now; attempt RSA-3072 at the ceremony, adopt if the
   chip supports it.** EA-1 shipped **RSA-2048** (112-bit; universally TPM-supported; secure through
-  ~2030+); RSA-3072 (128-bit) is more future-proof *if* the reference STMicro TPM supports it (not
+  \~2030+); RSA-3072 (128-bit) is more future-proof *if* the reference STMicro TPM supports it (not
   universal across TPM 2.0 chips). On the record (LA): the RSA size is a **minor knob, not the
   decades-hedge** — it only **wraps** the DEK. Long-term confidentiality rests on the **AES-256 DEK**
   (a large margin even against Grover) and the **versioned envelope's ability to re-wrap the DEK under a
@@ -255,7 +255,7 @@ key is supplied) — by design (§2.7).
 
 **Migration of existing rows (right-sized, not urgent).** The dev/test rows already on disk (§1) are
 **encrypted in place** as the natural populated-store fixture for the verification (§4 / SDV criterion
-#1): encrypt the existing ~107 chunks + 376 turns, then prove raw-read = ciphertext, retrieval
+#1): encrypt the existing \~107 chunks + 376 turns, then prove raw-read = ciphertext, retrieval
 equivalence, dedup-on-ciphertext, and a whole-file scan finding **no leftover plaintext** (a
 VACUUM/scrub after the in-place rewrite). This exercises the migration path as **engineering
 correctness and a free real-shaped test**, *not* urgent secret-protection — there is no sensitive data

@@ -8,7 +8,7 @@ select all, copy, paste into the GitHub comment box.
 
 **Target**: https://github.com/openvinotoolkit/openvino/issues/35641 (issue — comment goes on the issue)
 
-**Word count**: ~510 words. Length is signal density (data block + IR
+**Word count**: \~510 words. Length is signal density (data block + IR
 fingerprints + NNCF detail). v5 over v4 is a tone pass, not a content cut.
 
 **@-mentions**: three direct replies — `@Zulkifli-Intel`, `@diego-villalobos`,
@@ -26,7 +26,7 @@ fingerprints + NNCF detail). v5 over v4 is a tone pass, not a content cut.
 
 | v4 phrasing (declarative) | v5 phrasing (deferential) | Why |
 |---|---|---|
-| "the failure mode has shifted slightly — the NPU plugin loads/compiles the unsupported graph without complaint and only fails during kernel execution" | "the `CONSTRUCT_OK` line prints in ~17–18s before the process exits, so on this version the failure appears to occur after pipeline construction completes. The actual call site for the access violation is for the team to determine." | "Without complaint" framed Intel's code negatively. v5 describes what we observe and explicitly leaves the actual call site to Intel. |
+| "the failure mode has shifted slightly — the NPU plugin loads/compiles the unsupported graph without complaint and only fails during kernel execution" | "the `CONSTRUCT_OK` line prints in \~17–18s before the process exits, so on this version the failure appears to occur after pipeline construction completes. The actual call site for the access violation is for the team to determine." | "Without complaint" framed Intel's code negatively. v5 describes what we observe and explicitly leaves the actual call site to Intel. |
 | "This is the **separable defect** — undefined behavior on an unsupported configuration that the plugin **could surface as an actionable exception at load time**." | "INT8 weight-only being outside the documented NPU LLM matrix is useful framing regardless of where the crash originates. If a clearer signal at load time (a warning, an exception, or sharper docs) would help users avoid this configuration..." | v4 declared what the defect is AND what the plugin should do. v5 validates Diego's framing and offers three alternative shapes (warning / exception / docs) for whoever owns it to choose. |
 | "PR [#34651](...) — same plugin file, same `Plugin::compile_model` layer — **proposes the right pattern**" | "PR [#34651](...) takes a similar approach in the same plugin file (`Plugin::compile_model`) for a different unsupported case. **Whether that pattern fits here is for the team to judge.**" | v4 declared #34651 to be THE right pattern. v5 cites it as a reference point and explicitly defers the fit question. |
 | "Would the team prefer (a) extending PR #34651 ..., (b) a separate companion PR ..., or (c) deferring ...? I'm happy to follow whichever direction works best." | "If it would be useful, I'm happy to contribute in whatever shape fits your plans — extending PR #34651, opening a small companion PR following a similar pattern, providing more diagnostic captures, or simply standing by while the dev team investigates. No preference from this end." | v4 framed the ask as a menu we were asking Intel to pick from. v5 frames it as us offering help if useful, without implying Intel needs to choose from our list. |
@@ -71,7 +71,7 @@ IR fingerprints for verification:
 - `openvino_model.bin`: SHA256 `3fdde9ac20058bbdf364c98dbe3508b8eddffd1d33a0d213d111159f826dc939` (597,735,053 bytes)
 - NNCF bitwidth distribution: 100% `int8_asym, per-channel` across 197/197 layers (matches the 2026.0.0 export's distribution).
 
-One observation different from the original 2026.0.0 report: on 2026.1.0, the `CONSTRUCT_OK` line prints in ~17–18s before the process exits, so on this version the failure appears to occur after pipeline construction completes rather than during it. The actual call site for the access violation is for the team to determine.
+One observation different from the original 2026.0.0 report: on 2026.1.0, the `CONSTRUCT_OK` line prints in \~17–18s before the process exits, so on this version the failure appears to occur after pipeline construction completes rather than during it. The actual call site for the access violation is for the team to determine.
 
 Could you share which NPU hardware family was tested in your no-repro runs (Meteor Lake, Lunar Lake, Arrow Lake, etc.)? That would help me understand whether what we're seeing on Lunar Lake is silicon-specific or environment-specific.
 

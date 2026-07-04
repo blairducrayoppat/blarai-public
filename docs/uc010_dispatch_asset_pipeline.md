@@ -11,7 +11,7 @@ record is kept for its measured findings.
 
 **Why SEAM A, not the Phase-2b "ASSETS swap phase":** the only measured memory constraint is
 *image-model + 30B* (32.5 GB > the 31.323 GB ceiling). Base SDXL + the **14B** co-reside fine
-(~26 GB, 5.3 GB headroom — ADR-033 §Memory Phase-0; it is exactly how `/imagine` runs today). So the
+(\~26 GB, 5.3 GB headroom — ADR-033 §Memory Phase-0; it is exactly how `/imagine` runs today). So the
 dispatch generates AO-side at approve time WHILE THE 14B IS RESIDENT and BEFORE the swap, commits the
 PNGs into the target repo baseline (every best-of-N coder candidate inherits them), then the normal
 14B→30B swap runs the coder against assets already in the tree. This avoids loading a diffusion model
@@ -104,20 +104,20 @@ first). CPU generation is slower (see below) but proves the pipeline without GPU
 
 ## Validation (2026-06-24/25, Arc 140V host, CPU)
 
-- **Model load:** ~9 s on CPU.
-- **Generation:** 512²/20 steps ≈ 141 s; 768²/28 steps ≈ 475–485 s (~8 min) on CPU.
+- **Model load:** \~9 s on CPU.
+- **Generation:** 512²/20 steps ≈ 141 s; 768²/28 steps ≈ 475–485 s (\~8 min) on CPU.
 - **Cutout (rembg u2net):** < 1 s/image.
 - **Cutout quality:** the busy mosaic/dot background is **removed cleanly**; the flat subject is
-  isolated on transparent (~64% transparent for a centered single subject). Confirmed by viewing
+  isolated on transparent (\~64% transparent for a centered single subject). Confirmed by viewing
   the images. The remaining artifacts (occasional duplicate subject, low-res noise, garbled
   pseudo-text) are **generation** quality, not cutout quality.
 - **Generation tuning is the lever (the key finding).** The cutout only works when the generation
   yields a *distinct* subject. Two failure modes seen while tuning: (a) over-emphasising "empty
   white space / corporate icon" pales the whole image into a faint ghost (rembg then keeps faint
   near-white regions — useless); (b) under-constraining lets the SDXL mosaic clutter fill the entire
-  frame (rembg finds no background to remove — ~2% transparent). The sweet spot is a bold, saturated,
+  frame (rembg finds no background to remove — \~2% transparent). The sweet spot is a bold, saturated,
   outlined subject ("sticker style, thick outline, bold solid colours") against a plain background —
-  exactly what rembg isolates well. Prompt iteration is slow on CPU (~8 min/image) and belongs on
+  exactly what rembg isolates well. Prompt iteration is slow on CPU (\~8 min/image) and belongs on
   the GPU (the Phase-3 swap-sequence path).
 
 **Conclusion:** the gen → rembg → clean-cutout pipeline is proven. rembg is the right first move for

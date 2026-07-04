@@ -175,7 +175,7 @@ LA-facing operator dividend: the deterministic Active State refresh procedure
 plus the cross-repo SWAGR template plus the four numbered DECs reduce the
 ambient documentation-lookup friction at every sprint cadence. The fleet-bypass
 pattern (EA-4 + EA-5) preserved the deliverable schedule when the autonomous
-chain failed — at the cost of ~2 hours of Co-Lead direct-execution time per
+chain failed — at the cost of \~2 hours of Co-Lead direct-execution time per
 SCR §12.
 
 ### 3.4 Phase 5 roadmap position
@@ -289,10 +289,10 @@ Systematic categorization of BlarAI `14ac80d..f7f56b2` (60 commits, 5 merge comm
 | Sprint 11 EA content commits (BlarAI) | 5 (`2a0f07f` EA-1, `c73f44c` EA-2, `19d3574` EA-3, `9c82838` EA-4, `cbca32e` EA-5) | In-scope; EA-1..3 tagged `[role:ea_code]`; EA-4 + EA-5 tagged `[role:co_lead]` reflecting bypass path |
 | Sprint 11 kickoff + SDV amendment commits | 4 (`ac90f75` SDV signoff, `e18f8d1` roster transition, `b0cc471` v2, `a07be45` v3) | Expected DEC-15 flow + LA-directed amendments |
 | Sprint 11 LA-merge commits (la:merge) | 5 (`be09999`, `cf95e4b`, `9464346`, `3b4b645`, `50af4a0`) | Per merge-policy; auto-merge on first 3, direct merge on last 2 (bypass) |
-| Sprint 11 agent-narration / DEC-13 reports | ~30 (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]`) | Expected |
+| Sprint 11 agent-narration / DEC-13 reports | \~30 (`[agent:sdo]`, `[agent:co_lead]`, `[agent:ea_code]`) | Expected |
 | `chore(ops)` pause/unpause pairs | 4 (EA-1+2 shared window, EA-3, EA-4 attempted, post-EA-5) | Per fleet pause SOP; one pair shared per v2 amendment |
-| Co-Lead archive cleanups | ~3 | Routine |
-| OpenVINO workstream (orthogonal) | ~6 (`2104b5c`, `7702dba`, `44ee8b6`, `7295427`, `d2b535c`, plus 1 amend) | Out-of-Sprint-11; properly tagged `[agent:guide_11]` / `[agent:ea17]` |
+| Co-Lead archive cleanups | \~3 | Routine |
+| OpenVINO workstream (orthogonal) | \~6 (`2104b5c`, `7702dba`, `44ee8b6`, `7295427`, `d2b535c`, plus 1 amend) | Out-of-Sprint-11; properly tagged `[agent:guide_11]` / `[agent:ea17]` |
 | Sprint 11 SCR commit | 1 (`f7f56b2`) | Sprint close artifact |
 
 **Substantive ghost-commit concerns** (BlarAI side): none. Every BlarAI commit
@@ -355,7 +355,7 @@ All 16 substantive deliverables pass fitness-for-purpose at the read depth this
 audit performed. Notable strength: EA-4's investigation methodology
 (source-pinning + environment-decomposition) is stronger than the SDV-scoped
 bisect approach and produces a stronger result (non-attribution proof in 2
-pytest runs vs ~7 for naive bisect); this exceeds the mature-not-minimal
+pytest runs vs \~7 for naive bisect); this exceeds the mature-not-minimal
 standard.
 
 ---
@@ -390,7 +390,7 @@ standard.
 - **EA-4 escalation chain**: SDO authored queue-finalize v1 (`027bf00`), v2
   (`bd37b62`), v3 (`a1f9f4b`), v4 (`5eb71f4`), v5 (`3161af1`), v6 (`c200c60`),
   each verified-then-reverted by an unidentified Vikunja agent or hook within
-  ~5 minutes. SDO escalated at `b814e22` (`escalation_v1`). Co-Lead bypassed
+  \~5 minutes. SDO escalated at `b814e22` (`escalation_v1`). Co-Lead bypassed
   the fleet and executed EA-4 directly. **The reverter is not identified; this
   is the second HIGH-priority Sprint 12 carry-over per SCR §14.1.**
 
@@ -529,7 +529,7 @@ No ADRs amended (SDV §5.2 forbade). No drift.
 | Document | Accurate post-sprint? | Stale section if not |
 |---|---|---|
 | CLAUDE.md (BlarAI) — §"Active State" L111-121 | YES (live-computed via EA-2 procedure at SCR commit) | — |
-| CLAUDE.md (BlarAI) — §"Phase History" L101 | **NO — stale** | L101 says "Sprints 7-9 COMPLETE; Sprint 10 ACTIVE. Domain 6 MCP config COMPLETE. ~981 tests (regression)." Should reflect Sprint 10 COMPLETE + Sprint 11 COMPLETE/CLOSING + `1001 tests` |
+| CLAUDE.md (BlarAI) — §"Phase History" L101 | **NO — stale** | L101 says "Sprints 7-9 COMPLETE; Sprint 10 ACTIVE. Domain 6 MCP config COMPLETE. \~981 tests (regression)." Should reflect Sprint 10 COMPLETE + Sprint 11 COMPLETE/CLOSING + `1001 tests` |
 | `.github/copilot-instructions.md` (BlarAI) | YES (L94 pointer-element fix landed) | — |
 | AGENTS.md (BlarAI) | YES (no change required) | — |
 | devplatform CLAUDE.md | YES (post-token-expansion) | — |
@@ -590,7 +590,7 @@ audit time:
 | # | Risk / Gap | Severity | How auditor noticed | Evidence | Suggested mitigation |
 |---|---|---|---|---|---|
 | 1 | **Co-Lead direct execution of EA-4 + EA-5 (fleet bypass) preserves deliverable schedule but constitutes process debt**. 40% of Sprint 11 EAs (2 of 5) ran outside the SDV-prescribed SDO→EA Code→SDO→Co-Lead chain. The SCR §14.3 frames the bypass as a "legitimate fallback" — and it is, in the sense that LA-delegated authority + auditable commit tagging preserve governance — but the SCR's own §14.2 #1 acknowledges this is debt: "the fleet's autonomous chain should not require the fallback under normal operation." Sprint 12 candidate work (§14.1 #1 + #2) addresses the root causes (state-machine misclassification + Vikunja label-revert phenomenon) | MINOR (process; underlying causes are HIGH-priority Sprint 12 carry-overs per SCR §14.1, which the auditor concurs with) | Cross-referenced SCR §1, §7, §14.1, §14.2 #1, §14.3 with commit-subject inspection (`9c82838`, `cbca32e`, `3b4b645`, `50af4a0` all `[role:co_lead]` not `[role:ea_code]`) | SCR §14.1 #1 + #2 are the resolution paths. Auditor adds: until the state-machine bug is fixed, Sprint 12 should NOT run another within-sprint-parallel sprint (concurs with SCR §14.2 #2) |
-| 2 | **CLAUDE.md §"Phase History" table at L101 is stale** post-EA-2 refresh. The row reads: "Sprints 7-9 COMPLETE; Sprint 10 ACTIVE. Domain 6 MCP config COMPLETE. ~981 tests (regression)." This contradicts the freshly-refreshed §"Active State" at L115 which correctly says Sprint 11 ACTIVE + 1001 passed. The EA-2 procedure per SDV §5.3 scope boundary refreshes ONLY §"Active State"; the Phase History table is out of scope. Result: the same `CLAUDE.md` file is internally inconsistent. | MINOR | `grep -n "1001\|981\|Test baseline\|Active State" CLAUDE.md` at `f7f56b2` returned both the live `1001` at L115 and the stale `~981` at L101 | Either (a) extend the EA-2 procedure scope to also refresh the Phase History row each sprint cadence (small scope extension; well within procedure-runbook style), or (b) replace the L101 text with a pointer to L111+ §"Active State" so the table has no independent staleness surface |
+| 2 | **CLAUDE.md §"Phase History" table at L101 is stale** post-EA-2 refresh. The row reads: "Sprints 7-9 COMPLETE; Sprint 10 ACTIVE. Domain 6 MCP config COMPLETE. \~981 tests (regression)." This contradicts the freshly-refreshed §"Active State" at L115 which correctly says Sprint 11 ACTIVE + 1001 passed. The EA-2 procedure per SDV §5.3 scope boundary refreshes ONLY §"Active State"; the Phase History table is out of scope. Result: the same `CLAUDE.md` file is internally inconsistent. | MINOR | `grep -n "1001\|981\|Test baseline\|Active State" CLAUDE.md` at `f7f56b2` returned both the live `1001` at L115 and the stale `~981` at L101 | Either (a) extend the EA-2 procedure scope to also refresh the Phase History row each sprint cadence (small scope extension; well within procedure-runbook style), or (b) replace the L101 text with a pointer to L111+ §"Active State" so the table has no independent staleness surface |
 | 3 | **EA-3 SWAGR template subsection landed at §5.5 not §5.4** (as SDV §4 #3 wording stated). EA-3's commit body documents this as within-scope decision (a) — §5.4 already holds "Ghost commits — independent discovery"; sibling placement at §5.5 preserves single-responsibility-per-subsection. This is technically a deviation from the SDV's verification text. **No defect — the EA-3 commit body pre-discloses the choice; the audit-time inspection reads the actual landed template** | MINOR (documentation hygiene) | SDV §4 #3 says "§5.4 subsection"; actual template puts it at §5.5 (auditor confirmed by `grep -n "5.4\|5.5"`) | Sprint 12 SDV (or any future cross-repo SDV) should reference §5.5 by name. Sprint 11 SDV could be amended with a v4 erratum noting the §5.5 placement, but the deviation is pre-disclosed in-commit and downstream uses (this SWAGR) read the actual template — no remediation strictly necessary |
 | 4 | **`vikunja_mcp/README.md` Quick Start fix verification path not exercised independently**. SDV §4 #7 verification scoped "verified by independent invocation from at least two cwds." Auditor did not re-invoke the README from multiple cwds during this audit | MINOR (verification path) | SDV §4 #7 + auditor self-disclosure | Next-cadence audit could add a quick cwd-invocation check; OR Sprint 12 SDV trims this verification step since the SCR claim plus the file-on-disk evidence are adequate at audit cadence |
 | 5 | **OpenVINO contribution workstream concurrence is undocumented at fleet doctrine level**. SCR §5.4 + §14.1 row 7 (LOW priority) notes the first cross-workstream-concurrence on BlarAI repo. The OpenVINO workstream pauses + resumes the fleet without explicit sprint-roster acknowledgment | MINOR | SCR §5.4 + git log commit tags `[agent:guide_11]` / `[agent:ea17]` in the sprint window | Per SCR §14.1 row 7: Sprint 12+ governance note about cross-workstream fleet-pause discipline. Possibly cf-1 scope |
@@ -672,7 +672,7 @@ and the deliverable schedule.
 
 - Fleet pause/unpause discipline: held. 4 pause/unpause pairs (EA-1+2 shared,
   EA-3, EA-4 attempted, post-EA-5 cleanup).
-- Role budgets: SDV §11 budgeted LA ~20-30 min; SCR §11 reports actual ~45 min.
+- Role budgets: SDV §11 budgeted LA \~20-30 min; SCR §11 reports actual \~45 min.
   Marginal over per SCR — auditor concurs.
 - SOFT/HARD breaches: 0 evidenced.
 - `trusted_scope` operation: 3 of 5 EAs auto-merged (EA-1/2/3); EA-4 + EA-5
@@ -795,7 +795,7 @@ Sprint 13 = ISS-3 PA stop-token fix as the smallest UC-adjacent advancement.
 | # | Section source | Gap description | Severity | Evidence | Recommended action |
 |---|---|---|---|---|---|
 | 1 | §5.3, §7, §10.3 | Co-Lead direct execution of EA-4 + EA-5 (40% of Sprint 11 EAs) under LA-delegated authority due to within-sprint parallel state-machine misclassification + Vikunja label-revert phenomenon. SCR is transparent (`[role:co_lead][phase:completion]` tagging + explicit rationale in commit subjects) and identifies the underlying causes as HIGH-priority Sprint 12 carry-overs (§14.1 #1 + #2). The bypass preserves deliverables and audit trail but constitutes process debt per the SCR's own framing | MINOR (process; root-cause work is HIGH-priority Sprint 12 carry-over) | SCR §1, §7, §14.1, §14.2, §14.3; commit subjects `9c82838`, `cbca32e`, `3b4b645`, `50af4a0` | Sprint 12 §14.1 #1 + #2 are the resolution. Until state-machine bug is fixed, Sprint 12 must NOT run another within-sprint-parallel sprint |
-| 2 | §8.1, §9.5, §10.3 | `CLAUDE.md` §"Phase History" table at L101 contradicts the freshly-refreshed §"Active State" at L115: "Sprints 7-9 COMPLETE; Sprint 10 ACTIVE. ~981 tests." The EA-2 procedure scope (per SDV §5.3) refreshes §"Active State" only; the same file now has internal inconsistency | MINOR | `grep -n "1001\|981" CLAUDE.md` at `f7f56b2` | Extend EA-2 procedure scope to include the Phase History row, OR replace L101 with a pointer to L111+ §"Active State" so it has no independent staleness surface |
+| 2 | §8.1, §9.5, §10.3 | `CLAUDE.md` §"Phase History" table at L101 contradicts the freshly-refreshed §"Active State" at L115: "Sprints 7-9 COMPLETE; Sprint 10 ACTIVE. \~981 tests." The EA-2 procedure scope (per SDV §5.3) refreshes §"Active State" only; the same file now has internal inconsistency | MINOR | `grep -n "1001\|981" CLAUDE.md` at `f7f56b2` | Extend EA-2 procedure scope to include the Phase History row, OR replace L101 with a pointer to L111+ §"Active State" so it has no independent staleness surface |
 | 3 | §4 #3, §6, §10.3 | SWAGR template subsection landed at §5.5 (not §5.4 as SDV §4 #3 verification text stated). EA-3 commit body pre-discloses this as within-scope decision (a); audit-time inspection reads actual template. Sprint 11 SDV could be amended with a v4 erratum but not strictly necessary | MINOR (documentation hygiene) | SDV §4 #3 vs `_templates/strategic_work_analysis_and_gap_report_template.md:216` | No remediation strictly necessary. Sprint 12+ SDVs that reference the cross-repo subsection should cite §5.5 by name |
 | 4 | §4 #7, §5.1 row 12, §10.3 | `vikunja_mcp/README.md` Quick Start fix verification path not exercised independently by auditor (SDV §4 #7 prescribed "verified by independent invocation from at least two cwds"). SCR claim and file-on-disk evidence trusted | MINOR (verification path) | Auditor self-disclosure | Next-cadence audit add cwd-invocation check, OR Sprint 12 SDV trims SDV §4 verification step |
 | 5 | §5.3, §10.3 | OpenVINO contribution workstream concurrence is the first cross-workstream-concurrence on BlarAI repo (`[agent:guide_11]` / `[agent:ea17]` commits ran during Sprint 11 window). No formal protocol exists for cross-workstream fleet-pause coordination. SCR §14.1 row 7 captures as LOW priority | MINOR | SCR §5.4 + git log commit tags in sprint window | Sprint 12+ governance note (possibly cf-1 scope) about cross-workstream fleet-pause discipline. SCR's LOW priority assignment is appropriate |
@@ -821,7 +821,7 @@ Sprint 13 = ISS-3 PA stop-token fix as the smallest UC-adjacent advancement.
 ## 14. Recommendations for next sprint (Sprint 12)
 
 1. **(BOTH, HIGH)** **Fix within-sprint parallel EA state-machine misclassification** per SCR §14.1 #1. The EA Code wake-template state machine must disambiguate by `(task_id, ea_number)` or equivalent, otherwise the v2 SDV amendment pattern remains unsafe. Until this lands, Sprint 12 should NOT run another within-sprint-parallel sprint (concurs with SCR §14.2 #2). Evidence: gap #1.
-2. **(BOTH, HIGH)** **Identify and resolve the Vikunja label-revert phenomenon** per SCR §14.1 #2. Inspect Gate Stale Cleaner, Escalation Watchdog, Toast Watchdog, Fleet Reports automation, any background reconciler — anything that runs on a ~5-min cron and could re-apply labels based on stale state. Six independent SDO writes reverted within ~5 min cadence is a strong signal. Evidence: gap #1.
+2. **(BOTH, HIGH)** **Identify and resolve the Vikunja label-revert phenomenon** per SCR §14.1 #2. Inspect Gate Stale Cleaner, Escalation Watchdog, Toast Watchdog, Fleet Reports automation, any background reconciler — anything that runs on a \~5-min cron and could re-apply labels based on stale state. Six independent SDO writes reverted within \~5 min cadence is a strong signal. Evidence: gap #1.
 3. **(LA, MEDIUM)** **Close `CLAUDE.md` §"Phase History" L101 staleness** (gap #2). Choose: (a) extend EA-2 procedure to refresh L101 each sprint cadence, OR (b) replace L101 with pointer to §"Active State". Option (b) is structurally simpler and eliminates the row as an independent staleness surface.
 4. **(LA, MEDIUM)** **Adopt `{commit, environment, date}` triple convention for SDV-anchored baseline strings** per SCR §14.1 #3 + EA-4 §6 recommendation. Each SDV anchors against a triple, not a count. Future auditors can decompose source-vs-environment-attributed movement immediately.
 5. **(LA, LOW-MED)** **Ratify or revert within-sprint parallel** per SCR §14.1 #4. If §14.1 #1 fix lands cleanly, ratify via DEC-20. Otherwise document the tradeoff and revert to serial-only within-sprint.

@@ -32,7 +32,7 @@ out of scope — no 8B model is present in this workspace.
    Phase 1 is verification only — do NOT attempt to rewrite the function.
 4. `models/eagle3-qwen3-14b/` (OpenVINO IR destination) is empty — conversion has not run.
 
-**NOTE on deprecated harness API (line ~442 of run_p5_feasibility_005a.py):**
+**NOTE on deprecated harness API (line \~442 of run_p5_feasibility_005a.py):**
 The harness uses the dict-based `LLMPipeline` constructor:
 `ov_genai.LLMPipeline(str(model_dir), "GPU", config, **kwargs)`
 In OpenVINO GenAI 2026.0 the keyword-based form is preferred. The dict form may still

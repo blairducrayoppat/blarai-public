@@ -42,7 +42,7 @@ Same markdown structure as the monolithic-era entries: Summary → Deliverables 
 
 ## Legacy monolithic ledger
 
-`docs/POST_OPERATIONAL_MATURATION_LEDGER.md` contains Entry 1 through Entry 52 (closed 2026-04-22). It is **frozen** — no new entries appended. Historical references to that file remain valid (all ~100 existing cross-references point to the frozen archive, no updates needed).
+`docs/POST_OPERATIONAL_MATURATION_LEDGER.md` contains Entry 1 through Entry 52 (closed 2026-04-22). It is **frozen** — no new entries appended. Historical references to that file remain valid (all \~100 existing cross-references point to the frozen archive, no updates needed).
 
 The monolithic ledger's numbered sequence (Entry 1..52) does not continue here. Per-entry files use timestamp-based filenames instead of sequential numbers, eliminating the collision class that forced the migration. If a tool needs a chronological roll-up for human reading, it reads the monolithic file first, then `ls docs/ledger/` sorted chronologically, and concatenates.
 

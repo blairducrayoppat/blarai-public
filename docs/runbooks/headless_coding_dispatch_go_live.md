@@ -41,7 +41,7 @@ wiring + the first real run, which are only validatable on the box.
 
 This connects the gateway's confirm flow to the resident 14B (PLAN) and to the swap driver
 (EXECUTE). Today `DispatchCoordinator` (`services/ui_gateway/src/dispatch_coordinator.py`,
-constructed at `services/ui_gateway/src/transport.py` ~line 367) ships with
+constructed at `services/ui_gateway/src/transport.py` \~line 367) ships with
 `plan_fn=None` / `execute_fn=None`. Inject both as AO round-trips (mirror how the
 `ingest`/`imagine` coordinators reach the AO via their async `transport_call`):
 

@@ -97,7 +97,7 @@ Signals: credential appeared in a public paste, committed to git by accident, le
 
 A single JSON source file (`config/mcp-servers.json`) with a sync script that projects into the three destinations is **deferred** per D7 §6.7. Trigger conditions for implementing:
 
-- MCP server count grows past ~10 and manual sync becomes error-prone.
+- MCP server count grows past \~10 and manual sync becomes error-prone.
 - Credential rotation becomes frequent (e.g. Vikunja moves to rotating tokens).
 - Multi-operator scenario introduces sync drift between operators.
 

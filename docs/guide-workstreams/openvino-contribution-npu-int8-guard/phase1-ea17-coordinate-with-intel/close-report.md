@@ -31,7 +31,7 @@ informational for Guide-#11 cross-verification.
 | 0f (issue #34450 closure mechanism) | PASS_WITH_NOTE | Verified closed; closure mechanism **not surfaced** in WebFetch summary; Intel response to the LA's catchable-error suggestion **not visible**. Per dispatch §execution/T1 MUST-NOT clause, engagement comment cites PR #34651 only — does NOT cite #34450 as resolution precedent. |
 | 0g (state of #34532, #34617, npu_compiler #265+#266) | PASS_WITH_NOTE | Live state captured. **Delta from charter §5**: issue #34532 is closed, not "open, triaged" as charter says. Documented in `upstream-state-report.md` §4. Anomaly A-NEW4 (low-severity charter drift). |
 | 0h (CONTRIBUTING.md + AI Usage Policy in full) | PASS | Read `CONTRIBUTING.md`, `CONTRIBUTING_PR.md`, `AI_USAGE_POLICY.md`, `.github/pull_request_template.md`. AI Usage Policy last modified 2026-02-20 (commit `c4f4325`) — **same text** that was in effect when PR #34651 was opened on 2026-03-12. No policy delta. No DCO sign-off required. |
-| 0i (CLA status for `blairducrayoppat`) | PASS_WITH_NOTE | No CLA bot status visible on PR #34651's checks page; PR has been open since 2026-03-12 (~62 days) without a CLA block surfacing. Inference: CLA is signed or the project does not gate on a CLA bot. Documented in `cla-and-ai-policy-brief.md` §1. |
+| 0i (CLA status for `blairducrayoppat`) | PASS_WITH_NOTE | No CLA bot status visible on PR #34651's checks page; PR has been open since 2026-03-12 (\~62 days) without a CLA block surfacing. Inference: CLA is signed or the project does not gate on a CLA bot. Documented in `cla-and-ai-policy-brief.md` §1. |
 
 ## 3. Task results
 

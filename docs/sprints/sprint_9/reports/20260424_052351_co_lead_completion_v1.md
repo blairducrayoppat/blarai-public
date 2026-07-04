@@ -38,7 +38,7 @@ Authored `docs/sprints/sprint_9/strategic_completion_report.md` following the DE
 - **FAIL (criterion #3)**: 12 GOV Vikunja tickets (#15–22, #24–27) remain OPEN. No EA prompt or landing-page step was wired to call `complete_task`. Remediable via a one-off operator or Co-Lead firing that walks the 12 tickets and closes them with their merge commit hashes — no content work required.
 - All 12 governance docs DELIVERED at planned paths; STYLE.md + README.md both present; GOV-MIGRATE (#123) + GOV-15 (#124) follow-up tickets open.
 
-**Sprint duration**: 2026-04-22 → 2026-04-24 (~2 calendar days, faster than SDV estimate of 1–1.5 weeks).
+**Sprint duration**: 2026-04-22 → 2026-04-24 (\~2 calendar days, faster than SDV estimate of 1–1.5 weeks).
 
 **Process wins**: parallel execution with Sprint 8 held cleanly — zero collisions, zero merge conflicts. First live run of DEC-15 parallel-sprint execution succeeded.
 

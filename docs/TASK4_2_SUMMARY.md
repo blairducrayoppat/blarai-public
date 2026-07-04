@@ -30,7 +30,7 @@ Compare two draft model candidates for speculative decoding with the Qwen3-14B I
 | Inference precision | FP16 (Xe2 default — `INFERENCE_PRECISION` invalid on this build) |
 | KV cache precision | FP16 (default) |
 | Scheduler cache size | 3 GB |
-| Context tokens | ~4,115 (with chat template) |
+| Context tokens | \~4,115 (with chat template) |
 | max_new_tokens | 128 |
 | do_sample | False |
 | temperature | 0 |
@@ -102,11 +102,11 @@ Draft-B accepts more tokens per cycle but its forward passes are slower (71.1 ms
 
 2. **Acceptance rate data is available** via `extended_perf_metrics.m_batch_sizes` when using list-input `generate([prompt], ...)`. The original harness used bare-string `generate(prompt, ...)` which silently suppressed all extended metrics — corrected in the rerun.
 
-3. **Draft-B's higher acceptance rate does not compensate for its slower forward speed.** The pruned 22L INT8_ASYM model has ~12.4% lower standalone throughput than the full 28L INT4 model, which dominates the TPS outcome.
+3. **Draft-B's higher acceptance rate does not compensate for its slower forward speed.** The pruned 22L INT8_ASYM model has \~12.4% lower standalone throughput than the full 28L INT4 model, which dominates the TPS outcome.
 
-4. **TTFT is dominated by speculative-batch streaming.** The stream callback fires only after the first draft acceptance/rejection cycle completes (~9s for Draft-A, ~13s for Draft-B). This is a structural artifact of OV GenAI speculative decoding, not a real user-perceived latency difference at steady state.
+4. **TTFT is dominated by speculative-batch streaming.** The stream callback fires only after the first draft acceptance/rejection cycle completes (\~9s for Draft-A, \~13s for Draft-B). This is a structural artifact of OV GenAI speculative decoding, not a real user-perceived latency difference at steady state.
 
-5. **RSS is within budget.** Both speculative configs peak at ~12.5–12.6 GB, well within the 15,507 MB RSS budget.
+5. **RSS is within budget.** Both speculative configs peak at \~12.5–12.6 GB, well within the 15,507 MB RSS budget.
 
 ---
 

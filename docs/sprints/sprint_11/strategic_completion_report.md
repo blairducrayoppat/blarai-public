@@ -77,7 +77,7 @@ Q1-1 per-file format used throughout (DEC-17 permanence now formal). Monolithic
   are properly tagged with `[agent:guide_11]` and `[agent:ea17]` namespaces,
   do not touch Sprint 11 deliverables, and are not Sprint 11 scope.
 - **Vikunja label-revert phenomenon** observed during EA-4 dispatch (six
-  verified SDO queue-finalize writes reverted within ~5 minutes by unknown
+  verified SDO queue-finalize writes reverted within \~5 minutes by unknown
   agent or hook). SDO escalated at `b814e22`. Identification of the reverter
   agent is a Sprint 12 carry-over (§14.1).
 - **No Anthropic / dependency / user-environment changes** affecting Sprint
@@ -109,7 +109,7 @@ demonstrated each:
   SCR design) plus two Stage 6.7.5 doc-hygiene items.
 
 **Mature-not-minimal motto held**: every deliverable shipped substantive
-content. DEC-19 at ~140 lines; EA-4 investigation report at ~360 lines; EA-2
+content. DEC-19 at \~140 lines; EA-4 investigation report at \~360 lines; EA-2
 procedure file shipped with helper script; sprint_auditor §2.2 amendment with
 4 explicit guardrails not a single-line allowance.
 
@@ -120,9 +120,9 @@ procedure file shipped with helper script; sprint_auditor §2.2 amendment with
 | 1 | DEC bundle on devplatform main (DEC-16/17/18, ≥60 lines each) | **PASS** | `devplatform/docs/decisions/DEC-16_*.md`, `DEC-17_*.md`, `DEC-18_*.md` all present at devplatform commit `0dbd4a6`; each ≥ 60 lines | EA-1 trusted_scope auto-merge `be09999` |
 | 2 | Active State refresh procedure + integration | **PASS** | `docs/runbooks/active_state_refresh.md` exists; helper script shipped; devplatform Co-Lead wake-template hook landed at `674a0a9`; CLAUDE.md §"Active State" refreshed live in this SCR commit | EA-2 trusted_scope auto-merge `cf95e4b` + devplatform direct-to-main `674a0a9` |
 | 3 | SWAGR template §5.4 cross-repo subsection | **PASS** | `docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md` §5.4 amended; SDV template §8.4 broken pointer fixed | EA-3 trusted_scope auto-merge `9464346` |
-| 4 | Test-baseline drift root-caused and reported | **PASS** | `docs/sprints/sprint_11/test_baseline_drift_investigation.md` exists (~360 lines); methodology, bisect-equivalent log, fail-closed verification, Sprint 12+ recommendation all present | EA-4 Co-Lead direct merge `3b4b645` |
+| 4 | Test-baseline drift root-caused and reported | **PASS** | `docs/sprints/sprint_11/test_baseline_drift_investigation.md` exists (\~360 lines); methodology, bisect-equivalent log, fail-closed verification, Sprint 12+ recommendation all present | EA-4 Co-Lead direct merge `3b4b645` |
 | 5 | `copilot-instructions.md:93` doctrine defect closed | **PASS** | `grep -n "DEC-15" .github/copilot-instructions.md` returns single match inside `<sprint_lifecycle_pointer>` XML element, not in narrative phrase | EA-5 Co-Lead direct merge `50af4a0` |
-| 6 | Cross-reference style asymmetry resolved (symmetric absolute paths + DEC-19) | **PASS** | `grep -n "<BlarAI>" devplatform/CLAUDE.md` returns zero matches; DEC-19 file exists on devplatform main at `2b06d79`; ~140 lines | v3 amendment scope (originally v1/v2 was "accept asymmetry, document choice"; LA-directed upgrade) |
+| 6 | Cross-reference style asymmetry resolved (symmetric absolute paths + DEC-19) | **PASS** | `grep -n "<BlarAI>" devplatform/CLAUDE.md` returns zero matches; DEC-19 file exists on devplatform main at `2b06d79`; \~140 lines | v3 amendment scope (originally v1/v2 was "accept asymmetry, document choice"; LA-directed upgrade) |
 | 7 | Stage 6.7.5 doc-hygiene batch closed (vikunja_mcp README + Sprint Auditor §2.2) | **PASS** | `tools/vikunja_mcp/README.md` Quick Start uses absolute devplatform paths; `sprint_auditor.md` §2.2 has NARROW EXCEPTION clause with 4 guardrails | EA-5 devplatform commit `2b06d79` |
 
 **Aggregate**: 7/7 PASS, 0 PARTIAL, 0 FAIL, 0 MOOT.
@@ -154,7 +154,7 @@ rationalization (UU #316) — all untouched.
 
 | Item | Justification | Size | Merge commit |
 |---|---|---|---|
-| DEC-19 cross-reference style convention | v3 SDV amendment (LA-directed: "mature not minimal — feel free to improve and iterate"); upgraded the EA-5 cross-reference style sub-deliverable from "accept asymmetry, document choice" (v1/v2) to "symmetric expansion + formalize convention" | ~140-line DEC + 13 token substitutions | `2b06d79` (devplatform) |
+| DEC-19 cross-reference style convention | v3 SDV amendment (LA-directed: "mature not minimal — feel free to improve and iterate"); upgraded the EA-5 cross-reference style sub-deliverable from "accept asymmetry, document choice" (v1/v2) to "symmetric expansion + formalize convention" | \~140-line DEC + 13 token substitutions | `2b06d79` (devplatform) |
 | Stale Vikunja #398 closure (Sprint 10 EA-2 duplicate gate) | Pre-EA-5 housekeeping; closed during Phase 4 of kickoff to remove false-positive surface from monitoring loop | 1 Vikunja comment + label swap | n/a (Vikunja-only) |
 
 These are within-scope-with-LA-direction additions, not scope-expansion drift.
@@ -173,7 +173,7 @@ These are within-scope-with-LA-direction additions, not scope-expansion drift.
   proceed. Sprint 12 carry-over (§14.1).
 - **Vikunja label-revert phenomenon** during EA-4 dispatch — SDO authored
   six verified queue-finalize commits, each removing `Gate:Pending-Execution`
-  → applying `Gate:Pending-SDO`; each was reverted within ~5 minutes by
+  → applying `Gate:Pending-SDO`; each was reverted within \~5 minutes by
   unknown agent. SDO escalated at `b814e22` after the sixth attempt. Co-Lead
   bypassed the fleet and executed EA-4 directly. Sprint 12 carry-over
   (§14.1). Identifying the reverter is a process-investigation work item.
@@ -197,7 +197,7 @@ These are within-scope-with-LA-direction additions, not scope-expansion drift.
 | 6. Co-Lead wake-template hook | `devplatform/docs/scheduled/wake_templates/co_lead_architect.md` (amend) | same; amendment present at `674a0a9` | delivered |
 | 7. SWAGR template §5.4 cross-repo subsection | `BlarAI/docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md` (amend) | same | delivered |
 | 8. SDV template §8.4 broken-pointer fix | `BlarAI/docs/sprints/_templates/strategic_design_vision_template.md` (amend) | same | delivered |
-| 9. Test-baseline drift investigation report | `BlarAI/docs/sprints/sprint_11/test_baseline_drift_investigation.md` | same (~360 lines, well above the 80-line floor) | delivered |
+| 9. Test-baseline drift investigation report | `BlarAI/docs/sprints/sprint_11/test_baseline_drift_investigation.md` | same (\~360 lines, well above the 80-line floor) | delivered |
 | 10. `copilot-instructions.md:93` fix | `BlarAI/.github/copilot-instructions.md` | same | delivered |
 | 11. DEC-19 cross-reference style decision (v3 amendment) | `devplatform/docs/decisions/DEC-19_*.md` | same | delivered |
 | 11b. devplatform CLAUDE.md token expansion (v3 amendment) | `devplatform/CLAUDE.md` | 13 token expansions in place | delivered |
@@ -308,7 +308,7 @@ transition completed during the kickoff session.
    same tracking task. The fleet stalled after EA-1 merged; EA-2 was misclassified
    as Case F. Manual unblock required.
 2. **Vikunja label-revert phenomenon** — surprise. During EA-4 dispatch, SDO
-   authored six verified queue-finalize commits, each reverting within ~5
+   authored six verified queue-finalize commits, each reverting within \~5
    minutes by an unidentified background agent or hook. SDO escalated at
    `b814e22`. The reverter has not been identified.
 3. **OpenVINO contribution workstream concurrence** — surprise (but mild).
@@ -342,10 +342,10 @@ transition completed during the kickoff session.
 
 | Role | SDV-budgeted | Actual | Delta |
 |---|---|---|---|
-| LA | ~20-30 min | ~45 min (kickoff session + v2 amendment + v3 amendment + cross-reference style call confirmation + ongoing-sprint check-in on wake-up + delegation of mid-sprint fleet bypass authority) | Marginally over due to fleet-bug surface area; the no-stopping directive + delegation kept the LA from being woken |
-| Co-Lead | Autonomous | ~12 firings (kickoff + v2 amendment + v3 amendment + 5 EA peer reviews + 2 EA-4 + EA-5 direct executions + this SCR firing) | Heavier than budgeted due to the fleet-bypass on EA-4 + EA-5; direct execution preserved deliverable schedule at the cost of Co-Lead session time |
-| SDO | Autonomous | ~10 firings (3 EA-prompt authorings + 6 queue-finalize retries on EA-4 + 1 escalation report) | Heavier than budgeted due to EA-4 label-revert phenomenon |
-| EA Code | Autonomous | ~8 firings (3 successful Case A + Case C cycles for EA-1/2/3 + multiple Case A re-fires for EA-4 that all looped) | Inefficient: 2 of 5 EAs (40%) executed via Co-Lead bypass rather than EA Code, indicating fleet-mechanism limitations under stress |
+| LA | \~20-30 min | \~45 min (kickoff session + v2 amendment + v3 amendment + cross-reference style call confirmation + ongoing-sprint check-in on wake-up + delegation of mid-sprint fleet bypass authority) | Marginally over due to fleet-bug surface area; the no-stopping directive + delegation kept the LA from being woken |
+| Co-Lead | Autonomous | \~12 firings (kickoff + v2 amendment + v3 amendment + 5 EA peer reviews + 2 EA-4 + EA-5 direct executions + this SCR firing) | Heavier than budgeted due to the fleet-bypass on EA-4 + EA-5; direct execution preserved deliverable schedule at the cost of Co-Lead session time |
+| SDO | Autonomous | \~10 firings (3 EA-prompt authorings + 6 queue-finalize retries on EA-4 + 1 escalation report) | Heavier than budgeted due to EA-4 label-revert phenomenon |
+| EA Code | Autonomous | \~8 firings (3 successful Case A + Case C cycles for EA-1/2/3 + multiple Case A re-fires for EA-4 that all looped) | Inefficient: 2 of 5 EAs (40%) executed via Co-Lead bypass rather than EA Code, indicating fleet-mechanism limitations under stress |
 | Sprint Auditor | n/a | n/a (runs post-SCR; SWAGR pending) | Will fire on next cadence |
 
 ## 12. Duration
@@ -353,10 +353,10 @@ transition completed during the kickoff session.
 - Planned target (SDV §12 v3): 2-4 fleet-days from fleet unpause to SCR.
 - Actual: **2026-05-11T21:00 SDV sign-off → 2026-05-12T10:30 SCR authoring** —
   approximately **14 hours end-to-end (overnight + morning)**. Most LA-active
-  work occurred at sprint kickoff (~30 min) and at wake-up + monitoring
-  redirect (~15 min). Co-Lead direct execution of EA-4 + EA-5 added ~2 hours
+  work occurred at sprint kickoff (\~30 min) and at wake-up + monitoring
+  redirect (\~15 min). Co-Lead direct execution of EA-4 + EA-5 added \~2 hours
   of substantive content authoring vs the autonomous-fleet path that would
-  have taken ~30-60 min if it had worked.
+  have taken \~30-60 min if it had worked.
 - Variance: came in slightly under the lower bound of the planned 2-4 day
   range, BUT the path was non-canonical (Co-Lead bypass for 40% of EAs).
   The fleet's failure mode under within-sprint parallelism prevented the
@@ -402,7 +402,7 @@ All 4 DECs landed on devplatform main (`0dbd4a6` EA-1 + `2b06d79` EA-5).
 | Item | Priority | Proposed resolution path |
 |---|---|---|
 | **Fleet bug — within-sprint parallel EA state-machine misclassification** | **HIGH** | Sprint 12 candidate work: add `ea_number` disambiguation to EA Code wake-template state-machine (Case A / Case B / etc. classification keyed on `(task_id, ea_number)` pair), OR adopt per-EA tracking sub-tasks for parallel windows. Either approach unblocks future within-sprint parallel sprints. Sprint 11 v2 SDV amendment authorized parallelism but the fleet wasn't actually ready; the workaround (manual unblock) does not scale. |
-| **Fleet bug — Vikunja label-revert phenomenon on tracking task #410** | **HIGH** | Sprint 12 candidate work: identify the reverting agent or hook. Inspect: Gate Stale Cleaner (cron-scheduled), Escalation Watchdog (5-min cron), Toast Watchdog, Fleet Reports automation, any background reconciler. Six independent SDO writes were verified-then-reverted with ~5 min cadence — strongly suggesting a 5-min cron-scheduled task that re-applies labels based on a stale state. After identification: either scope-correct the offender to exclude active sprint tracking tasks OR disable the reverter loop. |
+| **Fleet bug — Vikunja label-revert phenomenon on tracking task #410** | **HIGH** | Sprint 12 candidate work: identify the reverting agent or hook. Inspect: Gate Stale Cleaner (cron-scheduled), Escalation Watchdog (5-min cron), Toast Watchdog, Fleet Reports automation, any background reconciler. Six independent SDO writes were verified-then-reverted with \~5 min cadence — strongly suggesting a 5-min cron-scheduled task that re-applies labels based on a stale state. After identification: either scope-correct the offender to exclude active sprint tracking tasks OR disable the reverter loop. |
 | **Sprint 12+ baseline-string convention** | MEDIUM | Adopt `{commit, environment, date}` triple per EA-4 §6 recommendation. Each SDV anchors the baseline against a triple, not a count. Future SWAGR auditors compare against the triple and immediately decompose source-vs-environment-attributed movement. |
 | **Within-sprint parallel — formal ratification or revert** | LOW-MED | If the §14.1 #1 fix lands cleanly in Sprint 12, ratify within-sprint parallel as a formal pattern via a new micro-DEC (DEC-20?). If the fix proves harder than expected, revert to serial-only within-sprint and document the tradeoff. Either way, do not run another within-sprint-parallel sprint without addressing the state-machine bug first. |
 | **`tools/vikunja_mcp/` migration** | LOW | Per Sprint 10 §5.2 #8, the MCP server stays in BlarAI for now. **Correction noted during Sprint 11 EA-5**: vikunja_mcp actually IS on devplatform now (`devplatform/tools/vikunja_mcp/`), discovered when fixing the Quick Start README. The Sprint 10 SDV §5.2 #8 wording was stale at SDV time. No further migration work needed. |
@@ -441,7 +441,7 @@ All 4 DECs landed on devplatform main (`0dbd4a6` EA-1 + `2b06d79` EA-5).
   autonomous fleet chain.
 - **Mature-not-minimal motto translated into concrete content density**
   per the DEC ≥ 60-line floor and the investigation report ≥ 80-line floor.
-  Sprint 11's DECs averaged ~120 lines and the investigation report at ~360
+  Sprint 11's DECs averaged \~120 lines and the investigation report at \~360
   lines. The motto consistently produces substantive artifacts rather than
   marker-style closures.
 - **Within-sprint parallelism is a higher-friction pattern than
@@ -450,7 +450,7 @@ All 4 DECs landed on devplatform main (`0dbd4a6` EA-1 + `2b06d79` EA-5).
   requires state-machine disambiguation that the current fleet does not
   provide. Sprint 12 should treat these as distinct patterns and not
   conflate them.
-- **DEC-13 disk reports + Fleet Reports tasks** produced ~12 disk reports
+- **DEC-13 disk reports + Fleet Reports tasks** produced \~12 disk reports
   for Sprint 11 (covering EA-1 through EA-3 normal cadence; EA-4 + EA-5
   bypass paths produced fewer DEC-13 reports because Co-Lead's
   direct-execution path skips the per-phase emission and goes straight to

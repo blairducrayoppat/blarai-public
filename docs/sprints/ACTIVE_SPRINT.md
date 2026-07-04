@@ -77,7 +77,7 @@ Two fleet-mechanism bugs surfaced during EA-4 dispatch; both are HIGH-priority S
 | Carry-over | Description | Sprint 12 candidate work |
 |---|---|---|
 | 1 | Within-sprint parallel EA + multi-EA-on-same-tracking-task state-machine misclassification | Add `ea_number` disambiguation to EA Code wake-template state-machine OR adopt per-EA tracking sub-tasks for parallel windows |
-| 2 | Vikunja label-revert phenomenon on tracking task #410 (six independent SDO writes reverted within ~5 min) | Identify the reverter agent or hook; scope-correct or disable |
+| 2 | Vikunja label-revert phenomenon on tracking task #410 (six independent SDO writes reverted within \~5 min) | Identify the reverter agent or hook; scope-correct or disable |
 
 Plus the Sprint 12+ baseline-string convention recommendation from EA-4 §6: adopt `{commit, environment, date}` triple instead of raw count.
 
@@ -111,7 +111,7 @@ SWAGR verdict: `ACCEPTABLE_ALIGNMENT` / `INCREMENTAL` / `IMPROVED`. 7/7 SDV crit
 
 | Sprint 10 SWAGR gap | Sprint 11 EA |
 |---|---|
-| #1 Active State baseline drift (~981 vs live 1001) | EA-2 + EA-4 |
+| #1 Active State baseline drift (\~981 vs live 1001) | EA-2 + EA-4 |
 | #2 copilot-instructions.md:93 narrative DEC-15 reference | EA-5 |
 | #3 Cross-reference style asymmetry BlarAI vs devplatform | EA-5 |
 | #4 SOP verification path (transparent; no action) | — (acknowledged, no Sprint 11 action) |

@@ -21,8 +21,8 @@ canonical 9-Use-Case vision at the Lead Architect's direction (image generation 
 an "honest future track" in ADR-015 / journal §19).
 
 The Phase-0 memory spike (build-or-no-build gate) PASSED on the real Arc 140V before
-the build: 14B core + ~3k KV-cache + SDXL INT8 co-resident + a 1024² generate peaked
-~26.0 GB vs the 31.323 GB ceiling (5.3 GB headroom); SDXL load 18.7 s; 1024² generate
+the build: 14B core + \~3k KV-cache + SDXL INT8 co-resident + a 1024² generate peaked
+\~26.0 GB vs the 31.323 GB ceiling (5.3 GB headroom); SDXL load 18.7 s; 1024² generate
 10.7 s. The budget closes with the 14B held resident, so the "14B never evicted"
 invariant holds and the build proceeded.
 

@@ -27,7 +27,7 @@ validate this assumption.
 |---|---|---|
 | Raw Physical (spec) | 32,768 MB (32 GB) | Architecture baseline |
 | OS-Visible via WMI | 32,075.2 MB (31.323 GB) | `Win32_ComputerSystem.TotalPhysicalMemory` |
-| Total Firmware Reservation | **692.8 MB (~693 MB)** | 32,768 − 32,075.2 |
+| Total Firmware Reservation | **692.8 MB (\~693 MB)** | 32,768 − 32,075.2 |
 | Intel iGPU AdapterRAM (WMI) | 2,048 MB | `Win32_VideoController.AdapterRAM` |
 | Registry DVMT values | `null` (not exposed) | Display adapter class registry |
 | BIOS DVMT registry split | Not determinable | Intel driver does not publish discrete DVMT value |

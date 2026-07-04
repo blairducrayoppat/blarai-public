@@ -73,7 +73,7 @@ Extend the Sprint 8 test suite to cover coverage gaps in `shared/` and `launcher
 
 ### A. MILESTONE OBJECTIVE (my words)
 
-I will harden the Sprint 8 test baseline by authoring ≥ 20 new tests that cover the gaps SDO identified in `shared/src/runtime_config.py`, `shared/schemas/car.py`, `shared/src/ipc_types.py`, `launcher/guest_deploy.py`, `launcher/__main__.py`, and `launcher/vm_manager.py`. Coverage is organized into 11 work items yielding ~42 tests if every branch is covered — the 20-test floor is a minimum, not a ceiling. All tests are unit-level with mocked transport, subprocess, and ctypes calls; zero real vsock connections, zero production-code edits. Deliverables commit to `feature/p5-task8-ea4-shared-launcher-hardening` with a per-file ledger entry.
+I will harden the Sprint 8 test baseline by authoring ≥ 20 new tests that cover the gaps SDO identified in `shared/src/runtime_config.py`, `shared/schemas/car.py`, `shared/src/ipc_types.py`, `launcher/guest_deploy.py`, `launcher/__main__.py`, and `launcher/vm_manager.py`. Coverage is organized into 11 work items yielding \~42 tests if every branch is covered — the 20-test floor is a minimum, not a ceiling. All tests are unit-level with mocked transport, subprocess, and ctypes calls; zero real vsock connections, zero production-code edits. Deliverables commit to `feature/p5-task8-ea4-shared-launcher-hardening` with a per-file ledger entry.
 
 ### B. WORK ITEMS
 
@@ -129,7 +129,7 @@ I will harden the Sprint 8 test baseline by authoring ≥ 20 new tests that cove
 | `shared/tests/test_car.py` | `TestEnums` | 3 |
 | `shared/tests/test_ipc_message_types.py` | (6 encoder tests) | 6 |
 
-**Total new tests**: ~45 (20-test floor cleared with substantial margin).
+**Total new tests**: \~45 (20-test floor cleared with substantial margin).
 
 **Ledger path**: `docs/ledger/<YYYYMMDD_HHMMSS>_sprint8_ea4_shared-launcher-hardening.md`
 
@@ -161,7 +161,7 @@ Expected output: **EMPTY**. Any path matching `shared/src/`, `services/*/src/`, 
 ### H. QUALITY GATE FLOOR
 
 - **Full-suite floor**: **982 passed, 2 skipped** (962 baseline + 20 new-test minimum).
-- **New-test minimum**: **20** (the WI decomposition yields ~42; the floor is a minimum).
+- **New-test minimum**: **20** (the WI decomposition yields \~42; the floor is a minimum).
 
 ### I. RISKS AND AMBIGUITIES (addressing I.1–I.8)
 
@@ -172,7 +172,7 @@ Expected output: **EMPTY**. Any path matching `shared/src/`, `services/*/src/`, 
 - **I.5** `__main__` import side effects (WI-7/8): patch `sys.argv = ["__main__"]` pre-import; mock `signal.signal` if needed; mirror existing `test_main.py` pattern.
 - **I.6** cleanup globals (WI-8): `monkeypatch.setattr(main_module, "_pa_service", mock_service)` pattern; identify exact global names from source.
 - **I.7** ctypes Windows-only (WI-9): mock at `ctypes.windll.shell32.ShellExecuteW` or the wrapper; do NOT import `ctypes.windll` in test body.
-- **I.8** EA-4 sizing: ~45 tests planned; 20-floor cleared with margin; "mature not minimal" honored.
+- **I.8** EA-4 sizing: \~45 tests planned; 20-floor cleared with margin; "mature not minimal" honored.
 
 ### J. PRODUCTION CODE PROHIBITION ACKNOWLEDGMENT
 

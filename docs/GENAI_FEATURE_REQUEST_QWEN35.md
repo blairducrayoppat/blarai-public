@@ -157,8 +157,8 @@ Full GPU inference requires #34532 to be resolved.
 
 Verified testing platform: **Intel Core Ultra 7 258V (Lunar Lake), Arc 140V (Xe2, 16 GB iGPU)**
 
-- Qwen3.5-0.8B at FP16: ~1.6 GB — fits comfortably
-- Qwen3.5-9B at INT4: ~5–6 GB — fits after quantization
+- Qwen3.5-0.8B at FP16: \~1.6 GB — fits comfortably
+- Qwen3.5-9B at INT4: \~5–6 GB — fits after quantization
 
 The ScatterUpdate GPU blocker was reproduced on this hardware in
 [openvino#34532](https://github.com/openvinotoolkit/openvino/issues/34532),

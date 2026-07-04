@@ -11,7 +11,7 @@ This is the honest, running record of building BlarAI: what I set out to do, wha
 
 **Moved to [`LESSONS.md`](LESSONS.md)** (2026-07-03, at 195 lessons). The
 distilled, numbered list — the compounding portfolio surface — now lives in its
-own file, led by a curated **Canonical Tier**: the ~20 classes a reader should
+own file, led by a curated **Canonical Tier**: the \~20 classes a reader should
 read first. Mechanical, environment-specific gotchas live in
 [`FIELD_NOTES.md`](FIELD_NOTES.md). Lesson numbers are stable and permanent —
 every `lesson N` reference in the entries below resolves against `LESSONS.md`.
@@ -107,9 +107,9 @@ It did, and the re-run is the part worth keeping. The agent cooled the GPU, ran 
 
 The clean numbers, taken from the early un-throttled passes, changed the answer. Overnight the agent had reported the two candidate draft models as "the same speed." They are not: on explanatory prompts they tie, but on a short factual question the full draft is about 20% faster. Not nothing.
 
-The overnight report had also framed a hard trade-off — *faster, or streaming; pick one* — and that turned out to be a false choice. Whether BlarAI streams its answer or delivers it all at once depends on *which draft model* it runs. The full draft does not stream. The smaller, pruned draft does. So the real decision was not speed versus streaming. It was: take the pruned draft and get *both* speculative decoding and live streaming, at the cost of ~20% on some prompts — or take the full draft, ~20% faster on those, and lose streaming entirely.
+The overnight report had also framed a hard trade-off — *faster, or streaming; pick one* — and that turned out to be a false choice. Whether BlarAI streams its answer or delivers it all at once depends on *which draft model* it runs. The full draft does not stream. The smaller, pruned draft does. So the real decision was not speed versus streaming. It was: take the pruned draft and get *both* speculative decoding and live streaming, at the cost of \~20% on some prompts — or take the full draft, \~20% faster on those, and lose streaming entirely.
 
-I chose the pruned draft, because the ~20% is mostly invisible and the streaming is felt on every reply. Both drafts already generate faster than I can read; once the first token appears — under a second — the model stays ahead of my eyes, so the throughput gap rarely surfaces as real waiting. Losing streaming, by contrast, means watching nothing happen for the whole generation and then having a wall of text land at once. For something I talk to, the responsive one wins. And it is a one-line setting — reversible the moment I think otherwise.
+I chose the pruned draft, because the \~20% is mostly invisible and the streaming is felt on every reply. Both drafts already generate faster than I can read; once the first token appears — under a second — the model stays ahead of my eyes, so the throughput gap rarely surfaces as real waiting. Losing streaming, by contrast, means watching nothing happen for the whole generation and then having a wall of text land at once. For something I talk to, the responsive one wins. And it is a one-line setting — reversible the moment I think otherwise.
 
 Two smaller things landed with it. The benchmark gained a per-run cooldown option, so the next sustained measurement can finally be thermally clean — the instrument fixed a second time, for the hole the first fix missed. And the document-reading feature, the `/load` branch, had tonight's whole engine improvement merged into it, so when I try `/load` it runs on the fast, streaming BlarAI rather than last night's slower one. The prompt-injection gap on that branch is unchanged: it is for experimenting with documents I trust, and it stays off the main line until the injection defence exists.
 
@@ -319,7 +319,7 @@ Blair said *autonomously develop this project for me now*. So this entry covers 
 
 **End-to-end PDF integration test** (USE-CASE-003 + USE-CASE-002 + USE-CASE-004 verification). The PDF support that landed in the previous entry was exercised by unit tests per layer — pypdf-extraction, AO grounded-context wiring, gateway document-staging — but nothing exercised the *combination*. The new `tests/integration/test_pdf_load_e2e.py` synthesises a real PDF via `pypdf.PdfWriter` in a temp `userdata/`, calls `load_document()` to extract the text, encodes a real `PROMPT_REQUEST` carrying the document, runs it through `AssistantOrchestratorService._handle_connection`, and asserts the AO's `ContextManager` has exactly one grounded chunk wrapped in the spotlighting delimiters with a `<|DOC-XXXXXXXX|>` datamarking prefix and the PDF's actual text inside (*"Hemoglobin"*, *"J. Doe"*). This is the test that catches silent regressions in any of those five layers — pypdf install, extension routing, extraction guards, IPC field plumbing, AO grounded-chunk wiring — and proves they compose. It also satisfies Blair's instruction to generate test PDFs autonomously rather than waiting for him to drop real files in.
 
-**Paste support** (USE-CASE-004 UX, a journal `Next:` hint open for three sessions now). The Textual `Input` widget has a built-in paste action, but in some terminals Ctrl+V is intercepted by the terminal itself and Textual never sees the keystroke. So `pyperclip` is now installed (~30 KB, pure Python, OS-clipboard wrapper), and `BlarAIApp.BINDINGS` gains an explicit `Binding(KEY_PASTE, "paste_clipboard", "Paste", show=False, priority=True)`. The new `action_paste_clipboard` reads the OS clipboard, caps the text at `PROMPT_MAX_CHARS` so a huge paste cannot lock the UI, and uses `Input.insert_text_at_cursor` to drop it at the cursor. Failure paths — pyperclip not installed, clipboard-read raises — surface as red lines in the response area rather than crashing the TUI. Five new tests cover the happy path, empty-clipboard silent no-op, oversize truncation, clipboard-read-error surfacing, and the "pyperclip missing" install-hint path. The existing `test_bindings_registered` count moved 5 → 6.
+**Paste support** (USE-CASE-004 UX, a journal `Next:` hint open for three sessions now). The Textual `Input` widget has a built-in paste action, but in some terminals Ctrl+V is intercepted by the terminal itself and Textual never sees the keystroke. So `pyperclip` is now installed (\~30 KB, pure Python, OS-clipboard wrapper), and `BlarAIApp.BINDINGS` gains an explicit `Binding(KEY_PASTE, "paste_clipboard", "Paste", show=False, priority=True)`. The new `action_paste_clipboard` reads the OS clipboard, caps the text at `PROMPT_MAX_CHARS` so a huge paste cannot lock the UI, and uses `Input.insert_text_at_cursor` to drop it at the cursor. Failure paths — pyperclip not installed, clipboard-read raises — surface as red lines in the response area rather than crashing the TUI. Five new tests cover the happy path, empty-clipboard silent no-op, oversize truncation, clipboard-read-error surfacing, and the "pyperclip missing" install-hint path. The existing `test_bindings_registered` count moved 5 → 6.
 
 A pattern in this push is worth naming. None of these four changes needed a feature branch. Each one is bounded — small in lines, focused in surface, fully tested before commit — and each adds a single visible capability to a system Blair is supposed to be using daily. Layer 3 was a security architecture that grew until it was bigger than the product it was protecting; *this* is what the "smallest thing that genuinely runs, grown one observed need at a time" working principle from the top of this file actually looks like, repeated four times in a row. The autonomous-shipping run is the apology for the previous arc and the answer to *develop BlarAI for me now*. Each of the four is real, real-shipped-on-main, and ready to use on the next BlarAI restart. *(commit `<this>`: 4 tools + args support + 21 tests; `/ls` + 5 tests; PDF integration test; paste support + pyperclip dep + 5 tests; pgov tool allowlist + AO system prompt + bindings-count test updates.)*
 
@@ -543,7 +543,7 @@ The lesson I am taking from it is the one that surprised me. Least privilege is 
 
 The ticket came pre-framed. #545 had killed the idea of caching the 14B's GPU compile — a 9 GB blob that reads back from cold disk no faster than it recompiles — and the handoff pointed at Whisper as "the real startup lever": a much smaller blob, so the cache math might finally come out ahead. The instinct was to go straight at it. The discipline was to profile the whole boot first, and the whole boot told a different story than the part I'd been handed.
 
-I pulled the per-step timings out of the launcher's own log across two consecutive boots and added them up. Of the ~26 seconds from the admin check to the window launching, the 14B+draft GPU compile is **thirteen and a half of them — 53%**. Everything else is small beside it: the VM start a second, the Policy Agent gate under four, the Assistant Orchestrator about four and a half, and the entire voice engine — Whisper *and* Kokoro together — just 2.6 seconds, about a tenth of boot. The lever the handoff pointed me at moves a tenth of the thing; the one that matters is the 14B, and that one is already settled. This is lesson fourteen again, its quieter half: a handoff is a map of what the predecessor believed, and "Whisper is the real lever" was a belief that did not survive being measured against the whole.
+I pulled the per-step timings out of the launcher's own log across two consecutive boots and added them up. Of the \~26 seconds from the admin check to the window launching, the 14B+draft GPU compile is **thirteen and a half of them — 53%**. Everything else is small beside it: the VM start a second, the Policy Agent gate under four, the Assistant Orchestrator about four and a half, and the entire voice engine — Whisper *and* Kokoro together — just 2.6 seconds, about a tenth of boot. The lever the handoff pointed me at moves a tenth of the thing; the one that matters is the 14B, and that one is already settled. This is lesson fourteen again, its quieter half: a handoff is a map of what the predecessor believed, and "Whisper is the real lever" was a belief that did not survive being measured against the whole.
 
 I measured the Whisper cache anyway, because the ticket asked and because "probably minor" is not a number. Five fresh processes, the only variable the cache directory. It does, unlike the 14B, come out *slightly* ahead: a fresh compile is 1.72 s, a warm cache read 0.75 s, and even after paying the 0.29 s to integrity-hash the half-gigabyte blob — the cost #545 taught me to always count — the warm path totals about 1.04 s, a net saving of roughly two-thirds of a second. Real, positive, and almost entirely beside the point: two-thirds of a second on a twenty-six-second boot, bought with a permanent 496 MB on disk that must be torn down and rebuilt every time OpenVINO or the driver or the model moves. And there's a hole I couldn't close: my probe's transcription step failed on the synthetic audio I fed it, so I never verified that the *cached* compile produces the same transcript as a fresh one. #545's whole point was that you don't trust a cache until you've proven it byte-identical to the real thing; I can't make that claim for Whisper. So the decision writes itself, and it rhymes with #545: keep the cache off — not because caching can't help here, but because the help is imperceptible, unverified, and carries a standing maintenance cost. The path is left open for a future where boot speed actually matters and the identity check is done first.
 
@@ -645,15 +645,15 @@ The LA also asked the sharp question while I worked: why not run the VLM *in the
 
 What I can prove from here is green: the loader stages images without reading a pixel and never calls the VLM on attach; the AO formulates, tasks, and datamarks on demand, with the bare-question skip and the Fail-Soft both pinned; the blast-radius sweep holds at 844 passed, 2 skipped. What I cannot prove from here is the only thing that counts — a real photo, attached instantly, answered relevantly in the flow of a real conversation, with voice and chat never queuing behind it. That is the User-Operator's live-verify, and it is the proof this entry is waiting on.
 
-**Next:** live-verify on the real boot (attach instant; ask-in-context relevant + fast; nothing freezes); then the co-residency memory question (VLM ~5 GB + 14B ~8.7 GB on the 31.3 GB ceiling) on the #550 / load-on-demand-eviction track, and the image-isolation hardening (#562 / ADR-022) when the network-facing track opens. *(commit `<this>`: lazy image attach (`document_loader` stashes path + `pending_vision`); AO-side `_ground_pending_image`/`_formulate_vision_query` (formulate → VL → datamarked ground; bare-question skip; Fail-Soft); framer carries image fields; ADR-015 amended; ADR-022 + #562 filed; lesson 26; blast-radius 844/2.)*
+**Next:** live-verify on the real boot (attach instant; ask-in-context relevant + fast; nothing freezes); then the co-residency memory question (VLM \~5 GB + 14B \~8.7 GB on the 31.3 GB ceiling) on the #550 / load-on-demand-eviction track, and the image-isolation hardening (#562 / ADR-022) when the network-facing track opens. *(commit `<this>`: lazy image attach (`document_loader` stashes path + `pending_vision`); AO-side `_ground_pending_image`/`_formulate_vision_query` (formulate → VL → datamarked ground; bare-question skip; Fail-Soft); framer carries image fields; ADR-015 amended; ADR-022 + #562 filed; lesson 26; blast-radius 844/2.)*
 
 ### 2026-06-04 — The deferred problem came due, wearing another bug's face
 
 The live boot gave mixed results: one session described a photo correctly, another threw "validation errors," and the machine froze at 100% memory. Two of those three were the same fault, and the third was the cause of the first two. The log told the whole story, as it always does. The "validation errors" were not validation at all: the launcher log showed `vsock ERROR: Receive failed: timed out` at almost exactly 120 seconds into each vision turn, followed by `get_pgov_result: not in cache (default deny)`. The gateway waits 120 s for the orchestrator's first frame; when a vision turn took longer, the receive timed out and the fail-closed default — deny when there is no validated result — kicked in. That is the *correct* safety posture, but it surfaced to Blair as a "validation error," naming the policy subsystem for what was really resource exhaustion. The proof it was disguise and not policy: the orchestrator kept working *95 seconds after the gateway gave up*, ingesting the document into the substrate at 08:28:34 for a turn the gateway had already denied at 08:26:53. The work succeeded; the answer just arrived after the door had closed.
 
-Why so slow? The memory freeze and the timeouts were one root cause. The vision MVP loaded the VLM once and cached it in a module global forever — `_pipe`, never freed. The Arc 140V is an integrated GPU with no separate VRAM, so that ~5 GB lives in the same 32 GB system RAM as the always-resident 14B (~8.7 GB), the draft, the 3 GB KV-cache, Whisper, the 54-voice Kokoro bank, two ONNX embedders, and a 2 GB Hyper-V VM that boots even in host mode. Over a multimodal session the never-freed VLM was the swing factor that pushed RAM to saturation; once Windows started swapping, every inference crawled, and a vision turn that should take ~50 s stretched past the 120 s timeout. The single correct early session was a *bare* "Who is this?" — three words, so the formulation pass was skipped (lesson 26) and the turn finished in 50 s before pressure built. The two that failed were formulated queries later in a longer session, by which point the cached VLM had been resident long enough to starve the machine.
+Why so slow? The memory freeze and the timeouts were one root cause. The vision MVP loaded the VLM once and cached it in a module global forever — `_pipe`, never freed. The Arc 140V is an integrated GPU with no separate VRAM, so that \~5 GB lives in the same 32 GB system RAM as the always-resident 14B (\~8.7 GB), the draft, the 3 GB KV-cache, Whisper, the 54-voice Kokoro bank, two ONNX embedders, and a 2 GB Hyper-V VM that boots even in host mode. Over a multimodal session the never-freed VLM was the swing factor that pushed RAM to saturation; once Windows started swapping, every inference crawled, and a vision turn that should take \~50 s stretched past the 120 s timeout. The single correct early session was a *bare* "Who is this?" — three words, so the formulation pass was skipped (lesson 26) and the turn finished in 50 s before pressure built. The two that failed were formulated queries later in a longer session, by which point the cached VLM had been resident long enough to starve the machine.
 
-The fix matches the diagnosis on both axes. Free the memory: `vlm.unload()` resets the cached pipe under its lock (and `_load_failed`, or the next image would never reload), then forces a `gc.collect()` — the codebase's proven OpenVINO-release pattern, since GenAI exposes no explicit `.release()`. The orchestrator calls it in a `finally` immediately after `describe_image`, so the ~5 GB is reclaimed *before* the final answer generation rather than lingering for the session — the co-resident peak now lasts only the describe window, and the next image re-loads on demand (~12-16 s, an acceptable price against a frozen host). And give the legitimate work room: the prompt timeout went 120 → 180 s, because a vision turn honestly chains a model load and up to two 14B generations, and a fail-closed deny should fire on a true hang, not on a turn that is merely long. The memory fix is the cure; the timeout is the headroom so the cure has time to work.
+The fix matches the diagnosis on both axes. Free the memory: `vlm.unload()` resets the cached pipe under its lock (and `_load_failed`, or the next image would never reload), then forces a `gc.collect()` — the codebase's proven OpenVINO-release pattern, since GenAI exposes no explicit `.release()`. The orchestrator calls it in a `finally` immediately after `describe_image`, so the \~5 GB is reclaimed *before* the final answer generation rather than lingering for the session — the co-resident peak now lasts only the describe window, and the next image re-loads on demand (\~12-16 s, an acceptable price against a frozen host). And give the legitimate work room: the prompt timeout went 120 → 180 s, because a vision turn honestly chains a model load and up to two 14B generations, and a fail-closed deny should fire on a true hang, not on a turn that is merely long. The memory fix is the cure; the timeout is the headroom so the cure has time to work.
 
 The part worth keeping for the portfolio is the masking. A fail-closed default is the right call — deny when you cannot validate — but it is a liability if it cannot say *why* it closed. "Denied by policy" and "denied because nothing answered in time" are different failures with different owners, and collapsing them into one user-visible "validation error" sends you (and Blair) debugging the PGOV validator when the real culprit is a 5 GB allocation that was never freed three layers away. The log distinguished them honestly (`default deny` vs `PGOV DENIED — N violations`); the surface did not. I deferred the co-residency problem in ADR-015 with eyes open, calling it the "open hard problem," but I deferred it *without bounding it* — and an unbounded deferred risk does not wait politely; it comes due as a hard freeze, not a graceful degrade.
 
@@ -798,15 +798,15 @@ The one pre-existing failure I hit: `tools/tests/` has four test files that impo
 
 ### 2026-06-04 — The first-prompt tax the 14B had already paid
 
-Two Substrate questions, running in parallel with a separate security session: benchmark what the Personal Knowledge Substrate (USE-CASE-002) costs at startup and per prompt (#542), and chase down a reported ~5–8 second "embedder first-prompt latency tax" (#553). The brief came with a real puzzle attached. The boot-attribution work from the day before (the 2026-06-03 "profiling the whole before caching the part" entry, #546) had clocked the Assistant Orchestrator's own boot slice at 4.6 seconds — *shorter* than the embedder's standalone 5–8 second load. The natural reading was that the embedder can't be loading during boot, so it must load lazily on the first prompt. But the code says the opposite: `_build_substrate()` runs synchronously inside `start()`, before the serve loop, and it calls the leakage detector's `load_model()` then and there. Static reading said boot; the boot number said not-boot. The instruction was the right one — pin it down empirically, because that one fact decides both tickets.
+Two Substrate questions, running in parallel with a separate security session: benchmark what the Personal Knowledge Substrate (USE-CASE-002) costs at startup and per prompt (#542), and chase down a reported \~5–8 second "embedder first-prompt latency tax" (#553). The brief came with a real puzzle attached. The boot-attribution work from the day before (the 2026-06-03 "profiling the whole before caching the part" entry, #546) had clocked the Assistant Orchestrator's own boot slice at 4.6 seconds — *shorter* than the embedder's standalone 5–8 second load. The natural reading was that the embedder can't be loading during boot, so it must load lazily on the first prompt. But the code says the opposite: `_build_substrate()` runs synchronously inside `start()`, before the serve loop, and it calls the leakage detector's `load_model()` then and there. Static reading said boot; the boot number said not-boot. The instruction was the right one — pin it down empirically, because that one fact decides both tickets.
 
 So I decomposed the load instead of trusting either story, mirroring `LeakageDetector.load_model` step by step with a stopwatch on each phase. The answer was not subtle: of 5 177 ms, the `from transformers import AutoTokenizer` line was 4 737 ms — 92% of the "embedder load" is a Python library import. The ONNX session construction with full graph optimization was 232 ms. The tokenizer files loaded in 44 ms. The first inference was 4 ms. Every hypothesis I'd have led with — graph-opt caching, tokenizer cost — was wrong by an order of magnitude, and measuring first was the only thing that would have told me so.
 
-That reframed the whole question. A library import is paid once per process, by whoever imports first. So who imports `transformers` first in the real AO? Not the Substrate. `entrypoint.py` imports `gpu_inference` at module top, and `gpu_inference` imports `transformers` at module level for the 14B's own tokenizer — both before `_build_substrate` is ever called. By the time the embedder loads, the library is cached. I proved it: a second detector load with `transformers` already imported cost ~0.3 s (0.3–0.4 s across runs), not 5 177. The embedder's *marginal* cost in the running AO is about three-tenths of a second, paid at boot, inside that 4.6-second slice — which is exactly why #546 never saw a 5–8 second spike there. The 5–8 seconds was real only on a bench that loads the embedder alone, where nothing else has paid the import. In the assembled system the tax does not exist; it's double-counting a cost the 14B already carries. #553 is a no-op, premise invalid — nothing to fold into boot, nothing to background, nothing to optimize.
+That reframed the whole question. A library import is paid once per process, by whoever imports first. So who imports `transformers` first in the real AO? Not the Substrate. `entrypoint.py` imports `gpu_inference` at module top, and `gpu_inference` imports `transformers` at module level for the 14B's own tokenizer — both before `_build_substrate` is ever called. By the time the embedder loads, the library is cached. I proved it: a second detector load with `transformers` already imported cost \~0.3 s (0.3–0.4 s across runs), not 5 177. The embedder's *marginal* cost in the running AO is about three-tenths of a second, paid at boot, inside that 4.6-second slice — which is exactly why #546 never saw a 5–8 second spike there. The 5–8 seconds was real only on a bench that loads the embedder alone, where nothing else has paid the import. In the assembled system the tax does not exist; it's double-counting a cost the 14B already carries. #553 is a no-op, premise invalid — nothing to fold into boot, nothing to background, nothing to optimize.
 
 The part of this that belongs in the journal because it was a failure of mine: the ticket listed three options for disposing of the 5–8 seconds, and I handed all three back to Blair as a live choice — after my own data had already shown there was no tax to dispose of. He pushed back, twice, and he was right both times. The second time was sharper: I'd "fixed" the first muddle by offering a new choice — close it, or spend GPU time on a live full-stack trace to confirm — where the trace was belt-and-suspenders I'd argued against in the same breath. That's not optionality, it's hedging, and it's the inverse of owning a call the evidence had already made. The standing "don't pick one yourself" instruction he'd given me lapsed the moment the measurement voided the premise it was about; I kept treating it as live. I logged the pattern so the next session inherits it: when your analysis settles a decision to one action, report the conclusion and proceed — don't relay the now-moot options, and don't invent a verification fork to look thorough.
 
-The benchmark half (#542) was cleaner. Per-turn retrieval — one query embed plus brute-force cosine over the document and turn matrices — runs at p95 6.2 ms at 100 chunks, 10.7 ms at 1 000, and 28.4 ms at 5 000, against a fresh temp substrate (the harness physically refuses to open the real `%LOCALAPPDATA%\BlarAI\substrate.db`, and a test asserts the refusal). Against a measured first-token latency of ~0.77 s (standard decoding; the spec-decode backend's streaming TTFT is reported n/a) to ~1.5 s (cold, spec-on), retrieval is ~0.8–1.3% of time-to-first-token at realistic single-user scale and under 5% even at 5 000 chunks — immaterial, no optimization follow-up warranted, and the brute-force cosine the design chose over an ANN index holds well past the scale a single user will ever reach. The one real follow-up is documentation, not code: `substrate.py` calls the search "sub-millisecond," which is true of the matmul alone but not the end-to-end retrieve (the SQLite row-fetch dominates at 5 000 chunks) — a Stage-6.7.5-style doc-cleanup ticket for the operator's backlog, not a perf bug. The committed harness (`tests/substrate_benchmark/`) measures both numbers, demonstrates the isolated-vs-marginal load gap in one process, and writes a community-grade record that validates against the #551 perf-contrib schema — so the Lunar Lake embedder numbers are upstream-ready, not just chat output.
+The benchmark half (#542) was cleaner. Per-turn retrieval — one query embed plus brute-force cosine over the document and turn matrices — runs at p95 6.2 ms at 100 chunks, 10.7 ms at 1 000, and 28.4 ms at 5 000, against a fresh temp substrate (the harness physically refuses to open the real `%LOCALAPPDATA%\BlarAI\substrate.db`, and a test asserts the refusal). Against a measured first-token latency of \~0.77 s (standard decoding; the spec-decode backend's streaming TTFT is reported n/a) to \~1.5 s (cold, spec-on), retrieval is \~0.8–1.3% of time-to-first-token at realistic single-user scale and under 5% even at 5 000 chunks — immaterial, no optimization follow-up warranted, and the brute-force cosine the design chose over an ANN index holds well past the scale a single user will ever reach. The one real follow-up is documentation, not code: `substrate.py` calls the search "sub-millisecond," which is true of the matmul alone but not the end-to-end retrieve (the SQLite row-fetch dominates at 5 000 chunks) — a Stage-6.7.5-style doc-cleanup ticket for the operator's backlog, not a perf bug. The committed harness (`tests/substrate_benchmark/`) measures both numbers, demonstrates the isolated-vs-marginal load gap in one process, and writes a community-grade record that validates against the #551 perf-contrib schema — so the Lunar Lake embedder numbers are upstream-ready, not just chat output.
 
 **Next:** the operator closes #553 as premise-invalid on the Vikunja side (the evidence and a ready-to-paste resolution note live here and in PERFORMANCE_LOG), files the `substrate.py` "sub-millisecond" wording as a doc-cleanup ticket, and — if he ever wants belt-and-suspenders on the no-tax finding — a live full-AO boot+first-prompt trace with the 14B loaded would confirm it, at the cost of GPU contention with the security session. Then this branch merges to main after re-confirming main isn't mid-merge and pulling the latest in. *(commit `<this>` — `tests/substrate_benchmark/` harness + 8 tests + pyproject testpath; community-grade record `docs/performance/harness_substrate_use_case_002_2026-06-04T21-20-23*.json`; PERFORMANCE_LOG entry; lesson 37. #542 measured + recorded; #553 resolved no-op. Crux corroborated by the 2026-06-03 #546 boot-attribution entry.)*
 
@@ -1156,7 +1156,7 @@ Blair asked a plain question — is 16K the right context window, and did we cho
 
 What caught it wasn't a re-run, it was a date. The finding predated the fix, so it described a system that no longer exists. Blair pushed back twice — "don't we already have that data from the last couple of days?" — and he was half-right in the most useful way: the May benchmarks I'd pointed at *did* confirm spec-decode works now, but every one of them ran at short context (≤252 generated tokens, sub-1K total). They proved the fix; they never touched 16K. So the corner was genuinely unmeasured, and "we have the data" would have been a true answer to the wrong question.
 
-So I ran the one targeted thing the record was missing — the 16K band, plus 2K and 8K controls to read the curve rather than a point, on the current draft, reusing the March measurement code verbatim so it's apples-to-apples. The cliff is gone: acceptance at 16K is 46%, not 0, holding 46–57% across all three bands, with throughput ~2.3× the old 16K number. 16K now delivers both the memory headroom it was chosen for *and* a live spec-decode speedup — better than the locked record claimed, so DEC-03 stands, reaffirmed on current data.
+So I ran the one targeted thing the record was missing — the 16K band, plus 2K and 8K controls to read the curve rather than a point, on the current draft, reusing the March measurement code verbatim so it's apples-to-apples. The cliff is gone: acceptance at 16K is 46%, not 0, holding 46–57% across all three bands, with throughput \~2.3× the old 16K number. 16K now delivers both the memory headroom it was chosen for *and* a live spec-decode speedup — better than the locked record claimed, so DEC-03 stands, reaffirmed on current data.
 
 The honest twist is that the same run found a *different* premise of the same decision had rotted in the opposite direction: the 16K footprint nearly quadrupled (3,562 MB → 12,715 MB on the new stack), so the old "20K is safe" headroom claim is now the suspect one — filed as #596, not chased. One decision, two premises, each with its own shelf life independent of the call it supported.
 
@@ -1297,8 +1297,8 @@ stores held "decades of the user's private data," sitting exposed in plaintext, 
 urgent rescue of already-exposed secrets. It read well. It was the natural motivation. It was also
 false.
 
-Checked on disk (2026-06-05): `substrate.db` holds 107 chunks (~400 KB) and `sessions.db` holds 59
-sessions / 376 turns (~250 KB) — all build-phase dev/test scaffolding. BlarAI has never been used in a
+Checked on disk (2026-06-05): `substrate.db` holds 107 chunks (\~400 KB) and `sessions.db` holds 59
+sessions / 376 turns (\~250 KB) — all build-phase dev/test scaffolding. BlarAI has never been used in a
 daily setting; there is no real sensitive data anywhere yet. The honest framing is the opposite of
 urgency: encrypt **now, before first real use**, so real data is *born encrypted* from its first byte
 (no plaintext window ever) and the #598 gate criterion is met. The sprint is well-timed, not urgent —
@@ -1395,7 +1395,7 @@ re-ingest dedup works on ciphertext. The accepted residual (ADR-025 §3): two id
 produce the same hash, leaking "these two chunks share a source" — the price of functional dedup,
 documented and accepted.
 
-The migration path was required to be correct, not urgent. The dev fixture (~107 chunks) has no real
+The migration path was required to be correct, not urgent. The dev fixture (\~107 chunks) has no real
 sensitive data, so the migration is an engineering-correctness exercise rather than a data-rescue
 operation. The in-place migration reads each plaintext row, encrypts text + embedding + source,
 populates source_hash, then calls VACUUM to scrub SQLite's freed pages — without the VACUUM, old
@@ -1440,7 +1440,7 @@ ciphertext, so it became read-decrypt-check; `_backfill_empty_titles` had to fil
 under a wrong-key open instead of decrypting every row; and the WAL-safety claim — that app-layer field
 encryption leaves only ciphertext in the `-wal` sidecar — went from prose in several files to an
 executable test that writes, declines to checkpoint, scans the raw sidecar bytes, and has a
-plaintext-store contrast case proving the scan has teeth. Per-field decrypt measured ~0.7 µs;
+plaintext-store contrast case proving the scan has teeth. Per-field decrypt measured \~0.7 µs;
 `list_sessions` over 50 sessions adds 0.10 ms over baseline — GPU inference dominates by orders of
 magnitude.
 
@@ -1784,7 +1784,7 @@ The trade-off I accepted and the path I rejected: I could have left the interloc
 
 The defect was a single integer. `socket.socket(AF_HYPERV, socket.SOCK_STREAM)` — two arguments, protocol defaulting to 0. Windows Hyper-V sockets require `proto=1`, which the Windows documentation names `HV_PROTOCOL_RAW` and documents in a single sentence buried well below the fold. Protocol 0 is valid for nearly every other socket family Python uses; it is the textbook omission. The call would compile, pass linting, and exercise cleanly in every test environment because the dev path (`AF_INET`, TCP loopback) has no such requirement. The `AF_HYPERV` path was exercised for the first time in production when EA-4b flipped the default from dev mode to the real Hyper-V path — and the Policy Agent listener's first `socket.socket` call came back with `WinError 10041` (WSAEPROTOTYPE), which is Windows's way of saying "wrong protocol for this address family."
 
-The fix itself is three source lines: a module constant `HV_PROTOCOL_RAW = 1` beside the existing `AF_HYPERV = 34`, and the constant threaded as the third argument into both `AF_HYPERV` socket creation sites — `VsockTransport.connect()` (~line 223) and `VsockListener.start()` (~line 436). The dev-mode `AF_INET` creations are left exactly as they were; they are correct.
+The fix itself is three source lines: a module constant `HV_PROTOCOL_RAW = 1` beside the existing `AF_HYPERV = 34`, and the constant threaded as the third argument into both `AF_HYPERV` socket creation sites — `VsockTransport.connect()` (\~line 223) and `VsockListener.start()` (\~line 436). The dev-mode `AF_INET` creations are left exactly as they were; they are correct.
 
 What makes this entry worth keeping is not the fix but the masking mechanism. The entire vsock test suite — Groups A through L, 1001+ tests — ran against the dev path exclusively. `dev_mode=True` is the test default, TCP loopback works, and nobody had reason to reach for `AF_HYPERV` in a unit test because you cannot usefully create a Hyper-V socket in a test environment without a live guest boundary. So the production path carried a two-year latent defect in a line of code that was right for every family except the one it was about to use. The lessons list already contains the "tested dev, ran production" failure class from other arcs; this is another instance with a notably clean causal chain: EA-4b flipped the production flag, EA-4c walked in on the first boot.
 
@@ -2925,7 +2925,7 @@ gate; a lock that never goes green is the lesson the boot-cascade smoke already
 paid for. So I split the assertion the way the SDV's tiering invites. The gate
 tier asserts the *resolved* posture through the exact resolution chain the
 launcher runs — `resolve_dev_mode(HOST, dev_mode_override=resolve_dev_override())`,
-the literal call at `launcher/__main__.py` ~:547 — and the PA's real
+the literal call at `launcher/__main__.py` \~:547 — and the PA's real
 `_load_entrypoint_config()` against the real shipped config (the PA defers
 `_validate_security_material` to `start()`, so config resolution returns a
 production config with no TPM/model/cert dependency). The slow tier carries the
@@ -3321,17 +3321,17 @@ automate-first reframe, Vikunja #629, LA-surfaced 2026-06-08. Earned lesson 86.)
 
 ### 2026-06-08 — The skip that wasn't a skip: when a process-leak masquerades as a coverage decision
 
-The standing gate had been reporting a clean 2342 passed / 0 skipped for weeks. Then it would occasionally read ~2333 passed / 9 skipped, with no obvious cause — no code change, no model change, no environment difference anyone had touched. The first instinct was to treat those ~9 skips as expected: the boot-cascade tests skip when a live BlarAI instance is detected, and surely someone had the app open. But the flag kept appearing on automated gate runs where no one had opened BlarAI at all.
+The standing gate had been reporting a clean 2342 passed / 0 skipped for weeks. Then it would occasionally read \~2333 passed / 9 skipped, with no obvious cause — no code change, no model change, no environment difference anyone had touched. The first instinct was to treat those \~9 skips as expected: the boot-cascade tests skip when a live BlarAI instance is detected, and surely someone had the app open. But the flag kept appearing on automated gate runs where no one had opened BlarAI at all.
 
 The root cause was a process-teardown gap in the WinUI harness, and the reason it was hard to see is that the gap was invisible at the harness tier. The four WinUI test files each called `proc.terminate()` to stop `BlarAI.Desktop.exe` at the end of a GUI automation run. Correct — except that the .NET app immediately spawns a Python backend child when it boots, and that child binds AO loopback port 5001. A bare `proc.terminate()` kills only the parent. The Python child becomes an orphan, continues holding port 5001, and on the *next* pytest invocation — which might be the standing gate — every test that guards on "is a live BlarAI instance running?" sees a held port and defensively skips. The skips are correct. The problem is that the "live instance" is a ghost: a leaked child with no parent, no window, serving no one.
 
 This is a class of bug worth naming carefully. It is not a failure the suite reports as a failure; it is a failure the suite reports as a perfectly reasonable skip. From inside the gate run, the skip looks valid — port held, operator probably has the app open. No assertion error, no exception, no noise. You only notice it if you run the gate twice with a WinUI harness run in between and think to compare skip counts — and even then the natural read is "someone opened the app." The ghost process is a red herring made out of a real herring.
 
-The fix was two-part. First, every bare `proc.terminate()` in the four harness files became a call to a new `tests/harness/process_tree.py` helper — `terminate_process_tree(pid)` — that uses psutil (already in the venv at 7.2.2) to walk the full descendant tree before terminating: children in reverse BFS order, then the root, all wrapped so it never raises out of a `finally`. I chose psutil over the `taskkill /T /F` fallback because it gives a deterministic, auditable tree-walk; the fallback remains for a psutil-absent future. Second, a session-scoped autouse fixture in the root `conftest.py` captures whether port 5001 is held at session start, yields, then evaluates the free→held delta at teardown. The design is deliberately asymmetric: held→held (a genuine live instance) and free→free (a clean run) both pass silently; only free→held fires, because that is the only transition representing a leak *this session caused*. On every clean gate run 5001 is free at both ends and the fixture is a silent no-op — it does not move the 2342/0 baseline at all; it only fires on the broken run that would otherwise drift to ~2333/9.
+The fix was two-part. First, every bare `proc.terminate()` in the four harness files became a call to a new `tests/harness/process_tree.py` helper — `terminate_process_tree(pid)` — that uses psutil (already in the venv at 7.2.2) to walk the full descendant tree before terminating: children in reverse BFS order, then the root, all wrapped so it never raises out of a `finally`. I chose psutil over the `taskkill /T /F` fallback because it gives a deterministic, auditable tree-walk; the fallback remains for a psutil-absent future. Second, a session-scoped autouse fixture in the root `conftest.py` captures whether port 5001 is held at session start, yields, then evaluates the free→held delta at teardown. The design is deliberately asymmetric: held→held (a genuine live instance) and free→free (a clean run) both pass silently; only free→held fires, because that is the only transition representing a leak *this session caused*. On every clean gate run 5001 is free at both ends and the fixture is a silent no-op — it does not move the 2342/0 baseline at all; it only fires on the broken run that would otherwise drift to \~2333/9.
 
 The trade-off I rejected was "just kill the leaked PID at teardown and be done." Cleanup-only hides the leak: if the Part-1 teardown fix ever regresses — someone adds a fifth harness file with a bare `terminate()`, a .NET change spawns a second child — cleanup-only masks it and the gate passes cleanly, leaving no record. Fail-loud keeps the signal. I kept the cleanup in the fixture too (belt-and-suspenders, so the next run is clean) but it is secondary to the failure. I factored the decision into a pure `port_leak_verdict(held_at_start, held_at_end)` with a four-case unit test locking the no-false-positive contract; the one that matters most is `test_free_to_free_is_silent_pass` — if it ever fails, the detector has broken the gate for everyone.
 
-**Next:** the real verification of the teardown fix is a WinUI harness run on the dev machine (exe present, display available) followed immediately by the standing gate — the 2342/0 should hold where it previously dropped to ~2333/9. That is the live confirmation the worktree cannot provide; the determinism criterion itself (the gate reproduces 2342/0 without a manual process-kill) is met and was re-confirmed twice from main.
+**Next:** the real verification of the teardown fix is a WinUI harness run on the dev machine (exe present, display available) followed immediately by the standing gate — the 2342/0 should hold where it previously dropped to \~2333/9. That is the live confirmation the worktree cannot provide; the determinism criterion itself (the gate reproduces 2342/0 without a manual process-kill) is met and was re-confirmed twice from main.
 
 *(commits `5698936` (C6 teardown fix + fail-loud detector) + `2c1f373` (docstring honesty) merged `f6193d1`; Orchestrator re-ran the standing gate from main twice at 2342/0; live WinUI teardown verify deferred to a dev-machine GUI run. Earned lesson 87.)*
 
@@ -3385,7 +3385,7 @@ gap is now closed by construction — and, more importantly, what still is not. 
 Architect's pre-sign-off deep-dive for removing the air-gap (#598), so its whole value is
 honesty: a deck that oversells the posture would get the gate decision wrong.
 
-The load-bearing chunk was the reconciliation — ~55 audit findings plus the 12 headline
+The load-bearing chunk was the reconciliation — \~55 audit findings plus the 12 headline
 attack paths, each needing a *current* status rooted in the code on disk today, not inherited
 from a narrative. I fanned that out to five read-only verifier subagents (one per domain
 cluster) returning structured status + evidence, while I personally nailed the credibility
@@ -3917,7 +3917,7 @@ test I should have applied is the one already written into this repo's doctrine:
 a decision is only a decision if the options differ on security, capability, or
 quality. These didn't, so the call was mine. I made it, told him so, and built.
 
-The build is deliberately boring. A ~145-line C# console helper
+The build is deliberately boring. A \~145-line C# console helper
 (`tools/hello_verify/`) fronts the WinRT `UserConsentVerifier` — the same
 `net8.0-windows10.0.19041.0` Windows-SDK projection the WinUI surface already
 targets, so there is no NuGet package, no new wheel, no supply-chain delta at
@@ -4034,7 +4034,7 @@ But the failure mode of being wrong is the bad kind: `ensure_owner_only_dacl` is
 fail-safe, so a missing privilege would not crash — it would log a warning and
 *skip*, flipping #637's defense-in-depth from "applied" to "quietly off" on a
 deployment we do not live-verify. Weighed against keeping two privileges out of
-~twenty, conservative-keep-on-doubt wins cleanly. I kept both, documented the
+\~twenty, conservative-keep-on-doubt wins cleanly. I kept both, documented the
 reasoning in full, and flagged the removal as a future tightening once #637 is
 live-verified to keep working without them. This is the "decision vs defect"
 boundary in practice: stripping a clearly-unused privilege is a defect-fix I just
@@ -4068,12 +4068,12 @@ belt-and-suspenders. On this non-elevated dev box the strip is a faithful small
 demonstration — it removed 4 privileges (`SeIncreaseWorkingSet`, `SeShutdown`,
 `SeTimeZone`, `SeUndock`), kept `SeChangeNotify`, and a second run found nothing
 left to remove, proving the removal is permanent. On the elevated launcher it will
-remove ~15 including the dangerous set. The before/after is visible headlessly via
+remove \~15 including the dangerous set. The before/after is visible headlessly via
 `scripts/show_launcher_privileges.py`; run it from an elevated shell for the full
 production-shaped strip.
 
 **Next:** the LA's on-box live-verify — run `scripts/show_launcher_privileges.py`
-from an elevated PowerShell to see the real ~15-privilege strip, then a full
+from an elevated PowerShell to see the real \~15-privilege strip, then a full
 `python -m launcher` boot to confirm (a) the WinUI surface still de-elevates
 cleanly (proving `SeImpersonate` survived the strip), (b) the #637 DACL hardening
 still applies to the sensitive files (proving the `SeRestore`/`SeTakeOwnership`
@@ -4549,7 +4549,7 @@ preview entirely — would have made the operator approve documents he cannot re
 Numbers: 46 new tests (29 corpus + 15 text-path + 2 security locks), all green alongside
 the untouched egress scans (48 passed in the targeted run). The 7-fixture synthesized
 corpus (nav/ads chrome, code blocks, NFD-and-ZWSP-bearing unicode, a paywall teaser, an
-injection-bearing article, a comments section, a listicle) extracts in ~2.1 ms per
+injection-bearing article, a comments section, a listicle) extracts in \~2.1 ms per
 article, 14.94 ms mean per full corpus pass (20 runs, stdev 3.3 ms, Python 3.11.9,
 trafilatura 2.1.0, lxml 6.1.1, CPU-only on the Core Ultra 7 258V) —
 `docs/performance/cleaner_pipeline_2026-06-10.json` records the methodology and names
@@ -4822,7 +4822,7 @@ transport for the DNS-rebinding TOCTOU — named follow-up, not built here.)*
 The independent LA-session verification of the ingest-UX branch (LA verdict
 2026-06-10) found the channel I had built around every defense and then left
 open beside them: the gateway persisted the operator's full `/ingest` message
-— up to ~40 KB of raw, pre-cleaning web text — as a `role='user'` turn in
+— up to \~40 KB of raw, pre-cleaning web text — as a `role='user'` turn in
 sessions.db, and the prompt-history filter forwards ALL user turns verbatim
 into later prompts. So the knowledge bank could clean, quarantine,
 approval-gate, encrypt, datamark, and ground that article as
@@ -5046,7 +5046,7 @@ green.
 
 ### 2026-06-10 — Two sessions wrote the same amendment, and the merge had to make them one law
 
-The UC-002/003 program landed on main tonight — four branches, ~11,300 inserted
+The UC-002/003 program landed on main tonight — four branches, \~11,300 inserted
 lines, the knowledge bank, the cleaner, the ingest UX, and the governance that
 binds them. The merge itself was the easy part: of the four `--no-ff` merges
 (ADRs → knowledge-bank → cleaner → ingest-ux, onto an integration branch off
@@ -5481,7 +5481,7 @@ cannot overflow`. The premise was false. The body IS tiny, but the envelope
 also carries the echoed correlation id, and `_validate_request_id` had no
 length cap — the assembler even records the id *before* size validation
 (deliberately, so violations can be answered), which made it unbounded up to
-the incoming frame size. A `request_id` of ~65,200 chars fits the incoming
+the incoming frame size. A `request_id` of \~65,200 chars fits the incoming
 64 KB frame; the echoed ERROR response then exceeds 65,536 bytes, and
 `MessageFramer.encode` raises a *plain* `ValueError` — the base class, not the
 subclass `_send_error` was catching. The exception sailed through
@@ -5505,9 +5505,9 @@ depth at the channel: `request_id` is now capped at
 `PARSE_REQUEST_ID_MAX_CHARS = 256` in `shared/ipc/parse_channel.py`, so an
 over-long id dies on the FIRST frame at assembly time — never recorded,
 nothing to echo, the error-encode overflow becomes unreachable from the wire.
-I chose 256 over the UUID-exact ~36 because correlation ids are host-minted
+I chose 256 over the UUID-exact \~36 because correlation ids are host-minted
 and I want headroom for future composite ids (sprint-prefixed, retry-suffixed)
-without a protocol bump, accepting that 256 is ~7x looser than today's actual
+without a protocol bump, accepting that 256 is \~7x looser than today's actual
 use. Third, the structural version of the same promise: `main()`'s accept
 loop now wraps each connection's serve in a catch-all that logs the exception
 *class name only* — never page content, never paths, the leak-tightness
@@ -5529,7 +5529,7 @@ the drop rule to them — dropping would have been defensible too, but it
 changes observable behavior the host glue will be written against, and the
 reviewer's finding was the label, not the lifecycle.
 
-Nine regression tests lock all of it: the ~65,200-char reproducer now served
+Nine regression tests lock all of it: the \~65,200-char reproducer now served
 as a clean drop (no response, no exception); the 256 cap rejected at encode
 and on the first assembled frame with the id never recorded; exactly-256
 accepted and still addressable for error responses; an injected plain
@@ -6342,7 +6342,7 @@ and making the ISO rebuild a five-step autonomous procedure before LA contact �
 what makes the channel durable rather than ad-hoc.
 
 **Next:** LA mounts the rebuilt `build/guest_cd.iso` as the VM DVD, runs
-`mount /dev/cdrom /mnt && sh /mnt/provision.sh` at the Hyper-V console (~5 min), and
+`mount /dev/cdrom /mnt && sh /mnt/provision.sh` at the Hyper-V console (\~5 min), and
 verifies `rc-service blarai-parser status → started`. Next launcher boot with the guest
 enabled drives the health probe. A live `/ingest <url>` returning a preview with rendered
 headings (`# Heading`, `- list item`) is the acceptance evidence for the full UC-003
@@ -6490,8 +6490,8 @@ because a 248 KB parse finishes in about 0.2 s while Hyper-V's demand metric upd
 on a multi-second cadence — a lone spike is invisible to it. That same design is what
 rescued the conclusion. By the burst phase the balloon had woken, reclaimed the
 assignment from 1024 MB down to 512 MB (only ballooning can drop a guest below its
-startup, so the driver was there all along — just ~60 s slow to engage), and reported
-a real demand of ~199 MB idle, ~256 MB under continuous near-cap load. The early
+startup, so the driver was there all along — just \~60 s slow to engage), and reported
+a real demand of \~199 MB idle, \~256 MB under continuous near-cap load. The early
 snapshot was not the failure mode; it was the transient before the balloon engaged,
 and the longer window outlived it. 195 consecutive near-cap parses ran with zero OOM,
 and the parser reached READY 34.5 s into the cold boot, well inside the 120 s budget.
@@ -6542,9 +6542,9 @@ the display, and here the display contradicted the truth.
 
 The root cause was a field divergence I should have seen when I wrote the feature.
 There are two markdown carriers for the same article. `Text` is what the
-read-mode `controls:MarkdownBlock` binds (`MainWindow.xaml` ~line 279); it
+read-mode `controls:MarkdownBlock` binds (`MainWindow.xaml` \~line 279); it
 accumulates the streamed preview body token by token. `EditableBody` is what the
-edit `TextBox` binds TwoWay (~line 285); it is the operator's working copy. The
+edit `TextBox` binds TwoWay (\~line 285); it is the operator's working copy. The
 `IsEditing` setter in `MessageItem.cs` toggled the two visibilities — edit box
 on, render off, and back — but on the true→false transition it never folded the
 working copy back into the rendered field. So "Done editing" hid the box and
@@ -7648,7 +7648,7 @@ DEK, a DACL-locked pipe, display-only output, zero egress — the boundary per-s
 enforce is "the operator from themselves," which is not a real trust boundary. The id is
 already a 128-bit unguessable `uuid4` bearer handle that only ever appears in the operator's
 own transcripts; you cannot resolve an image you don't already have the id for, and having
-the id means you had the transcript. Per-session would buy ~nil real security while costing
+the id means you had the transcript. Per-session would buy \~nil real security while costing
 something concrete: you could no longer use yesterday's generation as today's `/edit` seed
 (new session ⇒ seed won't resolve), and "my images" would silently fragment into
 per-thread vaults.
@@ -7748,7 +7748,7 @@ dormancy hides every integration seam at once.
 
 **The dead knob.** First noise. I assumed too-few denoising steps (the config
 shipped `steps=6`, a Lightning setting, but the provisioned model is base
-RealVisXL V5.0 on a DDIM scheduler that wants ~30). I bumped it to 30. Same
+RealVisXL V5.0 on a DDIM scheduler that wants \~30). I bumped it to 30. Same
 noise. The launcher log settled it: `MEM[image_gen.t2i.before] ... steps=0`.
 Every generation had run at *one* step. The gateway coordinator and the
 `IMAGE_GEN_REQUEST` frame default `steps` to `0` ("operator gave no override"),
@@ -7780,8 +7780,8 @@ drove the box to 99.8% memory and *paged the 14B out to disk* (`proc_rss`
 collapsed to 142 MB). It finished by thrashing for two minutes and blew the 90 s
 timeout. The honest finding: a 1536² diffusion pass and the 14B cannot co-exist
 in 31.3 GB. I should have measured the 1536² footprint before believing the
-design — the standalone number (26 GB peak) plus the 14B (~14 GB) was always
-~40 GB.
+design — the standalone number (26 GB peak) plus the 14B (\~14 GB) was always
+\~40 GB.
 
 **Evicting the shared 14B — and the premise I had to verify on disk.** The chosen
 fix (operator-approved, as it amends a locked ADR) is to evict the 14B for the
@@ -7798,9 +7798,9 @@ eviction is gated to the hires path. The OS was already evicting the 14B by
 paging — we just made it explicit and clean.
 
 **Two more seams the dormant build hid.** `/save` worked only after I decoupled
-the resolve corridor cap from the 2 MiB *fetch* cap (a 1536² PNG is ~3 MB). Then
+the resolve corridor cap from the 2 MiB *fetch* cap (a 1536² PNG is \~3 MB). Then
 `/edit` failed the same way one layer down: the seed-staging read cap was the
-2 MiB egress cap, and a hires seed is ~3 MB — so you could not edit a hires
+2 MiB egress cap, and a hires seed is \~3 MB — so you could not edit a hires
 image. Same decoupling: a `/edit` seed is a local/generated image, not a
 door-fetched blob, so it gets a 16 MiB cap while the egress door's 2 MiB
 (BED-3 anti-bomb) stays exactly where it was.
@@ -8107,7 +8107,7 @@ forward-looking "was-exported" boolean cannot describe a library older than itse
 and drifts from "currently safe on disk" even going forward. For a pre-existing
 backlog, only a decrypt-and-hash reconcile against the real save location is
 accurate — and it will correct the operator's memory, not just confirm it (8
-byte-identical copies on disk vs. a remembered ~14).
+byte-identical copies on disk vs. a remembered \~14).
 
 ### 2026-06-17 — The gallery that reused everything, and the allowlist that drifts in silence
 
@@ -8167,7 +8167,7 @@ on the Arc 140V, and the BlarAI-Orchestrator VM is a NIC-less parser with no GPU
 passthrough. The 14B and the 30B draw from the *same* unified pool — there is no
 cross-domain barrier to fear. That turned the question into one purely of magnitude
 and the #33896 carve-out return, not topology, and the keystone confirmed it before
-anything else: the live 14B sat at ~8.7 GB on the iGPU per the per-PID GPU counter,
+anything else: the live 14B sat at \~8.7 GB on the iGPU per the per-PID GPU counter,
 not in the guest.
 
 The release path already existed — `SharedInferencePipeline.unload()`, built for
@@ -8183,21 +8183,21 @@ shortcut of killing the process to "free" the GPU — a process exit always retu
 it and would have proved nothing about the in-process release that the swap actually
 performs.
 
-The carve-out comes back. In the live process `unload()` returned in ~1 second and
+The carve-out comes back. In the live process `unload()` returned in \~1 second and
 the per-PID GPU dropped 10,774 MB to a 677 MB floor and *stayed* there across the
 60-second settle — no driver-held residue, no #33896, every cycle, zero drift. The
-freed RAM was genuine: Committed Bytes fell ~11.3 GB and the Free&Zero list rose
-~11 GB in lockstep. The single production `gc.collect()` was enough — the labelled
+freed RAM was genuine: Committed Bytes fell \~11.3 GB and the Free&Zero list rose
+\~11 GB in lockstep. The single production `gc.collect()` was enough — the labelled
 second-collect diagnostic freed nothing more. The reload came back coherent, not
 garbled. The release mechanism is sound on this driver (32.0.101.8826, OpenVINO
 2026.1.0).
 
-But the honest part is the margin. Releasing the 14B took Available from ~11.6 GB to
-~22.0 GB — it clears the 30B's 21 GB gate, but by about a gigabyte, and that gigabyte
+But the honest part is the margin. Releasing the 14B took Available from \~11.6 GB to
+\~22.0 GB — it clears the 30B's 21 GB gate, but by about a gigabyte, and that gigabyte
 is on loan from the ambient. The cold floor on this box drifted between 19.4 GB and
 23.7 GB during the session purely from other processes; at the heavier end the same
-release lands ~18 GB and goes short. And the freed amount is itself state-dependent —
-~8.7 GB for an idle 14B, ~10.8 GB reloaded, ~11.8 GB once a conversation has built up
+release lands \~18 GB and goes short. And the freed amount is itself state-dependent —
+\~8.7 GB for an idle 14B, \~10.8 GB reloaded, \~11.8 GB once a conversation has built up
 KV. So the precondition is met, not the swap: a release returns enough memory to the
 right pool, in a lean-enough ambient, with thin margin.
 
@@ -8206,29 +8206,29 @@ side of the swap. The fleet's `start-llm.ps1` enforces its 21 GB headroom check
 inside `if (-not $Force)` — and the swap is required to pass `-Force` (to skip the
 interactive prompt that would otherwise offer to stop the BlarAI VM). So during the
 real swap *nothing enforces the gate*, and the only non-Force remediation is to stop
-a VM we now know holds ~0.5 GB and is irrelevant to the host-side 14B. The swap
+a VM we now know holds \~0.5 GB and is irrelevant to the host-side 14B. The swap
 design cannot lean on start-llm to catch a shortfall; it has to own its own pre-load
 Available check and its own remediation — trim ambient, or abort with a clear error —
 before it ever issues the irreversible 30B load.
 
 The certification ran the same day, and it is the part I nearly got wrong. The first
-pass looked like a win — the real Qwen3-Coder-30B loaded in ~30 seconds and decoded at
-37.4 tok/s (the ~87% override holds), took 15.3 GB of the iGPU at steady, and stopped
-clean. I wrote "the door opens, swap viable with a thin ~0.7 GB margin" and committed
+pass looked like a win — the real Qwen3-Coder-30B loaded in \~30 seconds and decoded at
+37.4 tok/s (the \~87% override holds), took 15.3 GB of the iGPU at steady, and stopped
+clean. I wrote "the door opens, swap viable with a thin \~0.7 GB margin" and committed
 it. The reviewer refused the verdict and demanded two things I had skipped: the
 *measured* load peak, not the modeled one, and a Committed cross-check instead of an
-Available number inflated by ~10 GB of standby. Both corrections cut the wrong way.
+Available number inflated by \~10 GB of standby. Both corrections cut the wrong way.
 
 So I sampled continuously *through* the staged load. Even with BlarAI fully **down** in
 a lean 25.4 GB ambient, the 30B's dual CPU+GPU weight copy drove Available to **67 MB**,
 Committed to **29.1 GB**, and the pagefile to **206,000 hard page-ins per second** for
 six seconds before it recovered. The load is a near-whole-pool transient that thrashes
 the box even in the best case. The brief's 21 GB gate is simply too low. And the bare
-swap keeps BlarAI alive (its ~1.5 GB remnant) and loads from B2's directly-measured
-~22 GB — three-plus gigabytes *tighter* than the 25 GB that already thrashed. The
+swap keeps BlarAI alive (its \~1.5 GB remnant) and loads from B2's directly-measured
+\~22 GB — three-plus gigabytes *tighter* than the 25 GB that already thrashed. The
 honest verdict is the opposite of what I first committed: **the bare swap is not
 viable.** It page-storms; from the swap's tighter pool it would death-spiral. My own
-"~8 GB steady headroom" was Available-with-standby — the committed-real steady is one
+"\~8 GB steady headroom" was Available-with-standby — the committed-real steady is one
 to three gigabytes, going negative as the 30B's KV fills. The one corroboration I keep
 is the §4 point, made twice over: the fleet's `-Force` skips the gate (the safety
 classifier refused it for exactly that), and the gate it skips is too low anyway.
@@ -8264,12 +8264,12 @@ that *actively* claws the box up past twenty-three gigabytes (full step-aside pl
 trim) before it dares the load, and verifies it got there.
 
 **Next:** the §4 gate is now designable against a measured number. A bare 14B-release is not
-enough — it lands ~20 GB here, sub-threshold — so the swap must fully step BlarAI aside *and*
-trim the ambient to clear ~23–25 GB, then verify before it loads, aborting otherwise (which
+enough — it lands \~20 GB here, sub-threshold — so the swap must fully step BlarAI aside *and*
+trim the ambient to clear \~23–25 GB, then verify before it loads, aborting otherwise (which
 the measurement shows the gate correctly doing). The one load still unmeasured is the 30B
 from a swap that has *reached* a viable headroom; it was deferred because it reproduces the
 marginal standalone case already on record. A lighter load path — mmap/streamed weights, or a
-smaller coder — would lift the whole question by shrinking the ~29 GB transient: a worthwhile
+smaller coder — would lift the whole question by shrinking the \~29 GB transient: a worthwhile
 optimisation, possibly an OpenVINO upstream lead. The harness (`scripts/measure_14b_release.py`)
 stays a reusable tool; the live hook was re-added for this measurement and removed again
 (launcher reverted clean, no diff vs HEAD).
@@ -8342,7 +8342,7 @@ standalone load already proven), run the fleet, swap back and reload the 14B wit
 coherence check, all crash-recoverable and never ending at zero models. Then, only
 then, the 14B decomposer (the brief's step 7), backed by templates and
 pre-validated rulers, never self-certified. The pre-load headroom gate it needs is
-the load-bearing one milestone 1 measured — set it to what actually loads (~the whole
+the load-bearing one milestone 1 measured — set it to what actually loads (\~the whole
 pool), not start-llm's too-low 21 GB, and never the `-Force` path that skips its own
 check.
 
@@ -8350,7 +8350,7 @@ check.
 correct integration here is a queue file and a summary read — but only because the
 hard parts (isolation, verify, merge, the model itself) already live on the other
 side of the fence. Re-implementing any of them inside BlarAI would have traded a
-~200-line engine for a second coder to contain.
+\~200-line engine for a second coder to contain.
 
 *(commit on branch `feat/fleet-dispatch-i1`: `shared/fleet/dispatch.py` engine +
 `dispatch_coordinator` + the dormant `[fleet_dispatch]` config + `/dispatch`
@@ -8361,10 +8361,10 @@ add-fleet-task.ps1 contract.)*
 ### 2026-06-22 — The swap you can only watch run on the real box
 
 Increment 2 is the one genuinely hard part of the headless-coding work: the 14B⇄30B model swap.
-The brief had a clean state machine for it (§4.2) — unload the 14B in-process, gate on ~21 GB,
+The brief had a clean state machine for it (§4.2) — unload the 14B in-process, gate on \~21 GB,
 load the 30B, run, swap back. Milestone-1 had already told me that plan doesn't survive contact
-with this box: a bare in-process unload frees only to ~20.1 GB, below the 30B's ~22-23 GB load
-peak, because ~6 GB of the live AO process (Python heap, the INT8 draft, the Level-Zero context,
+with this box: a bare in-process unload frees only to \~20.1 GB, below the 30B's \~22-23 GB load
+peak, because \~6 GB of the live AO process (Python heap, the INT8 draft, the Level-Zero context,
 the KV/embedding caches) is freed only by a process EXIT. So the design diverges where the
 measurement forces it: full step-aside means the launcher process exits, and because a process
 can't tear itself down and bring itself back, a detached host driver (breakaway, the increment-1
@@ -8404,7 +8404,7 @@ wiring it unvalidated into the live boot path would add risk no test could catch
 *subsystem* is done and proven; the last seam is welded on the hardware.
 
 One number moved late: the LA set the pre-load gate to 21, not the 24 I'd recommended from the
-milestone-1 margin. 21 matches start-llm's own gate and false-aborts less; 24 kept ~1-2 GB above
+milestone-1 margin. 21 matches start-llm's own gate and false-aborts less; 24 kept \~1-2 GB above
 the measured load peak. I flagged the trade-off — at 21 a marginal load thrashes-then-loads rather
 than hard-failing because the gate is graceful — and set it to 21 as directed, with the
 alternative on the record. It's a config key, so it moves without a code change.
@@ -8483,7 +8483,7 @@ The second bug was quieter: the relaunch came up under system `Python311`, not t
 
 Three fixes, all dormant. A single-instance guard — a per-checkout PID-file lock acquired before cert provisioning — so a second launcher refuses cleanly with a message that *is* the UX of the fix ("BlarAI is already running (PID N) — close that one first") and hard-exits without running `_cleanup`, because a refused instance that ran the always-stop VM cleanup would stop the *live* instance's VM. The guard confirms the holder is really a launcher (its cmdline runs `-m launcher`) before refusing, so a recycled PID after a crash reclaims the lock instead of falsely insisting BlarAI is already running — the one false-positive the operator would actually hit in a crash-relaunch. The venv fix makes the relaunch resolve the checkout's own `.venv` deterministically. And the guaranteed-termination watchdog forces the process down when the graceful interrupt doesn't land — because the load-bearing fix for a never-delivered signal is to stop waiting for it, not to wait longer; graceful first for a clean release, forceful as the guarantee, with a started-teardown flag so the wedged case is forced immediately while a real teardown is allowed to finish.
 
-What's honest to keep on the record: A/B/C only clear the cert-and-instance wall. The swap's actual core — the 30B loading and *fitting* in the freed pool, building, and the 14B coming back — is still unproven, because run-1 never reached it. The forced exit terminating, the GPU releasing in time for the 30B (~25 GB free clean, the 14B ~8.7 GB → should fit), the swap-back — those are the live unknowns the next run tests for the first time. Twenty-two unit tests prove the wiring and the decisions; none of them prove the physical swap. That distinction is the whole point of writing it down — and the re-run is expected to surface fresh wrinkles past the wall, which is the shakedown working, not a regression.
+What's honest to keep on the record: A/B/C only clear the cert-and-instance wall. The swap's actual core — the 30B loading and *fitting* in the freed pool, building, and the 14B coming back — is still unproven, because run-1 never reached it. The forced exit terminating, the GPU releasing in time for the 30B (\~25 GB free clean, the 14B \~8.7 GB → should fit), the swap-back — those are the live unknowns the next run tests for the first time. Twenty-two unit tests prove the wiring and the decisions; none of them prove the physical swap. That distinction is the whole point of writing it down — and the re-run is expected to surface fresh wrinkles past the wall, which is the shakedown working, not a regression.
 
 **Lesson 158:** *A control tested in isolation can still rest on an unstated single-instance assumption.* The relaunch passed every unit test and the standing gate, then failed the first time it ran on the box because four instances shared one per-boot certs dir. "Concurrency = 1" must be made explicit and enforced (a single-instance lock before the shared write), not inherited silently; a shared per-boot artifact with no instance guard is a latent multi-instance bug.
 
@@ -8497,7 +8497,7 @@ What's honest to keep on the record: A/B/C only clear the cert-and-instance wall
 
 The model swap fired for the second time, and this run carried clean through everything run-1 couldn't reach: a single-instance boot, the gateway↔Policy-Agent mTLS handshake on the first attempt, dispatch → approve → step-aside → the headroom gate → and the 30B coder model loading. A/B/C had cleared the cert-and-instance wall exactly as built. Then the driver hung at "loading the 30B" and sat there for ten minutes until the operator recovered it by hand.
 
-The first explanation was the obvious one, and it was wrong. The box's Arc iGPU has roughly 16 GB for the GPU; the 14B needs ~8.7 and the 30B ~15, so they cannot co-reside, and the natural read was a GPU out-of-memory — the 30B trying to load onto a GPU the force-exited 14B hadn't released. It's a clean, physical story, and it was held confidently. So the instruction was to confirm it in the OVMS load log — and the log said something else. The 30B reached `state changed to: AVAILABLE` thirty seconds after launch, the error log was zero bytes, and start-llm had armed its watchdog sentinel and started its coding-proxy — every sign that the model loaded and start-llm *knew* it was ready. The 30B loaded and fit on this box. The hang was not the GPU.
+The first explanation was the obvious one, and it was wrong. The box's Arc iGPU has roughly 16 GB for the GPU; the 14B needs \~8.7 and the 30B \~15, so they cannot co-reside, and the natural read was a GPU out-of-memory — the 30B trying to load onto a GPU the force-exited 14B hadn't released. It's a clean, physical story, and it was held confidently. So the instruction was to confirm it in the OVMS load log — and the log said something else. The 30B reached `state changed to: AVAILABLE` thirty seconds after launch, the error log was zero bytes, and start-llm had armed its watchdog sentinel and started its coding-proxy — every sign that the model loaded and start-llm *knew* it was ready. The 30B loaded and fit on this box. The hang was not the GPU.
 
 What hung was the driver's own plumbing. `real_load_30b` ran start-llm through `_safe_run`, which captures stdout and stderr through a pipe and waits for them to close. But start-llm launches two long-lived processes — OVMS itself and a stateless tool-call proxy — and on Windows those grandchildren inherit the captured pipe. So even though start-llm loaded the 30B and exited zero, the pipe never reached end-of-file (the proxy was still holding it, and was *still* running as I wrote this), and the wait blocked forever — past start-llm's own deadline, past the subprocess timeout, because the timeout's cleanup tries to drain the very pipe that won't close. The 30B was ready at 15:44:38; the driver was deadlocked and never looked up. Had we "fixed the GPU," the deadlock would have shipped untouched.
 
@@ -8645,7 +8645,7 @@ grandchild PID is irreducibly racy, and the boot reconciler is the named backsto
 implying it away.
 
 The trade-off I took on the watchdog lock: `abort()` holds the holder lock through the
-tree-kill's bounded reap (~3s), which can delay teardown entry by that much in the rare case a
+tree-kill's bounded reap (\~3s), which can delay teardown entry by that much in the rare case a
 budget fire coincides with teardown. I chose correctness (no wrong-child kill, no torn read)
 over shaving that window, having checked there's no deadlock — `terminate_process_tree` takes
 no other lock. The alternative (release before the reap) buys milliseconds and reopens a
@@ -8703,7 +8703,7 @@ landed to file them down was authored without source access. It made a guess abo
 them lived. That guess is the interesting part of this entry.
 
 B1 was the lone-test sibling. `write an is_palindrome function` had decomposed into two fleet
-tasks: `implement-is-palindrome` and a sibling `acceptance-tests` that then ran ~24 minutes
+tasks: `implement-is-palindrome` and a sibling `acceptance-tests` that then ran \~24 minutes
 *failing*, because it got its own git worktree and the implementation wasn't in it. The brief's
 diagnosis pointed at the right-sizing ruler in `decompose.py` — the collapse must have failed to
 fold the lone test task into the feature. Plausible. It was also wrong, and the brief told me to
@@ -8734,7 +8734,7 @@ single-feature behavior and are now deliberate behavior changes, flagged as such
 The LA, gating, noticed I'd surfaced all four rather than the one he'd named.
 
 B2 was the verify-the-stop that cried wolf. The same shakedown wrote a `SWAP_FAILED` file claiming
-OVMS was still resident after a forced stop, when in fact a ~15 GB model server simply unloads
+OVMS was still resident after a forced stop, when in fact a \~15 GB model server simply unloads
 slower than the old check-then-one-fast-retry window; the boot reconciler converged it moments
 later and the operator saw RECOVERED. The mechanism is correct; the timing was too eager.
 `_verify_ovms_stopped` now POLLs `ovms_alive` on a bounded window (mirroring the driver's existing
@@ -8769,7 +8769,7 @@ swap-back awaits the operator.)*
 
 ### 2026-06-23 — The acceptance task that tested nothing for twenty-four minutes
 
-On the rocket-calc dispatch the operator caught the resident 30B coder grinding for ~24 minutes
+On the rocket-calc dispatch the operator caught the resident 30B coder grinding for \~24 minutes
 (about 2,150 s of CPU) against an empty workspace, stopping only at the 3,600 s per-task cap. The
 decomposition had split his one-window "two number boxes, an Add button, a label that sums them"
 into three tasks — `create-main-window`, `implement-add-functionality`, and a dedicated
@@ -8937,7 +8937,7 @@ window-management approach. He shouldn't have to — the agent layer's AGENTS.md
 of that. But between his product intent and a runnable spec there is always a set of gaps
 the 14B has to fill by ASSUMING: decimals or integers only? a calculation history or not?
 a fixed window or a resizable one? Those are product decisions, and until now they were
-made silently. He approved a ~30-minute build without ever seeing the reads the system had
+made silently. He approved a \~30-minute build without ever seeing the reads the system had
 to make to turn his sentence into a plan. If one of those reads was wrong, he found out
 half an hour later, looking at the finished app.
 
@@ -9266,17 +9266,17 @@ The headless-coding dispatch swapped the resident 14B out for a 30B coder and ra
 build on the Arc 140V (run `20260624-120231-bd`). Two things from that run belong in the
 BlarAI record — one a hardware fact I had wrong in my own head, one a governance call.
 
-**The 30B load did not OOM, and for a reason worth understanding.** A ~29 GB committed
+**The 30B load did not OOM, and for a reason worth understanding.** A \~29 GB committed
 transient landing on a 31.32 GB box "should" have failed. It did not, because OOM on Windows
 fires when *commit charge* exceeds the *commit limit* — not when the working set exceeds
-physical RAM. The commit limit here is physical RAM + pagefile = 31.32 + ~11 = 42.32 GB, so a
+physical RAM. The commit limit here is physical RAM + pagefile = 31.32 + \~11 = 42.32 GB, so a
 29 GB transient sits comfortably under it. What actually happened — measured at the
 milestone-1 swap gate (2026-06-21) and corroborated by this run's pagefile peak (3.36 GB
-ever-used) — is that *physical* headroom exhausted (Available RAM cratered to ~67 MB,
-Committed peaked ~29.1 GB) and ~3.3 GB of modified pages spilled to disk in a brief
-~200k-pages/s storm. The load survives on three levers: swap-first (releasing the 14B frees
-~11 GB of baseline), the pagefile lifting the commit ceiling from 31 to 42 GB, and the 87%
-Intel Shared-GPU-Memory override giving the iGPU a ~27 GB window into the unified pool. The
+ever-used) — is that *physical* headroom exhausted (Available RAM cratered to \~67 MB,
+Committed peaked \~29.1 GB) and \~3.3 GB of modified pages spilled to disk in a brief
+\~200k-pages/s storm. The load survives on three levers: swap-first (releasing the 14B frees
+\~11 GB of baseline), the pagefile lifting the commit ceiling from 31 to 42 GB, and the 87%
+Intel Shared-GPU-Memory override giving the iGPU a \~27 GB window into the unified pool. The
 correction I had to make to my own earlier mental model: "Committed 29.1 GB < 31.3 GB physical
 so RAM never exhausted" was wrong — 31.3 GB is *physical*; the commit limit is higher
 (pagefile), and physical headroom *did* exhaust. The swap is therefore gated on a *headroom*
@@ -9554,7 +9554,7 @@ second, which also happens to be exactly the asset shape an embedded app graphic
 card, an icon on a surface — never a full-bleed square). The first proof made the point cleanly: a
 512² rocket generation came out as the brief predicted — passable rockets (two of them, and some
 garbled pseudo-text, at low CPU settings) sitting in a mosaic of coloured noise — and the cutout
-erased all of that mess and handed back the rockets on white, ~64% of the frame now transparent.
+erased all of that mess and handed back the rockets on white, \~64% of the frame now transparent.
 The artifacts that remained were the *generation's* (duplicate subject, low-step noise), not the
 cutout's. That distinction is the whole finding: rembg fixed the background problem completely, so
 the only lever left to pull is generation quality, which is steps, resolution, and a singular
@@ -9682,7 +9682,7 @@ driven by a pure, fully-tested BlarAI-side core, and the driver's invariant is l
 trade-off I accepted: the asset-generation phase (which genuinely needs the 30B swapped *out*, since
 Playground + 30B was the measured 32.5 GB breach) stays a separate, OVMS-gated step rather than a
 driver task-kind. The critique, by contrast, needs no swap at all — during a dispatch the 14B is
-already gone, so the VLM (~5 GB) co-resides with the 30B (~18 GB) under the ceiling.
+already gone, so the VLM (\~5 GB) co-resides with the 30B (\~18 GB) under the ceiling.
 
 The render proof was the good kind of surprise. WinUI 3 Desktop won't render an element that was
 never in a live visual tree — `RenderTargetBitmap` returns 0x0 if you try to be clever and never
@@ -9758,7 +9758,7 @@ through to the foreground tier, failed there too, and degraded — correctly, by
 design — to a structural-only check. No pixel critique, no iteration. The render
 wasn't broken: rebuilt warm it still did 784x529 in one second. What the unit
 tests never modelled was *the resident-30B memory and GPU pressure*. At `[6/6]`
-the 30B coder is still loaded and free RAM is ~5 GB; a cold App.exe's first
+the 30B coder is still loaded and free RAM is \~5 GB; a cold App.exe's first
 WinUI-compositor init under that pressure stalled past a 30s budget that had only
 ever been measured on an idle box. The fix was small — 90s and a warm-up retry,
 the second attempt being warm — but the lesson is that a timeout tuned on an idle
@@ -9863,7 +9863,7 @@ The capture never produced a pixel, even with the GPU completely free. Two compo
 process exits 0 immediately and hands the screenshot to a detached worker that writes the PNG about
 four seconds later, so the code's "check the file the instant the process exits" always missed it
 and fell through to a WinUI-oriented structural floor that doesn't even understand web. I pinned both
-empirically (variants A/E/F wrote 0 bytes; B/D wrote ~140 KB; variant G, the Start-Process form,
+empirically (variants A/E/F wrote 0 bytes; B/D wrote \~140 KB; variant G, the Start-Process form,
 wrote the file 4 s after `WaitForExit` returned exit 0). The fix is to poll for the file, not trust
 the process. With it the capture worked first try, and the VLM correctly reported "the rocket is
 missing — only a star, not a rocket" against criterion 2: a real defect, exactly the signal the loop
@@ -10127,10 +10127,10 @@ reframed the whole effort.
 It was all three of his hypotheses at once, in a specific and uncomfortable ratio. The
 *philosophy* was right: a deterministic build/test gate as the final judge, with the LLM and the
 VLM as signals, is the rare asset that makes a weak local model usable at all — most systems
-lack it, and we'd built it well. The *models* are a genuine, length-dependent ceiling: a ~30B
+lack it, and we'd built it well. The *models* are a genuine, length-dependent ceiling: a \~30B
 coder that fits in 31 GB builds a simple app end-to-end only 15-35% of the time, single digits
 once it's multi-feature, and the success rate falls roughly as p^N with the number of steps —
-METR measured ~100% on tasks under four minutes collapsing to under 10% past four hours. The
+METR measured \~100% on tasks under four minutes collapsing to under 10% past four hours. The
 "drew a star instead of a rocket, then spun for sixty minutes" failure I'd been treating as a
 harness bug was textbook: a capability-ceiling hit followed by the exact thing weak models are
 worst at — recovering from their own mistakes. But the part that stung was the engineering
@@ -10248,7 +10248,7 @@ three coloured cards it checks for were genuinely *there*, and deferred to the o
 deterministic gate earns its keep as much by staying silent on good work as by catching bad.
 
 **Next:** fold this and the seven 2026-06-26 fragments into `BUILD_JOURNAL.md` on a quiet tree; decide
-whether the now-proven cross-model critic should default to enabled (it costs one swap + ~3 min per
+whether the now-proven cross-model critic should default to enabled (it costs one swap + \~3 min per
 dispatch — a latency/rigour trade, the LA's call, [[default-proven-to-live]] pulling one way and
 dev-cycle-speed the other); investigate the read-only-review worktree mutation (#694) — candidate fix
 is to pre-gather the diff like `critic-run.ps1` does and then `bash: deny` the reviewer so the
@@ -10295,7 +10295,7 @@ P/R/F1 and false-allow/false-deny gates over its own 48-CAR corpus. The
 trade-off I took: **mirror its proven adapter pattern rather than import
 test code into `evals/`** — the new suite drives the same real functions
 (`DeterministicPolicyChecker.check`, `run_rule_engine`, `adjudicate` with a
-mocked-ALLOW GPU so rule verdicts stay non-appealable) in ~50 self-contained
+mocked-ALLOW GPU so rule verdicts stay non-appealable) in \~50 self-contained
 lines, keeping the long-lived harness free of a dependency on a test
 package, at the cost of a small acknowledged duplication. The alternative —
 importing `tests.pa_quality_benchmark.harness` — would have coupled the
@@ -10405,7 +10405,7 @@ speed by feeding the one resource the resident 14B actually fights for. I
 went with NPU as the shipped default, accepting a slower-than-GPU executor
 and a boot-time compile, because the whole point of #720 is taking work
 OFF the contended devices — and softened the compile cost with an OpenVINO
-blob cache (12.1 s cold → ~2.5 s warm), the exact optimisation the 14B
+blob cache (12.1 s cold → \~2.5 s warm), the exact optimisation the 14B
 deliberately refuses because its 9 GB blob cold-reads as slowly as it
 compiles. A 128 MB encoder is the opposite case. The honest caveat is
 recorded in the log: the isolation numbers *understate* the NPU's
@@ -10535,11 +10535,11 @@ reviewed baseline refresh. Going live is therefore three deliberate acts
 which can happen by drift.
 
 Two measured numbers worth keeping. The system-prompt tools block grew from
-2,210 to 3,333 chars with the two new schemas — +1,123 chars, ~+280 tokens
-under the repo's len//4 approximation (whole system prompt now ~5,103 chars
-/ ~1,275 tokens); that is real per-turn KV budget spent on advertising
+2,210 to 3,333 chars with the two new schemas — +1,123 chars, \~+280 tokens
+under the repo's len//4 approximation (whole system prompt now \~5,103 chars
+/ \~1,275 tokens); that is real per-turn KV budget spent on advertising
 retrieval, accepted because a model that cannot see the tools cannot reach
-for them. And the retrieval result cap landed at 4,000 chars (~1,000 tokens,
+for them. And the retrieval result cap landed at 4,000 chars (\~1,000 tokens,
 25% of the 4,096-token context budget), truncated deterministically with an
 explicit marker so the model knows it is reading a cut — sized against the
 auto-recall path's k=4 chunks so a tool retrieval cannot evict the
@@ -10627,7 +10627,7 @@ correct fix.
 
 Decisions flagged rather than made, for the morning: the grammar constraint
 shipped ON (proven-defaults-to-live doctrine; one TOML line to soak it OFF),
-the system prompt grew from ~270 to 841 tokens to carry the schema block (a
+the system prompt grew from \~270 to 841 tokens to carry the schema block (a
 real per-cold-prefill cost, accepted for format fidelity), and the legacy
 tool-call fallback stays in as transition telemetry until an LA call retires
 it. The NPU flip and the Whisper negative finding are recorded in their own
@@ -10702,7 +10702,7 @@ pass statuses for the model cases, not `skipped_hardware`) so any future
 drift in either direction fails the eval gate loudly. The alternative — leave
 the structural DENY in place and call the bias a safety feature — would have
 meant the GPU classifier stage was dead code for benign actions, burning
-~2-4 s of inference per request to produce a verdict the matrix would
+\~2-4 s of inference per request to produce a verdict the matrix would
 overrule.
 
 **Next:** fold the ISS-3 disposition back to the LA on #717 with these
@@ -11004,7 +11004,7 @@ grounded as `UNTRUSTED_EXTERNAL`, which is the tier fed to the Stage-5 cosine le
 detector. Decision two: don't echo untrusted content — an answer whose cosine
 similarity to an untrusted grounded chunk clears 0.85 is the exfiltration signature the
 control exists to catch. Both right. But a faithful answer relaying a search result is,
-by construction, ~verbatim to that result — that is what 0.930 measured. The control was
+by construction, \~verbatim to that result — that is what 0.930 measured. The control was
 not wrong about the similarity; it was wrong about the *direction*. Exfiltration is
 content leaving to an untrusted destination. Here the content was flowing *to the
 operator who asked for it*, and the search results were already public. Relaying public
@@ -11052,7 +11052,7 @@ difference between a leak and a relay.
 verbatim-echo control keyed on cosine alone cannot tell "leaked what you didn't ask for"
 from "answered with the public thing you did ask for" — it only sees that two strings
 match. Twice now (curated knowledge recall, web-search relay) the honest, requested
-behaviour has been ~verbatim to a grounded untrusted source and been held as a leak. The
+behaviour has been \~verbatim to a grounded untrusted source and been held as a leak. The
 durable fix is never a threshold tweak (a faithful relay is cosine → 1.0; no threshold
 separates it from an echo); it is provenance — carve the *intended-to-be-relayed* sources
 out of the leak feed by an explicit, auditable tier while keeping them untrusted for the
@@ -11456,7 +11456,7 @@ The UC-010 hires-fix — a second img2img pass at 1536² to sharpen small faces 
 wide shots — looked fine in every gate and on the Phase-0 memory measurement.
 Then the operator generated an image on the live box and it cascaded: the hires
 refine drove system RAM to **100%** (`avail=8 MB`) even with the 14B evicted for
-it, so it thrashed and the whole generate took ~209 s — past the 175 s UI failsafe,
+it, so it thrashed and the whole generate took \~209 s — past the 175 s UI failsafe,
 which reported a false "timed out" while the image was in fact completing. Worse,
 the 100% event battered the backend process (its resident set swapped down to a
 few MB), so the *next* action — saving the perfectly-good image that had just been
@@ -11471,7 +11471,7 @@ addition. The 1536² hires refine is a different, heavier animal, and its own co
 comment already called `hires_max_edge` an "OOM circuit breaker." On this 31.3 GB
 box it simply doesn't fit alongside everything else resident (web-search results,
 substrate, the reloading 14B), so the circuit breaker was set too high. The base
-1024² path peaks at ~62% RAM and is fast and stable; hires is a nice-to-have
+1024² path peaks at \~62% RAM and is fast and stable; hires is a nice-to-have
 sharpening pass, not the image itself. So it is now **off by default here**, with a
 dated comment on exactly why and the instruction to re-enable only at a reduced
 ceiling (1280 / factor 1.25) after re-measuring headroom.
@@ -11498,11 +11498,11 @@ image live-verify; base 1024^2 path unchanged + safe.)*
 
 *Plain summary: full-journal signal audit; the lessons list split out to `LESSONS.md` with a curated canonical tier and curation rules; mechanical gotchas moved to `FIELD_NOTES.md`; the entry form and SOP updated in `CLAUDE.md`. New lesson 196.*
 
-Tonight the operator asked the journal the question it exists to answer — what does all of this actually teach? — and answering it honestly meant reading all 11,876 lines, 255 entries, and 195 lessons at once. The reading found the journal healthy as evidence and degrading as signal. Three findings carried the audit. First, the lessons list had stopped compounding: the mock-versus-live class alone owns fifteen-plus numbers, minted as near-duplicates because search-before-mint was never a rule, and the one page a portfolio reviewer would actually read — the short list of canonical classes — did not exist. Second, the list was learning faster than the practice: a class named in May recurred at least six more times in late June, which means a written lesson installs nothing by itself. Third, entry inflation: early entries ran ~15 tight lines; recent ones run 60–130, much of it bookkeeping (gate counts, merge mechanics) already carried by the ledger and `CLAUDE.md`, which is agent self-documentation wearing a portfolio essay's clothes.
+Tonight the operator asked the journal the question it exists to answer — what does all of this actually teach? — and answering it honestly meant reading all 11,876 lines, 255 entries, and 195 lessons at once. The reading found the journal healthy as evidence and degrading as signal. Three findings carried the audit. First, the lessons list had stopped compounding: the mock-versus-live class alone owns fifteen-plus numbers, minted as near-duplicates because search-before-mint was never a rule, and the one page a portfolio reviewer would actually read — the short list of canonical classes — did not exist. Second, the list was learning faster than the practice: a class named in May recurred at least six more times in late June, which means a written lesson installs nothing by itself. Third, entry inflation: early entries ran \~15 tight lines; recent ones run 60–130, much of it bookkeeping (gate counts, merge mechanics) already carried by the ledger and `CLAUDE.md`, which is agent self-documentation wearing a portfolio essay's clothes.
 
 The fix is structural, because editorial willpower is exactly the kind of control lesson 44 says is not one. The numbered list moved verbatim to `LESSONS.md` — numbers untouched and permanent, since every `lesson N` reference in 255 entries resolves against them; renumbering was the rejected alternative, and it stays rejected for the same reason you never rewrite ratified history. That file now opens with a curated **Canonical Tier** (twenty classes, each naming its constituent lessons) and six curation rules, the sharpest being the **third-instance rule**: a lesson that recurs a third time must ship a structural enforcement — a gate test, a hook, a required checklist line — recorded on the lesson itself. Recurrences get a dated tally on the existing lesson instead of a new number. Environment-specific mechanics (the frozen-dataclass traceback mask, the .NET `$` anchor, the captured-pipe deadlock, the UIA tree's three preconditions) moved to a new `FIELD_NOTES.md` — reference material to grep before touching a surface, distinct from judgment a stranger could reuse. The trade-off taken: the journal loses its one-file self-containment — the opening line of this file once held everything — accepted for a findable canonical surface and a smaller merge-conflict region, the same trade the fragments inbox already made for the entry side (lesson 42).
 
-The SOP in `CLAUDE.md` changed to match: new entries carry a one-line plain-language summary under the poetic title (the titles are the voice; the subtitles are the index), narrative length is sized to the judgment rather than the bookkeeping, monthly retrospective entries give the arc a wide shot every ~30 days, and a quarterly consolidation pass (next due 2026-10-01) keeps the canonical tier honest. The stale opening blurb — still describing an air-gapped terminal program two capabilities and one governed egress door later — was corrected in the same pass, with the original preserved where it belongs, in the 2026-05-21 entry.
+The SOP in `CLAUDE.md` changed to match: new entries carry a one-line plain-language summary under the poetic title (the titles are the voice; the subtitles are the index), narrative length is sized to the judgment rather than the bookkeeping, monthly retrospective entries give the arc a wide shot every \~30 days, and a quarterly consolidation pass (next due 2026-10-01) keeps the canonical tier honest. The stale opening blurb — still describing an air-gapped terminal program two capabilities and one governed egress door later — was corrected in the same pass, with the original preserved where it belongs, in the 2026-05-21 entry.
 
 **Next:** the first monthly retrospective entry is due at the end of July; the first quarterly consolidation pass 2026-10-01; and the third-instance rule's first real test will be the next mock-versus-live recurrence — the class most likely to trip it, and the reason the rule exists.
 

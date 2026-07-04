@@ -22,12 +22,12 @@ it stick.
 
 ### The four domains and their weights
 
-| Domain | Title | ~% of exam |
+| Domain | Title | \~% of exam |
 |---|---|---|
-| I | Foundations of AI Governance | ~21% |
-| II | Laws, Standards and Frameworks for AI | ~25% |
-| III | Governance of AI Development | ~27% |
-| IV | Governance of AI Deployment and Use | ~27% |
+| I | Foundations of AI Governance | \~21% |
+| II | Laws, Standards and Frameworks for AI | \~25% |
+| III | Governance of AI Development | \~27% |
+| IV | Governance of AI Deployment and Use | \~27% |
 
 Domains III and IV together are over half the exam — the plan weights time accordingly.
 
@@ -36,9 +36,9 @@ Domains III and IV together are over half the exam — the plan weights time acc
 ## Your timeline
 
 - **Start:** 2026-05-22 (Week 1).
-- **Target exam date:** ~2026-07-03 (end of Week 6).
+- **Target exam date:** \~2026-07-03 (end of Week 6).
 - **Action this week:** book the exam now, for a date around 1–3 July. A booked exam is a commitment device and it locks the plan. Tell me the real date once booked and I will recalibrate the weekly split.
-- **Effort:** budget ~5–8 hours per week — a little most days beats one long session.
+- **Effort:** budget \~5–8 hours per week — a little most days beats one long session.
 
 ---
 
@@ -56,7 +56,7 @@ Domains III and IV together are over half the exam — the plan weights time acc
 
 ## Week-by-week
 
-### Week 1 — Domain I: Foundations of AI Governance (~21%)
+### Week 1 — Domain I: Foundations of AI Governance (\~21%)
 
 **Topics.** What AI and machine learning are; types of AI (supervised, unsupervised, reinforcement learning; generative AI and large language models; computer vision); narrow vs. general AI. The AI/ML lifecycle at a high level. Core technical concepts: training data, models, parameters, inference, foundation models. *Why* AI governance exists — the risks and harms of AI: bias and discrimination, privacy loss, safety, security, opacity, accountability gaps, environmental cost. Responsible / trustworthy-AI principles: fairness, accountability, transparency, explainability, safety, privacy, human oversight, robustness. Roles in AI governance and how an AI governance program is structured.
 
@@ -64,7 +64,7 @@ Domains III and IV together are over half the exam — the plan weights time acc
 
 **Self-check.** In your own words: bias, explainability, the difference between narrow and general AI. Name the trustworthiness characteristics. Why does AI need governance distinct from ordinary software governance?
 
-### Week 2 — Domain II, part 1: Existing laws applied to AI (~half of ~25%)
+### Week 2 — Domain II, part 1: Existing laws applied to AI (\~half of \~25%)
 
 **Topics.** Data-protection / privacy law and AI: GDPR's principles (lawfulness, fairness, transparency, purpose limitation, data minimization, accuracy, storage limitation, integrity & confidentiality, accountability); legal bases; data-subject rights; automated decision-making and profiling (Art. 22); Data Protection Impact Assessments. Pseudonymization vs. anonymization. The US privacy landscape — sectoral laws (HIPAA, GLBA, FCRA, COPPA) and state laws (CCPA/CPRA). Anti-discrimination and civil-rights law applied to AI (hiring, credit, housing). Intellectual property and AI. Product liability and consumer protection.
 
@@ -72,7 +72,7 @@ Domains III and IV together are over half the exam — the plan weights time acc
 
 **Self-check.** Recite GDPR's principles. Explain pseudonymization vs. anonymization and why it matters legally. Name HIPAA's two de-identification methods.
 
-### Week 3 — Domain II, part 2: AI-specific laws, standards & frameworks (~half of ~25%)
+### Week 3 — Domain II, part 2: AI-specific laws, standards & frameworks (\~half of \~25%)
 
 **Topics.** The EU AI Act: risk tiers (unacceptable, high, limited, minimal), high-risk obligations, general-purpose-AI rules, the timeline, and Article 10 data governance. The US picture: federal action, state AI laws (e.g., Colorado), sectoral guidance. Global instruments: OECD AI Principles, UNESCO, the Council of Europe AI Convention, and other jurisdictions. Standards and frameworks: NIST AI Risk Management Framework (its GOVERN / MAP / MEASURE / MANAGE functions), ISO/IEC 42001 (AI management system), ISO/IEC 23894 (AI risk), ISO/IEC 27701, the NIST Privacy Framework.
 
@@ -80,7 +80,7 @@ Domains III and IV together are over half the exam — the plan weights time acc
 
 **Self-check.** List the EU AI Act risk tiers. Name NIST AI RMF's four functions. Say what ISO/IEC 42001 is for.
 
-### Week 4 — Domain III: Governance of AI Development (~27%)
+### Week 4 — Domain III: Governance of AI Development (\~27%)
 
 **Topics.** The AI development lifecycle in depth: problem definition, data collection and governance, model design and training, testing and validation, documentation. Data governance for AI — data quality, representativeness, bias in data, provenance and lineage, minimization in training data. Model documentation — model cards, datasheets, technical documentation. Testing — validation, bias and fairness testing, red-teaming, adversarial testing. Impact assessments — AI impact assessments, fundamental-rights impact assessments, DPIAs. Designing in privacy, security and safety from the start; identifying and mitigating risk at the design phase. Third-party and procured components in development.
 
@@ -88,7 +88,7 @@ Domains III and IV together are over half the exam — the plan weights time acc
 
 **Self-check.** Name the lifecycle stages. Say what belongs in a model card. Describe what an AI impact assessment covers and when you run one.
 
-### Week 5 — Domain IV: Governance of AI Deployment and Use (~27%)
+### Week 5 — Domain IV: Governance of AI Deployment and Use (\~27%)
 
 **Topics.** Deployment readiness and release governance. Post-deployment monitoring — model drift, performance degradation, ongoing testing. AI incident management and response. Human oversight in operation (human in / on / out of the loop). Transparency and disclosure to users; labeling AI-generated content. Third-party and procurement governance for deployed systems; vendor management and contracts. Decommissioning and retirement. Ongoing risk management, audits, and accountability structures.
 

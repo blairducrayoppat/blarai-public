@@ -130,7 +130,7 @@ These need the benchmark harness + hardware time, which is Session 2's job. Each
 carries it with its benefit/risk/effort.
 
 - **B1. EAGLE-3 vs the vanilla 0.6B draft** — 8B (and 14B if D1=yes), sweeping `num_assistant_tokens` 3–7: tokens/s,
-  **acceptance length**, peak co-resident GiB. Calibrated expectation: modest on a bandwidth-bound iGPU (~1.3–1.8× over
+  **acceptance length**, peak co-resident GiB. Calibrated expectation: modest on a bandwidth-bound iGPU (\~1.3–1.8× over
   no-draft, possibly only marginally above the already-tuned 0.6B draft) — the honest result is the point. (R5)
 - **B2. INT4 KV-cache quant sweep** (A3) — {FP16,INT8,INT4} × {16K,32K} prompts: peak RAM, TTFT, TPOT, quality. (R2#1)
 - **B3. `min_p` A/B** (A1) on the AO eval set; **`guidance_rescale` A/B** (A2) on SDXL. (R1#1,#5)
@@ -174,7 +174,7 @@ carries it with its benefit/risk/effort.
   pool first. Measure/ticket. (R4#2,#3)
 - **C7. Enable GPU model caching (`CACHE_DIR`)** — the code sets `CACHE_DIR=""` (caching off) at every pipeline; enabling
   it + `CACHE_BLOB_ID` speeds every reload (the 14B reload after a hires eviction, VLM/SDXL on-demand loads). It's a
-  behaviour change (compiled-blob disk writes, ~GBs; cache-invalidation on driver/model change). Decide the cache dir +
+  behaviour change (compiled-blob disk writes, \~GBs; cache-invalidation on driver/model change). Decide the cache dir +
   measure (B6) before adopting. Ticket. (R2#3)
 - **C8. OVMS loopback hardening** — API-key auth on `/v3`, explicit localhost bind, non-root, default SSRF restriction.
   Defense-in-depth even air-gapped (other local processes can reach the port). Low effort. Ticket. (R4#5)
@@ -198,7 +198,7 @@ carries it with its benefit/risk/effort.
 - **OpenVINO backend for llama.cpp** (2026.1 preview) — different runtime ecosystem; no value to an in-process GenAI
   stack. (R2)
 - **Video (T2V/LTX), Whisper, JS/Node pipelines, TTS** — no use case in BlarAI. (R1)
-- **Models over the 31.323 GiB ceiling** — Qwen3-Next-80B-A3B (~40 GiB INT4), GPT-OSS-120B. Not runnable here. (R1,R3)
+- **Models over the 31.323 GiB ceiling** — Qwen3-Next-80B-A3B (\~40 GiB INT4), GPT-OSS-120B. Not runnable here. (R1,R3)
 - **Speculators-format EAGLE-3 (`Eagle3Speculator`)** — unsupported by optimum-intel (PR #1468 closed unmerged); the
   on-disk `eagle3-qwen3-8b-raw` is this format → use AngelSlim instead. (R5)
 - **OVSA (SGX/TEE license-server framework), HF model-download retry/resume, Docker resource auto-tuning, KServe/TFS

@@ -56,7 +56,7 @@ BlarAI-side only — no devplatform writes. devplatform doctrine authoring is EA
   `</vikunja_task_tracking>` close tag. Replaced the defunct `P5-Active`/`P5-Complete` label
   names in `<labels>` with the live canonical names (`Active id 1`, `Complete id 2`, etc.)
   per matrix row #55. Refreshed the `<phase name="Phase_5_...">` element per matrix F-4
-  (Task 7 COMPLETE; Sprints 7/8/9 COMPLETE; Sprint 10 ACTIVE; test baseline ~981/22; ledger
+  (Task 7 COMPLETE; Sprints 7/8/9 COMPLETE; Sprint 10 ACTIVE; test baseline \~981/22; ledger
   frozen at Entry 52 → `docs/ledger/` Q1-1 per-file entries).
 
 - **`AGENTS.md`**: 18 → 12 lines (wholesale replacement). Byte-exact replacement with the
@@ -101,7 +101,7 @@ docs/ledger/20260511_222928_sprint10_ea2_blarai-strip.md
     per LA verbatim wording.
   - IR-10: follows row #37 (no additional action).
 - **ACTIVE-STATE-REFRESH**: PASS. CLAUDE.md §"Active State" now lists Sprint 10 ACTIVE
-  (task #369), Sprints 7/8/9 COMPLETE, test baseline ~981/22, ledger frozen at Entry 52
+  (task #369), Sprints 7/8/9 COMPLETE, test baseline \~981/22, ledger frozen at Entry 52
   pointer, Domain 6 COMPLETE, Task 7 COMPLETE, ISS-1/2/3 still open + ISS-4-7 resolved,
   HEAD reference advice prefers `git log --oneline main`.
 - **LINE-COUNT-CHECK**: PASS (target met).
@@ -185,7 +185,7 @@ touch devplatform from this branch — not even read-only.
 
 None at completion. Optional in-scope refresh of `<phase name="Phase_5_...">` element
 (matrix F-4) was applied — the element now reflects Sprints 7/8/9 COMPLETE, Sprint 10
-ACTIVE, Task 7 COMPLETE, test baseline ~981/22, and the ledger-frozen-at-Entry-52 →
+ACTIVE, Task 7 COMPLETE, test baseline \~981/22, and the ledger-frozen-at-Entry-52 →
 `docs/ledger/` Q1-1 transition. No `docs/ledger/Q1-1` files were touched beyond this
 ledger entry itself.
 

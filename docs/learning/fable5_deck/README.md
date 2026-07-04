@@ -19,7 +19,7 @@ air-gap reversed as one reviewed act) → the evidence layer (journal/lessons
 discipline) → what this means for a team → close.
 
 Content budget is research-derived: rehearsed delivery ≈ 130–145 words/min,
-≈ 1 slide/min ceiling → 13 slides, ~1,880 speaker-note words ≈ 13–14.5 min
+≈ 1 slide/min ceiling → 13 slides, \~1,880 speaker-note words ≈ 13–14.5 min
 with transitions. Rehearse against the built-in timer at the 13:00 pace.
 
 ## Using it

@@ -60,7 +60,7 @@ preparable today** via optimum-intel v2.0.0.
 ## Recommendation + options (for a future focused effort — operator's call)
 
 Defer. Cost/benefit favors it: R5's calibration is that EAGLE-3's gain on a bandwidth-bound iGPU is **modest**
-(~1.3–1.8× over no-draft, possibly only marginally above the already-tuned 0.6B draft that gives ~1.5×) — this was
+(\~1.3–1.8× over no-draft, possibly only marginally above the already-tuned 0.6B draft that gives \~1.5×) — this was
 always a speculative A/B, not a sure win. Options, lowest-effort first:
 1. **File an optimum-intel issue** with the report above (the operator is an upstream contributor; this is exactly
    the actionable shape — the v2.0.0 `LlamaForCausalLMEagle3` modeling does not match the AngelSlim checkpoint

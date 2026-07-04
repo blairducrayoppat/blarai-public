@@ -26,7 +26,7 @@ verdict: null
 - `launcher/tests/test_vm_manager.py` — extended (WI-9, 3 tests).
 - `docs/ledger/20260423_062642_sprint8_ea4_shared-launcher-hardening.md` — **new** ledger entry.
 
-**Total new tests: 46** (above the 20-test floor, within the ~42-test estimate).
+**Total new tests: 46** (above the 20-test floor, within the \~42-test estimate).
 
 ## Acceptance check results
 

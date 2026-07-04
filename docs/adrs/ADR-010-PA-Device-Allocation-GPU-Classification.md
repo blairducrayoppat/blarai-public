@@ -37,7 +37,7 @@ NPU cannot meet the PA adjudication latency budget:
 
 All NPU optimization knobs (GENERATE_HINT, NPUW_LLM_PREFILL_ATTENTION_HINT,
 NPU_COMPILER_TYPE, max_new_tokens reduction) were exhausted. The NPU latency
-floor is ~430ms minimum, ~540ms mean — the bottleneck is prefill-phase
+floor is \~430ms minimum, \~540ms mean — the bottleneck is prefill-phase
 processing on the 1.5B-parameter model. This is a hardware throughput limit,
 not an optimization gap.
 
@@ -103,7 +103,7 @@ Device allocation:
 |------|----------|------------|
 | GPU contention from Windows DWM | LOW | PA classification is 78ms burst; DWM compositing is lightweight; fail-closed timeout catches stalls |
 | No hardware scheduling priority for PA on GPU | MEDIUM | No contention to arbitrate — PA is sole LLM consumer on GPU; Orchestrator is on NPU |
-| Shared LPDDR5X pressure from GPU allocation | LOW | GPU weights (~1GB compiled) already counted against 31.323GB ceiling; comparable to NPU allocation |
+| Shared LPDDR5X pressure from GPU allocation | LOW | GPU weights (\~1GB compiled) already counted against 31.323GB ceiling; comparable to NPU allocation |
 
 ### 3.4 ADR-008 Applicability
 

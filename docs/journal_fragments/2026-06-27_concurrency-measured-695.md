@@ -19,7 +19,7 @@ best-of-N prompt exactly once and `u8` halves the KV bytes. The thing that was s
 wall is almost free for this workload precisely because best-of-N candidates share their prompt.
 What DOES bind is compute: the integrated GPU saturates around 40-90 tok/s aggregate, so the
 speedup is real but sub-linear and per-request latency climbs with N (5.1 s to 17.2 s at eight).
-The net for best-of-N is a ~1.9x-to-2.4x cut in wall-clock-to-best-result, cache-cheap, with
+The net for best-of-N is a \~1.9x-to-2.4x cut in wall-clock-to-best-result, cache-cheap, with
 little to gain past about four concurrent.
 
 That is a clean, favorable answer to the question #695 was created to ask — parallelism is

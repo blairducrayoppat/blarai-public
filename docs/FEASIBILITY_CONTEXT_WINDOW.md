@@ -36,7 +36,7 @@ Non-goals respected:
 
 - **Primary enforcement:** `ContextManager.trim_to_budget()` FIFO eviction in `services/assistant_orchestrator/src/context_manager.py`
 - **Config limits:** `[context].max_context_tokens=4096` and `[npu].max_context_tokens=4096` in both orchestrator TOML profiles
-- **Composition:** system prompt (~270 tokens) + conversation turns + grounded chunks
+- **Composition:** system prompt (\~270 tokens) + conversation turns + grounded chunks
 
 ### Output generation
 
@@ -110,8 +110,8 @@ Relevant measured points (NPU):
 
 For transformer attention:
 
-- Prefill complexity ~ `O(n^2)` with sequence length `n`
-- Decode per-token complexity ~ `O(n)` with existing KV length
+- Prefill complexity \~ `O(n^2)` with sequence length `n`
+- Decode per-token complexity \~ `O(n)` with existing KV length
 
 Relative multipliers vs 4K baseline:
 
@@ -157,7 +157,7 @@ Interpretation:
 
 1. **Policy Agent coverage boundary:** PA adjudicates the raw request CAR before orchestration. Expanding retained conversation context does not proportionally increase PA visibility because PA is not validating the full assembled model context window.
 2. **Multi-turn injection persistence:** Larger retained history allows adversarial prompt fragments to survive longer across turns, increasing long-horizon injection surface.
-3. **System prompt dilution:** At 4,096 tokens, ~270-token system prompt is ~6.6% of context. At 16K, ~1.7%. Lower instruction ratio can reduce instruction-following robustness in long contexts.
+3. **System prompt dilution:** At 4,096 tokens, \~270-token system prompt is \~6.6% of context. At 16K, \~1.7%. Lower instruction ratio can reduce instruction-following robustness in long contexts.
 
 ## 5.2 Output cap expansion
 

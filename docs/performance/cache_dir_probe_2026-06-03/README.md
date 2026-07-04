@@ -32,6 +32,6 @@ OS process so cold/warm load timing is not contaminated by in-process warm state
 ## Result (one line)
 Output is **byte-identical** across all 5 runs (fresh compile == warm cache);
 the warm cache yields **no reliable startup win** on this hardware (fresh 14B
-compile ~11 s ≈ cold-disk 9 GB blob read) at a one-time +42 s write + 9.0 GB
+compile \~11 s ≈ cold-disk 9 GB blob read) at a one-time +42 s write + 9.0 GB
 disk cost. Recommendation on record: keep `CACHE_DIR=""`, correct the
 gpu-runtime.md rationale. Decision pending (User-Operator).

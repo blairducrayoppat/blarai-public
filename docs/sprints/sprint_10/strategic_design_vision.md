@@ -64,7 +64,7 @@ never seen the BlarAI runtime context.
 - **Predecessor SWAGR**: [docs/sprints/sprint_9/Strategic_Work_Analysis_and_Gap_Report_Sprint_9_20260424_053153.md](../sprint_9/Strategic_Work_Analysis_and_Gap_Report_Sprint_9_20260424_053153.md)
 
 Sprint 9 ("Governance Documentation") delivered all 12 in-scope GOV
-(Governance) ticket docs plus the `STYLE.md` and `README.md` synthesis (~3,925
+(Governance) ticket docs plus the `STYLE.md` and `README.md` synthesis (\~3,925
 lines of content) across 5 sequential EA milestones, all auto-merged under
 `trusted_scope`. Sprint 9 SCR claimed criterion #3 FAIL on GOV-ticket closure
 but the Sprint 9 SWAGR independently verified all 12 GOV tickets in fact have
@@ -186,7 +186,7 @@ finds itself routed into the fragmented authority.
 
 The specific cost: every Claude Code session, every Copilot agent session,
 every Codex / Cowork sandbox session that initializes by reading these three
-files spends ~30–40% of its initial-context budget on doctrine that does not
+files spends \~30–40% of its initial-context budget on doctrine that does not
 apply to the work it is about to do. A fresh Co-Lead session reads BlarAI
 runtime architecture it will never touch; a fresh BlarAI-runtime-task
 Claude Code session reads fleet sprint-lifecycle conventions it will never use.
@@ -270,7 +270,7 @@ documentation drift.
 
 5. **BlarAI §"Active State" current.** *Verification*: BlarAI's `CLAUDE.md`
    §"Active State" reflects post-Sprint-9-close baseline: HEAD reference points
-   at `git log --oneline main` (or current main); test baseline reads ~981
+   at `git log --oneline main` (or current main); test baseline reads \~981
    passed (per CLAUDE.md note "post-Sprint-8 EA-5"); Task 7 marked COMPLETE;
    Sprints 7, 8, 9 all marked COMPLETE; Sprint 10 marked active; Domain 6 MCP
    marked COMPLETE. The 2-sprint-stale finding from Sprint 8 SWAGR gap #5 +
@@ -279,7 +279,7 @@ documentation drift.
 6. **Post-split BlarAI line counts decrease meaningfully.** *Verification*:
    `(Get-Content C:\Users\mrbla\BlarAI\CLAUDE.md, C:\Users\mrbla\BlarAI\.github\copilot-instructions.md, C:\Users\mrbla\BlarAI\AGENTS.md | Measure-Object -Line).Lines`
    returns a total ≥ 30% smaller than the pre-split 572-line baseline (target
-   ~285–400 lines, soft target 50% reduction). Line count is a proxy — section
+   \~285–400 lines, soft target 50% reduction). Line count is a proxy — section
    coherence wins. If a 30% reduction would leave dangling references or
    break a coherent runtime narrative, EA-2 prefers coherence and explicitly
    cites which sections it kept verbatim despite hitting the floor in its
@@ -317,7 +317,7 @@ documentation drift.
    by retaining the BlarAI-side mirror, possibly re-phrased to fit a
    runtime-only narrative. Refresh BlarAI's `CLAUDE.md` §"Active State"
    section from the post-Sprint-9 baseline (live HEAD reference, current test
-   baseline ~981, sprint roster state, ledger pointer). Update
+   baseline \~981, sprint roster state, ledger pointer). Update
    BlarAI's `AGENTS.md` thin pointer to reflect the post-split BlarAI shape
    (the pointer becomes more accurate because it now points at strictly
    runtime-focused doctrine). Add cross-reference pointers (BlarAI →
@@ -692,15 +692,15 @@ N/A — serial kickoff (no other sprint active). See §5.4 for full rationale.
 | EA-3's devplatform direct-to-main commit pattern differs from BlarAI's branched-merge pattern, surprising a peer reviewer | Confirmed (not a risk per se, design choice) | N/A | EA-3 documents the cross-repo pattern divergence in its completion report; the divergence reflects existing Stage 6.7.5 history and is not a Sprint 10 invention |
 | Active State refresh in EA-2 conflicts with cf-1's eventual Active State write | Low | Low | Active State is BlarAI runtime state, not fleet state — should not be cf-1's territory; if cf-1 nevertheless edits Active State, the conflict is resolved by Sprint 11 (or whichever sprint follows cf-1) per standard sprint-transition Co-Lead Phase 3 refresh |
 | `.github/copilot-instructions.md` XML envelope splits non-trivially (parent element has children that should split) | Medium | Low | EA-2 / EA-3 preserve XML well-formedness in both repos; if a parent's children split, the parent is duplicated in both repos with the appropriate child subset; EA-1's matrix flags such elements as DECISION-PENDING-LA if non-trivial |
-| EA-2 exceeds `trusted_scope` 500-LOC threshold and merge-gate ESCALATEs | High (likely) | Low | LA-merge-approve via `la_merge_approve.ps1` is the accepted workaround, established in Sprint 9 EA-4 (ISS-239 ESCALATE pattern); LA budget for ~5 min ESCALATE handling per §11 |
+| EA-2 exceeds `trusted_scope` 500-LOC threshold and merge-gate ESCALATEs | High (likely) | Low | LA-merge-approve via `la_merge_approve.ps1` is the accepted workaround, established in Sprint 9 EA-4 (ISS-239 ESCALATE pattern); LA budget for \~5 min ESCALATE handling per §11 |
 | Sprint 10 EA prompts (authored by SDO at execution time) inherit Stage 6 ack chain framing inappropriately | Low | Low | Per Stage 6 FINAL close report rationale, "revival ticket gets fresh ack chain"; SDO references Sprint 10 SDV (this document) as the alignment baseline, not the Stage 6 spec; ack labels follow `g10-ea<N>_n<M>` global-EA-numbering pattern |
 | BlarAI's `tools/vikunja_mcp/README.md` Quick Start §2 has known stale `cd` reference (Stage 6 close report A12 carry-over) — Sprint 10 doctrine reads might surface it | Confirmed (pre-existing) | Low | Out-of-scope per §5.2 #1 (Sprint 10 doesn't refactor fleet code or run-tooling docs); EA-1 records the encounter as a finding but does not act |
 
 ### 9.2 Known unknowns
 
 1. **Final post-split line counts** — depend on EA-1's matrix decisions.
-   Soft target ~50% reduction (~286 lines total across the three BlarAI
-   files), hard floor 30% reduction (~400 lines). Variance driven by how
+   Soft target \~50% reduction (\~286 lines total across the three BlarAI
+   files), hard floor 30% reduction (\~400 lines). Variance driven by how
    many DELETE rows the matrix produces vs MIRROR-both rows.
 2. **Number of MIRROR-both rows in EA-1's matrix** — affects EA-3's authorial
    volume in devplatform. Estimate range: 3–8 mirror rows (Comprehension Gate,
@@ -810,7 +810,7 @@ the gap and recommend template amendment. Sprint 11+ concern, not a Sprint
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| LA (Lead Architect) | SDV sign-off; CAR adjudication if EA-1's classification matrix surfaces a DECISION-PENDING-LA row that requires LA arbitration; merge approval via `la_merge_approve.ps1` if EA-2 exceeds `trusted_scope` (likely); SCR + SWAGR read at sprint close; fleet pause/unpause coordination across the cf-1 boundary | ~30 min total |
+| LA (Lead Architect) | SDV sign-off; CAR adjudication if EA-1's classification matrix surfaces a DECISION-PENDING-LA row that requires LA arbitration; merge approval via `la_merge_approve.ps1` if EA-2 exceeds `trusted_scope` (likely); SCR + SWAGR read at sprint close; fleet pause/unpause coordination across the cf-1 boundary | \~30 min total |
 | Co-Lead Architect | This kickoff session (Phases 0–5 of `/sprint-kickoff`); SDO continuation XML authoring for Sprint 10 if/when fleet unpauses; EA peer review for 3 EAs at comprehension gate + completion gate; SCR authoring at sprint close | Autonomous per DEC-11 §1.1 |
 | SDO (Strategic Development Orchestrator) | EA prompt authoring for 3 EAs (each prompt grounded in this SDV + EA-1's matrix where relevant); EA peer review at completion gate; non-overlap sweep is N/A (single-sprint serial) | Autonomous per DEC-11 §1.2 |
 | EA Code | Milestone execution for 3 EAs; EA-1 produces classification matrix as a markdown file; EA-2 commits to BlarAI on a feature branch + merges; EA-3 commits to devplatform main directly per Stage-6.7.5 convention; each EA reads this SDV (and EA-1's matrix where applicable) as alignment baseline | Autonomous per DEC-11 §1.3 |
@@ -818,7 +818,7 @@ the gap and recommend template amendment. Sprint 11+ concern, not a Sprint
 
 ## 12. Estimated effort
 
-- **Rough duration**: 3 EAs × ~1 fleet-day each (Sprint 9 baseline) = ~3
+- **Rough duration**: 3 EAs × \~1 fleet-day each (Sprint 9 baseline) = \~3
   fleet-days. Sprint 10 may run slower than Sprint 9 because EA-1's design
   surface is non-trivial (classification across 572 lines of mixed doctrine
   with multiple DECISION-PENDING-LA candidates likely surfacing). Reference
@@ -826,14 +826,14 @@ the gap and recommend template amendment. Sprint 11+ concern, not a Sprint
   duration is gated by LA's pre-cf-1-pause schedule rather than fleet
   capacity per se.
 
-- **LA active-time expectation**: ~30 minutes total — 15 min SDV sign-off
-  (this kickoff session); ~5 min CAR adjudication if EA-1's matrix surfaces
-  a DECISION-PENDING-LA row (estimated 1–3 such rows); ~5 min merge-gate
+- **LA active-time expectation**: \~30 minutes total — 15 min SDV sign-off
+  (this kickoff session); \~5 min CAR adjudication if EA-1's matrix surfaces
+  a DECISION-PENDING-LA row (estimated 1–3 such rows); \~5 min merge-gate
   ESCALATE handling for EA-2 (likely to exceed `trusted_scope` line-count
-  threshold); ~5 min SCR + SWAGR read at sprint close. Variance driver: if
+  threshold); \~5 min SCR + SWAGR read at sprint close. Variance driver: if
   EA-1's classification matrix is unambiguous (DECISION-CLEAR for all rows),
-  LA active time falls to ~25 min; if the matrix surfaces 4+ DECISION-PENDING-
-  LA rows, LA active time may rise to ~45 min.
+  LA active time falls to \~25 min; if the matrix surfaces 4+ DECISION-PENDING-
+  LA rows, LA active time may rise to \~45 min.
 
 - **Confidence in estimate**: medium. Three drivers of variance:
   1. EA-1's classification ambiguity rate — primary variance.

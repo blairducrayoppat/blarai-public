@@ -17,7 +17,7 @@ ADR-016 shipped the Substrate MVP: `substrate.db`, chunked + embedded documents 
 brute-force cosine retrieval, encrypted under ADR-025. It is conversational memory, and it works.
 What it is not is a **curated knowledge bank**: it has no provenance column, no approval state, no
 source-type, no lexical retrieval, and a known embedding-quality defect — chunks are 2048 chars
-(~512 tokens, `substrate.py:79`) but embedded through the PGOV leakage detector's
+(\~512 tokens, `substrate.py:79`) but embedded through the PGOV leakage detector's
 `max_input_length=128` (`pgov.py:582,680`), so roughly three quarters of every stored chunk does not
 inform its vector. bge-small-en-v1.5 natively supports 512 tokens.
 
@@ -242,7 +242,7 @@ not silent:
   gate lands when the boundary does.
 - **HNSW/ANN + at-scale lexical** — brute-force cosine + in-RAM FTS5 hold at personal scale; the
   `_search_kind`-style private-seam discipline is kept in the new store so an ANN index slots in
-  unchanged (~100K-vector rule of thumb, ADR-016 §2.5).
+  unchanged (\~100K-vector rule of thumb, ADR-016 §2.5).
 
 ## Consequences
 

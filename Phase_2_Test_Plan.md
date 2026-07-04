@@ -155,7 +155,7 @@ VALIDATE_NPU_SCHEDULING
 
 1. Open Task Manager → Performance → Memory.
 2. Record "Hardware Reserved" value — this should include the DVMT pre-allocation.
-3. Record "Total Physical Memory" visible to Windows (expected: ~31.5GB or ~31.3GB after firmware tables).
+3. Record "Total Physical Memory" visible to Windows (expected: \~31.5GB or \~31.3GB after firmware tables).
 4. Cross-reference with `systeminfo | findstr "Total Physical Memory"`.
 
 **Metrics Captured:**
@@ -238,7 +238,7 @@ VALIDATE_DVMT_BUDGET
 For each agent component (simulated with representative workloads):
 
 1. **Policy Agent Proxy:** Load 1.7B INT4 model on NPU. Run 100 inferences. Record peak RSS.
-   - Include: KV-cache (target 350–550MB), deterministic rule engine placeholder (~50MB), mTLS state placeholder (~5MB).
+   - Include: KV-cache (target 350–550MB), deterministic rule engine placeholder (\~50MB), mTLS state placeholder (\~5MB).
 
 2. **Orchestrator Proxy:** Load 1.7B INT4 model on NPU. Run 100 inferences with 1024-token context. Record peak RSS.
    - Include: KV-cache (target 300–500MB).
@@ -259,7 +259,7 @@ For each agent component (simulated with representative workloads):
 | Orchestrator | Peak RSS (total) | MB | ≤ 1800 (with guest OS) |
 | Orchestrator | KV-cache measured | MB | 300–500 |
 | Semantic Router | Peak RSS (total) | MB | ≤ 150 |
-| Shared mmap weights | Physical pages (single copy) | MB | ~1000 |
+| Shared mmap weights | Physical pages (single copy) | MB | \~1000 |
 | Substrate | Peak RSS (total) | MB | ≤ 3000 |
 
 #### Test 3.4 — Execution Tier Summation and Validation

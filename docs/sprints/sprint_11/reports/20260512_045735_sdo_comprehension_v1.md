@@ -79,7 +79,7 @@ Section 8 milestone queue (verbatim):
 | EA-4 | M | BlarAI only | `feature/p5-task11-ea4-test-baseline-drift-investigation` | BlarAI `docs/sprints/sprint_11/test_baseline_drift_investigation.md` (≥80 lines), BlarAI ledger. **READ-ONLY** on tests/pyproject.toml/conftest.py |
 | EA-5 | S-M | BlarAI + devplatform Sprint Auditor wake template | BlarAI: `feature/p5-task11-ea5-doctrine-doc-hygiene-cleanup`; devplatform direct-to-main | BlarAI `.github/copilot-instructions.md`, `tools/vikunja_mcp/README.md`, cross-ref-style record (≥20 lines, landing surface EA-5's choice), BlarAI ledger; devplatform `docs/scheduled/wake_templates/sprint_auditor.md` §2.2 |
 
-Net commits: ~8 (6 BlarAI feature-branch-then-merge, 3 devplatform direct-to-main per Stage 6.7.5).
+Net commits: \~8 (6 BlarAI feature-branch-then-merge, 3 devplatform direct-to-main per Stage 6.7.5).
 
 ## D. Cross-repo posture
 
@@ -114,7 +114,7 @@ Sprint 11 is the **second consecutive** cross-repo sprint and the **first delibe
 6. **Cross-ref-style record exists** → Test-Path + ≥20 lines on EA-5's chosen landing surface.
 7. **Stage 6.7.5 doc-hygiene closed** → vikunja_mcp README cwd-agnostic verified from two cwds + Sprint Auditor wake-template §2.2 amendment landed.
 
-Test baseline at kickoff: ~981 passed, 22 skipped (CLAUDE.md §Active State current value); Sprint 10 SWAGR §8.1 reports 1001/2 at SCR commit. Sprint 11 EA-4 investigates this +20/-20 movement; Sprint 11 does not change the baseline (EA-4 is READ-ONLY investigation).
+Test baseline at kickoff: \~981 passed, 22 skipped (CLAUDE.md §Active State current value); Sprint 10 SWAGR §8.1 reports 1001/2 at SCR commit. Sprint 11 EA-4 investigates this +20/-20 movement; Sprint 11 does not change the baseline (EA-4 is READ-ONLY investigation).
 
 ## G. Lesson application
 

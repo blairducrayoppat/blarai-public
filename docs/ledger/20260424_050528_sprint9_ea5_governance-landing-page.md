@@ -44,7 +44,7 @@ Sprint 8 (L-16).
 
 - **LINE-FLOOR** (`wc -l docs/governance/README.md`): 334 raw lines.
   Substantive line count via `grep -cvE '^$|^<!--'` = **290**. Floor
-  ≥ 150 cleared by ~93%. PASS.
+  ≥ 150 cleared by \~93%. PASS.
 - **STYLE-ADAPTED-CONFORMANCE** (`grep -c "^## " docs/governance/README.md`):
   **10** level-2 headers. Threshold ≥ 9 cleared. The 10 are:
   Audience, How to Read This Directory, Governance Domain Inventory,

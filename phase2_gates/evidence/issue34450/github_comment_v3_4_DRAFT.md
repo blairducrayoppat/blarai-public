@@ -250,9 +250,9 @@ optimum-cli export openvino \
   ./qwen3-0.6b-int4-sym-g128
 ```
 
-`LLMPipeline(ir, "NPU")` then compiles in ~8.5 s on real NPU and generates
+`LLMPipeline(ir, "NPU")` then compiles in \~8.5 s on real NPU and generates
 end-to-end (`pipe.generate("The capital of France is", max_new_tokens=16)`
-returns sensible Qwen3 output in ~1 s).
+returns sensible Qwen3 output in \~1 s).
 
 Channel-wise asym (`--group-size -1`) also works end-to-end on NPU even
 though it's not in Intel's documented recipe. INT8 weight-only constructs

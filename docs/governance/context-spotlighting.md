@@ -166,15 +166,15 @@ The context manager caps total context at `max_context_tokens = 4096`
 (`__init__` line 76). Delimiter overhead reduces usable context.
 Approximate Qwen3 tokenization:
 
-- `<\|SYSTEM_BEGIN\|>` → ~5 tokens (single occurrence per session)
-- `<\|SYSTEM_END\|>` → ~5 tokens
-- `<\|GROUNDED_CONTEXT_BEGIN\|>` → ~7 tokens (per chunk)
-- `<\|GROUNDED_CONTEXT_END\|>` → ~7 tokens (per chunk)
+- `<\|SYSTEM_BEGIN\|>` → \~5 tokens (single occurrence per session)
+- `<\|SYSTEM_END\|>` → \~5 tokens
+- `<\|GROUNDED_CONTEXT_BEGIN\|>` → \~7 tokens (per chunk)
+- `<\|GROUNDED_CONTEXT_END\|>` → \~7 tokens (per chunk)
 
 Worked example: with 1 SYSTEM prompt and 8 retrieved chunks, fixed
 delimiter overhead = `2×5 + 8×(7+7) = 122 tokens`. Usable budget
-drops to ~3974 tokens for actual prompt content. If retrieval
-consistently returns more than ~10 chunks, consider chunk merging at
+drops to \~3974 tokens for actual prompt content. If retrieval
+consistently returns more than \~10 chunks, consider chunk merging at
 the retrieval layer rather than shrinking the delimiter strings —
 delimiter uniqueness is what makes Stage-3 echo detection reliable,
 and shortening them risks collision with natural language.
@@ -346,11 +346,11 @@ and `_datamark_chunk`, `add_grounded_context`):
   instructions impossible. The deterministic guarantee against bad
   *actions* lives in §11, not here.
 
-**Token overhead**: ~30 tokens for the self-describing header per
-chunk + ~5 tokens per non-empty line for the marker prefix. For a
-50-line document this is ~280 tokens; the 4096-token budget at §6
+**Token overhead**: \~30 tokens for the self-describing header per
+chunk + \~5 tokens per non-empty line for the marker prefix. For a
+50-line document this is \~280 tokens; the 4096-token budget at §6
 absorbs it. For documents near the 16 KB load cap, pressure increases
-~5–10% of chunk size.
+\~5–10% of chunk size.
 
 **Tests**: `services/assistant_orchestrator/tests/test_context_manager.py::TestDatamarking`
 covers marker presence, rotation between loads, header presence,

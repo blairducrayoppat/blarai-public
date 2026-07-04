@@ -19,11 +19,11 @@ cannot co-reside in the 31.323 GB shared ceiling. Increment 1 dispatched coding 
 with the 30B loaded **manually**. Increment 2 automates the 14B⇄30B swap so a `/dispatch` can run the
 30B end-to-end and restore the 14B — the one genuinely new hard part (brief §4).
 
-The brief's §4.2 keeps the AO process alive and unloads the 14B in-process (gate ~21 GiB). **Milestone
-1 measured that the bare in-process unload frees only to ~20.1 GB on this box** — below the 30B's
-~22–23 GB load peak — because ~6 GB of the live AO process (Python heap, the INT8 draft, the
+The brief's §4.2 keeps the AO process alive and unloads the 14B in-process (gate \~21 GiB). **Milestone
+1 measured that the bare in-process unload frees only to \~20.1 GB on this box** — below the 30B's
+\~22–23 GB load peak — because \~6 GB of the live AO process (Python heap, the INT8 draft, the
 Level-Zero context, KV/embedding caches) is freed only by a process exit; a fully-gone BlarAI sits at
-~26 GB. So the brief's in-process path does not clear on this box.
+\~26 GB. So the brief's in-process path does not clear on this box.
 
 ## Decision
 
@@ -93,7 +93,7 @@ wiring it unvalidated into the live boot/dispatch path would add risk no test co
 
 ## Rejected alternatives
 
-- **In-process unload, AO stays alive** (brief §4.2): milestone-1 measured ~20.1 GB free — below the
+- **In-process unload, AO stays alive** (brief §4.2): milestone-1 measured \~20.1 GB free — below the
   30B's load peak. Rejected on this box; forces the full step-aside + detached driver.
 - **Option B — serve the 14B via OVMS** (brief §4): a second listener in BlarAI's trust domain;
   rejected for air-gap purity (brief's own decision).
@@ -165,9 +165,9 @@ dispatch→approve→step-aside→gate→30B load). Then the driver hung at "loa
 corrected an initial GPU-OOM hypothesis against the actual logs.
 
 **What the logs showed — NOT a GPU/memory problem.** The OVMS log records the 30B reaching
-`state changed to: AVAILABLE` ~30 s after launch with a **zero-byte** error log — a clean GPU load — and
+`state changed to: AVAILABLE` \~30 s after launch with a **zero-byte** error log — a clean GPU load — and
 start-llm armed the watchdog sentinel + started the qwen-proxy (it detected READY). So the 30B loaded and
-*fit* on the Arc; the box runs it (the operator separately demonstrated the 30B standalone at ~88% system
+*fit* on the Arc; the box runs it (the operator separately demonstrated the 30B standalone at \~88% system
 memory). The hang was the DRIVER not observing it: `dispatch._safe_run` uses
 `subprocess.run(capture_output=True)`, and start-llm launches LONG-LIVED grandchildren (OVMS + the proxy)
 that inherit the captured stdout/stderr pipe on Windows, so the pipe never reaches EOF and the wait (even
@@ -180,7 +180,7 @@ Two fixes, both DORMANT-compatible:
    captured pipe, so a long-lived grandchild can't keep it open. SCOPED: the generic `_safe_run` is
    UNCHANGED for the run-fleet build/test/verify callers, which parse stdout (regression-locked).
 2. **(2) GPU handoff — timing luck → guarantee.** Run-2's clean load relied on `os._exit` freeing the
-   14B's GPU within OVMS's ~30 s load window (interrupt_main never woke the main thread, confirmed, so the
+   14B's GPU within OVMS's \~30 s load window (interrupt_main never woke the main thread, confirmed, so the
    graceful `_cleanup`/GPU-unload never ran). (2a) `SharedInferencePipeline.release_gpu_for_exit()` drops
    the 14B for the process-exit path (bypassing `unload()`'s rebuild-closure guard); the step-aside
    watchdog runs it **bounded** before `os._exit` so the 30B loads onto a clean GPU. (2b) the driver polls
@@ -189,7 +189,7 @@ Two fixes, both DORMANT-compatible:
    the step-aside.
 
 **iGPU probe caveat (LA-accepted).** The Arc 140V is an iGPU — GPU memory is shared system RAM, and the
-Windows GPU perf counters under-report OpenVINO/Level-Zero allocations (observed ~0.47 GiB with a 15 GB
+Windows GPU perf counters under-report OpenVINO/Level-Zero allocations (observed \~0.47 GiB with a 15 GB
 model loaded), so there is no reliable discrete-GPU 'budget-free' probe. `real_gpu_free_gb` therefore
 reads GPU-free as **system-RAM-free** (the pool the iGPU allocates from, which tracks the 14B's release).
 Consequence on this same-pool hardware: the GPU wait-verify (step 8b, ≥15 GiB) sits after the i2 RAM gate

@@ -44,7 +44,7 @@ boundary (the VM, or a host sandbox), and if so, which stage and which boundary?
   model weights and decoded pixels still live in GPU memory the host can see.
 - **The VM does not help performance, and likely hurts.** The guest has no GPU of
   its own; via GPU-PV it shares the **same physical Arc 140V**. So the co-residency
-  memory pressure (VLM ~5 GB + 14B ~8.7 GB vs the 31.3 GB ceiling) is identical
+  memory pressure (VLM \~5 GB + 14B \~8.7 GB vs the 31.3 GB ceiling) is identical
   wherever the process runs — a single-GPU fact — plus GPU-PV adds virtualization
   overhead. (The #561 freeze was an event-loop bug fixed by async, not a
   resource/location bug — do not conflate the two.)

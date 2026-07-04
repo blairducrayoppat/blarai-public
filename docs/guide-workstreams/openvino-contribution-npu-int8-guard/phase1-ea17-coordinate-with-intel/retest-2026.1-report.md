@@ -118,7 +118,7 @@ openvino_genai version) and the `CONSTRUCT_OK` line, then terminated. The
 crash is therefore **inside `pipe.generate(...)`** (or in a worker thread spawned
 by the NPU plugin during generation), not during `LLMPipeline(...)` construction.
 This is a meaningful refinement vs. the original report's "construct + generate
-crash" wording — at least on this build, construct succeeds in ~17-18s
+crash" wording — at least on this build, construct succeeds in \~17-18s
 (consistent with NPU model-compile overhead) and the access violation only
 manifests once generation actually begins.
 
@@ -162,7 +162,7 @@ Diego's claim is **REFUTED on this hardware**:
   all during `generate()`.
 
 Refinement of the original bug: `LLMPipeline(...)` construction on NPU
-**now succeeds** in ~17-18s. The crash is no longer at pipeline construction
+**now succeeds** in \~17-18s. The crash is no longer at pipeline construction
 but at first-token generation. The original ticket's framing of "construct +
 generate crash" should be tightened to "generate-time crash; construct
 completes silently".
@@ -190,7 +190,7 @@ remains a real defect regardless of whether the downstream crash is fixed.
   concrete data: "Retested on OV 2026.1.0 / openvino_genai 2026.1.0.0 with the
   exact same hardware and NPU driver; crash reproduces 3/3 with exit `0xC0000005`.
   The crash signature has migrated from pipeline-construction-time to
-  generate-time — `LLMPipeline(ir, "NPU")` now returns successfully in ~18s,
+  generate-time — `LLMPipeline(ir, "NPU")` now returns successfully in \~18s,
   then `pipe.generate(prompt, cfg)` access-violates within a few seconds."
 - This is **stronger data** than the v1 promise; it lets the GitHub comment
   open with an empirical update rather than a request for cross-check.
@@ -236,5 +236,5 @@ remains a real defect regardless of whether the downstream crash is fixed.
   immediately after each invocation. Per-run log files are at
   `C:\Users\mrbla\openvino-test-exports\npu_run{1,2,3}.log` and
   `gpu_control.log` (outside the repo, not committed).
-- Total retest wall-clock: ~7 minutes including venv setup, install, export,
+- Total retest wall-clock: \~7 minutes including venv setup, install, export,
   and four model runs.

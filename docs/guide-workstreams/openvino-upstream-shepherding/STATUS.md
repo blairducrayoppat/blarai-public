@@ -73,7 +73,7 @@ required action. Plain-language answer recorded:
 1. **#266 follow-up** — post the drafted follow-up.
 2. **#265 — leave alone for now.** Same reviewer / same architectural
    concern; #266 follow-up's IR-dumping answer applies to both.
-3. **#34651 — don't ping yet.** Re-evaluate in ~2-3 weeks (i.e., by
+3. **#34651 — don't ping yet.** Re-evaluate in \~2-3 weeks (i.e., by
    2026-06-01 to 2026-06-15). If still no engagement, consider
    posting on underlying issue #34617 with fresh data, similar to
    what we did for #35641.
@@ -133,7 +133,7 @@ worth recording:
   guidance) and DariaMityagina (LIT-test confirmation).
 - **#265**: no action this cycle. Same reviewer / same concern as #266
   — andrey's eventual response covers both.
-- **#34651**: no action this cycle. Re-evaluate ~2026-06-01 to 2026-06-15.
+- **#34651**: no action this cycle. Re-evaluate \~2026-06-01 to 2026-06-15.
   If still silent, consider posting on underlying issue #34617 with
   fresh data.
 

@@ -21,8 +21,8 @@
 | D-T4-01 | PA inference latency budget: **2,000ms P95 flat** | ADR-012 §2.5 |
 
 **Derivation basis:** 10.72 tps empirical (P5-005b D-01) + TTFT 408ms at 4K + overhead + P95 variance headroom.
-- Realistic e2e (5-token output, 4K input): ~875ms
-- Worst-case at `max_new_tokens=32`: ~2,987ms — **exceeds budget** → Task 4.8 must reduce `max_new_tokens`
+- Realistic e2e (5-token output, 4K input): \~875ms
+- Worst-case at `max_new_tokens=32`: \~2,987ms — **exceeds budget** → Task 4.8 must reduce `max_new_tokens`
 - Replaces: ADR-010 §3.2 — 125ms P95 (Qwen2.5-1.5B/NPU — invalidated)
 
 ## Commit #1 — Housekeeping Bundle (`cbce517`)

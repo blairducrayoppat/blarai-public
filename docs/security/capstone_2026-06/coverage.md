@@ -129,7 +129,7 @@ claim cites real code / commit / test in the deck cards.
 1. All the layers — Parts 1–2 (B–G) ☑ · 2. How they interact — the 3 system diagrams + data-flows ☑ ·
 3. Gaps + tickets — §H residual register + reconciliation cards ☑ · 4. Data flows — Part 4 (3 flows) ☑ ·
 5. Security gates / fail-closed — woven through Part 2 + "The Decision" ☑ · 6. Load-bearing elements — Q35 slide ☑ ·
-7. Operator footguns — Part 7 ☑ · 8. Explain-to-a-13-year-old — the two explainers (attestation; host↔guest), each ~2 slides + a diagram ☑.
+7. Operator footguns — Part 7 ☑ · 8. Explain-to-a-13-year-old — the two explainers (attestation; host↔guest), each \~2 slides + a diagram ☑.
 
 ## Reconciliation status summary (the 55 findings)
 

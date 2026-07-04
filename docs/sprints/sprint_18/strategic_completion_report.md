@@ -63,7 +63,7 @@ from a builder summary).
 Final standing gate from main after all merges: **`2342 passed / 0 skipped / 0
 failed / 113 deselected`** (deselected up 5 from the new @hardware/@slow tests in
 the gate paths; the passing baseline is unchanged). P first established the clean
-deterministic baseline; the worktree builders showed the expected ~2320/22
+deterministic baseline; the worktree builders showed the expected \~2320/22
 model-absence skip-shift (semantic_router embedding model absent in worktrees —
 NOT the port-5001 leak; the skip-signature disambiguation the guide called out).
 

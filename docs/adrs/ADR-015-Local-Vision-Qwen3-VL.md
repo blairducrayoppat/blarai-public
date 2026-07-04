@@ -36,7 +36,7 @@ not exist.)
 
 **Scope (MVP, this session):** image *understanding* — describe, recognize
 plants/features, answer questions, draft text. Hardware-validated: VLM loads on
-the Arc 140V in ~13 s, describes in ~16 s (PERFORMANCE_LOG 2026-06-03); live-verified
+the Arc 140V in \~13 s, describes in \~16 s (PERFORMANCE_LOG 2026-06-03); live-verified
 on a real photo.
 
 **Explicitly NOT in scope (honest limits):**
@@ -49,7 +49,7 @@ on a real photo.
 
 ## The open hard problem (memory)
 
-The VLM (~5 GB) loads on the GPU **alongside the resident 14B** (~8.7 GB) + Whisper
+The VLM (\~5 GB) loads on the GPU **alongside the resident 14B** (\~8.7 GB) + Whisper
 + embedder, against the **31.3 GB shared ceiling**. Co-resident cost is **UNMEASURED**
 (PERFORMANCE_LOG flags it as the key trend gap). Mitigations: Fail-Soft degrades an
 OOM to the placeholder; **load-on-demand 14B eviction** is the planned next iteration
@@ -60,7 +60,7 @@ if co-residency proves unstable in live use.
 - **+** Image understanding shipped behind the existing seam; zero UI rewrite (lesson #12 paid off).
 - **−** Co-residency unmeasured (brick risk bounded by Fail-Soft).
 - **−** HEIC/HEIF can be *attached* but need `pillow-heif` to decode (else Fail-Soft placeholder).
-- **−** First-image latency ~30 s (VLM load + describe); cached after.
+- **−** First-image latency \~30 s (VLM load + describe); cached after.
 
 ## Landscape use-case roadmap (honest feasibility, per the LA discussion)
 
@@ -94,7 +94,7 @@ loop**, and the first Tier-0 live boot showed all three were wrong:
   wasteful for everything that is not a garden.
 - **It froze the app.** The grounding ran synchronously on the backend's single
   event loop, monopolising the only serialised lane; a voice clip captured at
-  22:10:39 was not handed to the transcriber until 22:15:27 — a ~5-minute queue
+  22:10:39 was not handed to the transcriber until 22:15:27 — a \~5-minute queue
   behind one photo (BUILD_JOURNAL lessons 24, 25).
 
 ### The amended decision (Option B+, the hybrid the LA chose)
@@ -143,7 +143,7 @@ its own commit ahead of the lazy/context-aware change.
   on this silicon it is CPU-side sandboxing of a decoder exploit, **not** a
   confidential-GPU boundary (no TDX Connect/TDISP — Phase 2 Gate 4), at a
   performance cost; a cheaper *decode-in-a-sandbox* middle path is recorded there.
-- **Co-residency memory pressure** (VLM ~5 GB + 14B ~8.7 GB) is unchanged by this
+- **Co-residency memory pressure** (VLM \~5 GB + 14B \~8.7 GB) is unchanged by this
   amendment — a single-GPU fact independent of where the process runs — and stays
   on the #550 / load-on-demand-eviction track.
 

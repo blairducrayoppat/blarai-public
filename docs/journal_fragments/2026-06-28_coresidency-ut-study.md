@@ -11,13 +11,13 @@ the portfolio-worthy part.
 sample in Unix-epoch nanoseconds) and level-zero (GPU frequency / busy / memory-bandwidth — the data Task
 Manager hides, because OpenVINO runs on the GPU's neural/XMX engine, not the 3D engine). The catch: the
 level-zero driver flags a "timestamp-units" issue and stamps its samples on a *different* clock — I measured
-it ~27.7 hours offset from socwatch in the same capture. So power segmented cleanly into idle/contention
+it \~27.7 hours offset from socwatch in the same capture. So power segmented cleanly into idle/contention
 phases and GPU frequency did not — l0 only ever produced a single whole-run blob, exactly the thing the
 operator had said was "extremely important" to split. The fix was to stop trusting the l0 clock's absolute
 value and trust only its *linearity*: anchor the l0 sample range [min,max] linearly onto socwatch's Unix
 [min,max] window from the same `ut.exe` session. I validated it wasn't wishful thinking before relying on
 it — the remapped contention samples put the GPU-busy spike exactly where the power spike already was
-(idle ~90% → contention ~99%), and the split is physically coherent across frequency, busy, and bandwidth
+(idle \~90% → contention \~99%), and the split is physically coherent across frequency, busy, and bandwidth
 at once. One reliable clock can rescue an unreliable one if you only ask the unreliable one to be straight,
 not correct.
 
@@ -34,14 +34,14 @@ block-waited on it inline rather than gamble on it surviving the turn boundary �
 lesson I'll carry: when an execution *mode* keeps dying, diagnose what survives and switch modes; don't keep
 feeding the mode that's being eaten.
 
-The result was worth the trouble. Idle co-residence is ~free — any one of the three SDXL styles or the VLM
-can sit resident beside the 14B for ~0–5%. Concurrent generation is where it bites, and the mechanism is the
+The result was worth the trouble. Idle co-residence is \~free — any one of the three SDXL styles or the VLM
+can sit resident beside the 14B for \~0–5%. Concurrent generation is where it bites, and the mechanism is the
 satisfying bit: what's exhausted is GPU compute *scheduling*, not bandwidth and not the clock (the GPU pins
 at 1.95 GHz with zero throttle throughout). Pure SDXL diffusion is compute-bound and monopolises the EU
-scheduler so totally that the 14B can't finish its prefill in a 15 s window — TTFT blows to 13–15 s, ~1%
+scheduler so totally that the 14B can't finish its prefill in a 15 s window — TTFT blows to 13–15 s, \~1%
 throughput — and aggregate memory-read actually *drops*, because the bandwidth-bound decode can't get the
 slots to issue its reads. The VLM, being itself a bandwidth-bound transformer, keeps bandwidth saturated and
-lets the 14B hold ~13%. cartoon's LoRA, by spending more time on the CPU, accidentally leaves the 14B
+lets the 14B hold \~13%. cartoon's LoRA, by spending more time on the CPU, accidentally leaves the 14B
 scheduling gaps. The partner's compute-vs-bandwidth character *is* the contention signature. And
 `PMT-NPU-PWR` read 0.0 W in every phase of every run — a clean, twelve-times-repeated proof that the stack
 is pure-GPU, exactly as ADR-011 says.

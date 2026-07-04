@@ -15,7 +15,7 @@ Deterministic, **no models, no GPU**. Runs in the default `pytest` suite. It
 drives the real `RpcDispatcher` through a fake gateway to lock behavioural
 contracts — first among them the **freeze fix** (`f4406c5`): the dispatcher runs
 the blocking `gateway.load_document` **off** the event loop, so a slow image
-grounding can never again freeze voice + chat behind it (the ~5-minute voice
+grounding can never again freeze voice + chat behind it (the \~5-minute voice
 queue hit on the 2026-06-03 live boot; `BUILD_JOURNAL.md` lesson 24).
 
 The *lazy* half of that fix (attach does not call the VLM) is already unit-locked
@@ -81,7 +81,7 @@ UIA AutomationId, so no XAML changes were needed).
 | `chat`   | GPU | 14B reply, cold first turn (spec-decode on) | **first-token 1.5 s · 6.1 s / 64 tok** (load 19.3 s) |
 
 These confirm the design intuition: the image and chat waits are dominated by
-**cold model load** (~13–19 s), not the pipeline — which is exactly what the
+**cold model load** (\~13–19 s), not the pipeline — which is exactly what the
 keep-warm / eviction follow-up (ADR-015 / Vikunja #550) targets. The freeze the
 User-Operator hit was those seconds running **on the event loop**; Layer A locks
 them off it.

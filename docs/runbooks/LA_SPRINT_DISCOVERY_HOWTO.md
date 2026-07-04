@@ -96,7 +96,7 @@ The agent will probe, ground, and challenge — gently. You should expect questi
 
 ### Grounding statements
 
-- *"Sprint 7 flagged 13 HIGH items; shipping all of them is ~10-12 EA milestones which is heavy for one sprint. Alternatives: (a) Package A as-is, (b) Package A minus the launcher cluster, (c) split across Sprint 8 + 9. Which fits your risk posture?"*
+- *"Sprint 7 flagged 13 HIGH items; shipping all of them is \~10-12 EA milestones which is heavy for one sprint. Alternatives: (a) Package A as-is, (b) Package A minus the launcher cluster, (c) split across Sprint 8 + 9. Which fits your risk posture?"*
 - *"ADR-011 retired the NPU path. If we're touching those tests, we can also rename the stale NPU identifiers in the same sprint cheaply, or defer as a separate cleanup pass."*
 
 ### Challenging back
@@ -131,7 +131,7 @@ This is the translation loop. Aspirational → grounded → technical → Vikunj
 
 The agent will flag it immediately:
 
-- *"That would require ~8 GB beyond the 31.3 GB memory ceiling — not feasible without removing Y. Do you want to adjust the idea or consider the ceiling work a prerequisite?"*
+- *"That would require \~8 GB beyond the 31.3 GB memory ceiling — not feasible without removing Y. Do you want to adjust the idea or consider the ceiling work a prerequisite?"*
 - *"Any external network call in runtime code is out-of-scope per the privacy mandate. Is there an offline equivalent of what you want?"*
 - *"This doesn't map to any of the 9 Use Cases. Either it's a scope expansion (needs an explicit project-level decision), or it's a new UC candidate. Which?"*
 

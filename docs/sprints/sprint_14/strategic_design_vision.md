@@ -94,7 +94,7 @@ network-facing future (#556), and the LA has ratified that nothing goes online u
 holds, including at-rest encryption. But the reason to encrypt **now**, ahead of any network
 capability, is one of *timing*: BlarAI has not yet been used in a daily setting — verified on disk
 (2026-06-05), the two stores hold only disposable build-phase dev/test scaffolding (`substrate.db` ≈
-107 chunks / ~400 KB; `sessions.db` ≈ 59 sessions / 376 turns / ~250 KB), and **no real sensitive data
+107 chunks / \~400 KB; `sessions.db` ≈ 59 sessions / 376 turns / \~250 KB), and **no real sensitive data
 exists yet**. Building the at-rest control before real use begins means every byte of real data is
 **born encrypted from its first write — there is never a plaintext window on disk**. That is a cleaner
 and more honest motivation than "protect exposed data" (nothing is exposed): the architectural gap
@@ -198,7 +198,7 @@ refuse rather than fall back to plaintext.
    fields). Plus the envelope: ONE DEK, **dual-wrapped** — by the TPM seal and by a **high-entropy
    random offline recovery key** (not a passphrase: passphrases carry forget-risk and a
    password-hashing KDF, a possible new dependency — rejected). The envelope is **versioned to permit
-   a later key rotation** (the random-96-bit nonce birthday bound is ~2^32 messages — effectively
+   a later key rotation** (the random-96-bit nonce birthday bound is \~2^32 messages — effectively
    never at single-user scale, but it is the documented re-key trigger); rotation itself is not built
    (§5.2). The precise cryptographic choices (nonce, recovery-key nature, AAD binding) are **pinned
    in the ADR authored before this EA** (§5.1 #9, §7).
@@ -403,7 +403,7 @@ Co-Lead → Orchestrator; EA Code → specialist subagent; Sprint Auditor → Au
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| **LA (Lead Architect)** | SDV sign-off; a quick look at the envelope ADR before EA-2; the **batched on-chip ceremony** (RSA seal key + dedicated ECDSA audit key + offline recovery key); **one production-posture live-verify**; #598 governance; SWAGR read. **Only the production posture counts as "works."** | ~45–60 min |
+| **LA (Lead Architect)** | SDV sign-off; a quick look at the envelope ADR before EA-2; the **batched on-chip ceremony** (RSA seal key + dedicated ECDSA audit key + offline recovery key); **one production-posture live-verify**; #598 governance; SWAGR read. **Only the production posture counts as "works."** | \~45–60 min |
 | **Orchestrator** | EA prompt authoring (one at a time); the **envelope ADR** (design gate); **merge gate** (diff-review each EA against its criterion, not just the suite); SCR; journal fold; campaign-pacing plan. | Autonomous within this SDV |
 | **Specialist subagents (sonnet, worktree-isolated)** | EA execution; report fragment text (never merge, never touch `BUILD_JOURNAL.md`). | Autonomous per EA prompt |
 | **Auditor** | Independent adversarial SWAGR at close. | Autonomous |
@@ -413,10 +413,10 @@ Orchestrator **stops and reports** to the LA rather than fixing it unreviewed.
 
 ## 12. Estimated effort
 
-- **Rough duration:** ~1–2 days fleet-time; 5 EAs (4-deep serial spine + 1 parallel lane) + the ADR
+- **Rough duration:** \~1–2 days fleet-time; 5 EAs (4-deep serial spine + 1 parallel lane) + the ADR
   design gate.
-- **LA active-time expectation:** ~45–60 min total — ~15 min SDV sign-off; a few min on the ADR;
-  ~20–30 min the batched ceremony + one production-posture live-verify; ~10–15 min SWAGR read. (The
+- **LA active-time expectation:** \~45–60 min total — \~15 min SDV sign-off; a few min on the ADR;
+  \~20–30 min the batched ceremony + one production-posture live-verify; \~10–15 min SWAGR read. (The
   ceremony + live-verify are on the LA's own schedule; build-complete targets 2026-06-07.)
 - **Confidence:** **medium.** The cipher, DB wiring, and #605 are well-understood; the new CNG
   RSA-OAEP sealing primitive is the genuine unknown and sets the confidence level.
@@ -474,4 +474,4 @@ _(Signed via the frontmatter field `co_lead_drafted_on` + the git commit that la
 |---|---|---|---|
 | 1 | 2026-06-05 | Orchestrator (draft) | Initial draft for LA review. |
 | 2 | 2026-06-05 | LA review → Orchestrator | LA override: `substrate_chunks.source` (filename) moved INTO the cipher set via the keyed-hash-for-index pattern (HKDF-derived index subkey + AES-GCM display value); `session_id` stays plaintext. Pinned AES-GCM **nonce strategy** (fresh random 96-bit, prepended, never reused) in §5.1 #2 + criterion #3. Moved the envelope **ADR early** (design gate before EA-2; §5.1 #9, §7) to pin nonce/recovery-key/AAD. Recovery key pinned as a high-entropy **random** key (not a passphrase; §13 #2). Perf criterion #5 now measures **delta vs a pre-encryption baseline**. Added the explicit **"correctness outranks the date"** note (§12). |
-| 3 | 2026-06-05 | LA review → Orchestrator | **Premise correction (LA-directed, post-signoff; scope unchanged).** Verified on disk that the stores hold only disposable dev/test scaffolding (substrate ≈107 chunks / ~400 KB; sessions ≈59 sessions / 376 turns / ~250 KB) — there is **no "decades of exposed data on disk."** Reframed §1 + §3 from "protect already-exposed data / worst-rated exposure" to "build the control before real use so real data is **born encrypted**, and meet the #598 criterion"; the sprint is **well-timed, not urgent** (zero data-exposure time pressure → correctness > date). Migration of the existing dev rows is reframed as the populated-store **test fixture** + engineering correctness, not urgent secret-protection (detailed in ADR-025 §3). Companion: ADR-025 flipped to ACCEPTED with the same premise correction, the two §2.8 rulings recorded ((a) audit refuse-to-start, folded into EA-5; (b) RSA-2048 now / attempt-3072-at-ceremony), and the live-memory vector marked DEFERRED-not-denied (roadmap §8 / #611). |
+| 3 | 2026-06-05 | LA review → Orchestrator | **Premise correction (LA-directed, post-signoff; scope unchanged).** Verified on disk that the stores hold only disposable dev/test scaffolding (substrate ≈107 chunks / \~400 KB; sessions ≈59 sessions / 376 turns / \~250 KB) — there is **no "decades of exposed data on disk."** Reframed §1 + §3 from "protect already-exposed data / worst-rated exposure" to "build the control before real use so real data is **born encrypted**, and meet the #598 criterion"; the sprint is **well-timed, not urgent** (zero data-exposure time pressure → correctness > date). Migration of the existing dev rows is reframed as the populated-store **test fixture** + engineering correctness, not urgent secret-protection (detailed in ADR-025 §3). Companion: ADR-025 flipped to ACCEPTED with the same premise correction, the two §2.8 rulings recorded ((a) audit refuse-to-start, folded into EA-5; (b) RSA-2048 now / attempt-3072-at-ceremony), and the live-memory vector marked DEFERRED-not-denied (roadmap §8 / #611). |

@@ -37,7 +37,7 @@ No queue file, no pending-execution gate — outside the Case A/B/C/D/E/F enumer
 
 - Role: `ea_code`
 - `role_paused`: `false`
-- Session cap: 90 min — used ~2 min this firing
+- Session cap: 90 min — used \~2 min this firing
 - Warnings: none
 
 ## Fleet state

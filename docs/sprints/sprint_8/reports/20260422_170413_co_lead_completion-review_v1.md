@@ -72,7 +72,7 @@ All appropriate and scope-tight.
 
 ### 1. Baseline hint inaccuracy
 
-The prompt says **"post-EA-1 baseline is approximately 813 passed"**. The CLAUDE.md-recorded pre-Sprint-8 REGRESSION baseline is 755; EA-1 added ~18 tests per commit history, yielding ~773, not 813. The 40-test discrepancy may reflect a confusion with the FULL suite (835) rather than REGRESSION.
+The prompt says **"post-EA-1 baseline is approximately 813 passed"**. The CLAUDE.md-recorded pre-Sprint-8 REGRESSION baseline is 755; EA-1 added \~18 tests per commit history, yielding \~773, not 813. The 40-test discrepancy may reflect a confusion with the FULL suite (835) rather than REGRESSION.
 
 **Impact**: None on execution — the prompt correctly instructs EA to **re-measure at pickup** and record actual observed counts. The hint is informational, not authoritative. No ADJUST.
 

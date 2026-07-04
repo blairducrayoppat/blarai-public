@@ -68,7 +68,7 @@ directly.
   Code session with the EA prompt.
 - Do NOT generate SDO prompts (that is the Co-Lead Architect's job).
 - Output prompt drafts as XML workspace files under `docs/` when they
-  exceed ~20 lines, not as chat pastes.
+  exceed \~20 lines, not as chat pastes.
 - Output prompt reviews as structured PASS/FAIL/CONCERN reports.
 - **Verification scope declaration** required on every review — what you
   checked, what you accepted, what is unverified.

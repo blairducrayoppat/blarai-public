@@ -53,8 +53,8 @@ snapshot**, not a production-tuned baseline.
 | WINWORD.EXE | 521.7 | Not present in production |
 | Firefox (4 procs) | 1,871.9 | Not present in production |
 
-**Development-time overhead (removable):** ~5,024 MB (VS Code + Word + Firefox)
-**Estimated production host baseline:** ~13,000 MB → headroom would increase to ~6,500 MB (20%)
+**Development-time overhead (removable):** \~5,024 MB (VS Code + Word + Firefox)
+**Estimated production host baseline:** \~13,000 MB → headroom would increase to \~6,500 MB (20%)
 
 ## Decision
 

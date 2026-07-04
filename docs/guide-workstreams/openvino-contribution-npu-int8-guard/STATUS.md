@@ -28,7 +28,7 @@ poor receptions. We want to add value for the Intel team and build trust."*
 ### Critical context discovered during workstream founding
 
 1. **PR openvino#34651 (same author, same plugin layer) is the direct
-   precedent** for the kind of fix issue #35641 needs — a ~25-line
+   precedent** for the kind of fix issue #35641 needs — a \~25-line
    construct-time guard in `Plugin::compile_model()` that detects an
    unsupported config and throws an actionable catchable exception, using
    only existing public OpenVINO C++ APIs. As of 2026-05-12, PR #34651 is
@@ -173,8 +173,8 @@ had missed:
 ### Root cause of the miss
 
 WebFetch's HTML-summarization model for github.com pages systematically
-fails to surface comments. Both Guide-#11's initial recon (2026-05-12 ~14:00Z)
-and EA-17's preflight 0e re-verification (2026-05-12 ~15:23Z) used
+fails to surface comments. Both Guide-#11's initial recon (2026-05-12 \~14:00Z)
+and EA-17's preflight 0e re-verification (2026-05-12 \~15:23Z) used
 the HTML page and returned "no comments visible" — false for all three.
 The GitHub REST API endpoint returns the actual comments as structured
 JSON. Codified in the new memory note
@@ -265,17 +265,17 @@ GPU control: construct=5.65s, generate=0.27s, exit=0, coherent output
 
 On 2026.0.0, the original report framed this as a "construct + generate
 crash". The 2026.1.0 retest shows `LLMPipeline(ir, "NPU")` now **returns
-successfully in ~17-18s** — the access violation now fires inside
-`pipe.generate(...)` ~3-4s into generation. So:
+successfully in \~17-18s** — the access violation now fires inside
+`pipe.generate(...)` \~3-4s into generation. So:
 
 - 2026.0.0: silent construct **then** crash on generate (per original report)
-- 2026.1.0: silent construct succeeds in ~18s, **then** crash on generate
+- 2026.1.0: silent construct succeeds in \~18s, **then** crash on generate
 
 Either way, the **separable defect** (silent acceptance of an unsupported
 INT8-weight-only NPU LLM configuration that subsequently exhibits
 undefined behavior) is unaffected by which version exhibits the crash.
 The construct-time guard ask is **strengthened** by the refinement: the
-NPU plugin compiles the graph for ~18s without complaint and only fails
+NPU plugin compiles the graph for \~18s without complaint and only fails
 once it tries to execute. A capability check at compile time has even
 more value than at runtime.
 

@@ -72,7 +72,7 @@ The PR is 955+ lines across 8 files and requires `transformers >= 4.57.0`. It ta
    - Hardware: Intel Arc 140V, driver version, OpenVINO version
 
 ### Why 0.8B first
-At 24 layers with hidden_size 1024, Qwen3.5-0.8B fits comfortably in Arc 140V's ~8GB VRAM even at FP16. It exercises the full hybrid architecture (18 linear + 6 full attention layers). If it works, move to 9B.
+At 24 layers with hidden_size 1024, Qwen3.5-0.8B fits comfortably in Arc 140V's \~8GB VRAM even at FP16. It exercises the full hybrid architecture (18 linear + 6 full attention layers). If it works, move to 9B.
 
 ---
 
@@ -81,7 +81,7 @@ At 24 layers with hidden_size 1024, Qwen3.5-0.8B fits comfortably in Arc 140V's 
 **Impact:** Critical — this is the **blocking bug** for Qwen3.5 on GPU.
 
 Issue [#34532](https://github.com/openvinotoolkit/openvino/issues/34532) by `@Blackwood416` reports:
-- ScatterUpdate on GPU has FP16 down-cast precision loss (~0.001 per operation)
+- ScatterUpdate on GPU has FP16 down-cast precision loss (\~0.001 per operation)
 - Inside a Loop body (used by recurrent state updates), the GPU plugin **crashes**: `ProgramBuilder build failed! Check 'correct_layout_selected' failed`
 - The reporter explicitly identifies Qwen3.5 GatedDeltaNet as the blocked use case
 

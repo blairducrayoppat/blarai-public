@@ -16,7 +16,7 @@ docs/active_tasks.yaml, CLAUDE.md, AGENTS.md, .github/copilot-instructions.md).
 ## Summary
 
 The v1 plan was authored against a working, but in-flux, fleet. Between v1 commit and
-v2 refactor, ~46 files / ~6000 LOC of fleet infrastructure changes landed via Sprint 8
+v2 refactor, \~46 files / \~6000 LOC of fleet infrastructure changes landed via Sprint 8
 and Sprint 9 hardening. None of them invalidate the v1 architectural intent (extract
 the platform tools to a sibling repo), but several change the **inventory of files to
 copy**, the **scope of the multi-project refactor**, and the **safety procedures**
@@ -130,7 +130,7 @@ Count stays at **13**, NOT 14. Earlier drafts of this document incorrectly infer
 bump; the correction is reflected throughout v2 stage XMLs.
 
 **Impact on plan**:
-- Stage 0.6 expected count: **13** (was incorrectly written as ~14 in earlier drafts).
+- Stage 0.6 expected count: **13** (was incorrectly written as \~14 in earlier drafts).
 - Stage 4 task-XML rewrite loop must handle `escalation-watchdog.xml` (the export, not a new
   task registration).
 - All 13 task XMLs need their `<Command>` paths rewritten BlarAI → devplatform

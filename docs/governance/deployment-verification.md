@@ -274,7 +274,7 @@ file out-of-band before re-running.
    the per-code remediation. Fix the TOML, re-run.
 6. **`P5_GUEST_CHANNEL_NOT_READY` (step 5).** The probe copy
    timed out after 5 retries. The VM may be under heavy boot load or
-   the Hyper-V Integration Services may have regressed. Wait ~30 s,
+   the Hyper-V Integration Services may have regressed. Wait \~30 s,
    confirm `Get-VMIntegrationService` shows both Guest Service
    Interface and Heartbeat as `OK`, then re-run.
 7. **`P5_BUNDLE_BUILD_FAILED` (step 6).** A required source directory

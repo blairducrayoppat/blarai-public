@@ -15,7 +15,7 @@ verdict: null
 - **Timestamp**: 2026-04-22 16:48 UTC
 - **Roster** (`docs/active_tasks.yaml`): Task 82 / Sprint 8 + Task 121 / Sprint 9 (parallel)
 - **Budget self-check**: `may_proceed=True`, fleet/role not paused, 45-min session cap
-- **Delta since prior Co-Lead firing (16:31 UTC, report `20260422_163145_co_lead_no-op_v1.md`)**: merges landed ~17 minutes ago (`b85be4c` Sprint 8, `ef670eb` Sprint 9), plus `b0f0bde` raised merge-policy runaway thresholds and `29cea32` archived the stale queue file. LA merged manually without invoking `la_merge_approve.ps1`, leaving the helper's cleanup outputs (label transitions + Fleet Reports closure) stranded.
+- **Delta since prior Co-Lead firing (16:31 UTC, report `20260422_163145_co_lead_no-op_v1.md`)**: merges landed \~17 minutes ago (`b85be4c` Sprint 8, `ef670eb` Sprint 9), plus `b0f0bde` raised merge-policy runaway thresholds and `29cea32` archived the stale queue file. LA merged manually without invoking `la_merge_approve.ps1`, leaving the helper's cleanup outputs (label transitions + Fleet Reports closure) stranded.
 
 ## Phase-by-phase status
 

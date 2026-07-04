@@ -8,7 +8,7 @@ endpoints, not HTML page scraping.
 
 | PR | Repo | State | Last reviewer action | Last LA action | Days stalled | Recommended cycle-1 action |
 |---|---|---|---|---|---|---|
-| #34651 | openvino | open, no reviews, `mergeable_state: unstable` | none — zero reviews ever | 2026-04-25 (rebase) | 17 days since LA touch; ~60 days since open | Wait |
+| #34651 | openvino | open, no reviews, `mergeable_state: unstable` | none — zero reviews ever | 2026-04-25 (rebase) | 17 days since LA touch; \~60 days since open | Wait |
 | #265 | npu_compiler | open, CHANGES_REQUESTED, `mergeable_state: unstable` | `andrey-golubev` CHANGES_REQUESTED 2026-04-17 (read-only perms) | 2026-04-17 (LA replied to review) | 25 days | Wait — same reviewer / same concern as #266 |
 | #266 | npu_compiler | open, CHANGES_REQUESTED, `mergeable_state: unstable` | `andrey-golubev` CHANGES_REQUESTED 2026-04-17; `DariaMityagina` requested LIT test 2026-04-17 | 2026-04-17 (LA added LIT test + replied) | 25 days | Polite follow-up — re-surface IR-dumping question + flag Daria on the LIT test |
 

@@ -27,7 +27,7 @@ no new dependency — `cryptography` was already present). Executed as a per-tie
 worktree-isolated builder subagents (model sonnet), the Orchestrator holding the merge gate; builders
 never merged to `main` and never touched `BUILD_JOURNAL.md`.
 
-Full Layer-A suite on the integrated tree: **2055 passed, 0 failed** (1883 kickoff → 2055; ~+172 from
+Full Layer-A suite on the integrated tree: **2055 passed, 0 failed** (1883 kickoff → 2055; \~+172 from
 the sprint's own tests, zero regressions across the whole arc).
 
 **This is the first piece of the campaign that is real on the user's hardware.** Unlike Sprint 13
@@ -90,7 +90,7 @@ the PA signing keys are `dev_mode`-gated.
 
 ### 2.3 Premise correction (load-bearing)
 The SDV/ADR/roadmap initially asserted "decades of private data already on disk" as the urgency. The LA
-**verified on disk** that the stores held only disposable dev/test scaffolding (~107 chunks, ~59
+**verified on disk** that the stores held only disposable dev/test scaffolding (\~107 chunks, \~59
 sessions / 376 turns). ADR-025 §1/§3 + SDV v3 §1/§3 were corrected: the value is **born-encrypted before
 first real use** + meeting the #598 criterion; the sprint is **well-timed, not urgent**. Captured as a
 journal lesson (verify a load-bearing premise on disk, don't inherit it through the review chain).

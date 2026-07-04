@@ -499,7 +499,7 @@ documented posture went through ADR amendment, not a silent fix. No missed DEC t
 
 - One known stale-naming residual is **already ticketed**: the gateway's
   `check_pa_status`/`_attempt_pa_handshake` methods now handshake the AO (post-#620), not the
-  PA — tracked #623 (low priority, ~35 files, deliberately kept out of the #620 diff per SCR
+  PA — tracked #623 (low priority, \~35 files, deliberately kept out of the #620 diff per SCR
   §5). Correctly deferred per the hardening-followups-are-non-optional rule.
 - No NPU-in-production-source naming drift (ADR-011). Service names + path conventions consistent.
 
@@ -690,7 +690,7 @@ MINOR-1 is the one genuinely-new finding the SCR did not surface (the ADR-026 ce
    the seed — generalize it to a boot-cascade + key-transition lane before the class recurs.
 2. **(LA)** **Capture the cold-reboot continuity boot** (criterion #8 routine confirmation) — one
    `python -m launcher` after an OS restart, evidence appended. Low-risk, closes the one
-   uncaptured permutation. ~5 min on-chip.
+   uncaptured permutation. \~5 min on-chip.
 3. **(BOTH)** **Fix the ADR-026 cert-count drift (MINOR-1)** as part of the close — the ADR
    under-describes the shipped artifact set by 4 cert files. A doc-currency fix on the
    IAPP-portfolio surface, where the standard is strictest.

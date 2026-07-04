@@ -2,7 +2,7 @@
 
 **For:** #612 must-cover #8 (explain-to-a-13-year-old) + #4 (data flows). **Audience:** technically literate
 but new to *this* system; the spoken version should land for a non-technical interviewer.
-**Status:** draft seed (2026-06-08); refine at deck-build. Target: ~2 slides, ≥1 a diagram.
+**Status:** draft seed (2026-06-08); refine at deck-build. Target: \~2 slides, ≥1 a diagram.
 **Grounding:** `shared/ipc/vsock.py` (read 2026-06-08); project memory `blarai_host_mode_default_topology`; #615.
 
 ---
@@ -71,7 +71,7 @@ length-framed so nothing is lost, mutually-authenticated and encrypted so nothin
 
 ## 5. Why it's a strong interview topic
 
-In ~2 minutes you can speak to five transferable security fundamentals, with a concrete system to point at:
+In \~2 minutes you can speak to five transferable security fundamentals, with a concrete system to point at:
 1. **Reducing attack surface** — a guest with no network card cannot be reached from the internet at all.
 2. **Secure inter-process communication (IPC)** — a private hypervisor channel instead of the network.
 3. **Mutual authentication** — *both* sides prove identity (mTLS), not just the server (unlike normal HTTPS).

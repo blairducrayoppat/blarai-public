@@ -77,15 +77,15 @@ Sprint 16 split its heaviest stream by LA-approved precedent).
 
 | Stream | Criterion | Working set (verified disjoint) | Start |
 |---|---|---|---|
-| **G1 — #615 (spine)** | C1 | `shared/ipc/vsock.py`, `services/ui_gateway/src/transport.py`, `launcher/__main__.py` (~:927 topology region) | immediately |
+| **G1 — #615 (spine)** | C1 | `shared/ipc/vsock.py`, `services/ui_gateway/src/transport.py`, `launcher/__main__.py` (\~:927 topology region) | immediately |
 | **G2 — boot integration test (spine)** | C2 | `tests/integration/` (new file) | after G1 merges (needs the live topology for the real tier) |
 | **H — egress machinery** | C3 | `shared/security/egress_guard.py`, PA `rule_engine` (carve-out), new exfil-screen module, PGOV PII path, `services/*/config` | immediately (splittable) |
 | **I — security-cascade test** | C4 | `tests/integration/` (new file), `shared/security` (read-mostly) | immediately |
 | **J — production-posture guard** | C5 | `tests/security/test_production_posture.py` | after G2's boot-smoke infra exists (soft) |
 | **K — key-recovery path** | C6 | `shared/security/dek_envelope.py`, recovery-key store, tests | immediately |
 
-**Coordination (assign, don't race):** `launcher/__main__.py` — G1 (topology ~:927) vs H (egress arm
-~:1131): different regions, assign. `tests/integration/` — G2 + I add **distinct** files; J adds to
+**Coordination (assign, don't race):** `launcher/__main__.py` — G1 (topology \~:927) vs H (egress arm
+\~:1131): different regions, assign. `tests/integration/` — G2 + I add **distinct** files; J adds to
 `tests/security/`. `shared/security/` — H (`egress_guard`), I (read-mostly), K (`dek_envelope`): different
 files. Branch-guard (`branch==main` + toplevel) before EVERY main-tree merge — the worktree-cwd-branch
 hazard bit this project 3×.

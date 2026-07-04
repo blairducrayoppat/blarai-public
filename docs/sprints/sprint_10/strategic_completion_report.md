@@ -84,7 +84,7 @@ The stated purpose held. SDV §3 framed the split as a leverage move for
 the cf-1 boundary (cf-1 needs a clean devplatform doctrine substrate to
 author into) plus a correctness move (the SOP import bug). Both leverage
 arguments materialized during execution: EA-1's classification surfaced
-the precise extent of the runtime/fleet entanglement (~55 rows of which
+the precise extent of the runtime/fleet entanglement (\~55 rows of which
 19 MOVE-devplatform + 7 MIRROR-both, the predicted-medium scale, plus 9
 fresh devplatform-only rows added by EA-1); EA-3's SOP-fix verification
 matrix demonstrated the bug was live (6 invocations × 3 cwds × 2 commands,
@@ -99,7 +99,7 @@ motivation.
 | 2 | devplatform doctrine files exist with migrated fleet content (≥100 lines each, `[sprint:10][role:ea_code]` commit) | **PASS** | `9e5555c` on devplatform main; `CLAUDE.md` 185 / `AGENTS.md` 105 / `copilot-instructions.md` 343 | XML well-formed; all 7 required envelopes present |
 | 3 | Cross-references resolve in both directions | **PASS** | EA-3 completion audit table (5 BlarAI pointers, all RESOLVED; zero DANGLING) | Absolute Windows paths used per SDV §5.3 convention |
 | 4 | SOP import portability bug fixed (3 working dirs, no `ModuleNotFoundError`) | **PASS** | `tools/autonomy_budget/cli.py` (option (c) standalone CLI); 6×3×2 verification matrix in EA-3 completion report | Deviation accepted: matrix targeted isolated tmp `state.json` (harness denied 6 live toggles); import-resolution path identical; SDO independently corroborated from BlarAI cwd |
-| 5 | BlarAI §"Active State" current | **PASS** | EA-2 `ec2d09a` refreshed Active State to post-Sprint-9 baseline + Sprint 10 active; ~981 test baseline retained | Sprint 8/9 SWAGR carry-over gap closed |
+| 5 | BlarAI §"Active State" current | **PASS** | EA-2 `ec2d09a` refreshed Active State to post-Sprint-9 baseline + Sprint 10 active; \~981 test baseline retained | Sprint 8/9 SWAGR carry-over gap closed |
 | 6 | Post-split BlarAI line counts ≥30% smaller | **PASS** | 572 → 341 lines = **40.4% reduction**, exceeding 30% floor; near the 50% soft target | `CLAUDE.md` 283→156, `copilot-instructions.md` 265→175, `AGENTS.md` 24→10 |
 | 7 | Stage 6 v1 items 6.1/6.2/6.3/6.6 recorded CLOSED | **PASS** | Recorded in §13 below | Archived `STATUS.md` not amended per SDV plan; SCR is authoritative |
 
@@ -244,7 +244,7 @@ artifacts were present; DEC-15 infrastructure intact.
 | Cross-repo pattern surprise to reviewer | Acknowledged in EA-3 completion report; SDO accepted | n/a | None |
 | Active State refresh conflict with cf-1 | n/a — cf-1 dormant | n/a | None |
 | XML envelope non-trivial split | Manageable — EA-1 flagged elements; EA-2/EA-3 handled | Yes | None |
-| EA-2 exceeds trusted_scope | YES as predicted (HIGH probability) | Yes — `la_merge_approve.ps1` per DEC-14.5; ~5 min LA touch | None |
+| EA-2 exceeds trusted_scope | YES as predicted (HIGH probability) | Yes — `la_merge_approve.ps1` per DEC-14.5; \~5 min LA touch | None |
 | Stage 6 ack inheritance | No — fresh `g10-ea<N>_n<M>` chain used | n/a | None |
 | Stale `tools/vikunja_mcp/README.md` Quick Start `cd` | Pre-existing finding; not acted on per SDV §5.2 #1 | n/a | Carries forward to Stage 6.7.5 backlog |
 
@@ -301,9 +301,9 @@ artifacts were present; DEC-15 infrastructure intact.
 
 | Role | SDV-budgeted | Actual | Delta |
 |---|---|---|---|
-| LA | ~30 min | ~30–40 min (SDV sign-off + 2 `la_merge_approve` + 6-row arbitration via comment #521 + wake-template fix cluster + reads) | Marginally over due to wake-template fix; doctrine-split LA budget held |
-| Co-Lead | Autonomous | ~6 firings across kickoff + 3 EA peer reviews + Phase 2 ESCALATE escalations + 1 archive cleanup + this SCR firing | As expected for a 3-EA serial sprint |
-| SDO | Autonomous | ~6 firings (init + 3 EA-prompt authoring + 3 EA completion-reviews + EA-3 restore-report) | As expected |
+| LA | \~30 min | \~30–40 min (SDV sign-off + 2 `la_merge_approve` + 6-row arbitration via comment #521 + wake-template fix cluster + reads) | Marginally over due to wake-template fix; doctrine-split LA budget held |
+| Co-Lead | Autonomous | \~6 firings across kickoff + 3 EA peer reviews + Phase 2 ESCALATE escalations + 1 archive cleanup + this SCR firing | As expected for a 3-EA serial sprint |
+| SDO | Autonomous | \~6 firings (init + 3 EA-prompt authoring + 3 EA completion-reviews + EA-3 restore-report) | As expected |
 | EA Code | Autonomous | 3 firings (one per EA), all successful first-pass | As expected |
 | Sprint Auditor | n/a | n/a (runs post-SCR; SWAGR pending) | Will pick up next cadence |
 

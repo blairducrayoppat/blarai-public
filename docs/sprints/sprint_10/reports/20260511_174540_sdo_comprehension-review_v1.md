@@ -21,7 +21,7 @@ EA-1's comprehension (comment 512 on tracking task #369) is structurally complet
 - Wake-template section enumeration + M15 `--allowedTools` scope acknowledgment.
 - EA prompt source, milestone objective, and all 8 work items (WI-1 through WI-8) recited with concrete actions.
 - All 10 negative constraints (N-1…N-10) enumerated.
-- All 6 acceptance checks recited (STRUCTURE-LINT, ROW-COVERAGE, SDV-§5.3-CONFORMANCE, L-20-INTER-ELEMENT, ORACLE, REGRESSION-PYTEST) with regression baseline ~981 passed, 22 skipped.
+- All 6 acceptance checks recited (STRUCTURE-LINT, ROW-COVERAGE, SDV-§5.3-CONFORMANCE, L-20-INTER-ELEMENT, ORACLE, REGRESSION-PYTEST) with regression baseline \~981 passed, 22 skipped.
 - L-13 parent_head verify: `9263eb26457e2f99d69b6b16f09d33645f0cf292` matches prompt. EA explicitly chose to branch from parent_head rather than current `main` (HEAD `9c81800`, three commits ahead) to keep ORACLE diff scoped to the two declared paths. Intervening commits (`ca0b8fd`, `c5d32c0`, `c2634f3`, `9c81800`) author only `docs/sprints/sprint_10/reports/` and `docs/scheduled/ea_queue/` — disjoint from EA-1 write set. Sound call.
 - L-15 working-set declaration explicit (two output paths, no source-file edits).
 - L-20 inter-element reference enumeration plan present (§7 of plan-of-work).

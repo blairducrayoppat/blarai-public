@@ -79,7 +79,7 @@ Two expected `git diff --name-only` shapes (3-file SCR-skipped, 4-file SCR-amend
 
 ### Trusted_scope merge eligibility
 
-Aggregate ~75-115 LOC across 3-4 doc files, all under `docs/sprints/_templates/` + `docs/ledger/`. Well below DEC-18 thresholds (3000 LOC / 100 files). All paths under the trusted_scope doctrine envelope. Carve-outs pre-cleared; Phase 2 merge expected to auto-pass.
+Aggregate \~75-115 LOC across 3-4 doc files, all under `docs/sprints/_templates/` + `docs/ledger/`. Well below DEC-18 thresholds (3000 LOC / 100 files). All paths under the trusted_scope doctrine envelope. Carve-outs pre-cleared; Phase 2 merge expected to auto-pass.
 
 ### Sequencing
 

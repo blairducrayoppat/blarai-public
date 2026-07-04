@@ -9,7 +9,7 @@
 Sweep `num_assistant_tokens` [1, 2, 3, 5, 7, 10] across context bands [512, 2048, 4096, 8192, 12288, 16384, 20480] using Draft-A only (Qwen3-0.6B 28L INT4 GPU). Draft-B was eliminated in Task 4.2. Original spec was 4K-only with two draft models — scope expanded to full production range with 6 NAT values after Draft-B elimination.
 
 - **Total:** 42 configurations × 7 runs (2 warmup + 5 measured) = 294 `generate()` calls
-- **Estimated runtime:** ~2 hours
+- **Estimated runtime:** \~2 hours
 - **Pipeline:** Compiled once. NAT varies per-request via `GenerationConfig.num_assistant_tokens`
 - **XAttention:** OFF (default — not varied in this task)
 - **KV cache precision:** FP16 (locked)

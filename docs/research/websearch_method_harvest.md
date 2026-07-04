@@ -23,7 +23,7 @@ framework and dependency footprint behind.
 
 **What it does.** Multi-strategy research agent using LangGraph orchestration.
 Supports Ollama, llama.cpp, and cloud LLMs; 20+ search-engine integrations
-including arXiv, PubMed, Brave, SearXNG, Tavily. Claims ~95% on the SimpleQA
+including arXiv, PubMed, Brave, SearXNG, Tavily. Claims \~95% on the SimpleQA
 benchmark using Qwen3.6-27B on a local GPU.
 
 **How query decomposition works.** The LLM receives the user question and
@@ -122,8 +122,8 @@ extraction step. Each learning carries its source URL; the final synthesis LLM
 call receives the full set of (learning, source) pairs and is instructed to
 produce inline citations. Reports target approximately 2,000 words.
 
-**Latency and cost.** The project's own documentation cites ~5 minutes and
-~$0.40 per deep-research query at depth=2, breadth=4 using o3-mini. This is
+**Latency and cost.** The project's own documentation cites \~5 minutes and
+\~$0.40 per deep-research query at depth=2, breadth=4 using o3-mini. This is
 with cloud LLMs where the thinking dominates; local inference on 14B is slower
 per token but the total is more controllable.
 
@@ -262,7 +262,7 @@ with their properties:
 - Pricing: Consumer (Cecil/Agnes): **$0.030 per 1,000 tokens**; with Kagi
   Ultimate subscription: $0.025/1k tokens. Enterprise (Muriel): **$1.00 flat
   per summary** regardless of document length. Cached summaries are free.
-  Practical cost for a 5,000-word web article (approx. 6,500 tokens): ~$0.20
+  Practical cost for a 5,000-word web article (approx. 6,500 tokens): \~$0.20
   per summary at consumer tier, $1.00 at Muriel. For a lean loop using 5
   sources per query, the Summarizer is $0.10–$1.00 per research question at
   consumer tier — potentially more expensive per search than the Search API.
@@ -280,7 +280,7 @@ with their properties:
 - Response: `{ output: "<answer>", references: [{title, snippet, url}], tokens: N }`
 - Pricing: **$0.015 per query** ($15 per 1,000 queries) with web search enabled.
   Cached responses are free.
-- Latency: Example response time published in docs: ~7,943 ms (approximately
+- Latency: Example response time published in docs: \~7,943 ms (approximately
   8 seconds). This is the end-to-end wall-clock for a live search + synthesis
   call.
 - What it does: Kagi's servers search the web, then a Kagi-hosted LLM synthesizes
@@ -324,11 +324,11 @@ source summaries — breaks down as follows under each option:
 
 **Option A (Search API + local-14B synthesis):**
 - 4 Search API calls at $0.012 each: $0.048
-- 4 Universal Summarizer calls at ~$0.20 each (consumer, 5k-word pages): $0.80
+- 4 Universal Summarizer calls at \~$0.20 each (consumer, 5k-word pages): $0.80
   OR: skip the Summarizer, fetch raw text locally and extract with the 14B
   (zero marginal API cost, but more 14B context tokens consumed).
 - 14B synthesis: zero marginal cost (local GPU).
-- Total with Summarizer: ~$0.85 per answer. Without Summarizer: ~$0.05.
+- Total with Summarizer: \~$0.85 per answer. Without Summarizer: \~$0.05.
 - The Summarizer is optional in W3: the W3 design can use local fetch+extract
   as the default and offer the Summarizer as a quality upgrade. The W4 gate
   wires either path through the egress proxy.
@@ -337,7 +337,7 @@ source summaries — breaks down as follows under each option:
 - 1 FastGPT call: $0.015
 - Zero other API costs.
 - Zero local inference cost (no 14B used).
-- Total: ~$0.015 per answer.
+- Total: \~$0.015 per answer.
 
 FastGPT is substantially cheaper per answer at this scale. The cost difference
 inverts at high volume, but at personal-assistant usage (10–50 searches per day),
@@ -351,13 +351,13 @@ architectural seam, not on cost.
 **Option A:** The loop latency is dominated by the number of serial search +
 extract rounds. With one decomposition pass (3 searches, 3 extractions), one
 gap-fill pass (2 searches, 2 extractions), and a final synthesis:
-- 5 search calls at ~500 ms each: 2,500 ms (parallelizable within one pass)
-- 5 Summarizer calls at ~2,000 ms each: 10,000 ms (can be parallelized)
-- 14B synthesis at ~8,000 ms (cold, ~3,000 ms warm): 3,000–8,000 ms
+- 5 search calls at \~500 ms each: 2,500 ms (parallelizable within one pass)
+- 5 Summarizer calls at \~2,000 ms each: 10,000 ms (can be parallelized)
+- 14B synthesis at \~8,000 ms (cold, \~3,000 ms warm): 3,000–8,000 ms
 - End-to-end estimate: 10–20 seconds with parallelized fetches, dominated by
   content extraction.
 
-**Option B:** FastGPT latency: ~8 seconds (from Kagi documentation example).
+**Option B:** FastGPT latency: \~8 seconds (from Kagi documentation example).
 This is fixed per query; it does not scale with question complexity.
 
 For BlarAI's use case (a single user at a personal workstation), 10–20 seconds

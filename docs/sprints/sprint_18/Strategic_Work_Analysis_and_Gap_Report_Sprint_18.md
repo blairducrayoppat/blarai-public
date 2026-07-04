@@ -86,7 +86,7 @@ Result line (exact):
 ======== 2342 passed, 113 deselected, 3 warnings in 102.25s (0:01:42) =========
 ```
 **2342 passed / 0 skipped / 0 failed / 113 deselected.** Matches the SCR (§3) and
-TEST_GOVERNANCE §1 to the test. No port-5001 skip-shift (no ~2333/9) — the port was
+TEST_GOVERNANCE §1 to the test. No port-5001 skip-shift (no \~2333/9) — the port was
 free throughout, the C6 autouse detector recorded free→free and passed silently
 (confirming the no-false-positive contract on the live gate path, not just the unit
 truth-table). The 3 warnings are pre-existing SwigPy/`\p`-escape `DeprecationWarning`s,
@@ -394,7 +394,7 @@ the code contradicts within Sprint-18 scope.
   @hardware fixtures `service.stop()` in `finally` and the standing gate deselects them,
   so the clean baseline is safe; this is a theoretical full-suite edge. *Action:* if a
   future full-suite run ever false-fails, add a short settle/poll on the end-of-session
-  probe (e.g., retry `_port_held` for ~1–2 s) before the verdict. Note only; no change
+  probe (e.g., retry `_port_held` for \~1–2 s) before the verdict. Note only; no change
   needed now.
 
 - **MINOR-3 — §5.1 production-posture evidence is C1-anchored (single composed path).**

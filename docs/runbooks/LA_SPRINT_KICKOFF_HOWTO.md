@@ -27,7 +27,7 @@
 
 Every sprint starts with a signed Strategic Design Vision (SDV). The SDV is a markdown document authored collaboratively by you and the Co-Lead Architect, committed to git, and referenced by every agent in the fleet for the duration of the sprint.
 
-The key principle: **LA is in the loop at sprint boundaries, not during work.** You spend ~30–60 minutes here, then the fleet runs autonomously for days until the next sprint boundary. DEC-15 added Strategic Completion Report (SCR) and Strategic Work Analysis and Gap Report (SWAGR) at sprint *end* so you also get a retrospective read; those require no LA action, just reading.
+The key principle: **LA is in the loop at sprint boundaries, not during work.** You spend \~30–60 minutes here, then the fleet runs autonomously for days until the next sprint boundary. DEC-15 added Strategic Completion Report (SCR) and Strategic Work Analysis and Gap Report (SWAGR) at sprint *end* so you also get a retrospective read; those require no LA action, just reading.
 
 ---
 
@@ -119,7 +119,7 @@ The skill runs a pre-written prompt that tells Co-Lead to:
 1. Load its full context (CLAUDE.md, DEC-15 proposal, templates, predecessor SWAGR, recent ledger, active tracking task in Vikunja).
 2. Post a **first LA-facing message** containing:
    - A confirmation echo of what you said.
-   - A predecessor digest (~8 sentences of what last sprint did and missed).
+   - A predecessor digest (\~8 sentences of what last sprint did and missed).
    - 2–5 strategic-context observations (open gates, unresolved issues, risks).
    - A proposed **outline** of all 14 SDV sections.
    - 3–7 **specific questions** for you to answer before full drafting.

@@ -10,7 +10,7 @@
 
 ## 1. Method
 
-1. Inventoried every hardcoded `C:\Users\mrbla\BlarAI` reference across `tools/scheduled-tasks/` (200+ matches; 13 PS1+VBS scripts, 13 scheduled-task XMLs, 6 wake templates, ~150 runtime log entries).
+1. Inventoried every hardcoded `C:\Users\mrbla\BlarAI` reference across `tools/scheduled-tasks/` (200+ matches; 13 PS1+VBS scripts, 13 scheduled-task XMLs, 6 wake templates, \~150 runtime log entries).
 2. Inspected `wake_launcher.ps1` (head + Test-WorkAvailable body), `state.py`, `active_tasks.py`, `blarai_next_task_resolver.py` for path-resolution doctrine.
 3. Cross-referenced every hardcoded path against the rewrite/refactor coverage in `02_STAGE1_SCAFFOLD.xml`, `03_STAGE2_REFACTOR_MULTIPROJECT.xml`, `04_STAGE3_COPY_TOOLS.xml`, `05_STAGE4_CUTOVER.xml`.
 4. Read `INFRA_DELTA_v2.md` and `AUDIT_RISK_REVIEW.md` §0.6 (R1–R11) to confirm what the v2 refactor already documented.
@@ -85,7 +85,7 @@ That covers about 80% of the surface area. The remaining 20% — the gaps below 
 - After Stage 4.7, the `<Command>` rewrites to `C:\Users\mrbla\devplatform\.venv\Scripts\python.exe` ✓ but `<WorkingDirectory>` stays `C:\Users\mrbla\BlarAI`.
 - When `python -m tools.fleet_observability.daily_digest` runs, Python resolves `-m tools.X` first against site-packages (devplatform's venv has none for this) then against `sys.path[0]` (the cwd, which is BlarAI). Result: imports BlarAI's dormant `tools/fleet_observability/daily_digest.py` from the OLD copy that Stage 5 will subsequently delete.
 - **First firing after Stage 4.7 (during the smoke-test enable in Stage 4.8)**: works against the dormant BlarAI copy → **gives a false-green smoke test**.
-- **First firing after Stage 5 deletion** (~hours later, depending on cadence): `ModuleNotFoundError: No module named 'tools.fleet_observability'`. Daily Digest, Welcome Back Poll, Weekly Summary, Dashboard Maintainer, Credentials Rotation Reminder, Gate Stale Cleaner all fail simultaneously. Observability dashboards stop updating. F2 credential expiration warnings stop firing.
+- **First firing after Stage 5 deletion** (\~hours later, depending on cadence): `ModuleNotFoundError: No module named 'tools.fleet_observability'`. Daily Digest, Welcome Back Poll, Weekly Summary, Dashboard Maintainer, Credentials Rotation Reminder, Gate Stale Cleaner all fail simultaneously. Observability dashboards stop updating. F2 credential expiration warnings stop firing.
 
 **Fix** (additions to Stage 4.7 substitution loop, executed before re-register):
 ```powershell
@@ -100,7 +100,7 @@ $xml = $xml -replace '<WorkingDirectory>C:\\Users\\mrbla\\BlarAI</WorkingDirecto
 
 ---
 
-### G-3 (DEGRADED → BREAKING within ~24h) — `vikunja-autostart.xml` `<Command>` and `<WorkingDirectory>` paths not in Stage 4.7 substitution scope
+### G-3 (DEGRADED → BREAKING within \~24h) — `vikunja-autostart.xml` `<Command>` and `<WorkingDirectory>` paths not in Stage 4.7 substitution scope
 
 **Affected file**: `vikunja-autostart.xml` lines 73-74 (`<Command>` = path to vikunja exe; `<WorkingDirectory>` = `C:\Users\mrbla\BlarAI\tools\vikunja`).
 
@@ -153,7 +153,7 @@ The naming convention is also a smell. Cross-project devplatform should ship `ne
 
 `wake_launcher.ps1` writes to `Join-Path $RepoRoot 'tools\scheduled-tasks\logs'`. After Stage 4 cutover, `$RepoRoot` (or the new `$BlarAIRoot`) effectively means devplatform's wake_launcher is invoked from devplatform → logs go to `devplatform/tools/scheduled-tasks/logs/`. ✓
 
-The existing 7 days of logs in BlarAI's `tools/scheduled-tasks/logs/` (~150+ files in the user's grep) become stale audit history. Stage 5 cleanup deletes BlarAI's `tools/scheduled-tasks/` entirely — the logs go with it. **Recommend**: pre-Stage-5, copy `tools/scheduled-tasks/logs/archive/` to a long-term audit location (e.g., `C:\Users\mrbla\fleet-audit-archive\pre-platform-separation\`) before deletion. Otherwise audit trail is destroyed.
+The existing 7 days of logs in BlarAI's `tools/scheduled-tasks/logs/` (\~150+ files in the user's grep) become stale audit history. Stage 5 cleanup deletes BlarAI's `tools/scheduled-tasks/` entirely — the logs go with it. **Recommend**: pre-Stage-5, copy `tools/scheduled-tasks/logs/archive/` to a long-term audit location (e.g., `C:\Users\mrbla\fleet-audit-archive\pre-platform-separation\`) before deletion. Otherwise audit trail is destroyed.
 
 ---
 
@@ -176,9 +176,9 @@ Plain-text search over `**/*.{ps1,xml,bat}` (200+ matches capped) and targeted s
 | `tools/scheduled-tasks/wake_launcher.ps1` (L13,30,294) | 3 | Stage 2.5.v2 — `-BlarAIRoot` param (L13 is comment) | ✅ COVERED |
 | `tools/scheduled-tasks/test_async_post_gate.ps1` (L24) | 1 | Stage 5 §1 explicitly DELETES this file | ✅ COVERED |
 | `tools/scheduled-tasks/register_event_log_source.ps1` (L12) | 1 | Comment example only — no runtime path | ✅ NO ACTION |
-| `tools/scheduled-tasks/wake-*.xml` (12 wake/observability XMLs) | ~25 | Stage 4.7 substitution (`\tools\` + `\.venv\` + bare `<WorkingDirectory>`) | ✅ COVERED |
+| `tools/scheduled-tasks/wake-*.xml` (12 wake/observability XMLs) | \~25 | Stage 4.7 substitution (`\tools\` + `\.venv\` + bare `<WorkingDirectory>`) | ✅ COVERED |
 | `tools/scheduled-tasks/vikunja-autostart.xml` (L14,73,74) | 3 | Stage 4.7 substitution (all hits contain `\tools\`) | ✅ COVERED |
-| `tools/scheduled-tasks/escalation-watchdog.xml`, `toast-watchdog.xml`, `daily-digest.xml`, `dashboard-maintainer.xml`, `gate-stale-cleaner.xml`, `welcome-back-poll.xml`, `weekly-summary.xml`, `credentials-rotation-reminder.xml`, `agents-cadence-monitor.xml`, `sprint-auditor.xml` | ~20 | Stage 4.7 substitution | ✅ COVERED |
+| `tools/scheduled-tasks/escalation-watchdog.xml`, `toast-watchdog.xml`, `daily-digest.xml`, `dashboard-maintainer.xml`, `gate-stale-cleaner.xml`, `welcome-back-poll.xml`, `weekly-summary.xml`, `credentials-rotation-reminder.xml`, `agents-cadence-monitor.xml`, `sprint-auditor.xml` | \~20 | Stage 4.7 substitution | ✅ COVERED |
 | `docs/scheduled/wake_templates/co_lead_architect.md` (L150) | 1 | Stage 4.7.5 wake-template rewrite (`\tools\` → devplatform) | ✅ COVERED |
 | `docs/scheduled/wake_templates/co_lead_architect.md` (L162) | 1 | `cd 'C:\Users\mrbla\BlarAI'` for REJECT — target-project ref, **preserve** per Stage 4.7 preserve clause | ✅ NO ACTION |
 | `docs/scheduled/wake_templates/{configuration_agent,ea_code,ea_cowork,sdo,sprint_auditor}.md` | 0 | No hardcoded BlarAI paths found | ✅ CLEAN |
@@ -309,8 +309,8 @@ The procedure is now self-contained: no out-of-band operator setup is required b
 
 These are documentation-only patches to the v2 execution docs. No code changes needed.
 
-1. **Patch Stage 4.7 substitution loop to also rewrite bare `<WorkingDirectory>C:\Users\mrbla\BlarAI</WorkingDirectory>`** → fixes G-2. ~3 lines added, single sub-item. Risk: nil — bare BlarAI as WorkingDirectory is always wrong post-cutover.
-2. **Extend Stage 2.5.v1 refactor list to include `agents-cadence-monitor.ps1`, `la_merge_approve.ps1`, `escalation_watchdog.ps1`, `toast_watchdog.ps1`** with `-BlarAIRoot` parameter (mirroring §2.5.v2 wake_launcher signature) → fixes G-1, G-4. 4 file refactors, each ~5 LOC.
+1. **Patch Stage 4.7 substitution loop to also rewrite bare `<WorkingDirectory>C:\Users\mrbla\BlarAI</WorkingDirectory>`** → fixes G-2. \~3 lines added, single sub-item. Risk: nil — bare BlarAI as WorkingDirectory is always wrong post-cutover.
+2. **Extend Stage 2.5.v1 refactor list to include `agents-cadence-monitor.ps1`, `la_merge_approve.ps1`, `escalation_watchdog.ps1`, `toast_watchdog.ps1`** with `-BlarAIRoot` parameter (mirroring §2.5.v2 wake_launcher signature) → fixes G-1, G-4. 4 file refactors, each \~5 LOC.
 3. **Extend Stage 4.7.6 line-by-line scan to all 5 modified PS1s** (not just wake_launcher.ps1) → defense-in-depth for G-1, G-4.
 4. **Add Stage 4.7.7: confirm `vikunja-autostart` form** (scheduled-task vs. Startup-shortcut vs. both) and ensure each form is touched → resolves G-3 ambiguity.
 5. **Add Stage 5.0.5: archive `BlarAI/tools/scheduled-tasks/logs/archive/`** to `C:\Users\mrbla\fleet-audit-archive\pre-platform-separation\` before Stage 5 deletion → fixes S-2.

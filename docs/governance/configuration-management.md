@@ -126,7 +126,7 @@ Task 4 locked ten production decisions in the Post-Operational
 Maturation Ledger (DEC-01 through DEC-10). They are **Policy Agent
 tuning decisions**, not AO runtime-config decisions. The
 authoritative one-line summaries, transcribed from the ledger (see
-`docs/POST_OPERATIONAL_MATURATION_LEDGER.md` Entry ~34 "Locked
+`docs/POST_OPERATIONAL_MATURATION_LEDGER.md` Entry \~34 "Locked
 Decisions Wired" and surrounding Task 4 entries):
 
 - **DEC-01.** Number of Assistant Tokens `NAT = 3` for Policy Agent

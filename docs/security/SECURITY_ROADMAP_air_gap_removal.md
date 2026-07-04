@@ -213,7 +213,7 @@ Formal gate. The air-gap comes down **only** when **all** hold:
 
 ### 5.8 Measured-boot ordering
 
-- [x] **DONE** — Launcher enforces strict boot ordering: (1) admin check → (1.5) per-boot mTLS cert provisioning → (2) Hyper-V VM → (2.5) shared LLMPipeline → (3) PA measured-boot gate → (4) AO entrypoint → (5) session store (encrypted) → (6) transport gateway → (6a) handshake preflight → (6b) prompt-flow preflight. Services cannot start out of order. *(Evidence: `launcher/__main__.py` Steps 1–6b, lines ~591–1119.)*
+- [x] **DONE** — Launcher enforces strict boot ordering: (1) admin check → (1.5) per-boot mTLS cert provisioning → (2) Hyper-V VM → (2.5) shared LLMPipeline → (3) PA measured-boot gate → (4) AO entrypoint → (5) session store (encrypted) → (6) transport gateway → (6a) handshake preflight → (6b) prompt-flow preflight. Services cannot start out of order. *(Evidence: `launcher/__main__.py` Steps 1–6b, lines \~591–1119.)*
 - [x] **DONE** — PA `run_measured_boot()` enforces phase ordering within the PA boot: attestation (security-material validation) → weight integrity → model load → rules load → listener start. Any step failure is fatal; `hard_locked` after max attempts (3). *(Evidence: `services/policy_agent/src/boot.py:84–159`; `services/policy_agent/src/entrypoint.py:419–476`.)*
 
 ---
@@ -226,7 +226,7 @@ Formal gate. The air-gap comes down **only** when **all** hold:
 
 ### 5.10 PII-filter posture (DECIDED 2026-06-07 → ADR-027; build Sprint 17)
 
-- [~] **DECIDED (ADR-027, 2026-06-07): block-on-detection at the egress boundary; build Sprint 17** — PII (Personally Identifiable Information) redaction posture at the egress boundary. Decision 5 (§6): "off locally, redact at the egress boundary." The PGOV pipeline has a `pii_mode` config field; AO `default.toml:47` ships `pii_mode = "off"`. The detector (Luhn-less card check accuracy issue flagged in Decision 5) and the precise redact-vs-block policy at the egress path are both open items that activate when the network-facing work lands. The posture decision is ratified in principle (§6 Decision-5); the *implementation at the egress boundary* is REMAINING. *(Evidence: `services/assistant_orchestrator/config/default.toml:47` `pii_mode = "off"`; `tests/security/test_secure_defaults.py:13` notes `pii_mode` is a Tier-1 decision the roadmap leaves to the LA.)*
+- [\~] **DECIDED (ADR-027, 2026-06-07): block-on-detection at the egress boundary; build Sprint 17** — PII (Personally Identifiable Information) redaction posture at the egress boundary. Decision 5 (§6): "off locally, redact at the egress boundary." The PGOV pipeline has a `pii_mode` config field; AO `default.toml:47` ships `pii_mode = "off"`. The detector (Luhn-less card check accuracy issue flagged in Decision 5) and the precise redact-vs-block policy at the egress path are both open items that activate when the network-facing work lands. The posture decision is ratified in principle (§6 Decision-5); the *implementation at the egress boundary* is REMAINING. *(Evidence: `services/assistant_orchestrator/config/default.toml:47` `pii_mode = "off"`; `tests/security/test_secure_defaults.py:13` notes `pii_mode` is a Tier-1 decision the roadmap leaves to the LA.)*
 
 ---
 

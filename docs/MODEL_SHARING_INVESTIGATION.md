@@ -3,8 +3,8 @@
 **Date:** 2026-05-22
 **Author:** Blair + Claude (Opus 4.7)
 **Status:** Findings — input to a possible ADR-012 amendment
-**Trigger:** RAM measured at ~17 GB with BlarAI running (system 24.5 / 31.3 GB
-used, < 7 GB free). Boot ~43–56 s. Blair asked why the 14B model is loaded twice.
+**Trigger:** RAM measured at \~17 GB with BlarAI running (system 24.5 / 31.3 GB
+used, < 7 GB free). Boot \~43–56 s. Blair asked why the 14B model is loaded twice.
 
 ---
 
@@ -31,7 +31,7 @@ code does two.** Measured from `launcher.log`: the Policy Agent
 Orchestrator (`OrchestratorGPUInference`,
 `services/assistant_orchestrator/src/entrypoint.py:244`) each independently
 construct an `ov_genai.LLMPipeline` for `models/qwen3-14b/openvino-int4-gpu`
-and each compiles it for the GPU (~15 s + ~18 s). Two ~8–9 GB compiled copies
+and each compiles it for the GPU (\~15 s + \~18 s). Two \~8–9 GB compiled copies
 end up resident at once.
 
 This is an **implementation gap**, not a deliberate design choice — no ADR
@@ -41,12 +41,12 @@ rescinded the "single compilation" intent.
 
 | Metric | Measured |
 |---|---|
-| BlarAI footprint, idle (model loaded) | ~17 GB (GPU "Local Usage"); system 24.5 / 31.3 GB used |
-| Compiled-model copies | 2 × ~8 GB |
-| Boot — model compile | PA ~15 s + AO ~18 s ≈ 33 s of a ~43–56 s boot |
+| BlarAI footprint, idle (model loaded) | \~17 GB (GPU "Local Usage"); system 24.5 / 31.3 GB used |
+| Compiled-model copies | 2 × \~8 GB |
+| Boot — model compile | PA \~15 s + AO \~18 s ≈ 33 s of a \~43–56 s boot |
 | Free RAM while running | < 7 GB |
 
-A single shared copy would, in principle, free ~8 GB and remove one ~15–18 s
+A single shared copy would, in principle, free \~8 GB and remove one \~15–18 s
 compile from every boot.
 
 ## 4. Why it diverged — construction-config drift
@@ -109,7 +109,7 @@ model, one prefix-caching setting, one priority.
 ## 7. Does the Policy Agent need the 14B at all?
 
 A separate question Blair raised. ADR-012 locks the 14B for the PA, and the
-2,000 ms PA latency budget (§2.5) accommodates it (the PA generates only ~10
+2,000 ms PA latency budget (§2.5) accommodates it (the PA generates only \~10
 tokens). Notably, ADR-012 §2.4 records that the PA's *hardest* decisions
 (ESCALATE) are carried by the **DeterministicPolicyChecker** — 10 regex rules —
 not the LLM; the thinking-mode experiments measured the LLM path alone at only
@@ -121,7 +121,7 @@ intended) halves the footprint regardless of which model the PA uses.
 
 ## 8. Recommendation
 
-Worth doing. It frees ~8 GB of RAM and ~15 s of every boot, and it realigns the
+Worth doing. It frees \~8 GB of RAM and \~15 s of every boot, and it realigns the
 code with the locked ADR-012 architecture. But it is a deliberate,
 sprint-sized change touching the **security-critical PA inference path**: it
 needs the empirical config reconciliation, careful tests, an ADR-012

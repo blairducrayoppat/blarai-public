@@ -124,7 +124,7 @@ text) pairs and can instruct the 14B to produce inline citations traceable to
 specific passages.
 
 **Where Option B might win:** FastGPT is $0.015 per query vs $0.048–$0.85 for
-Option A (search + summarizer costs), and has a fixed ~8-second latency vs the
+Option A (search + summarizer costs), and has a fixed \~8-second latency vs the
 10–20 second estimate for Option A with a two-pass loop. For a disposable
 "quick lookup" shortcut that explicitly bypasses the local model, FastGPT would
 be a reasonable choice. But that is a different product — it removes the local-
@@ -760,10 +760,10 @@ the marker in the standard CI suite.
 
 | Scenario | Kagi API cost | Est. wall-clock |
 |---|---|---|
-| Simple question, 1 pass, no Summarizer | $0.024 (2 search calls) | ~8–12 s |
-| Simple question, 1 pass, with Summarizer (5 sources) | ~$0.024 + $1.00 | ~15–25 s |
-| Complex question, 2 passes, no Summarizer | ~$0.060 | ~15–30 s |
-| Complex question, 2 passes, with Summarizer | ~$0.060 + $2.00 | ~30–50 s |
+| Simple question, 1 pass, no Summarizer | $0.024 (2 search calls) | \~8–12 s |
+| Simple question, 1 pass, with Summarizer (5 sources) | \~$0.024 + $1.00 | \~15–25 s |
+| Complex question, 2 passes, no Summarizer | \~$0.060 | \~15–30 s |
+| Complex question, 2 passes, with Summarizer | \~$0.060 + $2.00 | \~30–50 s |
 
 The Summarizer cost dominates. `use_summarizer=false` is the recommended
 default; the User-Operator can enable it for high-stakes questions where summary
@@ -833,7 +833,7 @@ W2 begins:
 1. **Summarizer default.** The ADR recommends `use_summarizer=false` as the
    default (local fetch+extract via W4 egress proxy, zero marginal cost). Is
    that the right default, or does the LA want `use_summarizer=true` (higher
-   quality, ~$0.20–$1.00 per source, Kagi server-side) as the default from W4
+   quality, \~$0.20–$1.00 per source, Kagi server-side) as the default from W4
    onwards? This affects the cost model and the W4 implementation priority.
 
 2. **`max_passes` default.** The ADR uses 2 (one initial pass + one follow-up).

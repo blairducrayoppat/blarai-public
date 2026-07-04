@@ -59,7 +59,7 @@ All Sprint 8 entries live in the new `docs/ledger/` directory-per-entry tree (Q1
 
 ## 3. Sprint purpose — retrospective
 
-The stated purpose held cleanly. Sprint 8 was scoped as pure test-quality remediation against the Sprint 7 audit catalogue, and that is exactly what it delivered. No production code changes, no use-case work crept in. The "mature not minimal" directive from the LA (2026-04-22) shaped EA behavior visibly: EA-2 covered all 13 AO entrypoint config constraints rather than the floor of 6, and EA-3 added 65 tests against an SDV expectation closer to ~30. No drift in motivation observed.
+The stated purpose held cleanly. Sprint 8 was scoped as pure test-quality remediation against the Sprint 7 audit catalogue, and that is exactly what it delivered. No production code changes, no use-case work crept in. The "mature not minimal" directive from the LA (2026-04-22) shaped EA behavior visibly: EA-2 covered all 13 AO entrypoint config constraints rather than the floor of 6, and EA-3 added 65 tests against an SDV expectation closer to \~30. No drift in motivation observed.
 
 ## 4. Success criteria assessment
 
@@ -196,7 +196,7 @@ A smaller surprise: EA-5's merge tripped the Co-Lead `trusted_scope` carve-out o
 
 | Role | SDV-budgeted | Actual | Delta commentary |
 |---|---|---|---|
-| LA | ~20 min total | ~25–30 min (added: `la_merge_approve` for EA-5 + fleet-hygiene §4 edit) | Slight overrun driven by EA-5 escalation + an unrelated governance edit; both well within tolerance |
+| LA | \~20 min total | \~25–30 min (added: `la_merge_approve` for EA-5 + fleet-hygiene §4 edit) | Slight overrun driven by EA-5 escalation + an unrelated governance edit; both well within tolerance |
 | Co-Lead | Autonomous | Many cron firings (4 EA-prompt reviews, 1 escalate, 1 SCR — this one) | Operated within DEC-11 §1.1 budget |
 | SDO | Autonomous | 5 EA prompts authored + per-EA completion reviews | Operated within DEC-11 §1.2 |
 | EA | Autonomous | 5 EAs executed; one (EA-5) needed WI-4 fix-up commit pre-merge | Operated within DEC-11 §1.3 |
@@ -205,7 +205,7 @@ A smaller surprise: EA-5's merge tripped the Co-Lead `trusted_scope` carve-out o
 ## 12. Duration
 
 - Planned target (SDV §12): 3–5 calendar days, ending by 2026-04-27.
-- Actual: ~2 calendar days (2026-04-22 00:11 → 2026-04-23 ~22:00 local). Came in well under target.
+- Actual: \~2 calendar days (2026-04-22 00:11 → 2026-04-23 \~22:00 local). Came in well under target.
 - Variance explanation: parallel infrastructure effort (Pattern B worktrees, ledger format flip, fleet-hygiene §4) did not slow Sprint 8 because Co-Lead/SDO ran concurrently with infrastructure commits and EA agents were unaffected.
 
 ## 13. Deliberate non-goals — respected?

@@ -10,7 +10,7 @@ sprint_name: "Process-Hygiene Backlog Paydown"
 predecessor_sprint_id: 10
 vikunja_tracking_task_id: 410
 start_date: "2026-05-11"
-target_completion_date: "open — no hard deadline; ~3-5 fleet days from unpause per LA mature-not-minimal motto"
+target_completion_date: "open — no hard deadline; \~3-5 fleet days from unpause per LA mature-not-minimal motto"
 la_approved_on: "2026-05-11T21:00:00-05:00"
 la_approved_by: "blarai"
 co_lead_drafted_on: "2026-05-11T20:30:00-05:00"
@@ -469,7 +469,7 @@ process substrate it doesn't have to fix in-flight.
 
 4. **EA-4 — Test-Baseline Drift Investigation Report.** Conduct a real
    investigation into the +20 pass / -20 skip movement between Sprint 8 EA-5
-   close (~981 passed, 22 skipped per CLAUDE.md SDV-anchored baseline) and
+   close (\~981 passed, 22 skipped per CLAUDE.md SDV-anchored baseline) and
    Sprint 10 SCR commit (1001 passed, 2 skipped per Sprint 10 SWAGR §8.1).
    Methodology — at EA-4's discretion within scope — may include any of:
    - git-bisect across Sprint 8 close → Sprint 10 SCR window running
@@ -720,7 +720,7 @@ have to escalate every ambiguity.
   unambiguously. The earlier v1/v2 "accept asymmetry" default is
   superseded by LA's mature-not-minimal direction
   ("feel free to improve and iterate") 2026-05-11 night-handoff session.
-  Edit size is ~13 string replacements in a single file plus a ~50-line
+  Edit size is \~13 string replacements in a single file plus a \~50-line
   DEC document — well within `trusted_scope` (under 200 LOC); no
   escalation expected.
 
@@ -759,9 +759,9 @@ have to escalate every ambiguity.
   Phase tags: `[phase:completion]` for the merge commit; `[phase:in-progress]`
   for any pre-completion checkpoints (rare for this sprint's profile).
 
-- **`trusted_scope` escalation expected**: EA-1 (3 DECs aggregating ~180-240
+- **`trusted_scope` escalation expected**: EA-1 (3 DECs aggregating \~180-240
   lines) is unlikely to exceed `runaway_loc_threshold: 3000`. EA-4
-  investigation report at ~80-150 lines also unlikely. EA-3 template edits
+  investigation report at \~80-150 lines also unlikely. EA-3 template edits
   are small. EA-2 if it includes a helper script may approach but not
   exceed the threshold. **No EA is currently predicted to escalate**, but
   Sprint 11 carries no risk of `la_merge_approve.ps1` being needed under
@@ -977,7 +977,7 @@ is NOT called.
 | Test-baseline drift investigation surfaces a previously-undiagnosed environmental dependency (e.g., specific Python version, GPU driver, OpenVINO build) | MED | MED | EA-4 reports the environmental dependency as a finding; depending on severity, becomes a Sprint 11 mid-flight CAR escalation OR a Sprint 12 carry-over; report is the deliverable regardless |
 | Mature-not-minimal floor missed on a small deliverable (e.g., EA-5 cross-reference style record at exactly 20 lines feeling padded) | LOW | LOW | The floor is a content-density expectation, not a hard line count; if EA-5 produces a focused 15-line decision record with substantive content, Co-Lead's review accepts it; padded prose is rejected |
 | EA-1 DEC content drifts from current operational mechanics (DEC text says one thing, governance doc says another) | LOW | MED | EA-1 explicitly cites the existing governance doc as the operational authority in each DEC; the DEC is a ratification record, not a redefinition |
-| EA-1 + EA-2 parallel merge-queue contention (v2 SDV amendment): both EAs finish near the same time, both submit to Co-Lead's merge queue, Co-Lead must order them | MED | LOW | Co-Lead merge queue is serial-by-design; merge order between EA-1 and EA-2 is whichever Phase 1b APPROVED report lands first. Both EAs' working sets are disjoint, so no merge conflict possible; the contention is purely on Co-Lead session time. Estimate ~10 min added Co-Lead time vs serial cadence. If both merges hit trusted_scope escalation simultaneously, LA's `la_merge_approve.ps1` invocation is serial regardless |
+| EA-1 + EA-2 parallel merge-queue contention (v2 SDV amendment): both EAs finish near the same time, both submit to Co-Lead's merge queue, Co-Lead must order them | MED | LOW | Co-Lead merge queue is serial-by-design; merge order between EA-1 and EA-2 is whichever Phase 1b APPROVED report lands first. Both EAs' working sets are disjoint, so no merge conflict possible; the contention is purely on Co-Lead session time. Estimate \~10 min added Co-Lead time vs serial cadence. If both merges hit trusted_scope escalation simultaneously, LA's `la_merge_approve.ps1` invocation is serial regardless |
 | Parallel-window devplatform race (v2): EA-1 writes `docs/decisions/DEC-1*.md`, EA-2 amends `docs/scheduled/wake_templates/co_lead_architect.md` — both on devplatform main | LOW | LOW | File paths disjoint; git merges of two disjoint feature branches into devplatform main do not conflict. Convention is direct-to-main on devplatform per N-6; the two EA commits land sequentially in whichever order Co-Lead authorizes. No race condition surface |
 | EA-5 token expansion overlooks an intentional `<BlarAI>` use (v3): if `devplatform\CLAUDE.md` contains a literal `<BlarAI>` reference that is meant as the abstract project name rather than a substitutable path token | LOW | LOW | EA-5 enumerates every `grep -n "<BlarAI>"` match in `devplatform\CLAUDE.md` and inspects context line-by-line before bulk-replacing; if any occurrence is the abstract project name (e.g., "the BlarAI project") rather than a path token (e.g., `<BlarAI>\CLAUDE.md`), EA-5 preserves that one and notes the rationale in the EA completion report. At SDV v3 audit time, all 13 tokens in `devplatform\CLAUDE.md` were path-tokens (preceded by `\` and followed by file/directory path); zero abstract-name uses observed |
 | EA-5 DEC-19 (v3) drifts from existing absolute-path practice already in place across most of the codebase | LOW | LOW | DEC-19 explicitly cites the pre-existing BlarAI-side practice + the post-Sprint-10-EA-3 devplatform-side mixed state as the motivation; the DEC ratifies existing practice + closes the one-file outlier, NOT a new rule. EA-5 commits the DEC and the token expansion in the same merge to preserve the ratification-record + implementation atomicity |
@@ -1055,7 +1055,7 @@ pre-2026-04-22 entries — EA-1 commits DEC-17 first to remove this surface.
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| LA (Lead Architect) | SDV sign-off (concurrent with this kickoff per no-stopping directive), 0-2 expected `la_merge_approve` (Sprint 11 EAs profile small), cross-reference style call adjudication (EA-5), test-drift report read, SCR + SWAGR reads | ~20-30 min total |
+| LA (Lead Architect) | SDV sign-off (concurrent with this kickoff per no-stopping directive), 0-2 expected `la_merge_approve` (Sprint 11 EAs profile small), cross-reference style call adjudication (EA-5), test-drift report read, SCR + SWAGR reads | \~20-30 min total |
 | Co-Lead Architect | This kickoff session (Phase 0–5); SDO continuation XML authoring; per-EA peer review (Phase 1b prompt-staging APPROVED + Phase 2 merge-gate review); sprint-close SCR authoring; Active State refresh procedure invocation at SCR cadence (using EA-2 deliverable) | Autonomous per DEC-11 §1.1 |
 | SDO (Strategic Development Orchestrator) | EA-1..EA-5 prompt authoring (5 prompts); per-EA Phase 1a comprehension review + Phase 1b completion review (10 reviews total) | Autonomous per DEC-11 §1.2 |
 | EA Code | EA-1..EA-5 execution (5 firings) | Autonomous per DEC-11 §1.3 |
@@ -1064,11 +1064,11 @@ pre-2026-04-22 entries — EA-1 commits DEC-17 first to remove this surface.
 ## 12. Estimated effort
 
 - Rough duration: 2-4 fleet-days from fleet unpause to SCR (v2 amendment
-  reduces estimate ~1 day vs original v1 prediction due to EA-1 + EA-2
+  reduces estimate \~1 day vs original v1 prediction due to EA-1 + EA-2
   parallel window). Sprint 10 ran 2 calendar days end-to-end; Sprint 11
   has more EAs but each is smaller, AND EA-1 / EA-2 fire concurrently;
   net duration estimate slightly better than Sprint 10.
-- LA active-time expectation: ~20-30 min total — 5-10 min SDV review
+- LA active-time expectation: \~20-30 min total — 5-10 min SDV review
   (concurrent with this kickoff), 0-15 min cross-reference style call +
   any unexpected escalations, 5 min SCR read, 10 min SWAGR read.
 - EA budget profile:

@@ -107,7 +107,7 @@ executes a deterministic four-step load:
    warm cache produces **byte-identical** output to a fresh compile — the
    cache does not threaten reproducibility, it preserves it — and (b) the
    cache yields **no reliable startup win**: a fresh 14B + draft compile is
-   ~11 s, indistinguishable from a cold-disk read of the ~9 GB cache blob,
+   \~11 s, indistinguishable from a cold-disk read of the \~9 GB cache blob,
    while enabling it costs a one-time +42 s blob write, +9 GB disk per
    `{OV version, device, model, shape}` key, and a re-write on every
    OpenVINO / driver / model change (and the mandatory integrity-hash of
@@ -244,8 +244,8 @@ in `target_config` / `fallback_config` at `gpu_inference.py` lines
 The empirical throughput baseline from the P5-005 series (recorded at
 the time of the Qwen3-14B + Qwen3-0.6B speculative decoding pairing):
 
-- **~10.7 tps @ 4K-token context**
-- **~4.2 tps @ 20K-token context**
+- **\~10.7 tps @ 4K-token context**
+- **\~4.2 tps @ 20K-token context**
 
 These numbers are the load-bearing datum for the ADR-012 §2.2
 `num_assistant_tokens = 3` choice. The primary evidence path is

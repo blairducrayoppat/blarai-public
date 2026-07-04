@@ -6,7 +6,7 @@ nearly built exactly that. Then the LA, reading my comprehension gate, pushed ba
 assumption the whole shape rested on — that generating had to happen *inside* the model swap, after
 the 14B is gone. It didn't. The only memory constraint anyone had actually measured was
 image-model + the 30B coder (32.5 GB, over the 31.323 ceiling). Nobody had measured image-model +
-the *14B* as forbidden — because it isn't: ~26 GB, 5.3 GB of headroom, and it is exactly how
+the *14B* as forbidden — because it isn't: \~26 GB, 5.3 GB of headroom, and it is exactly how
 `/imagine` already runs. So the asset could be generated the way the assistant already makes
 pictures — 14B resident, before the swap — and committed into the repo the coder branches from. The
 "ASSETS swap phase" collapsed into a handful of lines at the approve seam. SEAM A.
@@ -27,7 +27,7 @@ artifact, not gallery content), reached through the one maintained generator ins
 abandoned one (Playground, deleted at #703). ADR-033 Amendment 3 records it.
 
 I proved it the way the F2 lesson taught — memory-safely, in halves. The generator, live on the Arc
-140V: a real 1024² cartoon elephant, coherent subject on a clean background, ~60 s at 30 steps, the
+140V: a real 1024² cartoon elephant, coherent subject on a clean background, \~60 s at 30 steps, the
 "after" to testproject6's hand-drawn `<ellipse>` SVG. Then the *real* W2/W3 code path — the actual
 `_maybe_generate_dispatch_assets`, not a stand-in — generating and committing that elephant into a
 scratch repo's baseline, working tree clean, only the named file staged. The 14B→30B swap that

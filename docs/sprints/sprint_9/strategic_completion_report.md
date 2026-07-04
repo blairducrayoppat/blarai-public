@@ -18,7 +18,7 @@ scr_version: 1
 
 ## 1. Executive summary
 
-Sprint 9 delivered all 12 in-scope governance documents plus the `docs/governance/STYLE.md` sub-artifact and the `docs/governance/README.md` landing page — 14 markdown files, ~4,000 lines of substantive governance content — through 5 sequential EA milestones that all auto-merged under `trusted_scope`. All 12 GOV Vikunja tickets remain **OPEN** (success criterion #3 FAIL); closure was never executed by any EA and is carried to the Sprint 9.1 remediation or a follow-up firing. Both sprint-close follow-up tickets (GOV-MIGRATE #123, GOV-15 #124) were opened as planned. Parallel-execution coexistence with Sprint 8 held cleanly — zero working-set collisions, zero git conflicts — validating the DEC-15 parallel-sprint design on its first live exercise.
+Sprint 9 delivered all 12 in-scope governance documents plus the `docs/governance/STYLE.md` sub-artifact and the `docs/governance/README.md` landing page — 14 markdown files, \~4,000 lines of substantive governance content — through 5 sequential EA milestones that all auto-merged under `trusted_scope`. All 12 GOV Vikunja tickets remain **OPEN** (success criterion #3 FAIL); closure was never executed by any EA and is carried to the Sprint 9.1 remediation or a follow-up firing. Both sprint-close follow-up tickets (GOV-MIGRATE #123, GOV-15 #124) were opened as planned. Parallel-execution coexistence with Sprint 8 held cleanly — zero working-set collisions, zero git conflicts — validating the DEC-15 parallel-sprint design on its first live exercise.
 
 ## 2. Context at completion
 
@@ -48,7 +48,7 @@ Per-sprint reports under `docs/sprints/sprint_9/reports/` and one root-level led
 
 ## 3. Sprint purpose — retrospective
 
-The stated purpose held cleanly. Sprint 9 was framed as "governance docs for the operational surface" and the 14 output files match that framing. No mid-sprint drift toward tooling, code changes, or ADR amendments. The "mature not minimal" directive was taken seriously — average doc length is ~315 lines, comfortably above the 150-line floor, and no doc is a thin ticket-bullet regurgitation.
+The stated purpose held cleanly. Sprint 9 was framed as "governance docs for the operational surface" and the 14 output files match that framing. No mid-sprint drift toward tooling, code changes, or ADR amendments. The "mature not minimal" directive was taken seriously — average doc length is \~315 lines, comfortably above the 150-line floor, and no doc is a thin ticket-bullet regurgitation.
 
 ## 4. Success criteria assessment
 
@@ -163,7 +163,7 @@ All 5 EAs delivered. EA-3 required a Path B remediation round (visible in git lo
 
 | Question | Answer found? | Answer |
 |---|---|---|
-| Exact doc length per topic | Yes | 12 docs total ~3,925 lines (245–376 each); avg ~327. Within the 3000-4500 estimate |
+| Exact doc length per topic | Yes | 12 docs total \~3,925 lines (245–376 each); avg \~327. Within the 3000-4500 estimate |
 | SDO non-overlap check works in practice | Yes | Held across all 5 EAs; no Sprint 9 EA ever touched a Sprint 8 file and vice versa |
 | "Scattered Sources" lists point to renamed/deleted files | No findings surfaced | EAs cited live files |
 | SWAGR template handles parallel-sprint coexistence | Pending — SWAGR produces next | Sprint Auditor will flag if needed |
@@ -172,7 +172,7 @@ All 5 EAs delivered. EA-3 required a Path B remediation round (visible in git lo
 
 Three mid-sprint surprises:
 
-1. **ISS-239 (merge-gate allowlist absolute-vs-relative paths)** surfaced when EA-4's docs-only diff was rejected by `merge_policy.decide()` due to a path-normalization mismatch. Remediated by `ef6d975` and `a6ba981`'s fleet-hygiene companion. Sprint 9 absorbed this without scope damage but it cost ~1 firing of EA-4 cycle time.
+1. **ISS-239 (merge-gate allowlist absolute-vs-relative paths)** surfaced when EA-4's docs-only diff was rejected by `merge_policy.decide()` due to a path-normalization mismatch. Remediated by `ef6d975` and `a6ba981`'s fleet-hygiene companion. Sprint 9 absorbed this without scope damage but it cost \~1 firing of EA-4 cycle time.
 2. **GOV ticket closure was never executed** by any EA or post-sprint step. The SDV §4 criterion #3 assumed the EA or the landing-page synthesis step would close each GOV ticket with its merge commit; neither step was wired in a Sprint-9 prompt, and no agent picked up the closure duty. This is a structural gap in the Sprint 9 EA prompt chain, not an agent failure.
 3. **Sprint 8 closed first** — despite Sprint 9's shorter scope, Sprint 8 reached SCR (`117142b`) before Sprint 9. Parallel execution made ordering emergent rather than programmed; this turned out to be non-disruptive but is a minor SWAGR observation.
 
@@ -187,16 +187,16 @@ Three mid-sprint surprises:
 
 | Role | SDV-budgeted | Actual | Delta |
 |---|---|---|---|
-| LA | ~20 min | ~25 min (SDV sign-off + one EA-4 `la_merge_approve` invocation + reading this SCR) | Trivial over-estimate |
-| Co-Lead | Autonomous | ~15 firings across authoring + 5 merge-gates + this SCR | In budget |
-| SDO | Autonomous | ~25 firings across 5 EA prompt cycles (EA-3 + EA-5 needed v2 passes) | In budget |
+| LA | \~20 min | \~25 min (SDV sign-off + one EA-4 `la_merge_approve` invocation + reading this SCR) | Trivial over-estimate |
+| Co-Lead | Autonomous | \~15 firings across authoring + 5 merge-gates + this SCR | In budget |
+| SDO | Autonomous | \~25 firings across 5 EA prompt cycles (EA-3 + EA-5 needed v2 passes) | In budget |
 | EA Code | Autonomous | 5 successful EA executions (+ 2 re-comprehensions for EA-3 and EA-5) | In budget |
 | Sprint Auditor | Post-sprint | Pending (runs on this SCR next) | N/A |
 
 ## 12. Duration
 
 - Planned target (SDV §12): open-ended; reference estimate 1–1.5 calendar weeks.
-- Actual: 2026-04-22 kickoff → 2026-04-24 Sprint 9 EA-5 merge. **~2 calendar days.**
+- Actual: 2026-04-22 kickoff → 2026-04-24 Sprint 9 EA-5 merge. **\~2 calendar days.**
 - Variance explanation: faster than estimated because parallel execution with Sprint 8 amplified fleet throughput, `trusted_scope` auto-merge eliminated LA-gate waits on every EA, and the translation-from-spec nature of the work minimized design-time blockers.
 
 ## 13. Deliberate non-goals — respected?
@@ -229,7 +229,7 @@ All 8 non-goals respected.
 ### 14.3 Process observations for future sprints
 
 - **Parallel execution works.** First live run was clean. Future two-sprint runs are low-risk. Three-sprint parallelism remains untested.
-- **`trusted_scope` auto-merge for docs-only sprints is optimal.** Five EAs merged without LA gating, LA budget spent ~25 min over 2 days.
+- **`trusted_scope` auto-merge for docs-only sprints is optimal.** Five EAs merged without LA gating, LA budget spent \~25 min over 2 days.
 - **EA prompts should explicitly enumerate post-merge hygiene steps.** GOV-ticket closure being missing in all 5 Sprint 9 EA prompts is a template-level concern worth a standing Co-Lead SDO-review check item.
 - **Sprint-close ordering under parallel execution is emergent.** Sprint 8 closed before Sprint 9 despite shorter Sprint 9 scope. Parallel-sprint SDV-authoring should stop implying serial ordering.
 

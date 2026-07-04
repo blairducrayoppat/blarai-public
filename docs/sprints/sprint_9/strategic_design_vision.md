@@ -228,7 +228,7 @@ audience, and the source-file inventory to research.
 4. **EA-2 / GOV-05 — GPU Runtime & Speculative Decoding Configuration Governance**
    (`docs/governance/gpu-runtime.md`): Model-load procedure (Qwen3-14B INT4 + Qwen3-0.6B
    INT4 draft); `num_assistant_tokens=3` lock per ADR-012 §2.2; KV-cache management (FP16,
-   PA ~350-550MB, AO ~1-1.2GB); circuit-breaker trip effect on KV-cache; thinking-mode
+   PA \~350-550MB, AO \~1-1.2GB); circuit-breaker trip effect on KV-cache; thinking-mode
    suppression mechanics (`/no_think` + stop-token IDs `[151645, 151668]`); XAttention OFF
    rationale; empirical performance baseline (10.72 tps @ 4K, 4.17 tps @ 20K per P5-005b);
    model rollback procedure (Qwen2.5-1.5B retained per ADR-012 §5).
@@ -485,7 +485,7 @@ within-Sprint-9 EA parallelism.
 |---|---|---|---|
 | Parallel-execution git conflict with Sprint 8 (both sprints touch `docs/`) | Low | Medium | SDO non-overlap check at prompt-authoring (§5.3); Sprint 8 SDV §5.1 confirms test-only writes; working sets are disjoint (`docs/governance/**` vs `**/tests/`) |
 | Governance-doc style drift across EAs | Medium | Medium | EA-1 authors STYLE.md before beginning its three docs; subsequent EAs read STYLE.md as prompt input; Co-Lead peer review at each EA gate checks style adherence |
-| EA over-applies "mature not minimal" → runaway doc length | Medium | Low | §5.3 sets a 150-line floor but no ceiling; Co-Lead peer review enforces editorial tightness; EAs flag docs over ~800 lines for Co-Lead coherence check |
+| EA over-applies "mature not minimal" → runaway doc length | Medium | Low | §5.3 sets a 150-line floor but no ceiling; Co-Lead peer review enforces editorial tightness; EAs flag docs over \~800 lines for Co-Lead coherence check |
 | EA under-applies "mature not minimal" → thin docs that repeat the ticket bullet list | Medium | Medium | §5.3 sets a 150-line floor; source-anchoring requirement (§6) forces substantive content; Co-Lead peer review rejects docs that lack the Audience / Prerequisites / ADR / Source References stanzas |
 | Source file referenced by a doc is misnamed or missing | Low | Low | EA reads each source file before citing; EAs treat discovery of a missing source as a finding, open a Vikunja ticket, and cite the gap rather than fabricate |
 | Phantom `BOOT_SEQUENCE_GOVERNANCE.md` references propagate into new docs (EAs cite a file that doesn't exist) | Medium | Low | SDO prompt for GOV-10-adjacent work (e.g., GOV-05, GOV-12) explicitly warns the EA that `BOOT_SEQUENCE_GOVERNANCE.md` is phantom; EAs cite the boot-sequence behavior by source file, not doc |
@@ -496,7 +496,7 @@ within-Sprint-9 EA parallelism.
 
 1. Exact doc length per topic — GOV-05 (GPU Runtime + speculative decoding) and GOV-11
    (Configuration Management) are the largest surfaces; could run 500+ lines each. GOV-14
-   (Rule Engine) is the narrowest and may run ~200 lines. Total Sprint 9 doc volume is
+   (Rule Engine) is the narrowest and may run \~200 lines. Total Sprint 9 doc volume is
    estimated at 3000-4500 lines across 12 docs plus the landing page and STYLE.md.
 2. Whether the parallel-execution SDO non-overlap check works as intended on first live
    exercise. Commit `20db5e7` is four hours old at Sprint 9 kickoff; Sprint 8 still runs
@@ -558,7 +558,7 @@ affected doc as a v2 in a later sprint; this is acceptable mature-evolution fric
 
 | Role | Responsibility this sprint | Budget |
 |---|---|---|
-| LA (Lead Architect) | SDV sign-off; CAR adjudication if a scope exception surfaces; SWAGR read at sprint end; approval of STYLE.md during EA-1 peer review if Co-Lead escalates a style question | ~20 min total |
+| LA (Lead Architect) | SDV sign-off; CAR adjudication if a scope exception surfaces; SWAGR read at sprint end; approval of STYLE.md during EA-1 peer review if Co-Lead escalates a style question | \~20 min total |
 | Co-Lead Architect | SDO continuation XML authoring for Sprint 9; EA prompt peer review via DEC-12 gate; **style-guide coherence check** on EA-1's STYLE.md before it becomes the cross-EA reference; SCR authoring at sprint end | Autonomous per DEC-11 §1.1 |
 | SDO (Strategic Development Orchestrator) | 5 EA-prompt authoring cycles; **new duty**: non-overlap verification with Sprint 8 at each EA-prompt authoring; EA peer review | Autonomous per DEC-11 §1.2 |
 | EA Code | Milestone execution (5 EAs); each EA reads STYLE.md (after EA-1 establishes it) and the assigned GOV tickets; authors docs under `docs/governance/`; opens follow-up tickets as findings surface | Autonomous per DEC-11 §1.3 |
@@ -567,11 +567,11 @@ affected doc as a v2 in a later sprint; this is acceptable mature-evolution fric
 ## 12. Estimated effort
 
 - **Rough duration**: open-ended per LA directive (no hard deadline; mature-not-minimal).
-  Reference estimate for planning: 5 EAs × ~1 fleet-day per EA = 5 fleet-days. At the
+  Reference estimate for planning: 5 EAs × \~1 fleet-day per EA = 5 fleet-days. At the
   15-minute wake cadence with parallel Sprint 8 execution, this maps to roughly 1 to 1.5
   calendar weeks at current fleet capacity. Actual duration will be longer if EAs run
   deeper-than-minimum per the "mature not minimal" directive.
-- **LA active-time expectation**: ~20 minutes total — 15 min SDV sign-off, ~5 min SWAGR
+- **LA active-time expectation**: \~20 minutes total — 15 min SDV sign-off, \~5 min SWAGR
   read at sprint close. EA merges are auto-merged by Co-Lead under `trusted_scope` mode
   (DEC-11 §3.4); no per-merge LA gate fires unless a merge exceeds trusted-scope criteria
   (500 LOC threshold — unlikely for a single governance doc; if a doc commit exceeds it,

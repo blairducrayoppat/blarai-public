@@ -38,7 +38,7 @@ faithful — so the harness was innocent and the fusion was the variable. Confir
 fusing a strong style LoRA overwrites the cross-attention weights that carry text conditioning
 (INT8 data-free quantization compounds it with outliers). **Resolution: never fuse** — illustrate
 uses prompting alone; cartoon applies the LoRA at runtime where it influences without silencing.
-Trade accepted: runtime-adapter cartoon is ~20 s slower cold (60.6 s vs 39.8 s) — paid willingly,
+Trade accepted: runtime-adapter cartoon is \~20 s slower cold (60.6 s vs 39.8 s) — paid willingly,
 because a fused-but-deaf model is worthless. Full narrative: journal fragment
 `docs/journal_fragments/2026-06-27_703-illustrate-cartoon.md`.
 
@@ -74,7 +74,7 @@ theater; keep the integrity spine.
 - **`services/assistant_orchestrator/config/default.toml`** — illustration model dir →
   `models/sdxl-illustration/openvino-int8-gpu`; cartoon LoRA path / alpha / sha256 keys.
 - **Model on disk (gitignored)** — `models/sdxl-illustration/openvino-int8-gpu` (base SDXL 1.0
-  INT8, 3.3 GB, OV tokenizers, **signed** manifest) + `lora/DD-vector-v2.safetensors` (~218 MB).
+  INT8, 3.3 GB, OV tokenizers, **signed** manifest) + `lora/DD-vector-v2.safetensors` (\~218 MB).
 - **Tests** — renamed-constant + adapter-config fail-soft (`shared/tests/test_image_gen.py`),
   per-style config mapping + IPC style round-trip (`…/tests/test_image_gen_wiring.py`),
   `/illustrate`+`/cartoon` coordinator tests (`…/tests/test_imagine_coordinator.py`).

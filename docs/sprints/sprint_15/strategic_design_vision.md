@@ -4,7 +4,7 @@ sprint_name: "Tier-2 Production Posture — Per-Boot mTLS + Dev-Mode-Off Flip"
 predecessor_sprint_id: 14
 vikunja_tracking_task_id: 616
 start_date: "2026-06-06"
-target_completion_date: "2026-06-08"   # LA estimate; ~1-2 days agent wall-clock, not a hard deadline
+target_completion_date: "2026-06-08"   # LA estimate; \~1-2 days agent wall-clock, not a hard deadline
 la_approved_on: "2026-06-06T12:12:23-07:00"  # LA sign-off (v4 — flip-timing locked; v2 original 2026-06-06T09:31:58-07:00)
 la_approved_by: "blarai"
 co_lead_drafted_on: "2026-06-06T08:34:03-07:00"
@@ -74,7 +74,7 @@ If we skipped this sprint: the #598 gate stalls indefinitely (no production-post
 
 ### 5.2 Out-of-scope (deliberately deferred) — each with its tracked ticket
 
-1. **Guest↔host AF_HYPERV boundary handshake (fidelity-3)** — **#615**, inherited by the VM-occupant sprint. *Why:* the guest deployment channel is unproven (`priority5_guest_deploy.json` = FAIL, ~3.5 months stale) and Alpine has no init wired; fixing that is multi-day infra that belongs with a real occupant.
+1. **Guest↔host AF_HYPERV boundary handshake (fidelity-3)** — **#615**, inherited by the VM-occupant sprint. *Why:* the guest deployment channel is unproven (`priority5_guest_deploy.json` = FAIL, \~3.5 months stale) and Alpine has no init wired; fixing that is multi-day infra that belongs with a real occupant.
 2. **Full FUT-04 weight integrity** (`require_signed_manifest=true` + integrity-verify ALL model weights at load) — **#106**. *Why:* a separate Tier-3 #598 criterion; Sprint 15 stages only a *minimal* boot manifest. (LA Condition 3.)
 3. **Relocating real services into the VM** — no occupant exists yet (web-nav is post-gate); building an empty quarantine box is capability-ahead-of-need.
 4. **Full Known-Good Manifest provisioning ceremony** — FUT-05 (#107).
@@ -173,15 +173,15 @@ This sprint changes the **default security posture of the whole system** and lig
 
 | Role (cf-3 standardized) | Responsibility this sprint | Budget |
 |---|---|---|
-| **LA (Lead Architect)** | SDV sign-off; the on-chip ceremony + the one production-posture live-verify; CAR adjudication; SCR + SWAGR read | ~30–60 min interactive + one ~20–30 min on-chip session |
+| **LA (Lead Architect)** | SDV sign-off; the on-chip ceremony + the one production-posture live-verify; CAR adjudication; SCR + SWAGR read | \~30–60 min interactive + one \~20–30 min on-chip session |
 | **Orchestrator** (was Co-Lead) | EA prompt authoring, merge-gate review, milestone peer review, SCR | Autonomous within the merge gate |
 | **Specialist subagents** (worktree builders) | EA-1..EA-4 execution in isolated worktrees | Per-EA, merge-gated |
 | **Auditor** | Independent SWAGR at sprint close (manual invocation; fleet paused) | Autonomous per DEC-15 |
 
 ## 12. Estimated effort
 
-- **Rough duration**: ~1–2 days agent wall-clock; 4 EA milestones (EA-1 ∥ EA-2, then EA-3, then EA-4).
-- **LA active-time**: ~30–60 min interactive (SDV sign-off + CARs + SWAGR read) **plus** one ~20–30 min on-chip ceremony/live-verify session — which **may run 1–2 iterative cycles** if production-only requirements surface (§9.3); EA-3's off-chip stub harness narrows the on-chip surprises to the TPM-key-backed signing.
+- **Rough duration**: \~1–2 days agent wall-clock; 4 EA milestones (EA-1 ∥ EA-2, then EA-3, then EA-4).
+- **LA active-time**: \~30–60 min interactive (SDV sign-off + CARs + SWAGR read) **plus** one \~20–30 min on-chip ceremony/live-verify session — which **may run 1–2 iterative cycles** if production-only requirements surface (§9.3); EA-3's off-chip stub harness narrows the on-chip surprises to the TPM-key-backed signing.
 - **Confidence**: **Medium** — the cascade and the ceremony are well-mapped on disk; the main variable is the per-boot cert rotation design (EA-1) and whatever the first real `dev_mode=false` boot surfaces (§9.3).
 
 ## 13. Deliberate non-goals

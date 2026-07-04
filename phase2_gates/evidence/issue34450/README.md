@@ -23,7 +23,7 @@ optimum-intel export flag(s) drive the divergence.
 | `repro_matrix.json` | Machine-readable companion (versions, sha256s, exit codes, stderr tails). | yes (after run) |
 | `cell_*_export.log` | Full optimum-cli output per cell. | yes (after run) |
 | `cell_*_crash.log` | Full subprocess stderr per cell. | yes (after run) |
-| `exports/` | Exported OpenVINO IR artifacts for cells B and C (~1.1 GB). | NO (gitignored) |
+| `exports/` | Exported OpenVINO IR artifacts for cells B and C (\~1.1 GB). | NO (gitignored) |
 
 ## Cells
 

@@ -85,6 +85,6 @@ The 705-insertion diff is entirely test-code (+609) + ledger (+59) + report (+37
 
 ## Budget self-check
 
-- Session runtime: ~8 min (pytest dominated at 161s).
+- Session runtime: \~8 min (pytest dominated at 161s).
 - Writes: Vikunja mutations + 1 disk report + 1 in-session commit + 1 event trigger. All within SDO `--allowedTools`.
 - No CRITICAL breach.

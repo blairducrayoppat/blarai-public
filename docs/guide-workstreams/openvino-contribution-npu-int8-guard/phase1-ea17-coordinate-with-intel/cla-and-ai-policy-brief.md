@@ -28,7 +28,7 @@ checked at PR creation, not at comment creation. Even on the eventual
 2. Inspected the PR's labels and conversation timeline for any "CLA
    missing", "EasyCLA pending", "needs-cla" or equivalent block markers.
    None found.
-3. Inferred: PR #34651 has been open since 2026-03-12 (~62 days at
+3. Inferred: PR #34651 has been open since 2026-03-12 (\~62 days at
    dispatch time) labelled `ExternalPR`. If a CLA were unsigned, OpenVINO
    tooling would have surfaced it long before now; absence of any CLA
    surface on a long-stale ExternalPR is strong (though not absolute)

@@ -7,7 +7,7 @@ authored_on: "2026-05-12"
 methodology: "source-pinning + environment-decomposition"
 findings_summary: "Drift is environmental, not source-attributable. Source-code drift between b83a870 and d2b535c is ZERO under the current execution environment. The 981/22 → 1001/2 string-change between Sprint 8 SWAGR and Sprint 10 SWAGR reflects environment evolution at audit-time, not commit-attributable test-code changes."
 fail_closed_regression_found: false
-recommendation: "Baseline strings should snapshot {commit, environment, date}; current SDV-anchored '~981 passed, 22 skipped' is stale for the current environment. Sprint 12+ should adopt 1001 passed, 2 skipped as the live-environment baseline, refreshed at every Sprint Co-Lead Phase 3 sprint-transition step per EA-2's deterministic Active State refresh procedure."
+recommendation: "Baseline strings should snapshot {commit, environment, date}; current SDV-anchored '\~981 passed, 22 skipped' is stale for the current environment. Sprint 12+ should adopt 1001 passed, 2 skipped as the live-environment baseline, refreshed at every Sprint Co-Lead Phase 3 sprint-transition step per EA-2's deterministic Active State refresh procedure."
 ---
 
 # Sprint 11 EA-4 — Test-Baseline Drift Investigation Report
@@ -262,7 +262,7 @@ Two findings for Sprint 11 SCR §14.1 (Carry-overs to next sprint):
    Sprint 11 EA-4 dispatch, SDO authored six verified queue-finalize
    commits (`027bf00`, `bd37b62`, `a1f9f4b`, `5eb71f4`, `3161af1`,
    `c200c60`), each applying `Gate:Pending-Execution` to #410 with
-   post-write read-back confirming application. Within ~5 minutes of
+   post-write read-back confirming application. Within \~5 minutes of
    each write, an unknown agent or hook reverted the labels. SDO
    escalated to `Gate:Pending-Human` after six attempts
    (`b814e22`, escalation report on disk). Co-Lead executed EA-4
@@ -279,7 +279,7 @@ process-hygiene items for Sprint 12.
 ## 8. Methodology validation — why source-pinning suffices
 
 The classic bisect-narrowing approach over an 80+ commit window in
-search of a `+20/-20` test-count delta would have taken ~7 pytest runs
+search of a `+20/-20` test-count delta would have taken \~7 pytest runs
 (`log2(80)` rounded up) and would have terminated INCONCLUSIVELY because
 the delta is not in the commit space. Source-pinning at the lower-bound
 commit (one pytest run) plus comparison against HEAD (one additional

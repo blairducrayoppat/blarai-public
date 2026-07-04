@@ -17,7 +17,7 @@ The following empirical studies have now completed:
 
 | Study | Key Finding | Evidence |
 |-------|-------------|----------|
-| P5-005a | Qwen3-14B INT4 loads on Arc 140V, speculative decoding with Qwen3-0.6B operational, ~10 tps at 4K context | `p5_005a_viability_check.json` |
+| P5-005a | Qwen3-14B INT4 loads on Arc 140V, speculative decoding with Qwen3-0.6B operational, \~10 tps at 4K context | `p5_005a_viability_check.json` |
 | P5-005b | Extended context feasible through 20,480 tokens, no OOM, peak RSS 12,517 MB (within 15,507 MB budget) | `p5_005b_context_optimization_matrix.json` |
 | P5-005b | XAttention (SDPA optimization) does NOT help speculative decoding (9.74 vs 10.02 tps) | `p5_005b_context_optimization_matrix.json` |
 | P5-005b | `num_assistant_tokens=3` optimal (10.72 tps at 4K vs NAT=5: 10.02, NAT=7: 10.65, NAT=10: 8.22) | `p5_005b_context_optimization_matrix.json` |
@@ -48,7 +48,7 @@ under active optimization (see §2.2).
 | Vocab size | 151,936 | config.json `vocab_size` (shared across Qwen3 family) |
 | KV heads | 8 (GQA) | config.json `num_key_value_heads` |
 | Device | GPU (Arc 140V) | ADR-011 (locked) |
-| Weight file size | ~9.1 GB | Measured `openvino_model.bin` |
+| Weight file size | \~9.1 GB | Measured `openvino_model.bin` |
 | Path | `models/qwen3-14b/openvino-int4-gpu/` | Acquired in P5-005a |
 | Consumers | PA (M2), AO (M3), USE-CASE-005 (Code Agent) | Unified model — single compilation, shared weights |
 
@@ -62,8 +62,8 @@ or MEASURED. Zero EVALUATING rows remain. Task 4.10 closed this table on 2026-03
 |-----------|-----------|--------|-------|
 | **Draft model** | Qwen3-0.6B INT4 (28 layers, 1024 hidden) | **LOCKED** | Task 4.2: Draft-A 10.87 tps / 3.18× baseline. Draft-B eliminated (9.50 tps, -12.6%). NPU draft REJECTED (LLVM_ABORT — VPUX compiler bug, upstream fix submitted: PRs [#265](https://github.com/openvinotoolkit/npu_compiler/pull/265)/[#266](https://github.com/openvinotoolkit/npu_compiler/pull/266)). Re-evaluate NPU draft if fix merges and OV GenAI supports heterogeneous device placement. Evidence: p5_task4_2_draft_model_comparison.json, p5_task4_2b_npu_draft_comparison.json. |
 | `num_assistant_tokens` | 3 | **LOCKED** | Task 4.3: NAT=3 wins weighted TPS across 512–8K production range (score 4.847, highest). Wins bands 2K/4K/8K. At 12K: NAT=1 is 61% faster (4.01 vs 2.48 tps) but 12K is USE-CASE-005-only and not yet in production. Adaptive NAT deferred as post-Task-5 optimization. At ≥16K: AR=0.000 for ALL NAT values — speculative decoding is inert. Evidence: p5_task4_3_nat_sweep_matrix.json. |
-| Max context window | 16,384 tokens | **LOCKED** | Task 4.3: no OOM through 20,480. Peak RSS 3,562 MB at 16K (within 15,507 MB budget). Speculative decoding inert above ~12K (AR=0.000 at 16K/20K) but system degrades gracefully to autoregressive. 20K proven safe but TPS too low for diminishing contextual value. Evidence: p5_task4_3_nat_sweep_matrix.json. |
-| Input/output split | ~12,288 input / ~4,096 output | **ADVISORY** | Heuristic guideline (75/25 split of 16,384 max context). Not empirically optimized. PA: irrelevant (output 3-10 tokens). AO/CODE: revisit if output truncation observed in production. |
+| Max context window | 16,384 tokens | **LOCKED** | Task 4.3: no OOM through 20,480. Peak RSS 3,562 MB at 16K (within 15,507 MB budget). Speculative decoding inert above \~12K (AR=0.000 at 16K/20K) but system degrades gracefully to autoregressive. 20K proven safe but TPS too low for diminishing contextual value. Evidence: p5_task4_3_nat_sweep_matrix.json. |
+| Input/output split | \~12,288 input / \~4,096 output | **ADVISORY** | Heuristic guideline (75/25 split of 16,384 max context). Not empirically optimized. PA: irrelevant (output 3-10 tokens). AO/CODE: revisit if output truncation observed in production. |
 | `KV_CACHE_PRECISION` | Not set (default FP16) | **LOCKED** | INT8 KV cache empirically ruled out: 19% TPS drop, 30% TTFT increase, negligible memory savings (P5-005a T-02/T-03). FP16 is the production default. |
 | `GPU_ENABLE_SDPA_OPTIMIZATION` | ON | **LOCKED** | Task 4.4: Full context sweep [4K–16K] reverses P5-005b finding. ON wins or ties at every band: 4K +5.8% TPS / +26.1% TTFT, 8K +1.8% TPS / +7.4% TTFT, 12K +0.7% TPS / +5.1% TTFT, 16K +2.3% TPS / +5.8% TTFT. Property verified effective (compile-time 4.5% delta + 4K TPS 5.8% delta). G-01..G-08 all PASS. Disposition: XATTENTION_ON_LOCKED. Evidence: p5_task4_4_xattention_sweep.json. |
 | Pipeline construction | Keyword `draft_model=ov_genai.draft_model()` | **LOCKED** | Dict-config deprecated (DeprecationWarning in OpenVINO GenAI). Production pattern: `LLMPipeline(path, device, draft_model=ov_genai.draft_model(draft_path, device), **kwargs)`. Locked 2026-03-01. |
@@ -79,9 +79,9 @@ or MEASURED. Zero EVALUATING rows remain. Task 4.10 closed this table on 2026-03
 
 | Candidate | Layers | Hidden | Quant | Size | Status |
 |-----------|--------|--------|-------|------|--------|
-| Qwen3-0.6B (full) | 28 | 1024 | INT4 | ~367 MB | **OPERATIONAL** — validated in P5-005a/005b |
-| Qwen3-pruned-6L-from-0.6B | 22 | 1024 | INT8_ASYM | ~300 MB (est.) | **ELIMINATED** — P5-005c acquisition aborted. Repository `OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov` not available. Draft-A (full 28L INT4) confirmed as sole draft candidate. |
-| Qwen3-1.7B | 28 | 2048 | INT4 | ~1 GB (est.) | **NOT TESTED** — larger draft, higher quality predictions, higher per-token cost. Candidate for future evaluation. |
+| Qwen3-0.6B (full) | 28 | 1024 | INT4 | \~367 MB | **OPERATIONAL** — validated in P5-005a/005b |
+| Qwen3-pruned-6L-from-0.6B | 22 | 1024 | INT8_ASYM | \~300 MB (est.) | **ELIMINATED** — P5-005c acquisition aborted. Repository `OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov` not available. Draft-A (full 28L INT4) confirmed as sole draft candidate. |
+| Qwen3-1.7B | 28 | 2048 | INT4 | \~1 GB (est.) | **NOT TESTED** — larger draft, higher quality predictions, higher per-token cost. Candidate for future evaluation. |
 
 Draft model selection is **LOCKED**: Draft-A (Qwen3-0.6B full 28L INT4) is the sole validated draft. Draft-B (pruned 22L INT8_ASYM) is eliminated due to unavailable acquisition target. No further draft model evaluation is required before Task 5.
 
@@ -258,11 +258,11 @@ reasoning content cannot inject or smuggle classification labels.
 | Budget item | Value | Status |
 |-------------|-------|--------|
 | **PA inference P95** | **2,000ms flat** | **LOCKED** |
-| Budget components | TTFT (~300–408ms at 2K–4K) + decode (~470–935ms for 5–10 tokens) + pipeline overhead (~100–200ms) + P95 variance headroom (~400ms) | Reference |
-| Worst-case ceiling at max_new_tokens=32 | ~2,987ms (EXCEEDS budget) | Drives Task 4.8 |
-| Realistic best-case E2E | ~8710 rules (4 DENY + 6 ESCALATE — Rules 7–10 added Task 4.12g) | DEC-10 (Tasks 4.9c–4.9d); expanded Task 4.12g |
+| Budget components | TTFT (\~300–408ms at 2K–4K) + decode (\~470–935ms for 5–10 tokens) + pipeline overhead (\~100–200ms) + P95 variance headroom (\~400ms) | Reference |
+| Worst-case ceiling at max_new_tokens=32 | \~2,987ms (EXCEEDS budget) | Drives Task 4.8 |
+| Realistic best-case E2E | \~8710 rules (4 DENY + 6 ESCALATE — Rules 7–10 added Task 4.12g) | DEC-10 (Tasks 4.9c–4.9d); expanded Task 4.12g |
 | Quality gate | 4.9d: 1.000 (40/40); 4.12e: 0.6055 (256); 4.12f: 0.7227 (256) FAIL; **4.12g: 0.9483 (55/58) PASS** | DEC-10, §2.4 Amend 2, Task 4.12g
-| Total PA authorization latency (inference + signing) | ~2,030–2,050ms | Reference |
+| Total PA authorization latency (inference + signing) | \~2,030–2,050ms | Reference |
 
 **Derivation basis:**
 - Empirical baseline: 10.72 tps (P5-005b D-01, NAT=3, XAttention=OFF, KV FP16, 4K context).
@@ -394,15 +394,15 @@ known security gaps that Task 4.11 (Security Hardening) must resolve before Task
 
 3. **Speculative decoding is mandatory.** The inference pipeline requires a draft model —
    standalone Qwen3-14B generation without speculative decoding is too slow for
-   interactive use (measured: ~2-3 tps solo vs ~10 tps with draft at 4K context).
+   interactive use (measured: \~2-3 tps solo vs \~10 tps with draft at 4K context).
 
 4. **Context window cap LOCKED at 16,384 tokens.** The 4,096 hard cap (P5-001) is superseded.
    Task 4.3 proved 20K is safe (no OOM, RSS 1,835 MB) but speculative decoding is inert above
-   ~12K (AR=0.000). The 16K cap balances Code Agent context needs with practical throughput.
+   \~12K (AR=0.000). The 16K cap balances Code Agent context needs with practical throughput.
 
 5. **Speculative decoding collapse documented.** Task 4.3 discovered that speculative decoding
    acceptance rate collapses to exactly 0.000 at ≥16K context for ALL NAT values. This means
-   the Qwen3-0.6B draft model provides zero speculative acceleration beyond ~12K. The system
+   the Qwen3-0.6B draft model provides zero speculative acceleration beyond \~12K. The system
    degrades gracefully to autoregressive generation (TPS 2.3–3.5 at 16K, functional but slower).
    This is a known limitation of the 0.6B/14B capacity gap at long context. No code change
    required — the pipeline handles rejection gracefully. Task 4.3b (2026-03-03) measured
@@ -484,7 +484,7 @@ If Qwen3-14B proves unsuitable after configuration optimization:
 §2.1 and §3.1 specified "single compilation, shared weights" across the
 Qwen3-14B's consumers. The implementation diverged after the streaming
 and draft-model work and held two compiled `LLMPipeline` instances — one
-per service — at ~17 GB combined GPU residency, with two ~15–18 s GPU
+per service — at \~17 GB combined GPU residency, with two \~15–18 s GPU
 compiles per boot. The investigation in
 `docs/MODEL_SHARING_INVESTIGATION.md` (commit `5c5201d`) measured the
 state and surfaced the drift.
@@ -499,7 +499,7 @@ thinking-mode prefill, stop tokens) remain per-consumer via
 
 | Setting | Pre-amendment PA | Pre-amendment AO | Locked (this amendment) | Rationale |
 |---|---|---|---|---|
-| Pipeline construction | Each service builds its own | Each service builds its own | One `ov_genai.LLMPipeline` built at launcher boot, threaded into both via `SharedInferencePipeline` wrapper | ADR-012 §2.1/§3.1 mandate; ~8 GB GPU memory + ~15–18 s boot recovered |
+| Pipeline construction | Each service builds its own | Each service builds its own | One `ov_genai.LLMPipeline` built at launcher boot, threaded into both via `SharedInferencePipeline` wrapper | ADR-012 §2.1/§3.1 mandate; \~8 GB GPU memory + \~15–18 s boot recovered |
 | Concurrency | n/a (separate pipelines) | n/a (separate pipelines) | `threading.Lock` serialises `.generate()` between PA and AO | One pipeline cannot serve two concurrent generations; see §6.4 |
 | `enable_prefix_caching` | OFF (DEC-06) | ON (drift) | **ON** | OV GenAI 2026.1 empirical re-check; §6.3 |
 | Draft model | `qwen3-0.6b` full 28L INT4 | `qwen3-0.6b-pruned-6l` INT8 | **Pruned-6L INT8** | AO streaming requirement; PA latency budget (§2.5) absorbs the small cost (current PA P95 ≈ 125 ms vs 2 000 ms budget) |
@@ -536,7 +536,7 @@ calls (AO 12K AR 0.402 → 0.003 → 0.000; PA 12K AR 0.167 → 0.000 →
 0.000). On OV GenAI 2026.1 — which shipped a "GPU prefix caching
 improved" release note — that signature is absent: 24/24 runs succeeded
 in both conditions, with no per-run AR collapse pattern, and prefix
-caching delivers ~23 % higher TPS and ~50 % lower TTFT (the system
+caching delivers \~23 % higher TPS and \~50 % lower TTFT (the system
 prompt prefill is reused across turns, exactly the property prefix
 caching exists for). **DEC-06 is hereby amended: `enable_prefix_caching`
 is ON for the shared pipeline (and therefore both PA and AO) on OV
@@ -621,8 +621,8 @@ external sharing would need to reconcile the license.
 ### 6.7 Memory and boot impact
 
 **Pre-amendment, measured** (investigation doc, commit `5c5201d`):
-- ~17 GB GPU memory ("Local Usage", BlarAI idle with model loaded)
-- ~44 s of model compile per boot (PA ~27 s + AO ~17 s, sequential per
+- \~17 GB GPU memory ("Local Usage", BlarAI idle with model loaded)
+- \~44 s of model compile per boot (PA \~27 s + AO \~17 s, sequential per
   the pre-sprint launcher.log entries)
 - System RAM: 24.5 / 31.32 GB used, < 7 GB free
 - Total boot: 43–56 s
@@ -631,10 +631,10 @@ external sharing would need to reconcile the license.
 `29bab02` + launcher restart at 16:35:36):
 - **8.7 GB GPU memory** (per `scripts/perf_snapshot.py`,
   `gpu = 8694.1 MB`) — **−8.3 GB**
-- **~18 s of one shared model compile** (launcher.log: `Building shared
+- **\~18 s of one shared model compile** (launcher.log: `Building shared
   LLMPipeline…` at 16:35:38.388 → `Shared pipeline built…` at
   16:35:56.994) — **−26 s vs the pre-sprint two-compile pattern**
-- System RAM: **20.4 / 31.32 GB used** — **~4 GB freed**
+- System RAM: **20.4 / 31.32 GB used** — **\~4 GB freed**
 - Total boot: **29.9 s** (`perf_snapshot.py boot 29.9s`) — **−13 to
   −26 s vs the 43–56 s pre-sprint band**
 - Launcher.log confirms architecture engaged:

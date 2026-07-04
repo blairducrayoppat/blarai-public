@@ -43,8 +43,8 @@ working set per L-16 / NC-7.
 
 - **LINE-FLOOR**: all three docs >= 150 substantive lines
   (340 / 337 / 350). All three exceeded the EA prompt's expected
-  ranges (observability ~400, deployment ~200-300, rule-engine ~200).
-  observability came in under the ~400 suggestion but well clear of
+  ranges (observability \~400, deployment \~200-300, rule-engine \~200).
+  observability came in under the \~400 suggestion but well clear of
   the floor; the subject surface is smaller than anticipated because
   standard Python `logging` semantics carry most of the weight.
 - **STYLE-CONFORMANCE**:

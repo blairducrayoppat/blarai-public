@@ -70,7 +70,7 @@ Standing gate selection: `shared/ services/ launcher/ tests/integration/ tests/s
 
 Final (host-independent invariant): **0 failed, 108 deselected, 2342 selected.**
 The passed/skipped split is host-dependent: on the provisioned dev box (model
-weights present) **2340 passed / 2 skipped** (~102s); in a clean git worktree (no
+weights present) **2340 passed / 2 skipped** (\~102s); in a clean git worktree (no
 `models/`) **2320 passed / 22 skipped** — the 20-test delta is the semantic-router
 suite, which needs an embedding model absent from a worktree (the same
 `models/`-presence seam as the J-fix, §7). The load-bearing, host-independent
@@ -114,9 +114,9 @@ post-`021ffda` doc) records what Sprint 17 advanced:
 - **#607** (audit retention policy + signing authority) — tracked LA decision, not gate-blocking.
 - **Sprint-18 pre-gate sweep** — production-posture SWAGR across all tiers + GAP-5/6/8/9 model-loaded automation; then the #612 Capstone phase; then the #598 5.12 sign-off.
 - **#626** (4 pre-existing `tools/tests/` collection errors) — low-priority tooling, outside the gate.
-- **Doctrine-currency sweep** — CLAUDE.md Phase-History row (~line 252: stale "Sprint 10 ACTIVE / ~981 tests") to refresh; a close-hygiene edit.
+- **Doctrine-currency sweep** — CLAUDE.md Phase-History row (\~line 252: stale "Sprint 10 ACTIVE / \~981 tests") to refresh; a close-hygiene edit.
 - **Dependency hash-pinning lockfile** (GAP-14 follow-on) — pins landed Sprint 16; hashes pending.
-- **State-hygiene cleanup** — ~33 stale Sprint-14/15 agent worktrees + branches (LA's approved inventory-not-delete action, whenever wanted).
+- **State-hygiene cleanup** — \~33 stale Sprint-14/15 agent worktrees + branches (LA's approved inventory-not-delete action, whenever wanted).
 
 ## 7. Decisions / findings of record
 

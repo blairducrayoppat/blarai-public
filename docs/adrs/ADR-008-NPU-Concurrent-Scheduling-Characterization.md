@@ -34,7 +34,7 @@ Two synthetic transformer-proxy models in OpenVINO IR format:
 
 Architecture: int64 input → Convert → MatMul embedding → 2× FF blocks (256→512→256) → output projection. Deterministic weights (np.random.seed(42)). Both models compiled and executed on the physical NPU device.
 
-**Design note:** These are lightweight proxy models (~1MB) used to characterize NPU *scheduling behavior* (parallelism, preemption, KV-cache), not *inference throughput* of production models. Absolute latency values will scale with model complexity; the qualitative scheduling characteristics observed here (parallel execution, cache persistence, low-overhead preemption) are hardware/driver properties expected to hold for larger models.
+**Design note:** These are lightweight proxy models (\~1MB) used to characterize NPU *scheduling behavior* (parallelism, preemption, KV-cache), not *inference throughput* of production models. Absolute latency values will scale with model complexity; the qualitative scheduling characteristics observed here (parallel execution, cache persistence, low-overhead preemption) are hardware/driver properties expected to hold for larger models.
 
 ## Empirical Results
 
@@ -62,7 +62,7 @@ Architecture: int64 input → Convert → MatMul embedding → 2× FF blocks (25
 | Peak RSS | 255.7 MB |
 | RSS delta | 0.0 MB |
 
-**Observation:** 2× input size yields ~30% latency increase (0.430ms → 0.559ms), indicating sub-linear scaling — the NPU efficiently handles larger sequence lengths.
+**Observation:** 2× input size yields \~30% latency increase (0.430ms → 0.559ms), indicating sub-linear scaling — the NPU efficiently handles larger sequence lengths.
 
 ### Test 1.3 — Dual-Model Concurrent Load
 
@@ -76,7 +76,7 @@ Architecture: int64 input → Convert → MatMul embedding → 2× FF blocks (25
 | Min throughput ratio | 0.749 | ≥ 0.60 | **PASS** |
 | Peak combined RSS | 277.6 MB | — | — |
 
-**Critical finding:** The Lunar Lake NPU executes true parallel dual-model inference. The parallelism ratio of 1.699 means concurrent execution of both models completed in ~59% of the time it would take to run them sequentially. The Orchestrator shows nearly zero degradation (97.6% throughput), while the PA shows modest contention at 74.9% — both well above the 60% concurrent throughput floor.
+**Critical finding:** The Lunar Lake NPU executes true parallel dual-model inference. The parallelism ratio of 1.699 means concurrent execution of both models completed in \~59% of the time it would take to run them sequentially. The Orchestrator shows nearly zero degradation (97.6% throughput), while the PA shows modest contention at 74.9% — both well above the 60% concurrent throughput floor.
 
 ### Test 1.4 — Preemption Latency
 
@@ -88,7 +88,7 @@ Architecture: int64 input → Convert → MatMul embedding → 2× FF blocks (25
 | Resume mean | 0.403 ms | — | — |
 | Resume max | 0.503 ms | ≤ 500 ms | **PASS** (994× margin) |
 
-**Observation:** Preemption overhead is negligible at the proxy model scale. Even accounting for 100–1000× scaling for production 1.7B INT4 models, the empirical margins provide substantial headroom. A 1000× scaling factor would yield P99 preemption of ~814ms — exceeding the 500ms budget. However, this represents an extreme upper bound; real-world scaling with optimized OpenVINO inference pipelines typically yields 10–100× increase, placing expected production preemption at 8–81ms (P99).
+**Observation:** Preemption overhead is negligible at the proxy model scale. Even accounting for 100–1000× scaling for production 1.7B INT4 models, the empirical margins provide substantial headroom. A 1000× scaling factor would yield P99 preemption of \~814ms — exceeding the 500ms budget. However, this represents an extreme upper bound; real-world scaling with optimized OpenVINO inference pipelines typically yields 10–100× increase, placing expected production preemption at 8–81ms (P99).
 
 ### Test 1.5 — KV-Cache Persistence
 
@@ -141,7 +141,7 @@ VALIDATE_NPU_SCHEDULING
 
 ## Residual Risks
 
-1. **Proxy-to-production scaling uncertainty:** Empirical data is from ~1MB proxy models. Production 1.7B INT4 models (~1GB) will exhibit higher absolute latencies. The qualitative findings (parallel scheduling, cache persistence) are hardware properties, but quantitative preemption budgets must be re-validated when production models are available (Phase 3 gate).
+1. **Proxy-to-production scaling uncertainty:** Empirical data is from \~1MB proxy models. Production 1.7B INT4 models (\~1GB) will exhibit higher absolute latencies. The qualitative findings (parallel scheduling, cache persistence) are hardware properties, but quantitative preemption budgets must be re-validated when production models are available (Phase 3 gate).
 
 2. **OpenVINO driver version coupling:** Results are tied to OpenVINO 2024.0.0-14509. NPU scheduling behavior may change with driver updates. Pin driver version in production deployment manifest.
 
@@ -151,7 +151,7 @@ VALIDATE_NPU_SCHEDULING
 
 If production-model validation (Phase 3) demonstrates that the NPU cannot sustain dual 1.7B inference within latency budgets:
 
-1. Policy Agent probabilistic classifier migrates to CPU (accepting ~2–5× inference latency degradation).
+1. Policy Agent probabilistic classifier migrates to CPU (accepting \~2–5× inference latency degradation).
 2. Orchestrator retains NPU exclusivity.
 3. Latency budgets revised per fallback allocation in Use Cases_FINAL.md.
 4. This ADR is superseded by the Phase 3 production-model ADR.
@@ -160,7 +160,7 @@ If production-model validation (Phase 3) demonstrates that the NPU cannot sustai
 
 ## Addendum — 2026-02-23: Model Acquisition Evidence Update
 
-Residual Risk 1 references "~1GB" for production 1.7B INT4 models. Per the Model
+Residual Risk 1 references "\~1GB" for production 1.7B INT4 models. Per the Model
 Acquisition gate (commit dc43a90, evidence: `phase2_gates/evidence/model_acquisition.json`),
 the measured size of the Qwen3-1.7B OpenVINO INT4 weight file is **1014.0 MB**. The
 qualitative risk statement remains valid — proxy-to-production scaling uncertainty persists

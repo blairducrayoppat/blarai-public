@@ -297,7 +297,7 @@ Notes:
 **Scope:** Lock target model selection (Qwen3-14B); confirm speculative decoding mandate; open configuration optimization phase
 
 Trigger:
-- P5-005a confirmed Qwen3-14B INT4 loads and runs on Arc 140V with speculative decoding (~10 tps at 4K)
+- P5-005a confirmed Qwen3-14B INT4 loads and runs on Arc 140V with speculative decoding (\~10 tps at 4K)
 - P5-005b confirmed context expansion feasible through 20,480 tokens, no OOM, peak RSS 12,517 MB
 - P5-005b determined optimal initial config: XAttention=OFF, NAT=3
 
@@ -344,7 +344,7 @@ Trigger:
 - With `MAX_CLASSIFICATION_TOKENS=32`, thinking mode could exhaust the token budget before producing the classification label
 
 Analysis:
-- PA classifier outputs ~3-5 tokens (e.g., `DECISION: ALLOW<|im_end|>`)
+- PA classifier outputs \~3-5 tokens (e.g., `DECISION: ALLOW<|im_end|>`)
 - If Qwen3 enters thinking mode, it emits `<|think|>` (token ID 151668) then chain-of-thought tokens before the answer
 - With only 32 max tokens, thinking could truncate the actual classification → false DENY (Fail-Closed)
 - AO and USE-CASE-005 have longer output budgets where thinking is beneficial for quality
@@ -541,7 +541,7 @@ Milestone type: empirical benchmark -- draft model comparison at baseline config
 - Draft-B standalone TPS: 42.19 tps (T-04, 3 runs; was 52.25 tps in buggy run)
 - Draft-A native TPS (speculative steps only): 10.52 tps mean (new field — unavailable in buggy run)
 - Draft-A native TTFT: 9,256 ms mean (new field — unavailable in buggy run)
-- Peak RSS: ~12,646 MB T-01 / ~12,510 MB T-02 (within 15,507 MB budget)
+- Peak RSS: \~12,646 MB T-01 / \~12,510 MB T-02 (within 15,507 MB budget)
 
 **Acceptance rates (CORRECTED 2026-03-02 — now available):**
 - T-01 Draft-A: AR=**0.4568** (370 / 810 tokens; source: `m_batch_sizes`)
@@ -692,7 +692,7 @@ Key findings:
   - Band 16384 (16403 tok):  NAT=7 @ 3.49 tps,  AR=0.000 for ALL NAT — speculative decoding collapses
   - Band 20480 (20499 tok):  NAT=1 @ 3.31 tps,  AR=0.000 for ALL NAT — no speculative benefit
 - **Critical: Speculative decoding AR collapses at ≥16K context** — Qwen3-0.6B draft model
-  fails to produce acceptable tokens beyond ~12K prompt length. All 6 NAT values show AR=0.000
+  fails to produce acceptable tokens beyond \~12K prompt length. All 6 NAT values show AR=0.000
   at 16384 and 20480. At these bands, NAT setting has no impact on quality but does affect
   TPS due to scheduler batching overhead (measured variance ±20%).
 - **NAT=3 imposes >10% TPS penalty at 12K and 16K** vs per-band optimal:
@@ -732,7 +732,7 @@ Evidence: `phase2_gates/evidence/p5_task4_3_nat_sweep_matrix.json`
   Task 4.3 dense baseline at NAT=3 LOCKED. 5 context bands [4096, 8192, 12288, 16384, 20480].
   Pipeline compilations: 3 (dense calibration, TRISHAPE, XATTENTION).
   Measured: 2 modes × 5 bands × 7 runs (2 warmup + 5 measured) = 70 generate calls (TRISHAPE only;
-  XATTENTION failed entirely). Total benchmark runtime: ~47 minutes.
+  XATTENTION failed entirely). Total benchmark runtime: \~47 minutes.
 
 Calibration note:
 - Dense 4K calibration TPS = 10.39 vs Task 4.3 reference 8.065 (+28.8%) — `CALIBRATION_WARNING`
@@ -988,7 +988,7 @@ TTFT warm reduction results (G-03):
 | AO 12288 | 0.390      | 0.402      | 0.003        | 0.000        | **YES — total** |
 
 At 12K context with prefix caching ON, speculative decoding acceptance rate collapses from
-~0.4 (cold) to near-zero (warm calls). This indicates `enable_prefix_caching` corrupts the
+\~0.4 (cold) to near-zero (warm calls). This indicates `enable_prefix_caching` corrupts the
 draft model's prediction alignment on warm invocations at long context lengths. The warm TTFT
 reduction (7–10%) is rendered moot by the loss of speculative decoding throughput.
 
@@ -1030,7 +1030,7 @@ Milestone disposition: **COMPLETE**
 **Type:** Empirical Evidence Collection (Configuration Optimization)
 **Scope:** `INFERENCE_PRECISION_HINT` {f16, bf16} tested on Arc 140V GPU for Qwen3-14B INT4
   speculative decoding. {PA, AO, CODE} profiles × {2 context bands} = 6 FP16 throughput groups.
-  10 PA adversarial quality comparison cases at ~2K tokens.
+  10 PA adversarial quality comparison cases at \~2K tokens.
 
 #### Key Finding — BF16 NOT SUPPORTED on Arc 140V
 
@@ -1121,11 +1121,11 @@ decision-relevant measurement for max_new_tokens optimization.
 | PA-T4  | 8             | 60%      | 33%       | FAILS — insufficient for DENY/ESCALATE |
 
 PA-T4 (8 tokens) failure analysis: Think block consumes 3 tokens, leaving only 5 for the
-label. ALLOW responses fit (~5 tokens: "DECISION: ALLOW"), but DENY (6 tokens) and
+label. ALLOW responses fit (\~5 tokens: "DECISION: ALLOW"), but DENY (6 tokens) and
 ESCALATE (7 tokens) are truncated. DENY extraction rate ≈ 0%, ESCALATE ≈ 0% at max_new_tokens=8.
 
 PA-T3 (10 tokens) passes because 10 - 3 = 7 remaining tokens, sufficient for all three
-label variants including ESCALATE (the longest at ~7 tokens with "DECISION: ESCALATE").
+label variants including ESCALATE (the longest at \~7 tokens with "DECISION: ESCALATE").
 
 #### Quality Gates
 
@@ -1136,7 +1136,7 @@ label variants including ESCALATE (the longest at ~7 tokens with "DECISION: ESCA
   runs. Mean overhead: 3.0 tokens, max: 3 tokens.
 - **G-05 (LATENCY_BUDGET):** LATENCY_WARNING — PA-T1 band 2048 P95=6616ms > 2000ms budget.
   This is expected: 2048-token input prefill dominates latency at this band. Band 512 P95
-  (~2300ms) is closer to budget. The latency budget (§2.5) was designed for P95 input size,
+  (\~2300ms) is closer to budget. The latency budget (§2.5) was designed for P95 input size,
   not worst-case 2K band.
 
 #### Decision
@@ -1654,7 +1654,7 @@ prompt refinement to improve boundary classification.
 | M-3 | `prefilter_coverage` | 23/40 cases | INFO | DENY_RESTRICTED_PATH:19, DENY_EXTERNAL_NETWORK:1, DENY_EXFILTRATION:3 |
 | M-4 | `label_extraction_rate` | 40/40 | 40/40 | **PASS** |
 | M-5 | `delta_from_4_9a` | +8 resolved, -2 regressed (net +6) | INFO | Cases 14,18,19,22,32,34,38,39 resolved; Cases 17,27 new |
-| M-6 | `latency` | prefilter P50=0ms; LLM 512:~2450ms, 4096:~13500ms | INFO | LLM-only consistent with 4.9a |
+| M-6 | `latency` | prefilter P50=0ms; LLM 512:\~2450ms, 4096:\~13500ms | INFO | LLM-only consistent with 4.9a |
 
 ### Delta Table (9 prior 4.9a disagreements)
 
@@ -1943,7 +1943,7 @@ and did not sufficiently improve ESCALATE recall.
 
 **Options considered:**
 - **Option A (Raise MAX_NEW_TOKENS to 4096+):** REJECTED. Would resolve G-02 TRUNC but
-  violates 2,000ms P95 latency budget (§2.5). At 10.72 tps, 4096 tokens = ~382s.
+  violates 2,000ms P95 latency budget (§2.5). At 10.72 tps, 4096 tokens = \~382s.
   Also does not fix ESCALATE recall (G-04 0.7227, primary failure mode).
 - **Option B (Revert /no_think + DPC ESCALATE expansion):** ACCEPTED. Eliminates TRUNC
   regression (G-02), restores latency compliance, leverages proven DPC mechanism
@@ -2030,7 +2030,7 @@ Multiple failed approaches during D3 implementation revealed the following OV Ge
 1. Append ` /no_think` to user turn text
 2. Prefill assistant turn with `<think>\n\n</think>\n\n` (consumed as INPUT context, not generated)
 3. `stop_token_ids = [151645]` — `<|im_end|>` only; NO thinking token IDs in stop list
-4. Model generates only the label within 10-token budget: `DECISION: ALLOW\n<|im_end|>` (~4–5 tokens)
+4. Model generates only the label within 10-token budget: `DECISION: ALLOW\n<|im_end|>` (\~4–5 tokens)
 
 Note: `think=True` still reported in harness output because the prefill `<think>...</think>` is in
 the input string — the parse logic flags it. Production classification is correct (label extracted).
@@ -2658,7 +2658,7 @@ Malformed inbox JSON is renamed to `.bad` and a fresh empty inbox is created.
 | Item | Description |
 |------|-------------|
 | `tools/vikunja_mcp/bridge/README.md` | Full protocol specification |
-| `tools/vikunja_mcp/bridge/daemon.py` | Bridge daemon (~310 lines) |
+| `tools/vikunja_mcp/bridge/daemon.py` | Bridge daemon (\~310 lines) |
 | `tools/vikunja_mcp/bridge/__init__.py` | Package marker |
 | `tools/vikunja_mcp/bridge/__main__.py` | `python -m` entry point |
 | `tools/vikunja_mcp/bridge/start_bridge.bat` | One-click startup script |
@@ -3006,7 +3006,7 @@ Addendum layering: v2.0 body (baed918) → v2.1 (Spike-7 + M15) addendum → v2.
 | Gate | Status |
 |------|--------|
 | COMPILE | N/A for DOCS-MOSTLY milestone. Python syntax verified via `ast.parse` for all new modules + tests + scripts. XML well-formedness verified (`xml.etree.ElementTree.parse` OK for `v3.xml`). |
-| TEST | DEV-TOOLING ONLY. ~80 new tests under `tools/vikunja_mcp/tests/`, `tools/autonomy_budget/tests/`, `tools/gate_stale_cleaner/tests/`, `tools/fleet_observability/tests/`, plus `test_multi_writer.py` + `test_scheduled_cowork_ea.py` in the bridge tests dir. All mock-only; no live Vikunja dependency. RUNTIME test baselines (755/2/80 REGRESSION; 835/2 FULL) UNCHANGED — zero runtime code touched. |
+| TEST | DEV-TOOLING ONLY. \~80 new tests under `tools/vikunja_mcp/tests/`, `tools/autonomy_budget/tests/`, `tools/gate_stale_cleaner/tests/`, `tools/fleet_observability/tests/`, plus `test_multi_writer.py` + `test_scheduled_cowork_ea.py` in the bridge tests dir. All mock-only; no live Vikunja dependency. RUNTIME test baselines (755/2/80 REGRESSION; 835/2 FULL) UNCHANGED — zero runtime code touched. |
 | ORACLE | PASS — `git diff main..HEAD` shows only `docs/`, `tools/`, `pyproject.toml`. No `services/`, no `shared/`, no `launcher/`, no `tests/` runtime changes. |
 | MATURE_FIDELITY | PASS — all 12 deliverables at full fidelity. No follow-up lists. Live Cowork `/schedule` registration (del. 9) is gated on LA execution per P-1, not punted to a follow-up domain. |
 | SCOPE_BOUNDARY | PASS — zero RUNTIME items. All new work under `tools/` (dev-tooling) or `docs/`. |
@@ -3175,7 +3175,7 @@ None. Domain 9 scope was fully bounded by the init XML + locked decisions (task 
 #### 9. Memory graph delta
 
 - 3 new `FleetComponent` entities: `Active-Task Roster`, `Task Driver Helpers`, `Merge Policy Module`.
-- ~10 new relations: `Domain 9 — Autonomous Task Kickoff` `produced` each of the three; `Merge Policy Module` `consumes_config_from` `Autonomy Budget Framework`; `Task Driver Helpers` `depends_on` `Active-Task Roster`; proactive-SDO + proactive-Co-Lead thin-orchestrators `delegate_to` `Task Driver Helpers`.
+- \~10 new relations: `Domain 9 — Autonomous Task Kickoff` `produced` each of the three; `Merge Policy Module` `consumes_config_from` `Autonomy Budget Framework`; `Task Driver Helpers` `depends_on` `Active-Task Roster`; proactive-SDO + proactive-Co-Lead thin-orchestrators `delegate_to` `Task Driver Helpers`.
 - New `ConfigurationDomain` entity: `Domain 9 — Autonomous Task Kickoff` (COMPLETE observation + the 5 themes as observations).
 - Existing `Domain 8` + v3.0 XML + CLAUDE.md + DEC-11 v3 entities gain observations for the D9 POST-CLOSE AMENDMENT.
 
@@ -3295,8 +3295,8 @@ peer-review lattice. SDO APPROVED the comprehension (comment 55 on Vikunja task 
 
 | Category | Scope | Count | Headline |
 |----------|-------|-------|----------|
-| Coverage gaps | shared | 7 modules assessed, ~18 gaps documented | `runtime_config.resolve_service_root()` and `resolve_deployment_mode()` have zero direct coverage (PyInstaller-frozen branch unverified); six UI-gateway encoder methods in `ipc/protocol.py` are deselected from REGRESSION scope |
-| Coverage gaps | launcher | 3 modules assessed, ~26 gaps documented | `_run_uat2_prompt_flow_preflight` is entirely untested; `guest_deploy._validate_vsock_topology` has zero failure-path coverage; `vm_manager.request_elevation()` has zero direct coverage |
+| Coverage gaps | shared | 7 modules assessed, \~18 gaps documented | `runtime_config.resolve_service_root()` and `resolve_deployment_mode()` have zero direct coverage (PyInstaller-frozen branch unverified); six UI-gateway encoder methods in `ipc/protocol.py` are deselected from REGRESSION scope |
+| Coverage gaps | launcher | 3 modules assessed, \~26 gaps documented | `_run_uat2_prompt_flow_preflight` is entirely untested; `guest_deploy._validate_vsock_topology` has zero failure-path coverage; `vm_manager.request_elevation()` has zero direct coverage |
 | Coverage gaps | integration | Cross-service surface mapped per file | `ui_gateway` + `policy_agent` over IPC has no integration test; `ui_shell` → `policy_agent` full-stack has no integration test; UAT2 prompt-flow preflight is not integration-tested |
 | Stale nomenclature | shared | 0 test-side findings | Clean. Production-code NPU docstrings in `constants.py` and `schemas/car.py` noted but out of test-audit scope |
 | Stale nomenclature | launcher | 0 test-side findings | Clean. Production docstring in `launcher/__main__.py` noted but out of test-audit scope |
@@ -3345,7 +3345,7 @@ Task 7 is now **COMPLETE**. The `## Prioritized Gap Report` in `docs/TEST_AUDIT_
 
 | Category | Scope | Count | Headline |
 |----------|-------|-------|----------|
-| HIGH Priority items | cross-service (synthesis of sections 1-4) | 13 | Fail-closed tests missing `last_failure["code"]` assertions across PA / AO; untested exact thresholds (escalation floor 0.50, PGOV leakage 0.85, dual-gate 0.50 / 0.04); ~13 AO TOML config validation constraints untested; zero-coverage helpers on UAT2 prompt-flow preflight, vsock topology validation, runtime-config resolvers, and Hyper-V UAC elevation; non-functional ui_shell guard tests; persistent stale NPU nomenclature post-ADR-011 across PA, AO, integration |
+| HIGH Priority items | cross-service (synthesis of sections 1-4) | 13 | Fail-closed tests missing `last_failure["code"]` assertions across PA / AO; untested exact thresholds (escalation floor 0.50, PGOV leakage 0.85, dual-gate 0.50 / 0.04); \~13 AO TOML config validation constraints untested; zero-coverage helpers on UAT2 prompt-flow preflight, vsock topology validation, runtime-config resolvers, and Hyper-V UAC elevation; non-functional ui_shell guard tests; persistent stale NPU nomenclature post-ADR-011 across PA, AO, integration |
 | MEDIUM Priority items | cross-service (synthesis of sections 1-4) | 24 | STREAM_TOKEN_BUFFER_LIMIT overflow-break path; CREDIT_CARD + HEX_SECRET PII patterns; real-time backoff sleeps; ui_shell `_ensure_session` / `session_panel.py` dedicated coverage; UI-gateway encoder unit-level round-trip; mTLS server-side `peer_cn` assertion; retry-loop call-count invariants; 23 live-TCP tests mis-placed in unit directories; 19 non-cross-service tests mis-placed in `tests/integration/`; cross-service `jwt_minter` imports; cross-service surface gaps (ui_gateway + PA, ui_shell + PA, launcher preflight, guest_deploy end-to-end, mTLS multi-service) |
 | LOW Priority items | cross-service (synthesis of sections 1-4) | 8 | `constants.py` UNCOVERED-implicit consolidated across six clusters; `test_adjudicator.py` vs `TestAdjudicatePureFunction` consolidation; assertion-polish items (streaming `_streaming` invariant, separator form, deprecated `asyncio.get_event_loop`); transport / session_store minor branches; dedicated `schemas/car.py` coverage; `vm_manager.py` non-critical branches; broad-catch `pytest.raises` match tightening; ui_shell `PGOV_REASON_LABELS` value anchoring |
 | Skip Analysis | `shared/tests/test_runtime_config.py` | 2 skip sites | Both sites use the `_can_symlink(tmp_path)` probe helper for privilege-driven self-selection; both receive **KEEP** disposition — neither masks a production-code defect; removing either would convert an environmental constraint into a hard failure on unelevated shells |
