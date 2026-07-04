@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BlarAI Execution Agent Prompt — Task 4.11 EA-2: P1+P2 Hardening + Doc Cleanup
+  Generated: 2026-04-17 by SDO
+  Parent: P5_SDO_INITIATION_PROMPT_v4.0.xml
+  Predecessor: P5_TASK4_11_EA1_PROMPT.xml (commit 13e4173)
+-->
+<execution_prompt version="1.0" milestone="P5-TASK4.11-EA2">
+
+  <metadata>
+    <title>Task 4.11 EA-2: P1+P2 Security Hardening — Regex Normalization, Sensitivity Required, Monotonic Clock, Symlink Guard, Confidence Fail-Closed, ADR-012 §2.3 Cleanup</title>
+    <parent_task>Task 4.11 — Security Hardening (Pre-Task-5)</parent_task>
+    <session_type>Execution Agent — single-session, scoped implementation</session_type>
+    <branch_name>feature/p5-task4-11-security-ea2</branch_name>
+    <parent_commit>13e4173 (on feature/p5-task4-11-security-ea1)</parent_commit>
+    <test_baseline>742/744 passed in `pytest shared/ services/` scope (2 pre-existing: test_build_prompt_does_not_contain_no_think, test_stop_token_ids_constants_defined)</test_baseline>
+    <scope_limit>5 production files + 1 ADR doc + tests. All items are small, surgical changes.</scope_limit>
+  </metadata>
+
+  <!-- ================================================================== -->
+  <!-- REQUIRED ATTACHMENTS                                                -->
+  <!-- ================================================================== -->
+  <required_attachments>
+    <file reason="Project governance and coding standards">`.github/copilot-instructions.md`</file>
+    <file reason="Security findings — authoritative scope definition">docs/SECURITY_ASSESSMENT.md</file>
+    <file reason="RECON-1 sensitivity audit — EA-1 output confirming minimal test impact">docs/P5_TASK4_11_SENSITIVITY_RECON.md</file>
+    <file reason="DPC regex + confidence fallback (P1-1, P2-3 target)">services/policy_agent/src/gpu_inference.py</file>
+    <file reason="CAR schema — sensitivity default (P1-2 target)">shared/schemas/car.py</file>
+    <file reason="build_car() — sensitivity default (P1-2 target)">services/policy_agent/src/car.py</file>
+    <file reason="NonceStore — time.time() (P2-1 target)">shared/crypto/jwt_validator.py</file>
+    <file reason="Config path resolution — symlink check (P2-2 target)">shared/runtime_config.py</file>
+    <file reason="ADR-012 — §2.3 stale Draft-B row (doc cleanup)">docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md</file>
+    <file reason="This prompt">docs/P5_TASK4_11_EA2_PROMPT.xml</file>
+  </required_attachments>
+
+  <!-- ================================================================== -->
+  <!-- ROLE AND CONSTRAINTS                                                -->
+  <!-- ================================================================== -->
+  <role_constraints>
+    <role>Execution Agent — implements exactly the scoped milestone below.</role>
+    <constraint>Follow all rules in `.github/copilot-instructions.md`.</constraint>
+    <constraint>Do NOT generate SDO/continuation prompts.</constraint>
+    <constraint>Windows 11 host, PowerShell terminal, Python venv at `.venv/`.</constraint>
+    <constraint>Git: create branch `feature/p5-task4-11-security-ea2` from commit 13e4173 (EA-1 HEAD on feature/p5-task4-11-security-ea1) before any edits.</constraint>
+    <constraint>Stop after milestone completion.</constraint>
+  </role_constraints>
+
+  <!-- ================================================================== -->
+  <!-- COMPREHENSION GATE (MANDATORY FIRST ACTION)                         -->
+  <!-- ================================================================== -->
+  <comprehension_gate>
+    <instruction>
+      Before writing ANY code, creating branches, or running commands, you MUST:
+      1. Read this entire prompt.
+      2. Present a structured summary to the Lead Architect containing:
+         (a) Milestone objective — in your own words.
+         (b) Work items — list each with a 1-sentence description.
+         (c) Files you will modify (production + test).
+         (d) Test strategy — what you will test and how.
+         (e) Risks or ambiguities you see.
+      3. STOP and WAIT for explicit approval from the Lead Architect.
+      4. Only after receiving approval, proceed with execution_order step 1.
+
+      This gate exists so the Lead Architect can verify you understood the task
+      correctly before any changes are made. Do NOT skip or abbreviate this step.
+    </instruction>
+  </comprehension_gate>
+
+  <!-- ================================================================== -->
+  <!-- MILESTONE DEFINITION                                                -->
+  <!-- ================================================================== -->
+  <milestone id="P5-TASK4.11-EA2" title="P1+P2 Security Hardening + Doc Cleanup">
+    <objective>
+      Close all remaining P1 and P2 findings from docs/SECURITY_ASSESSMENT.md,
+      plus clean up the stale ADR-012 §2.3 Draft-B row. This completes Task 4.11
+      in its entirety, unblocking Task 5 (Model Upgrade to Qwen3-14B).
+    </objective>
+
+    <!-- ============================================================== -->
+    <!-- P1-1: Authority Claim Regex — Unicode Normalization             -->
+    <!-- ============================================================== -->
+    <work_item id="P1-1" priority="HIGH" title="Authority Claim Regex Unicode Normalization">
+      <description>
+        `DeterministicPolicyChecker._AUTHORITY_CLAIM_RE` at gpu_inference.py ~L330 has 5 narrow
+        patterns. Unicode homoglyphs (e.g., U+2011 non-breaking hyphen instead of ASCII `-`,
+        U+FF41 fullwidth 'a' instead of ASCII 'a') bypass the regex entirely. Since this rule
+        defends against social engineering in `parameters_schema`, its bypass enables prompt
+        injection payloads that evade the DPC and reach the LLM.
+      </description>
+
+      <current_state>
+        ```python
+        _AUTHORITY_CLAIM_RE: ClassVar[re.Pattern[str]] = re.compile(
+            r"pre-approved|pre_approved(?!_)|security.{0,5}team.{0,10}author|authorization.{0,10}bypass|bypass.{0,10}author",
+            re.IGNORECASE,
+        )
+        ```
+        No Unicode normalization applied before matching.
+      </current_state>
+
+      <required_changes>
+        <change file="services/policy_agent/src/gpu_inference.py" description="Add NFKD normalization before regex match">
+          1. Import `unicodedata` at the top of the file.
+          2. In `DeterministicPolicyChecker.check()`, immediately before the
+             `cls._AUTHORITY_CLAIM_RE.search(params_str)` call (~RULE 4), normalize the
+             search string: `params_normalized = unicodedata.normalize("NFKD", params_str)`.
+          3. Search the regex against `params_normalized` instead of `params_str`.
+          4. NFKD collapses compatibility equivalences (fullwidth → ASCII, ligatures → components,
+             non-breaking hyphen → regular hyphen). This closes the homoglyph bypass vector.
+          5. Optionally: also apply NFKD to the exfiltration check (RULE 2 `/tmp/export/`)
+             for consistency — same 1-line pattern.
+        </change>
+      </required_changes>
+
+      <test_requirements>
+        <test description="Unit test: DENY_AUTHORITY_CLAIM fires on Unicode homoglyph bypass">
+          Construct a CAR with `parameters_schema={"note": "pre\u2011approved"}` (U+2011 non-breaking hyphen).
+          Verify check() returns ("DENY", "DENY_AUTHORITY_CLAIM").
+        </test>
+        <test description="Unit test: DENY_AUTHORITY_CLAIM fires on fullwidth characters">
+          Construct a CAR with `parameters_schema={"note": "\uff50\uff52\uff45-approved"}` (fullwidth "pre").
+          Verify check() returns ("DENY", "DENY_AUTHORITY_CLAIM").
+        </test>
+        <test description="Regression: existing DENY_AUTHORITY_CLAIM ASCII tests still pass">
+          All pre-existing authority claim tests must pass unchanged.
+        </test>
+      </test_requirements>
+    </work_item>
+
+    <!-- ============================================================== -->
+    <!-- P1-2: Sensitivity Field — Remove Default, Make Required         -->
+    <!-- ============================================================== -->
+    <work_item id="P1-2" priority="HIGH" title="Sensitivity Required Field">
+      <description>
+        `sensitivity` defaults to `Sensitivity.UNCLASSIFIED` in both the Pydantic model
+        (shared/schemas/car.py L93) and the `build_car()` factory (services/policy_agent/src/car.py L33).
+        While the rule engine correctly DENY-blocks UNCLASSIFIED CARs (fail-closed), the silent
+        default masks integration bugs. Making `sensitivity` required catches errors at
+        construction time instead of adjudication time.
+
+        Per RECON-1 (docs/P5_TASK4_11_SENSITIVITY_RECON.md): ALL test helpers already
+        explicitly set `sensitivity`. Only 1 test (`test_build_car_unclassified_sensitivity_default`
+        in test_car.py) validates the default behavior itself — that test must be rewritten.
+      </description>
+
+      <current_state>
+        ```python
+        # shared/schemas/car.py L93-95
+        sensitivity: Sensitivity = Field(
+            default=Sensitivity.UNCLASSIFIED,
+            description="Declared payload sensitivity. UNCLASSIFIED triggers Fail-Closed.",
+        )
+
+        # services/policy_agent/src/car.py L33
+        sensitivity: Sensitivity | str = Sensitivity.UNCLASSIFIED,
+        ```
+      </current_state>
+
+      <required_changes>
+        <change file="shared/schemas/car.py" description="Make sensitivity required (no default)">
+          Change from:
+          ```python
+          sensitivity: Sensitivity = Field(
+              default=Sensitivity.UNCLASSIFIED,
+              description="Declared payload sensitivity. UNCLASSIFIED triggers Fail-Closed.",
+          )
+          ```
+          To:
+          ```python
+          sensitivity: Sensitivity = Field(
+              ...,
+              description="Declared payload sensitivity. Required — callers must be explicit.",
+          )
+          ```
+        </change>
+
+        <change file="services/policy_agent/src/car.py" description="Remove sensitivity default from build_car()">
+          Change the `build_car()` signature from:
+          ```python
+          sensitivity: Sensitivity | str = Sensitivity.UNCLASSIFIED,
+          ```
+          To:
+          ```python
+          sensitivity: Sensitivity | str,
+          ```
+          Move the `sensitivity` parameter BEFORE `parameters_schema` (which has a default)
+          to maintain valid Python signature ordering (required params before optional params).
+        </change>
+
+        <change file="services/policy_agent/tests/test_car.py" description="Rewrite the default-test to test ValidationError">
+          Replace `test_build_car_unclassified_sensitivity_default`:
+          - OLD: constructs a CAR without sensitivity and asserts it equals UNCLASSIFIED.
+          - NEW: constructs a CAR without sensitivity and asserts it raises `ValidationError`
+            (from Pydantic) or equivalent construction error.
+          Also: verify that explicitly passing `sensitivity=Sensitivity.UNCLASSIFIED` still works
+          (the value is valid, it just can't be the default).
+        </change>
+      </required_changes>
+
+      <test_requirements>
+        <test description="Unit test: omitting sensitivity raises ValidationError">
+          Attempt to construct CanonicalActionRepresentation without sensitivity.
+          Verify raises ValidationError.
+        </test>
+        <test description="Unit test: explicit UNCLASSIFIED still accepted">
+          Construct CanonicalActionRepresentation with sensitivity=Sensitivity.UNCLASSIFIED.
+          Verify it succeeds (value is valid, just not default).
+        </test>
+        <test description="Unit test: build_car() without sensitivity raises TypeError">
+          Call build_car() without the sensitivity argument.
+          Verify raises TypeError (missing required positional argument).
+        </test>
+        <test description="Regression: all other tests pass unchanged">
+          RECON-1 confirmed all helpers explicitly set sensitivity. Expect zero cascading failures.
+        </test>
+      </test_requirements>
+    </work_item>
+
+    <!-- ============================================================== -->
+    <!-- P2-1: NonceStore Monotonic Clock                                -->
+    <!-- ============================================================== -->
+    <work_item id="P2-1" priority="LOW" title="NonceStore Monotonic Clock">
+      <description>
+        NonceStore in jwt_validator.py uses `time.time()` at two sites (check_and_add L80
+        and _gc L90). If the system clock jumps backward (NTP correction), nonces persist
+        past their TTL. The rate limiter already uses `time.monotonic()` correctly.
+      </description>
+
+      <current_state>
+        ```python
+        # jwt_validator.py check_and_add():
+        self._nonces[nonce] = time.time()
+
+        # jwt_validator.py _gc():
+        cutoff = time.time() - self._ttl
+        ```
+      </current_state>
+
+      <required_changes>
+        <change file="shared/crypto/jwt_validator.py" description="Replace time.time() with time.monotonic()">
+          Two substitutions:
+          1. `self._nonces[nonce] = time.time()` → `self._nonces[nonce] = time.monotonic()`
+          2. `cutoff = time.time() - self._ttl` → `cutoff = time.monotonic() - self._ttl`
+        </change>
+      </required_changes>
+
+      <test_requirements>
+        <test description="Existing NonceStore tests must pass unchanged">
+          The switch from time.time() to time.monotonic() is semantically transparent
+          to tests that use real sleeps or mock time. Verify no regressions.
+        </test>
+      </test_requirements>
+    </work_item>
+
+    <!-- ============================================================== -->
+    <!-- P2-2: Config Path Symlink Guard                                 -->
+    <!-- ============================================================== -->
+    <work_item id="P2-2" priority="LOW" title="Config Symlink Check">
+      <description>
+        `resolve_service_config_path()` in runtime_config.py resolves paths via `.resolve()`
+        but never checks if the result is a symlink. On a single-user system this requires
+        local FS write access to exploit, but the fix is trivial.
+      </description>
+
+      <current_state>
+        ```python
+        # runtime_config.py ~L143-146
+        if not resolved.exists():
+            raise ConfigResolutionError(
+                code="CFG_PATH_MISSING",
+                message=f"Config file not found: {resolved}",
+            )
+        return resolved
+        ```
+        No symlink check before returning.
+      </current_state>
+
+      <required_changes>
+        <change file="shared/runtime_config.py" description="Add symlink guard before exists check">
+          Insert BEFORE the `resolved.exists()` check:
+          ```python
+          if resolved.is_symlink():
+              raise ConfigResolutionError(
+                  code="CFG_SYMLINK_REJECTED",
+                  message=f"Config path is a symlink (rejected for security): {resolved}",
+              )
+          ```
+        </change>
+      </required_changes>
+
+      <test_requirements>
+        <test description="Unit test: symlink config path raises CFG_SYMLINK_REJECTED">
+          Create a temporary symlink pointing to a valid config file.
+          Call resolve_service_config_path with the symlink path.
+          Verify raises ConfigResolutionError with code "CFG_SYMLINK_REJECTED".
+        </test>
+        <test description="Regression: normal (non-symlink) path resolution still works">
+          Existing resolve_service_config_path tests must pass unchanged.
+        </test>
+      </test_requirements>
+    </work_item>
+
+    <!-- ============================================================== -->
+    <!-- P2-3: Confidence Fallback — Fail-Closed                         -->
+    <!-- ============================================================== -->
+    <work_item id="P2-3" priority="LOW" title="Confidence Fallback Fail-Closed">
+      <description>
+        `_DEFAULT_LABEL_CONFIDENCE` at gpu_inference.py ~L89-92 returns 0.995 for all labels
+        when the confidence regex fails to match. This means garbled LLM output gets treated
+        as high-confidence. While no threshold gate exists yet, this is latent fail-open risk.
+      </description>
+
+      <current_state>
+        ```python
+        _DEFAULT_LABEL_CONFIDENCE: dict[str, float] = {
+            "ALLOW": 0.995,
+            "DENY": 0.995,
+            "ESCALATE": 0.995,
+        }
+        ```
+      </current_state>
+
+      <required_changes>
+        <change file="services/policy_agent/src/gpu_inference.py" description="Set fallback confidence to 0.0">
+          Change all values to 0.0:
+          ```python
+          _DEFAULT_LABEL_CONFIDENCE: dict[str, float] = {
+              "ALLOW": 0.0,
+              "DENY": 0.0,
+              "ESCALATE": 0.0,
+          }
+          ```
+          This means: "the label was parsed but confidence is unknown." The label itself
+          still drives the decision. The 0.0 confidence signals to any future threshold
+          gate that this result was not explicitly confirmed by the model.
+        </change>
+      </required_changes>
+
+      <test_requirements>
+        <test description="Unit test: verify fallback confidence is 0.0 for all labels">
+          Verify `_DEFAULT_LABEL_CONFIDENCE["ALLOW"] == 0.0` etc.
+        </test>
+        <test description="Regression: tests asserting specific confidence values need updating">
+          Any test that asserts `confidence == 0.995` for a fallback case must be updated to
+          assert `confidence == 0.0`. This is expected — it's the whole point of the fix.
+        </test>
+      </test_requirements>
+    </work_item>
+
+    <!-- ============================================================== -->
+    <!-- DOC-1: ADR-012 §2.3 Stale Draft-B Row                          -->
+    <!-- ============================================================== -->
+    <work_item id="DOC-1" priority="CLEANUP" title="ADR-012 §2.3 Draft-B Status Correction">
+      <description>
+        ADR-012 §2.3 Draft Model Candidates table shows Draft-B (Qwen3-pruned-6L-from-0.6B)
+        with status "ACQUIRING — P5-005c in progress". Task 4.2 already eliminated Draft-B.
+        The status must be corrected.
+      </description>
+
+      <current_state>
+        ```markdown
+        | Qwen3-pruned-6L-from-0.6B | 22 | 1024 | INT8_ASYM | ~300 MB (est.) | **ACQUIRING** — P5-005c in progress. 6 layers pruned from 0.6B, fine-tuned against 8B. Repo: `OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov` |
+        ```
+      </current_state>
+
+      <required_changes>
+        <change file="docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md" description="Update Draft-B status to ELIMINATED">
+          Change the Status column of the Draft-B row from:
+          `**ACQUIRING** — P5-005c in progress. 6 layers pruned from 0.6B, fine-tuned against 8B. Repo: \`OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov\``
+          To:
+          `**ELIMINATED** — P5-005c: pruned draft model not viable (see P5-005c evidence). Full 28L INT4 (Draft-A) confirmed as production draft.`
+        </change>
+
+        <change file="docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md" description="Remove stale lock-pending paragraph">
+          The paragraph after the table says: "Draft model selection will be locked once P5-005c
+          benchmarking produces comparative evidence (pruned 22L INT8 vs full 28L INT4 at
+          equivalent NAT values)."
+
+          Replace with: "Draft model selection LOCKED: Qwen3-0.6B 28L INT4 (Draft-A) is the
+          production draft model. Draft-B (pruned 22L INT8_ASYM) eliminated in P5-005c."
+        </change>
+      </required_changes>
+    </work_item>
+  </milestone>
+
+  <!-- ================================================================== -->
+  <!-- EXECUTION ORDER                                                     -->
+  <!-- ================================================================== -->
+  <execution_order>
+    <step number="1">Checkout: `git checkout feature/p5-task4-11-security-ea1` then `git checkout -b feature/p5-task4-11-security-ea2`</step>
+    <step number="2">Implement P1-1 (Unicode normalization in DPC regex). Write tests. Run.</step>
+    <step number="3">Implement P1-2 (sensitivity required). Update test_car.py. Run tests — verify RECON-1 prediction (zero cascading failures).</step>
+    <step number="4">Implement P2-1 (NonceStore monotonic clock). Run tests.</step>
+    <step number="5">Implement P2-2 (config symlink guard). Write test. Run tests.</step>
+    <step number="6">Implement P2-3 (confidence fallback to 0.0). Update affected tests. Run tests.</step>
+    <step number="7">Apply DOC-1 (ADR-012 §2.3 Draft-B status correction).</step>
+    <step number="8">Run full test suite: `pytest shared/ services/ --tb=short -q`. Verify ≥ 742 passed (EA-1 baseline), zero new failures.</step>
+    <step number="9">Update docs/IMPLEMENTATION_PLAN.md §1.22 — add EA-2 deliverables, update disposition to COMPLETE (full Task 4.11).</step>
+    <step number="10">Commit with template below.</step>
+  </execution_order>
+
+  <!-- ================================================================== -->
+  <!-- COMMIT TEMPLATE                                                     -->
+  <!-- ================================================================== -->
+  <commit_template>
+```
+security: Task 4.11 EA-2 — P1+P2 hardening + ADR-012 §2.3 cleanup
+
+P1-1: DPC authority claim regex — NFKD Unicode normalization before match
+P1-2: sensitivity field — removed default, now required in CAR + build_car()
+P2-1: NonceStore — time.time() → time.monotonic() (clock-jump resilience)
+P2-2: resolve_service_config_path — symlink guard (CFG_SYMLINK_REJECTED)
+P2-3: confidence fallback — 0.995 → 0.0 (fail-closed for future threshold gates)
+DOC-1: ADR-012 §2.3 — Draft-B status corrected to ELIMINATED
+
+Task 4.11 COMPLETE — all 7 SECURITY_ASSESSMENT.md findings closed.
+Task 5 (Model Upgrade to Qwen3-14B) unblocked.
+
+Branch: feature/p5-task4-11-security-ea2
+Gate: pytest shared/ services/ --tb=short -q — no regression from 742 baseline
+LEDGER: Entry 14 (P5-TASK4.11-EA2)
+```
+  </commit_template>
+
+  <!-- ================================================================== -->
+  <!-- QUALITY GATE                                                        -->
+  <!-- ================================================================== -->
+  <quality_gate>
+    <gate id="COMPILE">All modified .py files pass `python -m py_compile`.</gate>
+    <gate id="UNIT_TESTS">All new and updated tests pass.</gate>
+    <gate id="REGRESSION">
+      `pytest shared/ services/ --tb=short -q` — passed count ≥ 742 (EA-1 baseline).
+      The 2 pre-existing failures (test_build_prompt_does_not_contain_no_think,
+      test_stop_token_ids_constants_defined) are NOT regressions.
+    </gate>
+    <gate id="SENSITIVITY_RECON_VALIDATION">
+      After P1-2 implementation, verify RECON-1 prediction: zero cascading test failures
+      from removing the sensitivity default (all helpers already explicit).
+    </gate>
+    <gate id="NO_P0_REGRESSION">
+      EA-1 changes (CN validation, schema allowlist, boundary markers) must remain intact.
+      Do NOT modify EA-1 deliverables except the confidence fallback dict in gpu_inference.py.
+    </gate>
+  </quality_gate>
+
+  <!-- ================================================================== -->
+  <!-- VERIFICATION COMMANDS                                               -->
+  <!-- ================================================================== -->
+  <verification>
+    <command description="Verify branch and last 3 commits">git log --oneline -3</command>
+    <command description="Verify changed files from EA-1 base">git diff feature/p5-task4-11-security-ea1 --name-only</command>
+    <command description="Compile check modified files">python -m py_compile services/policy_agent/src/gpu_inference.py; python -m py_compile shared/schemas/car.py; python -m py_compile services/policy_agent/src/car.py; python -m py_compile shared/crypto/jwt_validator.py; python -m py_compile shared/runtime_config.py</command>
+    <command description="Run full test suite">pytest shared/ services/ --tb=short -q</command>
+    <command description="Verify ADR-012 Draft-B status updated">findstr /C:"ELIMINATED" docs\adrs\ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md</command>
+    <command description="Verify sensitivity has no default">python -c "from shared.schemas.car import CanonicalActionRepresentation; CanonicalActionRepresentation(source_agent='x', destination_service='y', verb='READ', resource='z')" 2>&amp;1 | findstr /I "sensitivity"</command>
+  </verification>
+
+  <!-- ================================================================== -->
+  <!-- CONTEXT NOTES                                                       -->
+  <!-- ================================================================== -->
+  <context_notes>
+    <note topic="build_car signature reorder">
+      When removing the `sensitivity` default from `build_car()`, the parameter must move
+      BEFORE `parameters_schema` (which has `default=None`). Python requires non-default
+      parameters before default parameters. The new order:
+      `build_car(source_agent, destination_service, verb, resource, sensitivity, parameters_schema=None, session_id="")`
+    </note>
+    <note topic="NFKD normalization placement">
+      Apply NFKD normalization to `params_str` once, before BOTH the exfiltration check (RULE 2)
+      and the authority claim check (RULE 4). This way both rules benefit from homoglyph
+      collapse with only one normalization call.
+    </note>
+    <note topic="Confidence 0.0 test impact">
+      Tests that assert `confidence == 0.995` for fallback scenarios will fail. Search for
+      `0.995` in test files to find them. These are expected updates, not regressions.
+    </note>
+    <note topic="Symlink test on Windows">
+      `os.symlink()` on Windows may require elevated privileges or Developer Mode enabled.
+      If creating a symlink in the test fails with PermissionError, wrap the test with
+      `@pytest.mark.skipif(not can_symlink, reason="symlink not available")` where
+      `can_symlink` is determined by a try/except probe at module scope.
+    </note>
+    <note topic="EA-1 deliverables preserved">
+      gpu_inference.py was modified by EA-1 (schema allowlist, boundary markers, system prompt).
+      EA-2 modifies the SAME file but DIFFERENT sections: _AUTHORITY_CLAIM_RE regex usage (~L355),
+      _DEFAULT_LABEL_CONFIDENCE dict (~L89). No conflict expected.
+    </note>
+    <note topic="Task 4.11 completion">
+      After EA-2 commits, Task 4.11 is COMPLETE. Both EA branches need merging to main.
+      The Lead Architect will handle the merge — do NOT merge to main.
+    </note>
+  </context_notes>
+
+</execution_prompt>

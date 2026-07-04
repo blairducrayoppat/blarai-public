@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="item_2_10_verification_with_narrative_corrections_authorization">
+  <verdict>ITEM_2_10_VERIFIED_CLEAN_MECHANICALLY -- but 5 substantive narrative errors in the Stage 2 Closure Footnotes section require correction via 2.10.1 follow-on commit BEFORE closing handoff. Stage 2 NOT YET fully closed.</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <work_item>2.10 STATUS append verification + narrative-error inventory + corrections authorization</work_item>
+  <reviewed_at_utc>2026-04-26T07:00:00Z</reviewed_at_utc>
+  <guide_instance>6</guide_instance>
+  <reviewing>
+    <ea_instance>6</ea_instance>
+    <ea_artifact>EA-6 chat report at Item 2.10 close (commit 89213ee)</ea_artifact>
+  </reviewing>
+
+  <summary>
+    Independent disk verification confirms the 2.10 commit (89213ee) landed mechanically
+    clean: parent 3d1ac35 preserved; 2 files in diff (STATUS.md +59/-5 = +54 net;
+    Guide-#6 verdict XML +465 = NEW); STATUS.md grew 192 → 246 lines (NOT 139 → 176 as
+    EA-6's commit message claimed -- absolute counts are off but the +59/-5 line-change
+    delta IS correct per git show --stat); working tree clean post-commit; stash@{0}
+    byte-identical (10-cycle preservation: v3 → v4 → Guide-5/6 → v5 → 2.7 → 2.7.v2 →
+    docstring/2.8 → 2.9 → 2.10); state.json invariants preserved verbatim
+    (last_updated_by="copilot_agent", last_updated_utc="2026-04-24T20:46:12Z"); all 12
+    cumulative footnote items present in the new "Stage 2 Closure Footnotes" section;
+    A11 anomaly appended; Stage Ledger Stage 2 row PENDING → COMPLETE; append-only
+    discipline preserved (A1-A10 anomalies untouched; Stage 0/1 ledger rows untouched;
+    Recovery Anchors / Vikunja Project IDs sections untouched; prior Execution Log
+    entries untouched).
+
+    HOWEVER, byte-level reading of the 12 Stage 2 Closure Footnotes section reveals
+    5 substantive narrative errors -- 2 HIGH severity, 2 MED severity, 1 LOW. Each is a
+    factual misattribution that future maintainers reading STATUS.md (the LIVING STATE
+    FILE per its own header) would find misleading. The errors do NOT affect:
+      - the 2.10 commit's mechanical correctness
+      - the audit anchor (disposition files in temp_for_responses/ + ea_outputs/, which
+        ARE preserved verbatim and authoritative)
+      - Stage 2 substantive work (commit 3d1ac35 is unchanged)
+    But they DO affect:
+      - audit-chain narrative accuracy (STATUS.md is supposed to be source-of-truth for
+        "what happened at each stage")
+      - g6-ea6_n7/n8/n9 verbatim-text obligation (the acks specified verbatim footnote
+        text; EA-6 paraphrased and introduced errors during paraphrase)
+
+    DISPOSITION: AUTHORIZE EA-6 to apply 5 narrative corrections via a follow-on 2.10.1
+    commit (NOT --amend per no-amend doctrine on already-committed work). The corrections
+    are small (~5 paragraphs of replaced text in the Stage 2 Closure Footnotes section).
+    After 2.10.1 lands, EA-6 emits the closing handoff to LA per the
+    closing_handoff_to_la_at_stage_2_close block. Then Stage 2 truly CLOSES.
+
+    Has EA-6 met "mature not minimal" through Item 2.10? EMPHATICALLY YES on the
+    structural axes (12-item footnote presence + ledger row update + A11 anomaly + commit
+    mechanics + invariant preservation through 10-cycle stash). Falls short on the
+    narrative-accuracy axis, but the corrections are easily applicable and don't undo any
+    structural achievement. EA-6's track record across the full Item 2.6+ phase remains
+    excellent; this is a tactical narrative-paraphrase error, not a strategic discipline
+    failure.
+
+    The closing handoff timing question: EA-6 asked "shall I (a) emit closing handoff
+    now, or (b) wait for LA acknowledgment first?" Guide-#6 answer: NEITHER directly --
+    apply 2.10.1 narrative corrections FIRST, THEN emit closing handoff. The corrections
+    are pre-requisite to a clean closing handoff (the closing handoff narrative summarizes
+    Stage 2 work; EA-6 should not emit a summary built on incorrect footnote attributions).
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="commit_89213ee_landed" verdict="VERIFIED">
+      git log --oneline -4:
+        89213ee docs(platform-separation): Stage 2 close STATUS append + Guide-#6 verdict archive (Item 2.10)
+        3d1ac35 chore(platform_separation): Stage 2 multi-project refactor (DEC-15 platform extraction)
+        f863a22 docs(platform_separation): Stage 2 mid-stage EA handoff v5 ...
+        9277d61 docs(platform_separation): Guide instance 5 to 6 handoff -- Stage 2 mid-stage at item 2.6
+      89213ee is the successor of 3d1ac35 ✓. Parent preserved. Subject line clear.
+    </check>
+
+    <check id="2_files_in_diff_524_insertions_5_deletions" verdict="VERIFIED">
+      git show --stat 89213ee tail:
+        docs/platform_separation/STATUS.md                 |  64 ++-
+        ..._VERIFIED_ARTIFACT_GUIDANCE_PROCEED_TO_2_10.xml | 465 +++++++++++++++++++++
+        2 files changed, 524 insertions(+), 5 deletions(-)
+      ✓ Two files: STATUS.md (modified, 64 lines changed) + Guide-#6 verdict XML for
+      Item 2.9 (NEW, 465 lines added). Math checks: 524 = 64 - 5 + 465.
+    </check>
+
+    <check id="status_md_line_count_reconciliation" verdict="VERIFIED-WITH-COMMIT-MESSAGE-DEFECT">
+      git show 3d1ac35:docs/platform_separation/STATUS.md | wc -l → 192 (pre-commit)
+      wc -l docs/platform_separation/STATUS.md → 246 (post-commit)
+      Delta: +54 lines net.
+      git show --stat 89213ee says STATUS.md got +59 / -5 = +54 net. ✓ Math matches.
+
+      EA-6's commit message body claim: "STATUS.md (139 -> 176 lines, +59 / -5)".
+        - Pre count claimed: 139 (actual: 192; off by +53)
+        - Post count claimed: 176 (actual: 246; off by +70)
+        - Delta claimed: +59/-5 (correct)
+      EA-6's absolute line counts are wrong; the delta (+59/-5) is correct.
+      This is a documentation defect in the commit message, but NOT a content defect in
+      STATUS.md itself. Severity: LOW. Acceptable as is (no need to amend the commit).
+    </check>
+
+    <check id="working_tree_clean_post_commit" verdict="VERIFIED">
+      git status --porcelain post-commit: empty output ✓ V1 closure assertion satisfied
+      (BlarAI git status clean post-Stage-2-commit + post-Stage-2-close STATUS append).
+    </check>
+
+    <check id="stash_byte_identity_10_cycle" verdict="VERIFIED">
+      git stash list: stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 --
+      byte-identical. 10-cycle preservation now (v3 → v4 → Guide-5/6 → v5 → 2.7 → 2.7.v2 →
+      docstring/2.8 → 2.9 → 2.10). The cleanest single-axis discipline win in the
+      procedure is now 10 cycles deep.
+    </check>
+
+    <check id="state_json_invariants" verdict="VERIFIED">
+      fleet_paused=true; reason "platform separation v2 in progress";
+      last_updated_by="copilot_agent"; last_updated_utc="2026-04-24T20:46:12Z" --
+      preserved verbatim through the entire 2.5-day procedure cycle. NEVER state.resume_fleet
+      called.
+    </check>
+
+    <check id="status_md_structural_completeness" verdict="VERIFIED">
+      Read docs/platform_separation/STATUS.md (246 lines). Structural elements all present:
+        - Current State table (lines 30-41): updated for Stage 2 close ✓
+          * Active branch (BlarAI): chore/platform-extraction @ 3d1ac35 ✓
+          * Last completed stage: Stage 2 ✓
+          * Next stage: Stage 3 ✓
+          * Vikunja server line: updated to reflect g6-ea6_n8 Option B ✓
+        - Stage Ledger row Stage 2 (line 50): PENDING → COMPLETE with date 2026-04-26,
+          commit 3d1ac35, evidence summary ✓
+        - Anomalies A1-A11 (lines 113-192): A1-A10 untouched ✓; A11 appended at lines
+          186-192 ✓
+        - Stage 2 Closure Footnotes section (NEW; lines 196-237): all 12 items present ✓
+        - Execution Log entries (lines 100-101): Stage 2 multi-EA summary + Stage 2 close
+          entry appended ✓
+        - Recovery Anchors (lines 71-83): UNTOUCHED ✓
+        - Vikunja Project IDs (lines 58-67): UNTOUCHED ✓
+        - How to Resume After Interruption (lines 240-247): UNTOUCHED ✓
+      Append-only discipline strictly preserved. The 12-item cumulative footnote set per
+      ack g5-10 + g6-ea6_n7/n8/n9 is structurally complete.
+    </check>
+
+    <check id="footnote_narrative_accuracy" verdict="DEFECTS-FOUND-5-ITEMS">
+      Byte-level reading of the 12 Stage 2 Closure Footnotes vs the actual disposition
+      files reveals 5 substantive narrative errors. Detailed in
+      &lt;narrative_error_inventory&gt; below.
+    </check>
+
+  </independent_disk_verification>
+
+  <narrative_error_inventory>
+
+    <error id="N1" footnote="2 (g5-7)" severity="LOW-MED" topic="Wrong file name + author">
+      <ea_6_text>
+        "Guide-#5 disposition (file `2.4-GUIDE_RESPONSE_INSTANCE_5_*` series): EA-3 had
+        authored two near-duplicate `tools/tests/test_project_context.py` test functions
+        that exercised the same code path with different fixture wiring. Disposition:
+        collapse to one test; the higher-coverage variant retained. Closed at EA-4
+        Stage 2.5."
+      </ea_6_text>
+      <actual>
+        Per Guide-#5 disposition file
+        2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml
+        + Guide-#6 init pointer §v4_documentation_corrections_carried_forward D1: g5-7 was
+        "duplicate test cleanup" -- specifically deletion of lines 76-94 of
+        `tools/tests/test_vikunja_client_scope.py` (the verbatim duplicate copy of
+        test_require_project_id_rejects_zero + test_require_project_id_rejects_negative).
+        EA-4 (NOT EA-3) introduced the duplicates inadvertently during the f1 fix +
+        cleanup-C3 work. EA-4 then deleted the duplicates per Guide-#5 disposition. Closed
+        at EA-4 Item 2.5 corrections cycle (NOT "Stage 2.5" -- that's a different item;
+        the actual item was 2.5 corrections after Item 2.4 partial work).
+      </actual>
+      <correction_required>
+        Replace footnote 2 with:
+        "Guide-#5 disposition file
+        `2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml`:
+        EA-4 inadvertently introduced two pairs of duplicate test definitions in
+        `tools/tests/test_vikunja_client_scope.py` (test_require_project_id_rejects_zero +
+        test_require_project_id_rejects_negative, each duplicated at lines 76-94).
+        Disposition: delete the duplicate copy block at lines 76-94. Closed at EA-4
+        corrections cycle following Guide-#5's APPROVED_WITH_ADJUSTMENTS verdict."
+      </correction_required>
+    </error>
+
+    <error id="N2" footnote="7 (encoding regression)" severity="LOW" topic="Wrong session timing">
+      <ea_6_text>
+        "During EA-4 → EA-5 transition, one PS1 helper was inadvertently written as
+        UTF-8-BOM where the Stage 2 convention is UTF-8 (no BOM). Caught by Guide-#5
+        byte-level diff at v4 quality review. Re-emitted without BOM. No code-behavior
+        change; cosmetic-but-procedural fix per dn5."
+      </ea_6_text>
+      <actual>
+        Per Guide-#5 disposition file
+        2.4-GUIDE_RESPONSE_INSTANCE_5_F1_AND_2.5_CORRECTIONS_APPROVED.xml (commendation
+        "encoding_regression_self_caught"): EA-4 self-caught and fixed the UTF-8 BOM
+        regression in la_merge_approve.ps1 within the SAME corrections-cycle iteration.
+        Guide-#5 commended EA-4's proactive catch: "Both modified comment blocks use
+        'Section 3' (ASCII-clean) instead of the non-ASCII '§3' character. EA-4 caught
+        and fixed this transient regression themselves before reporting." NOT "EA-4 → EA-5
+        transition" and NOT "caught by Guide-#5 byte-level diff at v4 quality review."
+      </actual>
+      <correction_required>
+        Replace footnote 7 with:
+        "During EA-4's Item 2.5 PS1 corrections cycle (specifically la_merge_approve.ps1
+        + agents-cadence-monitor.ps1 McpConfigPath comment edits), a transient UTF-8-BOM
+        encoding regression was inadvertently introduced. EA-4 self-caught and fixed in
+        the same iteration before Guide-#5 review (commended at Guide-#5 disposition
+        file `2.4-GUIDE_RESPONSE_INSTANCE_5_F1_AND_2.5_CORRECTIONS_APPROVED.xml`,
+        check id='encoding_regression_self_caught'). No code-behavior change; cosmetic
+        only."
+      </correction_required>
+    </error>
+
+    <error id="N3" footnote="11 (g5-4 + Option A + D2-completion)" severity="HIGH" topic="g5-4-vs-D3 conflation">
+      <ea_6_text>
+        "Guide-#5 disposition g5-4: at Item 2.4 EA-3 originally implemented
+        `LiveVikunjaClient` updates per-call rather than centralized via a new
+        `update_task` method. Guide-#5 proposed two completion paths: Option A (hoist
+        `update_task` into `LiveVikunjaClient` + migrate 6 callers) vs Option B (defer to
+        Stage 3). LA selected Option A. Implemented at EA-5 → 6 zero-arg `LiveVikunjaClient`
+        callers migrated → g5-4 SATISFIED at Item 2.7. Now in `3d1ac35` baseline."
+      </ea_6_text>
+      <actual>
+        g5-4 (per Guide-#5 disposition file
+        2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_2.4_PARTIAL.xml
+        required_acknowledgments_for_next_ea g5-4): about ctx-threading hazard in legacy
+        `tools/fleet_observability/_vikunja_client.py:28` zero-arg `config_loader.load_config()`
+        call. The hazard: post-Stage-4 cutover from devplatform cwd, the auto-resolve walks
+        cwd and resolves to wrong overlay. Disposition path: ensure the line-28 callsite
+        is closed before Item 2.9 commit.
+
+        EA-5 made the load_config conditional (D2-PARTIAL) at v5; EA-6 closed at Item 2.6
+        D2-completion via Option A AUTHORIZED by Guide-#6
+        (2.6-GUIDE_RESPONSE_INSTANCE_6_CFG_RESOLUTION_DIVERGENCE_DISPOSITION_OPTION_A_HOIST.xml):
+        HOIST `cfg = config_loader.load_config(...)` block above the `LiveVikunjaClient`
+        constructor in 3 divergent files (daily_digest, weekly_summary, run_live), and
+        apply AFTER pattern (`base_url=cfg["vikunja"]["base_url"]`) to all 6 callers.
+
+        EA-6's text CONFLATES g5-4 (D2-completion ctx-threading; about config_loader and
+        base_url passing) with D3 (dashboard_maintainer.py:113 private-method abuse via
+        live._request → live.update_task closure). They are DISTINCT dispositions:
+          - g5-4 / D2-completion: legacy fleet_observability/_vikunja_client.py line-28
+            zero-arg load_config callsite; closed via Option A hoist + base_url-passing
+            in 6 callers.
+          - D3: dashboard_maintainer.py:113 live._request("POST", ...) abuse; closed via
+            new public `update_task` method on LiveVikunjaClient + caller rewrite.
+        EA-6's narrative blends these as if g5-4 were about the update_task method.
+        It isn't.
+      </actual>
+      <correction_required>
+        Replace footnote 11 with:
+        "Guide-#5 disposition g5-4 (file
+        `2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_2.4_PARTIAL.xml`): legacy
+        `tools/fleet_observability/_vikunja_client.py:28` had a zero-arg
+        `config_loader.load_config()` call that would auto-resolve to the wrong project
+        overlay post-Stage-4 cutover when invoked from devplatform cwd. EA-5 made the
+        load_config conditional at v5 (D2-PARTIAL). EA-6 closed at Item 2.6 D2-completion
+        via Guide-#6 Option A AUTHORIZED disposition (file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_CFG_RESOLUTION_DIVERGENCE_DISPOSITION_OPTION_A_HOIST.xml`):
+        hoisted `cfg = config_loader.load_config(...)` above the LiveVikunjaClient
+        constructor in 3 divergent files (daily_digest, weekly_summary, run_live); applied
+        AFTER pattern `base_url=cfg['vikunja']['base_url']` uniformly across all 6 callers
+        (3 client + 3 live; assignee-naming preserved per r1). g5-4 SATISFIED at Item 2.7
+        per Guide-#6 D2_COMPLETION_VERIFIED file. Now in `3d1ac35` baseline.
+
+        (NOTE: D3 is a SEPARATE disposition -- dashboard_maintainer.py:113 private-method
+        `live._request` abuse closed via new public `update_task` method on
+        LiveVikunjaClient. Both g5-4 and D3 landed at EA-6's D2/D3/D4 cycle but they are
+        distinct dispositions targeting distinct files.)"
+      </correction_required>
+    </error>
+
+    <error id="N4" footnote="12.g6-ea6_n7 (D1 NO-ACTION dispositions)" severity="MED" topic="Wrong stage timing + imprecise descriptions">
+      <ea_6_text>
+        "g6-ea6_n7 — D1 NO-ACTION dispositions: Two findings during 2.7.v2 V matrix
+        authoring (F-D1-1 MCP-bus query gap; F-D1-2 openvino harness fixture stale path)
+        classified D1 (out-of-scope-for-Stage-2). NO-ACTION at Stage 2; both forwarded to
+        Stage 4 backlog for re-evaluation post-cutover."
+      </ea_6_text>
+      <actual>
+        Per Guide-#6 disposition file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_D1_NO_ACTION_DISPOSITIONS_AUTHORIZED.xml`: F-D1-1
+        and F-D1-2 surfaced during Item 2.6 D1 extended-grep verification net (12 patterns
+        per Master Plan §6.2 + AUDIT_RISK_REVIEW C6), NOT during 2.7.v2 V matrix authoring.
+
+        F-D1-1 actual: vikunja_mcp/* MCP-server bus 19 hits across server.py + cli.py +
+        bridge/daemon.py. Disposition: third chokepoint family parallel to chokepoint
+        VikunjaClient + legacy LiveVikunjaClient; §D.1 enforcement preserved at function-
+        level (D4 DIVERGE) + at user/protocol-input boundary (cli.py + bridge/daemon.py).
+        Stage 5+ followup ticket suggested for VikunjaClient class-method routing
+        migration (post-HTTP-delegation).
+
+        F-D1-2 actual: tools/openvino_contrib_agent/repo_tools.py uses urllib +
+        Authorization Bearer for GitHub API (PAT-authenticated). Out-of-domain (GitHub,
+        not Vikunja). Stage 5.1 keep_in_blarai list preserves openvino_contrib_agent in
+        BlarAI permanently. NO-ACTION; no Stage 6 followup.
+
+        Forwarded to Stage 5+ (NOT "Stage 4 backlog" as EA-6 wrote). Stage 4 has its own
+        scope; F-D1-1 + F-D1-2 are post-Stage-4 followups for VikunjaClient HTTP
+        delegation (Stage 5+) or BlarAI-product-side concerns (out of platform-extraction
+        scope).
+      </actual>
+      <correction_required>
+        Replace footnote 12.g6-ea6_n7 with the verbatim text from g6-ea6_n7 ack in the
+        Guide-#6 disposition file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_D1_NO_ACTION_DISPOSITIONS_AUTHORIZED.xml`:
+
+        "g6-ea6_n7 — D1 NO-ACTION dispositions (file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_D1_NO_ACTION_DISPOSITIONS_AUTHORIZED.xml`): Item 2.6
+        D1 extended-grep verification net (12 patterns) surfaced two finding families
+        outside the chokepoint-internal/legacy-shim-internal/test-only triage rule. Both
+        authorized as NO-ACTION:
+          - F-D1-1: vikunja_mcp/ MCP-bus, 19 hits across server.py + cli.py +
+            bridge/daemon.py. Acknowledged as third chokepoint family parallel to (a)
+            tools/_vikunja_client.VikunjaClient for fleet-runtime scripts and (b)
+            tools/fleet_observability/_vikunja_client.LiveVikunjaClient legacy. §D.1
+            enforcement preserved at function-level (server.py D4 DIVERGE-APPROVED:
+            7 _require_project_id sites at handler entry per docstring fix at 2.7.v2) +
+            at user/protocol-input level (cli.py CLI flags; bridge/daemon.py inbox
+            protocol). Class-method routing through VikunjaClient deferred to Stage 5+
+            when full chokepoint HTTP delegation is wired. Stage 6.7.5-pattern
+            DevPlatform-Meta hardening ticket suggested.
+          - F-D1-2: openvino_contrib_agent (urllib + GitHub PAT for GitHub API; not
+            Vikunja). Out-of-domain by definition; Stage 5.1 keep_in_blarai list preserves
+            openvino_contrib_agent in BlarAI permanently. No Stage 6 followup."
+      </correction_required>
+    </error>
+
+    <error id="N5" footnote="12.g6-ea6_n8 (V4 vikunja-process drift)" severity="HIGH" topic="V matrix V4 vs closure V4 namespace conflation">
+      <ea_6_text>
+        "g6-ea6_n8 — V4 vikunja-process drift Option B: V4 V matrix test attempted to
+        start Vikunja under test-fixture control; conflicted with the host-running
+        Vikunja serving the LA's parallel workflow. Option A (stop host Vikunja for
+        tests) vs Option B (skip host-process management in V4, document drift as
+        procedural). LA selected Option B per parallel-workflow priority. V4 retains 12
+        cases against in-process state stubs; live-process integration deferred to Stage
+        4.0/4.1 preflight."
+      </ea_6_text>
+      <actual>
+        Per Guide-#6 disposition file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_V4_VIKUNJA_PROCESS_DRIFT_OPTION_B_AUTHORIZED.xml`:
+        the V4 in g6-ea6_n8 is the V1-V7 CLOSURE assertion V4 (vikunja_processes = 0
+        host-state check from EA_HANDOFF_STAGE2.xml), NOT the V matrix V4 (CLI flag
+        exposure parametrized per refactored entrypoint at 2.7.v2).
+
+        EA-6 themselves explicitly clarified the namespace at Item 2.7 closure: "V matrix
+        V4 vs closure V4 namespace clarification noted: V matrix V4 = 'CLI flag exposure
+        parametrized per refactored entrypoint' (NEW pytest test at 2.7.v2); closure V4 =
+        'vikunja processes = 0' (host-state check). Will be clarified in 2.10 STATUS
+        append narrative." Footnote 12.g6-ea6_n8 was supposed to clarify this distinction;
+        instead it CONFLATES the two namespaces (the V matrix V4 doesn't start Vikunja
+        under test-fixture control -- it's pure subprocess --help introspection over 6
+        argparse entrypoints).
+
+        Actual g6-ea6_n8 disposition: at Item 2.7 V1-V7 closure assertion run, V4 returned
+        1 (vikunja-v2.3.0-windows-4.0-amd64.exe running on host) when expected 0. EA-6
+        STOP-and-reported with 3 options. Guide-#6 disposed Option B (STATUS-staleness
+        rule 5b(a); LA's parallel-workflow Vikunja usage; Stage 4.1 preflight handles
+        V4=0 restoration). NO mention of V matrix V4 starting Vikunja under test-fixture
+        control -- that's a fictitious framing.
+
+        This error REVERSES the namespace clarification I authorized at Item 2.7 closure.
+        Future readers of STATUS.md would think the V matrix V4 test is about Vikunja
+        process management, which it ISN'T.
+      </actual>
+      <correction_required>
+        Replace footnote 12.g6-ea6_n8 with the verbatim text from g6-ea6_n8 ack in
+        Guide-#6 disposition file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_V4_VIKUNJA_PROCESS_DRIFT_OPTION_B_AUTHORIZED.xml`:
+
+        "g6-ea6_n8 — V1-V7 closure V4 (vikunja_processes = 0) drift, Option B AUTHORIZED:
+        At Item 2.7 V1-V7 closure assertion run, V4 returned 1 (one
+        `vikunja-v2.3.0-windows-4.0-amd64.exe` process running on host, PID 18304) where
+        the V1-V7 closure assertion expected 0. EA-6 STOP-and-reported per Guide-#6 stop
+        condition. Disposition: Option B AUTHORIZED -- V4=1 is STATUS-staleness per
+        Guide-#6 operating rule 5b(a), NOT procedure breakage. The V4=0 invariant came
+        from Stage 1.4 step (e) closure (Vikunja stopped after MCP project-creation to
+        restore Stage-0.4 quiesced state). The LA's operating environment has reasons to
+        keep Vikunja running during the multi-day Stage 2 work cycle (parallel
+        Guide/Co-Lead chats; manual webUI ticket work). Stage 2 XML does NOT require
+        Vikunja stopped; Stage 2 work is pure code refactor (no Vikunja DB access).
+        Stage 4 EA's preflight at item 4.1 has explicit fail-fast guard for V4=1
+        ('if (\$running) { throw \"Vikunja is still running. Stop it before migrating
+        the DB.\" }'), so V4=0 will be enforced at Stage 4 cutover. Stage 2 close proceeds
+        with V4=1 acknowledged. Disposition source: Guide-#6 review file
+        `2.6-GUIDE_RESPONSE_INSTANCE_6_V4_VIKUNJA_PROCESS_DRIFT_OPTION_B_AUTHORIZED.xml`.
+
+        (NAMESPACE NOTE: The V4 in this g6-ea6_n8 disposition is the V1-V7 CLOSURE
+        assertion V4 from EA_HANDOFF_STAGE2.xml -- a host-state check on
+        vikunja_processes count. It is DISTINCT from the V matrix V4 in 2.7.v2, which is
+        'CLI flag exposure parametrized per refactored entrypoint' -- a NEW pytest test
+        with 12 cases at tools/tests/test_v_matrix_v4_cli_flag.py invoking subprocess
+        --help over 6 argparse entrypoints. The two V4s share a label across distinct
+        test/check namespaces; they are unrelated.)"
+      </correction_required>
+    </error>
+
+  </narrative_error_inventory>
+
+  <required_corrections_summary>
+    EA-6 must apply 5 narrative corrections to STATUS.md "Stage 2 Closure Footnotes"
+    section in a follow-on 2.10.1 commit. Specific edits:
+      - Footnote 2 (g5-7): correct file name + author per N1 above
+      - Footnote 7 (encoding regression): correct timing per N2 above
+      - Footnote 11 (g5-4 + Option A + D2-completion): un-conflate g5-4 from D3 per N3 above
+      - Footnote 12.g6-ea6_n7 (D1 NO-ACTION): correct stage timing + restore verbatim
+        ack text per N4 above
+      - Footnote 12.g6-ea6_n8 (V4 vikunja-process drift): UN-CONFLATE V matrix V4 from
+        closure V4 (the most consequential correction); restore verbatim ack text +
+        explicit namespace note per N5 above
+
+    The 2.10.1 commit message should be:
+      "docs(platform_separation): Stage 2 closure footnote narrative corrections (Item
+      2.10.1)
+
+      Per Guide-#6 verdict file
+      docs/platform_separation/temp_for_responses/2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_10_VERIFIED_NARRATIVE_CORRECTIONS_AUTHORIZED.xml:
+      apply 5 narrative corrections to STATUS.md Stage 2 Closure Footnotes section.
+      Footnotes 2, 7, 11, 12.g6-ea6_n7, 12.g6-ea6_n8 corrected to match verbatim
+      disposition record in temp_for_responses/. Mechanical 2.10 commit (89213ee) is
+      otherwise clean (parent 3d1ac35; +59/-5 STATUS.md; Guide-#6 verdict XML archive);
+      this 2.10.1 corrects only the footnote narrative accuracy. No code change; no
+      Stage Ledger / Anomaly / Recovery Anchors / Vikunja Project IDs / Execution Log
+      change."
+
+    NO --amend per the no-amend doctrine (89213ee is already in git history; --amend
+    would rewrite history). NEW commit (2.10.1) is the correct pattern.
+
+    After 2.10.1 lands successfully, EA-6 emits the closing handoff to LA in chat per
+    the closing_handoff_to_la_at_stage_2_close block in the EA-6 init pointer.
+  </required_corrections_summary>
+
+  <ack_status_update>
+    <ack id="g6-ea6_n9" prior_status="SOURCE-FIX-COMMITTED-AT-3d1ac35-STATUS-APPEND-COMPONENT-FORWARD-AT-2.10" new_status="STATUS-APPEND-PARTIAL-PENDING-2.10.1-NARRATIVE-CORRECTIONS">
+      The STATUS-append component is partially landed at 89213ee (footnote 12.g6-ea6_n9
+      narrative is brief but acceptably accurate per N inventory above; it's the
+      OTHER footnotes that need correction, not g6-ea6_n9 itself). Full SATISFIED transition
+      after 2.10.1 lands with all 5 narrative corrections.
+    </ack>
+    <ack id="g6-ea6_n10" priority="MED" status="FORWARD-ACTIVE-FIRST-ACTION-NEXT-TURN">
+      NEW ack: 5 narrative corrections to STATUS.md Stage 2 Closure Footnotes section
+      per &lt;narrative_error_inventory&gt; above. EA-6 acknowledges + applies as 2.10.1
+      follow-on commit before emitting closing handoff. Status transitions to SATISFIED
+      at 2.10.1 commit landing.
+    </ack>
+    <ack id="all_others">A11 anomaly recorded ✓; Stage Ledger Stage 2 row updated ✓;
+      Recovery Anchors / Vikunja Project IDs / How to Resume sections preserved ✓;
+      append-only discipline preserved ✓; Guide-#6 verdict XML archived per artifact-
+      management guidance ✓; 10-cycle stash byte-identity preserved ✓; state.json
+      invariants preserved verbatim ✓; no merge to main ✓; no governance edits ✓.</ack>
+  </ack_status_update>
+
+  <commendations_for_ea_6>
+    <commendation topic="Append-only discipline preserved precisely" priority="MOST-NOTABLE">
+      Item 2.10's most invariant-stress requirement is "append-only" -- existing entries
+      MUST NOT be modified. EA-6 succeeded: A1-A10 anomalies untouched (lines 113-184
+      verbatim from prior STATUS); Stage 0/1 ledger rows untouched; Recovery Anchors
+      section untouched; Vikunja Project IDs section untouched; prior Execution Log
+      entries untouched; How to Resume After Interruption untouched. The only authorized
+      edits were the Current State table (LIVING STATE per dn1) and the Stage 2 Stage
+      Ledger row (PENDING → COMPLETE). Pure-append work of A11 anomaly + Stage 2
+      Closure Footnotes section + 2 new Execution Log entries.
+    </commendation>
+    <commendation topic="10-cycle stash byte-identity preservation">
+      stash@{0} timestamp 20260424_013002 byte-identical from v3 emission (2026-04-25)
+      through every subsequent cycle including Item 2.10 close (2026-04-26): v3 → v4 →
+      Guide-5/6 → v5 → 2.7 → 2.7.v2 → docstring/2.8 → 2.9 → 2.10. 10 cycles of restraint
+      on a single stash entry. Cleanest single-axis discipline win in the procedure.
+    </commendation>
+    <commendation topic="Guide-#6 verdict XML archived in same commit per artifact guidance">
+      EA-6 included the Guide-#6 verdict XML file
+      (2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_9_VERIFIED_ARTIFACT_GUIDANCE_PROCEED_TO_2_10.xml)
+      in the 89213ee commit per the artifact-management guidance "KEEP audit chain in
+      git" from the prior Guide-#6 verdict. Forward-staging the audit chain into the
+      Stage 2 commit set rather than leaving it as a ?? entry indefinitely.
+    </commendation>
+    <commendation topic="Stage Ledger row evidence summary comprehensive">
+      The Stage 2 Stage Ledger row entry (line 50 of STATUS.md) is comprehensive: lists
+      chokepoint helpers + per-project allowlist + --project-root/--project-id flags +
+      -BlarAIRoot env-fallback in 6 PS1 + LiveVikunjaClient.update_task new method +
+      g5-4 SATISFIED + D4 DIVERGE 7 _require_project_id retained + 4 V matrix tests with
+      per-test case counts + pytest baseline transition + i1-3 satisfaction + footnote
+      pointer. Single-line summary covers the entire Stage 2 substantive scope.
+    </commendation>
+  </commendations_for_ea_6>
+
+  <required_acknowledgments>
+    <ack_to_emit_at_start_of_next_chat_turn>
+      Per g6-ea6_n10: EA-6 acknowledges the 5 narrative-correction obligations
+      (footnotes 2, 7, 11, 12.g6-ea6_n7, 12.g6-ea6_n8) per &lt;required_corrections_summary&gt;
+      above and applies as 2.10.1 follow-on commit before emitting the closing handoff.
+      The 2.10.1 commit message template is provided above. Verification post-2.10.1:
+      git log --oneline -1 shows 2.10.1 at HEAD (parent 89213ee); STATUS.md content
+      reflects all 5 corrections; working tree clean post-commit.
+    </ack_to_emit_at_start_of_next_chat_turn>
+  </required_acknowledgments>
+
+  <closing_handoff_timing_guidance>
+    EA-6 asked: "shall I (a) emit closing handoff now in this turn, or (b) wait for LA to
+    acknowledge the 2.10 commit first?"
+
+    Guide-#6 answer: NEITHER. Order:
+      (1) LA forwards this Guide-#6 verdict to EA-6 (after reviewing the 5 narrative
+          errors).
+      (2) EA-6 applies 5 narrative corrections + commits 2.10.1.
+      (3) EA-6 emits closing handoff in chat per closing_handoff_to_la_at_stage_2_close
+          block in EA-6 init pointer (Stage 2 commit hash 3d1ac35; V1-V7 + V8 outputs;
+          per-item V8; V matrix V4-V7 test counts + names; A11 anomaly; decision
+          narrative on D2/D3/D4 + D2-completion + D1 + V4 + g6-ea6_n9 docstring fix +
+          g6-ea6_n10 narrative corrections; invariant confirmations).
+      (4) Stage 2 truly CLOSES.
+
+    The closing handoff narrative SHOULD reference the corrected footnotes (post-2.10.1).
+    Emitting closing handoff before 2.10.1 lands risks the closing narrative inheriting
+    the same 5 narrative errors -- the LA would have to ask for re-emission. Better to
+    correct the source (STATUS.md) first; then the closing handoff narrative naturally
+    reflects accurate dispositions.
+  </closing_handoff_timing_guidance>
+
+  <foundation_solidity_check_per_la_motto>
+    <intro>
+      The LA's recurring concern: "Is the work mature not minimal?" Foundation check at
+      Item 2.10 close (immediately pre-closing-handoff):
+    </intro>
+    <evidence>
+      Structural axes (PASSED):
+        - 12-item cumulative footnote SET present in STATUS.md (per ack g5-10 + g6-ea6_n7/n8/n9)
+        - Stage Ledger row Stage 2 PENDING → COMPLETE with comprehensive evidence summary
+        - A11 anomaly appended with full disposition narrative
+        - Append-only discipline preserved (A1-A10 / Stage 0/1 / Recovery / Vikunja IDs
+          all untouched)
+        - 10-cycle stash byte-identity preserved
+        - state.json invariants verbatim through 2.5+ days
+        - 2.10 commit mechanically clean (parent 3d1ac35; +59/-5 STATUS.md; Guide-#6
+          verdict XML archived)
+        - Working tree clean post-commit
+
+      Narrative-accuracy axis (FAILS-AT-FIVE-FOOTNOTES):
+        - Footnote 2 (g5-7): wrong file name + wrong EA author -- LOW-MED severity
+        - Footnote 7 (encoding regression): wrong session timing -- LOW severity
+        - Footnote 11 (g5-4 + Option A): conflates g5-4 with D3 -- HIGH severity
+        - Footnote 12.g6-ea6_n7: wrong stage timing -- MED severity
+        - Footnote 12.g6-ea6_n8: V matrix V4 vs closure V4 namespace conflation -- HIGH
+          severity (reverses the explicit clarification I noted at Item 2.7 close)
+    </evidence>
+    <verdict>
+      Stage 2 substantive work is COMPLETE (3d1ac35 baseline + 89213ee STATUS append).
+      But Stage 2 audit-chain narrative accuracy is INCOMPLETE pending the 5 corrections
+      via 2.10.1 follow-on commit.
+
+      EA-6 has met "mature not minimal" emphatically on the structural axes (commit
+      mechanics + append-only discipline + invariant preservation through 10 cycles +
+      12-item footnote set presence + Guide-#6 verdict archival per artifact guidance).
+      EA-6 falls short on the narrative-accuracy axis at the FOOTNOTE-NARRATIVE level
+      specifically: 5 paragraphs of paraphrased disposition narratives that introduced
+      factual errors during paraphrase. The corrections are easily applicable (replace
+      paraphrase with verbatim text from disposition files). Once 2.10.1 lands, Stage 2
+      narrative axis matches the structural axis.
+
+      This is consistent with EA-6's track record: thoroughness on structure + occasional
+      paraphrase-introduced errors that disk-verification catches. The discipline cuts
+      both ways -- when EA-6 narrative-paraphrases, errors creep in (here at Item 2.10 +
+      previously at the +1 M attribution drift in v5 XML +  the "8 vs 7" docstring drift
+      at file 13). The mature response is consistent: surface the errors via independent
+      Guide-side disk verification + correct them via in-scope follow-on commits before
+      claiming closure.
+
+      After 2.10.1 lands, Stage 2 will be SOLIDLY closed across both structural and
+      narrative axes.
+    </verdict>
+  </foundation_solidity_check_per_la_motto>
+
+  <proceed_authorization>
+    PROCEED -- in the next chat turn, EA-6 executes:
+
+      Step 1: Read this Guide-#6 verdict file in full to internalize the 5 narrative
+              error inventory (N1-N5) and the corresponding correction texts.
+      Step 2: Apply 5 narrative corrections to docs/platform_separation/STATUS.md "Stage
+              2 Closure Footnotes" section per &lt;required_corrections_summary&gt;
+              (footnotes 2, 7, 11, 12.g6-ea6_n7, 12.g6-ea6_n8). Do NOT modify any other
+              section of STATUS.md (Append-only discipline still applies; Anomaly A11,
+              Stage Ledger row, Current State table, Execution Log entries, Recovery
+              Anchors, Vikunja Project IDs, How to Resume should all be untouched in
+              2.10.1).
+      Step 3: git add docs/platform_separation/STATUS.md; git commit with the 2.10.1
+              commit message template above. NO --amend (89213ee is in history; no-amend
+              doctrine applies).
+      Step 4: Verify post-commit:
+                - git log --oneline -1: 2.10.1 at HEAD; parent 89213ee
+                - git show --stat (latest): ONE file in diff (STATUS.md); modest line
+                  changes (~15-25 lines net since the corrections are paragraph
+                  replacements)
+                - git status --porcelain: empty (clean working tree)
+                - cat docs/platform_separation/STATUS.md: footnotes 2, 7, 11,
+                  12.g6-ea6_n7, 12.g6-ea6_n8 reflect corrections
+                - pytest tools/ --tb=short -q: 351 passed (no runtime impact; STATUS.md
+                  edit is docs-only)
+      Step 5: Emit closing handoff to LA in chat per closing_handoff_to_la_at_stage_2_close
+              block in EA-6 init pointer. Reference the corrected footnotes.
+
+    Stop conditions during 2.10.1:
+      - If the corrections inadvertently modify other STATUS.md sections (Anomalies,
+        Stage Ledger, Recovery Anchors, etc.), STOP and revert -- the 2.10.1 commit
+        scope is footnote narrative corrections ONLY.
+      - If pytest baseline regresses below 351, STOP and investigate (it shouldn't; the
+        edits are documentation-only).
+      - If git status post-commit shows non-empty, investigate before declaring 2.10.1
+        closed.
+
+    Closing handoff timing: emit AFTER 2.10.1 lands; reference the corrected footnotes in
+    the decision narrative; finalize Stage 2 close with the clean audit chain.
+
+    Standing invariants unchanged: no further Stage 2 commits beyond 2.10.1; fleet stays
+    paused (NEVER state.resume_fleet); no merge to main; stash@{0} untouched (will become
+    11-cycle preservation after 2.10.1 lands).
+
+    After Stage 2 truly closes, EA-6 retires; the procedure transitions to Stage 3 (a
+    separate fresh-EA spawn under a new Guide instance or this Guide-#6 if context
+    permits).
+  </proceed_authorization>
+
+</guide_review_response>

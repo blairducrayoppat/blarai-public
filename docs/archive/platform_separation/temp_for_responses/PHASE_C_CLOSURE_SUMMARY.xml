@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GUIDE_RESPONSE_INSTANCE_8>
+  <header>
+    <emitter>Guide-#8 (Claude Code Opus 4.7, advisory surface)</emitter>
+    <occasion>Phase C closure — BUGs 1, 2, 4, 5 fixed; BUG 3 (Item 4.7.5.C) re-evaluated as correct given C3 architecture</occasion>
+    <date>2026-04-29</date>
+  </header>
+
+  <phase_c_summary>
+
+    <c1_complete name=".mcp.json template revert" bug_addressed="BUG 2 + BUG 5">
+      <change>BlarAI/.mcp.json `VIKUNJA_PASS` reverted from `${env:VIKUNJA_PASS}` template to literal password (sourced from User-scope env var; 23 chars).</change>
+      <verify>Manual Vikunja login test with new .mcp.json: SUCCESS (token received). All 5 affected PowerShell scripts now have working credential resolution.</verify>
+      <git_status>NOT committed — .mcp.json gitignored per Ticket I.</git_status>
+    </c1_complete>
+
+    <c2_skipped name="daily_digest.py:95 revert" reason="OBSOLETE">
+      <reasoning>Original BUG 3 framing assumed logs would stay at BlarAI. With C3 (relocate logs to devplatform), Item 4.7.5.C's `_DEVPLATFORM_ROOT` scan path is CORRECT — daily_digest now scans the same location wake_launcher writes to. No revert needed.</reasoning>
+    </c2_skipped>
+
+    <c3_c4_complete name="wake_launcher.ps1 path resolution" bug_addressed="BUG 1 + BUG 4">
+      <change>2-line edit in `devplatform/tools/scheduled-tasks/wake_launcher.ps1`:
+        - Line 69: `$LogsDir = Join-Path $RepoRoot 'tools\scheduled-tasks\logs'` → `$LogsDir = Join-Path $PSScriptRoot 'logs'`
+        - Line 809: `$StateFile = Join-Path $RepoRoot 'tools\autonomy_budget\state.json'` → `$StateFile = Join-Path (Split-Path $PSScriptRoot -Parent) 'autonomy_budget\state.json'`
+      </change>
+      <effect>
+        - $LogsDir now resolves to devplatform/tools/scheduled-tasks/logs (was BlarAI; will survive Stage 5)
+        - $StateFile now resolves to devplatform/tools/autonomy_budget/state.json (was BlarAI; was always-paused since Item 4.13.5 only touched devplatform)
+        - Decoupled wake_launcher from $RepoRoot (-BlarAIRoot) for these specific resources. workspace pointer (-BlarAIRoot) still used for project_root; logs + state are tooling-side artifacts now.
+      </effect>
+      <log_migration>820 unique BlarAI logs (pre-fix) migrated to devplatform/tools/scheduled-tasks/logs/ for historical preservation pre-Stage-5.</log_migration>
+      <git_status>Committed at devplatform HEAD `be22a15` ("fix(stage4-remediation): wake_launcher reads devplatform state.json + logs to devplatform"). Logs themselves gitignored (filesystem-only migration).</git_status>
+    </c3_c4_complete>
+
+    <phase_d_partial name="unpause + verify">
+      <unpause>devplatform state.json unpaused via state.resume_fleet (last_updated_by=guide_8_remediation, utc=2026-04-29T13:06:02Z). BlarAI state.json intentionally LEFT paused (dead artifact post-C4; will be deleted at Stage 5.1).</unpause>
+      <verify_pending>Next wake-* firing window (9:15 AM local) will produce first post-fix log files in devplatform/tools/scheduled-tasks/logs/. Expected: WORK-GATE evaluation logs (no "fleet_paused=true ABORT"), claude SKIPPED if no Vikunja Gate:Pending-* labels exist.</verify_pending>
+    </phase_d_partial>
+
+  </phase_c_summary>
+
+  <new_tickets_bound>
+    <ticket id="II_new" priority="MEDIUM" stage="6.7.5">
+      <title>Refactor PS1 scripts to direct env-var credential pattern (Python parity)</title>
+      <description>
+        Per LA directive 2026-04-29: refactor 5 PowerShell scripts to read VIKUNJA_USER/PASS/URL from env vars directly (matches Python's `os.environ.get(...)` pattern in vikunja_mcp/cli.py). Eliminates .mcp.json dependency for credentials in these scripts; .mcp.json reverts to MCP-server-config-only role.
+
+        Affected scripts (all in devplatform/tools/scheduled-tasks/):
+        1. wake_launcher.ps1 (lines 380-394: Test-WorkAvailable Vikunja login probe)
+        2. agents-cadence-monitor.ps1 (lines 41-58: Vikunja auth)
+        3. escalation_watchdog.ps1 (lines 44-65: Vikunja login)
+        4. la_merge_approve.ps1 (line 47 + 87: Vikunja auth)
+        5. test_async_post_gate.ps1 (line 210-215: live integration)
+
+        Refactor pattern (per cli.py model):
+        ```powershell
+        $vikUrl  = if ($env:VIKUNJA_URL)  { $env:VIKUNJA_URL }  else { 'http://localhost:3456' }
+        $vikUser = if ($env:VIKUNJA_USER) { $env:VIKUNJA_USER } else { 'blarai' }
+        $vikPass = $env:VIKUNJA_PASS
+        if (-not $vikPass) { Write-Log "ABORT: VIKUNJA_PASS env var not set"; exit 0 }
+        ```
+
+        Acceptance:
+        - All 5 scripts work without .mcp.json read for credentials
+        - VIKUNJA_USER + VIKUNJA_URL env vars set at User scope (currently only VIKUNJA_PASS is set)
+        - F-1 template format in .mcp.json no longer load-bearing for PowerShell consumers (only matters for VS Code MCP loader)
+        - Phase C1's literal-password revert in BlarAI/.mcp.json can be reverted back to template safely
+
+        Effort: ~30-45 min (5 scripts × Read+Edit+verify) plus 1 PowerShell command to set env vars at User scope.
+      </description>
+    </ticket>
+
+    <ticket id="JJ_new" priority="LOW" stage="6.7.5">
+      <title>devplatform/.mcp.json template consistency check</title>
+      <description>
+        Phase C1 reverted BlarAI/.mcp.json to literal but did NOT touch devplatform/.mcp.json (which may still have `${env:VIKUNJA_PASS}` template). devplatform/.mcp.json is read by VS Code Copilot operating in devplatform context — VS Code MCP loader handles template expansion correctly, so devplatform/.mcp.json is functional. But for consistency: either revert devplatform/.mcp.json to literal too, OR (with Ticket II completed) revert BlarAI/.mcp.json BACK to template. Decide per LA preference.
+      </description>
+    </ticket>
+
+    <ticket id="KK_new" priority="LOW" stage="6.7.5">
+      <title>Cleanup BlarAI/tools/autonomy_budget/state.json dead artifact</title>
+      <description>
+        Post-Phase C4: wake_launcher reads devplatform's state.json. BlarAI/tools/autonomy_budget/state.json is now a dead artifact (still on disk, intentionally paused; not read by any active consumer). Stage 5.1 deletes BlarAI/tools/autonomy_budget/ which removes it. No remediation needed unless Stage 5.1 is delayed further; in that case, can manually delete BlarAI/tools/autonomy_budget/ directory or just leave dormant.
+      </description>
+    </ticket>
+  </new_tickets_bound>
+
+  <state_post_phase_c>
+    <blarai_head>5965f6b UNCHANGED (no BlarAI commits at Phase C — .mcp.json gitignored, state.json runtime data)</blarai_head>
+    <devplatform_head>be22a15 (NEW — wake_launcher path-resolution fix; was df3d940 + b9b213d)</devplatform_head>
+    <blarai_state_json>fleet_paused=true (dead artifact; not read by wake_launcher anymore; will be deleted at Stage 5.1)</blarai_state_json>
+    <devplatform_state_json>fleet_paused=false (NEW authoritative; read by wake_launcher per C4 fix)</devplatform_state_json>
+    <stage_4_status>Operationally COMPLETE post-Phase-C; ready for soak observation</stage_4_status>
+  </state_post_phase_c>
+
+  <next_steps>
+    <step_1>Wait for next wake-* firing window (9:15 AM local) to verify post-fix behavior</step_1>
+    <step_2>Check log files at devplatform/tools/scheduled-tasks/logs/ for new firings (NEW log location after C3)</step_2>
+    <step_3>Confirm WORK-GATE behavior: skip claude when no pending labels; invoke claude only when Gate:Pending-* present</step_3>
+    <step_4>Soak 24-72h per LA preference</step_4>
+    <step_5>Stage 5 (cleanup) when soak passes</step_5>
+  </next_steps>
+</GUIDE_RESPONSE_INSTANCE_8>

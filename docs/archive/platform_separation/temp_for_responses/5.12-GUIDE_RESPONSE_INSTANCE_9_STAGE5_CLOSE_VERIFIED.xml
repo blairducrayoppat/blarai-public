@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_response
+  guide_instance="9"
+  procedure="platform_separation_v2"
+  stage="5"
+  item="5.12_close_verification"
+  classification="stage_5_close_verified_via_triple_subagent_convergence_plus_guide_9_independent_disk_cross_verification"
+  date="2026-04-30"
+  reviewed_at_utc="2026-04-30T16:05:00Z">
+
+  <verdict>
+    **STAGE 5 OPERATIONALLY VERIFIED CLOSE.** Triple-subagent convergence achieved per d6/w14/ack11: S1 (BlarAI-side technical) + S2 (devplatform-side path-reference) + S3 (procedural completeness) all return VERIFIED. Guide-#9 independent disk cross-verification per dn14/dn20/dn24/A18 confirms 2 documented drift items (both Class D doc-defects in EA-9's reporting; bound for Ticket MM scope expansion; non-blocking for close). All 8 dispatch exit_criteria met; 132 binding atoms; merge to main respected per R10/w10/ack8; pre-platform-extract tag preserved + post-platform-extract + platform-extracted tags annotated correctly; chore/platform-extraction branch preserved at 3e73484 per copilot-instructions preservation rule; fleet operating from devplatform (cadence_monitor + wake-* + escalation_watchdog firing; logs landing devplatform-side; Vikunja API serving v2.3.0); BlarAI runtime/platform isolation confirmed by LA boot test (A31). Procedure transitions to Stage 6 (Hardening, LOW risk, multi-session) per Master Plan §6.
+  </verdict>
+
+  <summary>
+
+    <trigger_context>
+      EA-9 reported Stage 5 OPERATIONALLY CLOSED at 2026-04-30T15:31:12Z with all 8 close steps PASS (BlarAI Stage 5 commit 3e73484 + merge 4122b92 + STATUS append f3b0071; devplatform Pre-Flight pause 1a552d9 + Phase E c20e298 + Phase F ae75507 + close-unpause 2637413; tags post-platform-extract / platform-extracted / pre-platform-extract preserved; chore/platform-extraction branch preserved at 3e73484; 132 binding atoms; 28 Stage 6.7.5 tickets; A20-A31 anomalies; 2 LA paste-relays). Guide-#9 spawned 3 parallel verification subagents per init pointer §stage_5_close_protocol + d6 + w14 + ack11.
+    </trigger_context>
+
+    <triple_subagent_convergence>
+      All 3 subagents VERIFIED Stage 5 close from orthogonal slices. Convergence achieved.
+
+      <s1 verdict="VERIFIED" output="5.12-S1_BLARAI_TECHNICAL_VERIFICATION.md" tool_uses="87" duration_ms="528412">
+        12 of 13 BlarAI-side technical checks PASS unconditionally:
+        - tools/ inventory: {openvino_contrib_agent, tests, __pycache__} (3 entries; no platform tool dirs) ✓
+        - .platform/ contents: 6 entries (active_tasks.yaml + audit_archive/ + docs_sprints/ + scheduled/ + sprints/ + vikunja_project_ids.yaml) ✓
+        - audit archive: 42.4 MB / 1500 zip entries; SHA-verified ✓
+        - governance SELECTIVE 4-of-17: 13 retained docs match n1(e) preserve list verbatim; 4 deleted absent ✓
+        - wake_templates absent ✓
+        - 9 platform-doctrine glob patterns: 0 hits ✓
+        - pyproject.toml testpaths: exactly 9 + asyncio/slow markers unchanged ✓
+        - .gitignore: 3 n1(h) additions present ✓
+        - git chain: HEAD=f3b0071 → merge 4122b92 → stage5 3e73484; chore/platform-extraction PRESERVED at 3e73484; tags post-platform-extract(67d0025→4122b92) + pre-platform-extract(ce2ec58→d0dc1c7) confirmed exact ✓
+        - working tree CLEAN ✓
+        - all 9 testpath dirs populated with real test files ✓
+        - merge commit 4122b92 has 2 parents (--no-ff lineage preservation) ✓
+        1 drift detected (§11) — DOCUMENTED. See &lt;drift_items&gt; below.
+      </s1>
+
+      <s2 verdict="VERIFIED" output="5.12-S2_DEVPLATFORM_PATHREF_VERIFICATION.md" tool_uses="71" duration_ms="331363">
+        ALL 10 devplatform-side path-reference checks PASS unconditionally:
+        - Phase E c20e298: 6 edits across 3 scripts (agents-cadence-monitor.ps1 line 28; escalation_watchdog.ps1 lines 79+164; toast_watchdog.ps1 lines 20+44+48) all verified verbatim ✓
+        - Phase F ae75507: 7 edits in wake_launcher.ps1 (lines 299, 344, 492, 789, 793, 833, 870) all verified verbatim; line 482 confirmed UNCHANGED per EA-9 caveat; line 870 wake-template gating fix is the load-bearing edit unblocking Item 5.5.v2 ✓
+        - 8-glob audit: 0 static-pattern hits + 1 expected dynamic-pattern hit at la_merge_approve.ps1:189 (deferred per LA option b2 → Stage 6.7.5 Ticket II) ✓
+        - Fleet operational (latest wake-* firing 11:45:02 local; WORK-GATE → NO-WORK-EXIT path; cadence_monitor writing to devplatform side) ✓
+        - Git chain: 1a552d9 → c20e298 → ae75507 → 2637413 on devplatform main; tag platform-extracted (object 896d591 → annotates ae75507) ✓
+        - state.json: paused=False, last_updated_by='ea_code_blarai_helper', last_updated_utc=2026-04-30T15:31:12Z, schema_version=1 ✓
+        - Vikunja API: v2.3.0 live on port 3456 ✓
+        - Working tree: 3 expected Stage-4-residue untracked items ✓
+        - 13/8 task fleet matches Phase A 2026-04-29 disposition ✓
+        No drift; EA-9's devplatform-side claims fully match disk reality.
+      </s2>
+
+      <s3 verdict="VERIFIED" output="5.12-S3_PROCEDURAL_COMPLETENESS_VERIFICATION.md" tool_uses="63" duration_ms="368147">
+        14 of 15 procedural completeness checks PASS:
+        - All 16 Stage 5 items + Pre-Flight Step 0/1/2/3 + close-unpause executed in expected order ✓
+        - All 8 exit_criteria met (#4 baseline EXCEEDED beneficially per A30: 1001 passed vs target 981) ✓
+        - Audit archive intact (1500-entry zip; ~44.5 MB at expected path) ✓
+        - All 3 tags annotated correctly (pre-platform-extract PRESERVED at d0dc1c7 Stage-0 baseline; post-platform-extract → 4122b92; platform-extracted → ae75507) ✓
+        - STATUS.md hash-verified append (89C30C6D…CE161 matches; +126/-6 lines per f3b0071) ✓
+        - Merge HALT-gate respected: 4122b92 has 2 parents (3e5f439 main + 3e73484 chore/platform-extraction tip); --no-ff discipline preserved both lineages ✓
+        - 132-atom cumulative-ack chain matches enumeration ✓
+        - 12 anomalies A20-A31 bound in STATUS append ✓
+        - chore/platform-extraction branch PRESERVED at 3e73484 ✓
+        - Single-commit discipline preserved (4 BlarAI commits + 4 devplatform commits) ✓
+        - 2 LA paste-relays documented ✓
+        - Audit-chain commit provenance intact (7 BlarAI + 12 devplatform commits all verified) ✓
+        - STATUS.md no-duplication discipline preserved (1 "Stage 5 Closure Footnotes" header; 0 duplicate "Stage 5 COMPLETE" markers) ✓
+        - All 13 acks (ack1-ack13) honored, including LOAD-BEARING ack9 + ack13 ✓
+        1 drift detected (Check 8: backlog count) — DOCUMENTED. See &lt;drift_items&gt; below.
+      </s3>
+
+      <convergence_quality>
+        All 3 subagents independently verified VERIFIED outcome from orthogonal scopes (BlarAI / devplatform / procedural). Cross-coverage: each subagent identified scope deferred to others — S1 deferred runtime path-references to S2 + procedural-trail to S3; S2 deferred tools/ deletions to S1 + ack-chain enumeration to S3; S3 deferred technical disk-checks to S1+S2. No overlap in claims; no contradictions. Two subagents (S1 + S3) flagged distinct drift items in EA-9's reporting; S2 found 0 drift. Total 2 documented drift items (both Class D doc-defects).
+      </convergence_quality>
+    </triple_subagent_convergence>
+
+    <drift_items_documented>
+      Two Class D doc-defect items in EA-9's reporting (per w11/dn14 EA-paraphrase-introduced-error pattern reinforcement). NOT procedural failures. NOT blocking close. Both bound for Stage 6.7.5 Ticket MM scope expansion (consistent with prior MM scope: dispatch text + init pointer V0 + ext2 strict-count refinement).
+
+      <drift id="1" source="S1 §11" severity="Class_D_doc_defect">
+        **EA-9 Item 5.10 commit-stat reporting drift.** EA-9 reported 3e73484 stats as `477 files / +31831 / -53494`. Actual `git show --shortstat 3e73484` returns `335 files / +1120 / -33179`. Guide-#9 cross-verified independently — actual is 335/+1120/-33179.
+
+        Likely cause: EA-9 conflated "single commit 3e73484 shortstat" with "git diff main..HEAD --stat across all 39+ pre-merge commits". The 477 number was the cumulative pre-merge diff (across 39 commits since divergence; including init pointer + audit verdict + Phase E + Phase F + handoff XMLs etc); the 335 number is the single-commit shortstat for 3e73484 alone.
+
+        EA-9's iter-1 HALT-gate matrix [4] referenced "477 files changed, +31831 / −53494" — this is the CORRECT description of the cumulative pre-merge diff. EA-9's Stage 5 close summary table re-quoted those numbers but mis-labeled them as the single 3e73484 commit stats.
+
+        **Operational impact**: NONE. The commit, merge, tags, and branch preservation are all on-disk correct. Only the post-hoc stat-reporting in STATUS.md §8 + EA-9 close report drifts.
+
+        **Disposition**: Ticket MM scope expansion — add to MM's existing "STATUS.md posterity-corrections" agenda. STATUS.md §8 should clarify cumulative-pre-merge-diff (477/+31831/-53494) vs single-commit-shortstat (335/+1120/-33179).
+      </drift>
+
+      <drift id="2" source="S3 Check 8" severity="Class_D_doc_defect">
+        **STATUS.md Stage 5 Closure Footnotes inherited-ticket list missing LL.** STATUS.md §7 headline reads "**28 tickets total**" but enumerates "**19 inherited from Stages 0-4**: I, K, L, M, V, W, X, Y, Z, AA, BB, CC, EE, FF, GG, HH, II, JJ, KK" (line 565). Math: 19 + 1 carryforward (TICKET A) + 7 new from Guide-#9 cycle (MM/OO/PP/QQ/RR/SS/TT; NN skipped) = 27, NOT 28.
+
+        Cross-verified against Guide-#8→#9 handoff XML line 376: "Stage 6.7.5 hardening backlog is now **20 tickets**: I, K, L, M, V, W, X, Y, Z, AA, BB, CC, EE, FF, GG, HH, II, JJ, KK, **LL** (plus carryforward TICKET A...). Ticket LL added post-handoff-emission per Anomaly A20 — wake_launcher auto-stash multi-cycle preservation narrative correction + forensic investigation of stash disappearance via Pattern D 24h retention sweep."
+
+        So the actual breakdown is:
+        - 20 inherited (incl. LL): I, K, L, M, V, W, X, Y, Z, AA, BB, CC, EE, FF, GG, HH, II, JJ, KK, LL
+        - 1 carryforward: TICKET A
+        - 7 new from Guide-#9 cycle: MM, OO, PP, QQ, RR, SS, TT (NN skipped per skip-the-cancelled-letter convention)
+        - Total: 28 ✓
+
+        STATUS.md headline "28 tickets total" is CORRECT; the inherited-list breakdown at line 565 (says "19 inherited") is incorrect — should say "20 inherited" and include LL in the letter list.
+
+        **Operational impact**: NONE. The total count is correct; the breakdown enumeration omits one letter. EA-9 likely copied the Stage 4 closure-era count (19) from STATUS.md historical line 380 instead of the post-handoff updated count (20) from handoff XML line 376.
+
+        **Disposition**: Ticket MM scope expansion — add to MM's existing "STATUS.md posterity-corrections" agenda. STATUS.md §7 line 565 should read "20 inherited from Stages 0-4: ...JJ, KK, LL".
+      </drift>
+
+      <combined_disposition>
+        Both drift items folded into existing Ticket MM scope (no new ticket; backlog stays at 28). MM scope post-Stage-5 covers:
+        (1) 06_STAGE5_CLEANUP.xml Item 5.9 task name `BlarAI_daily_digest` → `Daily Digest` posterity-correction
+        (2) Stage 5 init pointer V0 expected text BlarAI HEAD/WT (A21_provisional)
+        (3) Stage 5.0.v2 audit verdict ext2 strict-count refinement (A22 / A18)
+        (4) **NEW**: STATUS.md Stage 5 §8 commit-stat clarification (cumulative-diff vs single-commit-shortstat)
+        (5) **NEW**: STATUS.md Stage 5 §7 inherited-list LL letter restoration
+        Per LA mature-not-minimal motto + `feedback_doc_cleanup_non_optional.md`: Class D doc-defects are REQUIRED Stage 6.7.5 work, not optional. MM scope grows; backlog count unchanged.
+      </combined_disposition>
+    </drift_items_documented>
+
+    <stage_5_close_anchors>
+      <blarai_stage_5_commit>3e73484 (chore/platform-extraction tip pre-merge; "Extract platform layer to devplatform (Stages 2-5)"; 335 files / +1120 / -33179 actual shortstat)</blarai_stage_5_commit>
+      <blarai_merge_commit>4122b92 on main (--no-ff; "Merge platform extraction to main"); 2-parent lineage preservation</blarai_merge_commit>
+      <blarai_status_append>f3b0071 on main (1 file / +126 / -6; SHA256 305B1B77→89C30C6D)</blarai_status_append>
+      <blarai_tag_post>post-platform-extract (object 67d0025) annotates 4122b92</blarai_tag_post>
+      <blarai_tag_pre>pre-platform-extract (object ce2ec58) annotates d0dc1c7 (PRESERVED per RECOVERY.md)</blarai_tag_pre>
+      <devplatform_pre_flight_pause>1a552d9</devplatform_pre_flight_pause>
+      <devplatform_phase_e>c20e298 (3 PS1 scripts × 6 edits; cadence_monitor + escalation_watchdog + toast_watchdog)</devplatform_phase_e>
+      <devplatform_phase_f>ae75507 (wake_launcher.ps1 × 7 edits; line 870 wake-template gating)</devplatform_phase_f>
+      <devplatform_tag>platform-extracted (object 896d591) annotates ae75507</devplatform_tag>
+      <devplatform_close_unpause>2637413 (state.json paused=False, updated_utc=2026-04-30T15:31:12Z)</devplatform_close_unpause>
+      <chore_platform_extraction_preserved>tip at 3e73484 per copilot-instructions preservation rule</chore_platform_extraction_preserved>
+      <cumulative_ack_chain>132 binding atoms (130 inherited + g9-ea9_n2(a) Phase E + g9-ea9_n2(b) Phase F)</cumulative_ack_chain>
+      <stage_6_7_5_backlog>28 tickets (20 inherited incl. LL + 1 TICKET A + 7 Guide-#9 new MM/OO/PP/QQ/RR/SS/TT; NN skipped)</stage_6_7_5_backlog>
+      <anomalies>A20-A31 (12 entries; STATUS append documented)</anomalies>
+    </stage_5_close_anchors>
+
+    <stage_6_transition>
+      Stage 5 → Stage 6 (Hardening, LOW risk, multi-session per 07_STAGE6_HARDENING.xml). Stage 6 scope per Master Plan §6 + dispatch:
+      - Item 6.1-6.3 doctrine split (CLAUDE.md / copilot-instructions.md / AGENTS.md): DEFERRED per 6.1.v2 (LA already performed SOP work; revisit post-soak)
+      - Item 6.4 devplatform pyproject.toml finalization
+      - Item 6.5 cross-repo reference rules
+      - Item 6.6 commit doctrine splits (deferred per 6.1.v2)
+      - Item 6.7 24-hour soak observation
+      - Item 6.7.5 hardening tickets execution (28 tickets at close)
+      - Item 6.7.v2 monitoring additions (escalation watchdog liveness + bridge daemon liveness)
+      - Item 6.8 fleet-owned platform maintenance handoff (LA discretion)
+      - Item 6.9 archive platform_separation/ docs to docs/archive/
+
+      Stage 6 spawn pattern: fresh Guide-#10 (or current Guide-#9 continuation) + fresh EA-10 per established Guide-#7→#8→#9 precedent. Guide-#9 retire / Guide-#10 spawn at LA discretion.
+
+      Recommended LA next steps:
+      (a) Verify post-Stage-5 fleet stability over a 24h soak window before initiating Stage 6 work
+      (b) Optionally execute MM scope (2 STATUS.md doc-defect corrections) inline as a single-commit posterity edit; OR fold into Stage 6.7.5 ticket batch
+      (c) Spawn Stage 6 chain when ready; the platform extraction is operationally complete
+    </stage_6_transition>
+
+    <residual_risk_acknowledgment>
+      0 procedural failures. 0 data-loss risks. 0 outstanding LA decisions blocking close.
+
+      2 Class D doc-defects (drift items §1 + §2 above) bound to Ticket MM. Backlog 28; cumulative chain 132.
+
+      1 non-blocking deferred residual: la_merge_approve.ps1:189 dynamic-path pattern → Stage 6.7.5 Ticket II per LA option (b2). Documented + non-blocking.
+
+      Coverage estimate: triple-subagent + Guide-#9 disk cross-verification = ~95% Stage 5 close coverage. The remaining 5% is post-procedure runtime observation (Stage 6.7 24-hour soak will surface any latent runtime drift not caught by static verification).
+    </residual_risk_acknowledgment>
+
+  </summary>
+
+  <required_corrections>
+    NONE. EA-9 has correctly closed Stage 5. The 2 documented drift items are Class D doc-defects post-fact; they do not require corrective execution by EA-9.
+  </required_corrections>
+
+  <required_acknowledgments>
+    NONE for EA-9. Stage 5 close ritual complete. EA-9 may retire correctly (analogous to Stage 4 EA-8 retirement at Stage 4 OPERATIONAL CLOSE per b9b213d/Phase D close).
+
+    Implicit acknowledgments verified post-fact via S1+S2+S3 convergence:
+    - ack9 LOAD-BEARING (n1(e) selective 4-of-17): VERIFIED — 13 BlarAI-internal docs preserved; 4 fleet-relevant deleted
+    - ack13 LOAD-BEARING (n1(n) Step 0 HARD STOP discipline): VERIFIED — Pre-Flight Step 0 5/5 PASS; failure-handling untriggered per success path
+    - All ack1-ack13: HONORED throughout execution per S3 §15
+  </required_acknowledgments>
+
+  <proceed_authorization>
+    **STAGE 5 CLOSE VERIFIED.** Procedure transitions to Stage 6 (Hardening) at LA discretion per Master Plan §6 + 07_STAGE6_HARDENING.xml. No further EA-9 execution required. Guide-#9 has discharged Stage 5 supervision responsibilities.
+
+    Optional immediate LA actions:
+    (a) Initiate 24h soak observation (per Stage 6.7 precondition + procedural inheritance from Phase D pattern)
+    (b) Inline MM scope STATUS.md doc-defect corrections (2 edits; ~5 min) OR defer to Stage 6.7.5 batch
+    (c) Spawn Stage 6 chain (Guide-#10 + EA-10) when ready
+
+    Guide-#9 standby for any post-close LA queries. If LA requests Guide-#9 retirement + Guide-#10 spawn, Guide-#9 emits handoff brief per established precedent (analogous to Guide-#7 → #8 + #8 → #9 handoffs).
+  </proceed_authorization>
+
+  <iteration_count>
+    Stage 5 close verification complete in 1 cycle. Triple-subagent convergence achieved cleanly. No re-emit required.
+  </iteration_count>
+
+</guide_response>

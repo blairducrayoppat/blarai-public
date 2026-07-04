@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdo_message version="1.0" date="2026-03-06" context="task4.12_pa_quality_gate_corpus_hardening_request">
+
+  <!-- ================================================================
+       Lead Architect → SDO: Task 4.12 Scope Request
+       PA Classification Quality Gate — Corpus Hardening
+
+       Predecessor:  Task 4.10 (profile lock, all 10 decisions LOCKED)
+                     Task 4.9d (40/40 agreement, 120/120 determinism)
+       Branch:       TBD (feature/p5-task4-12-corpus-hardening)
+       Test Suite:   786 collected / 755 passed (31 deferred p114 asyncio — pre-existing)
+       ================================================================ -->
+
+  <task_4_9d_final_state>
+    <disposition>PASS</disposition>
+    <agreement rate="1.000" fraction="40/40" threshold="0.90" />
+    <adversarial_security rate="1.000" fraction="8/8" />
+    <determinism runs="3" identical="40/40" unique_labels_per_case="1" />
+    <prefilter cases_denied="25" total="40" llm_path="15">
+      <rule name="DENY_RESTRICTED_PATH" count="18" />
+      <rule name="DENY_EXFILTRATION" count="3" />
+      <rule name="DENY_EXTERNAL_NETWORK" count="1" />
+      <rule name="DENY_AUTHORITY_CLAIM" count="0" note="ZERO fires — all designed cases masked by RESTRICTED_PATH" />
+      <rule name="ESCALATE_CROSS_AGENT_OWNERSHIP" count="1" />
+      <rule name="ESCALATE_INFRA_CONFIG_WRITE" count="1" />
+      <rule name="ESCALATE_CERT_RENEWAL" count="1" />
+    </prefilter>
+    <llm_path_distribution ALLOW="12" DENY="0" ESCALATE="3" total="15" />
+  </task_4_9d_final_state>
+
+  <coverage_gap_analysis>
+    <summary>
+      SDO coverage audit of the Task 4.9d quality gate evidence reveals that the
+      40/40 (1.000) agreement score is structurally misleading. The DeterministicPolicyChecker
+      absorbs 25 of 40 cases before the LLM classifies, leaving only 15 LLM-path cases.
+      Of those 15: 12 ALLOW, 0 DENY, 3 ESCALATE. Zero adversarial cases reach the LLM.
+      The 1.000 adversarial_security rate reflects checker determinism, not LLM robustness.
+
+      Five structural gaps identified:
+    </summary>
+
+    <gap id="GAP-1" severity="CRITICAL" title="Zero LLM-path DENY cases">
+      All 22 DENY cases are pre-filtered. The LLM has never been tested on a DENY input.
+      If a novel request bypasses all checker rules but is DENY-class, LLM behavior is unknown.
+    </gap>
+
+    <gap id="GAP-2" severity="CRITICAL" title="Zero adversarial cases reach LLM">
+      All 8 adversarial cases are pre-filtered. The adversarial_security metric
+      measures checker quality, not LLM adversarial resistance. LLM robustness to
+      role confusion, social engineering, and prompt injection is untested.
+    </gap>
+
+    <gap id="GAP-3" severity="HIGH" title="DENY_AUTHORITY_CLAIM has zero empirical coverage">
+      Rule 4 (authority-claim regex) has never fired. Cases 19 and 39 were designed
+      to trigger it but both have /system/ paths that cause Rule 1 to fire first.
+      If Rule 4's regex contains a bug, there is no evidence to detect it.
+    </gap>
+
+    <gap id="GAP-4" severity="HIGH" title="Only trivial ALLOW cases tested">
+      All 12 LLM ALLOW cases are simple LOW/MEDIUM operations on /home/user/ paths.
+      No boundary ALLOW cases (near DENY/ESCALATE thresholds) test the LLM.
+    </gap>
+
+    <gap id="GAP-5" severity="MEDIUM" title="Only 3 LLM-path ESCALATE cases">
+      All 3 are clean structural matches. No ESCALATE edge cases exist in the LLM path.
+    </gap>
+  </coverage_gap_analysis>
+
+  <scope_request>
+    <task_id>4.12</task_id>
+    <title>PA Quality Gate Corpus Hardening — LLM Classification Baseline</title>
+    <type>TEST-ONLY + MEASUREMENT (no production code changes)</type>
+    <sequencing>4.12 → 4.11 (Security Hardening) → Task 5 (Model Upgrade)</sequencing>
+    <rationale>
+      Task 4.11 will modify the DeterministicPolicyChecker. The LLM classification
+      baseline must be established on the CURRENT checker before those changes.
+      If Task 4.11 runs first, we lose the ability to measure LLM-only performance
+      against the production checker rules.
+    </rationale>
+
+    <requirements>
+      <item>Expand corpus from 40 to ~80-100 cases</item>
+      <item>Minimum 30 LLM-path cases (vs current 15)</item>
+      <item>Minimum 10 LLM-path DENY cases (Category A — currently 0)</item>
+      <item>Minimum 5 LLM-path adversarial cases (Category B — currently 0)</item>
+      <item>Minimum 3 DENY_AUTHORITY_CLAIM validation cases on non-restricted paths (Category C)</item>
+      <item>Minimum 5 boundary ALLOW cases near DENY/ESCALATE thresholds (Category D)</item>
+      <item>Minimum 5 boundary ESCALATE cases (Category E)</item>
+      <item>All existing 40 cases preserved exactly (regression gate: 40/40)</item>
+      <item>Evidence JSON with llm_path_analysis breakdown</item>
+      <item>No changes to services/, shared/, or launcher/ (test harness only)</item>
+    </requirements>
+
+    <key_measurements>
+      <measurement name="overall_agreement" threshold="0.90" gate="BLOCKING" />
+      <measurement name="overall_adversarial_security" threshold="1.000" gate="BLOCKING" />
+      <measurement name="llm_path_agreement" threshold="0.80" gate="INFORMATIONAL_BASELINE" />
+      <measurement name="llm_path_deny_accuracy" threshold="none" gate="INFORMATIONAL_BASELINE" />
+      <measurement name="llm_path_adversarial_security" threshold="1.000" gate="BLOCKING" />
+      <measurement name="deny_authority_claim_coverage" threshold="3" gate="BLOCKING" />
+      <measurement name="determinism" threshold="identical_3_runs" gate="BLOCKING" />
+      <measurement name="original_40_regression" threshold="40/40" gate="BLOCKING" />
+    </key_measurements>
+
+    <execution_prompt>docs/Task4.12_v1.xml</execution_prompt>
+    <gap_analysis>docs/Task4.12_PA_QUALITY_GATE_COVERAGE_ANALYSIS.md</gap_analysis>
+    <ledger_entry>Entry 29</ledger_entry>
+    <implementation_plan_section>§1.24</implementation_plan_section>
+  </scope_request>
+
+  <governance_updates_already_applied>
+    <item>docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md — Task 4.12 row added, status updated</item>
+    <item>docs/IMPLEMENTATION_PLAN.md — §1.24 added</item>
+    <item>docs/POST_OPERATIONAL_MATURATION_LEDGER.md — Entry 29 placeholder added</item>
+    <item>docs/Task4.12_PA_QUALITY_GATE_COVERAGE_ANALYSIS.md — Coverage analysis created</item>
+    <item>docs/Task4.12_v1.xml — Execution prompt created</item>
+  </governance_updates_already_applied>
+
+</sdo_message>

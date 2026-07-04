@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0.0",
+  "milestone": "Operational Exit Milestone 4",
+  "timestamp": "2026-02-26T00:04:50Z",
+  "commit_hash": "715b014b0984e377f832193d23d73d8532aa2bab",
+  "participant_role": "non-dev",
+  "non_dev_participant_ids": ["User (Lead Architect / Non-Dev Operator)"],
+  "cold_start_execution_disposition": "PASS",
+  "disposition": "PASS",
+  "scenarios": [
+    {
+      "scenario_id": "UAT3-01",
+      "name": "Cold-start launch",
+      "result": "PASS",
+      "notes": "Non-dev launched via launch_blarai.bat from cold state, all services started, TUI rendered"
+    },
+    {
+      "scenario_id": "UAT3-02",
+      "name": "Session create",
+      "result": "PASS",
+      "notes": "New session created via Ctrl+N, session appeared in left panel"
+    },
+    {
+      "scenario_id": "UAT3-03",
+      "name": "Session switch",
+      "result": "PASS",
+      "notes": "Switched between sessions, history persisted. Bug fix applied: session reload on switch (commit b8dca40)"
+    },
+    {
+      "scenario_id": "UAT3-04",
+      "name": "Session delete",
+      "result": "PASS",
+      "notes": "Deleted session removed from session list"
+    },
+    {
+      "scenario_id": "UAT3-05",
+      "name": "Prompt/response flow",
+      "result": "PASS",
+      "notes": "Prompt submitted, NPU-generated response rendered correctly in English"
+    },
+    {
+      "scenario_id": "UAT3-06",
+      "name": "PGOV visibility",
+      "result": "PASS",
+      "notes": "Prompt injection attempt triggered red 'Policy Denial' box with 'Request validation error' and sanitized message. Normal prompt received permitted response."
+    },
+    {
+      "scenario_id": "UAT3-07",
+      "name": "Retry/recovery (fail-closed behavior)",
+      "result": "PASS",
+      "notes": "System recovered after policy denial; subsequent legitimate prompt processed successfully"
+    },
+    {
+      "scenario_id": "UAT3-08",
+      "name": "Graceful shutdown",
+      "result": "PASS",
+      "notes": "Ctrl+Q produced clean exit"
+    },
+    {
+      "scenario_id": "UAT3-09",
+      "name": "Relaunch continuity",
+      "result": "PASS",
+      "notes": "Previous sessions persisted across relaunch. Bug fix applied: phantom UAT2_M2_PROMPT_FLOW session cleanup (commit ca08164)"
+    },
+    {
+      "scenario_id": "UAT3-10",
+      "name": "Documentation usability",
+      "result": "PASS",
+      "notes": "4 doc inaccuracies found and corrected (commit 715b014). Both Runbook and How-To accepted as onboarding-grade."
+    }
+  ],
+  "ui_workflow_results": {
+    "session_create": "PASS",
+    "session_switch": "PASS",
+    "session_delete": "PASS",
+    "prompt_flow": "PASS",
+    "pgov_visibility": "PASS",
+    "retry_recovery": "PASS",
+    "shutdown_relaunch_continuity": "PASS"
+  }
+}

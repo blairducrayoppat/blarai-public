@@ -1,0 +1,313 @@
+<execution_prompt version="2.0" milestone="P5-005c-ACQUIRE-v2" type="model_acquisition">
+
+<metadata>
+  <title>P5-005c Draft Model Acquisition v2: Qwen3-pruned-6L-from-0.6B (INT8 OpenVINO IR)</title>
+  <generated_by>SDO Session — 2026-02-28</generated_by>
+  <parent_milestone>P5-005b (commit 62b44a2, disposition CONTEXT_EXPANSION_FEASIBLE)</parent_milestone>
+  <prior_attempt>P5-005c v1 (commit 6b0e7e5) — ACQUISITION_FAILED. Root cause: script searched for INT4 models and rejected the only available repo (INT8_ASYM). All conversion strategies failed because the model is only published as a pre-converted OpenVINO IR — no PyTorch source weights exist.</prior_attempt>
+  <branch_action>REUSE existing branch feature/p5-005c-pruned-draft-acquisition (from commit 6b0e7e5)</branch_action>
+  <branch_name>feature/p5-005c-pruned-draft-acquisition</branch_name>
+  <scope>Download the pre-built OpenVINO IR model from HuggingFace, validate architecture compatibility, run standalone and speculative-decoding smoke tests on Arc 140V GPU. No conversion or quantization needed — the model is already in OpenVINO format.</scope>
+  <exit_deliverable>A fully validated model directory at models/qwen3-0.6b-pruned-6l/openvino-int8-gpu/ with passing GPU smoke test and speculative-decoding compatibility confirmation against Qwen3-14B, plus an updated JSON evidence artifact.</exit_deliverable>
+</metadata>
+
+<role>
+  You are a single-session Execution Agent. Execute exactly the milestone defined below — no more, no less.
+  Do NOT generate SDO prompts, continuation prompts, or offer to plan future milestones.
+  Stop after milestone completion.
+</role>
+
+<critical_correction>
+  THE PREVIOUS ATTEMPT FAILED BECAUSE OF INCORRECT ASSUMPTIONS. Here is what is now confirmed via web search:
+
+  1. EXACT REPO ID: OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov
+     - Published by Intel's OpenVINO team (NOT by Qwen)
+     - This is the ONLY available version of this model
+
+  2. FORMAT: Already converted to OpenVINO IR format with INT8_ASYM weight compression via NNCF
+     - NO CONVERSION NEEDED — just download with huggingface_hub.snapshot_download
+     - Do NOT attempt optimum-cli export, Python API export, or any other conversion strategy
+     - Do NOT reject the model for being INT8 instead of INT4 — INT8 is the correct format
+
+  3. ARCHITECTURE: Qwen3ForCausalLM with 22 hidden layers (not 6)
+     - "6L" in the name means 6 layers were REMOVED from the 28-layer Qwen3-0.6B, leaving 22
+     - hidden_size=1024, vocab_size=151936 — same as full Qwen3-0.6B
+     - The model was fine-tuned against Qwen3-8B but is architecturally compatible with Qwen3-14B
+       because speculative decoding only requires matching vocab_size
+
+  4. COMPATIBILITY: OpenVINO 2025.2+ and Optimum Intel 1.25.3+ (our runtime is 2026.0 — compatible)
+
+  5. SPECULATIVE DECODING API: The model card shows this exact usage pattern:
+     ```python
+     import openvino_genai
+     draft_model = openvino_genai.draft_model(draft_model_path, draft_device)
+     scheduler_config = openvino_genai.SchedulerConfig()
+     scheduler_config.cache_size = 2
+     pipe = openvino_genai.LLMPipeline(main_model_path, main_device,
+                                        scheduler_config=scheduler_config,
+                                        draft_model=draft_model)
+     ```
+     HOWEVER: P5-005b used a DIFFERENT API pattern (without SchedulerConfig):
+     ```python
+     config = {"draft_model": ov_genai.draft_model(str(draft_model_path), "GPU")}
+     pipe = ov_genai.LLMPipeline(str(model_dir), "GPU", config)
+     ```
+     Try the P5-005b pattern FIRST (for consistency). If it fails, try the model-card pattern with SchedulerConfig.
+
+  6. NO PYTORCH WEIGHTS EXIST: The repo only contains openvino_model.xml, openvino_model.bin, and config files.
+     Strategies B-E from the previous prompt are IMPOSSIBLE. Do not attempt them.
+</critical_correction>
+
+<context>
+  <hardware>
+    Intel Core Ultra 7 258V (Lunar Lake), Arc 140V iGPU (~16GB shared LPDDR5X), 32GB total (31.323GB effective per ADR-005).
+    Windows 11 Pro host. PowerShell terminal. Python .venv at .venv\Scripts\Activate.ps1.
+  </hardware>
+  <runtime>
+    OpenVINO 2026.0.0-20965, openvino_genai 2026.0.0.0-2820-dab5b993a38.
+    huggingface_hub installed.
+  </runtime>
+  <existing_models>
+    - models/qwen3-14b/openvino-int4-gpu/ — Target model (Qwen3ForCausalLM, 40 layers, hidden_size=5120, vocab_size=151936)
+    - models/qwen3-0.6b/openvino-int4-gpu/ — Current draft model (Qwen3ForCausalLM, 28 layers, hidden_size=1024, vocab_size=151936, ~367MB bin)
+  </existing_models>
+  <target_model>
+    HuggingFace repo: OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov
+    Architecture: Qwen3ForCausalLM, 22 layers, hidden_size=1024, vocab_size=151936
+    Quantization: INT8_ASYM (NNCF compressed)
+    Target local directory: models/qwen3-0.6b-pruned-6l/openvino-int8-gpu/
+    NOTE: Directory name uses "int8" (not "int4") because the model IS int8.
+  </target_model>
+  <prior_art>
+    The P5-005b benchmark harness at phase2_gates/scripts/run_p5_feasibility_005b.py contains the proven
+    speculative decoding pipeline pattern (see create_pipeline function around line 385).
+    The acquisition script at phase2_gates/scripts/acquire_p5_005a_models.py contains proven patterns for:
+    - OpenVINO tokenizer asset generation (ensure_openvino_tokenizer_assets)
+    - Model integrity snapshots (SHA-256, file presence, size validation)
+    - GPU smoke test (quick_inference_smoke)
+    - AC power enforcement, disk space checks, atomic JSON evidence writing
+    Reuse these patterns where applicable.
+  </prior_art>
+</context>
+
+<execution_plan>
+
+  <step id="1" name="Branch and Environment Setup">
+    <action>Switch to branch feature/p5-005c-pruned-draft-acquisition (already exists from v1 attempt).</action>
+    <action>Activate .venv. Verify openvino, openvino_genai, huggingface_hub imports succeed.</action>
+    <action>Verify AC power is connected (psutil.sensors_battery).</action>
+    <action>Verify disk space >= 2GB free on C:\ (the model is ~300-400MB; generous buffer).</action>
+  </step>
+
+  <step id="2" name="Direct Download from HuggingFace">
+    <action>Download the model using the EXACT repo ID:
+      ```python
+      import huggingface_hub
+      huggingface_hub.snapshot_download(
+          repo_id="OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov",
+          local_dir=str(ROOT / "models" / "qwen3-0.6b-pruned-6l" / "openvino-int8-gpu"),
+          local_dir_use_symlinks=False,
+      )
+      ```
+    </action>
+    <action>Verify that openvino_model.xml and openvino_model.bin exist in the download directory.</action>
+    <action>If the download fails (network error, repo not found), record the error and set disposition ACQUISITION_FAILED.</action>
+  </step>
+
+  <step id="3" name="Architecture Validation">
+    <action>Read config.json from the downloaded directory and verify:
+      - "architectures" contains "Qwen3ForCausalLM"
+      - "vocab_size" == 151936 (MUST match Qwen3-14B for speculative decoding)
+      - "num_hidden_layers" == 22 (expected for the 6-layer-pruned variant)
+      - "hidden_size" == 1024
+    </action>
+    <action>Record full config.json contents in the evidence artifact.</action>
+    <action>If vocab_size does NOT equal 151936, STOP — set disposition INCOMPATIBLE.</action>
+  </step>
+
+  <step id="4" name="Tokenizer Asset Validation">
+    <action>Check if the downloaded directory contains openvino_tokenizer.xml, openvino_tokenizer.bin, openvino_detokenizer.xml, openvino_detokenizer.bin.</action>
+    <action>If these files are MISSING: generate them using openvino_tokenizers.convert_tokenizer, loading the tokenizer from the downloaded directory (it should contain tokenizer.json or tokenizer.model). If the tokenizer files are not in the download either, COPY them from models/qwen3-0.6b/openvino-int4-gpu/ (same tokenizer family, same vocab_size=151936).</action>
+    <action>Record which method was used to obtain the tokenizer assets.</action>
+  </step>
+
+  <step id="5" name="Standalone GPU Smoke Test">
+    <action>Load the pruned model standalone on GPU:
+      ```python
+      pipe = ov_genai.LLMPipeline(str(model_dir), "GPU")
+      config = ov_genai.GenerationConfig()
+      config.max_new_tokens = 20
+      config.do_sample = False
+      output = pipe.generate("What is 2+2?", config)
+      ```
+    </action>
+    <action>Record: success/fail, total latency_ms, output_text_preview, RSS after load.</action>
+    <action>Delete the pipeline and gc.collect() after the test to free GPU memory for the next step.</action>
+  </step>
+
+  <step id="6" name="Speculative Decoding Compatibility Smoke Test">
+    <description>THE CRITICAL GATE. Verify the pruned INT8 model works as a draft for the Qwen3-14B INT4 target model.</description>
+
+    <action>ATTEMPT 1 — P5-005b API pattern (preferred for benchmark consistency):
+      ```python
+      import openvino_genai as ov_genai
+      draft = ov_genai.draft_model(
+          str(ROOT / "models" / "qwen3-0.6b-pruned-6l" / "openvino-int8-gpu"),
+          "GPU"
+      )
+      pipe = ov_genai.LLMPipeline(
+          str(ROOT / "models" / "qwen3-14b" / "openvino-int4-gpu"),
+          "GPU",
+          {"draft_model": draft}
+      )
+      gen_config = ov_genai.GenerationConfig()
+      gen_config.max_new_tokens = 50
+      gen_config.num_assistant_tokens = 3
+      gen_config.do_sample = False
+      output = pipe.generate("Write a Python function that adds two numbers.", gen_config)
+      ```
+    </action>
+
+    <action>If ATTEMPT 1 fails, try ATTEMPT 2 — model-card SchedulerConfig pattern:
+      ```python
+      draft = ov_genai.draft_model(
+          str(ROOT / "models" / "qwen3-0.6b-pruned-6l" / "openvino-int8-gpu"),
+          "GPU"
+      )
+      scheduler_config = ov_genai.SchedulerConfig()
+      scheduler_config.cache_size = 2
+      pipe = ov_genai.LLMPipeline(
+          str(ROOT / "models" / "qwen3-14b" / "openvino-int4-gpu"),
+          "GPU",
+          scheduler_config=scheduler_config,
+          draft_model=draft
+      )
+      gen_config = ov_genai.GenerationConfig()
+      gen_config.max_new_tokens = 50
+      gen_config.num_assistant_tokens = 3
+      gen_config.do_sample = False
+      output = pipe.generate("Write a Python function that adds two numbers.", gen_config)
+      ```
+    </action>
+
+    <action>Record for whichever attempt succeeds:
+      - API pattern used (P5-005b or SchedulerConfig)
+      - success/fail
+      - output text preview
+      - approximate decode TPS (time the generate call, divide max_new_tokens by elapsed)
+      - RSS after pipeline creation
+    </action>
+
+    <action>If BOTH attempts fail, record FULL error tracebacks for both and set disposition STANDALONE_ONLY.
+      Common failure modes to capture:
+      - Shape mismatch errors (vocab_size incompatibility)
+      - Draft model compilation errors on GPU
+      - Memory allocation failures
+      - "Unsupported draft model" type errors
+    </action>
+  </step>
+
+  <step id="7" name="Model Integrity Snapshot">
+    <action>Compute SHA-256 hashes of openvino_model.bin and openvino_model.xml.</action>
+    <action>Record all file names and sizes in the downloaded directory.</action>
+    <action>Compare bin file size against the existing 0.6B model (~367MB). The pruned model should be ~22/28 = ~79% of the size (~290MB expected) since it has 22 of 28 layers, though INT8 quantization (vs INT4) may make it larger per layer.</action>
+  </step>
+
+  <step id="8" name="Evidence Artifact and Commit">
+    <action>Write the complete evidence artifact to: phase2_gates/evidence/p5_005c_pruned_draft_acquisition.json
+      (This OVERWRITES the v1 failed evidence artifact — that's intentional.)
+    </action>
+    <action>The artifact MUST contain:
+      - metadata: timestamp, git commit, runtime versions, AC power state, disk space
+      - model_source: exact HF repo ID ("OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov"), quantization format ("INT8_ASYM")
+      - architecture_validation: config.json contents, vocab_size match confirmation, num_hidden_layers
+      - download: elapsed time, files downloaded, any errors
+      - tokenizer: method used (downloaded / generated / copied from 0.6b)
+      - standalone_smoke: GPU inference result (success/fail, latency, output, RSS)
+      - speculative_smoke: Qwen3-14B + pruned draft result (success/fail, API pattern used, latency, TPS, output, RSS)
+      - comparison_vs_06b: file size comparison, layer count comparison (22 vs 28)
+      - disposition: one of:
+        - READY_FOR_BENCHMARK — both smoke tests passed, model is fully prepared
+        - STANDALONE_ONLY — standalone works but speculative decoding with 14B failed (record why)
+        - ACQUISITION_FAILED — download failed
+        - INCOMPATIBLE — architecture/vocab mismatch
+    </action>
+    <action>Git add and commit with message:
+      P5-005c: Acquire Qwen3-pruned-6L-from-0.6B-int8-ov draft model (v2)
+
+      Milestone: P5-005c-ACQUIRE v2 (direct OpenVINO IR download)
+      Source: OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov (INT8_ASYM, 22 layers)
+      Disposition: {DISPOSITION}
+      Evidence: phase2_gates/evidence/p5_005c_pruned_draft_acquisition.json
+
+      v1 failed due to incorrect assumption that INT4 was required and that
+      conversion from source weights was possible. v2 downloads the pre-built
+      OpenVINO IR directly.
+    </action>
+  </step>
+
+</execution_plan>
+
+<error_handling>
+  <known_issue name="v1_rejection_cause">
+    The v1 script rejected OpenVINO/Qwen3-pruned-6L-from-0.6B-int8-ov because it was INT8 not INT4.
+    CORRECTION: INT8 is the ONLY available quantization and is perfectly valid for a draft model.
+    Do NOT filter or reject based on quantization format in v2.
+  </known_issue>
+  <known_issue name="no_pytorch_weights">
+    This model repo contains ONLY OpenVINO IR files (openvino_model.xml, openvino_model.bin) and config/tokenizer files.
+    There are NO PyTorch weights (no pytorch_model.bin, no model.safetensors).
+    Do NOT attempt any export or conversion — the model is already ready.
+  </known_issue>
+  <known_issue name="int8_draft_with_int4_target">
+    The target model (Qwen3-14B) is INT4 while the draft model is INT8. This is architecturally fine —
+    speculative decoding only requires matching vocab_size for the logit comparison. The internal
+    quantization of each model is independent. If OpenVINO GenAI raises an error about mixed
+    quantization, record the exact error message — this would be a runtime limitation, not an
+    architectural incompatibility.
+  </known_issue>
+  <known_issue name="tokenizer_may_be_missing">
+    The OpenVINO-published repo may not include openvino_tokenizer.xml/bin and openvino_detokenizer.xml/bin.
+    It should include tokenizer.json and/or tokenizer.model. If the OpenVINO tokenizer assets are missing,
+    either generate them with openvino_tokenizers.convert_tokenizer OR copy them from the existing
+    models/qwen3-0.6b/openvino-int4-gpu/ directory (identical tokenizer, same vocab_size=151936).
+  </known_issue>
+  <known_issue name="speculative_api_variant">
+    Two API patterns exist for speculative decoding in OpenVINO GenAI:
+    1. Dict-config pattern (used in P5-005b): config={"draft_model": ov_genai.draft_model(...)}
+    2. SchedulerConfig pattern (shown in model card): scheduler_config=..., draft_model=...
+    Try pattern 1 first. If it fails, try pattern 2. Record which worked.
+  </known_issue>
+  <general_principle>
+    This is a SIMPLE DOWNLOAD + VALIDATE task. Do not over-engineer it. The model is already in the
+    correct format. Download it, check files, run two smoke tests, record evidence, commit.
+  </general_principle>
+</error_handling>
+
+<constraints>
+  <constraint>Do NOT modify any existing model directories (qwen3-14b, qwen3-0.6b, etc.).</constraint>
+  <constraint>Do NOT modify any production code in services/, shared/, or launcher/.</constraint>
+  <constraint>Do NOT run any benchmark — this milestone is acquisition and validation only.</constraint>
+  <constraint>Do NOT modify docs/POST_OPERATIONAL_MATURATION_LEDGER.md — the SDO will update it after review.</constraint>
+  <constraint>Do NOT attempt model conversion, quantization, or export — the model is already in OpenVINO IR format.</constraint>
+  <constraint>Do NOT reject the model for being INT8 instead of INT4.</constraint>
+  <constraint>AC power MUST be connected before starting.</constraint>
+</constraints>
+
+<required_attachments>
+  <attachment>c:\Users\mrbla\BlarAI\.github\copilot-instructions.md</attachment>
+  <attachment>c:\Users\mrbla\BlarAI\phase2_gates\scripts\acquire_p5_005a_models.py</attachment>
+  <attachment>c:\Users\mrbla\BlarAI\phase2_gates\scripts\run_p5_feasibility_005b.py</attachment>
+  <attachment>c:\Users\mrbla\BlarAI\models\qwen3-0.6b\openvino-int4-gpu\config.json</attachment>
+  <attachment>c:\Users\mrbla\BlarAI\models\qwen3-14b\openvino-int4-gpu\config.json</attachment>
+</required_attachments>
+
+<initialization_instruction>
+  When starting the Execution Agent session:
+  1. Attach the 5 files listed in required_attachments.
+  2. Paste this entire XML prompt as the first message.
+  3. The agent should begin with Step 1 (branch switch and environment verification).
+  4. This is a v2 retry — the branch already exists. Do not create a new branch.
+</initialization_instruction>
+
+</execution_prompt>

@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="midstage_completion_review_with_required_corrections">
+  <verdict>APPROVED_WITH_ADJUSTMENTS</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <work_item>2.4 closure (f1 fix) + 2.5 (canonical 7 PS1 + critical_notify inspection)</work_item>
+  <reviewed_at_utc>2026-04-25T20:45:00Z</reviewed_at_utc>
+  <guide_instance>5</guide_instance>
+  <reviewing>
+    <ea_instance>4</ea_instance>
+    <ea_work>f1 chokepoint fix + Item 2.5 PS1 + critical_notify.ps1 inspection</ea_work>
+  </reviewing>
+
+  <summary>
+    Independent disk verification of EA-4's f1 + Item 2.5 work product. Invariants HOLD: HEAD
+    still 9d17e7f (zero new commits — single-commit discipline intact); stash@{0} byte-identical
+    timestamp 20260424_013002; state.json fleet_paused=true with original reason and
+    last_updated_by/utc; pytest tools/ confirms 282 passed (matches EA-4 claim and the f1 +2
+    NET-ADD expectation). All 6 expected M PS1 entries appear in git status; critical_notify.ps1
+    + escalation_notify.ps1 correctly NOT in git status (Appendix A.1 SKIP).
+
+    f1 chokepoint fix on tools/_vikunja_client.py is CORRECTLY APPLIED on the helper itself:
+    rejection condition now includes `or project_id <= 0` (line 37); docstring updated with
+    Stage 2.4.v2 finding f1 reference (lines 28-31); error message updated to "explicit positive
+    int [...] not <= 0" (lines 40-42). Helper-level enforcement is sound.
+
+    HOWEVER, three substantive issues require correction before Item 2.5.v2 / Stage 2.9 commit:
+
+    (1) DEFECT — duplicate test definitions in tools/tests/test_vikunja_client_scope.py:
+    test_require_project_id_rejects_zero is defined at BOTH lines 57-63 AND lines 77-83;
+    test_require_project_id_rejects_negative is defined at BOTH lines 66-74 AND lines 86-94.
+    Python's late-binding semantics silently override the first definition with the second, so
+    pytest still reports 282 passed (the duplicate functions collapse to one runnable test
+    each). But the file contains 4 function definitions where 2 are intended -- an authoring
+    artifact (likely from an Edit/append operation that ran twice). MUST clean up before 2.9
+    commit.
+
+    (2) FUNCTIONAL DEFECT — env-fallback default OMITTED from all 6 PS1 scripts. Per Stage 2
+    XML 2.5.v2 signature:
+      `[string]$BlarAIRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })`
+    and per iteration-2 g4-2 binding ack canonical signature_pattern_ps1 (the same env-fallback
+    expression). EA-4 implementation: hardcoded `'C:\Users\mrbla\BlarAI'` default with NO
+    env-fallback. This breaks the v2 INFRA_DELTA design intent (devplatform users with
+    `$env:BLARAI_ROOT` set expect ad-hoc invocations to honor it; with EA-4's hardcoded default,
+    they don't). Stage 4.7 task XML rewrites pass `-BlarAIRoot` explicitly so the scheduled
+    firing path is unaffected, but ad-hoc invocations (especially la_merge_approve.ps1 by
+    Co-Lead per DEC-14.5) lose the env-override capability. Probable provenance: v3 handoff
+    item 2.5 prescription simplified the canonical signature (showed only hardcoded default,
+    no env-fallback); EA-4 followed v3 handoff verbatim and missed the g4-2 binding ack +
+    Stage 2 XML 2.5.v2 mandate. Per i1-2 dedup rule, g4-2 is the binding source; v3 handoff
+    drift from g4-2 is a chain-of-custody defect that EA-4 inherited. MUST FIX in all 6 PS1
+    scripts.
+
+    (3) FUNCTIONAL DEFECT — $McpConfigPath separately hardcoded in agents-cadence-monitor.ps1
+    (line 19) and la_merge_approve.ps1 (line 40). Per WORKFLOW_INTEGRITY_REVIEW.md G-1 fix #1
+    explicit instruction:
+      "Same for `$McpConfigPath` — pull from `Join-Path $BlarAIRoot '.mcp.json'`."
+    EA-4 left both as separate hardcoded BlarAI paths (`'C:\Users\mrbla\BlarAI\.mcp.json'`),
+    so even if a caller passes `-BlarAIRoot 'C:\Users\mrbla\devplatform'`, the script reads
+    BlarAI's .mcp.json — a cross-project mismatch. MUST FIX to derive $McpConfigPath from
+    $RepoRoot (or $BlarAIRoot if rename done) at function-entry, not at param default.
+
+    DOCUMENTABLE DEVIATION (acceptable engineering trade-off, not a required correction):
+    Alias-vs-rename approach for primary param name. EA-4 chose `[Alias('BlarAIRoot')]
+    [string]$RepoRoot` for 5 of 6 scripts (primary remains $RepoRoot, -BlarAIRoot as alias)
+    while test_async_post_gate.ps1 uses `[Alias('RepoRoot')] [string]$BlarAIRoot` + shim
+    (canonical primary $BlarAIRoot). Stage 2 XML 2.4.v2 + iteration-2 g4-2 + WORKFLOW_INTEGRITY
+    G-1 fix #1 prescribed RENAME (canonical primary $BlarAIRoot for all). EA-4's alias approach
+    achieves external `-BlarAIRoot` contract (which is what scheduled task XMLs and Co-Lead
+    invocations need) but leaves internal canonical naming non-uniform across the canonical 7.
+    Acceptable to keep as-is for Stage 2 closure with a documented deviation entry in 2.10
+    STATUS.md (as anomaly A11+) and a Stage 6 hardening follow-up ticket. The 3 required
+    corrections above (duplicate tests, env-fallback, McpConfigPath) MUST close before Stage
+    2.9 commit; the alias-vs-rename deviation can defer to Stage 6.
+
+    critical_notify.ps1 + escalation_notify.ps1 inspection per Appendix A.1: SKIP correctly
+    applied. Both files unmodified in git status. Disk verification confirms critical_notify.ps1
+    line 11 is comment-example as Appendix A.1 stated; escalation_notify.ps1 is sibling pattern
+    (also comment-example). Inspection rule from g4-1 / g4-2 honored.
+
+    After the 3 required corrections land + pytest re-confirms 282 passed (or higher if
+    additional env-fallback tests are added), EA-4 may proceed to Item 2.5.v2 verification.
+    The 2.5.v2 verification MUST functionally test the env-fallback (e.g., set $env:BLARAI_ROOT,
+    invoke without -BlarAIRoot, verify default takes the env value) -- not just the alias
+    binding.
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="invariants_preserved" verdict="PASS">
+      git log --oneline -1: 9d17e7f -- ZERO new commits since prior Guide-#5 review.
+      git status: 30 entries (15+1 LA-side housekeeping; +6 PS1 mods; 2 D + 7 ?? unchanged).
+      git stash list: stash@{0} timestamp 20260424_013002 byte-identical.
+      state.json: fleet_paused=true, original reason + last_updated_by/utc preserved.
+      pytest tools/: 282 passed in 2.34s (matches EA-4 claim; +2 NET-ADD vs prior 280).
+    </check>
+
+    <check id="f1_helper_correctly_strengthened" verdict="PASS">
+      Read tools/_vikunja_client.py lines 20-44:
+        - Line 21: docstring updated to "explicit positive int (not bool, not <= 0)"
+        - Lines 28-31: f1 reference paragraph added explaining the &lt;=0 leak
+        - Line 37: rejection condition includes `or project_id <= 0` (the fix)
+        - Lines 40-42: error message updated to "explicit positive int [...] not <= 0"
+      Verbatim match to my Guide-#5 disposition suggested fix. ✓
+    </check>
+
+    <check id="f1_test_file_has_DUPLICATE_definitions" verdict="DEFECT_REQUIRES_CLEANUP">
+      Read tools/tests/test_vikunja_client_scope.py end-to-end:
+        - Lines 57-63: def test_require_project_id_rejects_zero (FIRST definition)
+        - Lines 66-74: def test_require_project_id_rejects_negative (FIRST definition)
+        - Lines 77-83: def test_require_project_id_rejects_zero (SECOND identical definition)
+        - Lines 86-94: def test_require_project_id_rejects_negative (SECOND identical definition)
+      Python late-binding silently overrides the first def with the second; pytest sees
+      "test_require_project_id_rejects_zero" once at the second line range and
+      "test_require_project_id_rejects_negative" once at the second line range. Total runnable
+      tests = 282 (correct count). But the file has 4 function definitions where 2 are intended
+      -- a clear authoring artifact (likely an Edit/append operation that ran twice).
+
+      MUST FIX: delete lines 76 through 94 (the second copy block, which is verbatim duplicate
+      of lines 57-74). Keep only the first copy. Re-run pytest -- expect 282 still passed
+      (no count change since duplicates were collapsing to one runnable test each).
+    </check>
+
+    <check id="ps1_env_fallback_OMITTED_in_all_6_scripts" verdict="FUNCTIONAL_DEFECT">
+      Read all 6 modified PS1 scripts -- env-fallback default missing from every one:
+
+        wake_launcher.ps1 line 30-31:
+          [Alias('BlarAIRoot')]
+          [string]$RepoRoot = 'C:\Users\mrbla\BlarAI'
+        Expected per Stage 2 XML 2.5.v2 + iteration-2 g4-2 binding ack:
+          [string]$BlarAIRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })
+
+        agents-cadence-monitor.ps1 line 17-18: same pattern, no env-fallback
+        escalation_watchdog.ps1 line 32-33: same pattern, no env-fallback
+        toast_watchdog.ps1 line 14-15: same pattern, no env-fallback
+        la_merge_approve.ps1 line 38-39: same pattern, no env-fallback
+        test_async_post_gate.ps1 line 25-26 (alias INVERTED -- $BlarAIRoot primary,
+                                              -RepoRoot alias):
+          [Alias('RepoRoot')]
+          [string]$BlarAIRoot = 'C:\Users\mrbla\BlarAI'
+          (still missing env-fallback)
+
+      Functional impact: scripts ignore $env:BLARAI_ROOT. devplatform users (post-Stage-4 cutover)
+      who set $env:BLARAI_ROOT=C:\Users\mrbla\<other_project> expect ad-hoc invocations to honor
+      the env value; with EA-4's hardcoded default, they don't. Stage 4.7 task XML rewrites pass
+      -BlarAIRoot explicitly so the scheduled firing path is unaffected, but ad-hoc invocations
+      (especially la_merge_approve.ps1 by Co-Lead per DEC-14.5 / G-4) silently target BlarAI.
+
+      Provenance: v3 handoff item 2.5 prescription drifted from canonical signature (showed
+      simplified hardcoded default, omitted env-fallback). EA-4 followed v3 handoff and missed
+      the iteration-2 g4-2 binding + Stage 2 XML 2.5.v2 mandate. Per i1-2 dedup rule, g4-2 is
+      the binding source.
+
+      MUST FIX in all 6 PS1 scripts: replace hardcoded `'C:\Users\mrbla\BlarAI'` default with
+      `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })`.
+    </check>
+
+    <check id="mcpConfigPath_separately_hardcoded" verdict="FUNCTIONAL_DEFECT">
+      Read agents-cadence-monitor.ps1 line 19:
+        [string]$McpConfigPath  = 'C:\Users\mrbla\BlarAI\.mcp.json'
+      Read la_merge_approve.ps1 line 40:
+        [string]$McpConfigPath = 'C:\Users\mrbla\BlarAI\.mcp.json'
+
+      Per WORKFLOW_INTEGRITY_REVIEW.md G-1 fix #1 explicit instruction (in §3 G-1 fix list):
+        "Same for `$McpConfigPath` — pull from `Join-Path $BlarAIRoot '.mcp.json'`."
+
+      EA-4 left both as separate hardcoded BlarAI paths. Even if a caller passes
+      `-BlarAIRoot 'C:\Users\mrbla\devplatform'`, the script reads BlarAI's .mcp.json — a
+      cross-project mismatch that breaks the multi-project seam for these two scripts.
+
+      MUST FIX in agents-cadence-monitor.ps1 and la_merge_approve.ps1: derive $McpConfigPath
+      from $RepoRoot (or $BlarAIRoot if rename done). Two acceptable implementations:
+        (a) Move out of param block; compute at script body entry:
+              $McpConfigPath = Join-Path $RepoRoot '.mcp.json'
+        (b) Keep in param block but use late-binding default:
+              [string]$McpConfigPath = (Join-Path $RepoRoot '.mcp.json')
+            (NOTE: PowerShell param defaults can reference earlier-bound params in the same
+            param() block; verify this works as expected before committing.)
+    </check>
+
+    <check id="alias_vs_rename_internal_inconsistency" verdict="DOCUMENTABLE_DEVIATION">
+      Cross-script comparison reveals INTERNAL INCONSISTENCY:
+        - 5 scripts (wake_launcher, agents-cadence-monitor, escalation_watchdog, toast_watchdog,
+          la_merge_approve): `[Alias('BlarAIRoot')] [string]$RepoRoot = ...`
+          PRIMARY param: $RepoRoot (OLD name); ALIAS: -BlarAIRoot
+        - 1 script (test_async_post_gate): `[Alias('RepoRoot')] [string]$BlarAIRoot = ...`
+          + shim line `$RepoRoot = $BlarAIRoot`
+          PRIMARY param: $BlarAIRoot (CANONICAL); ALIAS: -RepoRoot
+
+      Stage 2 XML 2.4.v2 + iteration-2 g4-2 ack + WORKFLOW_INTEGRITY G-1 fix #1 prescribed
+      RENAME for all 7 (canonical primary $BlarAIRoot). EA-4 chose alias for 5 of 6 scripts
+      to avoid internal-reference churn (defensible engineering trade-off).
+
+      Disposition: ACCEPTABLE as-is for Stage 2 closure with a documented deviation entry in
+      eventual 2.10 STATUS.md (as anomaly A11+). Stage 6 hardening can convert aliases to
+      canonical renames as follow-up. The 3 required corrections above (duplicate tests,
+      env-fallback, McpConfigPath) take precedence -- correct those first, document the
+      alias-vs-rename deviation alongside.
+
+      Why acceptable: The external `-BlarAIRoot` contract IS satisfied (Get-Command shows
+      BlarAIRoot as a valid param name on all 6 scripts). Stage 4.7 task XML rewrite will
+      pass `-BlarAIRoot` (alias works). Co-Lead DEC-14.5 invocation with `-BlarAIRoot` works.
+      The deviation is procedural (canonical naming hygiene), not functional.
+    </check>
+
+    <check id="critical_notify_and_escalation_notify_correctly_skipped" verdict="PASS">
+      git status does NOT show critical_notify.ps1 or escalation_notify.ps1 as modified.
+      Disk read confirms critical_notify.ps1 line 11 is a comment-example invocation pattern
+      (`#   powershell.exe -NoProfile -File C:\Users\mrbla\BlarAI\tools\fleet_observability\critical_notify.ps1`),
+      not a runtime path resolution. Same pattern in escalation_notify.ps1. Both correctly
+      classified as no-action SKIP per WORKFLOW_INTEGRITY_REVIEW.md Appendix A.1. Honors
+      g4-1 inspection rule.
+    </check>
+
+    <check id="acks_g5_5_g5_6_emitted_per_compliance" verdict="PASS_PER_REPORT">
+      EA-4 reported emitting g5-5 (f1 disposition Option (a) compliance) and g5-6 (path-confusion
+      correction g5-4 ≠ f1) in the chat-side report. Substantive content of both acks matches
+      Guide-#5 prior disposition direction. Acks accepted.
+    </check>
+
+  </independent_disk_verification>
+
+  <required_corrections>
+
+    <correction id="1" severity="MED">
+      <issue>tools/tests/test_vikunja_client_scope.py contains DUPLICATE function definitions:
+        test_require_project_id_rejects_zero defined at lines 57-63 AND lines 77-83 (verbatim
+        duplicate); test_require_project_id_rejects_negative defined at lines 66-74 AND lines
+        86-94 (verbatim duplicate). Python late-binding silently overrides; pytest passes
+        because the duplicates collapse to one runnable test each. Authoring artifact.</issue>
+      <source_citation>tools/tests/test_vikunja_client_scope.py lines 57-94 (read by Guide-#5).</source_citation>
+      <required_action>Delete lines 76-94 (the second copy block). Keep only lines 56-74 (the
+        first copy with the new tests). Re-run pytest tools/ -- expect 282 passed (no count
+        change since duplicates were collapsing to one runnable test each).</required_action>
+    </correction>
+
+    <correction id="2" severity="HIGH">
+      <issue>All 6 modified PS1 scripts OMIT the env-fallback default per the iteration-2 g4-2
+        binding ack canonical signature_pattern_ps1 and the Stage 2 XML 2.5.v2 explicit
+        signature. EA-4 used hardcoded `'C:\Users\mrbla\BlarAI'` default; spec mandates
+        `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })`.
+        Functional impact: ad-hoc invocations from devplatform cwd with $env:BLARAI_ROOT set
+        do NOT honor the env-override; scripts silently target the hardcoded BlarAI path.
+        Probable provenance: v3 handoff item 2.5 prescription simplified the canonical signature
+        (showed only hardcoded default); EA-4 followed v3 handoff and missed the binding g4-2
+        ack. Per i1-2 dedup, g4-2 is the binding source.</issue>
+      <source_citation>03_STAGE2_REFACTOR_MULTIPROJECT.xml &lt;v2_updates&gt; &lt;item id="2.5.v2"&gt;
+        &lt;signature&gt; line; iteration-2 EA-3 gate part_b item 2.5 signature_pattern_ps1 block;
+        WORKFLOW_INTEGRITY_REVIEW.md §3 G-1 fix #1 ("rename `$RepoRoot` parameter ... mirroring
+        wake_launcher.ps1 §2.5.v2 signature"); INFRA_DELTA_v2.md §1.1 "Default to env BLARAI_ROOT,
+        then C:\Users\mrbla\BlarAI."</source_citation>
+      <required_action>In each of wake_launcher.ps1, agents-cadence-monitor.ps1,
+        escalation_watchdog.ps1, toast_watchdog.ps1, la_merge_approve.ps1, and test_async_post_gate.ps1:
+        replace the hardcoded `'C:\Users\mrbla\BlarAI'` default with
+        `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })`.
+        Keep the alias direction unchanged (alias-vs-rename is a separate documented deviation).
+        Optionally add a 2.7.v2 V matrix V5 test asserting that env-fallback is honored when
+        $env:BLARAI_ROOT is set and -BlarAIRoot is omitted.</required_action>
+    </correction>
+
+    <correction id="3" severity="HIGH">
+      <issue>$McpConfigPath separately hardcoded in agents-cadence-monitor.ps1 line 19 and
+        la_merge_approve.ps1 line 40. Even if a caller passes
+        `-BlarAIRoot 'C:\Users\mrbla\devplatform'`, the script reads BlarAI's .mcp.json. The
+        WORKFLOW_INTEGRITY_REVIEW G-1 fix #1 explicit instruction was to derive $McpConfigPath
+        from $RepoRoot/$BlarAIRoot via `Join-Path`.</issue>
+      <source_citation>WORKFLOW_INTEGRITY_REVIEW.md §3 G-1 fix #1: "Same for `$McpConfigPath` —
+        pull from `Join-Path $BlarAIRoot '.mcp.json'`."</source_citation>
+      <required_action>In agents-cadence-monitor.ps1 (line 19) and la_merge_approve.ps1
+        (line 40): derive $McpConfigPath from $RepoRoot at function-entry, not as a separate
+        hardcoded param default. Recommended pattern (move out of param block):
+          # In param block: REMOVE the [string]$McpConfigPath = '...' line entirely
+          # In script body, after param block:
+            $McpConfigPath = Join-Path $RepoRoot '.mcp.json'
+        Alternative if you want to keep the override capability:
+          # In param block:
+            [string]$McpConfigPath = ''
+          # In script body, after param block:
+            if (-not $McpConfigPath) { $McpConfigPath = Join-Path $RepoRoot '.mcp.json' }
+        Either pattern keeps $McpConfigPath consistent with $RepoRoot/$BlarAIRoot.</required_action>
+    </correction>
+
+  </required_corrections>
+
+  <documented_deviations_acceptable_for_stage_2_closure>
+
+    <deviation id="d1" severity="LOW" topic="alias-vs-rename for primary PS1 param name">
+      <issue>5 of 6 PS1 scripts use `[Alias('BlarAIRoot')] [string]$RepoRoot` (primary $RepoRoot,
+        alias -BlarAIRoot); 1 script (test_async_post_gate) uses `[Alias('RepoRoot')]
+        [string]$BlarAIRoot` (canonical primary $BlarAIRoot, alias -RepoRoot). Stage 2 XML +
+        iteration-2 g4-2 + WORKFLOW_INTEGRITY G-1 prescribed RENAME (canonical primary
+        $BlarAIRoot for all). EA-4 chose alias for 5 to avoid internal-reference churn.</issue>
+      <disposition>ACCEPTABLE for Stage 2 closure. Document as anomaly A11+ in 2.10 STATUS.md
+        with rationale: "EA-4 chose alias on existing $RepoRoot param for 5 of 6 scripts to
+        minimize internal-reference churn risk; external -BlarAIRoot contract satisfied;
+        canonical internal naming deferred to Stage 6 hardening." The external contract works
+        for both Stage 4.7 task XML rewrites (pass -BlarAIRoot) and Co-Lead DEC-14.5 ad-hoc
+        invocations (pass -BlarAIRoot). Stage 6 hardening ticket should standardize to canonical
+        rename pattern (test_async_post_gate already shows the correct shape: $BlarAIRoot
+        primary + RepoRoot alias + shim line for backward compat).</disposition>
+    </deviation>
+
+  </documented_deviations_acceptable_for_stage_2_closure>
+
+  <required_acknowledgments_for_ea_4_to_emit>
+
+    <ack id="g5-7" severity="MED" topic="duplicate test cleanup">
+      I will delete lines 76-94 of tools/tests/test_vikunja_client_scope.py (the verbatim
+      duplicate copy of test_require_project_id_rejects_zero + rejects_negative). Re-run pytest
+      tools/ and confirm 282 passed (no count change). The cleanup is purely artifact removal.
+    </ack>
+
+    <ack id="g5-8" severity="HIGH" topic="env-fallback default in 6 PS1 scripts">
+      I will replace the hardcoded `'C:\Users\mrbla\BlarAI'` default in wake_launcher.ps1,
+      agents-cadence-monitor.ps1, escalation_watchdog.ps1, toast_watchdog.ps1,
+      la_merge_approve.ps1, and test_async_post_gate.ps1 with the canonical env-fallback
+      expression `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })`
+      per Stage 2 XML 2.5.v2 + iteration-2 g4-2 binding. Alias direction unchanged. After
+      fixing, Item 2.5.v2 verification will functionally test env-fallback (set
+      $env:BLARAI_ROOT=&lt;test-path&gt;, invoke without -BlarAIRoot, verify default honors env).
+    </ack>
+
+    <ack id="g5-9" severity="HIGH" topic="$McpConfigPath derivation from $RepoRoot/$BlarAIRoot">
+      I will refactor $McpConfigPath in agents-cadence-monitor.ps1 (line 19) and
+      la_merge_approve.ps1 (line 40) to derive from $RepoRoot at function-entry rather than
+      as a separately-hardcoded param default. The script body computation will be
+      `$McpConfigPath = Join-Path $RepoRoot '.mcp.json'` (or the override-preserving variant
+      per correction-3 if I want to keep the explicit -McpConfigPath flag). This honors
+      WORKFLOW_INTEGRITY_REVIEW G-1 fix #1 explicit instruction.
+    </ack>
+
+    <ack id="g5-10" severity="LOW" topic="alias-vs-rename deviation documented as anomaly A11">
+      I will document the PS1 alias-vs-rename internal inconsistency (5 scripts with primary
+      $RepoRoot + alias -BlarAIRoot; 1 script with canonical primary $BlarAIRoot + alias
+      -RepoRoot + shim) as anomaly A11 (or next available number) in the eventual Stage 2.10
+      STATUS.md append-only entry. Rationale: backward compatibility preference; external
+      -BlarAIRoot contract satisfied; canonical internal naming deferred to Stage 6 hardening.
+      Stage 6 should standardize all to the test_async_post_gate pattern.
+    </ack>
+
+  </required_acknowledgments_for_ea_4_to_emit>
+
+  <continue_recommendation_after_corrections>
+    After the 3 required corrections land + pytest re-confirms 282 passed (or higher with new
+    env-fallback test) + acks g5-7/g5-8/g5-9/g5-10 emitted, proceed to Item 2.5.v2 verification.
+    The 2.5.v2 verification scope should now include:
+      - Per-PS1: dot-source or invoke with no -BlarAIRoot/-RepoRoot, confirm hardcoded default
+        applies (still BlarAI path)
+      - Per-PS1 env-fallback: with $env:BLARAI_ROOT set, invoke with no -BlarAIRoot, confirm
+        env value takes precedence over hardcoded default
+      - Per-PS1 alias binding: invoke with -BlarAIRoot 'X', confirm primary param ($RepoRoot
+        or $BlarAIRoot) receives 'X'
+      - For agents-cadence-monitor + la_merge_approve: invoke with -BlarAIRoot 'C:\test',
+        confirm $McpConfigPath resolves to 'C:\test\.mcp.json'
+    After 2.5.v2 closes, RE-EVALUATE budget at the 2.5.v2 → 2.6 boundary per the unchanged
+    continue-or-handoff criteria from prior Guide-#5 disposition.
+  </continue_recommendation_after_corrections>
+
+  <proceed_authorization>
+    APPROVED_WITH_ADJUSTMENTS — apply the 3 required corrections (g5-7, g5-8, g5-9) +
+    document deviation per g5-10. f1 chokepoint fix on the helper itself is RATIFIED. PS1
+    work is functionally adequate for the external `-BlarAIRoot` contract but has the env-
+    fallback omission and McpConfigPath separate-hardcoding defects that must close before
+    the Stage 2.9 commit. After corrections + acks, EA-4 may proceed directly to Item 2.5.v2
+    verification with the expanded env-fallback test scope above. No separate Guide re-review
+    required for the 4 g5-N acks; they are for audit-trail purposes. Standing reminders
+    unchanged: single Stage-2 commit at 2.9 (now containing f1 fix + corrected PS1 work);
+    fleet stays paused (NEVER state.resume_fleet); no merge to main; stash@{0} untouched;
+    append-only STATUS at 2.10 (now including A11 alias-vs-rename anomaly entry); g5-4 legacy
+    file disposition pending at 2.6; D3 dashboard_maintainer closure at 2.6; observation o1
+    handler-guards-vs-VikunjaClient-routing decision at 2.6. If the corrections surface
+    unexpected breakage (they should not per my disk verification), STOP and report.
+  </proceed_authorization>
+
+</guide_review_response>

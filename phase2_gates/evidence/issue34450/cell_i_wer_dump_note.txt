@@ -1,0 +1,35 @@
+# WER LocalDumps attempt — outcome record
+# Run date: 2026-05-01
+
+## What was attempted
+
+Enabled WER (Windows Error Reporting) LocalDumps for python.exe via registry:
+  Key:        HKCU\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\python.exe
+  DumpFolder: %LOCALAPPDATA%\CrashDumps
+  DumpType:   1 (mini dump)
+  DumpCount:  5
+
+Note: HKLM path (the standard WER LocalDumps path) requires admin elevation and was
+denied. HKCU is a supported alternative but appears to not intercept native crashes
+that bypass the Windows SEH (Structured Exception Handling) chain.
+
+## Outcome
+
+No dump produced. %LOCALAPPDATA%\CrashDumps\ did not exist after the NPU crash run.
+
+The STATUS_ACCESS_VIOLATION (0xC0000005) in openvino.dll at offset 0x77d86 terminates
+the python.exe process before WER's user-mode fault handler can capture a minidump.
+This is consistent with the crash bypassing Python's exception machinery entirely —
+the same mechanism that makes the crash uncatchable from Python also makes it
+uncapturable by user-mode WER hooks.
+
+The two Event Viewer Application Error entries (EventRecordID 105994 and 105971)
+confirm the crash is recorded by the kernel-mode fault path (see cell_i_event_viewer.txt),
+but no .dmp artifact was produced.
+
+## Conclusion
+
+A kernel-mode dump (requires admin + WER configured at HKLM, or a kernel debugger)
+would be needed to capture a crash dump for this failure mode. We have the faulting
+module (openvino.dll), version (2026.0.0.20965), and offset (0x0000000000077d86)
+from the Event Viewer record, which is sufficient for Intel to locate the crash site.

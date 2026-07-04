@@ -1,0 +1,784 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<comprehension_gate
+  ea_instance="9"
+  ea_global_number="9"
+  stage="5"
+  iteration="1"
+  emitted_at_utc="2026-04-30T04:30:00Z"
+  emitted_by="EA-9 (Stage 5 Executor Agent, instance 9; locally first EA of Stage 5 chain)"
+  source_init_pointer="docs/platform_separation/temp_for_responses/5.0-EA_INITIALIZATION_INSTANCE_9_STAGE5_CLEANUP.xml"
+  source_audit_verdict="docs/platform_separation/temp_for_responses/5.0.v2-GUIDE_RESPONSE_INSTANCE_9_STAGE5_PREFLIGHT_AUDIT_CHECKPOINT.xml (commit 176922c)"
+  source_rollback_dispatch="docs/platform_separation/temp_for_responses/5.0-GUIDE_RESPONSE_INSTANCE_8_ROLLBACK_READINESS_PREFLIGHT_FOR_EA_9.xml (commit 9e92b26)"
+  cumulative_ack_atoms="130 (116 inherited + 14 new under g9-ea9_n1)"
+  awaiting="Guide-#9 PROCEED authorization">
+
+  <preamble>
+    Iter-1 comprehension gate response per init pointer §required_first_actions Step 3 + §comprehension_gate_template. Pre-Flight Step 0 (rollback-readiness verification per n1(n)) and Step 1 (state.pause_fleet on devplatform per fleet-pause SOP) and Step 2 (V0 pickup verification) all executed; outputs captured in §B below. After this gate, EA-9 STOPS and awaits Guide-#9 PROCEED. No execution beyond Pre-Flight Steps 0-2 until PROCEED.
+  </preamble>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION A — Stage 5 Objective Restatement (own words) -->
+  <!-- ==================================================================== -->
+  <section_a name="Stage 5 Objective Restatement" required="MANDATORY">
+
+    <bullet>**Stage 5 (Cleanup, MEDIUM risk, single-session continuous-block) finalizes BlarAI's reduction to its product-only surface.** Stages 1-4 stood up devplatform and operationally cut over the platform fleet; Stage 5 now removes BlarAI's redundant platform machinery so devplatform is the sole authoritative platform layer. End-state: BlarAI keeps only product code (USE-CASE-001 + USE-CASE-004 + openvino_contrib_agent + BlarAI-internal docs/governance/) plus project-scoped coordination state under `BlarAI/.platform/`.</bullet>
+
+    <bullet>**Item 5.1: Delete 9 platform tool dirs/files from `BlarAI/tools/`** — `vikunja/`, `vikunja_mcp/`, `fleet_ops/`, `fleet_observability/`, `autonomy_budget/`, `gate_stale_cleaner/`, `scheduled-tasks/`, `_vikunja_client.py`, `_project_context.py`. PRESERVE `tools/openvino_contrib_agent/` (BlarAI-only) and `tools/tests/` (BlarAI-specific). Auto-resolves `BlarAI/tools/autonomy_budget/state.json` dead artifact per w21+dn31+Ticket KK.</bullet>
+
+    <bullet>**Item 5.0.5 (precondition for 5.1): Audit archive** — capture `*.log`, `*.jsonl`, `*.json.bak`, `state.json*`, `*.history` plus n1(a) extension (`lifts.json`, `escalation_seen.json`) from 6 about-to-be-deleted dirs into `BlarAI/.platform/audit_archive/pre_stage5_<stamp>.zip` BEFORE 5.1 deletion. Forensic preservation; never run 5.1 first (per dn32 + ack6).</bullet>
+
+    <bullet>**Item 5.3: Move 4 BlarAI coordination artifacts into `BlarAI/.platform/`** — `sprints/`, `scheduled/`, `docs/active_tasks.yaml`, `docs/sprints/` — wrapped in try/catch with `$applied` rollback list per n1(m) atomicity. Live devplatform fleet reads from `BlarAI/.platform/` post-cutover; the move preserves project state under a clean namespace.</bullet>
+
+    <bullet>**Items 5.5 + 5.5.v2: Selective doctrine deletion from BlarAI/docs/.** Delete the 7 wake_templates (6/6 fully migrated at Stage 3.2.v2) wholesale. Delete 31+3 platform-doctrine `.md`/`.xml`/`CLAUDE_*`/`CO_LEAD_*`/`DEC*`/`DOMAIN*`/`CONTINUATION_PROMPT` files per n1(d) extension (3 .md peers added: `DOMAIN8_CLARIFICATIONS_v1.md`, `DOMAIN9_KICKOFF_PROMPT.md`, `domain8_spike_findings.md` plus forward-compat `DEC*.md`). **CLASS A LOAD-BEARING per n1(e): SELECTIVELY delete only 4-of-17 governance docs (`STYLE.md`, `fleet-hygiene.md`, `merge-policy.md`, `parallel-sprints.md`); PRESERVE 13 BlarAI-internal architectural docs per A14 disposition** (`README.md`, `circuit-breaker.md`, `configuration-management.md`, `context-spotlighting.md`, `deployment-verification.md`, `error-recovery.md`, `gpu-runtime.md`, `ipc-protocol.md`, `observability.md`, `pgov-validation.md`, `rule-engine.md`, `session-state.md`, `streaming-output.md`). Wholesale `Remove-Item -Recurse -Force docs\governance` is NEVER allowed; would cause irreversible data loss.</bullet>
+
+    <bullet>**Item 5.4: Devplatform-side audit for stale `BlarAI/tools/` references** — n1(c) aug1 expanded scope (8 globs vs dispatch's 3): `fleet_ops/*.py`, `fleet_observability/*.py`, `autonomy_budget/*.py`, `scheduled-tasks/*.ps1`, `scheduled-tasks/*.xml`, `vikunja_mcp/**/*.py`, `gate_stale_cleaner/*.py`, `docs/scheduled/wake_templates/*.md`. Classify every live-code hit as preserve target-project / preserve historical / DRIFT-requiring-rewrite. Findings flow to Item 5.10 HALT-gate review matrix [1] per n1(k) aug2.</bullet>
+
+    <bullet>**Items 5.6 + 5.7 + 5.8.v2: BlarAI-side housekeeping** — `pyproject.toml` testpaths REMOVE 6 platform-tool entries + PRESERVE 9 BlarAI runtime entries per n1(g) explicit enumeration; `.gitignore` add `.claude/scheduled_tasks.lock` + `.platform/audit_archive/*.zip` + `.platform/audit_archive/pre_stage5_*/` per n1(h)+w20; `pytest shared/ services/ launcher/ --tb=short -q` baseline expected ~981 passed, 22 skipped per n1(i) supersede-by-5.8.v2.</bullet>
+
+    <bullet>**Item 5.9: F.2 30-min mini-soak** (REPLACES original `BlarAI_daily_digest` probe — DISABLED per Phase A + wrong-name format). Observe 8 ACTIVE tasks (Wake SDO/Co-Lead/EA Code, Sprint Auditor, Agents Cadence Monitor, Credentials Rotation Reminder, Escalation Watchdog, Gate Stale Cleaner) per their cadence over 30 min real-time post-Item-5.7 commit. ACCEPTANCE: all firing tasks LastTaskResult=0; non-firing tasks NOT failure (Credentials Rotation Reminder daily, Gate Stale Cleaner hourly may not fire in window). Wake-* WORK-GATE skip + NO-WORK-EXIT (NO claude.exe child processes per fleet-paused state).</bullet>
+
+    <bullet>**Items 5.10 + 5.11 + 5.12 + close unpause: Sealing Stage 5.** Item 5.10 commits on `chore/platform-extraction` (NEVER directly on main; per R10/w10/ack8) and HALTs with the 4-row pre-merge review matrix per n1(k) aug2: [1] 5.4 audit (8 globs PASS/FAIL), [2] 5.8.v2 baseline (~981/22), [3] 5.9 mini-soak (firing-task LastTaskResult=0; non-firing NOT failure), [4] DIFF SUMMARY. LA explicitly approves before merge. Item 5.11 tags both repos (`post-platform-extract` BlarAI, `platform-extracted` devplatform) with n1(l) precondition guard (warn if BlarAI not on `main` post-merge). Item 5.12 STATUS append per Stage 3/4 closure pattern, hash-verified pre-vs-post per d9/A17/EX-4. Stage 5 close LAST action: `state.resume_fleet` on devplatform + `chore(ops): unpause fleet -- Stage 5 cleanup done` commit (per fleet-pause SOP §3 last-action discipline).</bullet>
+
+    <bullet>**Defensive posture throughout**: fleet stays paused for the duration of Stage 5; rollback escape route is Level-2 (`git reset --hard pre-platform-extract`) per RECOVERY.md — Pre-Flight Step 0 verified the parachute is intact (5/5 PASS). EA-9 does NOT touch BlarAI's state.json directly (dead artifact; auto-resolved at 5.1); does NOT pop or apply any wake_launcher auto-stash (per dn10/w8/A20); does NOT edit BlarAI's CLAUDE.md / .github/copilot-instructions.md / AGENTS.md (per dn3); does NOT autonomously execute Step-0 recovery on failure (LA decisions per ack13/n1(n)). Triple-subagent verification (S1/S2/S3) at Stage 5 close per d6/w14/ack11 with Guide-#9 cross-verifying subagent claims on disk per dn14/dn20/dn24/A18.</bullet>
+
+  </section_a>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION B — Pre-Flight Step 0 + Step 1 + V0 Pickup Outputs -->
+  <!-- ==================================================================== -->
+  <section_b name="Pre-Flight Step 0 + Step 1 + V0 Pickup Outputs" required="MANDATORY">
+
+    <pre_flight_step_0_output runtime="~30s" verdict="PASS_5_OF_5">
+      <verbatim_powershell_output><![CDATA[
+=== Stage 5 Rollback Readiness Pre-Flight ===
+
+[1] PASS: BlarAI tag 'pre-platform-extract' exists
+[2] PASS: Bundle exists at C:\Users\mrbla\backups\BlarAI_pre_extract.bundle (425.9 MB)
+[3] PASS: OOG zip exists at C:\Users\mrbla\backups\blarai_oog_20260424_171721.zip (57.6 MB)
+[4] Computing bundle SHA256 (10-20s)...
+[4] PASS: Bundle SHA256 matches Stage 0 manifest
+[5] PASS: devplatform Phase C fix at be22a15 found in git log
+    be22a15 fix(stage4-remediation): wake_launcher reads devplatform state.json + logs to devplatform
+
+=== ALL 5 CHECKS PASS - Rollback parachute is intact. ===
+Authorized to proceed to Step 1 (state.pause_fleet) per Pre-Flight.
+      ]]></verbatim_powershell_output>
+      <interpretation>All 5 critical rollback-readiness checks PASS. Rollback target (`pre-platform-extract` tag), bundle (425.9 MB), OOG zip (57.6 MB), bundle SHA256 (matches `C051CCFB...65D7707` Stage 0 manifest), and devplatform Phase C wake_launcher fix at `be22a15` all confirmed on disk. EA-9 authorized to proceed to Step 1 per n1(n) success path.</interpretation>
+    </pre_flight_step_0_output>
+
+    <pre_flight_step_1_output runtime="~5s" verdict="PASS">
+      <action_a name="state.pause_fleet on devplatform">
+        Invoked from Push-Location `C:\Users\mrbla\devplatform`:
+        `state.pause_fleet('Stage 5 cleanup', updated_by='ea_code_blarai_helper', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')`
+        Returned successfully.
+      </action_a>
+      <action_b name="git add + commit on devplatform">
+        `git -C C:\Users\mrbla\devplatform add tools/autonomy_budget/state.json`
+        `git -C C:\Users\mrbla\devplatform commit -m "chore(ops): pause fleet -- Stage 5 cleanup"`
+        Result: `[main 1a552d9] chore(ops): pause fleet -- Stage 5 cleanup` — 1 file changed, 4 insertions(+), 4 deletions(-).
+      </action_b>
+      <verification name="post-pause state.json">
+        paused=True
+        reason=Stage 5 cleanup
+        updated_by=ea_code_blarai_helper
+        updated_utc=2026-04-30T04:27:50Z
+        schema_version=1
+      </verification>
+      <devplatform_head_post_step_1>1a552d9 chore(ops): pause fleet -- Stage 5 cleanup</devplatform_head_post_step_1>
+    </pre_flight_step_1_output>
+
+    <v0_pickup_table>
+      <field id="V0a" name="BlarAI HEAD + recent log" expected_per_init_pointer="`176922c` + Step 1 pause commit" actual="ff39a41 (init-pointer commit; 1 commit ahead of 176922c) — no Step-1 pause commit on BlarAI side per canonical §step_1 (devplatform-only)">
+        <log><![CDATA[
+ff39a41 docs(platform_separation): Stage 5 EA-9 init pointer -- 130-atom ack chain (116 inherited + 14 g9-ea9_n1) + Pre-Flight Step 0 rollback-readiness fold-in + LA pre-prep checklist + Ticket RR fleet-status.ps1 fold-in (Stage 6.7.5 backlog 25 -> 26)
+176922c docs(platform_separation): Stage 5.0.v2 audit chain commit + EX-1 wording fix
+9e92b26 docs(platform_separation): Guide-#8 rollback-readiness dispatch for EA-9 Pre-Flight Step 0
+        ]]></log>
+        <drift_classification class="STATUS_STALENESS_5b_a">Init pointer's V0 expected text was authored before its own commit landed; metadata.head_at_initiation correctly says "init-pointer-commit (this commit; spawn-time HEAD; recover actual hash via git log --oneline -1)". The V0_pickup_block's expected text "176922c + Step 1 pause commit" is a doc-defect on two counts: (1) the spawn-time HEAD is the init-pointer commit ff39a41, not 176922c; (2) §step_1 canonical instruction commits only on devplatform, not BlarAI. Document and proceed per Operating Rule 5b(a).</drift_classification>
+      </field>
+
+      <field id="V0b" name="BlarAI branch" expected="chore/platform-extraction" actual="chore/platform-extraction" verdict="MATCH"/>
+
+      <field id="V0c" name="BlarAI working tree" expected_per_init_pointer="clean post-Step-1-commit (only the Step 1 pause commit changed; no untracked except .claude/scheduled_tasks.lock)" actual="`M tools/autonomy_budget/state.json` + `?? .claude/scheduled_tasks.lock`">
+        <drift_classification class="STATUS_STALENESS_5b_a">The §step_1 canonical command commits only on devplatform; per §identity hard invariant "EA-9 does NOT touch BlarAI's state.json directly", the M state on BlarAI's state.json (BUG-5 emergency-pause snapshot from Phase B) stays UNCHANGED until Stage 5.1 deletes the parent directory and auto-resolves it (per w21/dn31/Ticket KK). The V0 expected "clean post-Step-1-commit" presumed BlarAI commit advance which does not occur per the canonical §step_1. Document and proceed per Operating Rule 5b(a). Also note: `git -C BlarAI diff --stat` confirms the M state is a 4-line modification (paused-state snapshot) which Stage 5.1 deletion will clean up.</drift_classification>
+      </field>
+
+      <field id="V0d" name="devplatform HEAD + recent log" expected="`45aec52` + Step 1 pause commit (= 1a552d9)" actual="1a552d9 chore(ops): pause fleet -- Stage 5 cleanup" verdict="MATCH">
+        <log><![CDATA[
+1a552d9 chore(ops): pause fleet -- Stage 5 cleanup
+45aec52 chore(ops): unpause fleet -- guide-8 EX-1 fix + audit chain commit done
+0fb794d chore(ops): pause fleet -- guide-8 EX-1 fix + audit chain commit
+        ]]></log>
+      </field>
+
+      <field id="V0e" name="devplatform branch" expected="main" actual="main" verdict="MATCH"/>
+
+      <field id="V0f" name="devplatform working tree" expected="3 untracked artifacts per handoff (post-cutover residue)" actual="`?? docs/FLEET_DASHBOARD.md` + `?? tools/vikunja/config.yml.pre_stage4_bak` + `?? tools/vikunja_mcp/bridge/inbox.json`" verdict="MATCH"/>
+
+      <field id="V0g" name="devplatform state.json" expected="`fleet_paused=true`, reason='Stage 5 cleanup', updated_by='ea_code_blarai_helper', schema_version=1" actual="paused=True, reason=Stage 5 cleanup, updated_by=ea_code_blarai_helper, updated_utc=2026-04-30T04:27:50Z, schema_version=1" verdict="MATCH"/>
+
+      <field id="V0h" name="BlarAI state.json (path-exists)" expected="True (file exists; will be deleted at Stage 5.1)" actual="True; diff vs HEAD = 4 insertions/3 deletions (BUG-5 emergency-pause snapshot, dead artifact)" verdict="MATCH"/>
+
+      <field id="V0i" name="BlarAI git stash list" expected="2+ wake_launcher auto-stashes from 2026-04-29 wake firings; do NOT pop or apply" actual="2 entries: stash@{0} co_lead_architect 20260429_004502 + stash@{1} sdo 20260429_004501" verdict="MATCH (DO NOT POP per ack4)"/>
+
+      <field id="V0j" name="BlarAI worktree list" expected="only main worktree" actual="C:/Users/mrbla/BlarAI ff39a41 [chore/platform-extraction] (only main)" verdict="MATCH (V1 contamination not present)"/>
+
+      <field id="V0j-dev" name="devplatform worktree list" expected="only main worktree" actual="C:/Users/mrbla/devplatform 1a552d9 [main] (only main)" verdict="MATCH"/>
+
+      <field id="V0k" name="13/8 task fleet split (Phase A 2026-04-29)" expected="13 total at \BlarAI\; 8 ACTIVE (Wake SDO/Co-Lead/EA Code, Sprint Auditor, Agents Cadence Monitor, Credentials Rotation Reminder, Escalation Watchdog, Gate Stale Cleaner) + 5 DISABLED (Welcome Back Poll, Daily Digest, Weekly Summary, Dashboard Maintainer, Toast Watchdog)" actual="13 total — 8 Ready: Agents Cadence Monitor, Credentials Rotation Reminder, Escalation Watchdog, Gate Stale Cleaner, Sprint Auditor, Wake Co-Lead Architect, Wake EA Code, Wake SDO; 5 Disabled: Daily Digest, Dashboard Maintainer, Toast Watchdog, Weekly Summary, Welcome Back Poll" verdict="MATCH"/>
+
+      <field id="V0l" name="MCP configs point to devplatform" expected="all 3 MCP configs (Claude Desktop + .vscode/mcp.json + .mcp.json) point to devplatform per Stage 4.4-4.6 cutover" actual="DEFERRED — informational only; Stage 5 doesn't modify these. EA-9 will rely on existing Stage 4 cutover state."/>
+
+      <field id="V0m" name="pytest baseline (BlarAI)" expected="~981 passed, 22 skipped on `pytest shared/ services/ launcher/`" actual="DEFERRED to Item 5.8.v2 execution (read-only Pre-Flight does not run pytest)"/>
+
+      <field id="V0n" name="Vikunja running" expected="background on localhost:3456" actual="DEFERRED — informational only; Stage 5 does not query Vikunja"/>
+    </v0_pickup_table>
+
+    <v0_drift_summary>
+      <drift_count_5b_a>2 (V0a + V0c)</drift_count_5b_a>
+      <drift_count_5b_b>0 (no procedure breakage detected)</drift_count_5b_b>
+      <interpretation>Two doc-defects in init pointer's `<v0_pickup_verification_block>` expected text both stem from the same root cause: V0 expected was authored against an idealized model where Step 1 pause commits on BOTH repos, but the canonical §step_1 instruction (consistent with §identity hard-invariant "EA-9 does NOT touch BlarAI's state.json directly") commits only on devplatform. BlarAI's M state.json + spawn-time HEAD ≠ 176922c are both consistent with this canonical interpretation. Per Operating Rule 5b(a): document and proceed. EA-9 requests Guide-#9 confirmation in PROCEED that this Operating-Rule-5b(a) classification is correct; if Guide-#9 instead intends BlarAI side to also receive a pause commit (capturing the BUG-5 dead-artifact M state), please direct in PROCEED message. For now, the BlarAI M state is pre-existing (pre-EA-9 spawn) and Stage 5.1 will auto-resolve via parent-directory deletion.</interpretation>
+    </v0_drift_summary>
+
+  </section_b>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION C — Cumulative-Ack Chain Restatement (VERBATIM) -->
+  <!-- ==================================================================== -->
+  <section_c name="Cumulative-Ack Chain Restatement (VERBATIM)" required="MANDATORY">
+
+    <intro>
+      Total cumulative-ack chain at EA-9 spawn: **130 binding atoms** (116 inherited + 14 new under g9-ea9_n1). Restatement below preserves IDs + brief verbatim descriptions per init pointer §cumulative_ack_chain_restatement; full source-text remains authoritative in cited verdict files. Section ends with full verbatim restatement of g9-ea9_n1(a)-(n) per the verdict at commit 176922c (Guide-#9-authored bindings).
+    </intro>
+
+    <inherited_chain count="116">
+
+      <ack id="g7-ea1_n10" source="3.1-GUIDE_RESPONSE_INSTANCE_7_ITERATION_1_APPROVED_STAGE3_EA_1.xml" status="SATISFIED_at_stage_3_iter_1_close" naming_defect="A12">
+        Stage 3 Iter-1 verdict APPROVED ack. Stage 3 EA = globally EA-7; A12 records EA-1-vs-EA-7 naming defect; verbatim restate per no-amend doctrine.
+      </ack>
+
+      <ack id="g7-ea1_n11" source="3.1.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_1_V2_VERIFIED_SPEC_CORRECTION_AUTHORIZED.xml" status="SATISFIED_at_stage_3_close" naming_defect="A12">
+        Stage 3.1.v2 escalation_watchdog filename + selective tools/+docs/ scope locked: 9 directories + initial runbooks fleet subset.
+      </ack>
+
+      <ack id="g7-ea1_n12" source="3.2.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_2_V2_RECLASSIFICATION_REQUIRED_SELECTIVE_COPY_AUTHORIZED.xml" status="SATISFIED_at_stage_3_close" naming_defect="A12">
+        Stage 3.2.v2 selective governance copy 4-of-17 (STYLE.md, fleet-hygiene.md, merge-policy.md, parallel-sprints.md) + 4 hardening tickets bound + Stage 3.3 expansion authorization for Claude/CO_LEAD/Domain governance pack. **Anchor for n1(e) LOAD-BEARING — the 13 NOT migrated stay at BlarAI per A14.**
+      </ack>
+
+      <ack id="g7-ea1_n13" source="3.0.v2-GUIDE_RESPONSE_INSTANCE_7_STAGE3_COMPREHENSIVE_AUDIT_CHECKPOINT.xml" status="SATISFIED_at_stage_3_close" naming_defect="A12" sub_clause_count="8">
+        Stage 3.0.v2 audit checkpoint, 8 sub-clauses (a)-(h):
+        n13(a) pyproject.toml dependency derivation (httpx, pyyaml, mcp, jsonschema; pytest+pytest-asyncio extras)
+        n13(b) execution_ordering 9-step plan + 5 stop_conditions
+        n13(c) MCP / VS Code config copy 3 sub-targets (per-file top-level keys preserved)
+        n13(d) daily_digest --help non-destructive smoke (exit 0; live-load deferred to Stage 4)
+        n13(e) .gitignore augment (logs/, escalation_seen.json{,.tmp}, devplatform.egg-info/)
+        n13(f) F-N11 promotion tools/tests/ Class D → Class C
+        n13(g) .copy_manifest_v2.yaml schema_version=1 (10 v1 + 21 v2 entries; 195 v2_files)
+        n13(h) forward + inverse drift verification (PASS; A13 F3 relocation accepted)
+      </ack>
+
+      <ack id="g7-ea7_n14" source="3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml" status="SATISFIED_at_stage_3_close" naming_corrected="true" sub_clause_count="4">
+        Stage 3.10 close VERIFIED, 4 sub-clauses (a)-(d):
+        n14(a) single-Stage-3-commit invariant (95884a0; 189 files; +39592/-2; parent 3894221)
+        n14(b) pre-stage state.json SHA256 71FC1A2F…D5D19 UNCHANGED
+        n14(c) BlarAI-side read-only invariant maintained (sole exception: Item 3.10 STATUS append)
+        n14(d) stop_condition status at close: (i)(ii)(iii)(iv) NOT triggered; (v) deferred to Stage 4 live-load smoke
+      </ack>
+
+      <ack id="g8-ea8_n1" source="4.0.v2-GUIDE_RESPONSE_INSTANCE_8_STAGE4_PREFLIGHT_AUDIT_CHECKPOINT.xml + supplements 1+2" status="SATISFIED_at_stage_4_close" sub_clause_count="16">
+        Stage 4 preflight audit + LA decisions, 16 sub-clauses (a)-(p):
+        n1(a) Item 4.0 EA-context preamble + self-termination preflight gate (CC-1) [SUPERSEDED-BY-g8-ea8_n2(b) per supplement 2]
+        n1(b) Item 4.0.6 absolute path on state.json gate command
+        n1(c) Item 4.1 LA-DECIDED 6-step DB location verification + config absolutization (DB stays at %LOCALAPPDATA%; CC-2/CC-3)
+        n1(d) Item 4.2 post-startup verification triad (REST project-count + DB sha256 stability)
+        n1(e) Item 4.3 VIKUNJA_TOKEN LA pre-flight checklist (Parts 0/1/2/3) + REST user/pass auth fallback (CC-7)
+        n1(f) Item 4.4 enumerate all 3 Claude Desktop BlarAI-coupled fields (command + PYTHONPATH + VIKUNJA_PASS)
+        n1(g) Items 4.5+4.6 explicit absolute-path + PYTHONPATH rewrites; VIKUNJA_PASS template (F-1 fix)
+        n1(h) Item 4.7 shape-aware arg-injection + S4U elevation guard for Agents Cadence Monitor (rr5; CC-4) [Step 4 REFINED-BY-g8-ea8_n2(c) per supplement 2]
+        n1(i) Item 4.7.5 forward-slash sibling patterns + preserve target-project refs (CC-6 partial)
+        n1(j) Item 4.7.7 -ErrorAction SilentlyContinue + tighten match regex
+        n1(k) Item 4.9 widen gate to Arguments/WorkingDirectory; rewrite start_vikunja_hidden.vbs (CC-6 main)
+        n1(l) Item 4.11 split EA-8 scriptable smoke (4.11a) vs LA manual smoke (4.11b deferred)
+        n1(m) Item 4.12 gitignore augmentation + explicit allow-list staging (CC-8); explicit staging of devplatform config.yml edit
+        n1(n) Item 4.13.5 two-step reset+resume on devplatform state.json path (CC-5)
+        n1(o) Item 4.4 Claude Desktop trustedFolders expansion for devplatform (per supplement 1)
+        n1(p) Item 4.4 Claude Desktop filesystem MCP expansion for devplatform (per supplement 1)
+      </ack>
+
+      <ack id="g8-ea8_n2" source="4.0.v2-GUIDE_RESPONSE_INSTANCE_8_SUPPLEMENT_2_TO_PREFLIGHT_AUDIT_CHECKPOINT.xml" status="SATISFIED_at_stage_4_close" sub_clause_count="6">
+        Stage 4 workflow simplification, 6 sub-clauses (a)-(f):
+        n2(a) Item 4.0 NARROWED kill (vikunja_mcp-only; preserve LA prep-2)
+        n2(b) EA-8 surface = VS Code Copilot Opus 4.7 agent mode native (supersedes n1(a))
+        n2(c) Item 4.7 S4U paste-relay carve-out (Agents Cadence Monitor only; one paste-relay total) (refines n1(h) Step 4)
+        n2(d) LA prep-3 reframing (elevated PowerShell on-demand for Item 4.7 only)
+        n2(e) surface_specific_directives_for_ea_8 update (VS Code Copilot agent mode canonical)
+        n2(f) iter-1 gate emit update (post-supplement-2)
+      </ack>
+
+      <ack id="g8-ea8_n3" source="STATUS.md Stage 4 Closure Footnotes §1 + Stage 4 EA-8 disposition files" status="SATISFIED_at_stage_4_close" sub_clause_count="12">
+        Stage 4 execution-time spec refinements, 12 sub-clauses (a)-(l):
+        n3(a-d) regex robustness + venv-stub filter + Pattern B' refinement
+        n3(e) Item 4.7.7 + 4.9 .lnk all-3-fields rewrite + null-safe field access
+        n3(f) 8 NEW Stage 4 work items (4.0.5, 4.0.6, 4.6.5, 4.7.5, 4.7.6, 4.7.7, 4.8.v2, 4.13.5)
+        n3(g) vikunja_project_ids.yaml regex schema fix
+        n3(h) non-idempotency hardening discipline
+        n3(i) Item 4.7.7 sub-check (a) match refinement (deferred)
+        n3(j) Item 4.8 LastTaskResult fleet_paused exit-4 acceptance (later root-caused at A19)
+        n3(k) Item 4.8 elevation paste-relay carve-out (n2(c) precedent extended for 3 Enabled=false tasks)
+        n3(l) Item 4.13 STATUS.md duplication surgical truncate (root cause AMBIGUOUS per A17)
+      </ack>
+
+      <total>116 binding atoms (per STATUS.md Stage 4 Closure Footnotes §1: "115 binding atoms total" + n3(l) increment = 116). Cumulative count includes all g7/g8 sub-clauses with their internal sub-letters.</total>
+
+    </inherited_chain>
+
+    <new_g9_ea9_n1
+      source="5.0.v2-GUIDE_RESPONSE_INSTANCE_9_STAGE5_PREFLIGHT_AUDIT_CHECKPOINT.xml (commit 176922c)"
+      sub_clause_count="14"
+      class_breakdown="A=1, B=0, C=8, D=5">
+
+      <preamble>
+        g9-ea9_n1 is the first ack emitted by Guide-#9 (reviewing EA-9). It binds 14 sub-clauses (a-n) covering all spec corrections surfaced by the Stage 5.0.v2 dual-track audit (Option A subagent + Option B+ inline reconciliation; sub-clauses a-m) PLUS the Pre-Flight Step 0 rollback-readiness verification from Guide-#8 dispatch at 9e92b26 (sub-clause n; added per LA directive 2026-04-29 in lieu of a 4th audit pass). EA-9 restates VERBATIM with all 14 sub-clauses. Sub-clause class summary: A=1 (LOAD-BEARING n1(e)), B=0, C=8, D=5; total = 14. The Class A sub-clause (e) is irreversible-operation-grade and converts a wholesale `Remove-Item -Recurse -Force` to a selective 4-of-17 delete preserving 13 BlarAI-internal architectural governance docs per A14 disposition. Sub-clause (n) is the Pre-Flight Step 0 rollback-readiness verification — 5 critical checks (~30s runtime); HARD STOP on any failure; LA decision required for recovery; runs BEFORE state.pause_fleet so failure leaves system clean.
+      </preamble>
+
+      <sub_clause id="a" item="5.0.5" class="D" severity="audit_trail">
+        <amendment>Extend dispatch line 96 `$patterns` array from `@('*.log', '*.jsonl', '*.json.bak', 'state.json*', '*.history')` to `@('*.log', '*.jsonl', '*.json.bak', 'state.json*', '*.history', 'lifts.json', 'escalation_seen.json')`. Per F.1 Option A "preserves stragglers; minimal cost". Captures 2 runtime artifacts (`tools/autonomy_budget/lifts.json`, `tools/fleet_observability/escalation_seen.json`) that current pattern set misses; ~2 KB forensic metadata per file at archive time.</amendment>
+        <citation>audit MD §1 + §20 F.1; Workflow-Integrity-Review S-2; F.1 LA disposition.</citation>
+      </sub_clause>
+
+      <sub_clause id="b" item="5.1.v2" class="D" severity="audit_trail">
+        <amendment>Correct dispatch line 14 from `Test-Path C:\Users\mrbla\BlarAI\tools\fleet_ops\blarai_next_task_resolver.py` to `Test-Path C:\Users\mrbla\BlarAI\tools\autonomy_budget\blarai_next_task_resolver.py`. The resolver lives at `autonomy_budget/`, not `fleet_ops/`, per Workflow-Integrity-Review §4 S-1 + AUDIT_RISK_REVIEW §0.6 R12. Stage 5.1 wholesale-deletes both directories so the verification still passes post-5.1, but for the right reason.</amendment>
+        <citation>audit MD §3; WORKFLOW_INTEGRITY_REVIEW.md §S-1; AUDIT_RISK_REVIEW.md §0.6 R12.</citation>
+      </sub_clause>
+
+      <sub_clause id="c" item="5.4" class="C" severity="ea_stop_risk_or_audit_incomplete">
+        <amendment>REPLACE dispatch lines 187-189 `<files_to_audit>` block with the 8-glob expansion per aug1:
+          ```
+          <f>devplatform/tools/fleet_ops/*.py</f>
+          <f>devplatform/tools/fleet_observability/*.py</f>
+          <f>devplatform/tools/autonomy_budget/*.py</f>
+          <f>devplatform/tools/scheduled-tasks/*.ps1</f>
+          <f>devplatform/tools/scheduled-tasks/*.xml</f>
+          <f>devplatform/tools/vikunja_mcp/**/*.py</f>
+          <f>devplatform/tools/gate_stale_cleaner/*.py</f>
+          <f>devplatform/docs/scheduled/wake_templates/*.md</f>
+          ```
+          AND amend the description with audit-acceptance criteria: "EA-9 verifies via `Select-String -Pattern 'C:\\Users\\mrbla\\BlarAI(?!-worktrees)\\tools' -Path &lt;each glob&gt;` AND classifies every live-code hit as either (a) preserve target-project (`-BlarAIRoot` defaults), (b) preserve historical log/test fixture, or (c) DRIFT requiring rewrite. Comment-only hits in `#`-prefix lines are auto-classified preserve unless the comment is doctrinally mis-pointing."
+          Note: All 8 globs are already CLEAN of substantive BlarAI/tools refs per audit MD §18 aug1 verification — but the dispatch's literal 3-glob enumeration is incomplete-by-spec; aug1 closes the scope gap.</amendment>
+        <citation>audit MD §6, §18 aug1; F.4 dual-track posture; aug1 binding.</citation>
+      </sub_clause>
+
+      <sub_clause id="d" item="5.5" class="D" severity="audit_trail">
+        <amendment>Extend dispatch lines 199-206 `<delete_patterns>` block to include 3 additional patterns capturing platform-doctrine `.md` files currently missed:
+          ```
+          <p>C:\Users\mrbla\BlarAI\docs\DOMAIN*.md</p>
+          <p>C:\Users\mrbla\BlarAI\docs\domain*.md</p>
+          <p>C:\Users\mrbla\BlarAI\docs\DEC*.md</p>
+          ```
+          Captures `DOMAIN8_CLARIFICATIONS_v1.md`, `DOMAIN9_KICKOFF_PROMPT.md`, `domain8_spike_findings.md` (lowercase prefix) per audit MD §7. The `DEC*.md` pattern is forward-compatibility (no current matches; symmetric with `DEC*.xml`).</amendment>
+        <citation>audit MD §7, §18 aug3 missed-files list.</citation>
+      </sub_clause>
+
+      <sub_clause id="e" item="5.5.v2" class="A" severity="data_loss_irreversible" load_bearing="true">
+        <amendment>**REPLACE wholesale `Remove-Item -Recurse -Force C:\Users\mrbla\BlarAI\docs\governance` (dispatch line 30) with SELECTIVE delete preserving 13 BlarAI-internal architectural governance docs per A14 disposition.**
+
+        Replacement command for the governance portion of Item 5.5.v2:
+        ```powershell
+        $governanceMigrated = @(
+          'C:\Users\mrbla\BlarAI\docs\governance\STYLE.md',
+          'C:\Users\mrbla\BlarAI\docs\governance\fleet-hygiene.md',
+          'C:\Users\mrbla\BlarAI\docs\governance\merge-policy.md',
+          'C:\Users\mrbla\BlarAI\docs\governance\parallel-sprints.md'
+        )
+        foreach ($p in $governanceMigrated) {
+          if (Test-Path $p) { Remove-Item -Force $p }
+        }
+        ```
+        KEEP the wake_templates wholesale-delete unchanged (`Remove-Item -Recurse -Force C:\Users\mrbla\BlarAI\docs\scheduled\wake_templates`) — 6/6 templates were fully migrated at Stage 3.2.v2 per .copy_manifest_v2.yaml.
+
+        Update `<verify>` line accordingly: `Test-Path C:\Users\mrbla\BlarAI\docs\governance` → expected True (directory + 13 BlarAI-internal docs retained); `Test-Path C:\Users\mrbla\BlarAI\docs\scheduled\wake_templates` → expected False.
+
+        The 13 BlarAI-internal governance docs preserved by this amendment: README.md (governance index), circuit-breaker.md, configuration-management.md, context-spotlighting.md, deployment-verification.md, error-recovery.md, gpu-runtime.md, ipc-protocol.md, observability.md, pgov-validation.md, rule-engine.md, session-state.md, streaming-output.md.
+
+        RATIONALE: the dispatch's description (line 24) claims "Copied to devplatform in Stage 3.2.v2 — now DELETE from BlarAI" — implying 17/17 governance docs were migrated. Reality per A14 + on-disk verification (Glob): only 4/17 migrated (the fleet-relevant subset: STYLE, fleet-hygiene, merge-policy, parallel-sprints). The other 13 are BlarAI-internal architectural governance (USE-CASE policies, ADR templates, hardware/runtime docs) and stay at BlarAI per the explicit Stage 3 selective-copy decision (g7-ea1_n12). Wholesale-delete contradicts that Stage 3 disposition and would cause irreversible data loss.
+
+        LOAD-BEARING: if EA-9 cannot reach LA mid-stage at Item 5.5.v2, fall back to selective-delete (preserve the 13). Data-preservation default per "irreversible operations require explicit affirmation."</amendment>
+        <citation>audit MD §8 (HIGHEST-IMPACT FINDING); STATUS.md A14; Stage 3 close marker (g7-ea1_n12); on-disk Glob verification (Guide-#9 cross-verified).</citation>
+      </sub_clause>
+
+      <sub_clause id="f" item="5.5.5" class="D" severity="audit_trail">
+        <amendment>Correct dispatch line 42 path-spec from `docs/ea_queue/archive/ — EA per-sprint archives (per-project)` to `scheduled/ea_queue/archive/ — EA per-sprint archives (per-project)`. The actual location is `BlarAI\scheduled\ea_queue\archive\` (top-level `scheduled/`), which Item 5.3 moves to `.platform/scheduled/ea_queue/archive/`. Pure documentation drift; no executable side-effect.</amendment>
+        <citation>audit MD §9.</citation>
+      </sub_clause>
+
+      <sub_clause id="g" item="5.6" class="C" severity="ea_stop_risk">
+        <amendment>REPLACE dispatch description line 211 ("remove anything referencing tools/vikunja_mcp, tools/fleet_*, tools/autonomy_budget") with explicit enumeration:
+        ```
+        Edit `[tool.pytest.ini_options]` testpaths array (lines 6-22 of BlarAI/pyproject.toml).
+        REMOVE these 6 testpaths (post-Stage-5.1 deletion of platform tool dirs):
+          - "tools/vikunja_mcp/bridge/tests"
+          - "tools/vikunja_mcp/tests"
+          - "tools/autonomy_budget/tests"
+          - "tools/gate_stale_cleaner/tests"
+          - "tools/fleet_observability/tests"
+          - "tools/fleet_ops/tests"
+        PRESERVE these 9 testpaths (BlarAI runtime — required for 5.8.v2 baseline):
+          - "shared/tests"
+          - "services/policy_agent/tests"
+          - "services/assistant_orchestrator/tests"
+          - "services/semantic_router/tests"
+          - "services/ui_gateway/tests"
+          - "services/ui_shell/tests"
+          - "launcher/tests"
+          - "tests/integration"
+          - "tools/tests"
+        Markers (lines 24-27): asyncio + slow; no platform-tool refs; NO marker removal needed.
+        ```
+        Without this explicit enumeration, EA-9 might leave `tools/gate_stale_cleaner/tests` in testpaths (dispatch description's "tools/fleet_*" wildcard does NOT match `gate_stale_cleaner`) — post-5.1 deletion of the directory, pytest at 5.8.v2 would emit ImportError/collection failure.</amendment>
+        <citation>audit MD §10, §19 r4; on-disk Read of BlarAI/pyproject.toml (Guide-#9 cross-verified); r4 binding.</citation>
+      </sub_clause>
+
+      <sub_clause id="h" item="5.7" class="C" severity="ea_stop_risk">
+        <amendment>REPLACE dispatch description line 215 (vague: "Add `.platform/` contents handling. Typically `.platform/` SHOULD be tracked... but secrets/tokens inside should be gitignored") with concrete `.gitignore` additions to make at Item 5.7:
+        ```
+        # Wake launcher mutex (per fleet-hygiene §1 Drift Catalogue Pattern A;
+        # same drift class as the UAT2 entries that caused 60+ accumulated
+        # wake_launcher auto-stashes in 2026-04-22/23). Per w20.
+        .claude/scheduled_tasks.lock
+
+        # Stage 5.0.5 archive output (large binary; forensic-only)
+        .platform/audit_archive/*.zip
+        .platform/audit_archive/pre_stage5_*/
+        ```
+        Track .platform/sprints/, .platform/scheduled/, .platform/active_tasks.yaml, .platform/docs_sprints/, .platform/vikunja_project_ids.yaml — these are project state, NOT runtime artifacts. EA-9 verifies post-edit `git status --short` shows the .platform/ contents staged correctly.</amendment>
+        <citation>audit MD §11; w20 watchpoint; .gitignore on-disk verification (Guide-#9 cross-verified).</citation>
+      </sub_clause>
+
+      <sub_clause id="i" item="5.8" class="C" severity="ea_stop_risk">
+        <amendment>Mark Item 5.8 (lines 218-221) SUPERSEDED-BY-5.8.v2 in dispatch text. Replace `<expected>` line 220 from "Same baseline (755 passed, 2 skipped). Or full scope (835 passed, 2 skipped) if live runtime available" with: "**SUPERSEDED BY 5.8.v2**: ~981 passed, 22 skipped on `pytest shared/ services/ launcher/ --tb=short -q`. The historical 755-baseline reference is pre-Sprint-8 and obsolete per CLAUDE.md §Active State + STATUS.md §v2 Banner."
+
+        Operationally: EA-9 runs Item 5.8.v2 command (which includes `launcher/` directory and uses regression scope), NOT the v1 5.8 command. If EA-9 runs v1 5.8 first, sees ~981 passed (not 755), it could mis-interpret as +226-test regression-discovery. False alarm; n1(i) prevents.</amendment>
+        <citation>audit MD §12; CLAUDE.md §Active State; STATUS.md §v2 Banner line 24.</citation>
+      </sub_clause>
+
+      <sub_clause id="j" item="5.9" class="C" severity="ea_stop_risk_compound">
+        <amendment>REPLACE Item 5.9 (lines 223-231) entirely with the F.2 30-min mini-soak protocol per LA F.2 disposition. Original dispatch references DISABLED `BlarAI_daily_digest` (Phase A 2026-04-29 disabling); task name is wrong format (should be `Daily Digest` Title Case Spaces, not underscore form).
+
+        Replacement Item 5.9:
+        ```xml
+        <item id="5.9" name="30-minute mini-soak: verify fleet operates end-to-end from devplatform">
+          <description>F.2 disposition (per LA 2026-04-29): replace original BlarAI_daily_digest probe (DISABLED per Phase A) with a 30-min observational soak across 2 full 15-min wake-* cycles post-Item-5.7 commit. Verify all 4 wake-* roles + cadence_monitor (every 5 min) + escalation_watchdog (every 5 min) produce expected silent-success outputs. **Mature-not-minimal upgrade per Phase D soak methodology proportional to Stage 5.**</description>
+          <command>
+            Write-Host "Starting 30-min mini-soak from $((Get-Date).ToString('HH:mm:ss'))..."
+            $start = Get-Date
+            $deadline = $start.AddMinutes(30)
+            while ((Get-Date) -lt $deadline) {
+              Start-Sleep 60
+              $elapsed = ((Get-Date) - $start).TotalMinutes
+              Write-Host "Elapsed $([math]::Round($elapsed,1)) min..."
+            }
+            Write-Host "`n=== Post-soak fleet state ==="
+            Get-ScheduledTask -TaskPath '\BlarAI\' | Get-ScheduledTaskInfo | Where-Object { $_.LastRunTime -ge $start } |
+              Select TaskName, LastRunTime, LastTaskResult | Format-Table -AutoSize
+          </command>
+          <expected>
+            During the 30-min window, expected firings (cadence × 30 min):
+              - Wake SDO, Wake Co-Lead Architect, Wake EA Code (every 15 min, 2 firings each = 6 total)
+              - Sprint Auditor (every 15 min, 2 firings)
+              - Agents Cadence Monitor (every 5 min, 6 firings)
+              - Escalation Watchdog (every 5 min, 6 firings)
+              - Credentials Rotation Reminder (typically daily; likely won't fire in 30-min window — NOT a failure if absent)
+              - Gate Stale Cleaner (typically hourly; may not fire in 30-min window — NOT a failure if absent)
+            ACCEPTANCE: all tasks that DO fire within the 30-min window show LastTaskResult=0. Tasks that don't fire due to longer cadence (e.g., Credentials Rotation Reminder daily, Gate Stale Cleaner hourly) are NOT a failure condition — only firings are evaluated.
+            Wake-* tasks: WORK-GATE skip + NO-WORK-EXIT (verify via devplatform/tools/scheduled-tasks/logs/&lt;role&gt;.log entries; NO claude.exe child processes).
+            Cadence Monitor + Escalation Watchdog: silent-success markers per Phase D evidence pattern.
+          </expected>
+        </item>
+        ```
+        Per F.2 binding decision; per LA mature-not-minimal motto.</amendment>
+        <citation>audit MD §14, §20 F.2; F.2 LA disposition (UPGRADED).</citation>
+      </sub_clause>
+
+      <sub_clause id="k" item="5.10" class="C" severity="ea_stop_risk_or_la_premature_approval">
+        <amendment>EXTEND dispatch HALT-message block (lines 240-248) with explicit pre-merge review matrix per aug2. EA-9 fills in actual PASS/FAIL values (not placeholders) before printing the HALT message.
+
+        Replacement HALT block (after `git diff main --stat`):
+        ```powershell
+        Write-Host '*** HALT: Lead Architect approval required before merging to main. ***' -ForegroundColor Yellow;
+        Write-Host '';
+        Write-Host '=== STAGE 5 COMPLETE - REVIEW MATRIX FOR LA ===' -ForegroundColor Cyan;
+        Write-Host '';
+        Write-Host '[1] 5.4 AUDIT (8 globs) - fill in PASS/FAIL for each:'
+        Write-Host '    devplatform/tools/fleet_ops/*.py            : <PASS|FAIL>'
+        Write-Host '    devplatform/tools/fleet_observability/*.py  : <PASS|FAIL>'
+        Write-Host '    devplatform/tools/autonomy_budget/*.py      : <PASS|FAIL>'
+        Write-Host '    devplatform/tools/scheduled-tasks/*.ps1     : <PASS|FAIL>'
+        Write-Host '    devplatform/tools/scheduled-tasks/*.xml     : <PASS|FAIL>'
+        Write-Host '    devplatform/tools/vikunja_mcp/**/*.py       : <PASS|FAIL>'
+        Write-Host '    devplatform/tools/gate_stale_cleaner/*.py   : <PASS|FAIL>'
+        Write-Host '    devplatform/docs/scheduled/wake_templates/*.md : <PASS|FAIL>'
+        Write-Host '';
+        Write-Host '[2] 5.8.v2 TEST BASELINE:'
+        Write-Host '    pytest shared/ services/ launcher/ -q : <N> passed, <M> skipped (target: ~981 / 22) <PASS|FAIL>'
+        Write-Host '';
+        Write-Host '[3] 5.9 F.2 MINI-SOAK (30 min):'
+        Write-Host '    Firing tasks LastTaskResult=0 (non-firing tasks NOT failure) : <PASS|FAIL>'
+        Write-Host '    0 fail-open claude invocations    : <PASS|FAIL>'
+        Write-Host '';
+        Write-Host '[4] DIFF SUMMARY:' (already printed above)
+        Write-Host '';
+        Write-Host 'LA: do NOT approve merge until [1], [2], [3] above all show PASS.' -ForegroundColor Yellow;
+        Write-Host 'After approval, run the merge block below:' -ForegroundColor Yellow;
+        Write-Host '  cd C:\Users\mrbla\BlarAI; git checkout main;' -ForegroundColor Yellow;
+        Write-Host '  git merge --no-ff chore/platform-extraction -m "Merge platform extraction to main";' -ForegroundColor Yellow;
+        Write-Host '  # Do NOT delete chore/platform-extraction branch - keep for audit per copilot-instructions preservation rule.' -ForegroundColor Yellow;
+        ```
+        Per aug2 binding decision; per LA mature-not-minimal: explicit pre-merge gate matrix.</amendment>
+        <citation>audit MD §15, §18 aug2; aug2 binding.</citation>
+      </sub_clause>
+
+      <sub_clause id="l" item="5.11" class="D" severity="audit_trail">
+        <amendment>Add precondition guard before Item 5.11 tag commands:
+        ```powershell
+        $onMain = (git -C C:\Users\mrbla\BlarAI branch --show-current) -eq 'main'
+        if (-not $onMain) {
+          Write-Warning "Item 5.11 expected to run AFTER 5.10 merge to main. Current branch: $((git -C C:\Users\mrbla\BlarAI branch --show-current)). Tagging chore/platform-extraction tip; LA may need to re-tag on main post-merge."
+        }
+        git -C C:\Users\mrbla\BlarAI tag post-platform-extract -m "BlarAI cleanup complete, devplatform authoritative"
+        git -C C:\Users\mrbla\devplatform tag platform-extracted -m "devplatform established from BlarAI extraction"
+        ```
+        Cosmetic only; if LA REJECTS at 5.10 HALT, tags created on chore/platform-extraction tip are still meaningful (close-state marker). If LA APPROVES (typical path), tags land on main via the merge commit. PRESERVE existing `pre-platform-extract` tag (BlarAI side; per RECOVERY.md asset coverage).</amendment>
+        <citation>audit MD §16; w10 watchpoint (Item 5.10 LA-merge gate).</citation>
+      </sub_clause>
+
+      <sub_clause id="m" item="5.3" class="C" severity="ea_stop_risk_or_partial_state">
+        <amendment>WRAP Item 5.3 `foreach ($m in $moves)` loop (lines 167-174) in try/catch with rollback:
+        ```powershell
+        $applied = @()
+        try {
+          foreach ($m in $moves) {
+            if (-not (Test-Path $m.From)) { Write-Host "SKIP (missing): $($m.From)"; continue }
+            if (Test-Path $m.To) { throw "Destination already exists: $($m.To). Refusing to overwrite." }
+            $parent = Split-Path $m.To -Parent
+            if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+            Move-Item -Path $m.From -Destination $m.To
+            $applied += $m
+            Write-Host "MOVED: $($m.From) -> $($m.To)"
+          }
+        } catch {
+          Write-Warning "Move loop failed mid-flight: $_"
+          Write-Warning "Rolling back $($applied.Count) applied moves..."
+          foreach ($m in $applied) {
+            if ((Test-Path $m.To) -and (-not (Test-Path $m.From))) {
+              Move-Item -Path $m.To -Destination $m.From
+              Write-Host "ROLLED BACK: $($m.To) -> $($m.From)"
+            }
+          }
+          throw "Item 5.3 atomicity broken; rolled back applied moves. Re-investigate before retry."
+        }
+        ```
+        Per r2 atomicity binding; per LA mature-not-minimal STOP-and-rollback pattern. Without this, mid-loop failure leaves working tree half-moved with no auto-revert.</amendment>
+        <citation>audit MD §5, §19 r2; r2 binding.</citation>
+      </sub_clause>
+
+      <sub_clause id="n" item="Pre-Flight Step 0" class="C" severity="ea_stop_risk_rollback_safety">
+        <amendment>INSERT new "Step 0 - Rollback Readiness Verification" in EA-9 init pointer Pre-Flight section, BEFORE Step 1 (state.pause_fleet on devplatform). Embed the consolidated PowerShell block from Guide-#8 dispatch §check_definition → &lt;consolidated_powershell_block&gt; verbatim (5 checks; ~30s runtime).
+
+        The 5 critical checks:
+          1. `pre-platform-extract` git tag exists on BlarAI (rollback target)
+          2. Bundle file exists at `C:\Users\mrbla\backups\BlarAI_pre_extract.bundle`
+          3. OOG (out-of-git) zip exists at `C:\Users\mrbla\backups\blarai_oog_20260424_171721.zip`
+          4. Bundle SHA256 matches `C051CCFB8FBC6CA31E03F48537816F56CC3FAFC927CEAFAEC9825C9EC65D7707` (Stage 0 manifest)
+          5. devplatform git log includes Phase C wake_launcher fix at `be22a15`
+
+        Step 0 placement BEFORE Step 1 (fleet pause) is intentional: read-only check; failure leaves system clean (no fleet pause to revert, no branch checkout to undo). PASS authorizes EA-9 to proceed to Step 1 (existing fleet-pause SOP per `.github/copilot-instructions.md §fleet_pause_sop`).
+
+        Failure handling: any single FAIL → HARD STOP. EA-9 reports to LA via chat with check ID + failure detail + per-check failure_disposition guidance (verbatim from Guide-#8 dispatch §per_check_details). EA-9 does NOT autonomously execute recovery (tag recreation, bundle regeneration, OOG-zip restore, Phase C fix re-application) - those are LA decisions because they involve modifying baseline state.
+
+        Output capture: EA-9 captures the inline PowerShell output text block in the Stage 5 close STATUS append (Item 5.12 - under a "Pre-Flight Verification Outputs" subsection per Guide-#8 dispatch §success_criteria).
+
+        Optional mature-not-minimal extensions if EA-9 wall-clock budget permits (per Guide-#8 dispatch §optional_extensions; +15-25s runtime; same HARD STOP discipline):
+          - ext1: OOG zip SHA256 verification against `15B4B9A138974F500FFAE9682350F333DC228AC94A1DB184E26A220508A129A8`
+          - ext2: 13 scheduled task XML backups exist at `C:\Users\mrbla\backups\scheduled_tasks_export\`
+          - ext3: devplatform branch is `main` (not branched off mid-Stage)
+        LA may direct EA-9 to include or skip these extensions in iter-1 comprehension gate.</amendment>
+        <citation>Guide-#8 dispatch `5.0-GUIDE_RESPONSE_INSTANCE_8_ROLLBACK_READINESS_PREFLIGHT_FOR_EA_9.xml` (committed at 9e92b26); LA directive 2026-04-29 (rollback-readiness verification chosen instead of 4th audit pass; mature-not-minimal procedural step in lieu of additional audit pass given diminishing returns); STATUS.md Recovery Anchors table; STATUS.md Stage 4 Closure Footnotes §4 (Phase C remediation) + Anomaly A19 (BUG 1 fix at devplatform be22a15).</citation>
+        <execution_status_for_this_iter_1_gate>EXECUTED at 2026-04-30T04:25Z. ALL 5 CHECKS PASS (output captured verbatim in §B above). EA-9 proceeded to Step 1 per success-path authorization. Optional ext1-ext3 extensions: NOT executed in this Pre-Flight pass per default-skip; LA may direct to run at iter-1 review if desired (informational; bundle SHA passed already).</execution_status_for_this_iter_1_gate>
+      </sub_clause>
+
+    </new_g9_ea9_n1>
+
+    <total>130 binding atoms (116 inherited + 14 g9-ea9_n1).</total>
+
+  </section_c>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION D — Required Acknowledgments (VERBATIM ack1-ack13) -->
+  <!-- ==================================================================== -->
+  <section_d name="Required Acknowledgments (VERBATIM)" required="MANDATORY">
+
+    <intro>13 required_acknowledgments per init pointer §required_acknowledgments_for_iter_1_gate + verdict §required_acknowledgments. ack9 (LOAD-BEARING; n1(e) selective-vs-wholesale) AND ack13 (n1(n) Step 0 HARD STOP discipline) are blocking.</intro>
+
+    <acknowledge id="ack1" status="ACKNOWLEDGED">I will restate the cumulative-ack chain VERBATIM (116 atoms inherited: g7-ea1_n10..n13 + g7-ea7_n14 + g8-ea8_n1(a..p) + g8-ea8_n2(a..f) + g8-ea8_n3(a..l)) per dn5/dn22/s9w1.</acknowledge>
+
+    <acknowledge id="ack2" status="ACKNOWLEDGED">I will restate g9-ea9_n1 VERBATIM with all 14 sub-clauses (a) through (n), including the verbatim text of n1(e) Class A LOAD-BEARING amendment converting Item 5.5.v2 wholesale-delete to selective 4-of-17 + n1(n) Pre-Flight Step 0 rollback-readiness verification per Guide-#8 dispatch at 9e92b26.</acknowledge>
+
+    <acknowledge id="ack3" status="ACKNOWLEDGED_AND_EXECUTED">I will pause the fleet via `state.pause_fleet('Stage 5 cleanup', updated_by='ea_code_blarai_helper', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')` then commit `chore(ops): pause fleet -- Stage 5 cleanup` BEFORE any branch checkout / non-trivial edit, per `.github/copilot-instructions.md §fleet_pause_sop`. The state.json target is **devplatform/** (NOT BlarAI/; BlarAI/tools/autonomy_budget/state.json is a dead artifact post-Phase-C4 per w21+dn31; auto-resolved at Stage 5.1 directory deletion per Ticket KK). [EXECUTED at 2026-04-30T04:27:50Z; devplatform commit 1a552d9.]</acknowledge>
+
+    <acknowledge id="ack4" status="ACKNOWLEDGED">I will NOT pop or apply ANY wake_launcher auto-stash entry per dn10 + w8 (corrected per A20). Discipline is generic regardless of timestamp. [V0i confirmed 2 stash entries; both LEFT in place.]</acknowledge>
+
+    <acknowledge id="ack5" status="ACKNOWLEDGED">I will NOT delete `BlarAI/tools/autonomy_budget/state.json` directly per dn31 + w21. Stage 5.1 deletes the parent directory which auto-resolves it. [V0h confirmed file present and untouched; M-state from BUG-5 emergency pause carries forward.]</acknowledge>
+
+    <acknowledge id="ack6" status="ACKNOWLEDGED">I will NOT execute Stage 5.1 deletions before Item 5.0.5 audit archive completes per dn32. Item ordering: 5.0.5 → 5.1.</acknowledge>
+
+    <acknowledge id="ack7" status="ACKNOWLEDGED">I will NOT edit BlarAI's CLAUDE.md, .github/copilot-instructions.md, or AGENTS.md per dn3 (V8 / 6.1.v2 deferred).</acknowledge>
+
+    <acknowledge id="ack8" status="ACKNOWLEDGED">I will NOT merge `chore/platform-extraction` to `main` until LA explicitly approves per R10 + w10. Item 5.10 has explicit HALT for this; n1(k) extends with review matrix.</acknowledge>
+
+    <acknowledge id="ack9" status="ACKNOWLEDGED_LOAD_BEARING">**LOAD-BEARING per n1(e)**: I will execute n1(e)'s selective-delete amendment at Item 5.5.v2 (preserving 13 BlarAI-internal governance docs per A14), NOT the original dispatch wholesale-delete. If at execution time the dispatch text appears unamended, I STOP and verify with LA before proceeding. Data-preservation default if LA unreachable: selective-delete.</acknowledge>
+
+    <acknowledge id="ack10" status="ACKNOWLEDGED">I will spot-check Item 5.12 STATUS.md append for duplication BEFORE committing per d9 + A17. Use `Add-Content -NoNewline` or hash-verified append helper if available; otherwise post-write hash-verification.</acknowledge>
+
+    <acknowledge id="ack11" status="ACKNOWLEDGED">Guide-#9 will spawn 3 parallel verification subagents at Stage 5 close (per d6 + w14). I cooperate by providing requested artifacts (file lists, git diff outputs) but do NOT manage subagent design. Independent disk-level verification by Guide-#9 happens AFTER subagents emit; my role at close is comprehensive close-report cross-checked by Guide-#9 per w11/dn14.</acknowledge>
+
+    <acknowledge id="ack12" status="ACKNOWLEDGED">Cross-check discipline: my "I did X" reports must be backed by independent `git diff` / `Test-Path` / `Get-ChildItem` evidence. EA-paraphrase-introduced-error pattern (w11) is a Guide-#9 cross-verification standard; close-report under-enumeration triggers re-verify per dn14/dn20/dn24.</acknowledge>
+
+    <acknowledge id="ack13" status="ACKNOWLEDGED_AND_EXECUTED_LOAD_BEARING">I will run Step 0 (rollback-readiness verification) BEFORE state.pause_fleet. If any of the 5 checks fail, I HARD STOP and report to LA with the failure_disposition guidance from the dispatch. I do NOT autonomously execute recovery (tag recreation, bundle regeneration, etc.) - those are LA decisions. [EXECUTED at 2026-04-30T04:25Z; ALL 5 CHECKS PASS; EA-9 proceeded to Step 1 per success path.]</acknowledge>
+
+    <la_pre_prep_attestation_recap>
+      <preamble>Per init pointer §la_pre_prep_checklist, EA-9's iter-1 gate confirms each LA attestation status. Stage 5 only requires prep-1 + prep-4 (prep-2 + prep-3 are N/A).</preamble>
+      <prep id="prep-1" name="other_ai_surfaces_closed" status="REQUEST_CONFIRMATION">EA-9 did not observe the explicit attestation line `[ATTESTATION prep-1] Other AI surfaces closed...` in the LA spawn message. The user's prose stated "LA pre-prep attestations: provided in this message above the chat-paste line", but the explicit attestation line(s) are not visible to EA-9. EA-9 requests Guide-#9 confirm at PROCEED whether prep-1 attestation is satisfied (LA closed Claude Desktop + other VS Code workspaces + Claude Code terminals before EA-9 spawn). Note: Stage 5 has no MCP-server kill at Pre-Flight (unlike Stage 4 Item 4.0 narrowed kill); the prep-1 risk is lower for Stage 5, but the attestation discipline applies.</prep>
+      <prep id="prep-2" name="vikunja_token_not_required" status="N_A_FOR_STAGE_5">N/A — Stage 5 does not require VIKUNJA_TOKEN (no Vikunja REST work; F.2 mini-soak observes via `Get-ScheduledTaskInfo`, not Vikunja queries).</prep>
+      <prep id="prep-3" name="elevated_powershell_not_required" status="N_A_FOR_STAGE_5">N/A — Stage 5 does not require elevated PowerShell (no S4U scheduled-task work; gitignore add for `.claude/scheduled_tasks.lock` runs in non-elevated terminal).</prep>
+      <prep id="prep-4" name="wall_clock_block_~3_4h_including_30min_minisoak" status="REQUEST_CONFIRMATION">EA-9 did not observe the explicit `[ATTESTATION prep-4] Available for ~3-4 hour block...` line. EA-9 requests Guide-#9 confirm LA availability for the full ~3-4h block including the 30-min F.2 mini-soak and reachability for Item 5.5.v2 selective-delete confirmation gate (per ack9) AND Item 5.10 pre-merge review matrix approval. If LA is NOT reachable mid-stage at Item 5.5.v2, EA-9 falls back to selective-delete per n1(e) data-preservation default.</prep>
+    </la_pre_prep_attestation_recap>
+
+  </section_d>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION E — Work Items + Files Touched + Verification Strategy -->
+  <!-- ==================================================================== -->
+  <section_e name="Work Items + Files Touched + Verification Strategy" required="MANDATORY">
+
+    <intro>16 Stage 5 items (12 v1 + 4 v2) per `06_STAGE5_CLEANUP.xml`, plus Pre-Flight Step 0 (NEW per n1(n)) + Step 1 (state.pause_fleet) + Stage-5-close unpause. Each row maps dispatch-instruction → g9-ea9_n1 amendment (if any) → files-touched → verification → STOP-and-report trigger.</intro>
+
+    <item id="Pre-Flight Step 0" status="EXECUTED_PASS_5_OF_5" amendment="n1(n) NEW">
+      <files_touched>none (read-only)</files_touched>
+      <verification>5 checks: tag exists, bundle exists, OOG zip exists, bundle SHA matches, Phase C fix at be22a15 in devplatform git log. ALL PASS.</verification>
+      <stop_trigger>t1 (LOAD-BEARING): any FAIL → HARD STOP, report failure_disposition guidance from Guide-#8 dispatch. NOT TRIGGERED.</stop_trigger>
+    </item>
+
+    <item id="Pre-Flight Step 1" status="EXECUTED_DEVPLATFORM_COMMIT_1a552d9">
+      <files_touched>devplatform/tools/autonomy_budget/state.json (modified to fleet_paused=true) + devplatform git tree (new commit 1a552d9 on main)</files_touched>
+      <verification>state.json paused=True, reason='Stage 5 cleanup', updated_by='ea_code_blarai_helper'; commit 1a552d9 ahead of 45aec52.</verification>
+      <stop_trigger>none specified; Step 1 is straightforward fleet-pause SOP application.</stop_trigger>
+    </item>
+
+    <item id="Pre-Flight Step 2" status="EXECUTED_2_DRIFT_5b_a_DOCUMENTED">
+      <files_touched>none (read-only)</files_touched>
+      <verification>V0a..V0n checked; 2 STATUS-staleness drift items documented in §B v0_drift_summary; 0 procedure-breakage drift items.</verification>
+      <stop_trigger>none triggered.</stop_trigger>
+    </item>
+
+    <item id="5.0.5" amendment="n1(a)" class="D" status="PENDING">
+      <files_touched>creates `BlarAI/.platform/audit_archive/pre_stage5_<stamp>.zip` from 6 about-to-be-deleted dirs (tools/fleet_ops, tools/fleet_observability, tools/autonomy_budget, tools/gate_stale_cleaner, tools/scheduled-tasks, tools/vikunja_mcp); patterns include `*.log`, `*.jsonl`, `*.json.bak`, `state.json*`, `*.history`, `lifts.json`, `escalation_seen.json` (n1(a) extension).</files_touched>
+      <verification>Test-Path on archive zip; verify `$copied -gt 0` post-archive; if `$copied -eq 0` AND source dirs non-empty → t3 trigger.</verification>
+      <stop_trigger>t3 (HIGH): pattern miss / no files captured → STOP before 5.1.</stop_trigger>
+    </item>
+
+    <item id="5.1" class="C" status="PENDING">
+      <files_touched>delete 9 paths: tools/vikunja, tools/vikunja_mcp, tools/fleet_ops, tools/fleet_observability, tools/autonomy_budget, tools/gate_stale_cleaner, tools/scheduled-tasks, tools/_vikunja_client.py, tools/_project_context.py. PRESERVE tools/openvino_contrib_agent + tools/tests.</files_touched>
+      <verification>Foreach Test-Path returns False for all 9 paths post-delete; `Test-Path tools/openvino_contrib_agent` = True; `Test-Path tools/tests` = True. Optional Class D cleanup of orphan `tools/__pycache__/` post-deletion.</verification>
+      <stop_trigger>any unexpected residual file beyond cache orphans → investigate.</stop_trigger>
+    </item>
+
+    <item id="5.1.v2" amendment="n1(b)" class="D" status="PENDING">
+      <files_touched>none (verify-only step; n1(b) corrects path for `blarai_next_task_resolver.py` from `fleet_ops/` to `autonomy_budget/`).</files_touched>
+      <verification>5 Test-Path checks (all expected False post-5.1).</verification>
+    </item>
+
+    <item id="5.2" status="PENDING_idempotent">
+      <files_touched>BlarAI/.platform/ directory (already exists from Stage 1.5 with vikunja_project_ids.yaml). `New-Item -Force` is idempotent.</files_touched>
+      <verification>Test-Path returns True.</verification>
+    </item>
+
+    <item id="5.3" amendment="n1(m)" class="C" status="PENDING">
+      <files_touched>4 moves: BlarAI/sprints/ → .platform/sprints/, BlarAI/scheduled/ → .platform/scheduled/, BlarAI/docs/active_tasks.yaml → .platform/active_tasks.yaml, BlarAI/docs/sprints/ → .platform/docs_sprints/. Wrapped in try/catch with `$applied` rollback per n1(m).</files_touched>
+      <verification>Get-ChildItem .platform -Recurse -Depth 1; 4 destinations populated; original 4 source paths return False on Test-Path.</verification>
+      <stop_trigger>t4 (HIGH): mid-loop Move-Item failure → try/catch rolls back applied moves; report to LA which moves succeeded vs failed.</stop_trigger>
+    </item>
+
+    <item id="5.4" amendment="n1(c) aug1" class="C" status="PENDING">
+      <files_touched>read-only across 8 globs in devplatform: fleet_ops/*.py, fleet_observability/*.py, autonomy_budget/*.py, scheduled-tasks/*.ps1, scheduled-tasks/*.xml, vikunja_mcp/**/*.py, gate_stale_cleaner/*.py, docs/scheduled/wake_templates/*.md.</files_touched>
+      <verification>Select-String pattern `'C:\\Users\\mrbla\\BlarAI(?!-worktrees)\\tools'` per glob; classify each hit as preserve (target-project / log/test fixture / forensic / comment-only) vs DRIFT-rewrite. Findings flow into 5.10 HALT-gate matrix [1].</verification>
+      <stop_trigger>t7 (MED): unexpected DRIFT requiring rewrite → record in matrix; do not auto-fix per t11 (Phase-C-pattern resurfacing → bind under g9-ea9_n*).</stop_trigger>
+    </item>
+
+    <item id="5.5" amendment="n1(d)" class="D" status="PENDING">
+      <files_touched>delete from BlarAI/docs/: CLAUDE_*.md, CLAUDE_*.xml, CO_LEAD_*.xml, DEC*.xml, DOMAIN*.xml, DOMAIN*.md (n1(d) extension), domain*.md (n1(d) extension lowercase), DEC*.md (n1(d) forward-compat), CONTINUATION_PROMPT.md. Powershell Remove-Item non-recursive default per dn13 — temp_for_responses/ is safe (verified r3 NOT-REAL by Guide-#9).</files_touched>
+      <verification>Get-ChildItem with same patterns post-delete returns empty.</verification>
+      <stop_trigger>t5 (HIGH): pre-deletion dry-run shows ANY pattern matches `docs\platform_separation\temp_for_responses\` → HARD STOP (would destroy Guide audit chain).</stop_trigger>
+    </item>
+
+    <item id="5.5.v2" amendment="n1(e) LOAD-BEARING Class A" class="A" status="PENDING_LA_GATE">
+      <files_touched>SELECTIVE delete from BlarAI/docs/governance/: STYLE.md, fleet-hygiene.md, merge-policy.md, parallel-sprints.md (4 of 17). PRESERVE 13 BlarAI-internal docs (README, circuit-breaker, configuration-management, context-spotlighting, deployment-verification, error-recovery, gpu-runtime, ipc-protocol, observability, pgov-validation, rule-engine, session-state, streaming-output). Wholesale delete BlarAI/docs/scheduled/wake_templates/ (6/6 fully migrated at Stage 3.2.v2).</files_touched>
+      <verification>`Test-Path docs/governance` = True (dir + 13 files retained); `Test-Path docs/scheduled/wake_templates` = False; `Get-ChildItem docs/governance | Measure-Object` = 13 files; the 4 deleted docs absent.</verification>
+      <stop_trigger>t2 (LOAD-BEARING): if dispatch text appears unamended (wholesale `Remove-Item -Recurse -Force docs\governance`) → STOP, verify with LA. Data-preservation default if LA unreachable: selective-delete (per ack9 + n1(e)).</stop_trigger>
+    </item>
+
+    <item id="5.5.5" amendment="n1(f)" class="D" status="PENDING">
+      <files_touched>none (documentation amendment per dispatch line 42; corrects path-spec `docs/ea_queue/archive/` → `scheduled/ea_queue/archive/`).</files_touched>
+      <verification>cosmetic; no executable side-effect.</verification>
+    </item>
+
+    <item id="5.6" amendment="n1(g)" class="C" status="PENDING">
+      <files_touched>BlarAI/pyproject.toml [tool.pytest.ini_options] testpaths array (lines 6-22). REMOVE 6 platform-tool testpaths; PRESERVE 9 BlarAI runtime testpaths.</files_touched>
+      <verification>post-edit Read of pyproject.toml shows exact 9 testpaths; markers (asyncio + slow) unchanged.</verification>
+    </item>
+
+    <item id="5.7" amendment="n1(h)" class="C" status="PENDING">
+      <files_touched>BlarAI/.gitignore — add 3 lines: `.claude/scheduled_tasks.lock`, `.platform/audit_archive/*.zip`, `.platform/audit_archive/pre_stage5_*/`.</files_touched>
+      <verification>post-edit `git status --short` shows `.claude/scheduled_tasks.lock` no longer untracked; `.platform/sprints/`, `.platform/scheduled/`, `.platform/active_tasks.yaml`, `.platform/docs_sprints/`, `.platform/vikunja_project_ids.yaml` STAGED (project state, tracked).</verification>
+    </item>
+
+    <item id="5.8" amendment="n1(i)" class="C" status="PENDING_SUPERSEDED">
+      <files_touched>none (marked SUPERSEDED-BY-5.8.v2; EA-9 runs 5.8.v2 directly).</files_touched>
+    </item>
+
+    <item id="5.8.v2" status="PENDING_BASELINE_VERIFY">
+      <files_touched>read-only pytest invocation: `cd BlarAI; .\.venv\Scripts\Activate.ps1; pytest shared/ services/ launcher/ --tb=short -q`.</files_touched>
+      <verification>Expected ~981 passed, 22 skipped (regression scope). Allow ±5 fluctuation per t6.</verification>
+      <stop_trigger>t6 (HIGH): baseline regression below ~981 passed / 22 skipped (±20+ delta) → report failures; LA decides revert-or-fix.</stop_trigger>
+    </item>
+
+    <item id="5.9" amendment="n1(j) F.2" class="C" status="PENDING_30MIN_SOAK">
+      <files_touched>read-only soak observation; Get-ScheduledTaskInfo polling. NO state mutation.</files_touched>
+      <verification>30-min real-time soak post-Item-5.7 commit. ACCEPTANCE: firing tasks LastTaskResult=0; non-firing NOT failure (Credentials Rotation Reminder daily, Gate Stale Cleaner hourly may not fire). Wake-* WORK-GATE skip + NO-WORK-EXIT (NO claude.exe child processes per fleet-paused state). Cadence Monitor + Escalation Watchdog silent-success markers per Phase D evidence pattern.</verification>
+    </item>
+
+    <item id="5.10" amendment="n1(k) aug2" class="C" status="PENDING_LA_HALT_GATE">
+      <files_touched>BlarAI git tree (new commit on chore/platform-extraction with all 5.0.5-5.9 changes); does NOT merge to main without LA approval.</files_touched>
+      <verification>Print 4-row HALT-gate matrix per n1(k) aug2 with actual PASS/FAIL values: [1] 5.4 audit (8 globs PASS/FAIL), [2] 5.8.v2 baseline (~981/22 PASS/FAIL), [3] 5.9 mini-soak (firing-task LastTaskResult=0 PASS/FAIL; non-firing NOT failure), [4] DIFF SUMMARY. EA-9 fills actual values, NOT placeholders. LA approves merge ONLY when [1][2][3] all show PASS.</verification>
+      <stop_trigger>t9 (MED): EA-9 attempts merge to main outside Item 5.10 LA-approval gate → HARD STOP per ack8/R10/w10.</stop_trigger>
+    </item>
+
+    <item id="5.11" amendment="n1(l)" class="D" status="PENDING_POST_MERGE">
+      <files_touched>BlarAI tag `post-platform-extract`, devplatform tag `platform-extracted`; precondition guard checks `git branch --show-current` is `main` post-5.10 merge (warn-not-throw if still on chore/platform-extraction).</files_touched>
+      <verification>`git tag -l "post-platform-extract"` returns the tag name on BlarAI; `git tag -l "platform-extracted"` on devplatform.</verification>
+    </item>
+
+    <item id="5.12" status="PENDING_STATUS_APPEND">
+      <files_touched>STATUS.md — append Stage 5 Closure Footnotes (Stage 3/4 closure pattern). Hash-verify pre-vs-post per d9/A17/EX-4.</files_touched>
+      <verification>SHA256 hash pre-append vs post-append shows single-line append-zone; no duplication. EA-9 close report items per init pointer §ea_9_close_report_requirements.</verification>
+      <stop_trigger>EX-4 — hash-mismatch indicates duplication; investigate before commit.</stop_trigger>
+    </item>
+
+    <item id="Stage-5-close unpause" status="PENDING_LAST_ACTION_BEFORE_EXIT">
+      <files_touched>devplatform/tools/autonomy_budget/state.json (resume_fleet); devplatform git tree (new unpause commit).</files_touched>
+      <verification>state.json paused=False; commit `chore(ops): unpause fleet -- Stage 5 cleanup done` on devplatform main.</verification>
+    </item>
+
+  </section_e>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION F — Risks / Ambiguities / Open Questions -->
+  <!-- ==================================================================== -->
+  <section_f name="Risks / Ambiguities / Open Questions" required="MANDATORY">
+
+    <risk id="R1" priority="HIGH" related_to="ack9 / n1(e) Class A LOAD-BEARING">
+      Item 5.5.v2 is the highest-stakes step in Stage 5: the dispatch text says wholesale `Remove-Item -Recurse -Force docs\governance` (line 30); the audit verdict (n1(e)) and EA-9 init pointer convert this to selective 4-of-17 preserving 13 BlarAI-internal docs. Guide-#9 / LA must confirm at PROCEED that EA-9 applies the n1(e) selective amendment, NOT the dispatch literal. Per ack9 / data-preservation default, if LA unreachable mid-stage, EA-9 falls back to selective-delete.
+    </risk>
+
+    <risk id="R2" priority="MED" related_to="LA pre-prep attestations prep-1 + prep-4">
+      EA-9 did not observe explicit `[ATTESTATION prep-1]` or `[ATTESTATION prep-4]` lines in the LA spawn message. The user prose stated "LA pre-prep attestations: provided in this message above the chat-paste line" but those lines are not present. Stage 5's prep-1 risk is lower than Stage 4 (no MCP-server kill at Pre-Flight); however the discipline applies. EA-9 requests Guide-#9 confirm at PROCEED whether prep-1 + prep-4 are satisfied. LA reachability for Item 5.5.v2 confirmation gate (per ack9) and Item 5.10 pre-merge review matrix (per ack8/n1(k)) is contingent on prep-4.
+    </risk>
+
+    <risk id="R3" priority="MED" related_to="V0 pickup STATUS-staleness">
+      Two doc-defects in init pointer's V0 pickup expected text (V0a BlarAI HEAD = 176922c → actual ff39a41; V0c BlarAI WT clean post-Step-1 → actual M state.json). Both consistent with §step_1 canonical "devplatform-only commit" + §identity hard-invariant "EA-9 does NOT touch BlarAI's state.json directly". EA-9 classified as Operating Rule 5b(a) STATUS staleness (document and proceed). Requesting Guide-#9 confirm classification at PROCEED. Alternative interpretation: if Guide-#9 intends BlarAI side ALSO receive a pause commit (capturing BUG-5 dead-artifact M state for clean diff at 5.1), please direct in PROCEED message; EA-9 will execute additional commit on BlarAI side.
+    </risk>
+
+    <risk id="R4" priority="LOW" related_to="audit subagent §24 likely-to-surface items">
+      Per audit MD §24, 5 items may surface during Stage 5 execution: (1) PowerShell `Remove-Item -Recurse -Force` filesystem-lock if wake_launcher firing concurrent (mitigated by Step-1 pause); (2) BlarAI/.mcp.json literal-password Phase C revert is gitignored per Ticket I, so 5.10 `git add -A` doesn't include it (verified safe); (3) STATUS.md duplication recurrence per d9/A17 — EA-9 hash-verifies pre-vs-post per ack10/EX-4; (4) test baseline drift between audit and execution (allow ±5 per t6); (5) devplatform unpause commit at audit time → EA-9's Step-1 pause now sets fleet_paused=true.
+    </risk>
+
+    <risk id="R5" priority="LOW" related_to="t10 / dn14/dn20/dn24/A18 cross-verification">
+      EA-9 must back every "I did X" report with `git diff` / `Test-Path` / `Get-ChildItem` evidence. Per ack12 + w11 EA-paraphrase-introduced-error pattern, Guide-#9 cross-verifies on disk. EA-9 commits to providing artifacts on Guide-#9 request without managing subagent design.
+    </risk>
+
+    <risk id="R6" priority="LOW" related_to="t11 / Phase-C-pattern resurfacing">
+      If Item 5.4 audit surfaces another PS1 script using `$RepoRoot` for state/log paths instead of `$PSScriptRoot` derivation (Phase C BUG 1/4 pattern), EA-9 binds as new finding under `g9-ea9_n*`; does NOT silently fix per dn35.
+    </risk>
+
+    <ambiguity id="A1" priority="LOW" related_to="optional ext1-ext3 extensions in n1(n)">
+      EA-9 ran the 5 critical Step 0 checks; did NOT run optional ext1 (OOG zip SHA verification), ext2 (13 scheduled task XML backups exist), ext3 (devplatform branch is main). The init pointer says "LA may direct EA-9 to include or skip these extensions in iter-1 comprehension gate". EA-9 default-skipped (5/5 critical PASS suffices for rollback parachute confirmation). Guide-#9 may direct re-run with extensions at PROCEED if mature-not-minimal posture warrants.
+    </ambiguity>
+
+    <ambiguity id="A2" priority="LOW" related_to="working directory for python helper invocation">
+      The init pointer §step_1 says "Working directory for `python -c` invocation: `C:\Users\mrbla\devplatform`". EA-9 used `Push-Location` to enter devplatform before invoking `python -`, then `Pop-Location` to return. The state.pause_fleet `path=` argument explicitly specifies devplatform's state.json regardless of import source, but using devplatform's authoritative state.py (vs BlarAI's dead-artifact state.py) is procedurally cleaner. EA-9 used the safer pattern; verifies via post-pause state.json read.
+    </ambiguity>
+
+    <open_question id="OQ1">
+      Per init pointer V0 pickup field BlarAI_HEAD drift handling: "if HEAD is at 176922c (no advance), Step 1 didn't commit; investigate" — this implies a BlarAI commit was expected. EA-9's interpretation is the field has a doc-defect (per §step_1 canonical only commits on devplatform); EA-9 documents and proceeds per 5b(a). Confirming with Guide-#9 at PROCEED.
+    </open_question>
+
+  </section_f>
+
+  <!-- ==================================================================== -->
+  <!-- SECTION G — Stage 5 Close Protocol Acknowledgment -->
+  <!-- ==================================================================== -->
+  <section_g name="Stage 5 Close Protocol Acknowledgment" required="MANDATORY">
+
+    <triple_subagent_verification_at_item_5_12>
+      EA-9 acknowledges per ack11 + d6 + w14: at Stage 5 close (Item 5.12), Guide-#9 spawns 3 parallel verification subagents:
+      - **S1 (BlarAI-side technical correctness)**: 9 platform tool dirs deleted; .platform/ populated correctly (sprints/, scheduled/, active_tasks.yaml, docs_sprints/, audit_archive/, vikunja_project_ids.yaml); BlarAI/docs/ platform-doctrine docs deleted per 5.5+5.5.v2; .gitignore augmented incl `.claude/scheduled_tasks.lock`; pyproject.toml updated; baseline preserved (~981/22).
+      - **S2 (devplatform-side path-reference correctness)**: 5.4 audit findings applied; 8-glob audit surfaces clean of BlarAI/tools/ refs (or correctly preserved as target-project / comment / fixture / forensic); fleet executes successfully post-Stage-5.
+      - **S3 (procedural completeness)**: all 12+4 v2 sub-items + Pre-Flight Step 0 + Step 1 executed; 8 exit_criteria met; audit archive intact for forensic recovery; tags created (post-platform-extract on BlarAI + platform-extracted on devplatform); STATUS.md updated; merge HALT-gate respected.
+
+      EA-9 cooperates by providing requested artifacts (file lists, git diff outputs, Test-Path results); does NOT manage subagent design. Guide-#9 cross-verifies subagent claims on disk per dn14/dn20/dn24/A18.
+    </triple_subagent_verification_at_item_5_12>
+
+    <ea_9_close_report_requirements>
+      Per init pointer §ea_9_close_report_requirements, EA-9's close report at Item 5.12 includes:
+      - Pre-Flight Step 0 PASS/FAIL summary + check details (verbatim from Step 0 PowerShell output) — already captured in §B.
+      - Pre-Flight Step 1 commit SHA — `1a552d9` on devplatform main.
+      - V0 pickup verification results (any drift documented per Operating Rule 5b) — already in §B.
+      - Per-item completion summary (16 items + Pre-Flight) with outcome + any anomalies.
+      - F.2 30-min mini-soak observations (firing-task LastTaskResult=0 + non-firing tasks documented as not-failure).
+      - 5.10 HALT-gate review matrix (4 rows; actual PASS/FAIL values; not placeholders).
+      - LA approval timestamp (when LA approved merge per w10).
+      - Merge commit SHA (BlarAI side post-LA-approval).
+      - Tag SHAs (post-platform-extract BlarAI + platform-extracted devplatform).
+      - STATUS.md append diff stats (verify single-copy invariant per d9/A17/EX-4).
+      - Stage 5 close unpause commit SHA (devplatform side; LAST action before exit).
+    </ea_9_close_report_requirements>
+
+    <ea_9_self_discipline>
+      EA-9 commits to:
+      - Per w11 / dn14: every "I did X" report cross-verifiable against `git diff` / `Test-Path` / `Get-ChildItem` evidence.
+      - Per ack10: hash-verify Item 5.12 STATUS append pre-vs-post BEFORE committing.
+      - Per ack8 + w10: NEVER merge to main without LA explicit approval.
+      - Per dn3: NO edits to BlarAI's CLAUDE.md, .github/copilot-instructions.md, AGENTS.md.
+      - Per dn10/w8/A20: NO pop or apply of any wake_launcher auto-stash entry.
+      - Per dn31/w21: NO direct touch of BlarAI's state.json (auto-resolved at 5.1).
+      - Per dn32/ack6: NO 5.1 deletion before 5.0.5 audit archive completes.
+      - Per t11/dn35: bind any newly-discovered Phase-C-pattern resurfacing as new finding under g9-ea9_n*; do NOT silently fix.
+    </ea_9_self_discipline>
+
+  </section_g>
+
+  <!-- ==================================================================== -->
+  <!-- STOP AND WAIT -->
+  <!-- ==================================================================== -->
+  <stop_and_wait>
+    EA-9 STOPS HERE. All Pre-Flight Steps 0-2 executed cleanly. iter-1 comprehension gate emitted. Awaiting Guide-#9 review and PROCEED authorization. Estimated EA-9 iter-1 turn count to PROCEED: 1-2.
+
+    PROCEED THRESHOLD per verdict §proceed_authorization: all 13 acknowledgments present (ACK1-ACK13 above) + 14 g9-ea9_n1 sub-clauses restated verbatim (§C above) + 116-atom inherited chain restated verbatim (§C above). Class A n1(e) acknowledgment (ack9, LOAD-BEARING) AND Class C n1(n) acknowledgment (ack13, EXECUTED) BOTH present and unambiguous.
+
+    Specific items requested in Guide-#9 PROCEED message:
+    1. Confirm V0 drift classification (Operating Rule 5b(a) STATUS-staleness per §B v0_drift_summary) is correct interpretation. Alternative (BlarAI-side commit also expected) requires explicit direction.
+    2. Confirm prep-1 + prep-4 LA attestation status (request from §D la_pre_prep_attestation_recap).
+    3. (Optional) Direct EA-9 to run ext1-ext3 Step 0 extensions if mature-not-minimal posture warrants (per §F A1).
+    4. PROCEED authorization for Item 5.0.5 (audit archive) → 5.1 (platform tool dir deletion) execution.
+  </stop_and_wait>
+
+</comprehension_gate>

@@ -1,0 +1,75 @@
+{
+  "milestone": "P5-FEASIBILITY-002",
+  "timestamp_utc": "2026-02-26T06:16:58.654570+00:00",
+  "metadata": {
+    "commit_hash": "68c2160d3db3c96c618a8b73ff60f829b1a5b46c",
+    "profile": "host",
+    "model_identifier": "qwen2.5-1.5b-instruct/openvino-int4-npu",
+    "baseline_artifact": "docs/FEASIBILITY_CONTEXT_WINDOW.md"
+  },
+  "corpus": {
+    "name": "p5_redecision_local_corpus",
+    "version": "1.0.0",
+    "input_bands_tokens": [
+      512,
+      1024,
+      2048,
+      3072,
+      4096
+    ],
+    "output_bands_tokens": [
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "pa_bands_tokens": [
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ]
+  },
+  "run_plan": {
+    "runs_per_mode": 15,
+    "warm_cold_modes": [
+      "cold",
+      "warm"
+    ],
+    "critical_points": {
+      "input": [
+        512,
+        4096
+      ],
+      "output": [
+        64,
+        4096
+      ],
+      "pa": [
+        256,
+        4096
+      ]
+    },
+    "reproducibility": {
+      "input_major_rerun_point": 4096,
+      "output_major_rerun_point": 1024,
+      "pa_major_rerun_point": 2048,
+      "runs": 10
+    }
+  },
+  "failure_fingerprint_schema": {
+    "prefixes": [
+      "AO_MODEL_LOAD_FAILED",
+      "AO_GEN_ERROR_*",
+      "AO_GEN_EXCEPTION_*",
+      "PA_MODEL_LOAD_FAILED",
+      "PA_ADJ_ERROR_*",
+      "PGOV_ERROR_*"
+    ],
+    "rule": "Uppercase alnum with underscore separators, deterministic truncation to 96 chars"
+  }
+}

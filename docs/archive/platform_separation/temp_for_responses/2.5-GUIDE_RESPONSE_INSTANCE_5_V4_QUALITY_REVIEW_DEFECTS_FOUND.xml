@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="midstage_handoff_quality_review">
+  <verdict>APPROVED_FOR_PROCESS_CONTINUITY_WITH_DOCUMENTED_DOCUMENTATION_DEFECTS</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <work_item>v4 mid-stage handoff documentation quality review</work_item>
+  <reviewed_at_utc>2026-04-25T23:10:00Z</reviewed_at_utc>
+  <guide_instance>5</guide_instance>
+  <reviewing>
+    <ea_artifact>docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v4.xml (commit d0c6df1)</ea_artifact>
+    <ea_instance>4</ea_instance>
+  </reviewing>
+
+  <summary>
+    The v4 commit + schema fidelity + work-completion claims are all sound on disk (already
+    ratified in prior turn). However, full-content review of v4 surfaces FIVE documentation
+    defects -- two HIGH (g5-N numbering wrong; binding-ack count undercounted), three LOW/MED
+    (cleaner.py undersells the g5-3 closure; f1 fix mischaracterized; canonical_param_pattern
+    includes phantom decorator). The work itself is correct on disk; the v4 documentation has
+    drift that would propagate to EA-5 if uncorrected.
+
+    Disposition: NO v4-amend commit (overhead + procedural noise). Instead: Guide-#6 MUST
+    include a corrected binding-ack list (33+ acks, not v4's "27") + corrected g5-N numbering
+    in the EA-5 init pointer. The v4 file persists as-is for audit (it shows what EA-4
+    documented at v4 emission time); the EA-5 init pointer authored by Guide-#6 becomes the
+    authoritative restatement that EA-5 reads + restates verbatim in its iteration-1 gate. EA-5's
+    iteration-1 gate then encodes the CORRECT ack chain forward.
+  </summary>
+
+  <documentation_defects>
+
+    <defect id="D1" severity="HIGH" topic="g5-N numbering and content mapping is WRONG">
+      <v4_claim>v4 lines 174-178 + 339-342:
+        - g5-7 SATISFIED: "PS1 env-fallback default expression"
+        - g5-8 SATISFIED: "PS1 alias attribute order"  (FICTITIOUS -- no such ack exists)
+        - g5-9 SATISFIED: "McpConfigPath derivation flows from $RepoRoot"
+        - g5-10 FORWARD: STATUS append + A11
+      </v4_claim>
+      <actual_per_guide_5_dispositions>
+        - g5-7 = duplicate test cleanup (delete lines 76-94 of test_vikunja_client_scope.py)
+        - g5-8 = env-fallback default in 6 PS1 scripts
+        - g5-9 = $McpConfigPath derivation in 2 scripts
+        - g5-10 = A11 documented deviation commitment
+        Source: 2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml
+        required_acknowledgments_for_ea_4_to_emit block.
+      </actual_per_guide_5_dispositions>
+      <impact>The g5-7 duplicate test cleanup is omitted from v4's correction history entirely.
+        EA-4 conflated env-fallback into g5-7 + invented "alias attribute order" as g5-8. If
+        EA-5 restates v4's incorrect mapping in iteration-1 gate, the audit chain is broken.</impact>
+      <required_correction_for_ea_5_init_pointer>
+        Guide-#6 MUST restate the CORRECT g5-7/g5-8/g5-9/g5-10 mapping in the EA-5 init pointer:
+          - g5-7 SATISFIED: duplicate test cleanup (lines 76-94 deletion in test_vikunja_client_scope.py)
+          - g5-8 SATISFIED: env-fallback default `$(if ($env:BLARAI_ROOT) ...)` in all 6 PS1 scripts
+          - g5-9 SATISFIED: $McpConfigPath = Join-Path $RepoRoot '.mcp.json' in agents-cadence-monitor + la_merge_approve
+          - g5-10 FORWARD to 2.10: A11 anomaly + g5-7/8/9 disposition log + f1 disposition log
+        EA-5 then restates verbatim in iteration-1 gate.
+      </required_correction_for_ea_5_init_pointer>
+    </defect>
+
+    <defect id="D2" severity="HIGH" topic="binding_acknowledgments_27_total UNDERCOUNTS the actual binding set">
+      <v4_claim>v4 lines 332-344: "binding_acknowledgments_27_total" with explicit listings for
+        i1-1..i1-7 (incorrect range), g4-1..g4-7, g5-1..g5-6, g5-7/8/9 SATISFIED, g5-10 FORWARD,
+        f1 SATISFIED. Implicitly omits 9 critical_carryovers (n=1..n=9) and 3 g3 acks
+        (g3-1, g3-2, g3-3).</v4_claim>
+      <actual_count>
+        - 9 critical_carryovers (n=1..n=9) -- OMITTED from v4
+        - 3 plus_guide_3 (g3-1, g3-2, g3-3) -- OMITTED from v4
+        - 4 plus_iteration_1 (i1-1, i1-2, i1-3, i1-4) -- v4 says "i1-1..i1-7" which is WRONG (only 4 exist)
+        - 7 plus_guide_4 (g4-1..g4-7) -- correct
+        - 4 plus_guide_5_pre_corrections (g5-1, g5-2, g5-3, g5-4) -- v4 lumps as "g5-1..g5-6"
+        - 6 plus_guide_5_corrections_cycle (g5-5 f1 disposition, g5-6 path-confusion, g5-7 dup tests,
+          g5-8 env-fallback, g5-9 McpConfigPath, g5-10 A11) -- v4 lumps part of these as "g5-1..g5-6"
+        - 1 f1 (treated as separate ack)
+        Total: 9 + 3 + 4 + 7 + 4 + 6 + 1 = 34 acks (or 33 if some dedup)
+      </actual_count>
+      <impact>v4 says "27_total" -- this is approximately the count BEFORE the corrections cycle
+        (9+3+4+7+4 = 27, matching g5-1..g5-4 era). EA-4 forgot to update the count after the
+        g5-5..g5-10 corrections cycle. EA-5 might think only 27 acks bind when ~33-34 do. The
+        original 9 critical_carryovers + 3 g3 acks aren't even mentioned in v4's binding list.</impact>
+      <required_correction_for_ea_5_init_pointer>
+        Guide-#6's EA-5 init pointer MUST include the FULL 33-34 ack list with verbatim text from
+        the chain of custody (EA-3 iter-2 gate has the original 9+3+4 = 16 acks verbatim; Guide-#4
+        added g4-1..g4-7; Guide-#5 init pointer added g5-1..g5-4; Guide-#5 corrections cycle added
+        g5-5..g5-10). Source files for verbatim restatement:
+          - 9 critical_carryovers + 3 g3-N + 4 i1-N: in 2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml
+          - 7 g4-N: in 2.4-GUIDE_RESPONSE_TO_EA_INITIALIZATION_03_STAGE2_REFACTOR_MULTIPROJECT.xml +
+            2.4-GUIDE_RESPONSE_ITERATION_2_APPROVED_03_STAGE2_REFACTOR_MULTIPROJECT.xml
+          - 4 g5-1..g5-4: in 2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_2.4_PARTIAL.xml
+          - 2 g5-5/g5-6: in 2.4-GUIDE_RESPONSE_INSTANCE_5_F1_DISPOSITION_OPTION_A.xml
+          - 4 g5-7/8/9/10: in 2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml
+        EA-5 iteration-1 gate restates all ~33 verbatim with SATISFIED / FORWARD-ACTIVE status.
+      </required_correction_for_ea_5_init_pointer>
+    </defect>
+
+    <defect id="D3" severity="MED" topic="cleaner.py undersells the g5-3 closure work">
+      <v4_claim>v4 lines 112-115: cleaner.py loc_changed="~3" disposition="REFACTORED_minimal"
+        with "Only change: chokepoint routing alignment for downstream f1 fix propagation.
+        Function signatures unchanged."</v4_claim>
+      <actual>cleaner.py change was substantive (~44 LOC per git diff --stat at the time):
+        added `from tools import _project_context` import; added `project_context:
+        "_project_context.ProjectContext | None" = None` kwarg to run_sweep() (function signature
+        DID change); added 3-branch fallback logic (config-injected wins → project_context
+        auto-resolve → legacy zero-arg) replacing single-line fallback at line 180; added
+        detailed docstring explaining Stage 2.4 g5-3 disposition Option (b) rationale.
+        This was the g5-3 closure (Guide-#5 EA-4 init pointer ack) per Option b.</actual>
+      <impact>Documentation undersells the work; doesn't credit g5-3 SATISFIED. EA-5 reading
+        v4 might think cleaner.py only had a trivial chokepoint alignment, miss the project-aware
+        fallback design.</impact>
+      <required_correction>Note in EA-5 init pointer that cleaner.py closure was substantive
+        g5-3 Option (b) implementation (project-aware fallback with 3-branch logic). Cite
+        Guide-#5 disposition 2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_2.4_COMPLETE.xml
+        check id="g5_3_cleaner_closed" verdict="PASS_OPTION_B_THOROUGH" for verbatim disposition
+        documentation.</required_correction>
+    </defect>
+
+    <defect id="D4" severity="LOW" topic="f1 fix mischaracterized as 'signature/routing' change">
+      <v4_claim>v4 lines 142-145: "corrected helper signature/routing in
+        tools/_vikunja_client.VikunjaClient to close f1 finding."</v4_claim>
+      <actual>The actual f1 fix was: extended `_require_project_id` rejection condition with
+        `or project_id <= 0`; updated docstring to mention "explicit positive int (not <= 0)";
+        updated error message; added 2 new tests (test_require_project_id_rejects_zero,
+        test_require_project_id_rejects_negative). The function SIGNATURE was unchanged; only
+        the BODY (rejection condition + error message) and the test file were modified. "Routing"
+        is unrelated to f1 (routing was the o1 concern, separate).</actual>
+      <impact>Cosmetic mischaracterization; EA-5 would re-read tools/_vikunja_client.py and see
+        the actual change. No procedural drift.</impact>
+      <required_correction>Note in EA-5 init pointer that f1 fix = rejection condition extension
+        + tests, not signature/routing.</required_correction>
+    </defect>
+
+    <defect id="D5" severity="LOW" topic="canonical_param_pattern includes phantom [Parameter(Mandatory=$false)] decorator">
+      <v4_claim>v4 lines 153-157 canonical_param_pattern shows:
+        ```
+        [Parameter(Mandatory=$false)]
+        [Alias('BlarAIRoot')]
+        [string]$RepoRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })
+        ```
+      </v4_claim>
+      <actual>Disk verification shows the actual on-disk pattern in the 5 G-1 PS1 scripts is:
+        ```
+        [Alias('BlarAIRoot')]
+        [string]$RepoRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })
+        ```
+        WITHOUT the [Parameter(Mandatory=$false)] decorator. EA-4's documentation includes a
+        decorator that doesn't exist in the actual files.</actual>
+      <impact>Cosmetic only; the implicit-mandatory-false default applies regardless of explicit
+        [Parameter(Mandatory=$false)] decorator. Functionally equivalent.</impact>
+      <required_correction>None required at EA-5 init pointer level. EA-5 will re-read the
+        scripts directly if it needs the pattern.</required_correction>
+    </defect>
+
+  </documentation_defects>
+
+  <disposition>
+
+    <decision>NO v4-amend commit. The v4 file persists as-is for audit (it documents what EA-4
+      knew at v4 emission time -- a snapshot, not a guarantee of perfection). v4-amend would add
+      procedural noise (another mid-stage commit, requires reopening EA-4 chat) without
+      meaningful benefit.</decision>
+
+    <decision>Guide-#6's EA-5 init pointer becomes the AUTHORITATIVE forward statement: corrects
+      g5-N mapping, restates the full ~33 binding ack list verbatim, properly credits g5-3
+      cleaner.py closure. EA-5 reads init pointer + restates verbatim in iteration-1 gate. The
+      v4 documentation defects don't propagate forward.</decision>
+
+    <decision>For audit completeness, EA-5's eventual 2.10 STATUS append should include a
+      brief footnote noting "v4 handoff documentation contained binding-ack-count drift (claimed
+      27; actual ~33); corrected in EA-5 iteration-1 gate via Guide-#6 init pointer." This
+      preserves the historical record without polluting v4 itself.</decision>
+
+  </disposition>
+
+  <addendum_to_handoff_brief>
+    <addendum>This v4 quality review file (2.5-GUIDE_RESPONSE_INSTANCE_5_V4_QUALITY_REVIEW_DEFECTS_FOUND.xml)
+      should be added to the EA-5 init pointer's reading list as the 9th Guide-#5 disposition
+      file. Guide-#6 reads this when running Variant B comprehension gate; uses the corrections
+      to author the corrected EA-5 init pointer.</addendum>
+    <addendum>The handoff brief written immediately prior to this file
+      (2.5-GUIDE_HANDOFF_INSTANCE_5_TO_6.xml) enumerates 8 Guide-#5 disposition XMLs in step 2
+      of first_action_for_successor. Guide-#6 should treat THIS file as the 9th -- not a
+      separate disposition cycle but a quality-review addendum to the v4 handoff itself.</addendum>
+    <addendum>Specifically: after Guide-#6 reads v4 + this quality review, the EA-5 init pointer
+      MUST:
+        (a) Restate g5-7 = duplicate test cleanup (NOT v4's "env-fallback")
+        (b) Restate g5-8 = env-fallback in 6 PS1 (NOT v4's "alias attribute order")
+        (c) Keep g5-9 = McpConfigPath derivation (v4 correct on this one)
+        (d) Keep g5-10 = A11 documented deviation (v4 correct)
+        (e) Restate the FULL ~33 binding ack list (not v4's "27"), drawing verbatim from each
+            source file noted in defect D2 required_correction.
+        (f) Properly credit cleaner.py as g5-3 SATISFIED via Option (b) substantive refactor
+            (NOT v4's "trivial chokepoint alignment").</addendum>
+  </addendum_to_handoff_brief>
+
+  <proceed_authorization>
+    APPROVED_FOR_PROCESS_CONTINUITY -- v4 commit + work-completion claims are sound on disk;
+    documentation defects are forward-correctable in EA-5 init pointer without rolling back v4
+    or amending. EA-4 may close session; v4 emission stands as the predecessor handoff. LA may
+    proceed with the planned Option B Guide-#5-to-6 transition. Guide-#6 absorbs this quality
+    review during Variant B comprehension gate + corrects in EA-5 init pointer. EA-5
+    iteration-1 gate becomes the authoritative ack-chain forward statement.
+  </proceed_authorization>
+
+</guide_review_response>

@@ -1,0 +1,911 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_prompt version="1.0" task="82" ea_number="3" authored_by="sdo" authored_at="2026-04-22">
+
+  <!--
+    BlarAI — EA Code Execution Prompt
+    Sprint 8 / Task 82: Test Quality Remediation — EA-3: UI Gateway + UI Shell Test Hardening
+    Branch: feature/p5-task8-ea3-ui-hardening
+    Ledger path (Q1-1 per-file convention — 2026-04-22):
+      docs/ledger/<YYYYMMDD_HHMMSS>_sprint8_ea3_ui-hardening.md
+    Predecessor ledger_id: 20260422_184004_sprint8_ea2_ao_sr_hardening
+
+    IMPORTANT (L-12): Before ANY work begins, the EA MUST post a comprehension gate
+    comment on Vikunja Task 82 prefixed [agent:ea_code][phase:comprehension] and STOP.
+    Do not start implementation until SDO explicitly approves with
+    [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+
+    IMPORTANT (L-15): This is a PURE TEST-AUTHORING milestone.
+    DO NOT modify any file outside tests/, conftest.py, docs/, or pyproject.toml.
+    If a production code change is required to unblock a test, STOP, document the
+    blocker in your completion report, and wait for SDO direction. Do not make the
+    change unilaterally.
+  -->
+
+  <!-- ===== SECTION 1: PARENT HEAD (L-13) ===== -->
+
+  <parent_head>cf0ab6a</parent_head>
+  <!-- Verified by SDO via `git rev-parse HEAD` immediately before authoring this
+       revision. Full HEAD at revision-authoring: cf0ab6a (SDO queue-move of Sprint 9
+       EA-3 after Co-Lead APPROVED; no code delta vs main). EA MUST verify this
+       matches the current main HEAD before branching. If HEAD has advanced, use the
+       current main HEAD — do not force-checkout cf0ab6a. -->
+
+  <!-- ===== SECTION 2: COMPREHENSION GATE (L-12) ===== -->
+
+  <comprehension_gate>
+    <instruction>
+      READ THIS ENTIRE PROMPT before posting your comprehension gate.
+      Then READ every file listed in required_attachments.
+      Then POST a comprehension gate comment on Vikunja Task 82, prefixed:
+
+        [agent:ea_code][phase:comprehension]
+
+      Your comprehension comment MUST contain ALL of the following sections (verbatim
+      section headers required, in this exact order, no numbered prefixes):
+
+        A. MILESTONE OBJECTIVE (in your own words, 3-5 sentences)
+        B. WORK ITEMS (one sentence each for ALL 15 WIs — do NOT summarize, do NOT group)
+        C. FILES TO CREATE (list every new test file exactly as specified in deliverables)
+        D. FILES TO MODIFY (list every existing test file you will add tests to)
+        E. FILES TO READ (all production source files you will read for context)
+        F. DELIVERABLE STRUCTURE (recite VERBATIM: branch name, every test file with its
+           test class/function names and naming conventions, ledger path + frontmatter)
+        G. ORACLE EXPECTATION (recite VERBATIM the exact git diff --name-only grep command
+           and the expected EMPTY output)
+        H. MATURE-NOT-MINIMAL 1-HOUR CAP ACKNOWLEDGMENT (one sentence)
+        I. RISKS AND AMBIGUITIES (list any; at minimum address: asyncio.to_thread()
+           verification strategy without a real Textual App loop, PA handshake backoff
+           monkeypatching strategy, constants-pinning vs shared/constants re-export chain,
+           boot-poll attempt-marker determinism without real timers)
+        J. PRODUCTION FILE PROHIBITION ACKNOWLEDGMENT (quote the prohibition verbatim)
+
+      After posting, STOP. Do NOT proceed to implementation.
+      You cannot begin code work until you have posted your
+      [agent:ea_code][phase:comprehension] comment AND received
+      [agent:sdo][phase:comprehension-review] VERDICT: APPROVED from the SDO.
+
+      If SDO issues VERDICT: ADJUST, update your comprehension gate and wait again.
+    </instruction>
+  </comprehension_gate>
+
+  <!-- ===== SECTION 3: MILESTONE ===== -->
+
+  <milestone>
+    <objective>
+      Close all test-coverage, boundary-verification, and assertion-quality gaps in
+      the UI Gateway (`services/ui_gateway/`) and UI Shell (`services/ui_shell/`)
+      service clusters scoped by `docs/P5_TASK8_SDO_CONTINUATION_v1.0.xml` §5 (EA-3
+      block, lines 255-274) and `docs/sprints/sprint_8/strategic_design_vision.md`
+      §5.1 item 3. Each WI below cites its authoritative production-file line range
+      directly; scope is prompt-internal (no external audit artifact).
+      This EA addresses: the STREAM_TOKEN_BUFFER_LIMIT overflow exact-boundary guard
+      in transport.py (lines 545-550); the `stream_tokens()` malformed-message /
+      decode-error continue path (transport.py:534-540); the `check_pa_status()`
+      already-connected short-circuit (transport.py:258-260); the PA handshake retry /
+      backoff sequence (transport.py:265-291); the `action_submit_prompt()` four
+      branches — PGOV-denied, PGOV-approved, RuntimeError, generic Exception
+      (app.py:405-445); the boot-poll attempt-marker progression (app.py:237-284);
+      `SessionPanel` public method surface plus the `asyncio.to_thread()` wiring
+      (session_panel.py full file); the `SessionListItem` label text format
+      (session_panel.py:45-48); streaming `_streaming` flag transitions
+      (streaming.py full file); the tool-call buffer boundary (transport.py:648); and
+      direct constants-pinning tests for both UI Gateway and UI Shell constants. No
+      production code is modified. All work is pure test authoring.
+    </objective>
+    <sprint>8</sprint>
+    <ea_number>3</ea_number>
+    <branch>feature/p5-task8-ea3-ui-hardening</branch>
+    <ledger_path>docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint8_ea3_ui-hardening.md</ledger_path>
+    <ledger_frontmatter>
+      <![CDATA[
+---
+ledger_id: <YYYYMMDD_HHMMSS>_sprint8_ea3_ui-hardening
+date: <YYYY-MM-DD>
+sprint_id: 8
+entry_type: EA
+predecessor: 20260422_184004_sprint8_ea2_ao_sr_hardening
+branch: feature/p5-task8-ea3-ui-hardening
+merge_commit: null
+disposition: COMPLETE
+---
+      ]]>
+    </ledger_frontmatter>
+    <sizing>M</sizing>
+    <depends_on>
+      EA-2 merged to main. Branch feature/p5-task8-ea2-ao-sr-hardening must be present
+      in main history (verified at authoring: merge commit 0b5e5ec, Co-Lead completion
+      report df686b8). If main has advanced further, use the current main HEAD.
+    </depends_on>
+  </milestone>
+
+  <!-- ===== SECTION 4: WORK ITEMS ===== -->
+
+  <work_items>
+
+    <!-- ===== HIGH PRIORITY — address first ===== -->
+
+    <item id="WI-1" priority="HIGH" source="continuation_xml §5 EA-3 + services/ui_gateway/src/transport.py:545-550">
+      <title>Add STREAM_TOKEN_BUFFER_LIMIT exact-boundary overflow test</title>
+      <detail>
+        File: services/ui_gateway/tests/test_transport.py (MODIFY)
+        Class: TestStreamTokensBufferLimit (CREATE NEW CLASS)
+
+        Tests that pin overflow-guard behavior of `stream_tokens()` at the exact
+        STREAM_TOKEN_BUFFER_LIMIT boundary. Read the actual value from
+        services/ui_gateway/src/constants.py at pickup; do NOT hardcode.
+
+        test_stream_tokens_at_limit_yields_last_token:
+          Drive the stream with exactly STREAM_TOKEN_BUFFER_LIMIT tokens. Assert all
+          LIMIT tokens are yielded in order; stream terminates cleanly without
+          overflow log.
+
+        test_stream_tokens_one_over_limit_breaks:
+          Drive with STREAM_TOKEN_BUFFER_LIMIT + 1 tokens. Assert exactly LIMIT tokens
+          are yielded; stream breaks on the (LIMIT+1)th; Fail-Closed error log is
+          emitted.
+
+        Read before writing:
+          services/ui_gateway/src/transport.py (stream_tokens method; locate the
+            overflow guard and surrounding yield/break structure)
+          services/ui_gateway/src/constants.py (STREAM_TOKEN_BUFFER_LIMIT value)
+          services/ui_gateway/tests/test_transport.py (existing stream_tokens test
+            patterns; mirror the mocking style)
+
+        Mocking: reuse the existing async generator / mock connection seam. Do not
+        add new production hooks.
+      </detail>
+    </item>
+
+    <item id="WI-2" priority="HIGH" source="continuation_xml §5 EA-3 + services/ui_gateway/src/transport.py:534-540">
+      <title>Add stream_tokens malformed-message / decode-error continue-path test</title>
+      <detail>
+        File: services/ui_gateway/tests/test_transport.py (MODIFY)
+        Class: TestStreamTokensDecodeError (CREATE NEW CLASS)
+
+        test_stream_tokens_malformed_frame_skips_and_continues:
+          Inject a frame sequence: [valid_token_0, malformed_payload, valid_token_1,
+          final_token]. Malformed decode must raise the production-realistic
+          exception (`ValueError` or `json.JSONDecodeError` — read transport.py to
+          determine which — use that exact type in the mock).
+          Assert: generator yields valid_token_0 and valid_token_1 (and final
+          payload). Malformed frame produces logger.error but does NOT raise or
+          terminate.
+
+        If transport.py catches `ValueError`, inject raising ValueError. If it
+        catches `json.JSONDecodeError`, raise JSONDecodeError. If broader catch,
+        cover both. Test asserts CURRENT production behavior, not an assumed one.
+
+        Read before writing:
+          services/ui_gateway/src/transport.py (stream_tokens decode catch path)
+          services/ui_gateway/tests/test_transport.py (frame-mocking patterns)
+      </detail>
+    </item>
+
+    <item id="WI-3" priority="HIGH" source="continuation_xml §5 EA-3 + services/ui_gateway/src/transport.py:258-260">
+      <title>Add check_pa_status already-connected short-circuit test</title>
+      <detail>
+        File: services/ui_gateway/tests/test_transport.py (MODIFY)
+        Class: TestCheckPaStatusShortCircuit (CREATE NEW CLASS)
+
+        test_check_pa_status_returns_true_when_already_connected:
+          Construct the gateway. Pre-set its internal _connected flag (or whatever
+          transport.py uses as its already-connected sentinel — read to determine).
+          Call await gateway.check_pa_status().
+          Assert: returns True.
+          Assert: no handshake/send path was invoked (Mock on the framer send or
+          socket send; assert_not_called()).
+
+        Read before writing:
+          services/ui_gateway/src/transport.py (check_pa_status and its
+            `if self._connected: ... return True` branch; identify the real
+            attribute name and the send-path method to assert not-called)
+          services/ui_gateway/tests/test_transport.py (gateway construction pattern)
+      </detail>
+    </item>
+
+    <item id="WI-4" priority="HIGH" source="continuation_xml §5 EA-3 + SDV §5.1 item 3 + services/ui_shell/src/app.py:405-418">
+      <title>Add action_submit_prompt PGOV-denied branch test</title>
+      <detail>
+        File: services/ui_shell/tests/test_app.py (MODIFY — add NEW tests; do NOT
+          rewrite existing tests)
+        Class: TestActionSubmitPromptBranches (CREATE NEW CLASS)
+
+        test_action_submit_prompt_pgov_denied_displays_panel_and_flushes_rejected:
+          Mock gateway.send_prompt() (or equivalent) to return a result with
+          `approved=False` and a denial reason code from PGOV_REASON_LABELS (read
+          services/ui_shell/src/constants.py for the authoritative label set).
+          Invoke the BlarAIApp's action_submit_prompt flow. Construction-only
+          strategy (see RISK I.1): construct the App, stub widget lookups with
+          Mocks, call the method directly.
+          Assert: PGOV panel display_denial called exactly once with the result.
+          Assert: tool-call buffer flush invoked with pgov_approved=False (or
+          whichever argument the production path uses — read app.py).
+          Assert: no approved-tokens persistence occurred.
+
+        If the Textual App test seam truly cannot be established without a live
+        loop, STOP and raise a blocker — do NOT add a production seam.
+      </detail>
+    </item>
+
+    <item id="WI-5" priority="HIGH" source="continuation_xml §5 EA-3 + services/ui_shell/src/app.py:419-436">
+      <title>Add action_submit_prompt PGOV-approved branch test</title>
+      <detail>
+        File: services/ui_shell/tests/test_app.py (MODIFY)
+        Class: TestActionSubmitPromptBranches (same class as WI-4)
+
+        test_action_submit_prompt_pgov_approved_persists_and_streams:
+          Mock gateway.send_prompt() to return a result with `approved=True` and
+          a non-empty approved-token stream.
+          Invoke action_submit_prompt per WI-4's construction strategy.
+          Assert: approved-token flush invoked with pgov_approved=True.
+          Assert: tokens fed to the streaming widget (or its mock).
+          Assert: PGOV panel display_denial NOT called.
+      </detail>
+    </item>
+
+    <item id="WI-6" priority="HIGH" source="continuation_xml §5 EA-3 + services/ui_shell/src/app.py:438-445 (RuntimeError and Exception handlers)">
+      <title>Add action_submit_prompt RuntimeError and generic-Exception handler tests</title>
+      <detail>
+        File: services/ui_shell/tests/test_app.py (MODIFY)
+        Class: TestActionSubmitPromptBranches (same class as WI-4/5)
+
+        test_action_submit_prompt_runtime_error_displays_specific_message:
+          Mock gateway.send_prompt() to raise RuntimeError("boom").
+          Invoke action_submit_prompt.
+          Assert: display_output_line (or equivalent — read app.py) called with a
+            message containing "boom" and the production RuntimeError styling
+            (e.g., "[red]Error:…").
+          Assert: no unexpected-error / fail-closed message was written.
+
+        test_action_submit_prompt_generic_exception_displays_fail_closed:
+          Mock gateway.send_prompt() to raise Exception("unknown").
+          Invoke action_submit_prompt.
+          Assert: display output line called with exact fail-closed message
+            defined in app.py.
+          Assert: error logged via logger.exception or logger.error — read app.py.
+
+        Use caplog for log assertions. Read exact log-level and message text from
+        app.py; do NOT invent strings.
+      </detail>
+    </item>
+
+    <item id="WI-7" priority="HIGH" source="Sprint 7 audit + services/ui_shell/tests/test_app.py:74-86 (tautological stub review)">
+      <title>Strengthen tautological / stub assertions in test_app.py</title>
+      <detail>
+        File: services/ui_shell/tests/test_app.py (MODIFY)
+
+        Review existing `test_submit_noop_when_not_operational` and
+        `test_submit_noop_when_no_gateway` (approx lines 74-86). They check
+        preconditions without actually invoking action_submit_prompt. Either:
+
+        (a) Strengthen them: invoke action_submit_prompt under each precondition and
+            assert gateway.send_prompt (mock) was NOT called — i.e. the guard
+            short-circuits the action.
+
+        OR, if reaching the action method requires production seam changes:
+
+        (b) Leave stubs intact but add new tests in TestActionSubmitPromptBranches
+            (WI-4/5/6) that explicitly call action_submit_prompt under each guard
+            condition and assert the send-path was not invoked.
+
+        Preferred: (a). Use (b) only if (a) would require a production change.
+
+        Read:
+          services/ui_shell/src/app.py (action_submit_prompt top-of-method guards)
+          services/ui_shell/tests/test_app.py (lines 74-86; identify guard shape)
+      </detail>
+    </item>
+
+    <!-- ===== MEDIUM PRIORITY ===== -->
+
+    <item id="WI-8" priority="MEDIUM" source="continuation_xml §5 EA-3 + SDV §5.1 item 3 + services/ui_shell/src/session_panel.py (full file)">
+      <title>Create dedicated test_session_panel.py covering public methods + to_thread wiring</title>
+      <detail>
+        File: services/ui_shell/tests/test_session_panel.py (CREATE NEW)
+        Classes: TestSessionPanelPublicMethods, TestSessionListItemLabelFormat
+
+        Public methods (async): refresh_list, create_new_session,
+        delete_current_session, select_session. Property: active_session_id.
+
+        For each async method:
+          Construct SessionPanel with a Mock session_store. Use pytest-asyncio
+          (confirm existing pattern). Call the method. Assert store methods were
+          invoked via asyncio.to_thread — the synchronous store method was called
+          exactly once with correct arguments. Monkeypatch `asyncio.to_thread` to
+          a thin wrapper that records invocations (see RISK I.2).
+
+          The point: the UI Shell must never call store methods synchronously from
+          the async context. Test must fail if a future refactor replaces
+          `await asyncio.to_thread(store.x)` with `store.x()`.
+
+        test_session_list_item_label_format:
+          Construct SessionSummary with known title and turn_count. Instantiate
+          SessionListItem; render its label. Assert label text matches production
+          format exactly. Read session_panel.py for the format string.
+
+        Read:
+          services/ui_shell/src/session_panel.py (full file)
+          services/ui_shell/src/constants.py (TITLE_PLACEHOLDER)
+          services/ui_gateway/src/session_store.py (SessionSummary shape)
+          services/ui_shell/tests/test_app.py, test_streaming.py (async patterns)
+      </detail>
+    </item>
+
+    <item id="WI-9" priority="MEDIUM" source="continuation_xml §5 EA-3 + services/ui_shell/src/app.py:237-284 (boot-poll attempt markers)">
+      <title>Add boot-poll attempt-marker progression test</title>
+      <detail>
+        File: services/ui_shell/tests/test_app.py (MODIFY)
+        Class: TestBootPollAttemptMarkers (CREATE NEW CLASS)
+
+        test_poll_boot_status_advances_all_attempt_markers:
+          Exercise the boot-poll loop that displays "attempt N/PA_HANDSHAKE_MAX_RETRIES"
+          banner updates. Use a controlled time source (monkeypatch time.monotonic
+          or equivalent) and a mocked gateway whose check_pa_status returns False
+          for the first two attempt windows and True on the third.
+          Assert: exactly PA_HANDSHAKE_MAX_RETRIES attempt-banner updates were
+          emitted in order (attempt 1/3, 2/3, 3/3).
+          Assert: final status transitions to "connected" when check_pa_status
+          returns True.
+
+        If the loop is too entangled with Textual widget setup, cover only the
+        attempt-marker LIST computation (app.py:237-242) as a pure unit test.
+        Document partial coverage in the completion report.
+
+        Read:
+          services/ui_shell/src/app.py (attempt_markers computation; poll loop)
+          services/ui_gateway/src/constants.py (PA_HANDSHAKE_MAX_RETRIES,
+            PA_HANDSHAKE_BACKOFF_BASE_S)
+      </detail>
+    </item>
+
+    <item id="WI-10" priority="MEDIUM" source="continuation_xml §5 EA-3 + services/ui_gateway/src/transport.py:265-291 (handshake retry/backoff loop)">
+      <title>Tighten PA handshake retry / backoff assertions</title>
+      <detail>
+        File: services/ui_gateway/tests/test_transport.py (MODIFY)
+        Class: TestPaHandshakeRetry (CREATE or extend existing)
+
+        Audit existing check_pa_status tests:
+          - Assert the exact number of asyncio.sleep calls?
+          - Assert exact backoff durations (1.0s, 2.0s)?
+          - Assert sleep is called BEFORE retries 2/3 but NOT after the final?
+        If any are missing, add them.
+
+        test_check_pa_status_backoff_sequence:
+          Mock handshake to fail twice then succeed on attempt 3. Monkeypatch
+          asyncio.sleep to record arguments (do NOT sleep — AsyncMock returns
+          immediately — see RISK I.8).
+          Assert: recorded sleep durations are
+            [PA_HANDSHAKE_BACKOFF_BASE_S, PA_HANDSHAKE_BACKOFF_BASE_S * 2]
+          (i.e. [1.0, 2.0] at base 1.0). No sleep after the successful third
+          attempt.
+
+        test_check_pa_status_exhausts_retries_returns_false:
+          Mock handshake to fail all PA_HANDSHAKE_MAX_RETRIES attempts.
+          Assert: returns False.
+          Assert: sleep was called exactly (MAX_RETRIES - 1) times.
+
+        Read:
+          services/ui_gateway/src/transport.py (check_pa_status retry loop)
+          services/ui_gateway/src/constants.py (PA_HANDSHAKE_MAX_RETRIES,
+            PA_HANDSHAKE_BACKOFF_BASE_S)
+      </detail>
+    </item>
+
+    <item id="WI-11" priority="MEDIUM" source="continuation_xml §5 EA-3 + services/ui_shell/src/streaming.py (full file — _streaming flag transitions)">
+      <title>Add streaming._streaming state-transition tests</title>
+      <detail>
+        File: services/ui_shell/tests/test_streaming.py (MODIFY)
+        Class: TestStreamingFlagTransitions (CREATE NEW CLASS)
+
+        test_streaming_flag_true_during_non_final_tokens:
+          Construct the StreamingWidget (or StreamingBuffer — read streaming.py
+          for the correct class name). Call append_token() with is_final=False
+          five times. Assert: is_streaming == True throughout and after.
+
+        test_streaming_flag_false_after_final_token:
+          Continue the above with is_final=True. Assert: is_streaming flips to
+          False.
+
+        test_streaming_flag_false_after_clear_display:
+          Enter streaming state. Call clear_display() (or equivalent). Assert:
+          _streaming is False and any partial buffer was released.
+
+        test_streaming_flag_false_after_start_new_response:
+          Enter streaming state. Call start_new_response(). Assert: _streaming
+          is False (or whatever the production path does — read streaming.py).
+
+        Read:
+          services/ui_shell/src/streaming.py (full file — identify real method
+            names; may differ from generic names above)
+          services/ui_shell/tests/test_streaming.py (existing patterns)
+      </detail>
+    </item>
+
+    <item id="WI-12" priority="MEDIUM" source="SDV §5.1 item 3 — UI Gateway constants">
+      <title>Create test_constants_ui_gateway.py constants-pinning tests</title>
+      <detail>
+        File: services/ui_gateway/tests/test_constants_ui_gateway.py (CREATE NEW)
+        Class: TestUiGatewayConstants
+
+        Direct-assertion tests pinning every constant in
+        services/ui_gateway/src/constants.py. Enumerate by reading constants.py
+        at pickup (do NOT trust the audit snapshot — source is authoritative).
+
+        Known constants (verify at pickup):
+          SESSION_DB_DIR (see RISK I.7 — path-shape assertion)
+          SESSION_DB_FILENAME == "sessions.db"
+          SESSION_DB_PATH (derived; assert endswith(SESSION_DB_FILENAME))
+          PA_HANDSHAKE_MAX_RETRIES == 3
+          PA_HANDSHAKE_BACKOFF_BASE_S == 1.0
+          PA_HANDSHAKE_TIMEOUT_S == 5.0
+          PROMPT_RESPONSE_TIMEOUT_S == 120.0
+          STREAM_TOKEN_BUFFER_LIMIT == 4096
+          TOOL_CALL_BUFFER_MAX_TOKENS == 512
+          SESSION_TITLE_MAX_CHARS == 80
+
+        If any constant is a re-export from shared/constants.py (VSOCK_PORT,
+        ORCHESTRATOR_VM_ID, etc.), pin the re-export: assert
+        `ui_gateway.constants.X is shared_ref` (identity via `is`, not ==).
+        See services/semantic_router/tests/test_constants_sr.py for the idiom.
+
+        Read:
+          services/ui_gateway/src/constants.py
+          shared/constants.py (for re-exports)
+          services/semantic_router/tests/test_constants_sr.py (re-export idiom)
+      </detail>
+    </item>
+
+    <item id="WI-13" priority="MEDIUM" source="SDV §5.1 item 3 — UI Shell constants">
+      <title>Create test_constants_ui_shell.py constants-pinning tests</title>
+      <detail>
+        File: services/ui_shell/tests/test_constants_ui_shell.py (CREATE NEW)
+        Class: TestUiShellConstants
+
+        Same approach as WI-12 for services/ui_shell/src/constants.py.
+
+        Known constants (verify at pickup):
+          SESSION_PANEL_WIDTH_PCT == 25
+          PROMPT_MAX_CHARS == 4096
+          RESPONSE_SCROLL_BACK_LINES == 10000
+          TITLE_PLACEHOLDER == "New session"
+          KEY_SUBMIT == "enter", KEY_RETRY == "ctrl+r", KEY_NEW_SESSION == "ctrl+n",
+          KEY_DELETE_SESSION == "ctrl+d", KEY_QUIT == "ctrl+q"
+          STREAM_REFRESH_INTERVAL_MS == 50
+          CURSOR_BLINK_INTERVAL_MS == 500
+          PGOV_PANEL_BORDER_STYLE == "heavy"
+          PGOV_DENIAL_TITLE == "Policy Denial"
+          PGOV_REASON_LABELS (dict — assert exact 6 keys and exact labels)
+          BOOT_STATUS_POLL_INTERVAL_S == 1.0
+          BOOT_BANNER_TEXT (exact string)
+          BOOT_FAILED_TEXT (exact string)
+
+        For PGOV_REASON_LABELS, enumerate every key-value pair in one test
+        (`test_pgov_reason_labels_complete_mapping`) so any rename/edit fails loudly.
+
+        Read:
+          services/ui_shell/src/constants.py
+          services/assistant_orchestrator/tests/test_constants_ao.py (idiom)
+      </detail>
+    </item>
+
+    <!-- ===== LOW PRIORITY ===== -->
+
+    <item id="WI-14" priority="LOW" source="continuation_xml §5 EA-3 + services/ui_gateway/src/transport.py:639-656 (buffer_tool_call_token overflow)">
+      <title>Add tool_call_buffer exact-boundary overflow test</title>
+      <detail>
+        File: services/ui_gateway/tests/test_transport.py (MODIFY)
+        Class: TestToolCallBufferBoundary (CREATE NEW CLASS)
+
+        test_tool_call_buffer_at_limit_minus_one_accepts_next_token:
+          Fill the buffer with TOOL_CALL_BUFFER_MAX_TOKENS - 1 tokens. Append one
+          more. Assert no exception (buffer now at exactly MAX_TOKENS). Append one
+          more. Assert raises ValueError with the production error message.
+
+        Read:
+          services/ui_gateway/src/transport.py (tool_call buffer append path)
+          services/ui_gateway/tests/test_transport.py (existing overflow test)
+      </detail>
+    </item>
+
+    <item id="WI-15" priority="LOW" source="Sprint 7 audit — deprecated asyncio patterns">
+      <title>Scan UI tests for deprecated loop.run_until_complete() and migrate</title>
+      <detail>
+        Files: services/ui_gateway/tests/**, services/ui_shell/tests/** (SCAN; MODIFY any matches)
+
+        Grep `run_until_complete` across both test trees. Per the scope audit, no
+        instances were found — re-verify at pickup. If any surface, migrate to
+        pytest-asyncio `@pytest.mark.asyncio` + `await`.
+
+        If zero instances are found, WI-15 closes with a single-line entry in the
+        completion report confirming the scan result. No code changes required.
+      </detail>
+    </item>
+
+  </work_items>
+
+  <!-- ===== SECTION 5: NEGATIVE CONSTRAINTS ===== -->
+
+  <negative_constraints>
+
+    <constraint id="NC-1">
+      <rule>L-15 PRODUCTION FILE PROHIBITION</rule>
+      <detail>
+        Zero production source files may be modified. Specifically: NO edits to
+        services/ui_gateway/src/**, services/ui_shell/src/**, shared/**, launcher/**,
+        or services/*/src/**. If a production change appears necessary to unblock a
+        test (e.g., to add a seam), STOP, document the blocker in the completion
+        report, and wait for SDO direction.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-2">
+      <rule>No renames or file moves</rule>
+      <detail>
+        Do not rename existing test files or move them. EA-5 owns structural cleanup.
+        New test files live in services/ui_gateway/tests/ or services/ui_shell/tests/
+        as specified per WI.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-3">
+      <rule>Per-file ledger convention (Q1-1, 2026-04-22)</rule>
+      <detail>
+        Do NOT append to docs/POST_OPERATIONAL_MATURATION_LEDGER.md (frozen at
+        Entry 52). Write a NEW per-file entry at docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;
+        _sprint8_ea3_ui-hardening.md with the frontmatter block from &lt;ledger_frontmatter&gt;.
+        Timestamp in UTC at second resolution. Predecessor:
+        20260422_184004_sprint8_ea2_ao_sr_hardening.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-4">
+      <rule>No new runtime dependencies</rule>
+      <detail>
+        pyproject.toml edits permitted ONLY for marker adjustments. No new packages.
+        All tests run under existing pytest-asyncio and Mock/AsyncMock stack.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-5">
+      <rule>No real sockets, no real vsock</rule>
+      <detail>
+        All transport tests MUST mock the underlying connection / framer / socket.
+        Do NOT attempt a real Hyper-V VM, real vsock endpoint, or real Policy Agent.
+        Mirror existing test_transport.py mock patterns.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-6">
+      <rule>No live Textual App</rule>
+      <detail>
+        Do NOT start the Textual App event loop. UI shell app.py tests construct
+        the App class, stub widget lookups with Mocks, exercise method-level
+        behavior only. See RISK I.1.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-7">
+      <rule>No new production seams</rule>
+      <detail>
+        If a test requires a hook not already present in production, STOP. Do NOT
+        add `_for_testing` attributes, test-only branches, or public setters.
+        Report the blocker.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-8">
+      <rule>Scope-limited test directories</rule>
+      <detail>
+        Write ONLY to services/ui_gateway/tests/ and services/ui_shell/tests/.
+        Do not touch services/assistant_orchestrator/tests/, services/policy_agent/
+        tests/, services/semantic_router/tests/, shared/tests/, launcher/tests/,
+        or tests/integration/.
+      </detail>
+    </constraint>
+
+  </negative_constraints>
+
+  <!-- ===== SECTION 6: RISKS AND AMBIGUITIES ===== -->
+
+  <risks>
+
+    <risk id="I.1">
+      <topic>Textual App testing without a live loop</topic>
+      <resolution>
+        Construction-only strategy: `app = BlarAIApp(...); app._gateway = Mock();
+        app._pgov_panel = Mock(); await app.action_submit_prompt()`. Stub every
+        widget lookup action_submit_prompt performs by pre-setting attributes to
+        Mocks (AsyncMock for awaited calls). Do NOT call `app.run()` or
+        `app.on_mount()`. If action_submit_prompt performs `self.query_one(...)`
+        that cannot be stubbed via attribute assignment, patch `BlarAIApp.query_one`
+        on the instance to return a Mock. If the method requires a live DOM, STOP
+        and raise the blocker.
+      </resolution>
+    </risk>
+
+    <risk id="I.2">
+      <topic>asyncio.to_thread verification without full event-loop</topic>
+      <resolution>
+        Use pytest-asyncio. Monkeypatch `asyncio.to_thread` with a thin async
+        wrapper that records the call and invokes the synchronous target directly:
+          recorded_calls = []
+          async def fake_to_thread(fn, *args, **kwargs):
+              recorded_calls.append((fn, args, kwargs))
+              return fn(*args, **kwargs)
+          monkeypatch.setattr(asyncio, 'to_thread', fake_to_thread)
+        After exercising the SessionPanel method, assert recorded_calls contains
+        the expected store method + args. Do NOT use a real thread.
+      </resolution>
+    </risk>
+
+    <risk id="I.3">
+      <topic>Deprecated asyncio.get_event_loop() / run_until_complete() usage</topic>
+      <resolution>
+        Python 3.12+ warnings about `asyncio.get_event_loop()` when no loop is
+        running are out of scope. WI-15 addresses only `run_until_complete()`
+        migration. If a new test needs an event loop, use `@pytest.mark.asyncio`
+        or `asyncio.run(...)` at test level. Do NOT introduce `get_event_loop()`
+        in new tests.
+      </resolution>
+    </risk>
+
+    <risk id="I.4">
+      <topic>EA-2 overlap — test_pgov_display.py line 121 was fixed in EA-2</topic>
+      <resolution>
+        Per Sprint 8 EA-2 ledger (20260422_184004_sprint8_ea2_ao_sr_hardening.md,
+        WI-10), the line-121 assertion bug in test_pgov_display.py is fixed. EA-3
+        does NOT re-touch this file unless a sibling assignment-posing-as-assertion
+        bug surfaces during scan. If found, fix it as adjacent work per the
+        mature-not-minimal clause.
+      </resolution>
+    </risk>
+
+    <risk id="I.5">
+      <topic>Production string authority — error messages, banners, label formats</topic>
+      <resolution>
+        Production source is ALWAYS authoritative for exact string values (error
+        messages, banner text, PGOV_REASON_LABELS entries, label format strings).
+        Read source at pickup; do NOT copy from this prompt. If audit-reported
+        value differs from source, trust source and record the discrepancy in
+        the completion report.
+      </resolution>
+    </risk>
+
+    <risk id="I.6">
+      <topic>Boot-poll loop entanglement with Textual widgets</topic>
+      <resolution>
+        If the boot-poll loop (app.py:237-284) cannot be driven to completion
+        without a live App, WI-9 falls back to pure unit coverage of the
+        `attempt_markers` list computation (lines 237-242). Document as partial
+        coverage in the completion report. Do NOT add a production seam.
+      </resolution>
+    </risk>
+
+    <risk id="I.7">
+      <topic>LOCALAPPDATA-dependent SESSION_DB_DIR on non-Windows test runs</topic>
+      <resolution>
+        SESSION_DB_DIR is constructed from os.environ["LOCALAPPDATA"]. On CI/test
+        the env var is present. For WI-12, test asserts:
+          - SESSION_DB_DIR.endswith("BlarAI") (or the actual subdir — read source)
+          - os.path.isabs(SESSION_DB_DIR) is True
+        Do NOT assert exact absolute path (user-specific). Do NOT monkeypatch
+        LOCALAPPDATA — constants.py evaluated at import time uses whatever was in
+        the environment at import.
+      </resolution>
+    </risk>
+
+    <risk id="I.8">
+      <topic>asyncio.sleep monkeypatching without hanging the test</topic>
+      <resolution>
+        Replace `asyncio.sleep` with an AsyncMock that returns immediately:
+          recorded_sleeps = []
+          async def fake_sleep(duration):
+              recorded_sleeps.append(duration)
+          monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        After the exercised code completes, assert on recorded_sleeps. Runs
+        instantly and deterministically.
+      </resolution>
+    </risk>
+
+  </risks>
+
+  <!-- ===== SECTION 7: QUALITY GATES ===== -->
+
+  <quality_gate>
+
+    <gate id="COMPILE">
+      Import smoke from repo root:
+        cd C:\Users\mrbla\BlarAI
+        .venv\Scripts\python -c "import services.ui_gateway.tests.test_transport"
+        .venv\Scripts\python -c "import services.ui_shell.tests.test_app"
+        .venv\Scripts\python -c "import services.ui_shell.tests.test_session_panel"
+        .venv\Scripts\python -c "import services.ui_shell.tests.test_streaming"
+        .venv\Scripts\python -c "import services.ui_gateway.tests.test_constants_ui_gateway"
+        .venv\Scripts\python -c "import services.ui_shell.tests.test_constants_ui_shell"
+      No ImportError/ModuleNotFoundError is acceptable.
+    </gate>
+
+    <gate id="TEST-FOCUSED">
+      Run the UI slice:
+        cd C:\Users\mrbla\BlarAI
+        .venv\Scripts\pytest services/ui_gateway/ services/ui_shell/ --tb=short -q
+      Expected: all new WI-1..WI-15 tests pass; pre-existing tests do not regress.
+      Count delta ≥ 14 new tests.
+    </gate>
+
+    <gate id="TEST-FULL">
+      Full regression:
+        cd C:\Users\mrbla\BlarAI
+        .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+      PASS criteria: post-EA-3 passed count ≥ post-EA-2 count (861 passed, 2 skipped
+      per EA-2 ledger). Floor: 861 + 14 = 875. Record both numbers in the commit
+      message. No pre-existing tests may regress.
+    </gate>
+
+    <gate id="ORACLE">
+      Verify no production files were modified:
+        git diff main...feature/p5-task8-ea3-ui-hardening --name-only | grep -vE "tests|conftest|docs|pyproject"
+      Expected output: EMPTY (zero lines). Any production file in the filtered diff
+      is an L-15 mandate violation. STOP and report.
+    </gate>
+
+  </quality_gate>
+
+  <!-- ===== SECTION 8: VERIFICATION (for Lead Architect) ===== -->
+
+  <verification>
+    <description>
+      Verbatim terminal commands the Lead Architect (non-developer) can run to
+      confirm success. Run from C:\Users\mrbla\BlarAI in PowerShell.
+    </description>
+
+    <step id="V-1">
+      <command>cd C:\Users\mrbla\BlarAI</command>
+      <expected>Working directory set to the BlarAI repo root.</expected>
+    </step>
+
+    <step id="V-2">
+      <command>git log --oneline -1</command>
+      <expected>
+        Most recent commit on main should be the EA-3 merge commit. Subject begins:
+          test(task82/ea3): UI Gateway + UI Shell boundary + branch + constants hardening —
+        followed by "N new tests, baseline X → Y".
+      </expected>
+    </step>
+
+    <step id="V-3">
+      <command>git diff main...feature/p5-task8-ea3-ui-hardening --name-only | findstr /v /R "tests conftest docs pyproject"</command>
+      <expected>Empty output. ORACLE gate verification.</expected>
+    </step>
+
+    <step id="V-4">
+      <command>.venv\Scripts\pytest services/ui_gateway/ services/ui_shell/ --tb=short -q</command>
+      <expected>All ui_gateway and ui_shell tests pass, including new WI-1..WI-15 tests.</expected>
+    </step>
+
+    <step id="V-5">
+      <command>.venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q</command>
+      <expected>
+        At least (post-EA-2 baseline, 861 passed, 2 skipped) + 14 = 875 passed,
+        2 skipped. Exact counts in the EA-3 commit message.
+      </expected>
+    </step>
+
+  </verification>
+
+  <!-- ===== SECTION 9: COMMIT TEMPLATE ===== -->
+
+  <commit_template>
+    <format>test(task82/ea3): UI Gateway + UI Shell boundary + branch + constants hardening — {N} new tests, baseline {X} → {Y}</format>
+    <example>test(task82/ea3): UI Gateway + UI Shell boundary + branch + constants hardening — 22 new tests, baseline 861 → 883</example>
+    <rules>
+      - N = exact count of new tests (verify with `pytest --co -q` diff).
+      - X = total passed on main BEFORE the branch.
+      - Y = total passed AFTER merge.
+      - Commit ONLY files under services/ui_gateway/tests/, services/ui_shell/tests/,
+        and docs/ledger/.
+      - Do NOT commit production source files.
+    </rules>
+  </commit_template>
+
+  <!-- ===== SECTION 10: MATURE NOT MINIMAL ===== -->
+
+  <mature_not_minimal>
+    <directive>
+      EA-3 is authorized to address directly adjacent findings discovered during
+      work — even if not pre-listed in the scope audit — provided each new item
+      adds ≤ 1 hour (per SDV §5.3).
+
+      Examples of in-scope adjacent work:
+      - While adding WI-8 SessionPanel tests, you notice a related SessionListItem
+        compose() edge case (empty title, None turn_count). Add coverage if ≤ 1h.
+      - While reading transport.py for WI-1, you discover a third overflow site
+        missed by the audit. Add coverage.
+      - While fixing stub tests in WI-7, you find a sibling test with the same
+        stub idiom. Fix it too.
+      - While pinning constants in WI-12/13, you notice a constant used in
+        production but untested. Add coverage.
+
+      Items EXCEEDING the 1-hour cap:
+      - Document in the completion report with estimated effort.
+      - Co-Lead opens a next-sprint Vikunja task.
+      - Do NOT absorb silently.
+
+      EA-3 addresses UI Gateway and UI Shell ONLY. AO/SR are EA-2 scope (merged);
+      shared/launcher/integration are EA-4 scope; structural cleanup is EA-5 scope.
+    </directive>
+  </mature_not_minimal>
+
+  <!-- ===== SECTION 11: REQUIRED ATTACHMENTS ===== -->
+
+  <required_attachments>
+
+    <file path="docs/P5_TASK8_SDO_CONTINUATION_v1.0.xml"
+          sections="§5 ea_decomposition EA-3 block (lines 255-274), §6 lessons_learned L-12 L-13 L-15, §7 ea_prompt_guidelines"
+          reason="Authoritative SDO continuation; EA-3 scope contract and L-rule requirements"/>
+
+    <file path="docs/sprints/sprint_8/strategic_design_vision.md"
+          sections="§5.1 item 3 (EA-3 scope), §5.2 Out-of-scope, §5.3 mature-not-minimal 1-hour cap, §4 Success Criteria"
+          reason="Strategic alignment baseline"/>
+
+    <file path="docs/ledger/20260422_184004_sprint8_ea2_ao_sr_hardening.md"
+          reason="Predecessor ledger — format reference; WI-10 context (test_pgov_display.py line 121 already fixed)"/>
+
+    <file path="docs/ledger/README.md"
+          reason="Per-file ledger convention (Q1-1, 2026-04-22)"/>
+
+    <file path="docs/TEST_GOVERNANCE.md"
+          sections="marker taxonomy (unit / integration / slow), pre-existing skip list, baseline reporting rules"
+          reason="Authoritative marker taxonomy and test placement rules"/>
+
+    <file path="services/ui_gateway/src/transport.py"
+          reason="Required for WI-1, WI-2, WI-3, WI-10, WI-14 — full read"/>
+
+    <file path="services/ui_gateway/src/constants.py"
+          reason="Required for WI-12 — full enumeration and re-exports"/>
+
+    <file path="services/ui_gateway/src/session_store.py"
+          reason="Required for WI-8 — SessionSummary / SessionStore public API surface"/>
+
+    <file path="services/ui_shell/src/app.py"
+          reason="Required for WI-4, WI-5, WI-6, WI-7, WI-9 — action_submit_prompt branches, boot-poll"/>
+
+    <file path="services/ui_shell/src/session_panel.py"
+          reason="Required for WI-8 — public methods, asyncio.to_thread call sites, SessionListItem label"/>
+
+    <file path="services/ui_shell/src/streaming.py"
+          reason="Required for WI-11 — _streaming flag, class name, method signatures"/>
+
+    <file path="services/ui_shell/src/constants.py"
+          reason="Required for WI-13 — full enumeration including PGOV_REASON_LABELS and KEY_* bindings"/>
+
+    <file path="services/ui_shell/src/pgov_display.py"
+          reason="Context for WI-4 (PGOV panel display_denial); confirms WI-10 from EA-2 is not re-touched"/>
+
+    <file path="services/ui_gateway/tests/test_transport.py"
+          reason="Required for WI-1, WI-2, WI-3, WI-10, WI-14 — existing mocking patterns"/>
+
+    <file path="services/ui_gateway/tests/test_session_store.py"
+          reason="Reference for SessionStore test patterns"/>
+
+    <file path="services/ui_shell/tests/test_app.py"
+          reason="Required for WI-4, WI-5, WI-6, WI-7, WI-9 — existing stub tests"/>
+
+    <file path="services/ui_shell/tests/test_pgov_display.py"
+          reason="WI-4 context — PGOV panel test patterns; confirm WI-10 from EA-2 fix present"/>
+
+    <file path="services/ui_shell/tests/test_streaming.py"
+          reason="Required for WI-11 — existing streaming patterns, async idiom"/>
+
+    <file path="services/assistant_orchestrator/tests/test_constants_ao.py"
+          reason="Required for WI-12, WI-13 — constants-pinning idiom from EA-2"/>
+
+    <file path="services/semantic_router/tests/test_constants_sr.py"
+          reason="Required for WI-12, WI-13 — re-export pinning idiom (identity via `is`)"/>
+
+    <file path="shared/constants.py"
+          reason="Required for WI-12 — identify re-exports (ORCHESTRATOR_VM_ID, VSOCK_PORT, VSOCK_SERVICE_GUID)"/>
+
+  </required_attachments>
+
+</ea_prompt>

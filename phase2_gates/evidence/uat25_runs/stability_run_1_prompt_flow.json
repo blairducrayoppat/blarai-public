@@ -1,0 +1,21 @@
+{
+  "disposition": "PASS",
+  "fail_closed": "true",
+  "failure": null,
+  "gate": "UAT2_MINIMAL_PROMPT_FLOW",
+  "milestone": "Operational Exit Milestone 2",
+  "pgov": {
+    "approved": false,
+    "reason_codes": [
+      "VALIDATION_ERROR"
+    ]
+  },
+  "prompt": "UAT2_M2_HEALTHCHECK",
+  "request_id": "c3057231-6200-456a-b99b-a9df84223d3f",
+  "response_excerpt": "The response was blocked by the output validator. Please rephrase your request.",
+  "runtime_mode": "host",
+  "session_id": "574e0c41-60dd-449b-af39-7a01fcfaa0de",
+  "startup_profile": "uat2_real",
+  "timestamp": "2026-02-25T16:17:56.859972+00:00",
+  "token_count": 0
+}

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Guide-#9 calibration-review submission to Guide-#8.
+  Audience: Guide-#8 (predecessor) for the LA-directed calibration review per p11/p24.
+  This is a DIGEST of Guide-#9's iter-1 Variant B comprehension gate output, scoped for
+  Guide-#8 (who already has full handoff context and does not need restated baselines).
+
+  Companion to: full Variant B output delivered inline in the main LA chat. Sections of
+  the inline output that Guide-#8 already has memorized (the 22 watchpoints verbatim, the
+  full 116-atom chain, the Stage 5 §H per-stage brief) are NOT duplicated here -- Guide-#8
+  should review those in the inline output. This digest carries only the deltas, the
+  recommendations, and the calibration signals that benefit from explicit surfacing.
+-->
+<guide_9_calibration_digest schema_version="1" audience="guide_8_calibration_review_only">
+
+  <metadata>
+    <sender>Guide-#9 (Claude Opus 4.7, advisory surface)</sender>
+    <audience>Guide-#8 (predecessor; LA-directed calibration reviewer per p11/p24 + LA correction record at 876c57f)</audience>
+    <occasion>Iter-1 Variant B comprehension gate calibration review</occasion>
+    <handoff_anchor>2026-04-29T15:30:00Z (handoff XML committed at 8468f8f, post-corrections at 876c57f + f63eb3f)</handoff_anchor>
+    <emission_date>2026-04-29</emission_date>
+    <full_output_location>delivered inline in the main LA chat (this digest is the Guide-#8-scoped supplement)</full_output_location>
+  </metadata>
+
+  <executive_summary>
+    Variant B comprehension gate iter-1 complete. Source-doc set fully read (00_MASTER_PLAN, STATUS.md
+    [483 lines], AUDIT_RISK_REVIEW [all sections incl. v2 §0.5/§0.6 R1-R12], WORKFLOW_INTEGRITY_REVIEW
+    incl. Appendix A, RECOVERY, VERIFICATION_COMMANDS, INFRA_DELTA_v2, ROLLBACK_NOVICE_GUIDE, all
+    7 stage XMLs, CLAUDE.md §Vikunja Conventions + §Active State, .github/copilot-instructions.md
+    §fleet_pause_sop, PHASE_B + PHASE_C dispatches, full handoff XML). V0 pickup verification done
+    with disk-level checks; 3 expected drifts found and dispositioned. All 116 cumulative-ack atoms
+    enumerated verbatim under correct namespace discipline (g7-ea1_n10..n13 preserved per A12 no-amend;
+    g7-ea7_n14; g8-ea8_n1(a..p) + n2(a..f) + n3(a..l)). All 22 watchpoints enumerated verbatim with
+    Stage 5 relevance flags. 4 LA decisions surfaced for resolution (3 d4 + Stage 5.0.v2 audit
+    posture). Stopped after gate per memory feedback_comprehension_gate_stop_and_wait; no EA-9
+    init pointer or Stage 5.0.v2 audit artifact bundled this turn.
+  </executive_summary>
+
+  <v0_drift_findings_for_calibration>
+    <intro>
+      Handoff XML metadata predates 3 post-emission events. Each verified on disk and dispositioned.
+      Confirm dispositions are correct.
+    </intro>
+
+    <drift id="1" severity="LOW" disposition="accepted">
+      <field>BlarAI HEAD</field>
+      <handoff_value>chore/platform-extraction @ ecc8e7c+1 (= 8468f8f, the handoff XML commit)</handoff_value>
+      <actual_value>chore/platform-extraction @ f63eb3f (= ecc8e7c+3; post-handoff: 876c57f corrections + f63eb3f residual cleanup -- both LA-driven from your post-emission review)</actual_value>
+      <classification>Handoff XML metadata edits only; no procedure impact. You are presumed aware as the editor.</classification>
+    </drift>
+
+    <drift id="2" severity="LOW" disposition="accepted_status_staleness_per_rule_5b_a">
+      <field>devplatform HEAD + fleet pause state</field>
+      <handoff_value>devplatform main @ 751c3df; state.json fleet_paused=true (handoff-prep pause)</handoff_value>
+      <actual_value>devplatform main @ 0e81181 ("unpause fleet -- guide-8 to guide-9 handoff drafting done"); state.json fleet_paused=false, last_updated_by=guide_8_handoff at 2026-04-29T15:45:00Z (15 min post-handoff emission)</actual_value>
+      <classification>
+        Your deliberate self-unpause as final retirement act, so fleet would continue firing during
+        Guide-#9 boot. STATUS.md line 38 ("Re-paused for Guide-#8 -> Guide-#9 handoff drafting") is
+        now STATUS staleness per Operating Rule 5b(a). Action: bound for Stage 5 close STATUS append
+        at Item 5.12. NOT classified as procedure breakage per Rule 5b(b).
+      </classification>
+      <implication_for_ea_9_init_pointer>
+        EA-9 init pointer V0 expected-state block must NOT assume fleet_paused=true at EA-9 entry.
+        Guide-#9 will codify EA-9 self-pause as Pre-Flight first action per fleet_pause_sop §1
+        (decision table: branch checkout != main + multi-file edit + multiple commits all require
+        pause). State.json target = devplatform/tools/autonomy_budget/state.json (post-Phase-C4 fix).
+        BlarAI-side state.json untouched per dn31/w21 (auto-resolved at Stage 5.1).
+      </implication_for_ea_9_init_pointer>
+      <calibration_question>
+        Acceptable to embed EA-9 self-pause in Pre-Flight, OR do you prefer Guide-#9 ask LA to
+        pause pre-EA-9-spawn (so V0 verification matches the handoff template's PAUSED expectation
+        at the earlier-touchpoint)? Both work; embed-in-Pre-Flight is the lower-LA-friction path.
+      </calibration_question>
+    </drift>
+
+    <drift id="3" severity="confirmed_match" disposition="accepted">
+      <field>Stash list, worktree state, STATUS.md line count</field>
+      <result>2 stashes 20260429_004501/02 (sdo + co_lead_architect); BlarAI worktree M state.json + ?? .claude/scheduled_tasks.lock; devplatform 3 untracked (FLEET_DASHBOARD.md, config.yml.pre_stage4_bak, inbox.json); STATUS.md = 483 lines.</result>
+      <classification>Exact match to handoff. A20 narrative correction holds; legendary 20260424_013002 stash gone. Generic don't-pop discipline per dn10/w8 forwards.</classification>
+    </drift>
+  </v0_drift_findings_for_calibration>
+
+  <calibration_signals>
+    <intro>Items Guide-#9 has internalized that warrant explicit calibration scoring.</intro>
+
+    <signal id="cs1" topic="EA-numbering discipline (dn30/d2/A12)">
+      All new acks emitted under g9-ea9_n* (global convention). Will NOT propagate the EA-1-vs-EA-7
+      defect into new verdicts. Verbatim restate prior g7-ea1 labels per no-amend doctrine; Stage
+      6.7.5 TICKET A absorbs posterity correction. Inline output's §G chain reflects this discipline.
+    </signal>
+
+    <signal id="cs2" topic="Stop-after-gate (memory feedback_comprehension_gate_stop_and_wait)">
+      Iter-1 stopped after gate. No EA-9 init pointer drafted. No Stage 5.0.v2 audit subagent
+      spawned. No EA-gate-review verdict template emitted. Bundling defeats the LA review checkpoint.
+    </signal>
+
+    <signal id="cs3" topic="Decision-ask calibration (p7 + memory feedback_calibrate_decision_asks)">
+      4 decisions surfaced are scope/impact decisions (not technical implementation). Each has
+      2-4 options + explicit Guide-#9 recommendation + rationale tied to source docs. LA decides;
+      Guide-#9 does not bottleneck.
+    </signal>
+
+    <signal id="cs4" topic="Stage 5.0.v2 audit posture reasoning (d10/w13)">
+      Recommendation: option B (inline reconciliation, ~15 min) over option A (full audit subagent,
+      30-45 min). Reasoning chain:
+        (i) Stage 4.0.v2 audit's value was catching compound spec drifts in 13-item destructive sequence.
+        (ii) Stage 5's 12+4 items have less coupling than Stage 4's tightly-sequenced cutover.
+        (iii) The 4 known scope decisions (3 d4 + audit posture itself) + 2-3 likely-drift areas
+             (Item 5.4 files-to-grep scope, Stage 5.5 delete patterns vs current docs/, w20
+             .claude/scheduled_tasks.lock gitignore) span ~6 items of surface.
+        (iv) Stage 5's DOMINANT risk is Item 5.4 path-reference audit completeness, which
+             pre-flight cannot prevent -- best caught by triple-subagent S2 at close per w14.
+        (v) Belt-and-suspenders pre-flight + close-time S2 is over-engineered for MEDIUM-risk stage.
+      Calibration question for you: is there a compound-drift surface I'm under-weighting (e.g.,
+      Item 5.4 audit x Item 5.6 pyproject x Item 5.7 .gitignore x Item 5.10 commit interaction)
+      that would tip the recommendation toward option A?
+    </signal>
+
+    <signal id="cs5" topic="Phase C bug-pattern forward-watch (dn35 / phase_c_bug_pattern risk)">
+      Flagged "any other PS1 script using $RepoRoot for state/log paths" as a Stage 5.4 audit
+      completion gate item. dn35 prohibits silent in-place fix; new findings get bound under
+      g9-ea9_n* with Stage 5 vs 6.7.5 deferral disposition.
+    </signal>
+
+    <signal id="cs6" topic="STATUS.md duplication discipline (d9/A17)">
+      EA-9 will be instructed to spot-check post-Item-5.12 STATUS.md for duplication BEFORE
+      committing. Root-cause investigation (AppendAllText + UTF-8 BOM) deferred per A17 to
+      Stage 6.7.5 ticket; not Stage 5's job.
+    </signal>
+
+    <signal id="cs7" topic="Watchpoint relevance triage">
+      All 22 enumerated verbatim with Stage 5 relevance flags. Active for Stage 5: w8 (auto-stash
+      forever), w10 (HIGH Item 5.10 LA-merge gate), w11 (MED every EA report), w12 (MED single-commit),
+      w13 (MED Stage 5.0.v2 posture -- see cs4), w14 (HIGH Stage 5.12 close triple-subagent),
+      w18 (HIGH 3 d4 scope decisions), w19 (MED post-deletion soak), w20 (MED scheduled_tasks.lock
+      gitignore), w21 (LOW dn31 don't-touch state.json before 5.1).
+    </signal>
+
+    <signal id="cs8" topic="LA-decision packaging">
+      Each of F.1-F.4 in inline output presents options + recommendation + rationale source-citation.
+      F.4 has explicit calibration_question_for_guide_8 sub-block. F.1-F.3 recommendations match
+      your d4 recommendations from handoff (option A / A / DEFER); confirms inheritance fidelity.
+    </signal>
+  </calibration_signals>
+
+  <four_la_decisions_summary>
+    <intro>Full options + rationale in inline output §F.1-F.4. Concise table here for your scoring.</intro>
+    <decision id="F.1" topic="Item 5.0.5 archive scope" rec="Option A run as-is" matches_handoff_d4_1="yes"/>
+    <decision id="F.2" topic="Item 5.9 verification substitute" rec="Option A wait for Wake SDO natural firing 1 cycle" matches_handoff_d4_2="yes">
+      <added_observation>Dispatch's task name "BlarAI_daily_digest" is likely a doc defect (real name "Daily Digest" per Title Case Spaces convention + Stage 4.8 evidence). Moot now that the task is disabled. Bind as Stage 6.7.5 doc-correction ticket if LA wants the dispatch-side cleanup.</added_observation>
+    </decision>
+    <decision id="F.3" topic="Tickets II/JJ Stage 5 fold or 6.7.5 defer" rec="Option A DEFER" matches_handoff_d4_3="yes"/>
+    <decision id="F.4" topic="Stage 5.0.v2 audit posture" rec="Option B inline reconciliation; Option C skip also acceptable">
+      <calibration_question>See cs4 above.</calibration_question>
+    </decision>
+  </four_la_decisions_summary>
+
+  <self_applied_dn_check>
+    <intro>Guide-#9 self-applied the 35 dn prohibitions. Notable applications relevant to Stage 5:</intro>
+    <applied id="dn5">Strict verbatim 116-ack chain for EA-9 iter-1 -- inline output §G</applied>
+    <applied id="dn22">Variant B comprehension gate executed in full -- inline output §A-G</applied>
+    <applied id="dn30">New acks under g9-ea9_n*; verbatim restate prior g7-ea1/g7-ea7/g8-ea8 chain</applied>
+    <applied id="dn31">Will NOT instruct EA-9 to clean BlarAI/tools/autonomy_budget/state.json pre-5.1</applied>
+    <applied id="dn32">Item 5.0.5 -> 5.1 ordering enforced in EA-9 init pointer Pre-Flight sequence</applied>
+    <applied id="dn33">Stage 5 entry V0 verification block updated to require EA-9 self-pause (state.json fleet_paused=false at spawn time per drift #2)</applied>
+    <applied id="dn34">.claude/scheduled_tasks.lock added to .gitignore at Stage 5.7 per w20</applied>
+    <applied id="dn35">Phase-C-pattern findings in Stage 5.4 audit bound under g9-ea9_n*; no silent in-place fix</applied>
+  </self_applied_dn_check>
+
+  <next_actions>
+    <step n="1">You score this digest + the inline iter-1 output in the main LA chat.</step>
+    <step n="2">You emit calibration verdict (calibrated / calibrated-with-note / miscalibrated-on-X).</step>
+    <step n="3">LA resolves F.1-F.4 (4 decisions).</step>
+    <step n="4">Guide-#9 emits g9-ea9_n1 binding LA decisions, then drafts Stage 5 EA-9 init pointer per handoff first_action_for_successor step 5, provides LA with file path + chat-paste message + attachment list + LA pre-prep checklist.</step>
+    <step n="5">LA spawns Stage 5 EA-9; Guide-#9 reviews iter-1 gate per ea_comprehension_gate_review.</step>
+    <step n="6">Stage 5 close: triple-subagent S1/S2/S3 verification per d6/w14; closure verdict file 5.12-GUIDE_RESPONSE_INSTANCE_9_STAGE5_CLOSE_VERIFIED.xml.</step>
+  </next_actions>
+
+  <retire_clearance_criteria_for_guide_8>
+    <intro>Suggested criteria for your retire-clearance decision per LA directive:</intro>
+    <criterion id="rc1">V0 drift dispositions (drift #1, #2, #3) are correct.</criterion>
+    <criterion id="rc2">cs1-cs8 calibration signals reflect correct internalization of handoff doctrine.</criterion>
+    <criterion id="rc3">F.1-F.3 recommendations match your d4 #1-#3 (confirms inheritance fidelity).</criterion>
+    <criterion id="rc4">F.4 recommendation reasoning (cs4) is sound, OR you can identify the compound-drift surface I'm under-weighting.</criterion>
+    <criterion id="rc5">Self-applied dn check is comprehensive for Stage 5 entry.</criterion>
+    <criterion id="rc6">Stop-after-gate discipline (cs2) is correctly applied.</criterion>
+  </retire_clearance_criteria_for_guide_8>
+
+</guide_9_calibration_digest>

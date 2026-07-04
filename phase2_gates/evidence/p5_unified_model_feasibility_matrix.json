@@ -1,0 +1,60 @@
+{
+  "milestone": "P5-FEASIBILITY-005",
+  "timestamp_utc": "2026-02-27T04:35:47.372843+00:00",
+  "metadata": {
+    "timestamp_utc": "2026-02-27T04:35:47.070067+00:00",
+    "commit_hash": "1f9ddfdeca60a4a711b9aba591ea1df96f174b6e",
+    "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "openvino_version": "2026.0.0-20965-c6d6a13a886-releases/2026/0",
+    "openvino_genai_version": "2026.0.0.0-2820-dab5b993a38",
+    "available_devices": [
+      "CPU",
+      "GPU",
+      "NPU"
+    ],
+    "power_envelope": {
+      "sensor_available": true,
+      "power_plugged": true,
+      "battery_percent": 80.0,
+      "seconds_left": -2
+    },
+    "memory_limits": {
+      "warning_rss_mb": 26000.0,
+      "budget_rss_mb": 15507.0
+    },
+    "model_checks": {
+      "qwen3-14b": {
+        "path": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+        "dir_exists": true,
+        "xml_exists": false,
+        "bin_exists": false
+      },
+      "qwen3-8b": {
+        "path": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-8b\\openvino-int4-gpu",
+        "dir_exists": true,
+        "xml_exists": false,
+        "bin_exists": false
+      },
+      "qwen3-0.6b": {
+        "path": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b\\openvino-int4-gpu",
+        "dir_exists": true,
+        "xml_exists": false,
+        "bin_exists": false
+      }
+    }
+  },
+  "status": "blocked",
+  "failure_reason": "MODEL_ASSET_PRECHECK_FAILED",
+  "missing_models": [
+    "qwen3-14b",
+    "qwen3-8b",
+    "qwen3-0.6b"
+  ],
+  "acquisition_artifact_present": true,
+  "tests": [],
+  "quality_gate": {
+    "disposition": "INSUFFICIENT_EVIDENCE",
+    "reason_code": "MISSING_MODEL_ASSETS"
+  }
+}

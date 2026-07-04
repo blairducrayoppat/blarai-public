@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sprint 10 EA-1 prompt — Doctrine Classification Matrix
+  Authored by SDO 2026-05-11 per docs/P5_TASK10_SDO_CONTINUATION_v1.0.xml task priority 2.
+  Staged for Co-Lead Phase 1b review before EA Code pickup.
+-->
+<ea_prompt sprint_id="10" ea_number="1" descriptor="classification-matrix">
+
+  <parent_head>9263eb26457e2f99d69b6b16f09d33645f0cf292</parent_head>
+  <devplatform_parent_head>544eb0921af8441c68ab85bd3c03cf0b082a0656</devplatform_parent_head>
+
+  <required_attachments>
+    <attachment path="docs/sprints/sprint_10/strategic_design_vision.md" reason="Authoritative scope + §5.3 gray-area pre-decisions; success criteria #1, #3 reference matrix structure"/>
+    <attachment path="docs/P5_TASK10_SDO_CONTINUATION_v1.0.xml" reason="Sprint 10 continuation; lessons L-12, L-15, L-19, L-20, L-22 cited herein"/>
+    <attachment path="C:\Users\mrbla\BlarAI\CLAUDE.md" reason="BlarAI doctrine — input to audit (read-only at this stage); SDO references it for fleet-pause SOP wording in EA pre-flight blocks"/>
+    <attachment path="C:\Users\mrbla\BlarAI\.github\copilot-instructions.md" reason="BlarAI doctrine XML — input to audit; L-20 inter-element reference enumeration required"/>
+    <attachment path="C:\Users\mrbla\BlarAI\AGENTS.md" reason="BlarAI doctrine pointer stub — input to audit"/>
+    <attachment path="C:\Users\mrbla\devplatform\CLAUDE.md" reason="Confirm absence (zero existing); treat as authoring target downstream"/>
+    <attachment path="C:\Users\mrbla\devplatform\.github\copilot-instructions.md" reason="Confirm absence"/>
+    <attachment path="C:\Users\mrbla\devplatform\AGENTS.md" reason="Confirm absence"/>
+  </required_attachments>
+
+  <pre_flight>
+    Sprint 10 is doctrine-only; EA-1 is read-only audit. NO source-code edits, NO doctrine-file edits. Single deliverable is the classification matrix.
+
+    Fleet-Pause SOP: this EA reads many files and writes ONE markdown file (the matrix) plus ONE ledger entry. Per fleet-hygiene §4 decision table, branch checkout + multi-file-read + commit IS substantive — PAUSE the fleet before checkout:
+
+      python -c "from tools.autonomy_budget import state; state.pause_fleet('Sprint 10 EA-1 doctrine classification matrix', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+
+    Then commit the pause via:
+      cd C:\Users\mrbla\BlarAI && git commit --allow-empty -m "chore(ops): pause fleet -- Sprint 10 EA-1 doctrine classification matrix"
+
+    Do your work. Resume LAST, before exit:
+
+      python -c "from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      cd C:\Users\mrbla\BlarAI && git commit --allow-empty -m "chore(ops): unpause fleet -- Sprint 10 EA-1 done"
+
+    API-NAME GOTCHA: the function is `resume_fleet`, NOT `unpause_fleet`. Calling `state.unpause_fleet(...)` raises AttributeError.
+
+    NOTE on SOP portability: invoking `from tools.autonomy_budget import state` from inside BlarAI working directory WILL FAIL with ModuleNotFoundError because `tools.autonomy_budget` lives in devplatform (commit df3d940 cutover). Use this fallback technique to call the helper from BlarAI:
+
+      $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.pause_fleet(...)"
+
+    OR change working directory to devplatform for the pause/resume invocations only:
+
+      cd C:\Users\mrbla\devplatform; python -c "..."; cd C:\Users\mrbla\BlarAI
+
+    This portability foot-gun is the very bug EA-3 will fix (success criterion #4). For EA-1 you accept it and use the workaround.
+  </pre_flight>
+
+  <comprehension_gate>
+    BEFORE making any edits or running git checkout, post a comprehension comment to Vikunja task #369 prefixed `[agent:ea_code][phase:comprehension]` containing ALL of:
+
+    1. **Milestone objective in your own words.** What you are building, why, who reads the matrix downstream (EA-2 and EA-3 are the downstream consumers).
+
+    2. **Per-deliverable work-item summary.** WI-1 through WI-N (see §work_items below) — one sentence per WI in your own words.
+
+    3. **Files to create/modify (absolute paths).** Exactly two files:
+       - `docs/sprints/sprint_10/doctrine_classification_matrix.md` (new, the matrix)
+       - `docs/ledger/{ts}_sprint10_ea1_classification-matrix.md` (new, ledger entry — `{ts}` = UTC timestamp `YYYYMMDD_HHMMSS` captured at EA start)
+       No other file is written by EA-1.
+
+    4. **Source files to read** (read-only audit). All six in-scope doctrine files (3 BlarAI + 3 devplatform-empty-confirmation) plus the SDV §5.3. List them by absolute path.
+
+    5. **EXACT deliverable structure — recite VERBATIM.** State the branch name (`feature/p5-task10-ea1-classification-matrix`), the matrix filename, the matrix section structure (Front-matter → Summary stats → Matrix table → Inter-element-reference findings → Findings/blockers for follow-up tickets), and the ledger entry filename + frontmatter shape (see ledger spec below).
+
+    6. **ORACLE expectation.** Verbatim:
+       `git diff main...feature/p5-task10-ea1-classification-matrix --name-only`
+       must output (sorted):
+         docs/ledger/{ts}_sprint10_ea1_classification-matrix.md
+         docs/sprints/sprint_10/doctrine_classification_matrix.md
+       Any other path → ORACLE violation; STOP and report.
+
+    7. **Working-set declaration (L-15).** "I write to exactly these two paths. I read the six doctrine files plus SDV §5.3 plus this prompt. I touch no other files in either repo. If I discover a defect in any source file, I record it as a finding row in the matrix or in a §"Findings" section; I do NOT edit the source."
+
+    8. **Mature-not-minimal acknowledgment (L-22).** Verbatim: "Coherence wins over brevity. The matrix is the cross-EA coordination artifact; row coverage and rationale clarity are the gates. No hard line floor — but a matrix with fewer than ~50 partition rows across 572 source lines is probably incomplete."
+
+    9. **Risks and ambiguities.** State any unresolved understanding before starting. Examples: ambiguity about whether a section is KEEP-BlarAI or MIRROR-both → record the row as DECISION-PENDING-LA with rationale rather than asking SDO.
+
+    10. **Acknowledgment of out-of-working-set prohibition (L-15).** Verbatim: "DO NOT modify any of the six in-scope doctrine files. EA-1 is read-only audit. My single output is the classification matrix plus my ledger entry. If I discover a doctrine-file defect that begs an edit, I record it in the matrix as a row with rationale; I do not edit."
+
+    After posting the comprehension comment, apply label `Gate:Pending-SDO` (id 9) on Vikunja task #369 and STOP. WAIT for SDO Phase 1a review verdict before doing any work. Do NOT bundle downstream work with the comprehension comment.
+  </comprehension_gate>
+
+  <milestone>
+    <objective>Produce a single per-section partition table that classifies every paragraph / XML element / numbered list item across BlarAI's three doctrine files (`CLAUDE.md`, `.github/copilot-instructions.md`, `AGENTS.md`) and confirms the three devplatform counterparts are empty. The table is the authoritative input EA-2 and EA-3 implement against. EA-1 makes NO edits to doctrine files — read-only audit only.</objective>
+    <ea_number>1</ea_number>
+    <branch>feature/p5-task10-ea1-classification-matrix</branch>
+    <ledger_entry>docs/ledger/{ts}_sprint10_ea1_classification-matrix.md</ledger_entry>
+    <size>M</size>
+    <size_rationale>572 source lines × 6 files audit surface, but single matrix output (no edits). Sizing accounts for partition decision quality, not raw line count.</size_rationale>
+  </milestone>
+
+  <work_items>
+    <wi id="1">
+      **Confirm devplatform-side empties.** Verify all three devplatform target paths are absent (file does not exist). Capture verbatim PowerShell output of `Test-Path` × 3 in the ledger entry's "Files Changed" section as evidence the authoring targets are still empty.
+
+      ```powershell
+      Test-Path C:\Users\mrbla\devplatform\CLAUDE.md
+      Test-Path C:\Users\mrbla\devplatform\.github\copilot-instructions.md
+      Test-Path C:\Users\mrbla\devplatform\AGENTS.md
+      ```
+      All three must print `False`. If any prints `True`, STOP and escalate via a Vikunja comment on #369 — the audit assumption is broken.
+    </wi>
+
+    <wi id="2">
+      **Read the three BlarAI doctrine files end-to-end.** Capture line totals via:
+      ```powershell
+      (Get-Content C:\Users\mrbla\BlarAI\CLAUDE.md | Measure-Object -Line).Lines
+      (Get-Content C:\Users\mrbla\BlarAI\.github\copilot-instructions.md | Measure-Object -Line).Lines
+      (Get-Content C:\Users\mrbla\BlarAI\AGENTS.md | Measure-Object -Line).Lines
+      ```
+      Expected baseline (SDV §2.2 / §8.1): ~283 / ~265 / ~24 = ~572 lines combined. Record actual values in matrix Summary Stats.
+    </wi>
+
+    <wi id="3">
+      **Partition every section / paragraph / XML element into the matrix.** Each row covers ONE logical unit of source content. Granularity guidance:
+      - For `CLAUDE.md`: row per `##` or `###` header section OR per coherent paragraph cluster; subsection-level if the parent header has multiple distinct topics.
+      - For `.github/copilot-instructions.md` (XML): row per named `<rule>` element, per named `<phase>` element, per `<safety>` / `<workflow>` / `<style>` block. Sub-rules grouped under their parent.
+      - For `AGENTS.md`: row per paragraph (24 lines total — likely 3-5 rows).
+
+      Each row partition is exactly one of:
+      - **KEEP-BlarAI** — content stays only in BlarAI's doctrine
+      - **MOVE-devplatform** — content removed from BlarAI; authored into devplatform
+      - **MIRROR-both** — content lives in BOTH repos (possibly re-phrased per audience)
+      - **DELETE** — stale or contradictory; removed from both, rationale recorded
+
+      Each row tagged exactly one of:
+      - **DECISION-CLEAR** — partition is determined by SDV §5.3 pre-decisions; EA-2 / EA-3 implement without LA escalation
+      - **DECISION-PENDING-LA** — partition is ambiguous, contested, or surfaces an unforeseen edge case; LA arbitration required before EA-2 / EA-3 execute that row
+    </wi>
+
+    <wi id="4">
+      **Apply SDV §5.3 gray-area pre-decisions as authoritative defaults.** Verbatim binding rules from SDV §5.3 (do NOT override; quote SDV §5.3 in the rationale column when invoking):
+
+      | SDV §5.3 rule | Partition default |
+      |---|---|
+      | "Fleet doctrine" definition (a-i) — agents, DEC-11/12/13/14.5/15, comprehension-gate protocol, fleet-pause SOP, autonomy_budget state.json, EA prompt XML format conventions, SDO continuation XML format, agent role taxonomy | MOVE-devplatform |
+      | "BlarAI runtime doctrine" definition (a-j) — 9 Use Cases, hardware (Lunar Lake, Arc 140V, 31.323 GB ceiling), Hyper-V/vsock/OpenVINO/Qwen3-14B, security mandates, locked ADRs 007/010/011/012, DEC-01..DEC-10, project structure (services/, shared/, launcher/), coding standards, Comprehension Gate for interactive Claude Desktop sessions in this repo, Phase History (1-5), §"Active State" | KEEP-BlarAI |
+      | Vikunja conventions — labels, priority scale, task title pattern, MCP tool list, server startup | KEEP-BlarAI |
+      | Vikunja MCP bridge daemon (sandbox-agent infrastructure) | MOVE-devplatform |
+      | Comprehension Gate | MIRROR-both (default) OR MOVE-devplatform with BlarAI cross-reference (EA-1 may propose alternative with rationale) |
+      | Fleet-Pause SOP | MOVE-devplatform (BlarAI keeps a one-line cross-reference pointer) |
+      | Phase History | KEEP-BlarAI |
+      | §"Current Active Sprint (DEC-15)" | MOVE-devplatform (BlarAI keeps a one-line pointer to devplatform §Current-Active-Sprint + a note that `docs/sprints/ACTIVE_SPRINT.md` itself stays in BlarAI) |
+      | §"Agent Operating Model" | MOVE-devplatform |
+      | Coding Standards | KEEP-BlarAI |
+
+      For any row whose subject is not covered by §5.3 verbatim → EA-1 makes the call and tags DECISION-CLEAR if it's a confident inference from §5.3's spirit, or DECISION-PENDING-LA if the call is genuinely contested.
+    </wi>
+
+    <wi id="5">
+      **Per-row rationale + source citation.** Every row carries:
+      - **Source file** (one of the three BlarAI paths)
+      - **Section / element identifier** (exact `##` header text, or XML element name + `name=` attribute, or paragraph snippet first ~10 words)
+      - **Line range** in source file (e.g., `CLAUDE.md:42-67`)
+      - **Partition** (KEEP-BlarAI / MOVE-devplatform / MIRROR-both / DELETE)
+      - **Tag** (DECISION-CLEAR / DECISION-PENDING-LA)
+      - **Rationale** (1-3 sentences citing §5.3 rule invoked or independent reasoning)
+    </wi>
+
+    <wi id="6">
+      **L-20 inter-element reference enumeration.** For BlarAI's `.github/copilot-instructions.md` (XML envelope with 14 named `<rule>` + 5 named `<phase>` elements per L-20):
+      1. Grep the file for cross-element references: any `<rule name="X">` or `<phase id="N">` mention occurring OUTSIDE that element's own body.
+      2. Record each cross-reference as a dedicated "Inter-element references" subsection of the matrix (separate from the per-section partition table).
+      3. For each cross-reference where the two referenced elements have DIFFERENT partitions (one STAYS, the other MOVES): flag the row DECISION-PENDING-LA in the main matrix, with rationale "splits inter-element reference X→Y; EA-2 / EA-3 must duplicate parent or rewrite reference".
+    </wi>
+
+    <wi id="7">
+      **Matrix file structure (recite VERBATIM in your comprehension):**
+
+      ```
+      ---
+      sprint_id: 10
+      ea_number: 1
+      authored_by: ea_code
+      authored_on: {YYYY-MM-DD}
+      parent_head: 9263eb26457e2f99d69b6b16f09d33645f0cf292
+      devplatform_parent_head: 544eb0921af8441c68ab85bd3c03cf0b082a0656
+      ---
+
+      # Sprint 10 — Doctrine Classification Matrix
+
+      ## 1. Summary statistics
+      ## 2. Matrix table
+      ## 3. Inter-element references (`.github/copilot-instructions.md` XML)
+      ## 4. Findings for follow-up tickets
+      ## 5. devplatform target-path absence verification
+      ```
+
+      §1 Summary statistics: source-file line totals (verified per WI-2), row counts per partition (KEEP-BlarAI / MOVE-devplatform / MIRROR-both / DELETE totals), row counts per tag (DECISION-CLEAR / DECISION-PENDING-LA totals).
+
+      §2 Matrix table: one row per partition decision per WI-3, columns per WI-5.
+
+      §3 Inter-element references: per WI-6.
+
+      §4 Findings: ANY doctrine-file defect, stale reference, contradiction, or out-of-scope concern observed during the audit. Each finding is one paragraph or one bulleted item; NO ticket-creation here (Stage 6.7.5-pattern follow-up ticket creation is out of EA-1 scope per SDV §5.2 #2).
+
+      §5 devplatform absence: paste verbatim PowerShell output from WI-1.
+
+      No other top-level sections. Do NOT add numbered prefixes if the matrix template renames sections; do NOT introduce extra sections. Per L-12 ACTION-1, this structure is recited verbatim in your comprehension gate.
+    </wi>
+
+    <wi id="8">
+      **Ledger entry.** Path: `docs/ledger/{ts}_sprint10_ea1_classification-matrix.md` where `{ts}` is the UTC timestamp `YYYYMMDD_HHMMSS` captured at EA start.
+
+      Required frontmatter (Q1-1 per docs/ledger/README.md):
+      ```yaml
+      ---
+      ledger_id: {ts}_sprint10_ea1_classification-matrix
+      date: {YYYY-MM-DD}
+      sprint_id: 10
+      entry_type: EA
+      predecessor: <ledger_id of the most recent docs/ledger/ entry, OR "Entry 52" if docs/ledger/ is empty>
+      branch: feature/p5-task10-ea1-classification-matrix
+      merge_commit: null
+      disposition: COMPLETE
+      ---
+      ```
+
+      Body sections: Summary → Deliverables → Files Changed → Quality Gate → Matrix Summary Stats (mirrors matrix §1 for ledger readers).
+    </wi>
+  </work_items>
+
+  <deliverable>
+    <branch>feature/p5-task10-ea1-classification-matrix</branch>
+    <files_created>
+      <file path="docs/sprints/sprint_10/doctrine_classification_matrix.md" structure="frontmatter + 5 numbered sections per WI-7"/>
+      <file path="docs/ledger/{ts}_sprint10_ea1_classification-matrix.md" structure="Q1-1 frontmatter + body per WI-8"/>
+    </files_created>
+    <files_modified>NONE — EA-1 is read-only audit on the six in-scope doctrine files.</files_modified>
+  </deliverable>
+
+  <negative_constraints>
+    <constraint id="N-1">DO NOT modify any of the six in-scope doctrine files. EA-1 is read-only audit. Your single output is the classification matrix plus your ledger entry. If you discover a doctrine-file defect that begs an edit, record it in matrix §4 Findings; do not edit. (L-15 verbatim)</constraint>
+    <constraint id="N-2">DO NOT touch devplatform from this branch. Read-only access to devplatform paths is exclusively for `Test-Path` verification of absence per WI-1. No edits, no scaffolding, no placeholder files.</constraint>
+    <constraint id="N-3">DO NOT amend any ADR (`docs/adrs/ADR-*.md`) or any governance doc (`docs/governance/*.md`). If a doctrine row references an ADR or governance doc that appears stale or contradictory, record it as a §4 Finding for a follow-up ticket. (SDV §5.2 #4, continuation §111)</constraint>
+    <constraint id="N-4">DO NOT modify `docs/TEST_GOVERNANCE.md` or `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` (the latter is FROZEN at Entry 52 per CLAUDE.md §Phase History).</constraint>
+    <constraint id="N-5">DO NOT modify `tools/vikunja_mcp/` or any code under `tools/`. Sprint 10 is doctrine-only. The single code touch (SOP portability fix) is EA-3's job, not EA-1's.</constraint>
+    <constraint id="N-6">DO NOT create follow-up Vikunja tickets for §4 Findings yourself. Findings are surfaced for LA + Co-Lead triage at SCR / SWAGR; ticket creation is NOT EA-1's scope.</constraint>
+    <constraint id="N-7">DO NOT pre-decide DECISION-PENDING-LA rows by guessing the LA's likely call. If a row is genuinely ambiguous, tag it PENDING-LA with rationale and leave the partition column with your best-guess provisional value flagged "(provisional)". The LA decides at SDO Phase 2 review when SDO folds the matrix into EA-2's prompt.</constraint>
+    <constraint id="N-8">DO NOT pre-load numbered section prefixes if the matrix template uses unnumbered headers (L-12 ACTION-1 — Task 7 EA-1 added `## 1. Foo` to unnumbered required headers). The recited structure in WI-7 IS numbered; preserve those numbers verbatim. Do NOT introduce additional numbered subsections.</constraint>
+    <constraint id="N-9">DO NOT add extra top-level sections beyond the five in WI-7. Do NOT rename any of the five.</constraint>
+    <constraint id="N-10">XML well-formedness — for `.github/copilot-instructions.md` audit, your matrix rows reference XML elements by element name + `name=` attribute. Do NOT introduce malformed XML snippets into the matrix's rationale column (paste only valid fragments or use the element identifier shorthand).</constraint>
+  </negative_constraints>
+
+  <quality_gate>
+    <step order="1" name="STRUCTURE-LINT">
+      Matrix has exactly 5 top-level sections per WI-7 in the exact order specified; frontmatter present with both parent_head values; ledger entry has Q1-1 frontmatter complete.
+    </step>
+    <step order="2" name="ROW-COVERAGE">
+      Matrix §2 has at minimum one row per `##` header section in BlarAI's `CLAUDE.md`, one row per named `<rule>` and `<phase>` element in `.github/copilot-instructions.md`, and at least 3 rows for `AGENTS.md`. Coverage gaps are an audit defect; investigate and add rows.
+    </step>
+    <step order="3" name="SDV-§5.3-CONFORMANCE">
+      Every row whose subject is covered verbatim in SDV §5.3 has the partition prescribed by §5.3. Spot-check: Fleet-Pause SOP rows = MOVE-devplatform; Phase History rows = KEEP-BlarAI; §"Current Active Sprint" rows = MOVE-devplatform; Coding Standards = KEEP-BlarAI; Vikunja conventions (labels/priority/MCP tool list) = KEEP-BlarAI; Vikunja MCP bridge daemon = MOVE-devplatform.
+    </step>
+    <step order="4" name="L-20-INTER-ELEMENT">
+      Matrix §3 enumerates every cross-element reference in BlarAI's `.github/copilot-instructions.md`. Any cross-partition reference (one STAYS, the other MOVES) appears as a flagged row in §2 with DECISION-PENDING-LA.
+    </step>
+    <step order="5" name="ORACLE">
+      `cd C:\Users\mrbla\BlarAI && git diff main...feature/p5-task10-ea1-classification-matrix --name-only` outputs (sorted):
+      ```
+      docs/ledger/{ts}_sprint10_ea1_classification-matrix.md
+      docs/sprints/sprint_10/doctrine_classification_matrix.md
+      ```
+      Any other path → ORACLE violation; STOP and report in completion gate.
+    </step>
+    <step order="6" name="REGRESSION-PYTEST">
+      Sprint 10 touches no test paths, but run the safety net per continuation §989:
+      ```
+      cd C:\Users\mrbla\BlarAI
+      .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+      ```
+      Expected: ~981 passed, ~22 skipped (per CLAUDE.md §Active State baseline). Any regression → STOP and report.
+    </step>
+  </quality_gate>
+
+  <verification>
+    Verbatim terminal commands for the LA to verify EA-1 completion:
+
+    ```powershell
+    cd C:\Users\mrbla\BlarAI
+    git log --oneline -1
+    git diff main --name-only
+    # EA-1 deliverable substantiveness:
+    (Get-Content docs\sprints\sprint_10\doctrine_classification_matrix.md | Measure-Object -Line).Lines
+    # Regression safety net:
+    .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+    ```
+
+    Expected:
+    - Last commit subject matches commit_template below.
+    - `git diff main --name-only` shows exactly two paths from the ORACLE gate.
+    - Matrix line count is substantive (no hard floor; coherence + row coverage are the gates per SDV §4 success criterion #3 and L-22).
+    - pytest: ~981 passed, ~22 skipped.
+  </verification>
+
+  <commit_template>
+    [sprint:10][role:ea_code][phase:completion] EA-1 doctrine classification matrix — 2 files, {actual_total_lines} lines
+
+    Body content (suggested; EA may adjust):
+      BlarAI Sprint 10 EA-1. Doctrine classification matrix for the
+      three BlarAI doctrine files + confirmed-empty devplatform targets.
+      Single design artifact; downstream EA-2 (BlarAI strip) and EA-3
+      (devplatform authorship) implement against this matrix.
+      No doctrine-file edits this EA.
+  </commit_template>
+
+  <mature_not_minimal>
+    Verbatim from L-22:
+
+    "Mature not minimal: each post-split file is a coherent operational reference in its own right, not a thin pointer-with-a-couple-of-sentences. devplatform files: ≥ 100 lines floor. BlarAI files: target ≥ 30% combined-line-count reduction (soft 50%). If hitting the reduction floor would leave dangling references or break a coherent runtime narrative, prefer coherence and explicitly cite which sections you kept verbatim despite hitting the floor in your completion report. The LA will not penalize a coherent file that fell short of the reduction target; the LA will penalize an incoherent file that hit it."
+
+    EA-1-specific application: the matrix itself has no hard line floor; row coverage + rationale clarity are the gates. A matrix with ~50-100 partition rows over 572 source lines is probably right-sized; substantially fewer suggests collapsed granularity (large unanalyzed source blocks); substantially more suggests over-granular row-per-line splitting.
+  </mature_not_minimal>
+
+  <handoff_protocol>
+    On completion:
+    1. Commit per commit_template.
+    2. Post `[agent:ea_code][phase:completion]` comment to Vikunja task #369 with:
+       - Commit hash
+       - Matrix path + line count
+       - Matrix Summary Stats (row counts per partition + per tag)
+       - Inter-element-reference count
+       - §4 Findings count (with one-line summary of each)
+       - ORACLE output verbatim
+       - pytest regression confirmation (passed/skipped counts)
+       - Resume-fleet confirmation
+    3. Apply label `Gate:Pending-SDO` (id 9) on task #369 (SDO Phase 1b reviews next).
+    4. Resume the fleet per pre_flight (LAST action before exit).
+
+    Next fleet step: SDO Phase 1b completion-review. If APPROVED → Co-Lead merge-gate (trusted_scope or LA-merge-approve). After merge, SDO Phase 2 authors EA-2 prompt folding this matrix's DECISION-CLEAR rows.
+  </handoff_protocol>
+
+</ea_prompt>

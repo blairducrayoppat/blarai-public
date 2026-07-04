@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BlarAI Phase 5 — Task 7: Test Quality Audit
+  Session: EA-1 — Policy Agent Audit
+  Generated: 2026-04-18
+  Author: SDO (Strategic Development Orchestrator)
+  Target: Execution Agent (single-session)
+  Scope: DOCS-ONLY audit of services/policy_agent
+-->
+
+<execution_prompt version="1.0" task="P5-Task-7" milestone="EA-1">
+
+  <comprehension_gate>
+    <instruction>
+      MANDATORY FIRST ACTION: Before any implementation work, read this entire prompt.
+      Then present a structured summary to the Lead Architect:
+        (a) Milestone objective in your own words
+        (b) List of work items with 1-sentence descriptions
+        (c) Files you will create or modify
+        (d) Validation strategy
+        (e) Any risks or ambiguities you see
+      Then STOP and WAIT for Lead Architect approval.
+      Do NOT create a branch, write files, or run commands until explicit approval is received.
+    </instruction>
+  </comprehension_gate>
+
+  <milestone>
+    <id>P5-TASK7-EA1</id>
+    <title>Task 7 / EA-1: Policy Agent Audit</title>
+    <type>DOCS-ONLY AUDIT</type>
+    <branch>feature/p5-task7-ea1-policy-agent-audit</branch>
+    <parent_branch>main</parent_branch>
+    <parent_head>88b330d</parent_head>
+    <predecessor>Task 6: Test Governance Framework (ledger Entry 38, commit 51d3031)</predecessor>
+    <harness_declaration>NO_FULL_HARNESS</harness_declaration>
+
+    <objective>
+      Audit the policy_agent test suite against docs/TEST_GOVERNANCE.md and record findings
+      in a new consolidated document at docs/TEST_AUDIT_FINDINGS.md. EA-1 is limited to
+      services/policy_agent/src and services/policy_agent/tests. It must answer the four
+      Task 7 audit questions for policy_agent only: coverage gaps, stale/dead tests,
+      assertion quality, and boundary correctness. It must also append ledger Entry 39 to
+      docs/POST_OPERATIONAL_MATURATION_LEDGER.md. No production files or test files may be changed.
+    </objective>
+
+    <scope>
+      Overall Task 7 audit surface: 33 test files and 37 production files across 8 test domains.
+      This EA-1 slice is limited to:
+      - services/policy_agent/src: 10 production Python files (excluding __init__.py)
+      - services/policy_agent/tests: 12 test files (excluding __init__.py)
+    </scope>
+
+    <deliverable_rule>
+      EA-1 CREATES docs/TEST_AUDIT_FINDINGS.md.
+      EA-2 through EA-4 APPEND additional service/domain findings.
+      EA-5 NORMALIZES the full document and writes the final Prioritized Gap Report
+      and Pre-existing Skip Analysis.
+    </deliverable_rule>
+
+    <tiered_methodology>
+      Tier 1 (MANDATORY): inventory and coverage map
+      Tier 2 (MANDATORY): full per-file scan for stale tests, assertion quality, and boundary correctness
+      Tier 3 (CONDITIONAL FAIL-SAFE): if you cannot complete the assigned scope without quality degradation,
+      STOP and produce a partial report plus recommended re-scope. Do NOT rush remaining files.
+    </tiered_methodology>
+  </milestone>
+
+  <branch_setup>
+    <base_ref>88b330d</base_ref>
+    <base_branch>main</base_branch>
+    <new_branch>feature/p5-task7-ea1-policy-agent-audit</new_branch>
+    <command>git checkout -b feature/p5-task7-ea1-policy-agent-audit 88b330d</command>
+  </branch_setup>
+
+  <files_to_create>
+    <file path="docs/TEST_AUDIT_FINDINGS.md" action="create">
+      <description>
+        Create the consolidated Task 7 findings document. For EA-1, populate the
+        policy_agent findings only.
+      </description>
+    </file>
+  </files_to_create>
+
+  <files_to_modify>
+    <file path="docs/POST_OPERATIONAL_MATURATION_LEDGER.md" action="modify">
+      <description>
+        Append ledger Entry 39 documenting completion of the policy_agent audit slice.
+      </description>
+    </file>
+  </files_to_modify>
+
+  <forbidden_changes>
+    <item>Do NOT modify any file under services/policy_agent/src/</item>
+    <item>Do NOT modify any file under services/policy_agent/tests/</item>
+    <item>Do NOT modify pyproject.toml</item>
+    <item>Do NOT modify docs/TEST_GOVERNANCE.md</item>
+    <item>Do NOT modify docs/IMPLEMENTATION_PLAN.md for this audit slice</item>
+    <item>Do NOT create or modify conftest.py</item>
+    <item>Do NOT add, remove, rename, or fix tests</item>
+    <item>Do NOT run coverage tooling or install dependencies</item>
+    <item>Do NOT touch the pre-existing unrelated untracked files in the worktree</item>
+  </forbidden_changes>
+
+  <work_items>
+
+    <item id="WI-1" title="Inventory policy_agent production and test files">
+      <description>
+        Build the authoritative policy_agent file inventory before drawing conclusions.
+      </description>
+      <instructions>
+        Confirm the full scope is exactly these production files:
+        - adjudicator.py
+        - boot.py
+        - car.py
+        - config_loader.py
+        - constants.py
+        - entrypoint.py
+        - gpu_inference.py
+        - ipc.py
+        - jwt_minter.py
+        - rule_engine.py
+
+        Confirm the full scope is exactly these test files:
+        - test_adjudicator.py
+        - test_boot.py
+        - test_car.py
+        - test_config_loader.py
+        - test_entrypoint.py
+        - test_gpu_inference.py
+        - test_hybrid_adjudicator.py
+        - test_integration_car_pipeline.py
+        - test_ipc.py
+        - test_jwt_minter.py
+        - test_rate_and_resource_rules.py
+        - test_rule_engine.py
+
+        Exclude __init__.py from the coverage count, but note its existence if relevant to
+        import-path or staleness findings.
+      </instructions>
+    </item>
+
+    <item id="WI-2" title="Create the Coverage Map for policy_agent">
+      <description>
+        Map every policy_agent production file to its test file(s) and assign a coverage assessment.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md create a top-level section exactly named:
+        ## Coverage Map
+
+        Under it, create a subsection:
+        ### policy_agent
+
+        Add a table with these columns:
+        | Production File | Test File(s) | Coverage Assessment | Rationale |
+
+        Use these assessment rules consistently:
+        - COVERED: direct test coverage exists and the module appears to satisfy the governance
+          expectation of primary path plus at least one error/edge path for its public behavior.
+        - PARTIAL: some direct or indirect coverage exists, but important public behavior,
+          error handling, or key branches appear untested or under-tested.
+        - NONE: no meaningful corresponding tests were found; incidental coverage from unrelated
+          tests does not count.
+
+        This table must include one row for each of the 10 production files.
+      </instructions>
+    </item>
+
+    <item id="WI-3" title="Audit stale or dead policy_agent tests">
+      <description>
+        Identify tests that reference dead code, stale imports, removed module paths, or superseded behavior.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md create a top-level section exactly named:
+        ## Stale Test Inventory
+
+        Under it, create a subsection:
+        ### policy_agent
+
+        Review all 12 policy_agent test files and cross-check every tested symbol, import path,
+        class name, and expected behavior against current production code.
+
+        Flag:
+        - references to symbols that no longer exist
+        - imports from dead or renamed modules
+        - tests that still encode superseded architectural assumptions
+        - tests whose stated purpose no longer matches the current implementation
+
+        For each finding, record:
+        - test file
+        - stale symbol/path/behavior
+        - current production reality
+        - why it is stale or dead
+
+        If no stale/dead findings exist for policy_agent, state that explicitly.
+      </instructions>
+    </item>
+
+    <item id="WI-4" title="Audit assertion quality in policy_agent tests">
+      <description>
+        Identify weak assertions and tests that prove too little.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md create a top-level section exactly named:
+        ## Assertion Quality Findings
+
+        Under it, create a subsection:
+        ### policy_agent
+
+        Evaluate all 12 policy_agent test files for weak assertion patterns, including:
+        - assert True
+        - bare truthiness assertions without checking value/behavior
+        - assert result is not None when the actual semantic value matters
+        - try/except patterns that swallow failures
+        - tests that only inspect internal implementation details rather than observable behavior
+        - tests whose assertions are too shallow to detect meaningful regressions
+
+        Produce:
+        - a short policy_agent summary paragraph
+        - a flat list of specific findings with test file and rationale
+
+        If no material assertion-quality findings exist, state that explicitly.
+      </instructions>
+    </item>
+
+    <item id="WI-5" title="Audit boundary correctness for policy_agent tests">
+      <description>
+        Determine whether policy_agent tests behave like true unit tests under the governance rules.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md create a top-level section exactly named:
+        ## Boundary Violations
+
+        Under it, create a subsection:
+        ### policy_agent
+
+        Evaluate whether any policy_agent tests:
+        - make real socket connections
+        - perform real filesystem writes beyond acceptable isolated test scaffolding
+        - depend on live services, hardware, or manual setup
+        - should really be integration tests rather than service-level unit tests
+
+        Apply the Task 6 governance rule strictly:
+        service-level tests under services/*/tests/ should be unit tests unless there is a
+        compelling reason they belong elsewhere.
+
+        For each violation or borderline case, record:
+        - test file
+        - observed behavior
+        - why it violates or strains the intended boundary
+        - recommended reclassification or remediation direction
+
+        If no material boundary violations exist for policy_agent, state that explicitly.
+      </instructions>
+    </item>
+
+    <item id="WI-6" title="Create the initial consolidated findings document correctly">
+      <description>
+        EA-1 must create docs/TEST_AUDIT_FINDINGS.md in a form that later audit sessions can append to cleanly.
+      </description>
+      <instructions>
+        docs/TEST_AUDIT_FINDINGS.md must contain these exact top-level sections in this order:
+
+        1. ## Coverage Map
+        2. ## Stale Test Inventory
+        3. ## Assertion Quality Findings
+        4. ## Boundary Violations
+        5. ## Prioritized Gap Report
+        6. ## Pre-existing Skip Analysis
+
+        For EA-1:
+        - Populate sections 1–4 with policy_agent findings only.
+        - In sections 5 and 6, insert a brief explicit placeholder:
+          "Deferred to EA-5 synthesis."
+        - Add a short introductory note near the top stating that the document is being built
+          across EA-1 through EA-5 and that EA-1 covers policy_agent only.
+
+        Do NOT write the final prioritized remediation ordering yet.
+        Do NOT disposition the two pre-existing skipped tests yet.
+      </instructions>
+    </item>
+
+    <item id="WI-7" title="Record ledger Entry 39">
+      <description>
+        Append Entry 39 documenting completion of the policy_agent audit slice.
+      </description>
+      <instructions>
+        Follow the existing ledger format.
+
+        Required content:
+        - Title: Entry 39 — Task 7: Test Quality Audit / EA-1 Policy Agent Audit (COMPLETE)
+        - Date: 2026-04-18 or actual execution date
+        - Branch: feature/p5-task7-ea1-policy-agent-audit
+        - Predecessor: Entry 38 — Task 6: Test Governance Framework
+        - Type: AUDIT / DOCS-ONLY
+        - Disposition: COMPLETE
+        - Summary: EA-1 completed; docs/TEST_AUDIT_FINDINGS.md created; policy_agent coverage map,
+          stale-test findings, assertion-quality findings, and boundary-correctness findings recorded;
+          global prioritization and skip analysis deferred to EA-5.
+        - Files: docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md only
+      </instructions>
+    </item>
+
+    <item id="WI-8" title="Enforce strict DOC_ONLY branch hygiene">
+      <description>
+        The worktree already contains unrelated untracked files. Preserve them and stage only the two allowed docs files.
+      </description>
+      <instructions>
+        Do NOT use git add .
+
+        Stage only:
+        - docs/TEST_AUDIT_FINDINGS.md
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+
+        The authoritative DOC_ONLY gate for this milestone is the staged diff against main.
+        After staging only the two allowed files, the diff must show only those files.
+      </instructions>
+    </item>
+
+    <item id="WI-9" title="Tier 3 fail-safe">
+      <description>
+        If the full policy_agent audit cannot be completed to quality within one session, stop cleanly.
+      </description>
+      <instructions>
+        If you determine mid-session that you cannot finish all 10 production files and 12 test files
+        without degraded quality:
+        - STOP
+        - leave a partial but clearly labeled report in docs/TEST_AUDIT_FINDINGS.md
+        - record the partial completion status in ledger Entry 39
+        - provide a recommended re-scope for the SDO
+        Do NOT compress the remaining review into superficial findings.
+      </instructions>
+    </item>
+
+  </work_items>
+
+  <context_notes>
+    <note id="CN-1" title="Audit standard">
+      docs/TEST_GOVERNANCE.md is the governing standard for this audit. Use its scope definitions,
+      marker policy, boundary rules, and coverage expectations as the audit rubric.
+    </note>
+
+    <note id="CN-2" title="Root pytest configuration">
+      pyproject.toml defines:
+      - testpaths including services/policy_agent/tests and tests/integration
+      - addopts = "--strict-markers -v --import-mode=importlib -m 'not slow'"
+      - registered markers: asyncio, slow
+      For policy_agent service tests, no slow marker usage is expected.
+    </note>
+
+    <note id="CN-3" title="Coverage assessment is qualitative">
+      Numeric coverage tooling is out of scope. This audit is based on careful code-to-test mapping
+      and qualitative adequacy against the Task 6 governance rule:
+      public behavior should have happy-path and error/edge-path test coverage.
+    </note>
+
+    <note id="CN-4" title="Out-of-scope untracked files already present">
+      The worktree contains unrelated untracked artifacts. Do not touch, stage, rename, or delete them.
+      They are outside this milestone.
+    </note>
+
+    <note id="CN-5" title="No code changes allowed">
+      This is a diagnosis-only audit. The EA must not fix any finding, add any test, or modify any source/test file.
+    </note>
+
+    <note id="CN-6" title="Global sections deferred to EA-5">
+      The final Prioritized Gap Report and the final Pre-existing Skip Analysis are not written in this slice.
+      EA-1 only creates placeholders for those sections.
+    </note>
+  </context_notes>
+
+  <quality_gate>
+    <gate id="COMPILE" order="1">
+      <command>N/A — DOCS-ONLY audit milestone</command>
+      <criteria>No Python files may be created or modified in this milestone.</criteria>
+    </gate>
+
+    <gate id="TEST" order="2">
+      <command>N/A — DOCS-ONLY audit milestone</command>
+      <criteria>
+        Do not run pytest as a standard gate for this slice. Use file inspection as the primary evidence source.
+        If you choose to run a targeted read-only command to confirm a suspected stale reference, report it explicitly.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_1" order="3">
+      <command>Manual audit completion against the 10 production files and 12 test files in scope</command>
+      <criteria>
+        All 10 policy_agent production files are mapped in the Coverage Map and all 12 policy_agent
+        test files are evaluated for staleness, assertion quality, and boundary correctness.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_2" order="4">
+      <command>Review docs/TEST_AUDIT_FINDINGS.md structure</command>
+      <criteria>
+        The document contains all 6 required top-level sections in order.
+        Sections 1–4 contain policy_agent content.
+        Sections 5–6 explicitly say "Deferred to EA-5 synthesis."
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_3" order="5">
+      <command>git diff --staged --name-only main</command>
+      <criteria>
+        Output contains ONLY:
+        - docs/TEST_AUDIT_FINDINGS.md
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_4" order="6">
+      <command>Tier 3 fail-safe check</command>
+      <criteria>
+        If the full scope was not completable without quality degradation, the EA stopped,
+        produced a partial report, and recommended a re-scope instead of rushing.
+      </criteria>
+    </gate>
+  </quality_gate>
+
+  <verification>
+    <instruction>
+      The Lead Architect will use terminal commands only. Provide a result set that these commands can confirm.
+    </instruction>
+    <commands>
+      <command>git branch --show-current</command>
+      <expected>feature/p5-task7-ea1-policy-agent-audit</expected>
+
+      <command>git log --oneline -1</command>
+      <expected>Single EA-1 audit commit on the feature branch</expected>
+
+      <command>git diff HEAD~1 --name-only</command>
+      <expected>
+        docs/TEST_AUDIT_FINDINGS.md
+        docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </expected>
+
+      <command>Select-String -Path docs/TEST_AUDIT_FINDINGS.md -Pattern "^## ","^### policy_agent","Deferred to EA-5 synthesis"</command>
+      <expected>
+        Shows all 6 required top-level sections, policy_agent subsections, and the deferred placeholders
+      </expected>
+
+      <command>Select-String -Path docs/TEST_AUDIT_FINDINGS.md -Pattern "COVERED|PARTIAL|NONE"</command>
+      <expected>Coverage Map contains qualitative assessments for policy_agent production files</expected>
+
+      <command>Select-String -Path docs/POST_OPERATIONAL_MATURATION_LEDGER.md -Pattern "Entry 39" | Select-Object -First 1</command>
+      <expected>Ledger contains Entry 39 for Task 7 / EA-1</expected>
+    </commands>
+  </verification>
+
+  <commit_template>
+    <message>
+Task 7 EA-1: Audit policy_agent test quality
+
+- Created docs/TEST_AUDIT_FINDINGS.md
+- Added policy_agent Coverage Map, Stale Test Inventory, Assertion Quality Findings,
+  and Boundary Violations
+- Deferred Prioritized Gap Report and Pre-existing Skip Analysis to EA-5 synthesis
+- Recorded ledger Entry 39 in Post-Operational Maturation Ledger
+
+DOC_ONLY gate: staged diff against main contains only docs/TEST_AUDIT_FINDINGS.md
+and docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+    </message>
+  </commit_template>
+
+  <attachments>
+    <instruction>Attach the following files when creating the EA-1 session:</instruction>
+    <required>
+      <file reason="Canonical audit rubric">docs/TEST_GOVERNANCE.md</file>
+      <file reason="Root pytest configuration and marker policy source">pyproject.toml</file>
+      <file reason="This execution prompt">docs/P5_TASK7_EA1_POLICY_AGENT_AUDIT.xml</file>
+    </required>
+    <follow_on_note>
+      Starting with EA-2, docs/TEST_AUDIT_FINDINGS.md becomes a required attachment as well.
+    </follow_on_note>
+  </attachments>
+
+</execution_prompt>

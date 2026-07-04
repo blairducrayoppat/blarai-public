@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_comprehension_gate>
+
+  <meta>
+    <ea_instance>6</ea_instance>
+    <predecessor>5</predecessor>
+    <iteration>1</iteration>
+    <stage_id>STAGE_2</stage_id>
+    <stage_xml>docs/platform_separation/03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+    <work_item_resume_at>2.6 (D2-completion 6-caller closure FIRST -- per g6-ea6_n1 priority CRITICAL; then D1 extended grep; then 2.7 / 2.7.v2 / 2.8 / 2.9 / 2.10)</work_item_resume_at>
+    <bootstrap_pointer>docs/platform_separation/temp_for_responses/2.6-EA_INITIALIZATION_INSTANCE_6_STAGE2_RESUME_AT_ITEM_2.6_D2_COMPLETION.xml</bootstrap_pointer>
+    <authoritative_work_plan>docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v5.xml (commit f863a22) WITH C1-C4 v5 documentation corrections forward-encoded below AND D1-D5 v4 corrections preserved as audit history</authoritative_work_plan>
+    <branch>chore/platform-extraction</branch>
+    <head_at_emission>f863a22</head_at_emission>
+    <last_la_commit>9277d61</last_la_commit>
+    <v4_commit>d0c6df1</v4_commit>
+    <v5_commit>f863a22</v5_commit>
+    <emitted_at_utc>2026-04-25T(now)Z</emitted_at_utc>
+    <stop_discipline>STOPPING after this gate. No D2-completion edits, branch checkout, or mutation commands until Guide instance 6 explicit PROCEED authorization. Per init pointer required_first_actions action n="3" stop_discipline.</stop_discipline>
+    <fleet_state_invariants_preserved>fleet_paused=True, last_updated_by="copilot_agent", last_updated_utc="2026-04-24T20:46:12Z" -- per ack n=2 + g6-ea6 prohibitions, NOT touched this session. Verified via V0e.</fleet_state_invariants_preserved>
+  </meta>
+
+  <pickup_verification_recap>
+    <intro>V0a-V0l executed per init pointer required_first_actions action n="2". All 12 checks PASS. No drift beyond expected 33-entry working tree (22 M + 2 D + 9 ??) with the +1 M correctly attributed to tools/fleet_observability/_vikunja_client.py per Guide-#6 v5 verification correction C1 (NOT GUIDE_PROMPT.xml as v5 XML §count_delta_vs_guide_6_prediction misstates). Stash@{0} byte-identical timestamp 20260424_013002 preserved untouched. Fleet invariants preserved.</intro>
+
+    <V0a check="git rev-parse --abbrev-ref HEAD" expect="chore/platform-extraction" observed="chore/platform-extraction" status="PASS"/>
+
+    <V0b check="git log --oneline -3" expect="f863a22 / 9277d61 / d0c6df1" status="PASS">
+      <line n="1">f863a22 (HEAD -&gt; chore/platform-extraction) docs(platform_separation): Stage 2 mid-stage EA handoff v5 -- D3 + D4 decision (DIVERGE) closed; D2 partial (load_config conditional but 6 callers still zero-arg, w15 escalation per g5-4); D1+2.7-2.10 deferred to successor</line>
+      <line n="2">9277d61 docs(platform_separation): Guide instance 5 to 6 handoff -- Stage 2 mid-stage at item 2.6</line>
+      <line n="3">d0c6df1 docs(platform_separation): Stage 2 mid-stage EA handoff v4 -- item 2.4 closed (all 13) + f1 fix + items 2.5 + 2.5.v2 complete (all uncommitted), resume at 2.6</line>
+    </V0b>
+
+    <V0c check="git status --porcelain count" expect="33 (22 M + 2 D + 9 ??)" observed="33" status="PASS">
+      <breakdown>
+        22 M observed (verbatim from `git status --porcelain | Where-Object { $_ -match '^ M' }`):
+          1.  docs/platform_separation/GUIDE_PROMPT.xml          (M throughout chain v3→v4→9277d61→v5; NOT a v4→v5 delta)
+          2.  pyproject.toml
+          3.  tools/autonomy_budget/blarai_next_task_resolver.py
+          4.  tools/autonomy_budget/config.yaml
+          5.  tools/autonomy_budget/config_loader.py
+          6.  tools/autonomy_budget/self_check.py
+          7.  tools/autonomy_budget/tests/test_config_loader.py
+          8.  tools/fleet_observability/_vikunja_client.py        ← +1 M v4→v5 (per C1; D2 PARTIAL conditional load_config + D3 enabler update_task)
+          9.  tools/fleet_observability/credential_rotation_reminder.py
+          10. tools/fleet_observability/daily_digest.py
+          11. tools/fleet_observability/dashboard_maintainer.py
+          12. tools/fleet_observability/weekly_summary.py
+          13. tools/fleet_observability/welcome_back_digest.py
+          14. tools/gate_stale_cleaner/cleaner.py
+          15. tools/gate_stale_cleaner/run_live.py
+          16. tools/scheduled-tasks/agents-cadence-monitor.ps1
+          17. tools/scheduled-tasks/escalation_watchdog.ps1
+          18. tools/scheduled-tasks/la_merge_approve.ps1
+          19. tools/scheduled-tasks/test_async_post_gate.ps1
+          20. tools/scheduled-tasks/toast_watchdog.ps1
+          21. tools/scheduled-tasks/wake_launcher.ps1
+          22. tools/vikunja_mcp/server.py                          (44-line decision block lines 13-57; D4 dup cleanup applied by EA-5)
+        2 D: "Temp for responses/0.10 blocked..." + "Temp for responses/0.7 re-verify..." (LA housekeeping per g5-1)
+        9 ??: EA_2.5.v2_VERIFICATION_EVIDENCE.txt, EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_GUIDE.xml, EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_LA.md, temp_for_responses/, scripts/verify_25_v2.ps1, tools/_project_context.py, tools/_vikunja_client.py, tools/autonomy_budget/projects/, tools/tests/
+      </breakdown>
+    </V0c>
+
+    <V0d check="git stash list" expect="stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002" observed="stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002" status="PASS"/>
+
+    <V0e check="state.json fleet invariants" expect="fleet_paused=True; last_updated_by='copilot_agent'; last_updated_utc='2026-04-24T20:46:12Z'" observed="paused=True; reason='platform separation v2 in progress'; by=copilot_agent; utc=2026-04-24T20:46:12Z" status="PASS"/>
+
+    <V0f check="pytest tools/ --tb=short -q" expect="282 passed" observed="282 passed in 2.64s" status="PASS"/>
+
+    <V0g check="head -65 tools/vikunja_mcp/server.py" expect="single 44-line decision block at lines 13-57; no duplicate; module imports follow" status="PASS">
+      <observation>Lines 11-57 contain the single Stage 2.6 deliverable 4 / observation o1 routing decision (DIVERGE) block authored by EA-5 per g6-ea5_n1 D4 dup cleanup. Module imports (`from __future__ import annotations`, `import json`, `import logging`) begin at line 60+. No duplicate block at lines 58-103 (EA-5 deleted those lines).</observation>
+    </V0g>
+
+    <V0h check="grep '(live|client)\._request' tools/" expect="1 hit (comment at dashboard_maintainer.py:113)" status="PASS">
+      <hit>tools/fleet_observability/dashboard_maintainer.py:113: # Stage 2.6 D3 closure: was ``live._request(&quot;POST&quot;, ...)`` reaching</hit>
+      <interpretation>Comment-only reference documenting the D3 closure history. Zero live private-method call sites. D3 CLEAN holds.</interpretation>
+    </V0h>
+
+    <V0i check="grep 'def update_task' tools/fleet_observability/_vikunja_client.py" expect="1 hit ~line 105" status="PASS">
+      <hit>tools/fleet_observability/_vikunja_client.py:105: def update_task(self, task_id: int, **fields: Any) -&gt; None:</hit>
+      <interpretation>EA-5 D3-enabler public method present at line 105 (alongside pre-existing update_task_priority at line 102). Replaces dashboard_maintainer.py:113's prior `live._request("POST", ...)` private call.</interpretation>
+    </V0i>
+
+    <V0j check="grep 'cfg = config_loader.load_config()' tools/fleet_observability/_vikunja_client.py" expect="1 hit ~line 40 inside `if base_url is None:` conditional block" status="PASS">
+      <hit>tools/fleet_observability/_vikunja_client.py:40: cfg = config_loader.load_config()</hit>
+      <interpretation>EA-5 D2 PARTIAL conditional fallback present. The line is reached only when LiveVikunjaClient() is invoked WITHOUT base_url argument; D2-completion 6-caller closure (EA-6 first action) makes the 6 production callers always supply base_url, leaving line 40 as a defensive fallback for any unanticipated zero-arg caller.</interpretation>
+    </V0j>
+
+    <V0k check="grep 'LiveVikunjaClient\(\s*\)' tools/" expect="6 hits" status="PASS">
+      <hit n="1">tools/fleet_observability/credential_rotation_reminder.py:54: client = LiveVikunjaClient()</hit>
+      <hit n="2">tools/fleet_observability/daily_digest.py:169: client = LiveVikunjaClient()</hit>
+      <hit n="3">tools/fleet_observability/dashboard_maintainer.py:93: live = LiveVikunjaClient()</hit>
+      <hit n="4">tools/fleet_observability/weekly_summary.py:123: client = LiveVikunjaClient()</hit>
+      <hit n="5">tools/fleet_observability/welcome_back_digest.py:84: live = LiveVikunjaClient()</hit>
+      <hit n="6">tools/gate_stale_cleaner/run_live.py:42: live = LiveVikunjaClient()</hit>
+      <interpretation>All 6 D2-completion targets observed verbatim against the g6-ea6_n1 6-caller list. Pattern uniform: zero-arg constructor invocation. EA-6 first substantive action (post-Guide-#6 PROCEED) updates each call site to pass `base_url=cfg["vikunja"]["base_url"]` per the BEFORE/AFTER pattern in g6-ea6_n1.</interpretation>
+    </V0k>
+
+    <V0l check="explicit +1 M attribution restated" expect="tools/fleet_observability/_vikunja_client.py (NOT GUIDE_PROMPT.xml)" status="PASS">
+      <statement>The +1 M working-tree delta v4→v5 is on `tools/fleet_observability/_vikunja_client.py`, NOT on `docs/platform_separation/GUIDE_PROMPT.xml`. GUIDE_PROMPT.xml has been M throughout the entire chain (v3 → v4 → 9277d61 → v5) and is NOT a delta. The legacy fleet_observability/_vikunja_client.py was deferred to 2.6 by EA-4 per g5-4 (file 12 disposition NO CHANGE in 2.4 closure) and remained matching HEAD until EA-5's D2 PARTIAL conditional load_config + D3 enabler update_task method made it M for the first time at v5 emission. v5 XML §count_delta_vs_guide_6_prediction (lines 55-57) misattributes this delta; immutable per no-amend doctrine, forward-corrected here per Guide-#6 v5 verification file C1.</statement>
+    </V0l>
+
+    <summary>12/12 V0 checks PASS. Pickup is clean. No false drift, no unexpected stash mutations, no governance-doc edits, no fleet resume cycle. The legacy file's +1 M state and the 6 zero-arg LiveVikunjaClient() callers are observed exactly as predicted by Guide-#6 init pointer + g6-ea6_n1. Safe to proceed to comprehension summary + ack restatement.</summary>
+  </pickup_verification_recap>
+
+  <v5_documentation_corrections_acknowledged>
+    <intro>The four defects below are restated VERBATIM from Guide-#6 v5 verification file (docs/platform_separation/temp_for_responses/2.6-GUIDE_RESPONSE_INSTANCE_6_V5_EMISSION_VERIFIED_WITH_COUNT_DELTA_CORRECTION.xml) and EA-6 init pointer §v5_documentation_corrections_required. The v5 mid-stage handoff XML at f863a22 is preserved unchanged on disk per the no-amend-commit doctrine; corrections propagate forward through this gate. EA-6 will include a verbatim footnote in the 2.10 STATUS.md append-only entry per documented_in_2_10_status_append.</intro>
+
+    <correction id="C1" severity="LOW" topic="+1 M working-tree delta misattribution">
+      <ea_5_v5_xml_claim>v5 XML §ground_truth_at_handoff §count_delta_vs_guide_6_prediction (lines 55-57): "Delta: +1 M on docs/platform_separation/GUIDE_PROMPT.xml (a docs-governance file owned by the LA; modified between Guide-#6's audit timestamp and v5 emission, OR Guide-#6's count omitted it because the file is considered governance not refactor). EA-5 has NOT touched GUIDE_PROMPT.xml in this session; the M state is inherited from prior cycles."</ea_5_v5_xml_claim>
+      <correct_attribution>GUIDE_PROMPT.xml has been M throughout the entire v3 → v4 → 9277d61 → v5 chain -- verified by reading the v4 git_status_porcelain block (which lists GUIDE_PROMPT.xml as M at v4 emission) and the current `git status --porcelain` output (which still lists it as M). It is NOT a delta vs v4. The actual +1 M delta is on tools/fleet_observability/_vikunja_client.py. This file was NOT M at v4 emission (EA-4 explicitly deferred it to 2.6 per g5-4, file 12 disposition NO CHANGE in 2.4 closure). EA-5's session edits (D2 conditional load_config + D3 update_task method) made it M for the first time. Going from 21 M at v4 to 22 M at v5. Total post-v5 working-tree count: 22 M + 2 D + 9 ?? = 33 entries.</correct_attribution>
+      <ea_6_acknowledgment>I restate the corrected attribution VERBATIM. V0c+V0l verified observed +1 M is `tools/fleet_observability/_vikunja_client.py`, NOT GUIDE_PROMPT.xml. I will NOT propagate v5 XML's misattribution forward into any EA-6 artifact. The 2.10 STATUS append footnote per documented_in_2_10_status_append explicitly cites this correction.</ea_6_acknowledgment>
+    </correction>
+
+    <correction id="C2" severity="LOW" topic="v4 commit hash placeholder">
+      <ea_5_v5_xml_claim>v5 XML lines 58-64 git_log_oneline_5 block uses "(predecessor of 9277d61)" instead of the actual hash.</ea_5_v5_xml_claim>
+      <correct_value>v4 commit hash: d0c6df1.</correct_value>
+      <ea_6_acknowledgment>I will use d0c6df1 verbatim when referencing the v4 commit in any EA-6 artifact (commit messages, STATUS append narrative, V0b output table). V0b observed d0c6df1 verbatim.</ea_6_acknowledgment>
+    </correction>
+
+    <correction id="C3" severity="LOW" topic="v4 commit message paraphrased">
+      <ea_5_v5_xml_claim>v5 XML line 60 paraphrases v4 commit message as "items 2.1+2.2+2.3+2.4 + f1 + 2.5 + 2.5.v2 complete (uncommitted), resume at 2.6".</ea_5_v5_xml_claim>
+      <correct_value>Verbatim from `git log --oneline d0c6df1`: "d0c6df1 docs(platform_separation): Stage 2 mid-stage EA handoff v4 -- item 2.4 closed (all 13) + f1 fix + items 2.5 + 2.5.v2 complete (all uncommitted), resume at 2.6"</correct_value>
+      <ea_6_acknowledgment>I will use the verbatim form when referencing v4 commit message in any EA-6 artifact. V0b confirms verbatim match against current `git log --oneline -3` output.</ea_6_acknowledgment>
+    </correction>
+
+    <correction id="C4" severity="LOW" topic="head_at_handoff_after_this_commit descriptive">
+      <ea_5_v5_xml_claim>v5 XML metadata line 10 says "(this commit -- one parent ahead of 9277d61; the v5 handoff XML is the only file in the diff)".</ea_5_v5_xml_claim>
+      <correct_value>v5 commit hash: f863a22 (after the v5 commit landed; cannot be self-referential within the v5 XML itself).</correct_value>
+      <ea_6_acknowledgment>I reference v5 commit as f863a22 verbatim throughout this gate (meta §head_at_emission, §v5_commit, V0b output) and will continue to do so in V0/closing artifacts. V0b confirms HEAD = f863a22.</ea_6_acknowledgment>
+    </correction>
+
+    <documented_in_2_10_status_append_per_init_pointer>
+      Per init pointer documented_in_2_10_status_append, EA-6 will include in the 2.10 STATUS.md append-only entry the verbatim footnote: "v5 mid-stage handoff XML at f863a22 contained 4 minor documentation defects (C1 +1 M attribution misnamed as GUIDE_PROMPT.xml; actual is fleet_observability/_vikunja_client.py; C2 v4 hash placeholder; C3 v4 commit message paraphrased; C4 head_at_handoff_after_this_commit descriptive). Forward-corrected in EA-6 iteration-1 gate via Guide-#6 init pointer at docs/platform_separation/temp_for_responses/2.6-EA_INITIALIZATION_INSTANCE_6_STAGE2_RESUME_AT_ITEM_2.6_D2_COMPLETION.xml and Guide-#6 v5 verification file at docs/platform_separation/temp_for_responses/2.6-GUIDE_RESPONSE_INSTANCE_6_V5_EMISSION_VERIFIED_WITH_COUNT_DELTA_CORRECTION.xml." This is in addition to the v4 documentation correction footnote per D2 of v4 quality review (carried forward from EA-5 init pointer; still required).
+    </documented_in_2_10_status_append_per_init_pointer>
+  </v5_documentation_corrections_acknowledged>
+
+  <v4_documentation_corrections_acknowledged>
+    <intro>The five defects below are carried forward from Guide-#5's v4 quality review and EA-5 iteration-1 gate. All five are SATISFIED-AS-AUDIT-HISTORY at v5 emission (D1 + D2 satisfied via EA-5 iter-1 gate restatement; D3, D4, D5 satisfied substantively at v4 closure with EA-5 carrying the audit narrative). Source-of-truth: docs/platform_separation/temp_for_responses/2.5-GUIDE_RESPONSE_INSTANCE_5_V4_QUALITY_REVIEW_DEFECTS_FOUND.xml and EA-5 init pointer §v4_documentation_corrections_required and EA-5 iter-1 gate §v4_documentation_corrections_acknowledged. EA-6 will continue the D2 footnote in 2.10 STATUS append.</intro>
+
+    <D1 severity="HIGH" status="SATISFIED-AS-AUDIT-HISTORY-by-EA-5-iter-1-gate">g5-N mapping correction: g5-7=duplicate test cleanup (delete lines 76-94 verbatim duplicates of 57-74 in tools/tests/test_vikunja_client_scope.py); g5-8=env-fallback default `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })` in 6 PS1 scripts; g5-9=$McpConfigPath = Join-Path $RepoRoot '.mcp.json' derivation in agents-cadence-monitor.ps1 + la_merge_approve.ps1 (G-1 fix #1); g5-10=A11 anomaly + g5-7/8/9 dispositions + f1 disposition log + encoding regression footnote + 2.5.v2 closure pointer in 2.10 STATUS append. v4 XML's incorrect labels (e.g., fictitious g5-8 "PS1 alias attribute order") rejected. EA-6 carries forward the correct mapping.</D1>
+
+    <D2 severity="HIGH" status="SATISFIED-AS-AUDIT-HISTORY-by-EA-5-iter-1-gate">33-ack count correction: v4's "27_total" rejected; correct count is 33 binding acks (9 critical_carryovers + 3 g3 + 4 i1 + 7 g4 + 4 g5-1..g5-4 + 2 g5-5/g5-6 + 4 g5-7/g5-8/g5-9/g5-10). f1 disposition IS g5-5 (NOT a separate ack). All 33 restated VERBATIM in EA-5 iter-1 gate; restated again VERBATIM in EA-6 iter-1 gate §required_acknowledgments_carryforward_verbatim_41_total below.</D2>
+
+    <D3 severity="MED" status="SATISFIED-AS-AUDIT-HISTORY">cleaner.py closure (g5-3 SATISFIED Option (b)) was substantive ~44 LOC: added `from tools import _project_context` import; added `project_context: "_project_context.ProjectContext | None" = None` kwarg to run_sweep() (function signature DID change); added 3-branch fallback logic at line 180 (config provided / project_context provided / legacy load_config). Cite Guide-#5 disposition 2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_2.4_COMPLETE.xml check id="g5_3_cleaner_closed" verdict="PASS_OPTION_B_THOROUGH". v4's "~3 LOC chokepoint alignment" understatement rejected. EA-6 will re-read cleaner.py end-to-end before any work that touches it.</D3>
+
+    <D4 severity="LOW" status="SATISFIED-AS-AUDIT-HISTORY">f1 fix (g5-5) was body-rejection-condition extension (extend `_require_project_id` rejection with `or project_id &lt;= 0`; update docstring + error message) + 2 NET-ADD tests (test_require_project_id_rejects_zero, test_require_project_id_rejects_negative). Function SIGNATURE unchanged. "Routing" is unrelated to f1 (routing is the separate observation o1 axis at deliverable 4, closed by EA-5 D4 DIVERGE-APPROVED).</D4>
+
+    <D5 severity="LOW" status="SATISFIED-AS-AUDIT-HISTORY">canonical_param_pattern phantom decorator: v4 XML lines 153-157 show `[Parameter(Mandatory=$false)]` decorator above [Alias('BlarAIRoot')] [string]$RepoRoot; disk verification shows actual on-disk pattern in 5 G-1 PS1 scripts WITHOUT the decorator. Cosmetic only (implicit-mandatory-false default applies). EA-6 will re-read actual on-disk PS1 scripts directly if canonical pattern is needed (e.g., for 2.7.v2 V matrix V5 test authoring).</D5>
+  </v4_documentation_corrections_acknowledged>
+
+  <required_acknowledgments_carryforward_verbatim_41_total>
+    <intro>All 41 binding acks restated VERBATIM from chain-of-custody source files per init pointer §ack_status_at_v5_emission. Decomposition: 33 v4-era acks (9 critical_carryovers + 3 g3 + 4 i1 + 7 g4 + 4 g5-1..g5-4 + 2 g5-5/g5-6 + 4 g5-7..g5-10) + 4 g6-ea5 acks (now SATISFIED-AS-AUDIT-HISTORY at v5 emission) + 4 g6-ea6 acks (FORWARD-ACTIVE for EA-6; n1 priority CRITICAL-FIRST-ACTION). SATISFIED acks are still restated verbatim with SATISFIED tag (audit history). FORWARD-ACTIVE acks are restated verbatim with commitment to enforcement through Stage 4 cutover.</intro>
+
+    <critical_carryovers count="9" source_file="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml" source_block="preexisting_binding_acknowledgments_carryforward / critical_carryovers">
+      <ack n="1" status="FORWARD-ACTIVE">Stage 2 produces exactly ONE commit (item 2.9). All intermediate work stays uncommitted.</ack>
+      <ack n="2" status="FORWARD-ACTIVE">Fleet stays paused throughout Stage 2. NEVER call state.resume_fleet(). Fleet remains paused through Stage 4 cutover.</ack>
+      <ack n="3" status="FORWARD-ACTIVE">No merge to main during Stage 2. Branch chore/platform-extraction is the only working surface.</ack>
+      <ack n="4" status="FORWARD-ACTIVE">stash@{0} (wake_launcher auto-stash on main) is NOT to be popped or applied.</ack>
+      <ack n="5" status="FORWARD-ACTIVE">No edits to CLAUDE.md, AGENTS.md, .github/copilot-instructions.md, or any A1-A10 governance doc during Stage 2.</ack>
+      <ack n="6" status="FORWARD-ACTIVE">All Vikunja access flows through tools/_vikunja_client.py. list_tasks / search_tasks MUST receive int project_id. bool is rejected before int (cleanup-C3).</ack>
+      <ack n="7" status="FORWARD-ACTIVE">_project_context.resolve() is the single source for ProjectContext in every refactored entrypoint. Hardcoded C:\Users\mrbla\BlarAI paths in entrypoints are a BUG.</ack>
+      <ack n="8" status="FORWARD-ACTIVE">V8 defaults preservation: pre-existing pytest discovery, fleet behavior on the BlarAI path, and CLI default behavior all unchanged when --project-root is omitted.</ack>
+      <ack n="9" status="FORWARD-ACTIVE">STATUS.md updates at item 2.10 are APPEND-ONLY. Do not edit prior Stage entries.</ack>
+    </critical_carryovers>
+
+    <plus_guide_3 count="3" source_file="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml" source_block="preexisting_binding_acknowledgments_carryforward / plus_guide_3">
+      <ack n="g3-1" status="FORWARD-ACTIVE">Single Stage 2 commit only.</ack>
+      <ack n="g3-2" status="FORWARD-ACTIVE">V1-V7 + V8 verification block before closing handoff.</ack>
+      <ack n="g3-3" status="FORWARD-ACTIVE">Item 2.10 STATUS.md edit is append-only.</ack>
+    </plus_guide_3>
+
+    <plus_iteration_1_acks count="4" source_file="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml" source_block="preexisting_binding_acknowledgments_carryforward / plus_iteration_1_acks">
+      <ack n="i1-1" status="SATISFIED-this-session">V0a-V0g pickup verification block must be re-executed (and outputs reported) at the start of every successor session before substantive work begins.</ack>
+      <ack n="i1-2" status="FORWARD-ACTIVE">All 10 acknowledgments above (9 from predecessor + 3 from Guide instance 3, deduped) are binding through Stage 4 cutover.</ack>
+      <ack n="i1-3" status="FORWARD-ACTIVE">V1-V7 closure verification (per EA_HANDOFF_STAGE2.xml) plus per-item V8 (defaults-preservation) must be executed and outputs included in the final closing handoff at Stage 2 completion.</ack>
+      <ack n="i1-4" status="FORWARD-ACTIVE">If a successor approaches context exhaustion before item 2.9, it MUST emit a v3 (or higher) mid-stage handoff XML following the same schema as v1/v2, commit ONLY that file (docs-only commit), and stop. NO partial-commit refactor work. NO emergency single-commit attempts that omit pending items.</ack>
+    </plus_iteration_1_acks>
+
+    <plus_guide_4 count="7" source_file_a="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml" source_block_a="required_acknowledgments_verbatim" source_file_b="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_TO_EA_INITIALIZATION_03_STAGE2_REFACTOR_MULTIPROJECT.xml" source_block_b="required_acknowledgments">
+      <ack n="g4-1" status="SATISFIED">I will incorporate all 8 corrections into a re-emitted comprehension gate before any item 2.4 work begins.</ack>
+      <ack n="g4-2" status="SATISFIED">I will use `-BlarAIRoot` (not `-ProjectRoot`) for all 7 PS1 parameters per v2 canonical signature pattern at 2.4.v2.</ack>
+      <ack n="g4-3" status="SATISFIED">I will explicitly enumerate the 12 Python entrypoints (9 load_config callers from v2-1 + 3 v2.4.v2 additions) and the 7 PS1 scripts (with la_merge_approve at the correct `tools/scheduled-tasks/` path).</ack>
+      <ack n="g4-4" status="SATISFIED">I will include `tools/vikunja_mcp/server.py` MCP handlers in item 2.4 audit and extend item 2.6 grep patterns per C4/C6 source citations.</ack>
+      <ack n="g4-5" status="FORWARD-ACTIVE-at-2.8">If item 2.8 `$BLARAI_PID` preflight returns empty or any value other than 3, I will STOP and report to Lead Architect -- no silent regex or yaml adaptation.</ack>
+      <ack n="g4-6" status="FORWARD-ACTIVE">I will use descriptive risk labels (no numeric prefix overlap with AUDIT_RISK_REVIEW or verification-block IDs).</ack>
+      <ack n="g4-7" status="SATISFIED">I will not begin item 2.4 work, create branches, or run mutation commands until the re-emitted gate is reviewed and explicitly authorized by Guide instance 4.</ack>
+    </plus_guide_4>
+
+    <plus_guide_5 count="4" source_file="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_2.4_PARTIAL.xml" source_block="required_acknowledgments_for_next_ea">
+      <ack n="g5-1" severity="MED" topic="Pickup verification expectations updated for LA-side housekeeping" status="SATISFIED-by-V0c-recap-this-session">The v3 handoff's predicted ground state (10 M + 4 ?? Temp + 4 ?? new tools artifacts) does NOT include the LA-side housekeeping that landed AFTER EA-3 emitted: (a) modified docs/platform_separation/GUIDE_PROMPT.xml (+19 lines, v2.1 file-output-discipline carve-out); (b) deleted "docs/platform_separation/Temp for responses/0.10 blocked..." and "docs/platform_separation/Temp for responses/0.7 re-verify..." (LA's old-XML housekeeping); (c) renamed directory "Temp for responses" -&gt; "temp_for_responses" (lowercase, underscores per v2.1 convention) -- visible in git as one new untracked entry "?? temp_for_responses/"; (d) two new ?? entries for EA-3's own report files (EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_GUIDE.xml + EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_LA.md). All FOUR additions are EXPECTED and not violations. EA-4's iteration-1 V0 pickup MUST account for these or it will report false drift.</ack>
+      <ack n="g5-2" severity="LOW" topic="File 12 path-label mismatch in EA reports vs v3 handoff" status="ACKNOWLEDGED">The EA's Guide-facing completion report (.xml) and LA-facing report (.md) both label file 12 as `tools/_vikunja_client.py` (the new chokepoint, Stage 2.1). The CORRECT path for the legacy load_config caller is `tools/fleet_observability/_vikunja_client.py`. The v3 handoff XML &lt;files_pending&gt; correctly uses `tools/fleet_observability/_vikunja_client.py`, so EA-4 (which reads the v3 handoff, not the LA/Guide reports) is not impacted -- the path is correct in the source-of-truth document. Cosmetic only, but EA-4 should note the discrepancy if cross-referencing the reports.</ack>
+      <ack n="g5-3" severity="LOW" topic="cleaner.py file 9 disposition adjustment" status="SATISFIED-Option-(b)-thorough-by-EA-4">v3 handoff plan for `tools/gate_stale_cleaner/cleaner.py` says "VERIFY by reading the file: confirm no module-level REPO_ROOT, no hardcoded BlarAI paths, no direct load_config calls." Independent grep shows line 180 contains `cfg = config if config is not None else config_loader.load_config()` -- a fallback load_config call. EA-4 must disposition this fallback (either remove if config is always injected by callers, or thread ctx through to make the fallback project-aware). Today's production caller (run_live.py:58) always passes config so the fallback is dead path, but it is a load_config-callsite that should be addressed in 2.4 scope.</ack>
+      <ack n="g5-4" severity="LOW" topic="Legacy fleet_observability/_vikunja_client.py disposition to 2.6 must close load_config callsite" status="FORWARD-ACTIVE-at-2.6-CLOSES-VIA-g6-ea6_n1">v3 handoff defers `tools/fleet_observability/_vikunja_client.py` to Item 2.6 ("HTTP client has no project knowledge"). Independent grep confirms line 28 contains `cfg = config_loader.load_config()` (zero-arg). The defaults-preservation chain holds today via _resolve_project_overlay_path auto-resolve from BlarAI cwd. POST-Stage-4 cutover risk: if the script is invoked from devplatform cwd, the auto-resolve resolves to a non-BlarAI ctx and the overlay merge produces wrong allowlist. EA-4 MUST ensure the Item 2.6 disposition (whether "fold entirely" or "thin shim through new chokepoint") explicitly closes the line-28 load_config callsite before Item 2.9 single-commit. If 2.6 ends up leaving the load_config call in place without ctx threading, that is a w15 hazard and requires escalation back to Guide.</ack>
+    </plus_guide_5>
+
+    <plus_guide_5_corrections_pre count="2" source_file="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_F1_DISPOSITION_OPTION_A.xml" source_block="required_acknowledgments_for_ea_4_to_emit_pre_fix">
+      <ack n="g5-5" severity="MED" topic="f1 disposition: Option (a) authorized by LA via Guide-#5" status="SATISFIED">I will apply the 2-line _require_project_id strengthening in tools/_vikunja_client.py (extend rejection condition with `or project_id &lt;= 0`; update error message to mention "positive int" / "not &lt;= 0") and add the two new tests (test_require_project_id_rejects_zero, test_require_project_id_rejects_negative) to tools/tests/test_vikunja_client_scope.py. Re-run pytest tools/ and confirm 282 passed (was 280; +2 NET-ADD per V matrix). Refactor stays UNCOMMITTED on disk per the single-commit-at-2.9 protocol -- the f1 fix folds into the same commit at 2.9 alongside all other Stage 2 work. I will document f1 disposition + the LA authorization in the eventual 2.10 STATUS.md append-only entry.</ack>
+      <ack n="g5-6" severity="LOW" topic="path-confusion correction: g5-4 ≠ f1" status="SATISFIED">I acknowledge the path-confusion correction: g5-4 disposition concerns `tools/fleet_observability/_vikunja_client.py` (the LEGACY pure-HTTP client) at Item 2.6; f1 disposition concerns `tools/_vikunja_client.py` (the NEW chokepoint, Stage 2.1 deliverable) at Item 2.4 closure. These are different files, different scope axes, and different dispositions. The 2.6 work plan does NOT inherently touch the chokepoint helper guard. f1 closure happens at 2.4; g5-4 closure happens at 2.6.</ack>
+    </plus_guide_5_corrections_pre>
+
+    <plus_guide_5_corrections_main count="4" source_file="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml" source_block="required_acknowledgments_for_ea_4_to_emit">
+      <ack n="g5-7" severity="MED" topic="duplicate test cleanup" status="SATISFIED">I will delete lines 76-94 of tools/tests/test_vikunja_client_scope.py (the verbatim duplicate copy of test_require_project_id_rejects_zero + rejects_negative). Re-run pytest tools/ and confirm 282 passed (no count change). The cleanup is purely artifact removal.</ack>
+      <ack n="g5-8" severity="HIGH" topic="env-fallback default in 6 PS1 scripts" status="SATISFIED">I will replace the hardcoded `'C:\Users\mrbla\BlarAI'` default in wake_launcher.ps1, agents-cadence-monitor.ps1, escalation_watchdog.ps1, toast_watchdog.ps1, la_merge_approve.ps1, and test_async_post_gate.ps1 with the canonical env-fallback expression `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })` per Stage 2 XML 2.5.v2 + iteration-2 g4-2 binding. Alias direction unchanged. After fixing, Item 2.5.v2 verification will functionally test env-fallback (set $env:BLARAI_ROOT=&lt;test-path&gt;, invoke without -BlarAIRoot, verify default honors env).</ack>
+      <ack n="g5-9" severity="HIGH" topic="$McpConfigPath derivation from $RepoRoot/$BlarAIRoot" status="SATISFIED">I will refactor $McpConfigPath in agents-cadence-monitor.ps1 (line 19) and la_merge_approve.ps1 (line 40) to derive from $RepoRoot at function-entry rather than as a separately-hardcoded param default. The script body computation will be `$McpConfigPath = Join-Path $RepoRoot '.mcp.json'` (or the override-preserving variant per correction-3 if I want to keep the explicit -McpConfigPath flag). This honors WORKFLOW_INTEGRITY_REVIEW G-1 fix #1 explicit instruction.</ack>
+      <ack n="g5-10" severity="LOW" topic="alias-vs-rename deviation documented as anomaly A11" status="FORWARD-ACTIVE-at-2.10">I will document the PS1 alias-vs-rename internal inconsistency (5 scripts with primary $RepoRoot + alias -BlarAIRoot; 1 script with canonical primary $BlarAIRoot + alias -RepoRoot + shim) as anomaly A11 (or next available number) in the eventual Stage 2.10 STATUS.md append-only entry. Rationale: backward compatibility preference; external -BlarAIRoot contract satisfied; canonical internal naming deferred to Stage 6 hardening. Stage 6 should standardize all to the test_async_post_gate pattern.</ack>
+    </plus_guide_5_corrections_main>
+
+    <plus_guide_6_ea5_satisfied count="4" source_file="docs/platform_separation/temp_for_responses/2.6-GUIDE_RESPONSE_INSTANCE_6_INTER_DELIVERABLE_REVIEW_EA_5_D2_INCOMPLETE_V5_AUTHORIZED.xml" source_block="required_acknowledgments">
+      <ack id="g6-ea5_n1" topic="D4 dup cleanup" status="SATISFIED-AS-AUDIT-HISTORY-by-EA-5">EA-5 acknowledges the duplicate decision block in tools/vikunja_mcp/server.py lines 58-103 will be deleted via Edit operation before v5 XML drafting. After the deletion, EA-5 will re-read the cleaned file to confirm the single 44-line block remains well-formed and the module imports at line 105+ are unchanged.
+        <ea_6_observation>Verified at V0g: single 44-line decision block at lines 13-57; module imports begin line 60+; no duplicate.</ea_6_observation>
+      </ack>
+      <ack id="g6-ea5_n2" topic="D2 incompleteness encoding in v5 XML" status="SATISFIED-AS-AUDIT-HISTORY-by-EA-5">EA-5 acknowledges that D2 disposition is INCOMPLETE per ack g5-4 because the line-40 load_config call is still triggered by 6 zero-arg callers, and that the v5 mid-stage handoff XML MUST explicitly encode: D2-completion as a NEW first deliverable in work_remaining (preceding D1); the 6-caller closure list verbatim (credential_rotation_reminder, welcome_back_digest, daily_digest, weekly_summary, dashboard_maintainer:93, gate_stale_cleaner.run_live); the BEFORE/AFTER pattern verbatim (LiveVikunjaClient() → LiveVikunjaClient(base_url=cfg["vikunja"]["base_url"])); the pytest sanity check (expect 282 passed; no count change); reference to this Guide-#6 review file as the source of the D2-incompleteness finding.
+        <ea_6_observation>Verified via V0j (line 40 load_config conditional present) + V0k (6 zero-arg callers exactly matching the verbatim list).</ea_6_observation>
+      </ack>
+      <ack id="g6-ea5_n3" topic="single docs-only commit for v5" status="SATISFIED-AS-AUDIT-HISTORY-by-EA-5">EA-5 acknowledges that the v5 commit MUST be docs-only (one file in diff: the v5 XML under ea_outputs/) per i1-4 + dn15. The dup-cleanup edit to server.py + any other working-tree state remains UNCOMMITTED for EA-6 to fold into the Stage-2 single commit at item 2.9.
+        <ea_6_observation>Verified via V0b (f863a22 commit message confirms docs-only) + V0c (server.py + 21 other M files remain UNCOMMITTED in working tree).</ea_6_observation>
+      </ack>
+      <ack id="g6-ea5_n4" topic="d4 decision retention" status="SATISFIED-AS-AUDIT-HISTORY-by-EA-5">EA-5 acknowledges Guide-#6 has APPROVED the D4 divergence (chokepoint-function-as-integration, not chokepoint-class-routing). The decision retention applies forward; future EA sessions or Stage 5 cleanup may revisit if VikunjaClient class HTTP delegation is wired and the D4 reasoning conditions change.
+        <ea_6_acknowledgment>I retain D4 DIVERGE-APPROVED forward. I will NOT re-open D4 in Stage 2; revisit conditional on VikunjaClient class HTTP delegation landing in Stage 5+. Per init pointer prohibition: "Do NOT re-open D4 (DIVERGE-APPROVED) or D3 (CLEAN) decisions."</ea_6_acknowledgment>
+      </ack>
+    </plus_guide_6_ea5_satisfied>
+
+    <plus_guide_6_ea6_forward_active count="4" source_file="docs/platform_separation/temp_for_responses/2.6-EA_INITIALIZATION_INSTANCE_6_STAGE2_RESUME_AT_ITEM_2.6_D2_COMPLETION.xml" source_block="ack_status_at_v5_emission / new_g6_ea6_introduced_in_this_init_pointer">
+      <ack id="g6-ea6_n1" status="FORWARD-ACTIVE-FIRST-ACTION" priority="CRITICAL">D2-completion 6-caller closure as FIRST substantive action after V0 + iter-1 gate. Update each of 6 zero-arg LiveVikunjaClient() callers to pass base_url=cfg["vikunja"]["base_url"]. The 6 callers (verbatim list, full paths): (1) tools/fleet_observability/credential_rotation_reminder.py; (2) tools/fleet_observability/welcome_back_digest.py; (3) tools/fleet_observability/daily_digest.py; (4) tools/fleet_observability/weekly_summary.py; (5) tools/fleet_observability/dashboard_maintainer.py (line ~93); (6) tools/gate_stale_cleaner/run_live.py. BEFORE/AFTER pattern: BEFORE: `live = LiveVikunjaClient()` AFTER: `live = LiveVikunjaClient(base_url=cfg["vikunja"]["base_url"])`. Each caller already has `cfg` resolved via prior ctx-aware load_config call. Total ~6 lines changed. Pytest sanity check after edits: `pytest tools/ --tb=short -q`; expect 282 passed. Grep verification: `grep -rn 'LiveVikunjaClient\(\s*\)' tools/` returns 0 hits in production code. Ack g5-4 transitions from FORWARD-ACTIVE to SATISFIED.
+        <ea_6_acknowledgment>I will execute D2-completion 6-caller closure as FIRST substantive action after Guide-#6 PROCEED authorization on this gate. Pre-edit: I will independently re-read each of the 6 caller files end-to-end (per dn14/dn20 + p3+p16 "mature not minimal" mandate) to verify cfg resolution context before applying the BEFORE/AFTER pattern. Variable name varies per file (`client` vs `live`); I will preserve existing local naming and modify only the constructor invocation. Post-edit verification: pytest tools/ (expect 282 passed); grep `LiveVikunjaClient\(\s*\)` returns 0 hits in production. Ack g5-4 transitions FORWARD-ACTIVE → SATISFIED upon successful closure.</ea_6_acknowledgment>
+      </ack>
+      <ack id="g6-ea6_n2" status="FORWARD-ACTIVE">+1 M working-tree delta correct attribution. v5 XML §count_delta_vs_guide_6_prediction misattributes the +1 to GUIDE_PROMPT.xml; actual is tools/fleet_observability/_vikunja_client.py (per Guide-#6 v5 verification correction C1). EA-6 iteration-1 gate restates the corrected attribution; V0c verification observes 33 entries (22 M + 2 D + 9 ??) with the +1 M correctly identified as fleet_observability/_vikunja_client.py.
+        <ea_6_acknowledgment>Restated VERBATIM in §v5_documentation_corrections_acknowledged C1 above and in V0c+V0l blocks. I will NOT propagate the misattribution forward in any artifact.</ea_6_acknowledgment>
+      </ack>
+      <ack id="g6-ea6_n3" status="FORWARD-ACTIVE-at-2.10">v5 XML minor doc defects (C2 v4 hash placeholder; C3 v4 commit message paraphrase; C4 v5 head_at_handoff_after_this_commit descriptive) acknowledged in 2.10 STATUS.md append-only footnote per documented_in_2_10_status_append block above.
+        <ea_6_acknowledgment>The verbatim 2.10 STATUS append footnote text (per init pointer documented_in_2_10_status_append) is preserved in §v5_documentation_corrections_acknowledged §documented_in_2_10_status_append_per_init_pointer above. I will include it verbatim in the 2.10 entry alongside the v4 D2 footnote.</ea_6_acknowledgment>
+      </ack>
+      <ack id="g6-ea6_n4" status="FORWARD-ACTIVE">If EA-6 budget tightens at any clean breakpoint before Item 2.9 (e.g., D2-completion close, D1 close, 2.7 close, 2.7.v2 close), emit v6 mid-stage handoff XML following v1/v2/v3/v4/v5 schema (docs-only commit, one file in diff). NO partial-commit refactor work. NO emergency single-commit attempts.
+        <ea_6_acknowledgment>Confirmed. Clean breakpoints recognized: D2-completion-close, D1-close, 2.7-close, 2.7.v2-close (and 2.8-close pre-commit). v6 handoff XML will mirror v5 schema with same `head_at_handoff_after_this_commit` self-reference accepted as audit-narrative limitation (per C4 pattern). Single-file docs-only commit. NO partial-refactor-commit attempts. NO emergency truncated 2.9 commits omitting pending items.</ea_6_acknowledgment>
+      </ack>
+    </plus_guide_6_ea6_forward_active>
+
+    <total>9 + 3 + 4 + 7 + 4 + 2 + 4 + 4 + 4 = 41 binding acks. Decomposition: 33 v4-era acks (preserved verbatim from EA-5 iter-1 gate; statuses unchanged or transitioned per work landed) + 4 g6-ea5 acks (SATISFIED-AS-AUDIT-HISTORY at v5 emission; observations restated against V0g/V0j/V0k/V0b verification) + 4 g6-ea6 acks (FORWARD-ACTIVE for EA-6; n1 priority CRITICAL-FIRST-ACTION). f1 = g5-5 (NOT enumerated separately). Per i1-2 dedup rule, all remain in force through Stage 4 cutover regardless of SATISFIED status -- SATISFIED tags preserve audit history, FORWARD-ACTIVE tags require ongoing enforcement.</total>
+  </required_acknowledgments_carryforward_verbatim_41_total>
+
+  <comprehension_summary>
+
+    <part_a_objective>
+      Complete Stage 2 from Item 2.6 D2-completion (FIRST -- 6-caller closure per g6-ea6_n1 priority CRITICAL) → D1 (extended grep verification net, 12 patterns per Master Plan §6.2 + AUDIT_RISK_REVIEW C6) → Item 2.7 (pytest tools/ ≥282 passed + V1-V7 closure assertions per EA_HANDOFF_STAGE2.xml + per-item V8 defaults-preservation on 2.6-touched files) → Item 2.7.v2 (V matrix V4-V7 NEW tests authoring: V4 CLI flag exposure parametrized per refactored entrypoint; V5 PS1 -BlarAIRoot AST-driven probe pattern from scripts/verify_25_v2.ps1; V6 MCP server project_id rejection mock-based; V7 cross-project byte-identity diff with two project overlays) → Item 2.8 ($BLARAI_PID==3 hard gate via python -c "from tools import _project_context; ctx = _project_context.resolve(); assert ctx.vikunja_project_id == 3, f'expected 3, got {ctx.vikunja_project_id}'; print('OK ctx.vikunja_project_id =', ctx.vikunja_project_id)" with stop-and-report on drift per g4-5; NO silent regex/yaml adaptation) → Item 2.9 (SINGLE Stage-2 commit folding ALL working-tree entries from v1/v2/v3/v4/v5 sessions + EA-6 D2-completion + 2.6/2.7/2.7.v2 work; pyproject.toml MUST be in commit per i1-3; commit template per v5 §work_remaining §2.9) → Item 2.10 (append-only STATUS.md update with all required inclusions per g5-10 + corollary: A11 alias-vs-rename anomaly + g5-7/8/9 dispositions + g5-10 self + f1 chokepoint helper fix log + encoding regression footnote + 2.5.v2 closure pointer at scripts/verify_25_v2.ps1 + EA_2.5.v2_VERIFICATION_EVIDENCE.txt + v4 documentation correction footnote per D2 + v5 documentation correction footnote per C1-C4). Branch chore/platform-extraction; HEAD discipline single-commit-at-2.9 intact (current f863a22 will become the parent of the Stage-2 commit); fleet stays paused; stash@{0} byte-identical untouched (timestamp 20260424_013002); Vikunja stopped; scheduled tasks Disabled; no merge to main; no governance edits. D4 DIVERGE-APPROVED retained from v5; D3 CLEAN retained from v5; no rebar opening.
+    </part_a_objective>
+
+    <part_b_work_plan>
+      <item_2_6_d2_completion priority="FIRST" source="g6-ea6_n1">
+        Update each of 6 zero-arg LiveVikunjaClient() callers to pass `base_url=cfg["vikunja"]["base_url"]`.
+        BEFORE: `live = LiveVikunjaClient()` (or `client = LiveVikunjaClient()` per local variable name)
+        AFTER:  `live = LiveVikunjaClient(base_url=cfg["vikunja"]["base_url"])`
+        Files (verbatim, full paths, with V0k-observed line numbers):
+          1. tools/fleet_observability/credential_rotation_reminder.py:54 (variable name: `client`)
+          2. tools/fleet_observability/welcome_back_digest.py:84            (variable name: `live`)
+          3. tools/fleet_observability/daily_digest.py:169                  (variable name: `client`)
+          4. tools/fleet_observability/weekly_summary.py:123                (variable name: `client`)
+          5. tools/fleet_observability/dashboard_maintainer.py:93           (variable name: `live`)
+          6. tools/gate_stale_cleaner/run_live.py:42                        (variable name: `live`)
+        Pre-edit: re-read each caller end-to-end (dn14/dn20 + p3+p16 mature-not-minimal); confirm `cfg` is resolved via prior ctx-aware load_config call before the constructor invocation; preserve local variable naming convention.
+        Verification: pytest tools/ --tb=short -q → expect 282 passed (no V matrix tests target this code path; baseline holds). Grep verification: `grep -rn 'LiveVikunjaClient\(\s*\)' tools/` returns 0 hits in production code (test files exempt per Master Plan §D.1 chokepoint scope).
+        Outcome: ack g5-4 transitions FORWARD-ACTIVE → SATISFIED; D2-completion closes; w15 hazard cleared; legacy line-40 conditional fallback remains as defensive safety net but is no longer reached by any production caller.
+      </item_2_6_d2_completion>
+
+      <item_2_6_d1_extended_grep priority="SECOND" source="Master Plan §6.2 + AUDIT_RISK_REVIEW C6 + init pointer work_plan_pointer">
+        After D2-completion lands. Run extended grep across tools/ for 12 chokepoint-violation patterns:
+          1. https?://localhost:3456
+          2. requests\.(get|post|put|patch|delete)
+          3. urllib\. / urllib3\. / aiohttp\. / httpx\.
+          4. api/v1/ / api/v2/
+          5. Authorization.*Bearer
+          6. X-Api-Token
+          7. VIKUNJA_API_TOKEN
+          8. .vikunja.yaml
+          9. LiveVikunjaClient
+          10. vikunja_mcp\.client
+          11. tools/_vikunja_client (sanity check)
+          12. (additional Vikunja-touching patterns surfaced during triage)
+        Expected post-D2-completion: ALL hits inside tools/_vikunja_client.VikunjaClient or its tests OR LegacyVikunjaClient (inside tools/fleet_observability/_vikunja_client.py). Triage every hit; do not pre-filter. Document findings + dispositions in EA-6 working notes; surface non-zero findings outside D1 scope to LA + Guide-#6 (NO silent expansion per init pointer prohibition).
+      </item_2_6_d1_extended_grep>
+
+      <item_2_7_pytest_gate priority="THIRD">
+        pytest tools/ --tb=short -q (expect ≥282 passed -- baseline holds; new tests from 2.7.v2 may push higher). V1-V7 closure assertions per EA_HANDOFF_STAGE2.xml. Per-item V8 (defaults-preservation) on 2.6-touched files (server.py D4 region, dashboard_maintainer.py, legacy fleet_observability/_vikunja_client.py, plus the 6 D2-completion targets).
+      </item_2_7_pytest_gate>
+
+      <item_2_7_v2_v_matrix_authoring priority="FOURTH">
+        Author NEW V matrix tests V4-V7:
+          V4 = CLI flag exposure (parametrized per refactored entrypoint).
+          V5 = PS1 -BlarAIRoot test (pytest-via-subprocess; AST-driven probe pattern at scripts/verify_25_v2.ps1 is precedent reference).
+          V6 = MCP server project_id rejection (mock-based; targets the 8 _require_project_id call sites at tools/vikunja_mcp/server.py handler entry, retained per D4 DIVERGE-APPROVED).
+          V7 = cross-project byte-identity (run with two project overlays; diff outputs).
+      </item_2_7_v2_v_matrix_authoring>
+
+      <item_2_8_blarai_pid_hard_gate priority="FIFTH" source="g4-5">
+        python -c "from tools import _project_context; ctx = _project_context.resolve(); assert ctx.vikunja_project_id == 3, f'expected 3, got {ctx.vikunja_project_id}'; print('OK ctx.vikunja_project_id =', ctx.vikunja_project_id)"
+        ON DRIFT: STOP. Do NOT proceed to commit. Report to LA per g4-5. NO silent regex/yaml adaptation.
+      </item_2_8_blarai_pid_hard_gate>
+
+      <item_2_9_single_stage_2_commit priority="SIXTH" source="ack n=1, g3-1, i1-3">
+        SINGLE Stage-2 commit folding ALL uncommitted work (the 33-entry working tree + EA-6 D2-completion edits + 2.6/2.7/2.7.v2 edits + any 2.10 STATUS append edit). Commit template per v5 §work_remaining §2.9 (lines 201-227). pyproject.toml MUST be in this commit per i1-3.
+      </item_2_9_single_stage_2_commit>
+
+      <item_2_10_status_append priority="SEVENTH" source="g5-10 + corollary + g6-ea6_n3">
+        Append-only STATUS.md update with all required inclusions:
+          - A11 alias-vs-rename anomaly (per g5-10)
+          - g5-7 (duplicate test cleanup) disposition
+          - g5-8 (env-fallback default in 6 PS1 scripts) disposition
+          - g5-9 ($McpConfigPath derivation) disposition
+          - g5-10 self-acknowledgment (anomaly recorded as A11)
+          - f1 chokepoint helper fix disposition log + LA authorization via Guide-#5
+          - encoding regression footnote
+          - 2.5.v2 closure pointer at scripts/verify_25_v2.ps1 + EA_2.5.v2_VERIFICATION_EVIDENCE.txt
+          - v4 documentation correction footnote per D2 (carried forward from EA-5 init pointer; verbatim text in EA-5 iter-1 gate documented_in_2_10_status_append_per_g5_10_corollary block)
+          - v5 documentation correction footnote per C1-C4 (verbatim text in this gate §v5_documentation_corrections_acknowledged §documented_in_2_10_status_append_per_init_pointer)
+      </item_2_10_status_append>
+    </part_b_work_plan>
+
+    <part_c_files_to_modify>
+      <d2_completion_first count="6">
+        1. tools/fleet_observability/credential_rotation_reminder.py (line 54)
+        2. tools/fleet_observability/welcome_back_digest.py (line 84)
+        3. tools/fleet_observability/daily_digest.py (line 169)
+        4. tools/fleet_observability/weekly_summary.py (line 123)
+        5. tools/fleet_observability/dashboard_maintainer.py (line 93)
+        6. tools/gate_stale_cleaner/run_live.py (line 42)
+      </d2_completion_first>
+      <items_2_7_v2_through_2_10 description="V matrix authoring + STATUS append">
+        - tools/tests/test_v_matrix_v4_cli_flag.py (NEW; V4)
+        - tools/tests/test_v_matrix_v5_ps1_blarairoot.py (NEW; V5)
+        - tools/tests/test_v_matrix_v6_mcp_project_id.py (NEW; V6)
+        - tools/tests/test_v_matrix_v7_cross_project_byte_identity.py (NEW; V7)
+        - docs/platform_separation/STATUS.md (append-only at item 2.10; existing file, last edited at Stage 2.3 closure)
+      </items_2_7_v2_through_2_10>
+      <not_modified_in_stage_2 description="Per init pointer prohibitions">
+        - CLAUDE.md, AGENTS.md, .github/copilot-instructions.md (governance; A1-A10 deferred)
+        - docs/platform_separation/* except STATUS.md append + any v6+ mid-stage handoff XML (EA-6 emits if context tightens)
+        - tools/autonomy_budget/projects/__init__.py (do NOT add; YAML data root not Python package)
+        - tools/_vikunja_client.py (chokepoint module unchanged in 2.6; D4 DIVERGE keeps server-side guards intact, no class HTTP delegation in scope)
+        - tools/_project_context.py (Stage 2.2 deliverable, untouched in 2.6)
+      </not_modified_in_stage_2>
+    </part_c_files_to_modify>
+
+    <part_d_verification_strategy>
+      V0a-V0l pickup verification: COMPLETE this session, all 12 PASS (recap above with the +1 M correctly attributed to fleet_observability/_vikunja_client.py per C1).
+      Per-deliverable verification at D2-completion: pytest tools/ re-run after the 6-caller edit (expect 282 passed); grep `LiveVikunjaClient\(\s*\)` zero-hits in production; manual diff inspection of each caller (cfg present pre-constructor; constructor arg correct).
+      Per-deliverable verification at D1: tabulate 12-pattern grep results; every hit triaged with disposition (chokepoint-internal vs. legacy-shim-internal vs. test-only vs. NEEDS-ESCALATION).
+      Per-deliverable verification at 2.7: pytest tools/ ≥282 passed; V1-V7 closure assertions; per-item V8 defaults-preservation.
+      Per-deliverable verification at 2.7.v2: 4 NEW V matrix tests pass when invoked with parametric inputs (BlarAI vs second project overlay).
+      Per-deliverable verification at 2.8: $BLARAI_PID==3 hard-gate python -c oneliner returns OK; otherwise STOP.
+      Per-deliverable verification at 2.9: git diff --name-only HEAD~1 shows ALL 33+ working-tree entries + new V matrix tests + STATUS.md edit; pyproject.toml present; commit message matches v5 §work_remaining §2.9 template.
+      Per-deliverable verification at 2.10: STATUS.md diff shows append-only addition (no edits to prior entries); all 10 required inclusions present (A11, g5-7, g5-8, g5-9, g5-10 self, f1 log, encoding regression footnote, 2.5.v2 evidence pointer, v4 D2 footnote, v5 C1-C4 footnote).
+    </part_d_verification_strategy>
+
+    <part_e_risks>
+      <risk label="g5-4-d2-completion-CRITICAL-FIRST-ACTION" severity="HIGH">D2-completion 6-caller closure must be EA-6's first action; deferring or interleaving with D1 would leave the w15 hazard active and miscarry the "mature not minimal" mandate.</risk>
+      <risk label="w12-multi-file-disk-verification" severity="MED">Pre-edit re-read of each of the 6 caller files end-to-end is mandatory (dn14/dn20). Skipping this risks subtle bugs around `cfg` resolution context (e.g., a caller that resolves `cfg` differently or imports a different LiveVikunjaClient).</risk>
+      <risk label="w13-single-commit-discipline" severity="HIGH">All 2.6/2.7/2.7.v2/2.10 work + the existing 33-entry working tree must fold into the SINGLE Stage 2 commit at item 2.9. NO mid-stage commit attempts (except v6+ docs-only handoff XMLs per i1-4 + g6-ea6_n4).</risk>
+      <risk label="C6-extended-grep-coverage" severity="MED">D1 grep must cover all 12 patterns per AUDIT_RISK_REVIEW C6; missing patterns risks chokepoint violation slipping into Stage 2 commit. Triage every hit; no pre-filter.</risk>
+      <risk label="C2-stage-6-deferral" severity="LOW">A11 alias-vs-rename canonical naming standardization is deferred to Stage 6 hardening per g5-10. EA-6 documents the anomaly; does NOT attempt rename.</risk>
+      <risk label="i1-4-g6_ea6_n4-mid-stage-handoff" severity="HIGH">If EA-6 budget tightens at any clean breakpoint (D2-completion-close, D1-close, 2.7-close, 2.7.v2-close), MUST emit v6 mid-stage handoff XML following v1/v2/v3/v4/v5 schema (docs-only commit, ONE file in diff). NO partial-refactor commits. NO emergency truncated 2.9 commits.</risk>
+      <risk label="w3-g4-5-blarai-pid-2.8" severity="HIGH">If item 2.8 $BLARAI_PID preflight returns empty or any value other than 3, STOP and report to LA. NO silent regex/yaml adaptation.</risk>
+      <risk label="dn18-path-confusion" severity="MED">Always cite full paths when discussing tools/_vikunja_client.py (chokepoint, Stage 2.1) vs tools/fleet_observability/_vikunja_client.py (legacy LiveVikunjaClient). g5-6 path-confusion correction binding.</risk>
+      <risk label="dn19-defect-vs-scope-expansion" severity="MED">In-scope DEFECT closure (e.g., g5-4 D2-completion) is LA-authorized via Guide disposition (this init pointer); distinct from additive scope expansion. Default disposition for any audit-surfaced PS1 (e.g., critical_notify, escalation_notify) is no-action with Appendix A.1 citation.</risk>
+      <risk label="c1-count-delta-correct-attribution" severity="LOW">v5 XML §count_delta_vs_guide_6_prediction is wrong about the +1 M file; EA-6 must NOT propagate that misattribution forward. Restated correctly in this gate (V0c+V0l) and in 2.10 STATUS append per g6-ea6_n3.</risk>
+    </part_e_risks>
+
+    <part_f_rollback_acknowledgment>
+      "If post-item-2.9 verification fails (V1-V7 closure or per-item V8), rollback is `git reset --hard HEAD~1` on chore/platform-extraction (level-1 per RECOVERY.md; branch is local, not pushed). Branch is preserved for audit per copilot-instructions preservation_rule. Fleet stays disabled -- no runtime impact from rollback."
+    </part_f_rollback_acknowledgment>
+
+  </comprehension_summary>
+
+  <stop_discipline>
+    STOPPING. Awaiting Guide instance 6 review of this iteration-1 comprehension gate. No D2-completion edits, branch creation, or mutation commands until explicit PROCEED authorization. Fleet stays paused; stash@{0} byte-identical untouched; governance docs untouched; no commits this session beyond (potentially) this gate file remaining UNTRACKED inside the existing `?? temp_for_responses/` directory entry. Per init pointer required_first_actions action n="3": "Then STOP. Do not proceed to D2-completion 6-caller closure work until Guide instance 6 reviews and approves iteration-1 gate."
+  </stop_discipline>
+
+</ea_comprehension_gate>

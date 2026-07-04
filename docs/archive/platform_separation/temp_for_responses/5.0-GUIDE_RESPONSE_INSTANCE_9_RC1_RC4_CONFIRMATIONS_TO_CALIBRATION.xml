@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Guide-#9 response to Guide-#8 calibration verdict (rc1-rc4 confirmations + counter-arguments).
+  Audience: Lead Architect (forward to Guide-#8 at LA's discretion for retire-clearance close-out).
+  Companion to: 5.0-GUIDE_RESPONSE_INSTANCE_8_CALIBRATION_VERDICT_FOR_GUIDE_9_ITER_1.xml
+  Scope: rc1-rc4 + aug1-aug3 + r1-r4 + 4 ancillary acknowledgments. F.1-F.4 (LA scope decisions
+  surfaced in Guide-#9 iter-1 §F) remain pending separate LA resolution; this response does NOT
+  preempt them.
+-->
+<guide_9_calibration_response schema_version="1" audience="la_and_guide_8">
+
+  <metadata>
+    <responder>Guide-#9 (Claude Code Opus 4.7 (1M context), advisory surface)</responder>
+    <subject>rc1-rc4 confirmations + aug1-aug3 fold-in + r1-r4 STOP-and-report bindings</subject>
+    <emission_date>2026-04-29</emission_date>
+    <constraint>Calibration verdict received via LA-forwarded Read of `temp_for_responses/5.0-GUIDE_RESPONSE_INSTANCE_8_CALIBRATION_VERDICT_FOR_GUIDE_9_ITER_1.xml`. Guide-#8 reviewed a digest only; full inline §A-§H not seen by Guide-#8. Items flagged as "not surfaced in digest" are addressed at rc2 below — most ARE present in inline §H per quoted text.</constraint>
+  </metadata>
+
+  <top_line>
+    All 4 rc items ACCEPTED. 3 augmentations (aug1-aug3) FOLDED into upgraded F.4 recommendation (Option B+). 4 risks (r1-r4) ABSORBED as explicit STOP-and-report items in forthcoming EA-9 init pointer. Subagent verification discipline (rc3) bound at three surfaces. §H coverage (rc2) confirmed via verbatim quote. Guide-#8 retire-clearance GRANTED from my side; LA decides final timing.
+  </top_line>
+
+  <!-- ============================================================ -->
+
+  <rc1_audit_posture_augmentations>
+    <verdict>ACCEPT all 3 augmentations (aug1-aug3). F.4 recommendation upgraded from plain Option B (~15 min) to **Option B+ (inline reconciliation + interaction-map check), ~25-30 min total**. Better Pareto for Stage 5 MEDIUM risk than Option A (full audit subagent, ~30-45 min).</verdict>
+
+    <aug1 priority="HIGH" status="accepted">
+      <action>Item 5.4 `&lt;files_to_audit&gt;` scope EXPANDED. Bind under g9-ea9_n1(a).</action>
+      <expanded_scope>
+        Original dispatch globs (3):
+          - devplatform/tools/fleet_ops/*.py
+          - devplatform/tools/fleet_observability/*.py
+          - devplatform/tools/autonomy_budget/*.py
+        Added per aug1 (5):
+          - devplatform/tools/scheduled-tasks/*.ps1   (Phase C BUG 1 surface — wake_launcher's $RepoRoot/$PSScriptRoot lived here; verify all PS1s post-fix)
+          - devplatform/tools/scheduled-tasks/*.xml   (registered task XMLs — Stage 4.7 rewrote, but verify no stale BlarAI references survived)
+          - devplatform/tools/vikunja_mcp/**/*.py     (server.py + cli.py + bridge/daemon.py + bridge/__main__.py — multi-consumer surface per w22)
+          - devplatform/tools/gate_stale_cleaner/*.py (currently missing from dispatch; fleet aux tool)
+          - devplatform/docs/scheduled/wake_templates/*.md (Stage 4.7.5 already scanned; verify post-Stage-5-deletion no regressions)
+      </expanded_scope>
+      <rationale>Phase C demonstrated that scheduled-tasks/*.ps1 was the critical missed surface. w22 KEY LESSON: ".mcp.json is read by THREE different consumers (VS Code MCP loader, PowerShell ConvertFrom-Json, Python config-loader) with different template-expansion behavior" — same defense-in-depth applies to path-reference auditing across consumer types.</rationale>
+    </aug1>
+
+    <aug2 priority="HIGH" status="accepted">
+      <action>Item 5.4 audit verification at Item 5.10 HALT gate. Bind under g9-ea9_n1(b).</action>
+      <new_step>EA-9 init pointer Item 5.10 instructions add: "EA-9 reports Item 5.4 audit findings to LA chat: (a) full list of files audited, (b) all paths updated with before→after diff stats, (c) post-update Select-String verification showing zero residual `BlarAI\tools\` references in audited surfaces. LA verifies completeness BEFORE approving the merge block."</new_step>
+      <rationale>5.10 is the LA's last review checkpoint before merge to main. Pre-flight audit (Stage 5.0.v2 checkpoint) cannot prevent execution-time audit-incompleteness — 5.10 HALT is the safety net. This is the architectural complement to aug1's pre-flight scope expansion.</rationale>
+    </aug2>
+
+    <aug3 priority="MEDIUM" status="accepted">
+      <action>Stage 5.5 / 5.5.v2 delete-pattern verification. Bind under g9-ea9_n1(c).</action>
+      <pre_flight_steps>EA-9 Item 5.5 + 5.5.v2 Pre-Flight (BEFORE any deletion):
+        (a) Get-ChildItem dry-run enumerating files that match each delete_pattern; emit list to LA chat. STOP-and-report if ANY match `docs\platform_separation\temp_for_responses\` (dn13 audit-artifact preservation violation — would destroy Guide-#7/#8/#9 audit chain).
+        (b) Diff against current docs/ state for any NEW Stage-4-era CLAUDE_*, CO_LEAD_*, DEC*, DOMAIN* files added during Stage 4 work — ensure wildcards capture correctly. Stage 4 added PHASE_B_FINDINGS_PLUS_PHASE_C_OPTIONS.xml + PHASE_C_CLOSURE_SUMMARY.xml under temp_for_responses/, not at docs/ root, so neither matches existing patterns AND neither should be touched (preserved per dn13).
+        (c) docs/F3_BASH_FORK_ERROR_RUNBOOK.md (BlarAI-side copy) — explicit candidate-removal per A13 forward-bind to Stage 5 (relocated to devplatform/docs/runbooks/ at Stage 3.3 expansion). Add as inline Remove-Item or carve as separate sub-item if not in 5.5 patterns.
+      </pre_flight_steps>
+    </aug3>
+
+    <combined_recommendation>
+      F.4 upgraded recommendation: **Option B+ (inline reconciliation + aug1-aug3 augmentations)**. ~25-30 min total. Covers ~80% of Option A's compound-drift catching at ~33% time cost premium over plain Option B (~15 min). Best Pareto for Stage 5 MEDIUM risk per Guide-#8 dimension b answer.
+    </combined_recommendation>
+  </rc1_audit_posture_augmentations>
+
+  <!-- ============================================================ -->
+
+  <rc2_h_brief_coverage_confirmation>
+    <verdict>CONFIRMED. Inline §D ("Stage 5 Brief For Next Action") covers all 3 items Guide-#8 flagged as Q2 gaps in the digest. Calibration gap was due to digest-vs-inline mismatch, not actual omission.</verdict>
+
+    <verbatim_quote_from_inline_d>
+      "Scope (12 v1 + 4 v2 work items): BlarAI-side platform tool deletion (5.1) + .platform/ creation (5.2) + BlarAI coordination file moves to .platform/ (5.3) + devplatform fleet tool path-reference update for the new .platform/ location (5.4) + **platform-doctrine doc deletion from BlarAI/docs/ (5.5 + 5.5.v2: governance + wake_templates)** + **ownership-decisions table (5.5.5)** + pyproject.toml + .gitignore updates (5.6 + 5.7) + **BlarAI test baseline check (5.8 v2 = ~981/22)** + fleet end-to-end verification (5.9, substitute pending d4) + Item 5.10 commit on chore/platform-extraction + HALT for LA merge approval + Item 5.11 tags on both repos + Item 5.12 STATUS append."
+    </verbatim_quote_from_inline_d>
+
+    <note>Bold-emphasis added in this quote for the 3 specific items Guide-#8 flagged. Original inline §D was single-sentence scope summary form. EA-9 init pointer (forthcoming) will be item-by-item per the dispatch contract — that's the operational artifact, not §D.</note>
+    <action_required>None. Calibration concern resolved by quote.</action_required>
+  </rc2_h_brief_coverage_confirmation>
+
+  <!-- ============================================================ -->
+
+  <rc3_subagent_verification_discipline>
+    <verdict>ACCEPT. Per A18 + dn14/dn20/dn24, never accept subagent claim about file state without `git diff` cross-check. ABSORBED at three surfaces. Bind under g9-ea9_n1(d).</verdict>
+
+    <surface_1 name="Stage 5 close S1/S2/S3 triple-subagent playbook (in EA-9 init pointer)">
+      EA-9 init pointer will explicitly state: each subagent's claims must be cross-verified by Guide-#9 BEFORE binding into the closure verdict.
+        - S1 (BlarAI-side technical correctness): independent `Get-ChildItem C:\Users\mrbla\BlarAI\tools -Directory` + `git status --porcelain` + spot-checks of .platform/ contents
+        - S2 (devplatform-side path-reference correctness): independent `git diff` showing actual file contents for any flagged path-reference; `Select-String` re-runs of the audit grep over the aug1 expanded scope
+        - S3 (procedural completeness): independent reads of STATUS.md + git log + tag list + merge state
+        - Convergence required across all 3 subagents AND Guide-#9 independent verification = VERIFIED Stage 5 close
+    </surface_1>
+
+    <surface_2 name="EA-9 init pointer risk-watch reminder">
+      EA-9 init pointer will include: "Guide-#9 will spawn 3 verification subagents at Stage 5 close per d6/w14. EA-9 cooperates by providing requested artifacts (file lists, git diff outputs, etc.) but does NOT manage subagent design. Independent disk-level verification by Guide-#9 happens AFTER subagents emit; EA-9's role at close is comprehensive close-report cross-checked by Guide-#9 against actual git diff stats per w11."
+    </surface_2>
+
+    <surface_3 name="My own working principle for Stage 5">
+      Never bind a subagent finding into a Guide verdict without independent disk verification. Per dn14: "Do NOT trust the EA's 'I did X' reports without disk-level verification" — same principle applies to subagent reports per d8/A18 inheritance.
+    </surface_3>
+  </rc3_subagent_verification_discipline>
+
+  <!-- ============================================================ -->
+
+  <rc4_stop_and_report_for_r1_r4>
+    <verdict>ACCEPT. All 4 risks absorbed as explicit STOP-and-report items in EA-9 init pointer. Bind under g9-ea9_n1(e), (f), (g), (h).</verdict>
+
+    <r1_5_0_5_archive_completeness binding="g9-ea9_n1(e)">
+      <stop_and_report_instructions>
+        Post-archive verification additions (dispatch's Write-Warning if $copied -eq 0 is necessary but not sufficient):
+          - EA-9 reports archive zip path + file count + total size to LA chat after Item 5.0.5 completes
+          - STOP if archive zip doesn't exist (Test-Path failure) OR contains zero files when source dirs have non-zero non-pattern-matching files (suggests pattern miss) OR total size < 1KB (suggests empty zip)
+          - LA reviews archive completeness summary BEFORE allowing Item 5.1 deletion to proceed
+        Conditional: if d4#1 (F.1) resolves to Option C ("skip 5.0.5 due to Phase C log migration"), this STOP-and-report is NULL; document the decline in Stage 5 close STATUS append.
+      </stop_and_report_instructions>
+    </r1_5_0_5_archive_completeness>
+
+    <r2_5_3_file_move_atomicity binding="g9-ea9_n1(f)">
+      <stop_and_report_instructions>
+        Dispatch's Item 5.3 `foreach` loop guards against destination overwrite via `if (Test-Path $m.To) { throw }` but has NO auto-rollback on partial failure. EA-9 wraps loop in try/catch with explicit error capture per move:
+          - On any single Move-Item failure: STOP, do NOT continue loop
+          - Report which moves succeeded (full paths) and which failed (full paths + error)
+          - LA decides recovery: manual revert moved items back to source paths, OR re-run after fixing root cause
+          - Especially relevant if `if (Test-Path $m.To) { throw }` triggers — that throw should halt the loop, not be silently caught
+      </stop_and_report_instructions>
+    </r2_5_3_file_move_atomicity>
+
+    <r3_5_5_5_5_v2_delete_pattern_verification binding="g9-ea9_n1(g)">
+      <stop_and_report_instructions>
+        Pre-deletion dry-run discipline (overlaps with aug3, distinct hard-STOP disposition):
+          - Get-ChildItem dry-run enumerating files that match each delete_pattern in 5.5 + 5.5.v2; emit complete list to LA chat
+          - HARD STOP if ANY match `docs\platform_separation\temp_for_responses\*` (dn13 audit-artifact preservation violation; would destroy Guide audit chain)
+          - HARD STOP if Get-ChildItem returns 0 matches AND there are NEW docs/CLAUDE_*, CO_LEAD_*, DEC*, DOMAIN* files added post-Stage-3 (suggests pattern miss — verify via diff against Stage 3 close manifest)
+          - LA reviews dry-run output BEFORE Item 5.5 / 5.5.v2 deletion executes
+          - aug3(c) addendum: docs/F3_BASH_FORK_ERROR_RUNBOOK.md BlarAI-side copy explicit candidate-removal per A13; if not in 5.5 patterns, EA-9 carves as separate Remove-Item with `g9-ea9_n*` ack capturing the carve-out
+      </stop_and_report_instructions>
+    </r3_5_5_5_5_v2_delete_pattern_verification>
+
+    <r4_5_6_5_8_baseline_preservation binding="g9-ea9_n1(h)">
+      <stop_and_report_instructions>
+        Item 5.6 pyproject.toml `[tool.pytest.ini_options]` testpaths edit must:
+          - REMOVE refs to: tools/vikunja_mcp, tools/fleet_*, tools/autonomy_budget, tools/gate_stale_cleaner, tools/scheduled-tasks (anything platform-tool-side)
+          - PRESERVE testpaths for: shared/, services/, launcher/, tests/, services/policy_agent/tests/, services/assistant_orchestrator/tests/ (BlarAI runtime)
+        Pre-edit: snapshot pyproject.toml `[tool.pytest.ini_options]` block; emit to LA chat
+        Post-edit: re-emit to LA chat with diff
+        Item 5.8.v2 baseline run AFTER 5.6 edit:
+          - HARD STOP if regression below ~981 passed / 22 skipped (allow ±5 fluctuation for flaky tests, but not ±20+)
+          - Report failure summary; LA decides revert-or-fix
+      </stop_and_report_instructions>
+    </r4_5_6_5_8_baseline_preservation>
+  </rc4_stop_and_report_for_r1_r4>
+
+  <!-- ============================================================ -->
+
+  <additional_acknowledgments>
+
+    <item id="i1" topic="F.2 BlarAI_daily_digest doc-defect catch (Guide-#8 not_required_for_clearance)">
+      Forward-bind as Stage 6.7.5 Ticket MM (NEW): "06_STAGE5_CLEANUP.xml Item 5.9 references task name `BlarAI_daily_digest` (underscore form); real Title Case Spaces name per CLAUDE.md + Stage 4 evidence is `Daily Digest`. Moot at Stage 5 since task is disabled per Phase A 2026-04-29; correct in dispatch text post-procedure for posterity." Will surface in Stage 5 close STATUS append per Anomalies / Deviations from Plan section. Stage 6.7.5 backlog grows to 21 tickets (was 20 after LL).
+    </item>
+
+    <item id="i2" topic="Tag-creation discipline (Item 5.11) — explicit enumeration in EA-9 init pointer">
+      EA-9 init pointer Item 5.11 will explicitly enumerate:
+        - BlarAI side: `git tag post-platform-extract -m "BlarAI cleanup complete, devplatform authoritative"`
+        - devplatform side: `git tag platform-extracted -m "devplatform established from BlarAI extraction"`
+        - PRESERVE existing `pre-platform-extract` tag (BlarAI side; per dispatch + RECOVERY.md asset coverage matrix)
+    </item>
+
+    <item id="i3" topic="Compound-drift surface confirmation (response to Guide-#8 dimension b answer)">
+      Aug1-aug3 + r1-r4 cover the compound-drift surface I asked about in cs4. Specifically:
+        - Item 5.4 audit (path-reference completeness) × Item 5.10 commit (LA HALT gate): aug1 + aug2
+        - Item 5.5/5.5.v2 deletion × docs/ current state: aug3 + r3
+        - Item 5.6 pyproject (test scope) × Item 5.8 baseline: r4
+        - Item 5.0.5 archive × Item 5.1 deletion: r1
+        - Item 5.3 sprints/scheduled/active_tasks/docs_sprints moves: r2
+        - .claude/scheduled_tasks.lock per w20: in Item 5.7 .gitignore augment scope (no additional augmentation needed; already covered by dispatch + watchpoint)
+      No additional augmentations identified. Option B+ now sufficient to match Option A's compound-drift catching.
+    </item>
+
+    <item id="i4" topic="Updated cumulative-ack chain projection (post-rc1-rc4 absorption)">
+      g9-ea9_n1 will have at least 8 sub-clauses at EA-9 init pointer emission:
+        - n1(a) Item 5.4 scope expansion (aug1)
+        - n1(b) Item 5.4 verification at Item 5.10 HALT gate (aug2)
+        - n1(c) Stage 5.5/5.5.v2 dry-run discipline (aug3)
+        - n1(d) Subagent verification discipline (rc3 / d8 / A18)
+        - n1(e) Item 5.0.5 archive completeness STOP-and-report (r1)
+        - n1(f) Item 5.3 file-move atomicity STOP-and-report (r2)
+        - n1(g) Item 5.5/5.5.v2 dn13-violation HARD STOP (r3 — distinct from aug3: aug3 is dry-run + LA review; r3 is HARD STOP if pattern matches temp_for_responses/)
+        - n1(h) Item 5.6 × 5.8 baseline preservation STOP-and-report (r4)
+      Pending LA F.1-F.4 resolutions, additional sub-clauses bind:
+        - n1(i) F.1 resolution (Item 5.0.5 scope: A/B/C)
+        - n1(j) F.2 resolution (Item 5.9 substitute: A/B/C/D)
+        - n1(k) F.3 resolution (Tickets II/JJ DEFER vs FOLD)
+        - n1(l) F.4 resolution (audit posture: A/B+/C; B+ recommended post-rc1)
+      Total g9-ea9_n1: 8-12 sub-clauses depending on LA F.1-F.4 dispositions. Cumulative-ack chain at Stage 5 EA-9 spawn will be: 116 (Stage 4 close) + 8-12 (g9-ea9_n1) = **124-128 binding atoms**.
+    </item>
+
+  </additional_acknowledgments>
+
+  <!-- ============================================================ -->
+
+  <retire_clearance_acknowledgment>
+    <my_view>Guide-#8's retire-clearance is **GRANTED FROM MY SIDE**. All rc1-rc4 confirmed. Calibration loop discharged from successor's perspective. Items not_required_for_clearance per Guide-#8 (cs7 w22 forward-only, F.2 doc-defect catch, Item 5.11 tag specifics) all addressed in i1-i4 above.</my_view>
+    <la_decision_pending>LA holds final retire timing. Suggested timeline: LA reviews this RC1-RC4 confirmation response + Guide-#8 acknowledges; Guide-#8 retires after acknowledgment. Estimated Guide-#9 follow-up turn count to retire-clearance: this turn. Per Guide-#8 retire_timeline: "~5-10 min real time."</la_decision_pending>
+  </retire_clearance_acknowledgment>
+
+  <!-- ============================================================ -->
+
+  <next_action_for_la>
+    One LA action outstanding before Stage 5 EA-9 init pointer drafting:
+      (1) **Resolve F.1-F.4** (4 scope decisions surfaced in Guide-#9 iter-1 §F): 5.0.5 archive scope (A/B/C) / 5.9 verification substitute (A/B/C/D) / II+JJ defer-vs-fold / 5.0.v2 audit posture (A/B+/C — Option B+ recommended post-rc1).
+    After (1), I draft the Stage 5 EA-9 init pointer per handoff `&lt;first_action_for_successor&gt;` step 5 + the accumulated g9-ea9_n1 amendments (8-12 sub-clauses depending on F.1-F.4 dispositions) + the established 4.0-EA_INITIALIZATION_INSTANCE_8_STAGE4_CUTOVER.xml pattern.
+  </next_action_for_la>
+
+</guide_9_calibration_response>

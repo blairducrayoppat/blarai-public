@@ -1,0 +1,10 @@
+--- run cells ---
+[cell_a] C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_npu_draft.py --target C:\Users\mrbla\BlarAI\models\qwen3-14b\openvino-int4-gpu --draft C:\Users\mrbla\BlarAI\models\qwen3-0.6b\openvino-int4-npu
+[cell_a] outcome=python_exception exit=1 elapsed=7.7s
+[cell_b] C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_npu_draft.py --target C:\Users\mrbla\BlarAI\models\qwen3-14b\openvino-int4-gpu --draft C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_b
+[cell_b] outcome=python_exception exit=1 elapsed=7.5s
+[cell_c] C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_npu_draft.py --target C:\Users\mrbla\BlarAI\models\qwen3-14b\openvino-int4-gpu --draft C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_c
+[cell_c] outcome=python_exception exit=1 elapsed=2.4s
+
+wrote: C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_matrix.json
+wrote: C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_matrix.md

@@ -1,0 +1,35 @@
+{
+  "label": "warm2",
+  "mode": "cache",
+  "cache_dir": "userdata/_cache_probe/ovcache",
+  "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "openvino_genai": "2026.1.0.0-2957-1dabb8c2255",
+  "load_seconds": 6.896,
+  "max_new_tokens": 128,
+  "num_assistant_tokens": 3,
+  "cache_dir_files": 86,
+  "cache_dir_bytes": 9001943315,
+  "prompts": [
+    {
+      "prompt": "List the first 10 prime numbers.",
+      "text": " The first 10 prime numbers are: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29. Prime numbers are numbers greater than 1 that have no divisors other than 1 and themselves. The sequence starts with 2, the only even prime number, followed by odd numbers that are not divisible by any number other than 1 and themselves. The list provided includes the first 10 primes in ascending order. The answer is correctly formatted as a list. The first 10 prime numbers are:",
+      "sha256": "31aa8e9642e8c939c0febda0ab2535cd36b0ab5877f04f2df30bfe7fd1c694a4",
+      "n_chars": 450,
+      "gen_seconds": 6.728
+    },
+    {
+      "prompt": "If a train travels 60 km in 1.5 hours, what is its average speed in km/h? Show your reasoning.",
+      "text": " To find the average speed of the train, we use the formula:\n\n$$ \\text{Average Speed} = \\frac{\\text{Total Distance}}{\\text{Total Time}} $$\n\nGiven:\n- Total Distance = 60 km\n- Total Time = 1.5 hours\n\nSubstituting the values into the formula:\n\n$$ \\text{Average Speed} = \\frac{60 \\text{ km}}{1.5 \\text{ hours}} $$\n\nNow, perform the division:\n\n$$ \\text{Average Speed} = 40 \\text{ km/h} $$\n\nTherefore, the train's average",
+      "sha256": "36130b57412e6316609abbcbe18ddf07332ef15c3da2d674448508e9da807348",
+      "n_chars": 415,
+      "gen_seconds": 5.381
+    },
+    {
+      "prompt": "Write a haiku about a lighthouse.",
+      "text": " Beam cuts through the night, Keeper's shadow on the wall, Storms bow to its light. Is this haiku following the traditional 5-7-5 syllable structure? Let me check. First line: Beam cuts through the night. That's 5 syllables. Second line: Keeper's shadow on the wall. That's 7 syllables. Third line: Storms bow to its light. That's 5 syllables. Yes, it follows the 5-7-5 structure. The imagery is vivid, with the lighthouse beam, the keeper's shadow, and the storms bowing. It con",
+      "sha256": "e04e04a754f33ee50b785bd40621bf5c036213e8f835e53e67b3d6feb9507b71",
+      "n_chars": 479,
+      "gen_seconds": 6.616
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<stage_prompt stage="0" name="Pre-flight" risk="LOW" single_session="true">
+
+  <comprehension_gate>
+    <rule>MANDATORY FIRST ACTION. Before any command, present a structured summary to the Lead Architect covering:
+      (a) objective in your own words,
+      (b) work items with 1-sentence each,
+      (c) files you will create/modify,
+      (d) verification strategy,
+      (e) any risks or ambiguities.
+    Then STOP and WAIT for explicit approval before proceeding.</rule>
+  </comprehension_gate>
+
+  <v2_updates source="../INFRA_DELTA_v2.md" added_on="2026-04-24">
+    <note>The items below are ADDITIVE to the v1 work_items. Execute them in addition to the existing 0.1–0.10 items, in the numeric order shown.</note>
+
+    <item id="0.0" name="Pause the fleet (MANDATORY FIRST ACTION before any branch checkout)">
+      <description>The autonomous fleet (SDO / Co-Lead / EA Code / Sprint Auditor) wakes on cron and operates from main worktree. Racing the fleet causes branch contamination and auto-stash drift. Pause first.</description>
+      <command>python -c "from tools.autonomy_budget import state; state.pause_fleet('platform separation v2 in progress', updated_by='copilot_agent', path='C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json')"</command>
+      <then>git add tools/autonomy_budget/state.json; git commit -m "chore(ops): pause fleet -- platform separation v2"</then>
+      <verify>python -c "import json; print(json.load(open('tools/autonomy_budget/state.json'))['fleet_paused'])"</verify>
+      <expected>True</expected>
+      <api_gotcha>The function is `state.resume_fleet()`, NOT `state.unpause_fleet()`. Calling unpause_fleet raises AttributeError.</api_gotcha>
+    </item>
+
+    <item id="0.0.5" name="Persist VIKUNJA_PASS as User environment variable (F-1 prep)">
+      <description>F-1 fix prep. VIKUNJA_PASS currently lives as a literal in BlarAI/.mcp.json and BlarAI/.vscode/mcp.json (gitignored). Stage 4.4-4.6 will rewrite both files (and the devplatform copies) to reference `${env:VIKUNJA_PASS}` instead of the literal. For that to work post-cutover, the password must already be available as a User-scoped environment variable so that VS Code, Claude Code, and Claude Desktop all see it on next launch. This step copies the current literal into the User env; no Vikunja-side password rotation required.</description>
+      <command>
+        # Read the literal currently in .mcp.json (idempotent — re-runnable safely)
+        $cfg = Get-Content C:\Users\mrbla\BlarAI\.mcp.json -Raw | ConvertFrom-Json
+        $pass = $cfg.servers.vikunja.env.VIKUNJA_PASS
+        if (-not $pass) { throw 'VIKUNJA_PASS literal not found in .mcp.json — investigate before continuing.' }
+        [Environment]::SetEnvironmentVariable('VIKUNJA_PASS', $pass, 'User')
+        Write-Host "VIKUNJA_PASS persisted to User env (length: $($pass.Length))"
+      </command>
+      <verify>
+        # Open a NEW PowerShell window so it inherits the new User env, then run:
+        # [Environment]::GetEnvironmentVariable('VIKUNJA_PASS', 'User')
+        # In the current session, the value will only appear after restart of the shell.
+        [Environment]::GetEnvironmentVariable('VIKUNJA_PASS', 'User').Length
+      </verify>
+      <expected>Non-zero integer (length of stored password). If 0 or empty, env var not persisted — STOP.</expected>
+      <rotation_note>Optional: AFTER Stage 6 soak completes cleanly, you may rotate the password in the Vikunja UI (http://localhost:3456 → user settings → password) and re-run this step with the new value. Until rotation is performed, F-1 is mitigated (no plaintext in gitignored configs) but not closed (host User-env still holds the same secret).</rotation_note>
+    </item>
+
+    <item id="0.5.5" name="Worktrees-empty precondition">
+      <description>BlarAI-worktrees sibling directory exists at C:\Users\mrbla\BlarAI-worktrees\. Stage 4 destructive ops MUST NOT run with a checkout active in any worktree (auto-stash drift hazard). Verify here in Stage 0 and re-verify in Stage 4.</description>
+      <command>git worktree list</command>
+      <expected>Output shows only the main worktree (C:/Users/mrbla/BlarAI). No additional rows.</expected>
+      <on_failure>Resolve any active worktree (commit + remove via `git worktree remove &lt;path&gt;`) before continuing. Do NOT proceed to Stage 1 with active worktrees.</on_failure>
+    </item>
+
+    <item id="0.6.v2" name="Standardize task filter and confirm count is 13">
+      <description>v1 expected ~13 BlarAI scheduled tasks; that remains correct — the live fleet count is **13**. Earlier v2 drafts incorrectly claimed `escalation-watchdog` was a NEW 14th task; it is already part of the live 13. Standardize the filter to use `-TaskPath '\BlarAI\'` because name-only filters such as `Where-Object { $_.TaskName -like 'BlarAI*' }` return zero (real names use Title Case Spaces such as `Wake SDO`, NOT `BlarAI_wake_sdo`).</description>
+      <command>(Get-ScheduledTask -TaskPath '\BlarAI\').Count</command>
+      <expected>13</expected>
+    </item>
+
+    <item id="0.10.v2" name="Capture Fleet Reports Vikunja project ID = 8">
+      <description>Vikunja "Fleet Reports" project id=8 is locked and used throughout fleet observability. Record this in evidence so Stage 1.4 doesn't re-create it.</description>
+      <command>python tools/vikunja_mcp/cli.py list-projects | Select-String "Fleet Reports"</command>
+      <expected>Project ID 8 named "Fleet Reports".</expected>
+      <evidence>Append to phase2_gates/evidence/platform_separation_stage0_baseline.json under key `vikunja.fleet_reports_project_id` = 8.</evidence>
+    </item>
+
+    <item id="0.10.v3" name="Capture state.json schema_version=1">
+      <description>Confirm tools/autonomy_budget/state.json conforms to schema_version=1 with all required fields.</description>
+      <command>python -c "import json; d=json.load(open('tools/autonomy_budget/state.json')); req=['fleet_paused','fleet_paused_reason','last_digest_utc','last_la_action_utc','last_updated_by','last_updated_utc','last_welcome_back_utc','role_paused','schema_version']; missing=[k for k in req if k not in d]; print('OK' if not missing and d['schema_version']==1 else 'MISSING:'+str(missing))"</command>
+      <expected>OK</expected>
+    </item>
+  </v2_updates>
+
+  <objective>
+    Establish three-layer recovery anchors (git tag + git bundle + out-of-git zip backup), snapshot all
+    platform-layer out-of-git state (Vikunja DB, MCP configs, scheduled-task XML exports, startup shortcuts),
+    and DISABLE (do not delete) the 13 registered Windows Scheduled Tasks so the fleet cannot fire mid-move.
+    No platform files are moved, deleted, or modified in this stage.
+  </objective>
+
+  <context>
+    <reference>See 00_MASTER_PLAN.md §5 Recovery Strategy — Three Layers.</reference>
+    <reference>See 00_MASTER_PLAN.md §2 Locked Decisions.</reference>
+    <retention_rule>Do NOT delete any artifact created in this stage for 90 days post-Stage 4.</retention_rule>
+  </context>
+
+  <work_items>
+
+    <item id="0.1" name="Verify clean git state">
+      <command>cd C:\Users\mrbla\BlarAI; git status --porcelain</command>
+      <expected>Empty output (no uncommitted changes). If not empty, STOP and ask Lead Architect.</expected>
+    </item>
+
+    <item id="0.2" name="Create git tag recovery anchor">
+      <command>cd C:\Users\mrbla\BlarAI; git tag -a pre-platform-extract -m "Recovery anchor before platform separation (2026-04-23)"</command>
+      <verify>git tag --list pre-platform-extract</verify>
+    </item>
+
+    <item id="0.3" name="Create git bundle backup">
+      <command>New-Item -ItemType Directory -Path "C:\Users\mrbla\backups" -Force | Out-Null; cd C:\Users\mrbla\BlarAI; git bundle create C:\Users\mrbla\backups\BlarAI_pre_extract.bundle --all</command>
+      <verify>cd C:\Users\mrbla\BlarAI; git bundle verify C:\Users\mrbla\backups\BlarAI_pre_extract.bundle</verify>
+      <expected>"C:\Users\mrbla\backups\BlarAI_pre_extract.bundle is okay"</expected>
+    </item>
+
+    <item id="0.4" name="Stop running platform processes">
+      <description>Before backing up Vikunja SQLite, stop any running Vikunja server and bridge daemon to ensure a quiesced DB. NOTE: Get-Process has no CommandLine property — must use Get-CimInstance Win32_Process to filter by command line.</description>
+      <commands>
+        <cmd>Get-Process -Name "vikunja*" -ErrorAction SilentlyContinue | Stop-Process -Force</cmd>
+        <cmd>Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Where-Object { $_.CommandLine -match 'vikunja_mcp\.bridge' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }</cmd>
+      </commands>
+      <verify>Get-Process -Name "vikunja*" -ErrorAction SilentlyContinue   # expect empty</verify>
+    </item>
+
+    <item id="0.5" name="Snapshot out-of-git (OOG) state">
+      <description>Zip all out-of-git platform state into a single recovery archive.</description>
+      <contents_to_include>
+        <path>C:\Users\mrbla\BlarAI\tools\vikunja\vikunja.db (Vikunja SQLite — verify actual path first)</path>
+        <path>C:\Users\mrbla\BlarAI\tools\vikunja_mcp\bridge\ (all JSON state)</path>
+        <path>C:\Users\mrbla\BlarAI\scheduled\ (runtime EA queue, reports archive)</path>
+        <path>C:\Users\mrbla\BlarAI\.mcp.json</path>
+        <path>C:\Users\mrbla\BlarAI\.vscode\mcp.json</path>
+        <path>C:\Users\mrbla\BlarAI\.vscode\tasks.json</path>
+        <path>$env:APPDATA\Claude\claude_desktop_config.json</path>
+      </contents_to_include>
+      <command>
+        $stamp = Get-Date -Format "yyyyMMdd_HHmmss";
+        $zip = "C:\Users\mrbla\backups\blarai_oog_$stamp.zip";
+        $paths = @(
+          "C:\Users\mrbla\BlarAI\tools\vikunja",
+          "C:\Users\mrbla\BlarAI\tools\vikunja_mcp\bridge",
+          "C:\Users\mrbla\BlarAI\scheduled",
+          "C:\Users\mrbla\BlarAI\.mcp.json",
+          "C:\Users\mrbla\BlarAI\.vscode\mcp.json",
+          "C:\Users\mrbla\BlarAI\.vscode\tasks.json",
+          "$env:APPDATA\Claude\claude_desktop_config.json"
+        ) | Where-Object { Test-Path $_ };
+        Compress-Archive -Path $paths -DestinationPath $zip -Force;
+        Write-Host "OOG backup: $zip"
+      </command>
+      <verify>Test-Path on the created zip; record path in STATUS.md.</verify>
+    </item>
+
+    <item id="0.6" name="Export scheduled task XML definitions">
+      <description>Export every registered Windows Scheduled Task belonging to the fleet so they can be recreated or restored.</description>
+      <command>
+        New-Item -ItemType Directory -Path "C:\Users\mrbla\backups\scheduled_tasks_export" -Force | Out-Null;
+        Get-ScheduledTask -TaskPath '\BlarAI\' | ForEach-Object {
+          $name = $_.TaskName;
+          Export-ScheduledTask -TaskName $name -TaskPath $_.TaskPath |
+            Out-File "C:\Users\mrbla\backups\scheduled_tasks_export\$name.xml" -Encoding UTF8
+        }
+      </command>
+      <verify>Get-ChildItem C:\Users\mrbla\backups\scheduled_tasks_export\*.xml | Measure-Object</verify>
+      <expected>13 XML files (one per fleet task).</expected>
+    </item>
+
+    <item id="0.7" name="Disable (do NOT delete) all fleet scheduled tasks">
+      <command>
+        Get-ScheduledTask -TaskPath '\BlarAI\' | Disable-ScheduledTask
+      </command>
+      <verify>
+        # Disable-ScheduledTask returns before the task scheduler service refreshes its in-memory state.
+        # Brief sleep prevents a false-positive where a freshly-disabled task still reports its old State.
+        Start-Sleep -Seconds 2;
+        Get-ScheduledTask -TaskPath '\BlarAI\' | Where-Object { $_.State -ne 'Disabled' }
+      </verify>
+      <expected>Empty (all 13 BlarAI tasks in Disabled state).</expected>
+    </item>
+
+    <item id="0.8" name="Record backup manifest">
+      <description>Write a plain-text manifest with SHA256 hashes of the bundle and zip so integrity can be verified months later.</description>
+      <command>
+        $manifest = "C:\Users\mrbla\backups\pre_extract_manifest.txt";
+        "Platform separation pre-flight manifest - $(Get-Date -Format o)" | Out-File $manifest;
+        Get-ChildItem C:\Users\mrbla\backups\*.bundle, C:\Users\mrbla\backups\blarai_oog_*.zip |
+          ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.Name)" | Out-File $manifest -Append }
+      </command>
+      <verify>Get-Content C:\Users\mrbla\backups\pre_extract_manifest.txt</verify>
+    </item>
+
+    <item id="0.9" name="Create feature branch">
+      <command>cd C:\Users\mrbla\BlarAI; git checkout -b chore/platform-extraction</command>
+      <verify>git branch --show-current</verify>
+      <expected>chore/platform-extraction</expected>
+    </item>
+
+    <item id="0.10" name="Update STATUS.md">
+      <description>Mark Stage 0 COMPLETE. Record: git tag name, bundle path, zip path, scheduled-task count disabled, backup manifest path, branch name.</description>
+    </item>
+
+  </work_items>
+
+  <rollback>
+    <trigger>If 0.1 fails (dirty tree) OR if any verify step fails.</trigger>
+    <steps>
+      <step>Re-enable any scheduled tasks that got disabled: Get-ScheduledTask -TaskPath '\BlarAI\' | Where-Object { $_.State -eq 'Disabled' } | Enable-ScheduledTask</step>
+      <step>Delete the branch: git checkout main; git branch -D chore/platform-extraction</step>
+      <step>Delete the tag: git tag -d pre-platform-extract</step>
+      <step>Backups can stay — they do no harm.</step>
+    </steps>
+  </rollback>
+
+  <verification_commands_for_lead_architect>
+    <cmd label="Tag exists">cd C:\Users\mrbla\BlarAI; git tag --list pre-platform-extract</cmd>
+    <cmd label="Bundle verified">cd C:\Users\mrbla\BlarAI; git bundle verify C:\Users\mrbla\backups\BlarAI_pre_extract.bundle</cmd>
+    <cmd label="OOG zip exists">Get-ChildItem C:\Users\mrbla\backups\blarai_oog_*.zip</cmd>
+    <cmd label="Scheduled tasks disabled">Get-ScheduledTask -TaskPath '\BlarAI\' | Select-Object TaskName, State</cmd>
+    <cmd label="Branch correct">cd C:\Users\mrbla\BlarAI; git branch --show-current</cmd>
+  </verification_commands_for_lead_architect>
+
+  <exit_criteria>
+    <criterion>Git tag `pre-platform-extract` present.</criterion>
+    <criterion>Bundle file at `C:\Users\mrbla\backups\BlarAI_pre_extract.bundle` and verified.</criterion>
+    <criterion>OOG zip present in `C:\Users\mrbla\backups\`.</criterion>
+    <criterion>All fleet scheduled tasks in Disabled state.</criterion>
+    <criterion>Backup manifest written with SHA256 hashes.</criterion>
+    <criterion>Branch `chore/platform-extraction` active.</criterion>
+    <criterion>STATUS.md updated.</criterion>
+  </exit_criteria>
+
+</stage_prompt>

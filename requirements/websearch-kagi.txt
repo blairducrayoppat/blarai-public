@@ -1,0 +1,48 @@
+# BlarAI Agentic Web-Search Skill — Kagi API client dependency block
+#
+# PURPOSE: Pinned + hash-checked requirements for W4 adoption of the kagiapi
+# client and its full transitive dependency tree.
+#
+# INSTALL ONLY WITH:
+#   pip install --require-hashes -r requirements/websearch-kagi.txt
+#
+# DO NOT INSTALL until the Lead Architect explicitly approves W4 (W2 Agentic
+# Web-Search Skill, Vikunja #573).  This file is a supply-chain artefact
+# produced by the W2 vetting track (kagiapi_supply_chain_vetting.md §4).
+# It is NOT a live dependency in W1, W2, or W3.
+#
+# Each entry carries the wheel sha256 AND the sdist sha256 so pip --require-hashes
+# can verify against either artefact.  When a package ships architecture-specific
+# wheels (e.g. charset-normalizer C-extension), the universal py3-none-any wheel
+# hash is listed; the sdist hash is the fallback safety net.
+#
+# See docs/research/kagiapi_supply_chain_vetting.md for the full vetting record.
+# -------------------------------------------------------------------------
+
+kagiapi==0.2.1 \
+    --hash=sha256:f3f1466908041d117770b7f93bee12097e114dd518c4dda35413df785546799a \
+    --hash=sha256:355fe407b4c683d6f084827e4f854fd95134df2842f15d089dacff620e3f4aeb
+
+requests==2.32.3 \
+    --hash=sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6 \
+    --hash=sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760
+
+typing_extensions==4.12.2 \
+    --hash=sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d \
+    --hash=sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8
+
+charset_normalizer==3.4.1 \
+    --hash=sha256:56f1371d137d5c9ebc3d07cade541f66d55e61eb114ecc80e7cf5b735c70d67c \
+    --hash=sha256:f30bf9fd9be89ecb2360c7d94a711f00c09b976258846efe40db3d05828e8089
+
+idna==3.10 \
+    --hash=sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3 \
+    --hash=sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9
+
+urllib3==2.3.0 \
+    --hash=sha256:1cee9ad369867bfdbbb48b7dd50374c0967a0bb7710050facf0dd6911440e3df \
+    --hash=sha256:f8c5449b3cf0861679ce7e0503c7b44b5ec981bec0d1d3795a07f1ba96f0204d
+
+certifi==2025.1.31 \
+    --hash=sha256:ca78db4565a652026a4db2bcdf68f2fb589ea80d0be70e03929ed730746b84fe \
+    --hash=sha256:3d5da6925056f6f18f119200434a4780a94263f10d1c21d032a6f6b2baa20651

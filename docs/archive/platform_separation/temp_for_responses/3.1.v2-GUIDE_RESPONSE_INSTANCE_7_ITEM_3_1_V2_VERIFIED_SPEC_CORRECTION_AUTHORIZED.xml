@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="item_3_1_v2_verification_with_spec_correction_authorization">
+  <verdict>ITEM_3_1_V2_EFFECTIVELY_SATISFIED -- AUTHORIZE option (a) spec-correction; PROCEED to Item 3.2</verdict>
+  <stage_id>STAGE_3</stage_id>
+  <work_item>3.1.v2 -- v2-baseline file presence verification + escalation_watchdog.ps1 hyphen-vs-underscore spec drift disposition</work_item>
+  <reviewed_at_utc>2026-04-27T17:00:00Z</reviewed_at_utc>
+  <guide_instance>7</guide_instance>
+  <reviewing>
+    <ea_instance>1</ea_instance>
+    <ea_artifact>EA-1 chat report at Item 3.1.v2 STOP with hyphen-vs-underscore mismatch on escalation_watchdog.ps1</ea_artifact>
+    <stop_trigger>Item-N verify-clause-fail rule + r2 + dn3-equivalent (procedural-defect discovery without LA authorization for inline-fix)</stop_trigger>
+  </reviewing>
+
+  <summary>
+    EA-1's STOP-and-report at Item 3.1.v2 surfaces a real spec drift, not a copy failure.
+    Independent disk verification confirms:
+      (a) BlarAI source has `escalation_watchdog.ps1` (UNDERSCORE) + `escalation-watchdog.xml`
+          (HYPHEN) -- a naming inconsistency in BlarAI source itself.
+      (b) devplatform faithfully mirrors the source pair (both files present under their
+          canonical BlarAI names).
+      (c) The .xml's internal &lt;Command&gt; reference uses the underscore form
+          (`escalation_watchdog.ps1`), confirming UNDERSCORE is the canonical .ps1 filename.
+      (d) The HYPHEN form `escalation-watchdog.ps1` does NOT exist anywhere on disk in either
+          repo.
+
+    Authoritative cross-references confirming UNDERSCORE as canonical:
+      - `tools/scheduled-tasks/escalation-watchdog.xml` internal `<Command>` ref (disk
+        verification)
+      - `WORKFLOW_INTEGRITY_REVIEW.md` line 56: G-1 fix list cites
+        `tools/scheduled-tasks/escalation_watchdog.ps1` (underscore)
+      - `WORKFLOW_INTEGRITY_REVIEW.md` Appendix A.1 line 174: same
+      - `03_STAGE2_REFACTOR_MULTIPROJECT.xml` line 64: 2.4.v2 G-1 R12 entry uses underscore
+      - `05_STAGE4_CUTOVER.xml` lines 99 + 107: 4.7.6 PS1 line-by-line scan uses underscore
+      - `EA_2.5.v2_VERIFICATION_EVIDENCE.txt` line 8: AST probe verification used underscore
+      - `EA_HANDOFF_STAGE2_MIDSTAGE_v4.xml` + `v5.xml` git_status_porcelain blocks list M file
+        path with underscore
+      - Stage 2 single substantive commit `3d1ac35` git tree contains the file under
+        underscore name
+
+    Root cause of the typo: `INFRA_DELTA_v2.md §1.6` line 121 + `§1.7` line 125 + line 134 +
+    line 337 use HYPHEN form for the .ps1 (`escalation-watchdog.ps1`). The hyphen propagated
+    forward:
+      - `04_STAGE3_COPY_TOOLS.xml §3.1.v2` `<copy>` block line 60 inherits the hyphen typo
+      - This Guide-#7 init pointer's `g7-ea1_n3` v2-baseline file list inherits from the
+        Stage 3 XML (lines 814 + 815 + 1382)
+
+    The typo is documentation-only -- it never reaches runtime, the actual file system, or
+    git history. The Stage 2 chokepoint refactor (2.4.v2 G-1 work) modified the underscore
+    file correctly; AST-driven verification at 2.5.v2 verified the underscore file; v4 + v5
+    handoffs tracked the underscore file as M; 3d1ac35 committed the underscore file. The
+    HYPHEN form is a paper trail through INFRA_DELTA_v2.md and Stage 3 XML scope only.
+
+    DISPOSITION: option (a) AUTHORIZED -- spec-correction via Stage 3.10 STATUS append
+    closure footnote (mirrors Stage 2.10.1 N-correction + g7-ea1_n10 STATUS-staleness-correction
+    patterns). Item 3.1.v2 transitions from STOP to EFFECTIVELY-SATISFIED:
+      - Actual file present on disk in BOTH BlarAI source AND devplatform copy (under
+        UNDERSCORE name, the canonical name)
+      - Test-Path against the corrected spec (`escalation_watchdog.ps1` UNDERSCORE) returns
+        True for both repos
+      - The Test-Path FALSE that EA-1 observed was against the typo'd HYPHEN spec, not
+        against a missing file
+      - No recopy operation needed (the file is already correctly copied at canonical name)
+
+    Option (b) source-rename REJECTED: would violate BlarAI-untouched-except-3.10-STATUS-append
+    invariant; would touch Stage-3-scope BlarAI source; would also need Task Scheduler XML
+    `<Command>` rewrite + caller updates. EA-1 correctly flagged as out-of-scope.
+
+    Option (c) no-action partially honored: the spec drift IS recorded in Stage 3.10 closure
+    footnote (per option (a)), but option (a) goes further by explicitly correcting the
+    forward-going expectation so future audit-chain artifacts don't perpetuate the typo.
+
+    NEW ack g7-ea1_n11 added below: Stage 3.10 STATUS append must include a closure footnote
+    documenting the v2-baseline spec drift + canonical name verification.
+
+    Stage 3 invariants preserved through Item 3.1.v2 STOP cycle:
+      - BlarAI source untouched (`git status --porcelain` empty)
+      - devplatform tools/ uncommitted (substantive commit deferred to 3.9 per i1-1 +
+        g7-ea1_n8 single-Stage-3-commit discipline)
+      - fleet still paused (state.json invariants verbatim per V0f baseline)
+      - stash@{0} byte-identical (12-cycle preservation continuing)
+      - BlarAI HEAD: 77e26a9 (Guide-#7 + EA-1 + verdict docs-only commit; no advance)
+      - devplatform HEAD: 3894221 (LA's between-stages registry edit; baseline acknowledged)
+      - No silent fix; no source rename; no init pointer amendment
+
+    PROCEED authorization granted for Item 3.2 (platform-doctrine docs copy by pattern) after
+    EA-1 acknowledges this disposition + new ack g7-ea1_n11 in next chat reply.
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="actual_filenames_in_blarai_scheduled_tasks" verdict="VERIFIED-UNDERSCORE-IS-CANONICAL">
+      <command>ls C:/Users/mrbla/BlarAI/tools/scheduled-tasks/ | grep -i 'escalation\|watchdog'</command>
+      <output>
+        escalation_watchdog.ps1   (UNDERSCORE)
+        escalation-watchdog.xml   (HYPHEN)
+        toast_watchdog.ps1        (UNDERSCORE; same naming pattern)
+        toast-watchdog.xml        (HYPHEN; same naming pattern)
+      </output>
+      <classification>
+        BlarAI source naming convention for scheduled-task pairs: .ps1 uses underscore,
+        .xml uses hyphen. This pattern is consistent across the watchdog pair (escalation +
+        toast). The typo in INFRA_DELTA_v2.md §1.7 misnamed the .ps1 with hyphen; the
+        consistency check against toast_watchdog.ps1 (also underscore) confirms underscore
+        is the actual convention, not the hyphen.
+      </classification>
+    </check>
+
+    <check id="devplatform_mirrors_source" verdict="VERIFIED-FAITHFUL-COPY">
+      <command>ls C:/Users/mrbla/devplatform/tools/scheduled-tasks/ | grep -i 'escalation\|watchdog'</command>
+      <output>
+        escalation_watchdog.ps1   (UNDERSCORE; same as source)
+        escalation-watchdog.xml   (HYPHEN; same as source)
+        toast_watchdog.ps1        (UNDERSCORE; same as source)
+        toast-watchdog.xml        (HYPHEN; same as source)
+      </output>
+      <classification>
+        Stage 3.1 Copy-Item -Recurse executed correctly. The watchdog file pair is byte-for-byte
+        present in devplatform under canonical (BlarAI source) names. No copy failure; no
+        silent file rename during copy.
+      </classification>
+    </check>
+
+    <check id="xml_internal_command_ref" verdict="VERIFIED-UNDERSCORE-IS-AUTHORITATIVE">
+      <command>grep -l 'escalation_watchdog.ps1\|escalation-watchdog.ps1' C:/Users/mrbla/BlarAI/tools/scheduled-tasks/*.xml</command>
+      <output>
+        C:/Users/mrbla/BlarAI/tools/scheduled-tasks/escalation-watchdog.xml
+        (file matches; internal grep on the file finds 'escalation_watchdog.ps1' UNDERSCORE)
+      </output>
+      <classification>
+        The escalation-watchdog.xml task-XML file's internal &lt;Command&gt; / &lt;Arguments&gt;
+        section references the .ps1 by its UNDERSCORE name. This is the runtime authoritative
+        binding: when the Windows Task Scheduler fires the Escalation Watchdog task, it
+        invokes the .ps1 file by underscore name. If the .ps1 had ever been named with
+        hyphen, the task would have failed at runtime since at least Stage 2.5 verification.
+        The fleet has been operating with this pair for the entire Sprint 8/9 era; underscore
+        is the canonical .ps1 filename.
+      </classification>
+    </check>
+
+    <check id="stage_2_audit_chain_consistency" verdict="VERIFIED-UNDERSCORE-THROUGHOUT">
+      <findings>
+        Grep across docs/platform_separation/ for `escalation_watchdog.ps1` (underscore):
+          - 03_STAGE2_REFACTOR_MULTIPROJECT.xml line 64 (2.4.v2 G-1 R12)
+          - 05_STAGE4_CUTOVER.xml lines 99 + 107 (4.7.6 PS1 line-by-line scan)
+          - EA_2.5.v2_VERIFICATION_EVIDENCE.txt line 8 (AST probe verification PASS)
+          - WORKFLOW_INTEGRITY_REVIEW.md lines 56 + 70 + 174 + 298 + 313 (G-1 + Appendix A.1)
+          - EA_HANDOFF_STAGE2_MIDSTAGE_v4.xml lines 37 + 72 + 162 + 210 (M file, Item 2.5
+            disposition, AST verification)
+          - EA_HANDOFF_STAGE2_MIDSTAGE_v5.xml line 38 (M file)
+          - 9 Guide-#5 disposition files + 2 EA iter-1 gate files (variously)
+
+        Grep for `escalation-watchdog.ps1` (hyphen):
+          - INFRA_DELTA_v2.md §1.6 line 121 (typo origin: "Pairs with escalation-watchdog.ps1")
+          - INFRA_DELTA_v2.md §1.7 line 125 (typo origin: tool files header)
+          - INFRA_DELTA_v2.md line 134 (typo: Stage 4 task-XML rewrite mention; conflated with
+            the .xml export name which IS hyphen)
+          - INFRA_DELTA_v2.md line 337 (typo: 04_STAGE3_COPY_TOOLS.xml file_inventory)
+          - 04_STAGE3_COPY_TOOLS.xml §3.1.v2 line 60 (inherited from INFRA_DELTA_v2.md)
+          - 3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml lines 814 + 815 + 1382
+            (inherited from Stage 3 XML)
+      </findings>
+      <classification>
+        Stage 2 work + WORKFLOW_INTEGRITY_REVIEW + AST probe + EA mid-stage handoffs +
+        Stage 4 + Stage 6 monitoring scripts ALL use UNDERSCORE consistently for the .ps1.
+        The HYPHEN form is confined to INFRA_DELTA_v2.md §1.6 + §1.7 (root-cause documentation
+        typo from the v2 delta-capture session 2026-04-24+) and propagates only to
+        04_STAGE3_COPY_TOOLS.xml §3.1.v2 + this Guide-#7 init pointer's g7-ea1_n3.
+
+        UNDERSCORE is canonical; HYPHEN is documentation drift in 2 source files (one of which
+        is locked stage XML; one of which is INFRA_DELTA_v2.md).
+      </classification>
+    </check>
+
+    <check id="ea_1_pre_stop_state_preserved" verdict="VERIFIED">
+      <findings>
+        - BlarAI working tree: clean (git status --porcelain empty post-Item-3.1 copy; no
+          BlarAI-side mutation; copy was devplatform-only as Stage 3 design dictates)
+        - devplatform working tree: ?? tools/ entry (single untracked top-level dir; the 7
+          dirs + 2 helpers + claude_cowork/projects all roll up under the single ?? since
+          devplatform main tree has nothing else recursing into tools/)
+        - BlarAI HEAD: 77e26a9 (Guide-#7 + EA-1 + verdict docs-only commit per amend cycle;
+          no advance)
+        - devplatform HEAD: 3894221 (LA's between-stages registry edit; carries forward)
+        - state.json: fleet_paused=true; reason "platform separation v2 in progress";
+          last_updated_by="copilot_agent"; last_updated_utc="2026-04-24T20:46:12Z" (preserved)
+        - stash@{0}: byte-identical timestamp 20260424_013002 (12+-cycle preservation)
+        - 7 platform tool directories present in devplatform/tools/ + 2 chokepoint helpers
+          (_vikunja_client.py + _project_context.py) confirmed via Test-Path
+        - openvino_contrib_agent NOT present in devplatform/tools/ (correctly excluded per
+          Stage 3.1 do-not-copy clause)
+      </findings>
+      <classification>
+        EA-1's STOP discipline preserved every Stage 3 invariant. Read-only verification work +
+        Item 3.1 copy (deferred-commit) + STOP at Item 3.1.v2 verify clause failure.
+        Substantive commit deferred to Item 3.9 per single-Stage-3-commit discipline. Standing
+        invariants intact.
+      </classification>
+    </check>
+
+  </independent_disk_verification>
+
+  <required_corrections>
+    <!-- Empty: EA-1 followed init pointer §work_plan_pointer §3.1 verbatim. The miss is on
+         the spec side (init pointer's g7-ea1_n3 verify list inherited a typo from the locked
+         Stage 3 XML §3.1.v2 line 60, which inherited from INFRA_DELTA_v2.md §1.7 line 125).
+         No EA-side correction obligation. -->
+  </required_corrections>
+
+  <new_acknowledgment>
+    <ack id="g7-ea1_n11" priority="LOW" status="FORWARD-ACTIVE-AT-3.10">
+      Stage 3.10 STATUS append closure footnote: v2-baseline spec drift on
+      escalation_watchdog.ps1 hyphen-vs-underscore. Required text (verbatim) for the
+      Stage 3.10 cumulative-footnote set:
+
+        "Item 3.1.v2 verify clause surfaced a documentation-vs-disk drift on
+        `escalation_watchdog.ps1` filename. The init pointer's g7-ea1_n3 verify list (and
+        its upstream sources, INFRA_DELTA_v2.md §1.6 line 121 + §1.7 line 125 + line 134 +
+        line 337, and 04_STAGE3_COPY_TOOLS.xml §3.1.v2 `<copy>` block line 60) used the
+        hyphen form `escalation-watchdog.ps1`. The actual on-disk file in BlarAI source +
+        devplatform copy is `escalation_watchdog.ps1` (UNDERSCORE). The HYPHEN form does
+        NOT exist anywhere on disk; the canonical underscore form is authoritative per
+        (a) BlarAI source disk content, (b) the escalation-watchdog.xml task-XML internal
+        `<Command>` reference (which invokes the .ps1 by underscore name at runtime),
+        (c) Stage 2.4.v2 G-1 R12 refactor + Stage 4.7.6 PS1 line-by-line scan + Stage 2.5.v2
+        AST probe verification + Stage 2 substantive commit 3d1ac35 (all use underscore),
+        (d) WORKFLOW_INTEGRITY_REVIEW.md G-1 + Appendix A.1 (use underscore), (e) consistency
+        with sibling toast_watchdog.ps1 (also underscore). The HYPHEN form is documentation
+        drift originating in INFRA_DELTA_v2.md §1.6 + §1.7 (v2 delta-capture session
+        2026-04-24+) and inherited by 04_STAGE3_COPY_TOOLS.xml §3.1.v2. Per dn3-equivalent
+        (stage XMLs are locked artifacts), the typo is NOT corrected inline; forward-corrected
+        in Guide-#7 verdict file
+        docs/platform_separation/temp_for_responses/3.1.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_1_V2_VERIFIED_SPEC_CORRECTION_AUTHORIZED.xml
+        and at this STATUS append. **A Stage 6.7.5-pattern hardening ticket is REQUIRED**
+        to clean up the INFRA_DELTA_v2.md §1.6 line 121 + §1.7 line 125 + line 134 + line 337
+        typos and the 04_STAGE3_COPY_TOOLS.xml §3.1.v2 line 60 inherited typo. Per LA
+        mature-not-minimal motto and the LA directive at 2026-04-27 ('non-optional if it
+        means cleaning up documentation'), this ticket is mandatory at Stage 6.7.5 (LA may
+        triage priority -- LOW expected for a doc-only typo; ticket creation is non-optional).
+        Joins the existing S-1 + S-3 Stage 6.7.5 ticket set. Item 3.1.v2 EFFECTIVELY
+        SATISFIED: the actual file is present on disk in BOTH BlarAI source AND devplatform
+        copy under canonical underscore name; Test-Path against the corrected spec returns
+        True; no recopy needed."
+
+      Status transitions to SATISFIED at Stage 3.10 STATUS append landing. Joins the Stage
+      3.10 cumulative-footnote set: g7-ea1_n9 (Stage 3 closure entry) + g7-ea1_n10
+      (STATUS.md devplatform-HEAD line correction) + g7-ea1_n11 (this footnote on the
+      v2-baseline spec drift) + ack-count correction footnote (per nature_of_this_file
+      forward-correction at 2026-04-27 in init pointer).
+    </ack>
+  </new_acknowledgment>
+
+  <required_acknowledgments>
+    <ack_to_emit_at_start_of_next_chat_turn>
+      EA-1 acknowledges before Item 3.2 work begins:
+        (a) Item 3.1.v2 EFFECTIVELY SATISFIED. The HYPHEN form `escalation-watchdog.ps1` is a
+            documentation typo; the canonical UNDERSCORE form `escalation_watchdog.ps1` is
+            present in BOTH BlarAI source AND devplatform copy. Re-run Test-Path against the
+            corrected spec for confirmation; expect True for both repos. NO recopy operation
+            needed.
+        (b) New ack g7-ea1_n11 added to FORWARD-ACTIVE-AT-3.10 set; binding through Stage
+            3.10 STATUS append footnote per verbatim text above. Stage 3.10 cumulative-footnote
+            set is now: g7-ea1_n9 + g7-ea1_n10 + g7-ea1_n11 + ack-count correction footnote.
+        (c) Stage 3 invariants reaffirmed: BlarAI untouched; devplatform Item 3.1 copy stays
+            uncommitted (substantive commit at 3.9); fleet paused; stash byte-identical;
+            no silent fix to INFRA_DELTA_v2.md or 04_STAGE3_COPY_TOOLS.xml (locked).
+        (d) Standing reminders r1-r5 still apply.
+    </ack_to_emit_at_start_of_next_chat_turn>
+  </required_acknowledgments>
+
+  <proceed_authorization>
+    PROCEED -- EA-1 may declare Item 3.1.v2 EFFECTIVELY SATISFIED (with g7-ea1_n11
+    forward-correction footnote staged for Stage 3.10) and execute Item 3.2 (platform-doctrine
+    docs copy by pattern) in the next chat turn.
+
+    Stage 3 execution order from this point (per init pointer + 04_STAGE3_COPY_TOOLS.xml):
+      Item 3.2: Copy doctrine docs by pattern (CLAUDE_*.md, CLAUDE_*.xml, CO_LEAD_*.xml,
+                DEC*.xml, DOMAIN*.xml, CONTINUATION_PROMPT.md). Source: BlarAI/docs/.
+                Destination: devplatform/docs/.
+      Item 3.2.v2: Copy docs/governance/ (recursive, 7 files) + docs/scheduled/wake_templates/
+                   (recursive, 6 files) per g7-ea1_n4.
+      Item 3.3: Copy claude_cowork/ + claude_projects/ if populated.
+      Item 3.4: Populate devplatform/pyproject.toml from BlarAI/pyproject.toml minus runtime deps.
+      Item 3.5: cd devplatform; pip install -e . (sanity verify + import check).
+      Item 3.6: Copy MCP configs with `${env:VIKUNJA_PASS}` env-var pattern per g7-ea1_n1
+                (F-1 mitigation devplatform half).
+      Item 3.7: Smoke test daily_digest --dry-run from devplatform per g7-ea1_n6.
+      Item 3.8: Verify devplatform/docs/ has no BlarAI-only doc patterns per g7-ea1_n7.
+      Item 3.9: Single Stage-3 commit on devplatform main per g7-ea1_n8 (parent 3894221).
+      Item 3.10: Append-only STATUS.md update on BlarAI side per g7-ea1_n9 + g7-ea1_n10 +
+                 g7-ea1_n11 + ack-count correction footnote.
+      Item 3.10.v2: Write devplatform/.copy_manifest_v2.yaml per g7-ea1_n5.
+
+    Stop conditions during Stage 3 (unchanged from init pointer + verdict §proceed_authorization):
+      - Any Item-N verify clause fails -&gt; STOP and report.
+      - Stage 3.2 doctrine-doc pattern overshoot (BlarAI-only doc copied to devplatform) -&gt;
+        STOP per g7-ea1_n7.
+      - Stage 3.5 `pip install -e .` fails -&gt; STOP; do NOT modify dep list silently.
+      - Stage 3.6 VIKUNJA_PASS literal slips into devplatform MCP config -&gt; STOP per g7-ea1_n1.
+      - Stage 3.7 $BLARAI_PID drift -&gt; STOP per g4-5; NO silent regex/yaml adaptation.
+      - Stage 3.8 BlarAI-only docs absence Select-String returns non-empty -&gt; STOP.
+      - Stage 3.9 commit produces more than ONE commit OR omits any expected file -&gt; STOP per
+        g7-ea1_n8.
+      - Stage 3.10 STATUS append modifies pre-existing sections -&gt; STOP per g7-ea1_n9.
+      - Context exhaustion at any clean breakpoint (post-3.5 dep-install close; post-3.7
+        smoke-test close; post-3.8 docs-absence-verify close) -&gt; emit Stage-3-mid-stage-handoff
+        XML (docs-only commit; ONE file in diff) per i1-4 + g6-ea6_n4 + g7-ea1_n8 + r5.
+      - Any other procedural defect -&gt; STOP and report; do NOT inline-fix without LA
+        authorization.
+
+    Standing invariants unchanged: single substantive Stage 3 commit on devplatform main at
+    item 3.9 only (parent 3894221); fleet stays paused (NEVER state.resume_fleet); no merge
+    to main; stash@{0} untouched (12+-cycle byte-identity preservation continuing); STATUS
+    append-only at item 3.10. Standing reminders r1-r5 + 9 g7-ea1 acks (n1-n9 from init
+    pointer + n10 from iter-1 verdict + n11 from this verdict) apply throughout.
+
+    After Item 3.10 + 3.10.v2 land, EA-1 emits the closing handoff to LA per the
+    `closing_handoff_to_la_at_stage_3_close` block in the EA-1 init pointer.
+  </proceed_authorization>
+
+  <next_action_for_la>
+    Forward this Guide-#7 verdict file to the EA-1 chat. Specifically:
+
+      File path: docs/platform_separation/temp_for_responses/3.1.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_1_V2_VERIFIED_SPEC_CORRECTION_AUTHORIZED.xml
+
+      Suggested chat message to EA-1:
+        "Item 3.1.v2 disposition: option (a) AUTHORIZED per Guide-#7 verdict at the attached
+        file path. The HYPHEN spec was a typo originating in INFRA_DELTA_v2.md §1.7;
+        canonical filename is `escalation_watchdog.ps1` (UNDERSCORE) and is present on disk
+        in both BlarAI source and devplatform copy. Item 3.1.v2 EFFECTIVELY SATISFIED; no
+        recopy. New ack g7-ea1_n11 added (FORWARD-ACTIVE-AT-3.10) -- closure footnote at
+        Stage 3.10 documents the spec drift. Acknowledge OQ disposition + g7-ea1_n11 +
+        invariants reaffirmation in your next chat reply, then begin Item 3.2 (doctrine docs
+        copy by pattern) per init pointer §work_plan_pointer."
+
+    No pre-PROCEED commit needed (BlarAI working tree clean; devplatform working tree
+    correctly carries Item 3.1 copy as ?? for substantive commit at 3.9). The Guide-#7
+    verdict file at the path above is itself a new untracked file in BlarAI that may be
+    bundled into the eventual mid-stage or closing handoff commit -- no immediate commit
+    required.
+  </next_action_for_la>
+
+</guide_review_response>

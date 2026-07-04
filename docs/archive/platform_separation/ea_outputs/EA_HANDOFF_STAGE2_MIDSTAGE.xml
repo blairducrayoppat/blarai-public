@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_handoff_stage2_midstage>
+
+  <metadata>
+    <emitted_at_utc>2026-04-24T00:00:00Z</emitted_at_utc>
+    <predecessor_ea>stage_2_ea_instance_1</predecessor_ea>
+    <successor_ea>stage_2_ea_instance_2</successor_ea>
+    <branch_at_handoff>chore/platform-extraction</branch_at_handoff>
+    <head_at_handoff>ef0e30e</head_at_handoff>
+    <note>HEAD will advance by exactly one docs-only commit (this handoff XML) after this file lands. Successor should expect HEAD to be that new commit, with the four 2.1/2.2 paths still untracked/modified per uncommitted_on_disk below.</note>
+    <fleet_paused>true</fleet_paused>
+    <items_completed>2.1, 2.2</items_completed>
+    <items_remaining>2.3, 2.4, 2.4.v2, 2.5, 2.5.v2, 2.6, 2.7, 2.7.v2, 2.8, 2.9, 2.10</items_remaining>
+    <stop_reason>context_window_exhaustion</stop_reason>
+  </metadata>
+
+  <ground_truth_at_handoff>
+    <git_status_porcelain><![CDATA[
+ M pyproject.toml
+?? tools/_project_context.py
+?? tools/_vikunja_client.py
+?? tools/tests/
+]]></git_status_porcelain>
+    <git_log_oneline_3><![CDATA[
+ef0e30e (HEAD -> chore/platform-extraction) docs(platform_separation): Stage 1→2 handoffs (Guide instance 2→3 + EA Stage 1→Stage 2)
+aa09f6a chore(platform_separation): between-stages cleanup -- Stage 2 XML defect fixes + REST fallback codification + STATUS A6/A7/A8/A9/A10
+1d06135 docs(platform_separation): Stage 1 -- BlarAI-side reverse-lookup + STATUS update
+]]></git_log_oneline_3>
+    <git_worktree_list><![CDATA[
+C:/Users/mrbla/BlarAI ef0e30e [chore/platform-extraction]
+]]></git_worktree_list>
+    <fleet_paused_field source="tools/autonomy_budget/state.json">true (reason: "platform separation v2 in progress")</fleet_paused_field>
+    <vikunja_process_count expected="0" observed="0"/>
+    <scheduled_tasks taskpath="\BlarAI\" expected="13/13 Disabled" observed="13 Disabled"/>
+    <stash_zero_untouched>stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 -- DO NOT TOUCH</stash_zero_untouched>
+  </ground_truth_at_handoff>
+
+  <work_completed>
+
+    <item id="2.1" name="VikunjaClient + scope tests">
+      <files_created>
+        <file path="C:\Users\mrbla\BlarAI\tools\_vikunja_client.py" loc="71">
+          Verbatim from EA_HANDOFF_STAGE2.xml. Exposes ProjectScopeError(ValueError), _require_project_id(value)->int (rejects None, then bool BEFORE int per cleanup-C3, then non-int), and VikunjaClient(base_url, token) with list_tasks(*, project_id, **filters), search_tasks(*, project_id, query, **filters), get_task(task_id). HTTP delegation intentionally stubbed; wired in item 2.6.
+        </file>
+        <file path="C:\Users\mrbla\BlarAI\tools\tests\__init__.py" loc="0">empty package marker</file>
+        <file path="C:\Users\mrbla\BlarAI\tools\tests\test_vikunja_client_scope.py" loc="54">6 scope tests, all green</file>
+      </files_created>
+      <tests_added>
+        <t>tools/tests/test_vikunja_client_scope.py::test_list_without_project_id_raises</t>
+        <t>tools/tests/test_vikunja_client_scope.py::test_list_with_string_project_id_raises</t>
+        <t>tools/tests/test_vikunja_client_scope.py::test_list_with_bool_project_id_raises</t>
+        <t>tools/tests/test_vikunja_client_scope.py::test_list_with_int_project_id_ok</t>
+        <t>tools/tests/test_vikunja_client_scope.py::test_require_project_id_returns_value_on_int</t>
+        <t>tools/tests/test_vikunja_client_scope.py::test_require_project_id_rejects_float</t>
+      </tests_added>
+    </item>
+
+    <item id="2.2" name="ProjectContext resolver + tests">
+      <files_created>
+        <file path="C:\Users\mrbla\BlarAI\tools\_project_context.py" loc="98">
+          Verbatim from EA_HANDOFF_STAGE2.xml. Exports DEFAULT_BLARAI_ROOT = Path(r"C:\Users\mrbla\BlarAI"), REGISTRY_RELATIVE = Path(".platform/vikunja_project_ids.yaml"), @dataclass(frozen=True) ProjectContext(root, vikunja_project_id, name), _load_registry, _walk_up_for, resolve(cli_root=None, cli_project_id=None). 5-step resolution: cli_root → BLARAI_PROJECT_ROOT env → walk-up registry → walk-up .git → DEFAULT_BLARAI_ROOT (warns). name_key = f"{root.name.lower()}_project_id" (cleanup-C1 generalized) with generic "project_id" fallback. Rejects None / non-int / bool project_id with ValueError.
+        </file>
+        <file path="C:\Users\mrbla\BlarAI\tools\tests\test_project_context.py" loc="100">9 resolver tests, all green</file>
+      </files_created>
+      <tests_added>
+        <t>tools/tests/test_project_context.py::test_load_registry_missing_raises</t>
+        <t>tools/tests/test_project_context.py::test_resolve_with_explicit_cli_root</t>
+        <t>tools/tests/test_project_context.py::test_resolve_cli_project_id_overrides_registry</t>
+        <t>tools/tests/test_project_context.py::test_resolve_rejects_bool_project_id</t>
+        <t>tools/tests/test_project_context.py::test_resolve_rejects_string_project_id</t>
+        <t>tools/tests/test_project_context.py::test_resolve_falls_back_to_generic_project_id_key</t>
+        <t>tools/tests/test_project_context.py::test_resolve_env_var</t>
+        <t>tools/tests/test_project_context.py::test_default_blarai_root_constant</t>
+        <t>tools/tests/test_project_context.py::test_default_blarai_resolves_to_project_id_3</t>
+      </tests_added>
+    </item>
+
+    <pyproject_change file="C:\Users\mrbla\BlarAI\pyproject.toml">
+      <before><![CDATA[
+testpaths = [
+    "shared",
+    "services",
+    "launcher",
+    "tests",
+    "phase2_gates/scripts",
+    "tools/openvino_contrib_agent/tests",
+]
+]]></before>
+      <after><![CDATA[
+testpaths = [
+    "tools/tests",
+    "shared",
+    "services",
+    "launcher",
+    "tests",
+    "phase2_gates/scripts",
+    "tools/openvino_contrib_agent/tests",
+]
+]]></after>
+      <diff_stat>1 file changed, 1 insertion(+)</diff_stat>
+      <v8_defaults_preservation>Additive only. All previously-discovered paths remain in their original order.</v8_defaults_preservation>
+    </pyproject_change>
+
+    <pytest_output_summary><![CDATA[
+============================= 15 passed in 0.12s ==============================
+]]></pytest_output_summary>
+
+  </work_completed>
+
+  <uncommitted_on_disk>
+    <note>These four paths stay UNCOMMITTED on disk. Successor folds them into the single Stage 2 commit at item 2.9 along with all 2.3-2.8 work.</note>
+    <entry status="modified" path="pyproject.toml">testpaths additively extended with "tools/tests" as first entry</entry>
+    <entry status="untracked" path="tools/_vikunja_client.py">71 LOC; ProjectScopeError + _require_project_id + VikunjaClient stub</entry>
+    <entry status="untracked" path="tools/_project_context.py">98 LOC; ProjectContext dataclass + resolve() + registry loader</entry>
+    <entry status="untracked" path="tools/tests/">contains __init__.py (empty), test_vikunja_client_scope.py (54 LOC, 6 tests), test_project_context.py (100 LOC, 9 tests)</entry>
+  </uncommitted_on_disk>
+
+  <work_remaining>
+    <item id="2.3">Refactor tools/autonomy_budget/config.yaml — remove hardcoded C:\Users\mrbla\BlarAI\ allowlist; replace with loader that reads projects/&lt;name&gt;.yaml based on active ProjectContext from tools._project_context.resolve().</item>
+    <item id="2.4">Add argparse --project-root and --project-id (type=int) to: tools/fleet_observability/daily_digest.py, weekly_summary.py, dashboards/*.py; tools/gate_stale_cleaner/*.py; tools/autonomy_budget/*.py entrypoints; tools/fleet_ops/*.py wake launchers; tools/vikunja_mcp/cli.py; tools/vikunja_mcp/bridge/__main__.py. Each entrypoint calls _project_context.resolve(cli_root, cli_project_id) and uses the result wherever a hardcoded BlarAI path appeared.</item>
+    <item id="2.4.v2">v2 verification of 2.4 — every modified entrypoint exposes both flags via --help output.</item>
+    <item id="2.5">PowerShell -ProjectRoot param on every .ps1 in tools/scheduled-tasks/ and tools/fleet_ops/. Confirmed touchpoints from XML: tools/scheduled-tasks/wake_launcher.ps1 line 30, tools/fleet_ops/la_merge_approve.ps1 line 38; verify and patch all other .ps1 in those two dirs that hardcode the BlarAI path.</item>
+    <item id="2.5.v2">v2 verification of 2.5 — each .ps1 accepts -ProjectRoot and defaults preserve current behavior for the BlarAI path.</item>
+    <item id="2.6">Audit Vikunja call sites — grep for requests.*localhost:3456, /api/v1/projects/.*/tasks, /api/v1/tasks/all. Replace each direct HTTP call with VikunjaClient. Any list/search call site that cannot supply project_id is a BUG and must be fixed (not deferred).</item>
+    <item id="2.7">pytest tools/ --tb=short -q — must pass with no regressions.</item>
+    <item id="2.7.v2">v2 verification — V6 assertions from EA_HANDOFF_STAGE2.xml.</item>
+    <item id="2.8">Defaults-preservation smoke: $BLARAI_PID = (Get-Content C:\Users\mrbla\BlarAI\.platform\vikunja_project_ids.yaml | Select-String 'blarai_project_id:\s*(\d+)').Matches.Groups[1].Value; python -m tools.fleet_observability.daily_digest --project-root C:\Users\mrbla\BlarAI --project-id $BLARAI_PID. Currently $BLARAI_PID = 3.</item>
+    <item id="2.9">Single Stage 2 commit. Per Guide instance 3 acknowledgment #1: ONE commit covering items 2.1-2.8. Use the commit message prescribed in EA_HANDOFF_STAGE2.xml item 2.9 (predecessor used the form: "Stage 2: add multi-project seam to fleet tools (pre-move refactor)" — successor must re-verify against the XML and use the XML's prescribed message verbatim). NOTE: pyproject.toml MUST be included in the commit (test discovery for tools/tests depends on it); the XML's literal "git add tools/" instruction is insufficient — successor uses git add -A or git add tools/ pyproject.toml.</item>
+    <item id="2.10">Append-only update to docs/platform_separation/STATUS.md (Stage 2 COMPLETE marker + commit hash + files-touched count). DO NOT modify any other STATUS.md region.</item>
+
+    <midflight_observations>
+      <obs>Predecessor saw a benign "yaml type stubs not installed" lint warning in tools/_project_context.py. PyYAML is a runtime dep; the warning is type-checker only. No action needed.</obs>
+      <obs>pyproject.toml change is non-negotiable for item 2.7's pytest discovery — without "tools/tests" in testpaths, the new tests are not collected. Confirm it survives any rebase / cleanup before item 2.9.</obs>
+      <obs>cleanup-C1 (generalized name_key) and cleanup-C3 (bool-before-int guard) from the Stage 2 XML are already implemented in the on-disk files. Successor does NOT need to re-apply them.</obs>
+      <obs>VikunjaClient HTTP methods are intentionally stubbed; the wiring lives in item 2.6 audit-and-replace pass. Stub must remain importable until then.</obs>
+      <obs>BLARAI_PID resolves to 3 from .platform/vikunja_project_ids.yaml; this is asserted by test_default_blarai_resolves_to_project_id_3.</obs>
+    </midflight_observations>
+  </work_remaining>
+
+  <critical_carryovers>
+    <note>The 9 verbatim acknowledgments from the predecessor's APPROVED comprehension gate remain binding for the successor. Restated:</note>
+    <ack n="1">Stage 2 produces exactly ONE commit (item 2.9). All intermediate work stays uncommitted.</ack>
+    <ack n="2">Fleet stays paused throughout Stage 2. NEVER call state.resume_fleet(). Fleet remains paused through Stage 4 cutover.</ack>
+    <ack n="3">No merge to main during Stage 2. Branch chore/platform-extraction is the only working surface.</ack>
+    <ack n="4">stash@{0} (wake_launcher auto-stash on main) is NOT to be popped or applied.</ack>
+    <ack n="5">No edits to CLAUDE.md, AGENTS.md, .github/copilot-instructions.md, or any A1–A10 governance doc during Stage 2.</ack>
+    <ack n="6">All Vikunja access flows through tools/_vikunja_client.py. list_tasks / search_tasks MUST receive int project_id. bool is rejected before int (cleanup-C3).</ack>
+    <ack n="7">_project_context.resolve() is the single source for ProjectContext in every refactored entrypoint. Hardcoded C:\Users\mrbla\BlarAI paths in entrypoints are a BUG.</ack>
+    <ack n="8">V8 defaults preservation: pre-existing pytest discovery, fleet behavior on the BlarAI path, and CLI default behavior all unchanged when --project-root is omitted.</ack>
+    <ack n="9">STATUS.md updates at item 2.10 are APPEND-ONLY. Do not edit prior Stage entries.</ack>
+    <plus_guide_3>Three additional acknowledgments from Guide instance 3 still apply: (G3-1) single Stage 2 commit only; (G3-2) V1–V7 + V8 verification block before closing handoff; (G3-3) item 2.10 STATUS.md edit is append-only.</plus_guide_3>
+  </critical_carryovers>
+
+  <single_commit_discipline>
+    Items 2.1 and 2.2 work stays UNCOMMITTED on disk. The successor runs git add -A (or explicit git add tools/ pyproject.toml) and produces the SINGLE Stage 2 commit at item 2.9 using the commit message prescribed in EA_HANDOFF_STAGE2.xml item 2.9.
+  </single_commit_discipline>
+
+  <successor_pickup_verification>
+    <command id="V0a">git rev-parse --abbrev-ref HEAD                  # expect: chore/platform-extraction</command>
+    <command id="V0b">git log --oneline -1                              # expect: the new mid-stage handoff commit (parent: ef0e30e)</command>
+    <command id="V0c">git status --porcelain                            # expect EXACTLY:
+ M pyproject.toml
+?? tools/_project_context.py
+?? tools/_vikunja_client.py
+?? tools/tests/</command>
+    <command id="V0d">Test-Path tools/_vikunja_client.py, tools/_project_context.py, tools/tests/__init__.py, tools/tests/test_vikunja_client_scope.py, tools/tests/test_project_context.py   # expect 5x True</command>
+    <command id="V0e">pytest tools/tests/ -v --tb=short                 # expect: 15 passed, 0 failed</command>
+    <command id="V0f">Get-Content tools/autonomy_budget/state.json | Select-String fleet_paused   # expect: "fleet_paused": true</command>
+    <command id="V0g">git stash list                                    # expect: stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 (DO NOT POP)</command>
+  </successor_pickup_verification>
+
+  <do_not>
+    <prohibition>Do NOT merge chore/platform-extraction to main during Stage 2.</prohibition>
+    <prohibition>Do NOT git stash pop / git stash apply on stash@{0}. It is a stale wake_launcher auto-stash.</prohibition>
+    <prohibition>Do NOT edit CLAUDE.md, AGENTS.md, .github/copilot-instructions.md, or any A1–A10 governance doc.</prohibition>
+    <prohibition>Do NOT call state.resume_fleet(...). Fleet stays paused through Stage 4 cutover.</prohibition>
+    <prohibition>Do NOT produce more than one Stage 2 commit (item 2.9). All other artifacts (handoff XMLs, etc.) are out of Stage 2 scope.</prohibition>
+    <prohibition>Do NOT touch any file under docs/platform_separation/ other than (a) STATUS.md append-only at item 2.10, and (b) any handoff XML this successor itself emits to ea_outputs/.</prohibition>
+  </do_not>
+
+</ea_handoff_stage2_midstage>

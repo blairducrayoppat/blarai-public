@@ -1,0 +1,59 @@
+{
+  "milestone": "P5-FEASIBILITY-005a-EAGLE3",
+  "phase": "gap_fill_benchmark",
+  "metadata": {
+    "timestamp_utc": "2026-03-02T10:12:31.223624+00:00",
+    "commit_hash": "c46439209db6adbf73e0aadf1378f8c82a041b2d",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "acquisition_evidence_path": "p5_005a_eagle3_acquisition.json",
+    "acquisition_overall_disposition": "FRAMEWORK_NOT_SUPPORTED"
+  },
+  "tests": [
+    {
+      "id": "T-05",
+      "name": "14B + EAGLE-3",
+      "target": "14B",
+      "is_speculative": true,
+      "draft_device": "GPU",
+      "status": "failed",
+      "skip_reason": null,
+      "fail_reason": "FRAMEWORK_NOT_SUPPORTED",
+      "fail_detail": "architecture=LlamaForCausalLMEagle3; class_check: 'LlamaForCausalLMEagle3' not in transformers 4.51.3; optimum_export_returncode=1; root_cause: ValueError: The state dictionary of the model you are trying to load is corrupted. Are you sure it was properly saved?; ov_genai_draft_model: Exception from src\\inference\\src\\cpp\\core.cpp:85:\nCheck 'util::directory_exists(path) || util::file_exists(path)' failed",
+      "tps_512": null,
+      "speedup_vs_baseline_512": null,
+      "points": [],
+      "eagle3_gap_fill_utc": "2026-03-02T10:12:31.223624+00:00",
+      "eagle3_acquisition_evidence_path": "p5_005a_eagle3_acquisition.json",
+      "eagle3_acquisition_overall_disposition": "FRAMEWORK_NOT_SUPPORTED",
+      "eagle3_ir_produced": false
+    },
+    {
+      "id": "T-07",
+      "name": "8B + EAGLE-3",
+      "target": "8B",
+      "is_speculative": true,
+      "draft_device": "GPU",
+      "status": "failed",
+      "skip_reason": null,
+      "fail_reason": "FRAMEWORK_NOT_SUPPORTED",
+      "fail_detail": "architecture=Eagle3Speculator; class_check: 'Eagle3Speculator' not in transformers 4.51.3; optimum_export_returncode=1; root_cause: ValueError: The state dictionary of the model you are trying to load is corrupted. Are you sure it was properly saved?; ov_genai_draft_model: Exception from src\\inference\\src\\cpp\\core.cpp:85:\nCheck 'util::directory_exists(path) || util::file_exists(path)' failed",
+      "tps_512": null,
+      "speedup_vs_baseline_512": null,
+      "points": [],
+      "eagle3_gap_fill_utc": "2026-03-02T10:12:31.223624+00:00",
+      "eagle3_acquisition_evidence_path": "p5_005a_eagle3_acquisition.json",
+      "eagle3_acquisition_overall_disposition": "FRAMEWORK_NOT_SUPPORTED",
+      "eagle3_ir_produced": false
+    }
+  ],
+  "summary": {
+    "t05_status": "failed",
+    "t05_fail_reason": "FRAMEWORK_NOT_SUPPORTED",
+    "t07_status": "failed",
+    "t07_fail_reason": "FRAMEWORK_NOT_SUPPORTED",
+    "overall_disposition": "FRAMEWORK_NOT_SUPPORTED",
+    "note": "EAGLE-3 draft heads (LlamaForCausalLMEagle3, Eagle3Speculator) are not loadable by the transformers+optimum-intel pipeline. Both architectures fail at model deserialization \u2014 weight shapes are incompatible with standard CausalLM schemas. ov_genai.draft_model() requires OV IR format which cannot be produced. Disposition: FRAMEWORK_NOT_SUPPORTED."
+  },
+  "finished_utc": "2026-03-02T10:12:31.223624+00:00"
+}

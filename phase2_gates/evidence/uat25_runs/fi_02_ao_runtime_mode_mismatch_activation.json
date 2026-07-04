@@ -1,0 +1,28 @@
+{
+  "disposition": "FAIL",
+  "fail_closed": "true",
+  "failure": {
+    "code": "AO_CFG_RUNTIME_MODE_MISMATCH",
+    "disposition": "FAIL",
+    "fail_closed": "true",
+    "message": "Runtime mode mismatch for default.toml: expected 'host', got 'guest'.",
+    "stage": "config_validation"
+  },
+  "gate": "UAT2_REAL_RUNTIME_ACTIVATION",
+  "milestone": "Operational Exit Milestone 1",
+  "mock_backend_required": false,
+  "runtime_mode": "host",
+  "startup_profile": "uat2_real",
+  "steps": {
+    "admin_ok": true,
+    "assistant_orchestrator_started": false,
+    "gateway_handshake_ok": false,
+    "gateway_initialized": false,
+    "mock_backend_started": false,
+    "policy_agent_started": true,
+    "prompt_flow_ok": false,
+    "vm_running": true
+  },
+  "timestamp": "2026-02-25T16:20:46.973666+00:00",
+  "vm_required": true
+}

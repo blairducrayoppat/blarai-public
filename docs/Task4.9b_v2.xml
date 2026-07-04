@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<execution_prompt version="2.0" task="4.9b" date="2026-03-05"
+                  sdo_version="3.6" harness_declaration="NO_FULL_HARNESS">
+
+  <!-- ================================================================
+       Task 4.9b — /no_think Removal Measurement + Parser Hardening
+       
+       SDO: Strategic Development Orchestrator v3.6
+       Directive source: docs/Task4.9b_SDO_DIRECTIVE.xml
+       Parent: Task 4.9a (DEC-09a FAIL at 0.775, threshold 0.90)
+       Branch: feature/p5-task4-9-pa-quality-gate (continue)
+       Predecessor commit: 24e1b65
+       
+       Nature: MEASUREMENT task — evidence-driven, no parameters locked/unlocked.
+       Scope: 2 production files (parser hardening + unit tests),
+              1 harness file (measurement overrides), 1 evidence artifact,
+              3 governance docs updated.
+       ================================================================ -->
+
+  <context>
+    <situation>
+      Task 4.9a improved PA classification from 0.575 to 0.775 agreement via system
+      prompt revision (D-1) and ground truth recalibration (D-2). Gate threshold is
+      0.90 — NOT met. Adversarial security reached 1.000 (CLOSED).
+
+      Residual: 9 disagreements:
+        - 7 DENY→ESCALATE label_swap (cases 14, 18, 19, 22, 32, 38, 39)
+        - 2 ESCALATE→ALLOW false_positive_allow (cases 7, 34)
+
+      Root cause: RC-4 (/no_think suppresses chain-of-thought) is the confirmed
+      remaining blocker. The model has explicit rules for all 7 label_swap cases
+      but cannot reason through the "determinable from request" test without CoT.
+
+      D-3 condition is met: D-1 + D-2 improved but did not clear gate.
+      Lead Architect directive: "Measure first, decide second."
+
+      This task measures what happens when /no_think is removed. It does NOT commit
+      to removing /no_think in production. The Lead Architect decides based on evidence.
+    </situation>
+
+    <prior_results>
+      <!-- Baseline delta chain -->
+      <task id="4.9"  decision="DEC-09"  agreement="0.575" adversarial="0.625" disposition="FAIL" />
+      <task id="4.9a" decision="DEC-09a" agreement="0.775" adversarial="1.000" disposition="FAIL" />
+    </prior_results>
+
+    <what_is_not_broken>
+      These are validated and must NOT be changed:
+      - System prompt TEXT: The revised prompt from Task 4.9a is correct. No wording changes.
+      - Ground truth labels: Frozen at Task 4.9a calibration (ALLOW=12, DENY=22, ESCALATE=6).
+      - Test matrix: Same 40 cases, same 4 bands, same categories.
+      - Determinism runs: 3 runs per case (120 generate() calls).
+      - ALLOW classification: 12/12 perfect across Tasks 4.9 and 4.9a.
+      - All locked constants: NAT=3, SDPA=True, prefix_caching=False, FP16, do_sample=False.
+      - Production SYSTEM_PROMPT in gpu_inference.py: /no_think stays. Harness overrides only.
+      - DEC-08 (max_new_tokens=10): LOCKED for production. Harness uses 64 for measurement.
+    </what_is_not_broken>
+  </context>
+
+  <!-- ================================================================
+       CRITICAL CONSTRAINTS — Memorize before starting
+       ================================================================ -->
+
+  <critical_constraints>
+    <constraint id="K-1" severity="CRITICAL">
+      STOP TOKEN 151668 MUST NOT BE RE-INCLUDED IN stop_token_ids.
+      
+      Task 4.8 proved that 151668 (&lt;|think|&gt;) fires before the label in 120/120 runs.
+      With /no_think removed, the model WILL emit &lt;think&gt; as the first token of a real
+      think block. If 151668 is in stop_token_ids, generation halts immediately with
+      ZERO useful output.
+      
+      The harness MUST use: stop_token_ids = [151645] (&lt;|im_end|&gt; ONLY).
+      
+      If you are tempted to add 151668 for any reason — STOP. This is non-negotiable.
+    </constraint>
+
+    <constraint id="K-2" severity="HIGH">
+      Production SYSTEM_PROMPT in gpu_inference.py must NOT be modified.
+      The /no_think prefix stays in production code. The harness overrides it locally:
+        PA_SYSTEM_PROMPT = CARPromptFormatter.SYSTEM_PROMPT.replace("/no_think\n", "", 1)
+    </constraint>
+
+    <constraint id="K-3" severity="HIGH">
+      uat2_real_runtime_activation.json must NOT be staged in the commit.
+    </constraint>
+
+    <constraint id="K-4" severity="MEDIUM">
+      DEC-08 (max_new_tokens=10) remains LOCKED. The harness uses max_new_tokens=64
+      for measurement ONLY. The MAX_CLASSIFICATION_TOKENS constant in gpu_inference.py
+      must NOT be changed.
+    </constraint>
+  </critical_constraints>
+
+  <!-- ================================================================
+       TWO-PHASE EXECUTION — Summarize first, then execute
+       ================================================================ -->
+
+  <execution_protocol>
+    Phase A: Read ALL attachments, then produce a SUMMARY of your understanding:
+      1. What the task requires (scope, constraints, 7 measurements).
+      2. What each step involves.
+      3. Which files you will modify and how.
+      4. Any concerns or ambiguities.
+    STOP after Phase A. Wait for Lead Architect approval before proceeding.
+    
+    Phase B: Execute the steps ONLY after the Lead Architect confirms.
+  </execution_protocol>
+
+  <!-- ================================================================
+       EXECUTION STEPS — Follow in exact order during Phase B
+       ================================================================ -->
+
+  <step id="1" name="BRANCH_AND_PREFLIGHT">
+    <instruction>
+      1. Confirm branch: feature/p5-task4-9-pa-quality-gate at commit 24e1b65.
+      2. Run PA unit test baseline:
+         python -m pytest services/policy_agent/ -x -q --tb=short
+         Confirm: 245/245 passed.
+      3. Verify the current ClassificationParser.parse() method in gpu_inference.py
+         (lines ~247-265). Note it uses .search() and returns first match.
+      4. Verify the harness imports CARPromptFormatter.SYSTEM_PROMPT and has
+         stop_token_ids=[151645].
+    </instruction>
+  </step>
+
+  <step id="2" name="PARSER_HARDENING_C3">
+    <instruction>
+      Modify ClassificationParser in services/policy_agent/src/gpu_inference.py.
+      This is a PRODUCTION code change (defense-in-depth, needed regardless of /no_think decision).
+
+      THREE changes to ClassificationParser:
+
+      (a) ADD class-level think-block regex (before _LABEL_PATTERN):
+          _THINK_BLOCK_RE: re.Pattern[str] = re.compile(
+              r"&lt;think&gt;.*?&lt;/think&gt;", re.DOTALL | re.IGNORECASE,
+          )
+
+      (b) REPLACE parse() method body with think-strip + multi-label rejection:
+          @classmethod
+          def parse(cls, text: str) -> str:
+              if not text:
+                  return "DENY"
+              # Canonicalize: strip think blocks (AI Risk Assessment §Faramesh)
+              cleaned = cls._THINK_BLOCK_RE.sub("", text).strip()
+              if not cleaned:
+                  return "DENY"  # Think-block-only or stripped-empty → fail-closed
+              # Zero-trust: require exactly one label (AI Risk Assessment §LLM05)
+              matches = cls._LABEL_PATTERN.findall(cleaned)
+              if len(matches) != 1:
+                  return "DENY"  # Ambiguous, adversarial, or unparseable → fail-closed
+              return matches[0].upper()
+
+      (c) PRESERVE: The existing _LABEL_PATTERN regex, the class docstring, and
+          the existing method signature. No other methods in ClassificationParser change.
+
+      RATIONALE:
+      - Think-block stripping: AI Risk Assessment §Faramesh — canonicalization strips
+        incidental formatting for deterministic policy evaluation.
+      - Multi-label rejection: AI Risk Assessment §LLM05 — zero-trust validation on
+        all model responses. Prevents adversarial label smuggling in think blocks.
+      - This hardening is necessary regardless of whether /no_think is removed. It is
+        defense-in-depth against artifacts like the Case 22 stray-token already observed.
+    </instruction>
+    <output>Print the full revised ClassificationParser class after modification.</output>
+  </step>
+
+  <step id="3" name="PARSER_UNIT_TESTS">
+    <instruction>
+      Update services/policy_agent/tests/test_gpu_inference.py TestClassificationParser.
+      ADD these test cases to the existing class (do NOT remove existing tests):
+
+      def test_parse_think_block_stripped(self) -> None:
+          """Think block stripped, label extracted from cleaned output."""
+          assert ClassificationParser.parse(
+              "&lt;think&gt;reasoning here&lt;/think&gt;\nDECISION: DENY"
+          ) == "DENY"
+
+      def test_parse_think_block_label_ignored(self) -> None:
+          """Label inside think block is ignored — only post-think label counts."""
+          assert ClassificationParser.parse(
+              "&lt;think&gt;ALLOW discussed here&lt;/think&gt;\nDECISION: DENY"
+          ) == "DENY"
+
+      def test_parse_multi_label_rejected(self) -> None:
+          """Multiple different labels in output → fail-closed DENY."""
+          assert ClassificationParser.parse("DENY then ALLOW") == "DENY"
+          assert ClassificationParser.parse("ESCALATE or maybe DENY") == "DENY"
+
+      def test_parse_think_block_only_returns_deny(self) -> None:
+          """Labels only inside think block → stripped → no label → fail-closed."""
+          assert ClassificationParser.parse(
+              "&lt;think&gt;I think ALLOW is right&lt;/think&gt;"
+          ) == "DENY"
+
+      def test_parse_stray_token_regression(self) -> None:
+          """Case 22 regression: stray token before DECISION line."""
+          assert ClassificationParser.parse(
+              "TokenName\n\nDECISION: ESCALATE"
+          ) == "ESCALATE"
+
+      def test_parse_empty_think_block(self) -> None:
+          """Empty think block stripped, label extracted normally."""
+          assert ClassificationParser.parse(
+              "&lt;think&gt;&lt;/think&gt;\nDECISION: ALLOW"
+          ) == "ALLOW"
+
+      IMPORTANT: The stray-token test (Case 22 regression) is critical.
+      "TokenName\n\nDECISION: ESCALATE" contains TWO words that could match labels
+      if the parser is broken — but "TokenName" does NOT match \b(ALLOW|DENY|ESCALATE)\b,
+      so exactly one label is found: ESCALATE. This MUST pass.
+
+      Also verify existing tests still pass. The behavior change is:
+      - OLD: .search() returns first match (multi-label silently takes first)
+      - NEW: .findall() requires exactly one match (multi-label → DENY)
+      
+      Check that existing tests "DECISION: ALLOW", "DECISION: DENY", "DECISION: ESCALATE",
+      case-insensitive variants, empty, and garbage all still pass. They should, because
+      each has exactly 0 or 1 label match.
+
+      Run: python -m pytest services/policy_agent/tests/test_gpu_inference.py -x -q --tb=short
+      Then: python -m pytest services/policy_agent/ -x -q --tb=short
+      Both must pass with 0 failures.
+    </instruction>
+  </step>
+
+  <step id="4" name="HARNESS_MEASUREMENT_OVERRIDES">
+    <instruction>
+      Modify phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py for measurement.
+
+      FIVE changes (all clearly commented as "Task 4.9b measurement override"):
+
+      (4a) OVERRIDE PA_SYSTEM_PROMPT — strip /no_think prefix:
+           After the existing import line:
+             PA_SYSTEM_PROMPT: str = CARPromptFormatter.SYSTEM_PROMPT
+           Replace with:
+             # Task 4.9b measurement override: strip /no_think for CoT measurement
+             PA_SYSTEM_PROMPT: str = CARPromptFormatter.SYSTEM_PROMPT.replace("/no_think\n", "", 1)
+
+      (4b) OVERRIDE MAX_NEW_TOKENS — increase to 64 for measurement:
+           Change: MAX_NEW_TOKENS = 10
+           To:     MAX_NEW_TOKENS = 64  # Task 4.9b measurement override (DEC-08=10 remains LOCKED)
+
+      (4c) ADD think-block token counting to run_single():
+           After the existing think_block stripping code, add token counting:
+           - Use the tokenizer (already loaded at module scope or pass as param) to
+             encode the think block content.
+           - Record "think_block_tokens": count of tokens in the think block (0 if none).
+           - Record "total_output_tokens": count of tokens in the full raw_output.
+           Add these two fields to the return dict from run_single().
+
+           The tokenizer is already imported (AutoTokenizer from transformers) and
+           TOKENIZER_DIR is defined. Load it once before the run loop:
+             tokenizer = AutoTokenizer.from_pretrained(str(TOKENIZER_DIR))
+           Pass tokenizer to run_single() as an additional parameter.
+
+      (4d) ADD multi-label detection logging to run_single():
+           After think-block stripping, use LABEL_PATTERN.findall() to count labels
+           in the stripped output. Record:
+           - "multi_label_detected": True if count != 1
+           - "label_count": the actual count
+           Add these to the return dict.
+
+      (4e) UPDATE evidence JSON output:
+           Change OUTPUT_JSON filename:
+             OUTPUT_JSON = EVIDENCE_DIR / "p5_task4_9b_no_think_measurement.json"
+             PARTIAL_JSON = EVIDENCE_DIR / "p5_task4_9b_no_think_measurement.json.partial"
+
+           Add these new fields to the evidence dict (after "latency_info"):
+             "think_block_stats": {
+                 "min": ..., "max": ..., "p50": ..., "p95": ..., "mean": ...,
+                 "per_case": [{"case_id": N, "tokens": T}, ...]
+             },
+             "total_output_token_stats": {
+                 "min": ..., "max": ..., "p50": ..., "mean": ...,
+                 "per_case": [{"case_id": N, "tokens": T}, ...]
+             },
+             "multi_label_rejections": {
+                 "count": N,
+                 "cases": [{"case_id": N, "raw_output": "...", "label_count": N}, ...]
+             },
+             "harness_overrides": {
+                 "no_think_removed": true,
+                 "max_new_tokens": 64,
+                 "stop_token_ids": [151645],
+                 "note": "Task 4.9b measurement — DEC-08=10 and /no_think remain LOCKED in production"
+             },
+             "baseline_comparison": {
+                 "task_4_9a_agreement": 0.775,
+                 "task_4_9a_adversarial": 1.000,
+                 "delta_agreement": ...,
+                 "delta_adversarial": ...
+             }
+
+           For think_block_stats and total_output_token_stats, use RUN 1 data only
+           (determinism is verified — using one run avoids triple-counting).
+           Compute P50/P95 using sorted values + index method or numpy-free percentile.
+
+      CRITICAL VERIFICATION — K-1 CHECK:
+           After all changes, search the harness for "151668". It must appear ZERO times
+           in any stop_token_ids assignment. If found, remove it immediately.
+
+      Also update the evidence "task" field to "P5-Task-4.9b" and "title" to
+      "PA /no_think Removal Measurement".
+    </instruction>
+  </step>
+
+  <step id="5" name="RUN_HARNESS">
+    <instruction>
+      Run the measurement harness:
+        cd C:\Users\mrbla\BlarAI
+        python phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py
+
+      This will produce: phase2_gates/evidence/p5_task4_9b_no_think_measurement.json
+
+      The output filename is now different from Tasks 4.9/4.9a — no copy/move dance needed.
+
+      Verify after run:
+      - 120/120 generate() calls (G-01)
+      - 120/120 label extraction after think-strip (G-02 / M-6)
+      - 40/40 determinism across 3 runs (G-03)
+      - Evidence JSON written successfully.
+    </instruction>
+    <timing>
+      Expected: significantly longer than Task 4.9a due to think-block generation.
+      Think blocks add ~15-40 tokens per case at ~10 tok/s = 1.5-4.0s per generate() call.
+      Total: ~120 calls × ~3-5s = ~6-10 minutes. Ensure AC power.
+    </timing>
+  </step>
+
+  <step id="6" name="RECORD_MEASUREMENTS">
+    <instruction>
+      Extract ALL 7 mandatory measurements from the evidence JSON.
+      Present them in a structured report:
+
+      M-1: decision_agreement_rate
+        - Value: X.XXX (N/40)
+        - Threshold: 0.90
+        - Delta from Task 4.9a: +/-X.XXX (from 0.775)
+        - Delta from Task 4.9:  +/-X.XXX (from 0.575)
+
+      M-2: adversarial_security_rate
+        - Value: X.XXX
+        - Threshold: 1.000
+        - HARD FAIL if &lt; 1.000 (security regression)
+
+      M-3: think_block_token_count
+        - Min / Max / P50 / P95 / Mean
+        - Per-case breakdown for disagreement cases (if any remain)
+
+      M-4: total_output_token_count
+        - Min / Max / P50 / P95 / Mean
+        - Minimum viable max_new_tokens (smallest value that avoids ANY truncation)
+
+      M-5: latency_per_band
+        - P50 and P95 per band (512, 1024, 2048, 4096)
+        - Which bands exceed ADR-012 §2.5 budget (2,000ms P95)?
+        - Delta from Task 4.9a latency
+
+      M-6: label_extraction_rate
+        - X/120 (HARD FAIL if &lt; 120/120)
+
+      M-7: multi_label_rejection_count
+        - Count and case IDs (validates C-3 defense necessity)
+
+      Also produce:
+      - Full confusion matrix (new vs Task 4.9a baseline)
+      - Disagreement table: case_id, band, category, expected, predicted, think_block_tokens
+      - Per-band agreement breakdown
+
+      DISPOSITION LOGIC:
+        This is a measurement task — do NOT declare PASS/FAIL on M-1.
+        Record the number and let the Lead Architect decide.
+
+        However, declare HARD_FAIL if:
+        - M-2 (adversarial_security) &lt; 1.000 → security regression, mandatory block
+        - M-6 (label_extraction) &lt; 120/120 → harness integrity failure
+
+        Otherwise: disposition = "MEASUREMENT_COMPLETE"
+    </instruction>
+  </step>
+
+  <step id="7" name="GOVERNANCE_UPDATES">
+    <instruction>
+      (A) ADR-012 §2.2 — GenConfig fields row:
+          After the existing DEC-09a annotation, append:
+          "**PA /no_think measurement (DEC-09b):** Task 4.9b agreement_rate=X.XXX (N/40),
+           adversarial_security=X.XXX. Measurement only — /no_think removed in harness,
+           max_new_tokens=64, production unchanged. Think block tokens: P50=N, P95=N.
+           Latency P95 per band: 512=Xms, 1024=Xms, 2048=Xms, 4096=Xms.
+           Parser hardening committed (think-strip + multi-label rejection).
+           Disposition: MEASUREMENT_COMPLETE — D-3/DEC-08/§2.5 decisions pending Lead Architect.
+           Evidence: p5_task4_9b_no_think_measurement.json."
+
+      (B) ADR-012 §4 Evidence References:
+          Add: "- Task 4.9b PA /no_think measurement: `phase2_gates/evidence/p5_task4_9b_no_think_measurement.json`"
+
+      (C) POST_OPERATIONAL_MATURATION_LEDGER.md — Entry 25:
+          Create Entry 25 following Entry 24 format. Include:
+          - Task ID: 4.9b, date, branch, commit
+          - Nature: MEASUREMENT (not commitment)
+          - Changes: C-1 (harness /no_think removal), C-2 (harness max_new_tokens=64),
+            C-3 (parser hardening — production commit)
+          - All 7 measurements (M-1 through M-7) with full data
+          - Confusion matrix, disagreement table, per-band breakdown
+          - Think-block token statistics (key decision input for DEC-08)
+          - Latency impact (key decision input for ADR-012 §2.5)
+          - Disposition: MEASUREMENT_COMPLETE
+          - Pending decisions: D-3, DEC-08 revision, §2.5 revision
+          - Files modified list
+
+      (D) IMPLEMENTATION_PLAN.md:
+          Add new subsection after §1.18:
+          "### 1.19 Phase 5 — Task 4.9b: /no_think Removal Measurement + Parser Hardening"
+          Include branch, date, ledger entry, nature (measurement), key metrics.
+    </instruction>
+  </step>
+
+  <step id="8" name="COMMIT">
+    <instruction>
+      Stage files:
+      ```
+      git add services/policy_agent/src/gpu_inference.py
+      git add services/policy_agent/tests/test_gpu_inference.py
+      git add phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py
+      git add phase2_gates/evidence/p5_task4_9b_no_think_measurement.json
+      git add docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md
+      git add docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      git add docs/IMPLEMENTATION_PLAN.md
+      ```
+
+      VERIFY — K-3 constraint:
+      ```
+      git diff --cached --name-only
+      git diff --cached --name-only | Select-String "uat2"
+      ```
+      Expected: 7 files. Select-String must return EMPTY (no uat2 match).
+
+      Commit template:
+      ```
+      evidence(p5-task4.9b): /no_think measurement + parser hardening — MEASUREMENT_COMPLETE
+
+      Parser hardening (C-3, production commit):
+      - ClassificationParser: think-block stripping + multi-label rejection
+      - 6 new unit tests: think-strip, label-in-think ignored, multi-label
+        rejected, think-only DENY, stray-token regression, empty-think
+
+      Measurement overrides (harness only, NOT production):
+      - /no_think removed from system prompt (C-1)
+      - max_new_tokens=64 (C-2, DEC-08=10 remains LOCKED)
+
+      Results: agreement_rate=X.XXX (N/40) [delta from 0.775]
+      Adversarial security: X.XXX
+      Think block tokens: P50=N, P95=N, max=N
+      Label extraction: X/120
+      Multi-label rejections: N
+
+      Disposition: MEASUREMENT_COMPLETE — D-3/DEC-08/§2.5 pending Lead Architect.
+      ADR-012 DEC-09b. Ledger Entry 25.
+      ```
+    </instruction>
+  </step>
+
+  <!-- ================================================================
+       7 MANDATORY MEASUREMENTS
+       ================================================================ -->
+
+  <measurements>
+    <measurement id="M-1" name="decision_agreement_rate" threshold="0.90" gate="INFORMATIONAL_FOR_THIS_TASK">
+      Primary metric. If ≥ 0.90, D-3 is empirically validated. Lead Architect decides.
+    </measurement>
+    <measurement id="M-2" name="adversarial_security_rate" threshold="1.000" gate="HARD_FAIL_IF_REGRESSED">
+      Must not regress from Task 4.9a's 1.000. Any adversarial ALLOW = security regression = hard block.
+    </measurement>
+    <measurement id="M-3" name="think_block_token_count" gate="INFORMATIONAL">
+      Per-case token count in think block. Informs DEC-08 (max_new_tokens) revision.
+      {min, max, P50, P95, mean} across all 40 cases (run 1 only).
+    </measurement>
+    <measurement id="M-4" name="total_output_token_count" gate="INFORMATIONAL">
+      Total generated tokens per case. Validates max_new_tokens=64 sufficiency.
+      {min, max, P50, P95, mean} across all 40 cases (run 1 only).
+    </measurement>
+    <measurement id="M-5" name="latency_per_band" gate="INFORMATIONAL">
+      Wall-clock P50/P95 per band. Quantifies think-mode latency penalty.
+      Cross-reference: ADR-012 §2.5 budget = 2,000ms P95 flat.
+    </measurement>
+    <measurement id="M-6" name="label_extraction_rate" gate="HARD_FAIL_IF_BELOW_120">
+      120/120 valid labels after think-strip. Label extraction failure = hard block.
+    </measurement>
+    <measurement id="M-7" name="multi_label_rejection_count" gate="INFORMATIONAL">
+      Count of cases where model emitted multiple labels (validates C-3 necessity).
+    </measurement>
+  </measurements>
+
+  <!-- ================================================================
+       LOCKED CONSTANTS — Do NOT modify
+       ================================================================ -->
+
+  <locked_constants>
+    <constant name="num_assistant_tokens" value="3" decision="DEC-01" />
+    <constant name="draft_model" value="Qwen3-0.6B INT4 28L" decision="Task 4.2" />
+    <constant name="GPU_ENABLE_SDPA_OPTIMIZATION" value="True" decision="DEC-05" />
+    <constant name="enable_prefix_caching" value="False" decision="DEC-06" />
+    <constant name="INFERENCE_PRECISION_HINT" value="f16" decision="DEC-07" />
+    <constant name="max_new_tokens" value="10" decision="DEC-08" note="LOCKED for production. Harness uses 64 for MEASUREMENT ONLY." />
+    <constant name="do_sample" value="False" />
+    <constant name="temperature" value="0.0" />
+    <constant name="stop_token_ids" value="[151645]" note="LABEL_EXTRACTION config — 151668 MUST NOT be added (K-1)" />
+    <constant name="model" value="Qwen3-14B INT4 GPU" />
+    <constant name="context_cap" value="16384" />
+    <constant name="system_prompt_text" note="Task 4.9a revised prompt — no wording changes" />
+    <constant name="ground_truth_labels" note="Frozen: ALLOW=12, DENY=22, ESCALATE=6" />
+  </locked_constants>
+
+  <!-- ================================================================
+       DECISIONS THIS TASK INFORMS (but does NOT make)
+       ================================================================ -->
+
+  <decision_context>
+    <pending id="D-3" question="Should /no_think be permanently removed from PA system prompt?">
+      Evidence needed: M-1 (agreement with CoT) vs Task 4.9a (0.775 without CoT).
+      Decision maker: Lead Architect.
+    </pending>
+    <pending id="DEC-08-revision" question="Should max_new_tokens increase from 10?">
+      Evidence needed: M-3 (think tokens) + M-4 (total tokens) → minimum viable ceiling.
+      Only relevant if D-3 approved.
+    </pending>
+    <pending id="ADR-012-2.5-revision" question="Should 2,000ms P95 latency budget be revised?">
+      Evidence needed: M-5 (latency per band with think-mode).
+      Only relevant if D-3 approved.
+    </pending>
+  </decision_context>
+
+  <!-- ================================================================
+       REQUIRED ATTACHMENTS FOR EXECUTION AGENT
+       ================================================================ -->
+
+  <required_attachments>
+    <attachment purpose="parser_hardening_target">
+      services/policy_agent/src/gpu_inference.py
+    </attachment>
+    <attachment purpose="parser_unit_tests">
+      services/policy_agent/tests/test_gpu_inference.py
+    </attachment>
+    <attachment purpose="harness_to_modify">
+      phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py
+    </attachment>
+    <attachment purpose="4.9a_evidence_baseline">
+      phase2_gates/evidence/p5_task4_9a_prompt_revision_quality_gate.json
+    </attachment>
+    <attachment purpose="adr_012">
+      docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md
+    </attachment>
+    <attachment purpose="ledger">
+      docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+    </attachment>
+    <attachment purpose="implementation_plan">
+      docs/IMPLEMENTATION_PLAN.md
+    </attachment>
+    <attachment purpose="sdo_directive">
+      docs/Task4.9b_SDO_DIRECTIVE.xml
+    </attachment>
+    <attachment purpose="risk_assessment_reference">
+      AI Risk Assessment and Mitigation Strategy.md
+    </attachment>
+  </required_attachments>
+
+  <!-- ================================================================
+       VERIFICATION COMMANDS (non-dev — Lead Architect)
+       ================================================================ -->
+
+  <verification>
+    <command purpose="confirm_commit">
+      git log --oneline -3
+    </command>
+    <command purpose="confirm_files_changed">
+      git diff HEAD~1 --name-only
+    </command>
+    <command purpose="confirm_no_uat2">
+      git diff HEAD~1 --name-only | Select-String "uat2"
+    </command>
+    <command purpose="confirm_parser_tests">
+      python -m pytest services/policy_agent/tests/test_gpu_inference.py -x -q --tb=short
+    </command>
+    <command purpose="confirm_evidence_exists">
+      Test-Path "phase2_gates/evidence/p5_task4_9b_no_think_measurement.json"
+    </command>
+    <command purpose="confirm_agreement_rate">
+      python -c "import json; d=json.load(open('phase2_gates/evidence/p5_task4_9b_no_think_measurement.json')); print(f'Agreement: {d[\"quality_gates\"][\"decision_agreement_rate\"]}')"
+    </command>
+    <command purpose="confirm_adversarial_security">
+      python -c "import json; d=json.load(open('phase2_gates/evidence/p5_task4_9b_no_think_measurement.json')); print(f'Adv Security: {d[\"quality_gates\"][\"adversarial_security_rate\"]}')"
+    </command>
+    <command purpose="confirm_think_stats">
+      python -c "import json; d=json.load(open('phase2_gates/evidence/p5_task4_9b_no_think_measurement.json')); s=d['think_block_stats']; print(f'Think tokens — P50:{s[\"p50\"]}, P95:{s[\"p95\"]}, max:{s[\"max\"]}')"
+    </command>
+    <command purpose="confirm_no_think_removed">
+      python -c "import json; d=json.load(open('phase2_gates/evidence/p5_task4_9b_no_think_measurement.json')); print(f'no_think_removed: {d[\"harness_overrides\"][\"no_think_removed\"]}')"
+    </command>
+    <command purpose="confirm_production_unchanged">
+      python -c "from services.policy_agent.src.gpu_inference import CARPromptFormatter; print('Production /no_think:', CARPromptFormatter.SYSTEM_PROMPT.startswith('/no_think'))"
+    </command>
+  </verification>
+
+</execution_prompt>

@@ -1,0 +1,45 @@
+{
+  "name": "image_gen_phase0",
+  "timestamp": "2026-06-16T16:19:34+00:00",
+  "model": "RealVisXL_V5.0 (SDXL)",
+  "precision": "INT8",
+  "use_case": "UC-010 Local Generative Imaging (ADR-033, #666)",
+  "methodology": "Build-or-no-build memory GATE. With Qwen3-14B INT4 resident + a ~3000-token KV-cache populated, the AO eviction path (unload_vlm + substrate unload_embed_cache) was exercised, then the SDXL Text2ImagePipeline was loaded on-demand on the GPU and a single 1024x1024 image generated at 6 few-step (Lightning) inference steps; log_memory deltas were taken across load -> generate -> unload. One generate, one config -- a feasibility spike, NOT a throughput sweep. Uncensored = the checkpoint (the diffusers safety_checker is not emitted into the OpenVINO pipeline); no classifier.",
+  "environment": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2)",
+    "memory_ceiling_gb": 31.323,
+    "openvino_version": "2026.1.0",
+    "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+    "models_co_resident": [
+      "Qwen3-14B INT4 (target, always-resident)",
+      "Qwen3-0.6B pruned-6L INT8 (draft)",
+      "RealVisXL_V5.0 SDXL INT8 (nncf weight-only, diffusers-OpenVINO layout)"
+    ],
+    "not_measured": [
+      "GPU driver version (read from dxdiag / Device Manager; not introspectable here)",
+      "VLM + voice co-residency DURING a generate (the eviction sequence removes them first -- the intended-absent cost, not an unmeasured peak)",
+      "dataset-calibrated INT8 quality",
+      "subjective image fidelity",
+      "throughput across a prompt set / multiple resolutions (single feasibility generate)"
+    ]
+  },
+  "measurements": {
+    "available": true,
+    "model": "RealVisXL_V5.0 (SDXL)",
+    "precision": "INT8",
+    "device": "GPU",
+    "fourteen_b_resident": true,
+    "kv_cache_tokens_approx": 3000,
+    "coresident_peak_gb": 26.0,
+    "headroom_gb": 5.3,
+    "sdxl_load_ms": 18700.0,
+    "generate_1024_ms": 10700.0,
+    "generate_steps": 6,
+    "generate_resolution": "1024x1024",
+    "swap_thrash_or_oom": false,
+    "gate_verdict": "PASS -- budget closes with the 14B held resident; 14B-never-evicted invariant holds; build A-H proceeded"
+  },
+  "notes": "Phase-0 build-or-no-build gate for UC-010 (ADR-033). Capability ships DORMANT ([image_generation].enabled=false + model gitignored). Community-grade LIVE numbers (per-resolution latency, fidelity, full eviction trace) land at the LA-present go-live ceremony.",
+  "source": "ADR-033 Phase-0 spike (Vikunja #666)"
+}

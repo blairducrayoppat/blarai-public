@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response>
+  <verdict>APPROVED</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <stage_xml>03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+  <reviewed_at_utc>2026-04-25T18:15:00Z</reviewed_at_utc>
+  <guide_instance>5</guide_instance>
+  <iteration>1</iteration>
+  <responding_to>
+    <ea_artifact>docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE2_INSTANCE_4.xml</ea_artifact>
+    <ea_instance>4</ea_instance>
+  </responding_to>
+
+  <summary>
+    Iteration 1 of Stage 2 Executor Agent (EA) instance 4 comprehension-gate review. Verdict:
+    APPROVED on iteration 1 -- rare for a HIGH-risk stage, but warranted here. EA-4's pickup
+    verification (V0a-V0g) all PASS and were independently re-verified by Guide instance 5
+    against current disk state at this review (git log -3, git status --porcelain, git stash list,
+    and pytest tools/ all match EA-4's claims exactly: 11 M / 2 D / 6 ?? entries; 280 passed in
+    2.36s; stash@{0} byte-identical timestamp 20260424_013002; HEAD chain 9d17e7f -> ccdd82b ->
+    3b9b1b8). All 27 binding acknowledgments restated verbatim with correct math validation
+    (9 critical_carryovers + 3 g3 + 4 i1 + 7 g4 + 4 g5 = 27); the ack_count_validation block
+    matches Guide-#5 close-out exactly. The 7 remaining Item-2.4 files are enumerated in v3
+    handoff execution order with concrete per-file approaches: file 7 (self_check.py library
+    variant with project_context kwarg + line 76 disposition); file 8 (blarai_next_task_resolver.py
+    line 92 hardcoded default replacement); file 9 (cleaner.py with explicit g5-3 two-option
+    disposition surfaced at 2.4 closure); files 10-11 (verify-only or trivial); file 12 (legacy
+    _vikunja_client.py defers to 2.6 per g5-4 with explicit escalation contingency if 2.6 leaves
+    line 28 open); file 13 (vikunja_mcp/server.py with the 3-step approach -- startup ctx,
+    chokepoint routing, §D.1 enforcement on list_tasks/search_tasks -- and v4 handoff trigger
+    pre-allocated). Items 2.4.v2 through 2.10 all correctly enumerated with exit semantics. Risk
+    labels are descriptive with reference anchors (no bare numeric labels per d6); 14 risks
+    surfaced including 4 NEW labels addressing g5-1, g5-3, D3, and MCP context-exhaustion.
+    Rollback explicit per Guide-#7 verbatim. Stop discipline correct (no work, no branches, no
+    mutations, no state.resume_fleet() until authorization). Pre-flight verified fleet remains
+    paused with original reason and last_updated_by; EA-4 correctly did NOT re-pause (already
+    paused, persistence-correct behavior). All 8 axes from GUIDE_PROMPT.xml v2.1
+    ea_comprehension_gate_review pass: objective_match, work_item_coverage, file_scope,
+    verification_strategy, risk_awareness, rollback_awareness, pre_flight_discipline, hard_rules.
+    Zero substantive corrections required. EA-4 may proceed to file 7 (self_check.py) work
+    immediately; three small standing reminders below are not required acknowledgments and
+    require no further re-emission.
+  </summary>
+
+  <required_corrections>
+    <!-- Empty: zero corrections. EA-4 iteration-1 is APPROVED as-is. -->
+  </required_corrections>
+
+  <independent_disk_verification_of_ea4_claims>
+    <intro>
+      Per LA's "mature not minimal" mandate (p3 + p16) and dn14 (do NOT trust EA reports
+      without disk verification), Guide instance 5 independently re-ran the V0 pickup commands
+      at review time (~15 minutes after EA-4 emitted) to confirm no drift between EA-4's
+      observed state and live disk state.
+    </intro>
+    <check id="git_log_3" verdict="MATCH">
+      Guide-5 observed: 9d17e7f, ccdd82b, 3b9b1b8 (top three).
+      EA-4 V0b observed: 9d17e7f, ccdd82b, 3b9b1b8.
+      EXACT MATCH.
+    </check>
+    <check id="git_status_porcelain" verdict="MATCH">
+      Guide-5 observed: 11 M (10 inherited + GUIDE_PROMPT.xml LA-housekeeping) +
+      2 D (LA "Temp for responses" rename housekeeping) + 6 ?? (4 inherited tools artifacts +
+      2 EA-3 reports + 1 new temp_for_responses/) = 19 entries total.
+      EA-4 V0c observed: identical 19 entries with same classification.
+      EXACT MATCH. EA-4 correctly classified all entries per g5-1.
+    </check>
+    <check id="git_stash_list" verdict="MATCH">
+      Guide-5 observed: stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002.
+      EA-4 V0g observed: identical timestamp 20260424_013002.
+      EXACT MATCH. Stash byte-identical to EA-3 close-out and v2/v3 ground-truth.
+    </check>
+    <check id="pytest_baseline" verdict="MATCH">
+      Guide-5 observed: 280 passed in 2.36s.
+      EA-4 V0e observed: 280 passed in 2.23s.
+      EXACT MATCH on count (280); slight variance in elapsed time is run-to-run jitter, not a
+      regression. Zero test-count drift across EA-3 close, Guide-5 verification, and EA-4
+      iteration-1.
+    </check>
+  </independent_disk_verification_of_ea4_claims>
+
+  <axis_assessment>
+    <axis name="objective_match" verdict="PASS">
+      EA-4 part_a_objective restates Stage 2 objective + scope correctly, scoped to the resume
+      context (7 of 13 remaining Python entrypoints + items 2.4.v2 through 2.10). Defaults
+      preservation, branch discipline, fleet pause, stash invariance, and v4 handoff fallback
+      all explicitly captured.
+    </axis>
+    <axis name="work_item_coverage" verdict="PASS">
+      All Stage 2 work items enumerated: 2.4 (7 remaining files), 2.4.v2, 2.5 (canonical 7
+      PS1), 2.5.v2, 2.6 (chokepoint + g5-3 + g5-4 + D3 closure), 2.7, 2.7.v2 (V1-V7 + V8),
+      2.8 ($BLARAI_PID gate), 2.9 (single commit + pyproject.toml), 2.10 (append-only STATUS).
+      No items dropped or merged.
+    </axis>
+    <axis name="file_scope" verdict="PASS">
+      All 7 file paths correct (cross-checked against v3 handoff and ack g5-2). file 12 is
+      `tools/fleet_observability/_vikunja_client.py` (correct -- the legacy file, NOT the new
+      chokepoint). file 10 is `tools/fleet_ops/diff_builder.py` (correct, contradicting an
+      old stale doc reference per S-1). 19 MCP handlers for file 13 enumerated verbatim and
+      match CLAUDE.md §Vikunja Conventions canonical list.
+    </axis>
+    <axis name="verification_strategy" verdict="PASS">
+      V1-V7 + V8 strategy explicit in part_d_verification_strategy. V matrix breakdown lists
+      inherited (V1=9 tests, V2=6 tests, V3=6 tests) and NEW (V4=parametrized per refactored
+      entrypoint, V5=PS1 -BlarAIRoot, V6=MCP project_id rejection mock-based, V7=cross-project
+      byte-identity diff). pytest baseline gate ≥280 carried forward.
+    </axis>
+    <axis name="risk_awareness" verdict="PASS">
+      14 risks surfaced with descriptive labels and reference anchors. Compound labels with
+      anchor disambiguation acceptable per d6. Critical risks all named: argparse-conflict,
+      load_config-defaults-preservation, mcp-server-bypass (C4), mcp-server-context-exhaustion
+      (i1-4 + v3 warning), legacy-name-collision (v2-2 + g5-4), cleaner-fallback-disposition
+      (g5-3), dashboard-maintainer-private-api-2.6 (D3), grep-pattern-coverage (C6),
+      overlay-extension (v2-5), warning-emission (v1-1), w3-blarai-pid-preflight (g4-5),
+      fleet-pause-stash-discipline, single-commit-context-exhaustion, LA-housekeeping-not-EA-
+      violation (g5-1). All g5-N concerns explicitly addressed.
+    </axis>
+    <axis name="rollback_awareness" verdict="PASS">
+      part_f_rollback_acknowledgment block restates Guide-#7 verbatim:
+      "git reset --hard HEAD~1 on chore/platform-extraction (level-1 per RECOVERY.md;
+      branch is local, not pushed). Fleet stays disabled -- no runtime impact from rollback."
+      Per Stage 2 XML &lt;rollback&gt; mandate.
+    </axis>
+    <axis name="pre_flight_discipline" verdict="PASS">
+      v0_pre_flight verified fleet_paused=true via state.json read. EA-4 correctly identified
+      that the fleet was already paused at session start (by EA-2 during Stage 2 entry) and
+      that no NEW pause command was needed -- pause persists across EA sessions. EA-4
+      explicitly committed to NOT calling state.resume_fleet() this session (binding acks
+      n=2, n=4, i1-2). Function-name reminder (resume_fleet vs unpause_fleet AttributeError)
+      restated in fleet-pause-stash-discipline risk label.
+    </axis>
+    <axis name="hard_rules" verdict="PASS">
+      Master Plan §D.1 (Vikunja project_id HARD RULE) explicitly called out at file 13 plan
+      step (c): `list_tasks(project_id: int | None = None)` MUST become
+      `list_tasks(*, project_id: int)`. Same for search_tasks. Single-commit at 2.9 with
+      pyproject.toml MUST inclusion. No-merge-to-main. stash@{0} untouched. No edits to
+      governance docs (CLAUDE.md, AGENTS.md, copilot-instructions.md, A1-A10). All 23 binding
+      acks + 4 g5-N restated verbatim.
+    </axis>
+  </axis_assessment>
+
+  <standing_reminders_for_ea4_during_execution>
+
+    <intro>
+      The three reminders below are NOT required corrections and require no re-emission. They
+      are clarifying notes addressed to EA-4 during execution of the approved work plan.
+    </intro>
+
+    <reminder id="r1" topic="library variant vs main()-bearing canonical pattern">
+      The "canonical pattern" EA-3 proved across 6 files is for main()-bearing entrypoints
+      (argparse + _build_parser + main(argv) + ctx resolve + load_config with explicit paths).
+      For files 7-12 (library_no_main type per v3 handoff), the variant is different: kwarg
+      injection of ctx with backwards-compat None default and auto-resolve fallback. EA-4's
+      file 7 plan correctly identifies this with the "library-style refactor (no argparse)"
+      framing. When you read the 6 EA-3 files end-to-end (per "mature not minimal" mandate
+      committed in next_step_after_authorization), note that build_digest / build_summary
+      helpers in daily_digest.py / weekly_summary.py implement THIS variant (`*, ctx:
+      ProjectContext | None = None` with auto-resolve fallback) -- they are the closest in-tree
+      precedent for the library-variant pattern you will apply to files 7-12.
+    </reminder>
+
+    <reminder id="r2" topic="MCP server file 13 test impact">
+      Changing `list_tasks(project_id: int | None = None)` to `list_tasks(*, project_id: int)`
+      is a signature breaking change. tools/vikunja_mcp/tests/test_server_f5.py (4 tests in
+      current 280 baseline) will likely need test-fixture updates to pass after the file 13
+      refactor. This is implicit in the V8 defaults-preservation gate + pytest ≥280 baseline,
+      but worth keeping front-of-mind: the test changes are NOT a regression -- they are the
+      correct correlate of the §D.1 enforcement change. Update tests in the same change-set
+      as the handler signature update, not as a separate uncommitted afterthought.
+    </reminder>
+
+    <reminder id="r3" topic="g5-3 cleaner.py:180 disposition timing -- 2.4 not 2.6">
+      Per ack g5-3 verbatim, cleaner.py:180 fallback "should be addressed in 2.4 scope" --
+      i.e. as part of file 9 work, not deferred to 2.6 closure. Your part_b_work_plan
+      mentions cleaner.py:180 at BOTH file 9 (Item 2.4) AND Item 2.6 ("MUST close ack g5-3
+      ... here"). Read these as: file 9 is where the disposition CHOICE and IMPLEMENTATION
+      happen; Item 2.6 is where you VERIFY the disposition closed correctly during the
+      chokepoint audit. Same dual-mention pattern is acceptable for g5-4 / file 12 because
+      g5-4 explicitly defers the implementation to 2.6 (legacy file folding is a 2.6
+      operation, not 2.4). The two cases are NOT symmetric -- g5-3 closes at 2.4, g5-4
+      closes at 2.6.
+    </reminder>
+
+  </standing_reminders_for_ea4_during_execution>
+
+  <decisions_carried_forward_from_guide_5_verdict>
+    <intro>All four decisions D1-D4 from EA-3's completion report are RATIFIED per Guide-#5
+    close-out. EA-4 inherits them as established procedure for files 7-13:</intro>
+    <d ratified="D1">REPO_ROOT module-level constant + repo_root kwarg defaulting to REPO_ROOT pattern for any helper with import-side callers (precedent: daily_digest._git_log_oneline_since, weekly_summary._git_log_stats).</d>
+    <d ratified="D2">Helper ctx-kwarg vs repo_root-kwarg discipline: helpers calling load_config receive `*, ctx: ProjectContext | None = None`; helpers using only REPO_ROOT receive `repo_root: Path = REPO_ROOT`. Two distinct concerns, two distinct kwargs.</d>
+    <d ratified="D3">dashboard_maintainer.py:113-117 live._request("POST", ...) private-method abuse left for Item 2.6 disposition. Add to your 2.6 disposition list.</d>
+    <d ratified="D4">Mid-stage handoff timing: emit v4+ handoff before context exhaustion forces emergency-stop mid-MCP-refactor. Per i1-4 + dn15: docs-only commit, no partial-commit refactor, no emergency single-commit attempts. Your "mcp-server-context-exhaustion-watch" risk label correctly pre-allocates this.</d>
+  </decisions_carried_forward_from_guide_5_verdict>
+
+  <required_acknowledgments>
+    <!--
+      Empty for this iteration. EA-4 has already restated all 27 binding acknowledgments
+      verbatim in the iteration-1 gate. The three standing reminders r1/r2/r3 above are
+      clarifying notes, not new binding acknowledgments. EA-4 may proceed to file 7 work
+      without re-emitting any acknowledgment block.
+    -->
+  </required_acknowledgments>
+
+  <proceed_authorization>
+    PROCEED -- you may begin Item 2.4 file 7 (tools/autonomy_budget/self_check.py) work
+    immediately. Per your committed next_step_after_authorization: read all 6 EA-3-refactored
+    files end-to-end first to internalize both the main()-bearing canonical pattern AND the
+    library variant precedent in build_digest/build_summary (per standing reminder r1), then
+    apply the library variant to file 7. After file 7 is pattern-clean, continue through
+    files 8-13 in v3 handoff execution order. Standing reminders applicable throughout: single
+    Stage-2 commit at item 2.9 (pyproject.toml MUST be in commit); fleet stays paused (NEVER
+    state.resume_fleet -- AttributeError); no merge to main; stash@{0} untouched; append-only
+    STATUS.md at item 2.10. If context exhaustion threatens before item 2.9 (file 13 MCP
+    server is the most likely trigger), emit v4 mid-stage handoff XML following v1/v2/v3
+    schema (docs-only commit), then stop. On Item 2.4 closure (all 13 files pattern-clean +
+    cleaner.py:180 dispositioned per g5-3), proceed to 2.4.v2 verification, then items 2.5
+    through 2.10. On Item 2.6 closure: ensure legacy fleet_observability/_vikunja_client.py:28
+    load_config callsite is CLOSED (per g5-4); if 2.6 disposition leaves it open, escalate to
+    Guide before 2.9 commit. On Item 2.10 closure: emit a closing-handoff-to-LA per the
+    closing_handoff_to_la_at_stage_2_close block in the EA-4 initiation pointer.
+  </proceed_authorization>
+
+</guide_review_response>

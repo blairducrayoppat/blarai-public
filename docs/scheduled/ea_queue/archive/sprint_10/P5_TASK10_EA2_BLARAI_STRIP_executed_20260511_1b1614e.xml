@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sprint 10 EA-2 prompt — BlarAI Strip + Active State Refresh + AGENTS.md Pointer Update
+  Authored by SDO 2026-05-11 (post-LA-arbitration) per docs/P5_TASK10_SDO_CONTINUATION_v1.0.xml task AUTHOR-EA2-PROMPT.
+  Staged for Co-Lead Phase 1b review before EA Code pickup.
+
+  Authoritative inputs:
+    - docs/sprints/sprint_10/doctrine_classification_matrix.md (EA-1 deliverable, merged 2026-05-11)
+    - docs/sprints/sprint_10/strategic_design_vision.md (SDV)
+    - LA arbitration on the 6 DECISION-PENDING-LA rows: Vikunja task #369 comment #521
+      (2026-05-11 16:05 PDT) — supersedes any earlier disk arbitration report.
+
+  IMPORTANT: This EA-2 prompt encodes the LA-arbitrated dispositions verbatim. The earlier
+  disk report `docs/sprints/sprint_10/reports/20260511_220000_sdo_pending-la-arbitration_v1.md`
+  is STALE — do not act on its gate-transition or partition instructions. Use comment #521
+  for the 6 PENDING-LA rows, the classification matrix for everything else.
+-->
+<ea_prompt sprint_id="10" ea_number="2" descriptor="blarai-strip">
+
+  <parent_head>c2e7dbd468bc5f0709fa9ebc2b04cfd790ab1b0a</parent_head>
+  <devplatform_parent_head>1a4713d49ae2c846ca5a72b2f68e294f9546606b</devplatform_parent_head>
+
+  <required_attachments>
+    <attachment path="docs/sprints/sprint_10/doctrine_classification_matrix.md" reason="Authoritative per-row partition input — EA-1 deliverable. Every BlarAI strip decision derives from this matrix's DECISION-CLEAR rows + the 6 LA-arbitrated PENDING-LA rows."/>
+    <attachment path="docs/sprints/sprint_10/strategic_design_vision.md" reason="SDV §5.1 #2 (EA-2 scope), §5.3 (gray-area pre-decisions, cross-reference style, mature-not-minimal), §4 #5 (Active State refresh content), §4 #6 (line-count soft target)."/>
+    <attachment path="docs/P5_TASK10_SDO_CONTINUATION_v1.0.xml" reason="Sprint 10 continuation. Lessons L-12 (recitation), L-13 (parent_head), L-15 (working-set), L-19 (cross-repo ordering), L-20 (XML well-formedness), L-22 (mature-not-minimal)."/>
+    <attachment path="C:\Users\mrbla\BlarAI\CLAUDE.md" reason="Strip target #1. Audit-time line count 216 (matrix §1)."/>
+    <attachment path="C:\Users\mrbla\BlarAI\.github\copilot-instructions.md" reason="Strip target #2 (XML). Audit-time line count 240. Preserve XML well-formedness (L-20)."/>
+    <attachment path="C:\Users\mrbla\BlarAI\AGENTS.md" reason="Replace target #3. Audit-time line count 18. Will be replaced wholesale with the 12-line LA-arbitrated re-framed pointer (LA comment #521 row #41)."/>
+  </required_attachments>
+
+  <pre_flight>
+    Sprint 10 EA-2 strips three BlarAI doctrine files based on the EA-1 classification matrix and the LA-arbitrated dispositions in Vikunja task #369 comment #521. The working set is BlarAI-only (no devplatform writes — that is EA-3's job). Substantive multi-file edits on a feature branch — fleet-hygiene §4 mandates pause.
+
+    **API-NAME GOTCHA**: the function is `resume_fleet`, NOT `unpause_fleet`. Calling `state.unpause_fleet(...)` raises `AttributeError`.
+
+    **SOP portability foot-gun** (L-21): `from tools.autonomy_budget import state` lives in devplatform post-Stage-4 cutover (commit `df3d940`). Invoking literally from `C:\Users\mrbla\BlarAI` raises `ModuleNotFoundError`. Use this workaround verbatim:
+
+    ```powershell
+    $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.pause_fleet('Sprint 10 EA-2 BlarAI doctrine strip', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+    cd C:\Users\mrbla\BlarAI ; git commit --allow-empty -m "chore(ops): pause fleet -- Sprint 10 EA-2 BlarAI doctrine strip"
+    ```
+
+    Resume LAST, before exit:
+
+    ```powershell
+    $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+    cd C:\Users\mrbla\BlarAI ; git commit --allow-empty -m "chore(ops): unpause fleet -- Sprint 10 EA-2 done"
+    ```
+
+    This is the very bug EA-3 will fix (SDV success criterion #4). For EA-2 you accept the workaround.
+
+    **Branch checkout**: pause MUST land before the `git checkout -b feature/p5-task10-ea2-blarai-strip`.
+  </pre_flight>
+
+  <comprehension_gate>
+    BEFORE making any edits or running `git checkout`, post a comprehension comment to Vikunja task #369 prefixed `[agent:ea_code][phase:comprehension]` containing ALL of:
+
+    1. **Milestone objective in your own words.** What you are stripping, why, what the post-EA-2 BlarAI doctrine surface looks like, and who reads BlarAI's doctrine downstream (interactive Claude Desktop sessions in this repo, NOT fleet sessions — those will consume devplatform's authored doctrine after EA-3).
+
+    2. **Per-work-item summary.** WI-1 through WI-N (see §work_items below) — one sentence per WI in your own words.
+
+    3. **Files to create/modify (absolute paths).** Exactly four files written:
+       - `C:\Users\mrbla\BlarAI\CLAUDE.md` (modified — strip + Active State refresh + cross-references)
+       - `C:\Users\mrbla\BlarAI\.github\copilot-instructions.md` (modified — XML strip + `<fleet_pause_sop_pointer>` insert per IR-9)
+       - `C:\Users\mrbla\BlarAI\AGENTS.md` (replaced — 12-line LA-arbitrated re-framed pointer per row #41)
+       - `docs/ledger/{ts}_sprint10_ea2_blarai-strip.md` (new — Q1-1 ledger entry, `{ts}` = UTC `YYYYMMDD_HHMMSS` captured at EA start)
+
+    4. **Source files to read (matrix-driven).** The classification matrix (`docs/sprints/sprint_10/doctrine_classification_matrix.md`); the LA arbitration in Vikunja task #369 comment #521 (verbatim dispositions embedded in this prompt §la_arbitrated_dispositions); the SDV; the three BlarAI source files. No reads outside this list are required for EA-2's strip.
+
+    5. **EXACT deliverable structure — recite VERBATIM.** State:
+       - Branch name: `feature/p5-task10-ea2-blarai-strip`
+       - Ledger entry filename pattern: `docs/ledger/{ts}_sprint10_ea2_blarai-strip.md`
+       - AGENTS.md will be REPLACED (not edited) with the 12-line content embedded in §la_arbitrated_dispositions §Row #41
+       - Each of the three doctrine files retains a coherent runtime-only narrative after strip
+
+    6. **ORACLE expectation (L-12 ACTION-3) — recite VERBATIM:**
+       ```
+       cd C:\Users\mrbla\BlarAI
+       git diff main...feature/p5-task10-ea2-blarai-strip --name-only
+       ```
+       must output exactly (sorted):
+       ```
+       .github/copilot-instructions.md
+       AGENTS.md
+       CLAUDE.md
+       docs/ledger/{ts}_sprint10_ea2_blarai-strip.md
+       ```
+       Any other path → ORACLE violation; STOP and report.
+
+    7. **Working-set declaration (L-15) — verbatim.** "I write to exactly four paths: BlarAI/CLAUDE.md, BlarAI/.github/copilot-instructions.md, BlarAI/AGENTS.md, and my ledger entry. I read the classification matrix, the SDV, the LA arbitration in this prompt, and the three BlarAI source files. I touch NO devplatform path — even read-only. I touch no other BlarAI path. If I discover a defect outside the working set that begs an edit, I STOP and document in my completion report; I do not freelance."
+
+    8. **Cross-repo ordering acknowledgment (L-19) — verbatim.** "EA-2 lands on BlarAI main first via Co-Lead trusted_scope merge (or LA-merge-approve if ESCALATE on diff size). EA-3 commits to devplatform main second after EA-2 merges; EA-3's commit body references my BlarAI merge commit hash. My commit body uses cross-repo option (B) per SDV §8: `devplatform companion: see Sprint 10 SCR for landed devplatform commits`. I do NOT touch devplatform from this branch."
+
+    9. **Mature-not-minimal acknowledgment (L-22) — verbatim.** "Mature not minimal: each post-split file is a coherent operational reference in its own right, not a thin pointer-with-a-couple-of-sentences. devplatform files: ≥ 100 lines floor. BlarAI files: target ≥ 30% combined-line-count reduction (soft 50%). If hitting the reduction floor would leave dangling references or break a coherent runtime narrative, prefer coherence and explicitly cite which sections you kept verbatim despite hitting the floor in your completion report. The LA will not penalize a coherent file that fell short of the reduction target; the LA will penalize an incoherent file that hit it."
+
+    10. **LA-arbitrated dispositions acknowledgment.** Recite the 6 LA dispositions (row #12, row #27, row #37, row #41, IR-9, IR-10) one-line each in your own words, confirming you will apply the LA's verbatim re-framed content for row #41 and IR-9 (not freelance phrasing).
+
+    11. **Risks and ambiguities.** State any unresolved understanding before starting. Examples: which sections you anticipate retaining verbatim despite the 30% reduction soft target; whether a MIRROR-both row's BlarAI half needs runtime re-framing or stays as-is.
+
+    12. **Out-of-working-set prohibition acknowledgment (L-15 verbatim).** "DO NOT modify any file outside [BlarAI CLAUDE.md, .github/copilot-instructions.md, AGENTS.md, my ledger entry]. DO NOT touch devplatform from this branch. DO NOT amend ADRs, governance docs, runbooks, or any other docs/ file. If a non-working-set change appears necessary to unblock a strip (e.g., a stale reference in docs/runbooks/), STOP, document the blocker in my completion report, and wait for SDO direction."
+
+    After posting the comprehension comment, apply label `Gate:Pending-SDO` (id 9) on Vikunja task #369 and STOP. WAIT for SDO Phase 1a review verdict before doing any work. Do NOT bundle downstream work with the comprehension comment.
+  </comprehension_gate>
+
+  <milestone>
+    <objective>Apply EA-1's classification matrix to BlarAI's three doctrine files: strip MOVE-devplatform + DELETE rows; retain (and where applicable runtime-re-frame) MIRROR-both rows; refresh BlarAI's CLAUDE.md §"Active State" from the post-Sprint-9 baseline; replace AGENTS.md with the LA-arbitrated 12-line re-framed pointer; insert the LA-arbitrated `<fleet_pause_sop_pointer>` placeholder into the BlarAI XML envelope per IR-9; add BlarAI → devplatform cross-references in the italicized form for each section moved. BlarAI-side only — no devplatform writes.</objective>
+    <ea_number>2</ea_number>
+    <branch>feature/p5-task10-ea2-blarai-strip</branch>
+    <ledger_entry>docs/ledger/{ts}_sprint10_ea2_blarai-strip.md</ledger_entry>
+    <size>L</size>
+    <size_rationale>Three files touched with substantial removals across 474 lines of source (216 + 240 + 18). Likely 30-50% reduction. Combined adds + removes will likely exceed trusted_scope 500-LOC threshold — LA-merge-approve via la_merge_approve.ps1 is the accepted workaround (SDV §9.1 risk-row 8, Sprint 9 EA-4 ESCALATE precedent).</size_rationale>
+  </milestone>
+
+  <la_arbitrated_dispositions>
+    The 6 DECISION-PENDING-LA rows from the classification matrix were arbitrated by the LA in Vikunja task #369 comment #521 (2026-05-11 16:05 PDT). The dispositions below are AUTHORITATIVE — implement verbatim where the LA supplies verbatim content. Do NOT re-execute any gate-transition or partition instructions from the stale arbitration disk report `docs/sprints/sprint_10/reports/20260511_220000_sdo_pending-la-arbitration_v1.md`.
+
+    ### Row #12 — CLAUDE.md "Human pointer" doctrine (lines 139-141)
+    **Partition**: MOVE-devplatform.
+    **EA-2 action**: STRIP the three-line block describing `docs/sprints/ACTIVE_SPRINT.md` from BlarAI CLAUDE.md. Replace with this one-line cross-reference (italicized, verbatim from LA comment #521):
+
+    ```markdown
+    *See also: `C:\Users\mrbla\devplatform\CLAUDE.md` §Current-Active-Sprint.*
+    ```
+
+    NOTE: the file `docs/sprints/ACTIVE_SPRINT.md` itself stays in BlarAI (per SDV §5.3). Only the *doctrine describing the file* moves.
+
+    ### Row #27 — `<user_identity>` XML element (.github/copilot-instructions.md lines 9-14)
+    **Partition**: MIRROR-both.
+    **EA-2 action**: KEEP the `<user_identity>` element in BlarAI's XML. No re-framing required for this EA — devplatform's mirrored copy is EA-3's authoring job. BlarAI side is unchanged from audit-time content.
+
+    ### Row #37 — `<vikunja_task_tracking>` envelope (.github/copilot-instructions.md lines 236-257)
+    **Partition**: Option A — SPLIT ENVELOPE.
+    **EA-2 action**: Inside BlarAI's `<vikunja_task_tracking>` envelope, KEEP `<labels>` and `<conventions>` children. STRIP `<sdo_responsibilities>` and `<ea_responsibilities>` children (those move to devplatform — EA-3 authors them). Both XML envelopes (BlarAI + devplatform) reference BlarAI's CLAUDE.md row #6 (the live Vikunja-conventions section) as the canonical label-id table. Inside BlarAI's stripped envelope, add this one-line note immediately before the `</vikunja_task_tracking>` close tag:
+
+    ```xml
+    <fleet_responsibilities_pointer>SDO and EA agent responsibilities live in devplatform doctrine. See: C:\Users\mrbla\devplatform\.github\copilot-instructions.md §vikunja_task_tracking.</fleet_responsibilities_pointer>
+    ```
+
+    Also: per matrix row #55 (DELETE), the `<labels>` element in BlarAI's XML currently references defunct `P5-Active`/`P5-Complete` names. REPLACE those defunct names with the live canonical names (cross-reference CLAUDE.md row #6 verbatim live names: `Active id 1`, `Complete id 2`, `Blocked id 3`, etc.). The DELETE row scope ends with removing the defunct names; the replacement keeps the `<labels>` element well-formed and accurate.
+
+    ### Row #41 — AGENTS.md pointer-block — RE-FRAMED (LA correction)
+    **Partition**: KEEP-BlarAI (REPLACE wholesale).
+    **EA-2 action**: REPLACE the entire content of BlarAI's `AGENTS.md` with EXACTLY this 12-line content (verbatim from LA comment #521; do NOT alter wording, ordering, capitalization, or backticks):
+
+    ```markdown
+    # AGENTS.md — BlarAI repo pointer
+
+    This repo is the BlarAI product (locally-run Qwen3 runtime — see CLAUDE.md §Project Identity). It is NOT a Claude host environment; Claude / Codex / Copilot agents work ON this repo from a separate dev environment.
+
+    When a dev-side agent touches code or docs in this repo, treat the following as authoritative:
+
+    - [`CLAUDE.md`](CLAUDE.md) — BlarAI runtime architecture, ADRs, Use Cases, security mandates, project structure, coding standards
+    - Fleet operating-model context (SDO / Co-Lead / EA mechanics, sprint lifecycle, fleet-pause SOP): `C:\Users\mrbla\devplatform\CLAUDE.md`
+
+    BlarAI's own coding-assistant Use Case (UC-005) is a future Qwen3 agent that will run *inside* the BlarAI runtime. It has nothing to do with Claude. When it ships, it will have its own doctrine separate from this file.
+    ```
+
+    Rationale per LA: earlier wording ("Claude Code / Copilot for BlarAI runtime work") incorrectly implied Claude operates inside BlarAI's runtime. BlarAI is a Qwen3 product runtime; Claude is NEVER part of BlarAI's runtime. Claude/Codex/Copilot are dev-side agents targeting two repos (BlarAI and devplatform).
+
+    ### IR-9 — `<security_and_workflow_constraints>` envelope split — RE-FRAMED (LA correction)
+    **Partition**: BlarAI KEEPS the envelope and its non-SOP children; MOVES the `<fleet_pause_sop>` child to devplatform; INSERTS a placeholder pointer child.
+    **EA-2 action**: Inside BlarAI's `<security_and_workflow_constraints>` envelope (audit lines 170-218):
+       - KEEP `<privacy_mandate>`, `<branching>`, `<preservation_rule>`, `<environment>` children unchanged.
+       - STRIP the existing `<fleet_pause_sop name="LA_Fleet_Pause_SOP">` child (lines ~175-217) entirely.
+       - INSERT in its place this placeholder pointer child (verbatim from LA comment #521; do NOT alter wording):
+
+    ```xml
+    <fleet_pause_sop_pointer>
+    Dev-side Claude/Codex/Copilot sessions touching this repo's git tree must pause the fleet before substantive multi-commit or branch-checkout work, per the authoritative SOP at C:\Users\mrbla\devplatform\.github\copilot-instructions.md §fleet_pause_sop. This norm protects against scheduled wake firings racing your in-flight session — it is NOT a BlarAI runtime constraint.
+    </fleet_pause_sop_pointer>
+    ```
+
+    The element name `<fleet_pause_sop_pointer>` is intentionally distinct from `<fleet_pause_sop>` (which is devplatform's element name) to avoid grep collisions. Preserve XML well-formedness (L-20).
+
+    ### IR-10 — `<vikunja_task_tracking>` inter-element follow-on
+    **Disposition**: Follows row #37 — split envelope (Option A). No additional EA-2 action beyond row #37 above.
+  </la_arbitrated_dispositions>
+
+  <work_items>
+    <wi id="1">
+      **CLAUDE.md strip pass (matrix-driven).** Apply every MOVE-devplatform and DELETE row from matrix §2 CLAUDE.md rows (rows #1-24) to `C:\Users\mrbla\BlarAI\CLAUDE.md`. MOVE-devplatform rows to strip:
+        - Row #8 (Vikunja Bridge / Sandbox Agents block, audit lines 68-87)
+        - Row #10 (## Current Active Sprint (DEC-15) intro + ### Single source of truth, lines 110-127)
+        - Row #11 (### Derived paths table, lines 129-137)
+        - Row #12 (### Human pointer block, lines 139-141) — REPLACE with one-line cross-reference per §la_arbitrated_dispositions row #12
+        - Row #13 (### When agents should consult the SDV, lines 143-149)
+        - Row #14 (### What this pattern does NOT do, lines 151-155)
+        - Row #15 (### References, lines 157-162)
+        - Row #19 (## Agent Operating Model intro + 7-step list, lines 193-203)
+        - Row #21 (### Fleet-Pause SOP, lines 209-253)
+
+      KEEP-BlarAI rows are unchanged. The MIRROR-both row #20 (### Comprehension Gate, lines 205-207) is KEPT on BlarAI side — re-frame the framing one-line to specify "interactive Claude Desktop / Code sessions touching this repo" if the existing wording is fleet-flavored (per SDV §5.3 split-call framing).
+
+      **Cross-references**: for the MOVE block (rows #10-15), add a single italicized cross-reference pointer immediately after the last KEEP section that precedes the strip site:
+
+      ```markdown
+      *See also: `C:\Users\mrbla\devplatform\CLAUDE.md` §Current-Active-Sprint.*
+      ```
+
+      For the row #19 + row #21 MOVE block (## Agent Operating Model + ### Fleet-Pause SOP), add this cross-reference where the section used to sit:
+
+      ```markdown
+      *See also: `C:\Users\mrbla\devplatform\CLAUDE.md` §Agent-Operating-Model and §Fleet-Pause-SOP.*
+      ```
+
+      For the row #8 MOVE (Vikunja Bridge), add this cross-reference where the section used to sit:
+
+      ```markdown
+      *See also: `C:\Users\mrbla\devplatform\CLAUDE.md` §Vikunja-Bridge.*
+      ```
+
+      Cross-reference style (SDV §5.3 verbatim): each cross-reference is a single italicized line using the form `*See also: \`<absolute path>\` §<section name>*`. No prose linking, no directional verbs beyond `See also:`.
+    </wi>
+
+    <wi id="2">
+      **CLAUDE.md §"Active State" refresh (SDV §4 #5 + §5.1 #2).** The current §"Active State" (audit lines 182-191) is two sprints stale (Sprint 8 SWAGR gap #5, Sprint 9 SWAGR gap #4, matrix §4 F-3). Replace its content with post-Sprint-9-close baseline:
+
+      - **HEAD reference**: current main HEAD verified by `git log --oneline -1 main` at EA start (capture and embed verbatim short-hash + subject; e.g., the merge commit `caa46f5` for Sprint 10 EA-1 OR whatever main HEAD is at EA-2 dispatch time). Prefer `git log --oneline main` in the doctrine text rather than pinning a specific hash, since post-EA-2 the HEAD will advance again.
+      - **Sprint state**: Sprint 10 is active (task #369); Sprints 7, 8, 9 are COMPLETE; roster at `docs/active_tasks.yaml` lists task 369 / sprint_id 10. Remove the stale "active_tasks: []" claim.
+      - **Test baseline**: ~981 passed, 22 skipped on `pytest shared/ services/ launcher/` (post-Sprint-8 EA-5 REGRESSION baseline per CLAUDE.md note).
+      - **Task 7** (Test Quality Audit): COMPLETE — closed by Sprint 8 execution.
+      - **Domain 6** (MCP Ecosystem): COMPLETE — 6/6 Tier A+B servers live-verified 2026-04-20.
+      - **Open issues**: ISS-1 (AO speculative decoding), ISS-2 (think tags in TUI), ISS-3 (PA classification misses). ISS-4/5/6/7 resolved during Sprint 8.
+      - **Ledger**: monolithic `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` FROZEN at Entry 52 (2026-04-22, commit `dc768b1`); new entries land in `docs/ledger/` per-file (Q1-1 format). Pointer to `docs/ledger/README.md`.
+
+      This refresh resolves Sprint 8 SWAGR gap #5 + Sprint 9 SWAGR gap #4 in-sprint (SDV §5.1 #2 explicit). The refresh is in-place; do NOT relocate the §"Active State" header.
+    </wi>
+
+    <wi id="3">
+      **.github/copilot-instructions.md XML strip pass (matrix-driven + LA-arbitrated).** Apply every MOVE-devplatform and DELETE row from matrix §2 copilot-instructions.md rows (rows #25-39) to `C:\Users\mrbla\BlarAI\.github\copilot-instructions.md`. MOVE-devplatform rows to strip:
+        - Row #28 + Row #29 + Row #30 (`<chat_role_taxonomy>` envelope + both `<role>` children, lines 16-45)
+        - Row #32f (`<rule name="Single_Session_Scope">`, line 58)
+        - Row #32h (`<rule name="Evidence_First_Decision_Gating">`, line 60)
+        - Row #32j (`<rule name="Harness_Declaration_Required">`, line 62)
+        - Row #32k (`<rule name="Harness_Fail_Closed_Gating">`, line 63)
+        - Row #32l (`<rule name="Role_Boundary_Enforcement">`, line 64)
+        - Row #32n (`<rule name="Attachment_Scope_Discipline">`, line 66)
+        - Row #32o (`<rule name="Non_Dev_Verification_Requirement">`, line 67)
+        - Row #35e (`<fleet_pause_sop name="LA_Fleet_Pause_SOP">`, lines 175-217) — REPLACE with `<fleet_pause_sop_pointer>` per §la_arbitrated_dispositions IR-9
+        - Row #37 split: STRIP `<sdo_responsibilities>` + `<ea_responsibilities>` children inside `<vikunja_task_tracking>`; KEEP `<labels>` + `<conventions>` (per §la_arbitrated_dispositions row #37)
+
+      DELETE row to apply:
+        - Row #55 (defunct `P5-Active`/`P5-Complete` label names in `<labels>` line 239) — REPLACE the defunct names with the live canonical label names from CLAUDE.md row #6's table (verbatim live names; rationale = matrix F-5).
+
+      MIRROR-both rows (#26, #31, #32, #32a, #32b, #32c, #32i, #32m, #32p, #34, #35, #35a-d, #36, #38, #39, #33-33e all variants per matrix §2): KEEP in BlarAI. No re-framing required for EA-2; devplatform's mirrored copies are EA-3's authoring job.
+
+      **XML well-formedness (L-20)**: after every strip, the resulting XML must parse cleanly. Test verbally by reading the close-tag structure: every `<element>` has a matching `</element>` at the same indentation level. If a parent element's children all moved, decide whether the parent envelope itself stays (per SDV §5.3: "if a parent element exists only in one repo, the children that move take their parent with them"). For `<chat_role_taxonomy>` (row #30), the WHOLE envelope MOVES — STRIP the envelope and both children together.
+
+      **Cross-references inside the XML**: where a MOVE-devplatform block leaves a structural hole, the BlarAI side does NOT insert XML-style cross-reference children — XML is structured-data, not narrative. Instead, the cross-references for moved XML content sit in BlarAI/CLAUDE.md prose (per WI-1). The single XML insertion EA-2 makes is the `<fleet_pause_sop_pointer>` per IR-9 and the `<fleet_responsibilities_pointer>` per §la_arbitrated_dispositions row #37 — both pointer elements use distinct element names to avoid grep collision with devplatform's authoritative element names.
+
+      **Stale Phase 5 content (matrix F-4)**: the `<phase name="Phase_5_Post_Operational_Development">` element (rows #33e, lines 128-160) is KEEP-BlarAI but references stale Task 7 state and HEAD `be52ef4`. EA-2 may refresh this element's content in-sprint (matrix F-4 explicitly says "EA-2 may also refresh this in scope") to align with the §"Active State" refresh in WI-2 (Task 7 COMPLETE, Sprint 8/9 COMPLETE, ledger frozen at Entry 52). If refreshed, the refresh is a same-file in-place narrative update — NOT additional file writes.
+    </wi>
+
+    <wi id="4">
+      **AGENTS.md wholesale replacement (LA-arbitrated row #41).** REPLACE the entire content of `C:\Users\mrbla\BlarAI\AGENTS.md` with the 12-line LA-arbitrated content embedded in §la_arbitrated_dispositions row #41 above. The replacement is byte-exact: copy the 12 lines verbatim (including blank lines between paragraphs). No edits, no formatting drift, no "improvement" of wording.
+
+      Verify by `(Get-Content C:\Users\mrbla\BlarAI\AGENTS.md | Measure-Object -Line).Lines` — result should be approximately 12 (exact line count depends on how the markdown trailing newline is counted; the substantive content matches the LA-arbitrated block).
+    </wi>
+
+    <wi id="5">
+      **Ledger entry (Q1-1 per docs/ledger/README.md).** Path: `docs/ledger/{ts}_sprint10_ea2_blarai-strip.md` where `{ts}` is the UTC timestamp `YYYYMMDD_HHMMSS` captured at EA start.
+
+      Required frontmatter:
+      ```yaml
+      ---
+      ledger_id: {ts}_sprint10_ea2_blarai-strip
+      date: {YYYY-MM-DD}
+      sprint_id: 10
+      entry_type: EA
+      predecessor: 20260511_192009_sprint10_ea1_classification-matrix
+      branch: feature/p5-task10-ea2-blarai-strip
+      merge_commit: null
+      disposition: COMPLETE
+      ---
+      ```
+
+      Body sections:
+        - **Summary** (1-2 paragraphs) — what was stripped, what was retained, what was refreshed.
+        - **Deliverables** — per-file changeset summary (CLAUDE.md before/after line counts; copilot-instructions.md before/after; AGENTS.md replacement; ledger entry).
+        - **Files Changed** — exactly the four paths in the ORACLE gate; any other path is a defect.
+        - **Quality Gate** — STRUCTURE-LINT pass, XML well-formedness pass (paste verbatim `python -c "import xml.etree.ElementTree as ET; ET.parse(r'C:\Users\mrbla\BlarAI\.github\copilot-instructions.md')"` exit-0 confirmation), LA-arbitration-conformance pass (the 6 dispositions verbatim applied), ORACLE pass, regression pytest pass.
+        - **Line-count summary** — BlarAI three-file combined line count before EA-2 / after EA-2 / % reduction. Target ≥ 30% per SDV §4 #6. If hit floor, cite which sections kept verbatim despite the floor (mature-not-minimal escape clause).
+        - **LA-arbitration conformance** — confirm the 6 dispositions from Vikunja task #369 comment #521 were applied byte-exact (row #12 cross-reference, row #27 keep, row #37 split + label-name fix, row #41 wholesale replace, IR-9 pointer element insert, IR-10 follows #37).
+
+      The predecessor field above (`20260511_192009_sprint10_ea1_classification-matrix`) is approximate — replace with the exact filename stem of the most recent docs/ledger/ entry from EA-1 (verify by `ls docs/ledger/` at EA start). If your verification disagrees with the value above, use the actual filename and note the discrepancy in your ledger entry's Summary.
+    </wi>
+  </work_items>
+
+  <deliverable>
+    <branch>feature/p5-task10-ea2-blarai-strip</branch>
+    <files_modified>
+      <file path="C:\Users\mrbla\BlarAI\CLAUDE.md" type="strip + Active State refresh + 3 italicized cross-references"/>
+      <file path="C:\Users\mrbla\BlarAI\.github\copilot-instructions.md" type="XML strip + `<fleet_pause_sop_pointer>` + `<fleet_responsibilities_pointer>` + label-name correction + Phase 5 refresh (optional in-scope per matrix F-4)"/>
+      <file path="C:\Users\mrbla\BlarAI\AGENTS.md" type="wholesale replacement with 12-line LA-arbitrated content"/>
+    </files_modified>
+    <files_created>
+      <file path="docs/ledger/{ts}_sprint10_ea2_blarai-strip.md" structure="Q1-1 frontmatter + body per WI-5"/>
+    </files_created>
+    <files_devplatform>NONE — devplatform is exclusively EA-3's working set. EA-2 does not read or write any devplatform path.</files_devplatform>
+  </deliverable>
+
+  <negative_constraints>
+    <constraint id="N-1">DO NOT modify any file outside [`C:\Users\mrbla\BlarAI\CLAUDE.md`, `C:\Users\mrbla\BlarAI\.github\copilot-instructions.md`, `C:\Users\mrbla\BlarAI\AGENTS.md`, `docs/ledger/{ts}_sprint10_ea2_blarai-strip.md`]. (L-15 verbatim, continuation §763)</constraint>
+    <constraint id="N-2">DO NOT touch devplatform from this branch — not even read-only. EA-3 owns devplatform authorship. If you find yourself reading a devplatform path, STOP and re-read the working-set declaration. (L-19 (d) verbatim)</constraint>
+    <constraint id="N-3">DO NOT amend any ADR (`docs/adrs/ADR-*.md`) or governance doc (`docs/governance/*.md`) or runbook (`docs/runbooks/*.md`). If a doctrine strip surfaces a stale reference outside the working set, STOP and document the blocker in your completion report. Do not freelance. (SDV §5.2 #3-#4, continuation §765-768)</constraint>
+    <constraint id="N-4">DO NOT modify `docs/TEST_GOVERNANCE.md` (out-of-scope per SDV §13 #2 and GOV-MIGRATE / Vikunja #123 deferred state).</constraint>
+    <constraint id="N-5">DO NOT modify `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` (FROZEN at Entry 52 per CLAUDE.md §Phase History; SDV §out_of_scope).</constraint>
+    <constraint id="N-6">DO NOT modify `tools/vikunja_mcp/` or any code under `tools/`. Sprint 10 is doctrine-only. The single code touch (SOP portability fix) is EA-3's job, not EA-2's. (SDV §5.2 #8)</constraint>
+    <constraint id="N-7">DO NOT refactor any devplatform code, period. Sprint 10 is doctrine-only with one focused devplatform code-touch (SOP portability fix in EA-3). devplatform fleet refactor is cf-1's purpose. (L-19 (d) verbatim)</constraint>
+    <constraint id="N-8">DO NOT alter the verbatim LA-arbitrated content for row #41 (AGENTS.md replacement) or IR-9 (`<fleet_pause_sop_pointer>` element). Wording, ordering, capitalization, backticks, blank lines — all byte-exact. The LA reviewed these specifically; freelance phrasing changes are an automatic ESCALATE. (LA comment #521 §Row #41 + §IR-9)</constraint>
+    <constraint id="N-9">DO NOT preserve XML malformedness. After every strip, the BlarAI `.github/copilot-instructions.md` MUST parse cleanly via `python -c "import xml.etree.ElementTree as ET; ET.parse(r'C:\Users\mrbla\BlarAI\.github\copilot-instructions.md')"` (exit 0, no error). Test this verbatim before commit. (L-20)</constraint>
+    <constraint id="N-10">DO NOT sacrifice runtime-narrative coherence to hit the 30%-reduction soft target. If a strip would leave a dangling reference or break a coherent runtime story, KEEP the section and cite it in your completion report's "kept verbatim despite floor" list. (L-22 mature-not-minimal carve-out, SDV §9.1 risk-row 2)</constraint>
+    <constraint id="N-11">DO NOT create follow-up Vikunja tickets for matrix §4 Findings yourself. Findings are surfaced for LA + Co-Lead triage at SCR / SWAGR; ticket creation is NOT EA-2's scope. (Continuation N-6 pattern)</constraint>
+    <constraint id="N-12">DO NOT introduce new doctrine content not present in the source files. EA-2 strips and re-frames; it does NOT invent. The single exceptions are: (a) the italicized cross-reference pointer lines (template provided in WI-1), (b) the LA-arbitrated verbatim content for AGENTS.md (12 lines) and `<fleet_pause_sop_pointer>` element, (c) the in-place §"Active State" refresh content (post-Sprint-9 baseline facts derivable from the matrix §4 F-3 + Sprint 8/9 SWAGRs), (d) the optional Phase 5 element refresh per matrix F-4 (which is also derivable, not invented). (SDV §5.2 #2)</constraint>
+  </negative_constraints>
+
+  <cross_repo_ordering>
+    Per L-19 (b), recite this verbatim in your comprehension and your completion report:
+
+    "EA-2 commits to BlarAI main first (via Co-Lead trusted_scope merge or LA-merge-approve if ESCALATE on diff size). EA-3 commits to devplatform main second. Each commit body references the other repo. If EA-3 dispatches before EA-2 merges due to fleet-cadence anomaly, EA-3 STOPs and waits for EA-2 to land."
+
+    **Cross-repo commit-body content for EA-2** (SDV §8 cross-reference option (B) — chosen by SDO for fewer commits): EA-2's commit body includes verbatim:
+
+    ```
+    devplatform companion: see Sprint 10 SCR for landed devplatform commits.
+    ```
+
+    The Sprint 10 SCR (authored at sprint close by Co-Lead) is the cross-reference record; EA-3's devplatform commit body cites this EA-2 merge commit hash explicitly (verifiable at EA-3 dispatch time via `cd C:\Users\mrbla\BlarAI && git log --oneline -1 main`).
+  </cross_repo_ordering>
+
+  <quality_gate>
+    <step order="1" name="STRUCTURE-LINT">
+      All three modified BlarAI files retain valid markdown / XML structure. No orphan headers (header with no body), no XML mis-nesting, no unmatched code-fence triple-backticks. AGENTS.md is exactly the 12-line LA-arbitrated content with no preamble or appendix.
+    </step>
+    <step order="2" name="XML-WELL-FORMEDNESS">
+      ```powershell
+      python -c "import xml.etree.ElementTree as ET; ET.parse(r'C:\Users\mrbla\BlarAI\.github\copilot-instructions.md')"
+      ```
+      Must exit 0 with no error output. Any parse error → STOP, fix XML, retest. (L-20)
+    </step>
+    <step order="3" name="MATRIX-CONFORMANCE">
+      Every MOVE-devplatform row in matrix §2 (rows #8, #10-15, #19, #21, #28-30, #32f, #32h, #32j-l, #32n-o, #35e, #43) has been stripped from BlarAI. Every DELETE row (#55) has been removed. Every MIRROR-both row's BlarAI half is retained. Every KEEP-BlarAI row is retained. Spot-check 5 random matrix rows by line-range presence/absence in the post-EA-2 files.
+    </step>
+    <step order="4" name="LA-ARBITRATION-CONFORMANCE">
+      The 6 LA-arbitrated dispositions are applied byte-exact:
+        (a) CLAUDE.md row #12 strip + italicized cross-reference present.
+        (b) copilot-instructions.md `<user_identity>` (row #27) retained unchanged.
+        (c) copilot-instructions.md `<vikunja_task_tracking>` split (row #37): `<labels>` + `<conventions>` retained; `<sdo_responsibilities>` + `<ea_responsibilities>` stripped; `<fleet_responsibilities_pointer>` inserted; defunct `P5-Active`/`P5-Complete` names replaced with live canonical names.
+        (d) AGENTS.md (row #41): wholesale 12-line LA-verbatim replacement; first line is `# AGENTS.md — BlarAI repo pointer`; no preamble.
+        (e) copilot-instructions.md IR-9: `<fleet_pause_sop>` element stripped; `<fleet_pause_sop_pointer>` element inserted byte-exact per LA verbatim text.
+        (f) IR-10 follows row #37 (no additional check).
+    </step>
+    <step order="5" name="ACTIVE-STATE-REFRESH">
+      CLAUDE.md §"Active State" content reflects the post-Sprint-9-close baseline per WI-2. Specifically: Sprint 10 listed as active; Sprints 7, 8, 9 listed as COMPLETE; test baseline `~981 passed, 22 skipped`; ledger frozen at Entry 52 pointer; Domain 6 COMPLETE; Task 7 COMPLETE; ISS-1/2/3 still open, ISS-4-7 noted resolved; HEAD reference advice prefers `git log --oneline main` over pinned hash.
+    </step>
+    <step order="6" name="LINE-COUNT-CHECK">
+      ```powershell
+      (Get-Content C:\Users\mrbla\BlarAI\CLAUDE.md, `
+                   C:\Users\mrbla\BlarAI\.github\copilot-instructions.md, `
+                   C:\Users\mrbla\BlarAI\AGENTS.md | Measure-Object -Line).Lines
+      ```
+      Target ≤ 400 lines combined (SDV §4 #6 ≥30% reduction floor from audit-time 474). Soft target 50% reduction (~237 lines). If above 400 lines, cite kept-verbatim sections in completion report per L-22 carve-out. Below ~237 indicates over-strip — review for coherence loss before commit.
+    </step>
+    <step order="7" name="ORACLE">
+      ```powershell
+      cd C:\Users\mrbla\BlarAI
+      git diff main...feature/p5-task10-ea2-blarai-strip --name-only
+      ```
+      Must output EXACTLY (sorted):
+      ```
+      .github/copilot-instructions.md
+      AGENTS.md
+      CLAUDE.md
+      docs/ledger/{ts}_sprint10_ea2_blarai-strip.md
+      ```
+      Any other path → ORACLE violation; STOP and report in completion gate.
+    </step>
+    <step order="8" name="REGRESSION-PYTEST">
+      Sprint 10 touches no test paths, but run the regression safety net (continuation §989):
+      ```powershell
+      cd C:\Users\mrbla\BlarAI
+      .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+      ```
+      Expected: ~981 passed, ~22 skipped. Any regression → STOP and report.
+    </step>
+  </quality_gate>
+
+  <verification>
+    Verbatim terminal commands for the LA to verify EA-2 completion:
+
+    ```powershell
+    cd C:\Users\mrbla\BlarAI
+    git log --oneline -1
+    git diff main --name-only
+    # Combined line-count check (SDV §4 #6 target ≥30% reduction from 474):
+    (Get-Content C:\Users\mrbla\BlarAI\CLAUDE.md, `
+                 C:\Users\mrbla\BlarAI\.github\copilot-instructions.md, `
+                 C:\Users\mrbla\BlarAI\AGENTS.md | Measure-Object -Line).Lines
+    # XML well-formedness:
+    python -c "import xml.etree.ElementTree as ET; ET.parse(r'C:\Users\mrbla\BlarAI\.github\copilot-instructions.md')"
+    # AGENTS.md is the 12-line LA-arbitrated replacement:
+    Get-Content C:\Users\mrbla\BlarAI\AGENTS.md
+    # Regression safety net:
+    .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+    ```
+
+    Expected:
+    - Last commit subject matches commit_template below.
+    - `git diff main --name-only` shows exactly the four paths in the ORACLE gate.
+    - Combined line count ≤ 400 (target) or coherence-justified deviation cited in EA-2 completion report.
+    - XML parse exits 0 with no error.
+    - AGENTS.md is the 12-line LA-arbitrated content; first line `# AGENTS.md — BlarAI repo pointer`.
+    - pytest: ~981 passed, ~22 skipped.
+  </verification>
+
+  <commit_template>
+    [sprint:10][role:ea_code][phase:completion] EA-2 BlarAI doctrine strip + Active State refresh — 3 files, {actual_net_lines_delta} net lines ({before_total} → {after_total})
+
+    Body content (suggested; EA may adjust):
+      BlarAI Sprint 10 EA-2. Applied EA-1's classification matrix
+      (docs/sprints/sprint_10/doctrine_classification_matrix.md) and the
+      LA-arbitrated dispositions in Vikunja task #369 comment #521 to
+      BlarAI's three doctrine files. Stripped MOVE-devplatform + DELETE
+      rows; retained MIRROR-both rows; refreshed CLAUDE.md §"Active State"
+      to post-Sprint-9 baseline; replaced AGENTS.md with the 12-line
+      LA-arbitrated re-framed pointer (row #41); inserted
+      `<fleet_pause_sop_pointer>` placeholder per IR-9; corrected defunct
+      `P5-Active`/`P5-Complete` label names per matrix row #55.
+
+      devplatform companion: see Sprint 10 SCR for landed devplatform commits.
+
+      Resolves Sprint 8 SWAGR gap #5 + Sprint 9 SWAGR gap #4 (CLAUDE.md
+      §"Active State" staleness, in-scope per SDV §5.1 #2).
+  </commit_template>
+
+  <mature_not_minimal>
+    Verbatim from L-22:
+
+    "Mature not minimal: each post-split file is a coherent operational reference in its own right, not a thin pointer-with-a-couple-of-sentences. devplatform files: ≥ 100 lines floor. BlarAI files: target ≥ 30% combined-line-count reduction (soft 50%). If hitting the reduction floor would leave dangling references or break a coherent runtime narrative, prefer coherence and explicitly cite which sections you kept verbatim despite hitting the floor in your completion report. The LA will not penalize a coherent file that fell short of the reduction target; the LA will penalize an incoherent file that hit it."
+
+    EA-2-specific application: BlarAI's three doctrine files combined go from 474 lines (audit-time) toward ~285-330 lines (30-40% reduction target). AGENTS.md is wholesale-replaced with a 12-line LA-arbitrated content (no choice there). CLAUDE.md's reduction comes from stripping the Vikunja Bridge, Current Active Sprint block, Agent Operating Model, Fleet-Pause SOP. copilot-instructions.md's reduction comes from stripping `<chat_role_taxonomy>`, eight named `<rule>` elements, and the `<fleet_pause_sop>` element. If reaching ~285 lines requires cutting a coherent runtime narrative section, KEEP it and cite it.
+  </mature_not_minimal>
+
+  <handoff_protocol>
+    On completion:
+    1. Run all 8 quality_gate steps in order. If any step fails, STOP and document in completion comment (do not commit until all pass).
+    2. Commit per commit_template.
+    3. Post `[agent:ea_code][phase:completion]` comment to Vikunja task #369 with:
+       - Commit hash (BlarAI side)
+       - Combined three-file line count before / after / % reduction
+       - AGENTS.md line count (~12)
+       - XML well-formedness pass confirmation
+       - LA-arbitration conformance: confirm the 6 dispositions applied (row #12, #27, #37, #41, IR-9, IR-10 follows #37)
+       - ORACLE output verbatim (exactly four paths)
+       - pytest regression result (passed/skipped counts)
+       - Active State refresh confirmation (Sprint 8 SWAGR gap #5 + Sprint 9 SWAGR gap #4 resolved)
+       - Resume-fleet confirmation
+       - Any sections kept verbatim despite the 30% reduction floor (L-22 coherence carve-out citations)
+    4. Apply label `Gate:Pending-SDO` (id 9) on Vikunja task #369 (SDO Phase 1b reviews next).
+    5. Resume the fleet per pre_flight (LAST action before exit).
+
+    Next fleet step: SDO Phase 1b completion-review. If APPROVED → Co-Lead merge-gate (trusted_scope merge OR LA-merge-approve via `la_merge_approve.ps1` if ESCALATE on diff size; ESCALATE expected per SDV §9.1 risk-row 8). After merge, SDO Phase 2 authors EA-3 prompt (devplatform doctrine authorship + SOP portability fix).
+  </handoff_protocol>
+
+</ea_prompt>

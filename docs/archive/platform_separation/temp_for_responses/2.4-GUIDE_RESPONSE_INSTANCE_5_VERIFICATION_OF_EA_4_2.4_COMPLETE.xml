@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="midstage_completion_review_with_continue_or_handoff_recommendation">
+  <verdict>APPROVED</verdict>
+  <continue_recommendation>CONTINUE_INTO_2.4.v2_AND_LIKELY_2.5_AND_2.5.v2; REEVALUATE_AT_2.5.v2_TO_2.6_BOUNDARY</continue_recommendation>
+  <stage_id>STAGE_2</stage_id>
+  <stage_xml>03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+  <work_item>2.4_complete (files 7-13)</work_item>
+  <reviewed_at_utc>2026-04-25T19:00:00Z</reviewed_at_utc>
+  <guide_instance>5</guide_instance>
+  <reviewing>
+    <ea_instance>4</ea_instance>
+    <ea_work>Files 7-13 of Item 2.4 -- closes the entire 2.4 file-scope work</ea_work>
+  </reviewing>
+
+  <summary>
+    EA-4 has completed Item 2.4 file scope: files 7 (self_check.py), 8 (blarai_next_task_resolver.py),
+    9 (cleaner.py with g5-3 closed), and 13 (vikunja_mcp/server.py with full §D.1 hardening) are
+    refactored on disk; files 10 (fleet_ops/diff_builder.py), 11 (autonomy_budget/active_tasks.py),
+    and 12 (fleet_observability/_vikunja_client.py) correctly require NO CHANGE in 2.4 scope per
+    the v3 handoff plan (file 12 deferred to 2.6 per g5-4). Independent disk verification confirms
+    every claim reproduces: git log -3 unchanged (zero new commits — single-commit discipline holds);
+    git status shows 4 NEW M files added vs EA-3 close (blarai_next_task_resolver.py +12 lines,
+    self_check.py +19, cleaner.py +44, server.py +63); git stash list shows stash@{0} byte-identical
+    timestamp 20260424_013002; state.json fleet_paused=true with original reason and last_updated_by;
+    pytest tools/ shows EXACTLY 280 passed (matches v0e baseline; zero regression); pytest
+    tools/vikunja_mcp/ shows EXACTLY 26 passed (matches EA-4's claim). The §D.1 enforcement in
+    file 13 is THOROUGH: list_tasks now `(*, project_id: int, ...)` with _require_project_id guard
+    and the unscoped /tasks branch removed (always /projects/{project_id}/tasks); search_tasks now
+    `(*, project_id: int, query: str)` with the previously-default cross-project /tasks?s=...
+    closed (always /projects/{project_id}/tasks?s=...); plus defensive _require_project_id guards
+    on get_project, update_project, delete_project, create_task, bulk_create_tasks (5 additional
+    handlers — chokepoint contract extended consistently beyond bare §D.1 scope as good defensive
+    coding). The lazy ctx resolver design (_ctx module-level cache + _get_project_context() helper)
+    is excellent: avoids import-time _project_context.resolve() which would break unrelated unit
+    tests, while production path resolves on first handler call. EA-4's r2 correction (F-5 tests
+    target label handlers, not list/search signatures) is correct and a valid pushback on my
+    standing reminder. g5-3 closed via Option (b) — project-aware fallback in cleaner.py.run_sweep
+    with three-branch logic preserving config-injected primacy + project_context-derived path +
+    legacy zero-arg fallback for back-compat. Decisions D1-D4 honored throughout. All 27 binding
+    acknowledgments held (no resume_fleet, no commits, no merge, no stash touch, no governance
+    edits). One small structural deferral noted (HTTP routing through VikunjaClient instance
+    methods deferred to 2.6 — EA-4 imported _require_project_id directly rather than wiring the
+    VikunjaClient stub now; defensible since VikunjaClient HTTP delegation is itself 2.6-scope per
+    Stage 2.1 stub design). RECOMMENDATION: CONTINUE this session into 2.4.v2 (--help verification
+    + MCP handler routing checks; low-risk and small) and likely 2.5 + 2.5.v2 (PS1 work +
+    critical_notify.ps1 inspection — self-contained scope similar in complexity to one or two
+    Item-2.4 files). RE-EVALUATE budget honestly at the 2.5.v2 → 2.6 boundary; 2.6 is the next
+    big-lift comparable to file 13 (extended grep + chokepoint routing across multiple files +
+    g5-4 closure + D3 closure). If budget is healthy at that boundary, push into 2.6; if even
+    slightly tight, emit v4 mid-stage handoff per i1-4 / dn15 (docs-only commit, no partial-commit
+    refactor).
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="single_commit_discipline" verdict="PASS_HOLDS_PERFECTLY">
+      git log --oneline -3 (Guide-5 observed):
+        9d17e7f docs(platform_separation): Guide instance 4→5 handoff
+        ccdd82b docs(platform_separation): Stage 2 mid-stage EA handoff v3
+        3b9b1b8 docs(platform_separation): Stage 2 mid-stage EA handoff v2
+      ZERO new commits since EA-4 began. The 4 newly-modified file 7/8/9/13 changes are all
+      uncommitted in working tree per the Stage-2 single-commit-at-2.9 protocol. Match EA-4's
+      claim "No commits per single-commit-at-2.9 protocol" exactly.
+    </check>
+
+    <check id="working_tree_delta" verdict="PASS_MATCHES_EA4_CLAIM">
+      git status --porcelain shows 4 NEW M files vs EA-3 close:
+        M tools/autonomy_budget/blarai_next_task_resolver.py (file 8)
+        M tools/autonomy_budget/self_check.py (file 7)
+        M tools/gate_stale_cleaner/cleaner.py (file 9)
+        M tools/vikunja_mcp/server.py (file 13)
+      git diff --stat line counts:
+        blarai_next_task_resolver.py | 12 (single-line default change + module constant comment block)
+        self_check.py | 19 (kwarg added, conditional config_path derivation, docstring)
+        cleaner.py | 44 (import + kwarg + 3-branch fallback logic + docstring -- substantive g5-3 closure)
+        server.py | 63 (imports + lazy ctx resolver + §D.1 hardening on list_tasks/search_tasks
+                       + 5 defensive guards on get/update/delete_project/create_task/bulk_create_tasks
+                       + docstring annotations)
+      EXACTLY matches EA-4's claim "4 modified files (files 7, 8, 9, 13)".
+    </check>
+
+    <check id="stash_invariant" verdict="PASS">
+      git stash list:
+        stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002
+      Byte-identical to EA-3 close-out and predecessor v2/v3 ground-truth. Untouched.
+    </check>
+
+    <check id="fleet_pause_invariant" verdict="PASS">
+      state.json:
+        fleet_paused: true
+        fleet_paused_reason: "platform separation v2 in progress"
+        last_updated_by: "copilot_agent"
+        last_updated_utc: "2026-04-24T20:46:12Z"
+        schema_version: 1
+      No state.resume_fleet() call this session. Original reason and last_updated_by/utc preserved
+      verbatim from EA-2's pause at Stage 2 entry. Acks n=2, n=4, i1-2 all honored.
+    </check>
+
+    <check id="pytest_tools" verdict="PASS_BASELINE_HELD_EXACTLY">
+      .venv/Scripts/python.exe -m pytest tools/ --tb=short -q
+        Result: 280 passed in 2.27s
+      EXACT match to v0e baseline (280) from every prior verification. ZERO regression despite
+      4 substantive refactors including the §D.1 hardening on list_tasks / search_tasks signatures.
+      This confirms no test in the current 280-baseline depended on the old project_id=None
+      default (would have broken on the new (*, project_id: int) keyword-only required signature).
+    </check>
+
+    <check id="pytest_vikunja_mcp" verdict="PASS_MATCHES_EA4_26_CLAIM">
+      .venv/Scripts/python.exe -m pytest tools/vikunja_mcp/ --tb=short -q
+        Result: 26 passed in 0.80s
+      EXACTLY 26 passes (10 test_bridge + 7 test_multi_writer + 5 test_scheduled_cowork_ea +
+      4 test_server_f5). EA-4's claim "26/26 pass" verified. EA-4's r2 correction is correct:
+      test_server_f5.py targets label handlers (specifically the F-5 fix from CLAUDE.md history
+      around remove_label_from_task), NOT list_tasks/search_tasks signatures. My standing reminder
+      r2 was over-cautious; EA-4's empirical pushback is valid.
+    </check>
+
+    <check id="file_7_self_check" verdict="PASS_LIBRARY_VARIANT_CORRECT">
+      Read tools/autonomy_budget/self_check.py end-to-end:
+        - Import added: `from tools import _project_context` (line 31). ✓
+        - run() signature: `project_context: "_project_context.ProjectContext | None" = None`
+          kwarg added at line 59 (last position; existing 5 kwargs preserved). ✓
+        - Conditional derivation at lines 88-91: when config_path is None AND project_context
+          is provided, derive `config_path = project_context.root / "tools" / "autonomy_budget"
+          / "config.yaml"`. ✓
+        - Existing test invocations (5 tests in test_self_check.py per EA-4's 8/8 pass) UNCHANGED
+          because they pass explicit config_path (which wins). Backwards-compat preserved. ✓
+        - Library variant pattern (no argparse, no main() change) -- correct per file type
+          "library_no_main" in v3 handoff. ✓
+    </check>
+
+    <check id="file_8_blarai_next_task_resolver" verdict="PASS_MINIMAL_CORRECT">
+      Read tools/autonomy_budget/blarai_next_task_resolver.py:
+        - Import added: `from tools import _project_context` (line 54). ✓
+        - Constructor default changed: line 102 now reads
+          `repo_root: Path | str = _project_context.DEFAULT_BLARAI_ROOT` (was hardcoded
+          `Path(r"C:/Users/mrbla/BlarAI")`). ✓
+        - Module-level constant `PROJECT_BLARAI_CORE_DEVELOPMENT: int = 3` PRESERVED unchanged
+          (line 68); annotated with explanatory comment block (lines 61-67) that this is flagged
+          for migration to ctx.vikunja_project_id at Item 2.6, deferred per Master Plan §D.1.
+          Preserves resolver's public class signature stable for 2.4 -- correct deferral scope. ✓
+        - 12 lines of changes total -- exactly the minimum for the v3 handoff approach. ✓
+    </check>
+
+    <check id="file_9_cleaner_g5_3_closed" verdict="PASS_OPTION_B_THOROUGH">
+      Read tools/gate_stale_cleaner/cleaner.py:
+        - Import added: `from tools import _project_context` (line 21). ✓
+        - run_sweep() signature: `project_context: "_project_context.ProjectContext | None" =
+          None` kwarg added at line 171 (after lifts_path). ✓
+        - Three-branch fallback logic (lines 198-222) replacing the original single-line
+          `cfg = config if config is not None else config_loader.load_config()`:
+            (1) if config is not None: use config (existing config-injected callers unchanged)
+            (2) elif project_context is not None: project-aware load_config(path=ctx.root/...,
+                project_overlay_path=ctx.root/projects/{name.lower()}.yaml) -- the g5-3 Option (b)
+                project-aware fallback
+            (3) else: legacy zero-arg config_loader.load_config() -- back-compat for README
+                example and ad-hoc local usage
+        - Detailed docstring (lines 188-197) explaining Stage 2.4 g5-3 disposition rationale.
+        - Order matters: config-injected primacy preserves existing test invariants (cleaner.py
+          tests pass `config=_CFG` and rely on that taking precedence). ✓
+        - 6/6 tests pass per EA-4 claim; my pytest tools/ confirms 280-baseline (which includes
+          cleaner tests). ✓
+        - Correct disposition of g5-3 as 2.4-scope work, not deferred to 2.6. Matches my
+          standing reminder r3 ("g5-3 closes at 2.4 (file 9), g5-4 closes at 2.6 (legacy fold) --
+          NOT symmetric"). ✓
+    </check>
+
+    <check id="file_13_server_§D_1_HARDENING" verdict="PASS_THOROUGH_AND_CORRECT">
+      Read tools/vikunja_mcp/server.py end-to-end:
+
+        Imports (lines 24-25):
+          from tools import _project_context
+          from tools._vikunja_client import _require_project_id
+        ✓ Both imports present.
+
+        Lazy ctx resolver (lines 38-53):
+          - Module-level `_ctx: ProjectContext | None = None`
+          - `_get_project_context()` function caches on first call, lazy-resolves
+          - Comment block explains: "Resolved lazily so import-time failures (missing registry,
+            exotic cwd) don't break unit tests that exercise unrelated handlers."
+        ✓ Excellent design preserving test isolation while enabling production path.
+
+        §D.1 list_tasks (lines 233-291):
+          - Signature line 234: `def list_tasks(*, project_id: int, page: int = 1, ...)` ✓
+            keyword-only, REQUIRED, NO None default
+          - Line 262: `_require_project_id(project_id)` guard ✓
+          - Line 275: `tasks = _api_get(f"/projects/{project_id}/tasks", params)` ✓
+            Always project-scoped path; the dangerous unscoped /tasks branch is REMOVED.
+          - Docstring (lines 246-261) explicitly annotates §D.1 closure with rationale.
+        ✓ §D.1 enforcement HARDENED. The "All tasks" leak is closed.
+
+        §D.1 search_tasks (lines 608-636):
+          - Signature line 609: `def search_tasks(*, project_id: int, query: str)` ✓
+            keyword-only, REQUIRED, NO None default
+          - Line 622: `_require_project_id(project_id)` guard ✓
+          - Lines 623-626: `_api_get(f"/projects/{project_id}/tasks", params={"s": query, ...})` ✓
+            Project-scoped path; the previously-default cross-project /tasks?s=... is REMOVED.
+          - Docstring (lines 612-621) explicitly annotates §D.1 closure and notes "this was the
+            more dangerous of the two -- search across-projects was previously default behavior."
+        ✓ §D.1 enforcement HARDENED. The cross-project search bypass (more dangerous than
+          list_tasks per EA-4's correct observation) is closed.
+
+        Defensive guards on 5 additional handlers (per EA-4 claim):
+          - get_project (line 183): _require_project_id(project_id) ✓
+          - update_project (line 203): _require_project_id(project_id) ✓
+          - delete_project (line 225): _require_project_id(project_id) ✓
+          - create_task (line 313): _require_project_id(project_id) ✓
+          - bulk_create_tasks (line 654): _require_project_id(project_id) ✓
+        ✓ All 5 defensive guards confirmed. These extend the chokepoint contract beyond bare
+          §D.1 scope (which targets list/search) but are well-judged defensive coding -- they
+          reject bool/str/None project_id consistently, catching e.g. mistaken delete_project(True)
+          calls before they hit Vikunja.
+
+        Handlers correctly NOT given guards (because they don't take project_id):
+          list_projects, create_project, get_task, update_task, complete_task, delete_task,
+          list_labels, create_label, add_label_to_task, remove_label_from_task, find_user,
+          list_task_assignees, assign_user_to_task, remove_user_from_task, list_task_comments,
+          add_task_comment, project_summary.
+        ✓ Correctly scoped.
+
+        project_summary (line 677-698) note: This iterates per-project via /projects/{pid}/tasks
+        per-call, which IS project-scoped. The /projects "all projects" listing is NOT a
+        §D.1-violating tasks query. Acceptable.
+    </check>
+
+    <check id="file_10_diff_builder_NO_CHANGE" verdict="PASS_PER_PLAN">
+      git status does NOT show tools/fleet_ops/diff_builder.py as modified. EA-4 plan called for
+      verify-only; verification passed (diff_builder tests pass per pytest 280-baseline).
+      Correct adherence to v3 handoff "likely NO change" guidance.
+    </check>
+
+    <check id="file_11_active_tasks_NO_CHANGE" verdict="PASS_PER_PLAN">
+      git status does NOT show tools/autonomy_budget/active_tasks.py as modified. Verify-only
+      per v3 handoff. Tests pass per pytest 280-baseline.
+    </check>
+
+    <check id="file_12_legacy_vikunja_client_NO_CHANGE_g5_4_pending" verdict="PASS_DEFERRED_PER_g5_4">
+      git status does NOT show tools/fleet_observability/_vikunja_client.py as modified. EA-4
+      correctly deferred to Item 2.6 per g5-4 disposition direction. The line-28 load_config
+      callsite remains OPEN; per g5-4 + EA-4's iteration-1 ack, this MUST be CLOSED at 2.6
+      (either fold legacy file entirely or thin-shim with explicit ctx threading) before 2.9
+      single-commit. If 2.6 leaves it open, escalate to Guide before 2.9 commit (w15 hazard).
+    </check>
+
+  </independent_disk_verification>
+
+  <minor_observations_for_2.6_disposition>
+
+    <observation id="o1" topic="HTTP routing deferred -- guard imported directly">
+      EA-4's iteration-1 plan said for file 13: "(b) Refactor 19 MCP handlers to route through
+      tools/_vikunja_client.VikunjaClient with _require_project_id guard." EA-4 did the second
+      half (added _require_project_id guards) but NOT the first half (HTTP calls still go through
+      httpx directly via _api_get / _api_put / _api_post / _api_delete; not through VikunjaClient
+      instance methods). Defensible deferral because tools/_vikunja_client.py VikunjaClient HTTP
+      delegation was intentionally stubbed at Stage 2.1 ("Delegation to the underlying HTTP
+      client is wired in Stage 2.6"); routing through it now would require implementing the
+      delegation first, which is out of v3-handoff 2.4 scope. The §D.1 hard rule (the security
+      concern) IS closed at the handler level. Note for 2.6 disposition: when 2.6 routes call
+      sites through VikunjaClient, the handler-level guards become redundant with VikunjaClient's
+      internal _require_project_id call. EA-4's 2.6 work should decide: (a) remove handler-level
+      guards (let VikunjaClient enforce), or (b) keep them as defense-in-depth. Either is fine;
+      surface the choice in the 2.6 closure.
+    </observation>
+
+    <observation id="o2" topic="g5-3 disposition Option (b) — Guide endorses choice">
+      EA-4 chose Option (b) from the g5-3 disposition (thread ctx through to make fallback
+      project-aware). The alternative was Option (a) (remove fallback if always-injected
+      invariant is enforced). Option (b) is more conservative: it doesn't break any existing
+      pattern, just adds a project-aware fallback path, while preserving the legacy zero-arg
+      fallback for back-compat (README example, ad-hoc usage). Good engineering judgment. Guide
+      endorses; no further action required.
+    </observation>
+
+    <observation id="o3" topic="r2 standing reminder over-corrected by EA-4 -- accepted">
+      EA-4 noted my standing reminder r2 (test_server_f5.py would need updating after signature
+      change) was over-cautious because F-5 tests target label handlers, not list/search
+      signatures. EA-4 is correct: the empirical pytest 280-pass result confirms no test in the
+      current baseline depends on the old project_id=None default. My r2 was a precautionary
+      what-if; EA-4's disk verification confirmed it didn't materialize. Accepted; no
+      acknowledgment needed.
+    </observation>
+
+    <observation id="o4" topic="Pre-existing _get_token mypy str | None typing flagged but not introduced">
+      EA-4 noted: "Pre-existing: line 72 _get_token() mypy str | None → str is pre-existing,
+      not introduced by this refactor." Confirmed by reading server.py: line 75-77 _get_token()
+      returns `_token if _token is not None else _login()`; the function signature returns `str`
+      but the return value is technically `str | None` per mypy because _token is module-level
+      `str | None`. This is pre-existing technical debt, NOT introduced by EA-4's refactor.
+      Out of 2.4 scope; can be addressed at Stage 6 hardening or as a separate ticket.
+    </observation>
+
+  </minor_observations_for_2.6_disposition>
+
+  <continue_or_handoff_recommendation>
+
+    <intro>
+      EA-4 asked: "continue this session into 2.4.v2, or emit v4 handoff now while context is
+      healthy and the file 13 closure is the clean breakpoint." Guide instance 5 recommendation
+      below.
+    </intro>
+
+    <recommendation>CONTINUE_INTO_2.4.v2_AND_LIKELY_2.5_AND_2.5.v2; REEVALUATE_AT_2.5.v2_TO_2.6_BOUNDARY</recommendation>
+
+    <rationale>
+
+      <argument_for_continue>
+        2.4.v2 is verification (--help on each main()-bearing entrypoint + MCP handler routing
+        check). Low-risk, fast, and EA-4 has the canonical pattern context loaded from the
+        just-completed 13-file refactor. Splitting 2.4 from 2.4.v2 across sessions would force
+        the next EA to re-audit all 13 files just to verify them. Inefficient.
+
+        2.5 (PS1 work + critical_notify.ps1 inspection) is self-contained scope with clear
+        constraints from g4-1 + g4-2 + g4-3 acks. The canonical 7 PS1 enumeration is locked.
+        The critical_notify.ps1 inspection rule is a single Appendix A.1 confirmation. Estimate:
+        moderate complexity, smaller than file 13. EA-4 should be able to complete 2.5 + 2.5.v2
+        within remaining context budget given context was "healthy" after the largest single 2.4
+        lift.
+      </argument_for_continue>
+
+      <argument_for_handoff_now>
+        2.6 is the next big-lift comparable to file 13: extended grep with 12 patterns (per
+        iteration-2 gate) + chokepoint routing decisions across multiple files + g5-4 closure
+        (legacy file fold-or-thin-shim disposition) + D3 closure (dashboard_maintainer.py:113
+        private-method abuse) + observation o1 (routing through VikunjaClient instance methods,
+        which requires implementing VikunjaClient HTTP delegation first). 2.6 may itself take a
+        focused session.
+
+        File 13 IS the natural breakpoint per D4 rationale -- it was the largest single lift in
+        2.4. Emitting v4 handoff at this clean boundary follows the same logic that drove EA-3's
+        v3 handoff at the file 6/7 boundary.
+      </argument_for_handoff_now>
+
+      <synthesis>
+        The EA's own report frames file 13 closure as a "clean breakpoint" but also says
+        "context is healthy." Both can be true. The optimal path is to push through 2.4.v2 (truly
+        small) and 2.5 + 2.5.v2 (medium complexity, but smaller than file 13 individually and
+        self-contained), then re-evaluate budget HONESTLY at the 2.5.v2 → 2.6 boundary. If
+        budget is healthy at that boundary, push into 2.6 (and possibly 2.7 / 2.7.v2 / 2.8 /
+        2.9 / 2.10 if remaining capacity supports it). If even slightly tight, emit v4 mid-stage
+        handoff per i1-4 / dn15 (docs-only commit, no partial-commit refactor). The "first sign
+        of strain" framing EA-4 articulated in iteration-1 plan applies here.
+
+        The LA's instinct to continue is sound — context efficiency favors continuation when
+        natural sub-scopes (verification + PS1 work) align with remaining capacity.
+      </synthesis>
+
+    </rationale>
+
+    <re_evaluation_criteria_at_2.5.v2_to_2.6_boundary>
+      <criterion>Honestly assess remaining context budget. If percentage-consumed has crossed
+        the threshold where you're tracking individual edits vs sessions, emit v4.</criterion>
+      <criterion>Look ahead to 2.6 work scope: extended grep + triage every hit + g5-4 closure
+        decision + D3 closure + observation o1 (VikunjaClient HTTP delegation implementation
+        if you choose to thread through it now). 2.6 is structurally as complex as file 13.</criterion>
+      <criterion>If unsure, emit v4. The v4 handoff cost (one docs-only commit + bootstrap
+        cost for next EA) is small compared to the cost of a botched 2.6 mid-execution.</criterion>
+      <criterion>w13 single-commit discipline still applies: if you emit v4, it MUST be a
+        docs-only commit. NO partial-commit refactor work folded in. NO emergency single-commit
+        attempts that omit pending items.</criterion>
+    </re_evaluation_criteria_at_2.5.v2_to_2.6_boundary>
+
+  </continue_or_handoff_recommendation>
+
+  <required_acknowledgments>
+    <!--
+      No new acknowledgments required. EA-4 may proceed to 2.4.v2 work directly. The 27 binding
+      acknowledgments from iteration-1 + the four observations o1-o4 above remain in force as
+      already-binding context. The continue_recommendation above is guidance, not a corrections
+      block requiring re-emission.
+    -->
+  </required_acknowledgments>
+
+  <proceed_authorization>
+    APPROVED -- EA-4's Item 2.4 file scope (files 7-13) is fully closed and ratified. CONTINUE
+    into Item 2.4.v2 verification (--help on the main()-bearing entrypoints + MCP handler
+    routing checks). After 2.4.v2 closes, proceed into Item 2.5 (canonical 7 PS1 with
+    -BlarAIRoot per g4-2 + critical_notify.ps1 inspection per g4-1) and Item 2.5.v2
+    (per-PS1 verification). At the 2.5.v2 → 2.6 boundary, RE-EVALUATE budget honestly per the
+    criteria above. Standing reminders applicable throughout: single Stage-2 commit at item 2.9
+    only (pyproject.toml MUST be in commit); fleet stays paused (NEVER state.resume_fleet —
+    AttributeError); no merge to main; stash@{0} untouched; append-only STATUS at item 2.10;
+    g5-4 legacy _vikunja_client.py:28 load_config callsite MUST be CLOSED at 2.6 disposition
+    (escalate to Guide before 2.9 if 2.6 leaves it open); D3 dashboard_maintainer.py:113
+    private-method abuse closure at 2.6; observation o1 (handler-level guards vs VikunjaClient
+    routing) is your 2.6 design choice. If context exhaustion threatens before item 2.9, emit
+    v4 mid-stage handoff XML per i1-4 / dn15 (docs-only commit). On Stage 2 closure (item 2.10),
+    emit your final closing handoff to LA per the closing_handoff_to_la_at_stage_2_close block
+    in your initiation pointer.
+  </proceed_authorization>
+
+</guide_review_response>

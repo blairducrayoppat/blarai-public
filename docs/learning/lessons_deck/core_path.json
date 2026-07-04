@@ -1,0 +1,14 @@
+{
+  "description": "The curated default study track ('core path') for the lessons deck. The deck opens in core mode: navigation walks only these units; the full deck remains one keypress away (c). Chosen 2026-06-11 under the LA's 'core path only' scope decision, after the 390-slide scale surfaced.",
+  "criteria": "A lesson earns core placement by (1) AIGP density — it exemplifies a named Body of Knowledge domain or framework idea the exam actually tests (TEVV, fail-safe posture, human oversight, decision records, premise verification); (2) arc coverage — the founding failure, the verification turn, the security posture, the governance maturity beats are all represented; (3) story strength — the failure is concrete enough to anchor the principle in memory. Domain II (laws as applied) is structurally absent from lived lessons and is named as a gap on the AIGP-frame slide, not papered over.",
+  "study_estimate": "31 lessons, roughly 2-3 hours across sittings",
+  "core": [
+    "L1", "L2", "L3", "L5", "L6", "L7",
+    "L13", "L17", "L19",
+    "L22", "L29", "L33", "L36", "L38", "L39",
+    "L44", "L46", "L48", "L49",
+    "L53", "L54", "L56",
+    "L66", "L78", "L85", "L86",
+    "L94", "L97", "L103", "L105", "L107"
+  ]
+}

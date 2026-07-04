@@ -1,0 +1,94 @@
+{
+  "milestone": "Task 4.2b",
+  "title": "NPU Draft Device Comparison \u2014 T-05 GPU+NPU Heterogeneous Speculative Decoding",
+  "timestamp_utc": "2026-03-02T08:14:52Z",
+  "metadata": {
+    "branch": "feature/p5-task4-2-combined-rerun",
+    "harness": "run_p5_task4_2_combined.py",
+    "npu_driver": "32.0.100.4514",
+    "npu_driver_meets_minimum": true,
+    "ovgenai_version": "2026.0.0.0-2820-dab5b993a38",
+    "parent_artifact": "p5_task4_2_draft_model_comparison.json",
+    "corrected_rerun": true,
+    "original_run_head": "95a3f0a"
+  },
+  "locked_config": {
+    "target_model": "Qwen3-14B INT4",
+    "target_device": "GPU",
+    "draft_model": "Draft-A: Qwen3-0.6B 28L INT4",
+    "NAT": 3,
+    "xattention": false,
+    "kv_precision": "FP16",
+    "context_tokens": 4096,
+    "max_new_tokens": 128,
+    "warmup_runs": 2,
+    "measured_runs_spec": 5
+  },
+  "tests": [
+    {
+      "id": "T-01-ref",
+      "name": "14B + Draft-A/GPU (reference from Task 4.2)",
+      "draft_device": "GPU",
+      "draft_path": "models/qwen3-0.6b/openvino-int4-gpu",
+      "pipeline_creation_ok": true,
+      "summary": {
+        "combined_tps": {
+          "mean": 10.8703
+        },
+        "acceptance_rate_aggregate": 0.4568,
+        "native_tps_mean": 10.5194,
+        "ttft_ms_mean": 9256.24,
+        "data_source": "p5_task4_2_draft_model_comparison.json T-01"
+      }
+    },
+    {
+      "id": "T-05",
+      "name": "14B/GPU + Draft-A/NPU (Qwen3-0.6B 28L INT4, heterogeneous)",
+      "draft_device": "NPU",
+      "draft_path": "models/qwen3-0.6b/openvino-int4-npu",
+      "pipeline_creation_ok": false,
+      "failure_class": "LLVM_ABORT_VPUX_COMPILER",
+      "failure_detail": "VPUX compiler LLVM ABORT during NPU model compilation. Root cause: as_convolution decomposition pass produces degenerate tensor shape (1x0x1x1xf16) for self_attn.v_proj linear layer (Channels count mismatch: 0 != 8). Error: IE.Convolution (tensor<1x0x1x1xf16>, tensor<1x8x1x1xf16>) \u2014 model shape incompatible with NPU convolution kernel. C-level abort (SIGABRT) \u2014 not catchable via Python exception. Confirmed: openvino-int4-npu format cannot be compiled by VPUX on driver 32.0.100.4514 in heterogeneous speculative mode.",
+      "summary": null
+    }
+  ],
+  "npu_viability_assessment": {
+    "npu_compiles": false,
+    "npu_runs": false,
+    "failure_at_stage": "model_compilation",
+    "failure_recoverable": false,
+    "retried": false,
+    "retry_rationale": "LLVM ABORT is deterministic for this model/driver combination",
+    "npu_driver_version": "32.0.100.4514",
+    "npu_driver_meets_minimum": true,
+    "note": "Driver meets ADR-011 minimum but VPUX compiler cannot handle Qwen3-0.6B INT4 shape in speculative decoding context."
+  },
+  "comparison": {
+    "gpu_draft_tps": 10.8703,
+    "npu_draft_tps": null,
+    "gpu_draft_ar": 0.4568,
+    "npu_draft_ar": null,
+    "tps_delta_percent": null,
+    "gpu_draft_native_tps": 10.5194,
+    "npu_draft_native_tps": null
+  },
+  "disposition": "REJECTED",
+  "disposition_rationale": "NPU draft device REJECTED. T-05 failed at model compilation stage with deterministic LLVM ABORT (VPUX as_convolution pass incompatibility). NPU cannot be used as speculative draft device for Qwen3-0.6B INT4 on driver 32.0.100.4514. GPU remains sole viable device for draft inference.",
+  "adr_011_update": {
+    "section": "\u00a72.4",
+    "previous_status": "EVALUATING",
+    "new_status": "REJECTED",
+    "evidence_reference": "phase2_gates/evidence/p5_task4_2b_npu_draft_comparison.json"
+  },
+  "carry_forward": {
+    "draft_device": "GPU",
+    "draft_model": "Draft-A (Qwen3-0.6B 28L INT4)",
+    "draft_path": "models/qwen3-0.6b/openvino-int4-gpu",
+    "carries_to": [
+      "Task 4.3 (NAT sweep)",
+      "Task 4.4 (XAttention)",
+      "Task 4.5 (context bands)",
+      "Task 4.6+"
+    ]
+  }
+}

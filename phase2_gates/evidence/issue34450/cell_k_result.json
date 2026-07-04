@@ -1,0 +1,237 @@
+{
+  "issue": "openvinotoolkit/openvino#34450",
+  "generated_utc": "2026-04-25T20:03:44Z",
+  "ir_dir": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\issue34450\\exports\\cell_b",
+  "results": [
+    {
+      "label": "K1",
+      "batch": 1,
+      "seq_len": 1024,
+      "past_kv_len": 1023,
+      "num_kv_heads": 16,
+      "head_dim": 128,
+      "num_layers_observed": 0,
+      "inputs_before": [
+        {
+          "names": [
+            "input_ids"
+          ],
+          "partial_shape": "[?,?]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "attention_mask"
+          ],
+          "partial_shape": "[?,?]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "position_ids"
+          ],
+          "partial_shape": "[?,?]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "beam_idx"
+          ],
+          "partial_shape": "[?]",
+          "rank": 1
+        }
+      ],
+      "reshape_map_preview": {
+        "input_ids": [
+          1,
+          1024
+        ],
+        "attention_mask": [
+          1,
+          1024
+        ],
+        "position_ids": [
+          1,
+          1024
+        ],
+        "beam_idx": [
+          1
+        ]
+      },
+      "reshape_map_size": 4,
+      "inputs_after": [
+        {
+          "names": [
+            "input_ids"
+          ],
+          "partial_shape": "[1,1024]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "attention_mask"
+          ],
+          "partial_shape": "[1,1024]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "position_ids"
+          ],
+          "partial_shape": "[1,1024]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "beam_idx"
+          ],
+          "partial_shape": "[1]",
+          "rank": 1
+        }
+      ],
+      "all_inputs_static": true,
+      "stage_failed": "compile",
+      "exception_class": "RuntimeError",
+      "exception_msg": "Exception from src\\inference\\src\\cpp\\core.cpp:113: | Exception from src\\inference\\src\\dev\\plugin.cpp:53: | Exception from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:879: | Exception from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\ze_graph_ext_wrappers.cpp:405: | L0 pfnCreate2 result: ZE_RESULT_ERROR_INVALID_NULL_POINTER, code 0x78000007 - pointer argument may not be nullptr . [NPU_VCL] Compiler returned msg: | Exception from src\\core\\src\\partial_shape.cpp:266: | to_shape was called on a dynamic shape. |  |  |  |  | ",
+      "traceback_tail": [
+        "Traceback (most recent call last):",
+        "  File \"C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\issue34450\\cell_k_reshape_compile.py\", line 154, in attempt_reshape_compile",
+        "    _cm = core.compile_model(model, \"NPU\")",
+        "          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        "  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\openvino\\_ov_api.py\", line 646, in compile_model",
+        "    super().compile_model(model, device_name, {} if config is None else config),",
+        "    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        "RuntimeError: Exception from src\\inference\\src\\cpp\\core.cpp:113:",
+        "Exception from src\\inference\\src\\dev\\plugin.cpp:53:",
+        "Exception from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:879:",
+        "Exception from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\ze_graph_ext_wrappers.cpp:405:",
+        "L0 pfnCreate2 result: ZE_RESULT_ERROR_INVALID_NULL_POINTER, code 0x78000007 - pointer argument may not be nullptr . [NPU_VCL] Compiler returned msg:",
+        "Exception from src\\core\\src\\partial_shape.cpp:266:",
+        "to_shape was called on a dynamic shape.",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "compile_elapsed_seconds": 1.89,
+      "elapsed_seconds": 1.95,
+      "outcome": "compile_failed"
+    },
+    {
+      "label": "K2",
+      "batch": 1,
+      "seq_len": 1,
+      "past_kv_len": 0,
+      "num_kv_heads": 16,
+      "head_dim": 128,
+      "num_layers_observed": 0,
+      "inputs_before": [
+        {
+          "names": [
+            "input_ids"
+          ],
+          "partial_shape": "[?,?]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "attention_mask"
+          ],
+          "partial_shape": "[?,?]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "position_ids"
+          ],
+          "partial_shape": "[?,?]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "beam_idx"
+          ],
+          "partial_shape": "[?]",
+          "rank": 1
+        }
+      ],
+      "reshape_map_preview": {
+        "input_ids": [
+          1,
+          1
+        ],
+        "attention_mask": [
+          1,
+          1
+        ],
+        "position_ids": [
+          1,
+          1
+        ],
+        "beam_idx": [
+          1
+        ]
+      },
+      "reshape_map_size": 4,
+      "inputs_after": [
+        {
+          "names": [
+            "input_ids"
+          ],
+          "partial_shape": "[1,1]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "attention_mask"
+          ],
+          "partial_shape": "[1,1]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "position_ids"
+          ],
+          "partial_shape": "[1,1]",
+          "rank": 2
+        },
+        {
+          "names": [
+            "beam_idx"
+          ],
+          "partial_shape": "[1]",
+          "rank": 1
+        }
+      ],
+      "all_inputs_static": true,
+      "stage_failed": "compile",
+      "exception_class": "RuntimeError",
+      "exception_msg": "Exception from src\\inference\\src\\cpp\\core.cpp:113: | Exception from src\\inference\\src\\dev\\plugin.cpp:53: | Exception from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:879: | Exception from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\ze_graph_ext_wrappers.cpp:405: | L0 pfnCreate2 result: ZE_RESULT_ERROR_INVALID_NULL_POINTER, code 0x78000007 - pointer argument may not be nullptr . [NPU_VCL] Compiler returned msg: | Exception from src\\core\\src\\partial_shape.cpp:266: | to_shape was called on a dynamic shape. |  |  |  |  | ",
+      "traceback_tail": [
+        "Traceback (most recent call last):",
+        "  File \"C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\issue34450\\cell_k_reshape_compile.py\", line 154, in attempt_reshape_compile",
+        "    _cm = core.compile_model(model, \"NPU\")",
+        "          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        "  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\openvino\\_ov_api.py\", line 646, in compile_model",
+        "    super().compile_model(model, device_name, {} if config is None else config),",
+        "    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        "RuntimeError: Exception from src\\inference\\src\\cpp\\core.cpp:113:",
+        "Exception from src\\inference\\src\\dev\\plugin.cpp:53:",
+        "Exception from src\\plugins\\intel_npu\\src\\plugin\\src\\plugin.cpp:879:",
+        "Exception from src\\plugins\\intel_npu\\src\\compiler_adapter\\src\\ze_graph_ext_wrappers.cpp:405:",
+        "L0 pfnCreate2 result: ZE_RESULT_ERROR_INVALID_NULL_POINTER, code 0x78000007 - pointer argument may not be nullptr . [NPU_VCL] Compiler returned msg:",
+        "Exception from src\\core\\src\\partial_shape.cpp:266:",
+        "to_shape was called on a dynamic shape.",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "compile_elapsed_seconds": 1.81,
+      "elapsed_seconds": 1.88,
+      "outcome": "compile_failed"
+    }
+  ]
+}

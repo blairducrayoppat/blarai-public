@@ -1,0 +1,26 @@
+{
+  "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "openvino_genai": "2026.1.0.0-2957-1dabb8c2255",
+  "labels": [
+    "cold",
+    "prod1",
+    "prod2",
+    "warm1",
+    "warm2"
+  ],
+  "determinism_prod1_prod2": true,
+  "cache_identity_prod1_warm1": true,
+  "coldwarm_cold_warm1": true,
+  "warm_stable_warm1_warm2": true,
+  "load_seconds_by_label": {
+    "cold": 53.083,
+    "prod1": 11.152,
+    "prod2": 10.445,
+    "warm1": 11.831,
+    "warm2": 6.896
+  },
+  "load_prod_mean_s": 10.7985,
+  "load_cold_s": 53.083,
+  "load_warm_mean_s": 9.3635,
+  "load_delta_prod_minus_warm_s": 1.4350000000000005
+}

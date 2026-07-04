@@ -1,0 +1,36 @@
+{
+  "name": "chat",
+  "timestamp": "2026-06-04T17:21:56.906527+00:00",
+  "model": "Qwen3-14B",
+  "precision": "INT4",
+  "methodology": "OrchestratorGPUInference.generate_text(max_new_tokens=64) on a single cold prompt; cold load timed separately; speculative decoding ON; greedy/deterministic. KV-cache cold (first turn) \u2014 warm first-token would be lower.",
+  "environment": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2)",
+    "memory_ceiling_gb": 31.323,
+    "openvino_version": "2026.1.0-21367-63e31528c62-releases/2026/1",
+    "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+    "not_measured": [
+      "GPU driver version (read from dxdiag / Device Manager; not introspectable here)",
+      "co-resident memory cost when other models are loaded alongside",
+      "subjective voice naturalness / visual answer quality"
+    ]
+  },
+  "measurements": {
+    "available": true,
+    "model": "Qwen3-14B",
+    "precision": "INT4",
+    "device": "GPU",
+    "speculative_decoding": true,
+    "load_ms": 19333.4,
+    "wall_clock_generate_ms": 6137.8,
+    "engine_first_token_ms": 1500.0,
+    "engine_total_ms": 6122.6,
+    "max_new_tokens": 64,
+    "reply_chars": 221,
+    "reply_preview": "A local-first AI assistant is an AI system designed to operate entirely on a user's local device, ensuring data privacy by keeping all processing and storage offline without relying on external networks or cloud services.",
+    "methodology": "OrchestratorGPUInference.generate_text(max_new_tokens=64) on a single cold prompt; cold load timed separately; speculative decoding ON; greedy/deterministic. KV-cache cold (first turn) \u2014 warm first-token would be lower."
+  },
+  "notes": "",
+  "source": "tests/harness (Vikunja #563)"
+}

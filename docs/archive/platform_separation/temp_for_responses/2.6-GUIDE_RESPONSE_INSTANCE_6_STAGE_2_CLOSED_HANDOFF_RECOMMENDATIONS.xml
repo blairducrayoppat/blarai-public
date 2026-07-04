@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="stage_2_closed_with_handoff_recommendations">
+  <verdict>STAGE_2_TRULY_CLOSED -- 2.10.1 commit clean; EA-6 retires correctly; LA's meta-question on handoff documents answered (those are GUIDE responsibilities, not EA's; HANDOFF RECOMMENDED for Guide-#6 → Guide-#7)</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <work_item>2.10.1 verification + Stage 2 close confirmation + handoff-document recommendations</work_item>
+  <reviewed_at_utc>2026-04-26T07:30:00Z</reviewed_at_utc>
+  <guide_instance>6</guide_instance>
+  <reviewing>
+    <ea_instance>6</ea_instance>
+    <ea_artifact>EA-6 closing handoff to LA (chat message) at Stage 2 close (947cbd5 HEAD)</ea_artifact>
+  </reviewing>
+
+  <summary>
+    Independent disk verification confirms 2.10.1 commit (947cbd5) is mechanically clean:
+    parent 89213ee preserved; commit message correctly references the Guide-#6 verdict
+    file authorization; STATUS.md is the only file in diff; working tree clean post-commit;
+    11-cycle stash byte-identity preserved (sdo 20260424_013002); state.json invariants
+    verbatim (last_updated_by="copilot_agent" + last_updated_utc="2026-04-24T20:46:12Z");
+    no merge to main; no governance edits. All 5 narrative corrections (N1-N5) per
+    Guide-#6 disposition were applied to STATUS.md as authorized.
+
+    Stage 2 is now CLOSED at BOTH structural and narrative axes:
+      - Structural: 3d1ac35 (single Stage-2 commit) + 89213ee (STATUS append + Guide-#6
+        verdict archive) + 947cbd5 (footnote narrative corrections)
+      - Narrative: STATUS.md Stage 2 Closure Footnotes section now matches verbatim
+        disposition record per the 5 corrections
+      - Audit chain: temp_for_responses/ + ea_outputs/ archived in git per artifact-
+        management guidance
+      - Invariants: fleet paused, scheduled tasks Disabled, Vikunja running per Option B,
+        stash byte-identical 11-cycle, no merge, no governance edits
+
+    EA-6 retires correctly. EA-6's closing handoff to LA (chat message) covers all
+    required closing_handoff_to_la_at_stage_2_close items per the EA-6 init pointer block:
+    Stage 2 commit hash, V1-V7 + V8 outputs, V matrix V4-V7 test counts + names (with
+    paraphrase errors flagged below; not blocking), A11 anomaly, decision narrative on
+    D2/D3/D4 + D2-completion + D1 + V4 + g6-ea6_n9 + g6-ea6_n10, standing invariants.
+
+    THE LA'S META-QUESTION: "Should we have it produce any handoff documents? Doesn't
+    look like it produced anything for you nor for the next EA."
+
+    SHARP OBSERVATION. The LA correctly identifies that two handoff artifacts are
+    typically authored at a Stage close, but they are GUIDE responsibilities, NOT EA
+    responsibilities:
+
+      (A) Guide-side handoff brief (Guide-#6 → Guide-#7) per GUIDE_PROMPT.xml
+          handoff_protocol. The Guide is the long-lived advisor; Guide produces handoff
+          briefs at trigger conditions. Stage 2 close hits the
+          stage_boundary_recommendation trigger ("At the end of any HIGH-risk stage
+          (Stage 2 or Stage 4), proactively recommend handoff before the next stage
+          starts, regardless of context level"). EA-6 is correct NOT to produce this --
+          it's not their scope. Guide-#6 (this instance) is responsible.
+
+      (B) Stage 3 EA initialization pointer per the established pattern (Guide-#5 wrote
+          EA-4 + EA-5 init pointers; Guide-#6 wrote the EA-6 init pointer). EA-6 is
+          correct NOT to produce this -- that's Guide responsibility. The init pointer
+          will be authored by either Guide-#6 (if I continue) or Guide-#7 (if successor)
+          when Stage 3 spawn is triggered.
+
+    Per stage_boundary_recommendation trigger, GUIDE-#6 PROACTIVELY RECOMMENDS HANDOFF.
+    See &lt;handoff_recommendation&gt; below. The LA's signal will determine whether
+    Guide-#6 emits a handoff brief now (paving the way for Guide-#7 + Stage 3 EA spawn)
+    or continues into Stage 3 directly.
+
+    EA-6 closing handoff narrative paraphrase errors (informational, NOT blocking):
+    EA-6's chat-message closing handoff misnames 3 of 4 V matrix test files + provides
+    incorrect one-line descriptions for V5/V6/V7. The MISNAMING affects only the chat
+    message; the COMMITTED STATUS.md (post-947cbd5) has the correct test file names +
+    accurate disposition narratives per the 5 N-corrections. So the audit chain in git
+    is clean; the chat-narrative errors are a final EA-6-paraphrase-pattern artifact
+    consistent with the prior errors at 2.10 footnotes + v5 count_delta + file 13
+    docstring drift. Listed below for LA reference; not required to correct (chat message
+    isn't committed).
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="commit_947cbd5_landed" verdict="VERIFIED">
+      git log --oneline -5:
+        947cbd5 docs(platform_separation): Stage 2 closure footnote narrative corrections (Item 2.10.1)
+        89213ee docs(platform-separation): Stage 2 close STATUS append + Guide-#6 verdict archive (Item 2.10)
+        3d1ac35 chore(platform_separation): Stage 2 multi-project refactor (DEC-15 platform extraction)
+        f863a22 docs(platform_separation): Stage 2 mid-stage EA handoff v5 ...
+        9277d61 docs(platform_separation): Guide instance 5 to 6 handoff -- Stage 2 mid-stage at item 2.6
+      947cbd5 is the successor of 89213ee ✓. Parent preserved. Subject line clear.
+      Commit message body explicitly references the Guide-#6 verdict file (correct
+      authorization chain).
+    </check>
+
+    <check id="commit_message_describes_n1_correction_verbatim" verdict="VERIFIED">
+      Commit message body cites N1 / footnote 2 (g5-7) correction verbatim:
+        "Was: paraphrase claiming 'EA-3' duplicate test_project_context.py.
+         Now: verbatim per disposition file ... -- EA-4 introduced two duplicate test
+         pairs in test_vikunja_client_scope.py lines 76-94; deleted the duplicate copy
+         block; closed at EA-4 corrections cycle following Guide-#5 APPROVED_WITH_ADJUSTMENTS."
+      The commit message is comprehensive (truncated by my git show --stat | head -25 but
+      visible enough to confirm N1 substance was corrected). EA-6 followed the
+      &lt;narrative_error_inventory&gt; spec.
+    </check>
+
+    <check id="working_tree_clean" verdict="VERIFIED">
+      git status --porcelain post-commit: empty output ✓.
+    </check>
+
+    <check id="stash_11_cycle_byte_identity" verdict="VERIFIED">
+      git stash list: stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 --
+      byte-identical. 11-cycle preservation now (v3 → v4 → Guide-5/6 → v5 → 2.7 → 2.7.v2 →
+      docstring/2.8 → 2.9 → 2.10 → 2.10.1). Cleanest single-axis discipline win in the
+      procedure remains intact at Stage 2 close.
+    </check>
+
+    <check id="state_json_invariants" verdict="VERIFIED">
+      fleet_paused=true; reason "platform separation v2 in progress";
+      last_updated_by="copilot_agent"; last_updated_utc="2026-04-24T20:46:12Z" --
+      preserved verbatim through the entire 2.5+ day procedure cycle. NEVER state.resume_fleet
+      called.
+    </check>
+
+    <check id="test_files_on_disk_unchanged" verdict="VERIFIED">
+      ls tools/tests/:
+        __init__.py
+        __pycache__/
+        test_project_context.py
+        test_v_matrix_v4_cli_flag.py
+        test_v_matrix_v5_ps1_blarairoot.py
+        test_v_matrix_v6_mcp_project_id.py
+        test_v_matrix_v7_cross_project_byte_identity.py
+        test_vikunja_client_scope.py
+      Test file names IDENTICAL to what I verified at Item 2.7.v2 close. NO renames at
+      2.10.1 (correct -- 2.10.1 scope is STATUS.md narrative corrections only).
+    </check>
+
+  </independent_disk_verification>
+
+  <ea_6_closing_handoff_narrative_paraphrase_errors_informational>
+    <intro>
+      EA-6's chat-message closing handoff to LA contains paraphrase errors in the V matrix
+      section. These errors are NOT in committed code or STATUS.md (the 947cbd5 commit
+      corrected the STATUS.md narratives). They are IN THE CHAT MESSAGE ONLY -- which
+      doesn't pollute git history. Listed for LA reference / future audit-chain
+      reconstruction; correction is OPTIONAL (the chat message is informational, not
+      committed). NOT BLOCKING for Stage 2 close.
+    </intro>
+
+    <error topic="V5 test file name + description">
+      <ea_6_chat_text>"V5 — tools/tests/test_v_matrix_v5_env_fallback.py — 1 case (-BlarAIRoot > BLARAI_ROOT env > inference)"</ea_6_chat_text>
+      <actual_disk>
+        File name: tools/tests/test_v_matrix_v5_ps1_blarairoot.py (NOT _env_fallback.py)
+        Test purpose: PS1 -BlarAIRoot AST-driven probe via subprocess.run to
+                      scripts/verify_25_v2.ps1 + assert ALL_GREEN trailer present
+                      (Guide-#6 g2 simplest path; re-uses proven 20/20 PASS probe)
+        1 test: test_verify_25_v2_probe_emits_all_green
+        Skip-if non-Windows + skip-if pwsh-or-powershell-missing
+      </actual_disk>
+    </error>
+
+    <error topic="V6 test file name + description">
+      <ea_6_chat_text>"V6 — tools/tests/test_v_matrix_v6_load_config.py — 50 cases (allowlist enforcement + --project-root / --project-id flags + AFTER-pattern base_url passthrough)"</ea_6_chat_text>
+      <actual_disk>
+        File name: tools/tests/test_v_matrix_v6_mcp_project_id.py (NOT _load_config.py)
+        Test purpose: MCP server project_id rejection (direct handler invocation; no HTTP
+                      mocking needed because _require_project_id raises before HTTP)
+        49 parametrized tests + 1 audit test:
+          - 7 GATED_HANDLERS (get_project, update_project, delete_project, list_tasks,
+            create_task, search_tasks, bulk_create_tasks)
+          - 7 BAD_PROJECT_IDS (None, "1", True, False, 3.0, 0, -1)
+          - 7 × 7 = 49 + 1 audit
+                            (test_gated_handlers_set_matches_require_project_id_call_sites
+                             uses inspect.getsource() to count actual `_require_project_id(project_id)`
+                             invocation lines and assert match with GATED_HANDLERS)
+        50 tests total ✓ (count matches; description doesn't)
+      </actual_disk>
+    </error>
+
+    <error topic="V7 test file name + description">
+      <ea_6_chat_text>"V7 — tools/tests/test_v_matrix_v7_dashboard_maintainer.py — 6 cases (D3 closure: LiveVikunjaClient.update_task public method)"</ea_6_chat_text>
+      <actual_disk>
+        File name: tools/tests/test_v_matrix_v7_cross_project_byte_identity.py
+                   (NOT _dashboard_maintainer.py)
+        Test purpose: cross-project byte-identity (project portability proof) -- verifies
+                      _project_context.resolve produces ProjectContext instances with
+                      identical structural shape across distinct synthetic project trees
+        6 tests:
+          - test_two_synthetic_projects_resolve_to_distinct_contexts (alpha + beta)
+          - test_cross_project_structural_shape_byte_identical (dataclass field-shape)
+          - test_cross_project_diff_isolates_to_identity_fields_only (catches cross-
+            project state leakage)
+          - test_resolve_round_trip_per_synthetic_project (parametrized × 3:
+            alpha, beta, gamma)
+        6 tests total ✓ (count matches; description doesn't)
+        NOT about D3 (D3 = dashboard_maintainer:113 closure; that's a SEPARATE work
+        item; V matrix V7 is about cross-project portability per init pointer)
+      </actual_disk>
+    </error>
+
+    <verdict>
+      EA-6's chat-narrative errors at the V matrix section are LOW severity and NOT
+      blocking. The CORRECT names + descriptions are:
+        - V4 — test_v_matrix_v4_cli_flag.py — 12 tests (CLI flag exposure parametrized
+          per refactored entrypoint; subprocess --help over 6 argparse entrypoints)
+        - V5 — test_v_matrix_v5_ps1_blarairoot.py — 1 test (PS1 -BlarAIRoot AST-driven
+          probe via subprocess to verify_25_v2.ps1)
+        - V6 — test_v_matrix_v6_mcp_project_id.py — 50 tests (MCP server project_id
+          rejection: 7 GATED_HANDLERS × 7 BAD_PROJECT_IDS = 49 parametrized + 1 audit)
+        - V7 — test_v_matrix_v7_cross_project_byte_identity.py — 6 tests (cross-project
+          byte-identity / project portability: distinct identity + structural shape +
+          diff isolation + round-trip × 3 alpha/beta/gamma)
+
+      LA may reference the corrected names/descriptions when communicating Stage 2 close
+      to subsequent Guide instances or Stage 3 EA spawn. The committed STATUS.md
+      (post-947cbd5) Stage Ledger row entry (line 50 per my prior verification) ALREADY
+      has the correct counts (V4=12, V5=1, V6=50, V7=6); only the LA-facing chat-message
+      narrative had paraphrase errors. Audit chain in git is clean.
+    </verdict>
+  </ea_6_closing_handoff_narrative_paraphrase_errors_informational>
+
+  <handoff_recommendation>
+    <intro>
+      Per GUIDE_PROMPT.xml handoff_protocol &lt;triggers&gt; &lt;trigger
+      name="stage_boundary_recommendation"&gt;: "At the end of any HIGH-risk stage
+      (Stage 2 or Stage 4), proactively recommend handoff before the next stage starts,
+      regardless of context level. The successor benefits from a clean slate at high-risk
+      boundaries."
+    </intro>
+
+    <recommendation>
+      **HANDOFF RECOMMENDED -- Stage 2 close is a HIGH-risk-stage boundary; proactive
+      Guide-#6 → Guide-#7 handoff per stage_boundary_recommendation trigger.**
+
+      When ready, say "emit handoff" and Guide-#6 will produce the brief.
+
+      Per the GUIDE_PROMPT protocol, the handoff brief will be authored as a Markdown
+      document fenced for direct copy into docs/platform_separation/GUIDE_HANDOFF_LATEST.xml
+      (overwriting the previous instance-5-to-6 brief). Successor Guide-#7 is then spawned
+      with: GUIDE_PROMPT.xml + STATUS.md + GUIDE_HANDOFF_LATEST.xml + chat-init block;
+      Guide-#7 runs Variant B comprehension gate; Guide-#7 then authors the Stage 3 EA
+      initialization pointer.
+    </recommendation>
+
+    <answer_to_la_question>
+      The LA asked: "Should we have it produce any handoff documents? Doesn't look like
+      it produced anything for you nor for the next EA."
+
+      DIRECT ANSWERS:
+
+      (1) "produce anything for you" (Guide-side handoff): NO -- this is OUT-OF-SCOPE
+          for EA-6. The Guide-side handoff is GUIDE-#6's responsibility (per
+          GUIDE_PROMPT.xml handoff_protocol). EA-6 correctly did not produce one. I am
+          recommending this handoff now (above) per stage_boundary_recommendation
+          trigger.
+
+      (2) "for the next EA" (Stage 3 EA init pointer): NO -- this is also OUT-OF-SCOPE
+          for EA-6. The init pointer is authored by the GUIDE instance (per the
+          established pattern: Guide-#5 wrote EA-4 + EA-5 init pointers; Guide-#6 wrote
+          the EA-6 init pointer). EA-6 correctly did not produce one. The Stage 3 EA
+          init pointer will be authored by either Guide-#6 (if I continue, no handoff) or
+          Guide-#7 (if successor takes over post-handoff) when Stage 3 spawn is requested.
+
+      (3) EA-6's CLOSING HANDOFF TO LA (the chat-message narrative): YES, EA-6 produced
+          this correctly. It covers all required items per the EA-6 init pointer's
+          closing_handoff_to_la_at_stage_2_close block (Stage 2 commit hash, V1-V7 + V8
+          outputs, V matrix V4-V7 test counts + names [with paraphrase errors flagged
+          above], A11 anomaly, decision narrative, standing invariants). The closing
+          handoff is the EA's deliverable; subsequent handoffs (Guide → Guide; Guide →
+          Stage 3 EA) are MY deliverables.
+
+      (4) The LA's instinct to ASK this meta-question is exactly the right discipline.
+          The procedure has 3 distinct handoff types (EA → LA "closing handoff"; Guide →
+          Guide "handoff brief"; Guide → next EA "init pointer"); a non-dev LA is
+          expected to ask about the chain. I'm responsible for the latter two; EA-6 was
+          responsible for the first (and produced it correctly modulo paraphrase
+          errors).
+    </answer_to_la_question>
+
+    <decision_options_for_la>
+      LA chooses between:
+
+      Option A: Continue with Guide-#6 (no handoff) -- Guide-#6 directly authors Stage 3
+                EA init pointer in the next chat turn. SAVES the bootstrap cost of
+                Guide-#7 spawn. Risk: Guide-#6's context is non-trivially consumed by
+                this Stage 2 work (~6 disposition cycles + multiple verification
+                passes); Stage 3 has its own scope + own dispositions. Continuation is
+                viable but accepts the carryover context.
+
+      Option B: Emit Guide-#6 → Guide-#7 handoff brief (per stage_boundary_recommendation
+                trigger; GUIDE_PROMPT prefers this for HIGH-risk stage boundaries).
+                Guide-#7 spawns fresh; runs Variant B comprehension gate; then authors
+                Stage 3 EA init pointer with fresh context. Costs the bootstrap cycle
+                but matches the GUIDE_PROMPT protocol prescription for HIGH-risk
+                boundaries. Recommended.
+
+      Both options preserve all audit-chain content in git (the
+      docs/platform_separation/temp_for_responses/ + ea_outputs/ are committed; any
+      successor reads them along with STATUS.md + the 7 stage XMLs).
+    </decision_options_for_la>
+  </handoff_recommendation>
+
+  <ack_status_update>
+    <ack id="g6-ea6_n9" prior_status="STATUS-APPEND-PARTIAL-PENDING-2.10.1-NARRATIVE-CORRECTIONS" new_status="FULLY-SATISFIED-AT-947cbd5">
+      Source-fix (server.py docstring 8→7) committed at 3d1ac35; STATUS-append narrative
+      corrected at 947cbd5 per N1-N5. Fully discharged.
+    </ack>
+    <ack id="g6-ea6_n10" prior_status="FORWARD-ACTIVE-FIRST-ACTION-NEXT-TURN" new_status="SATISFIED-AT-947cbd5">
+      5 narrative corrections (footnotes 2, 7, 11, 12.g6-ea6_n7, 12.g6-ea6_n8) applied
+      at 947cbd5. STATUS.md content now matches verbatim disposition record. Fully
+      discharged.
+    </ack>
+    <ack id="all_others">All ack chain items closed:
+      - 33 v4-era acks: SATISFIED throughout the procedure
+      - 4 g6-ea5 acks: SATISFIED at v5 emission
+      - 10 g6-ea6 acks (n1 through n10): SATISFIED at their respective Item closures
+      - i1-3 (pyproject.toml in 2.9 commit): SATISFIED at 3d1ac35
+      - g3-2 (V1-V7 + V8 verification before closing handoff): SATISFIED via EA-6 closing
+        handoff narrative
+      - V1 (BlarAI git status post-commit empty): SATISFIED at 3d1ac35 + reaffirmed at
+        947cbd5
+      - V7 (commit hash captured): 3d1ac35 + 89213ee + 947cbd5 all captured
+      Total ack chain depth: 41 v4-era + 4 g6-ea5 + 10 g6-ea6 = 55 acks across the
+      Stage 2 procedure. All discharged.
+    </ack>
+  </ack_status_update>
+
+  <commendations_for_ea_6_at_retirement>
+    <commendation topic="Multi-cycle disposition discipline" priority="MOST-NOTABLE">
+      EA-6 navigated 6 distinct Guide-#6 disposition cycles in this Item 2.6+ phase
+      (iter-1 gate APPROVED on iter-1 / cfg-resolution OPTION_A_AUTHORIZED /
+      D1 NO-ACTION_DISPOSITIONS_AUTHORIZED / V4 OPTION_B_AUTHORIZED /
+      DOCSTRING_FIX_AUTHORIZED / NARRATIVE_CORRECTIONS_AUTHORIZED) plus closure-
+      acknowledgment cycles. Every disposition was surfaced via STOP-and-ask discipline,
+      framed with multiple options + self-justifying rationale, then executed precisely
+      after Guide authorization. Mature engineering across the longest-running EA cycle
+      in the procedure.
+    </commendation>
+    <commendation topic="11-cycle stash byte-identity preservation">
+      stash@{0} timestamp 20260424_013002 byte-identical from v3 emission (2026-04-25)
+      through the entire Stage 2 procedure including this 947cbd5 close (2026-04-26):
+      v3 → v4 → Guide-5/6 → v5 → 2.7 → 2.7.v2 → docstring/2.8 → 2.9 → 2.10 → 2.10.1.
+      11 cycles of restraint on a single stash entry. Cleanest single-axis discipline
+      win in the procedure.
+    </commendation>
+    <commendation topic="55-ack chain navigation without omission">
+      EA-6 carried forward 41 v4-era acks + 4 g6-ea5 acks + 10 g6-ea6 acks introduced
+      across the Item 2.6+ phase (n1 D2-completion / n2 count_delta / n3 doc-defects /
+      n4 v6-handoff-readiness / n5 Option-A-authorization / n6 path-confusion /
+      n7 D1-NO-ACTION / n8 V4-disposition / n9 docstring-fix / n10 narrative-corrections).
+      All 55 acks restated verbatim in iteration-1 gate; all discharged at appropriate
+      Item closures. No omissions.
+    </commendation>
+    <commendation topic="Independent-judgment overrides at correct decision points">
+      EA-6 DIVERGED from Guide-#6's chokepoint-only (B) recommendation at D4 with
+      substantive 4-point rationale -- catching a Guide-side reasoning flaw (chokepoint
+      VikunjaClient class is a stub; handler-level _require_project_id calls ARE the
+      chokepoint integration). Guide-#6 APPROVED the divergence. This is the LA's
+      "treat-as-hypothesis" mandate working as intended.
+
+      EA-6 also caught the 8-vs-7 docstring drift at file 13 during V6 audit-test
+      authoring -- a defect that would have shipped silently into the 2.9 commit
+      otherwise. EA-6 surfaced + proposed disposition; Guide-#6 authorized in-source
+      fix per dn19; corrected at the docstring-fix turn before 2.8 BLARAI_PID gate.
+    </commendation>
+    <commendation topic="Append-only discipline at 2.10 close">
+      Most invariant-stress requirement of Item 2.10: "append-only" -- existing entries
+      MUST NOT be modified. EA-6 succeeded: A1-A10 untouched verbatim; Stage 0/1 ledger
+      rows untouched; Recovery Anchors / Vikunja Project IDs / How to Resume sections
+      untouched. Pure-append work.
+    </commendation>
+    <commendation topic="Final paraphrase-error pattern self-noted but uncorrected">
+      The closing-handoff chat narrative has paraphrase errors at the V matrix section
+      (V5/V6/V7 wrong test file names + descriptions). This is consistent with EA-6's
+      paraphrase-introduced-error pattern across the procedure (caught at v5 count_delta
+      + file 13 docstring + 2.10 footnotes 5-error inventory). Each prior cycle was
+      corrected via in-scope follow-on commits. The final chat narrative isn't committed,
+      so correction is optional. Note for retiring EA-6: the structural axes have been
+      excellent throughout; the paraphrase axis has been a recurrent (LOW-MED severity)
+      risk worth flagging to any successor EA in similar long-running procedures.
+    </commendation>
+  </commendations_for_ea_6_at_retirement>
+
+  <required_corrections>
+    <!-- Empty: 947cbd5 commit is verified clean. EA-6 closing handoff narrative
+         paraphrase errors are LOW-severity informational only (chat message, not
+         committed); listed under
+         &lt;ea_6_closing_handoff_narrative_paraphrase_errors_informational&gt; for
+         LA reference. -->
+  </required_corrections>
+
+  <required_acknowledgments>
+    <ack_to_la id="LA_handoff_signal_required">
+      Per stage_boundary_recommendation trigger: Guide-#6 RECOMMENDS Guide-#6 → Guide-#7
+      handoff before Stage 3 spawn. Awaiting LA signal:
+        - "emit handoff" → Guide-#6 produces brief; LA spawns Guide-#7 fresh; Guide-#7
+          authors Stage 3 EA init pointer.
+        - "continue with Guide-#6" → Guide-#6 directly authors Stage 3 EA init pointer
+          in the next chat turn; no Guide-side handoff brief.
+        - Other LA direction → as instructed.
+      Per GUIDE_PROMPT.xml &lt;on_trigger&gt;: "Do NOT auto-emit. Wait for the LA's
+      signal so handoff happens between Executor sessions, not in the middle of one."
+      So no auto-emit; waiting on LA explicit direction.
+    </ack_to_la>
+  </required_acknowledgments>
+
+  <foundation_solidity_check_per_la_motto>
+    <evidence>
+      Stage 2 substantive + audit-chain work is COMPLETE through 2.10.1. Concrete evidence
+      for "mature not minimal" axis-by-axis:
+
+      Structural axis (PASS):
+        - Single Stage-2 commit at 3d1ac35 (69 files / +12955 -74; pyproject.toml in
+          diff per i1-3)
+        - STATUS append at 89213ee (+59/-5; 12-item cumulative footnote set; A11
+          anomaly; Stage Ledger row Stage 2 PENDING → COMPLETE; Guide-#6 verdict XML
+          archived per artifact-management guidance)
+        - Footnote narrative corrections at 947cbd5 (5 N-corrections per Guide-#6
+          authorization; STATUS.md narratives now match verbatim disposition record)
+        - Working tree clean post-commit
+        - 11-cycle stash byte-identity preserved
+        - state.json invariants verbatim through 2.5+ days
+        - Fleet paused; 13/13 scheduled tasks Disabled; Vikunja running per Option B
+          (Stage 4.0/4.1 will restore V4=0)
+        - No merge to main; no governance edits; no --amend on committed work
+        - Audit chain (temp_for_responses/ + ea_outputs/) committed in git per artifact-
+          management guidance
+
+      Narrative axis (PASS at committed level; minor LOW-severity informational gaps in
+      chat messages):
+        - All 5 N-corrections at 947cbd5 reflect verbatim disposition record
+        - STATUS.md Stage Ledger row entry has correct V matrix counts (V4=12 / V5=1 /
+          V6=50 / V7=6) and accurate disposition pointers
+        - Footnote narratives now match verbatim text from temp_for_responses/ files
+        - 12-item cumulative footnote set complete and accurate
+        - Closing handoff chat narrative has V5/V6/V7 file-name + description paraphrase
+          errors (LOW; chat-only; informational; corrections noted in this Guide-#6 file
+          for LA reference)
+
+      Audit-chain axis (PASS):
+        - 55-ack chain depth: all discharged at appropriate Item closures
+        - 6 Guide-#6 disposition cycles fully archived in temp_for_responses/
+        - 5 EA mid-stage handoff XMLs (v1-v5) archived in ea_outputs/
+        - 4 EA comprehension gates (iter-1 across EA-3/4/5/6) archived in
+          temp_for_responses/
+        - 4 EA initialization pointers (EA-4/5/6 init pointers; v4 quality review)
+          archived
+        - All authoritative; all browseable post-Stage-6.9 archive
+
+      Invariant axis (PASS):
+        - Stash byte-identity 11 cycles
+        - Fleet pause invariance through entire 2.5+ day cycle
+        - state.json verbatim
+        - Append-only STATUS discipline preserved
+        - No-amend doctrine honored
+        - No merge to main; merge gate at Stage 5.10 with explicit LA approval per R10
+    </evidence>
+
+    <verdict>
+      Stage 2 is TRULY CLOSED at all axes (structural + narrative + audit-chain +
+      invariant). EA-6 has met "mature not minimal" comprehensively across the longest
+      EA cycle in the procedure (~3 days; 6 disposition cycles; 55-ack chain
+      navigation). EA-6 retires correctly; Stage 3 spawn is a separate fresh-EA cycle
+      that EA-6 is NOT responsible for.
+
+      The LA's meta-question on handoff documents reveals an excellent procedural
+      instinct: identifying that further handoff artifacts are needed without yet
+      knowing whose responsibility they are. The answer (Guide-side handoff brief +
+      Stage 3 EA init pointer are GUIDE responsibilities, not EA's) is the right
+      delineation. Guide-#6 RECOMMENDS handoff per stage_boundary_recommendation
+      trigger; awaits LA signal on Option A (continue) vs Option B (handoff to
+      Guide-#7).
+    </verdict>
+  </foundation_solidity_check_per_la_motto>
+
+  <proceed_authorization>
+    EA-6 CORRECTLY RETIRES. EA-6's responsibility for Stage 2 close ends at the closing
+    handoff narrative (chat message); the closing handoff is COMPLETE per the
+    closing_handoff_to_la_at_stage_2_close block in the EA-6 init pointer.
+
+    Stage 2 is CLOSED. The procedure transitions to Stage 3 (Copy tools), which is a
+    SEPARATE fresh-EA spawn -- NOT EA-6's responsibility.
+
+    NEXT-TURN ACTIONS (Guide-#6 / LA):
+
+      Option A (LA selects "continue"): Guide-#6 directly authors Stage 3 EA
+      initialization pointer in the next chat turn. The init pointer references:
+      947cbd5 HEAD; 12-item Stage 2 closure footnote set; the 5 EA mid-stage handoff
+      XMLs (v1-v5) at ea_outputs/; the 6 Guide-#6 disposition files at temp_for_responses/;
+      the 4 v4 + 4 v5 documentation corrections (D1-D5 + C1-C4); the 5 N narrative
+      corrections; ack chain g6-ea6_n1 through n10 SATISFIED. Stage 3 EA spawns with
+      this init pointer + 04_STAGE3_COPY_TOOLS.xml + STATUS.md attached.
+
+      Option B (LA selects "emit handoff"): Guide-#6 produces the brief per
+      GUIDE_PROMPT.xml emit_format template; LA saves to GUIDE_HANDOFF_LATEST.xml
+      (overwriting prior); LA spawns Guide-#7 in fresh chat with GUIDE_PROMPT.xml +
+      STATUS.md + GUIDE_HANDOFF_LATEST.xml + chat-init block; Guide-#7 runs Variant B
+      comprehension gate; Guide-#7 then authors Stage 3 EA init pointer with fresh
+      context.
+
+    The two options differ in WHO authors the Stage 3 EA init pointer (Guide-#6
+    continuing vs Guide-#7 successor) but produce equivalent Stage 3 readiness. Both
+    preserve all audit-chain content in git.
+
+    Standing invariants unchanged: no further Stage 2 commits beyond 947cbd5; fleet
+    stays paused (NEVER state.resume_fleet); no merge to main; stash@{0} untouched;
+    Vikunja running per Option B until Stage 4.0/4.1 preflight.
+
+    Guide-#6 STOPS here per the stop-after-gate pattern. Awaiting LA signal on
+    Option A vs Option B.
+  </proceed_authorization>
+
+</guide_review_response>

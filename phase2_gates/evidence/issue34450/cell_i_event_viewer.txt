@@ -1,0 +1,54 @@
+# Windows Application Error — Event Viewer capture
+# Source: Windows Logs > Application, Event ID 1000, Provider: Application Error
+# Captured: 2026-05-01 (queried via Get-WinEvent from prior session crash)
+# Most recent python.exe crash entry (EventRecordID 105994)
+
+TimeCreated:        2026-04-25T20:56:05.3787167Z
+EventRecordID:      105994
+Computer:           Northstar100
+
+AppName:            python.exe
+AppVersion:         3.11.9150.1013
+AppTimeStamp:       660bda91
+AppPath:            C:\Users\mrbla\AppData\Local\Programs\Python\Python311\python.exe
+
+ModuleName:         openvino.dll
+ModuleVersion:      2026.0.0.20965
+ModuleTimeStamp:    6995f8bb
+ModulePath:         C:\Users\mrbla\BlarAI\.venv\Lib\site-packages\openvino\libs\openvino.dll
+
+ExceptionCode:      c0000005   (STATUS_ACCESS_VIOLATION)
+FaultingOffset:     0000000000077d86
+
+ProcessId:          0x43bc
+
+# Second entry (same crash pattern, EventRecordID 105971, same faulting offset):
+# TimeCreated: 2026-04-25T20:48:21.7157579Z
+# ModuleName:  openvino.dll  ModuleVersion: 2026.0.0.20965
+# ExceptionCode: c0000005  FaultingOffset: 0000000000077d86
+# Both crashes fault at the same openvino.dll+0x77d86 offset — deterministic.
+
+# Raw XML (most recent entry):
+# <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+#   <System>
+#     <Provider Name='Application Error' Guid='{a0e9b465-b939-57d7-b27d-95d8e925ff57}'/>
+#     <EventID>1000</EventID><Level>2</Level><Task>100</Task>
+#     <TimeCreated SystemTime='2026-04-25T20:56:05.3787167Z'/>
+#     <EventRecordID>105994</EventRecordID>
+#     <Computer>Northstar100</Computer>
+#   </System>
+#   <EventData>
+#     <Data Name='AppName'>python.exe</Data>
+#     <Data Name='AppVersion'>3.11.9150.1013</Data>
+#     <Data Name='AppTimeStamp'>660bda91</Data>
+#     <Data Name='ModuleName'>openvino.dll</Data>
+#     <Data Name='ModuleVersion'>2026.0.0.20965</Data>
+#     <Data Name='ModuleTimeStamp'>6995f8bb</Data>
+#     <Data Name='ExceptionCode'>c0000005</Data>
+#     <Data Name='FaultingOffset'>0000000000077d86</Data>
+#     <Data Name='ProcessId'>0x43bc</Data>
+#     <Data Name='AppPath'>C:\Users\mrbla\AppData\Local\Programs\Python\Python311\python.exe</Data>
+#     <Data Name='ModulePath'>C:\Users\mrbla\BlarAI\.venv\Lib\site-packages\openvino\libs\openvino.dll</Data>
+#     <Data Name='IntegratorReportId'>3ed3a66a-e28d-4c49-8dda-b0e186099bab</Data>
+#   </EventData>
+# </Event>

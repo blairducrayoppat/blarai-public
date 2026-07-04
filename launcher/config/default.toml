@@ -1,0 +1,102 @@
+# BlarAI Launcher — guest-service configuration (#655 Stage C)
+# =============================================================
+# Read by launcher/guest_parser.py (tomllib).  This file deliberately follows
+# the services convention (<component>/config/default.toml) even though the
+# launcher's own *posture* knobs stay env-vars (the #657 idiom): the guest
+# parser is a managed SERVICE with addressing + paths, not a posture flag.
+#
+# [guest_parser] — the UC-003 guest-homed parser (ADR-030 §3: hostile web
+# bytes are parsed ONLY inside the Hyper-V guest; cleaned text returns over
+# AF_HYPERV vsock).
+#
+# DORMANT BY DEFAULT (enabled = false): until the controlled activation
+# session proves the deploy channel + the guest service end-to-end, the
+# launcher skips the guest parser entirely and the parse capability reports
+# unavailable — URL-mode ingest then REFUSES (the cleaner's fail-closed
+# refusal; ADR-030's named anti-pattern is silently falling back to host-side
+# parsing, which this config can never express).
+
+[guest_parser]
+# Master switch.  false → launcher never touches the VM for the parser and
+# is_available() is False (capability refused, boot unaffected).
+enabled = false
+
+# Hyper-V VM that homes the parser (the existing BlarAI-Orchestrator guest —
+# Alpine 3.21, NIC-less, zero-NIC posture asserted at VM start by
+# launcher/vm_manager.verify_vm_zero_nic).
+vm_name = "BlarAI-Orchestrator"
+
+# Guest-side root the provisioning script creates (scripts/guest/
+# provision_parser.sh).  incoming/ receives deploy bundles; current/ is the
+# live release symlink; venv/ holds the pinned extraction stack.
+guest_root = "/opt/blarai/parser"
+
+# AF_VSOCK port the guest parser binds + the matching hv_sock service GUID.
+# The GUID MUST be the hv_sock template form for the port
+# (<port_hex>-facb-11e6-bd58-64006a7986d3); the loader fails closed on any
+# mismatch so the two can never silently diverge (the #615 lesson).
+# 50001 = 0xC351.  NOTE: the host-side registry registration for this GUID
+# (HKLM\...\Virtualization\GuestCommunicationServices\<guid>) is a controlled-
+# session step — scripts/register_parser_vsock_service.ps1.
+vsock_port = 50001
+service_guid = "0000c351-facb-11e6-bd58-64006a7986d3"
+
+# Host-side directory (repo-root-relative) holding the parser service files
+# the deploy step bundles + ships.  This is the EXPECTED future home of the
+# guest parser service being built on the parallel #655 branch; deploy fails
+# closed (GP_SOURCE_MISSING) while it does not exist.
+service_source_dir = "services/cleaner/guest"
+
+# Python module the guest supervisor launches (venv/bin/python -m <module>).
+# Written into the deploy bundle's service.conf; the supervisor exports
+# BLARAI_PARSER_VSOCK_PORT to it.  Binds to the parallel branch's entrypoint.
+entry_module = "blarai_guest_parser"
+
+# Timeouts.  deploy_timeout_s bounds each Copy-VMFile; health_timeout_s
+# bounds the start step's wait for a vsock health response (transport
+# reachability poll + the seam-bound frame-level probe).  health_timeout_s
+# must cover a COLD VM boot: when the launcher starts the VM from Off, the
+# Alpine guest + the resident OpenRC parser service take longer than the old
+# 30s to begin answering on vsock (observed GP_HEALTH_TIMEOUT on a cold start
+# 2026-06-12; a WARM VM answered in ~1s).  The poll connects the instant the
+# listener is up, so a warm boot is still fast — this is only the ceiling.
+deploy_timeout_s = 120.0
+health_timeout_s = 120.0
+health_poll_interval_s = 1.0
+
+# AF_HYPERV version bridge (#655 Option A).  The runtime venv is Python 3.11,
+# which lacks socket.AF_HYPERV (added in 3.12); the launcher reaches the guest
+# through a small 3.14 subprocess helper (launcher.guest_parser_bridge).  This
+# key pins the bridge interpreter:
+#   ""        → auto-discover (py -3.14, then the known dev-box 3.14 path);
+#               the 3.11 runtime sys.executable is NEVER silently used.
+#   <path>    → an explicit python.exe that MUST have socket.AF_HYPERV.
+# If no qualifying interpreter is found the launcher fails closed LOUD
+# (GP_BRIDGE_UNAVAILABLE) — URL ingest refuses, never a host-side parse.
+# A future 3.12+ runtime venv makes the bridge unnecessary: the launcher then
+# opens AF_HYPERV in-process and skips the subprocess entirely.
+bridge_python = ""
+
+# Resident model (#655 go-live) — PERMANENT correct truth.  The parser is baked
+# into the guest image and auto-starts on boot via OpenRC, so the host-side
+# Copy-VMFile deploy is dead on the guest kernel (it was never the live channel:
+# the guest supervisor watches incoming/, and a resident image needs no
+# shipment).  true → the launcher SKIPS deploy() and goes straight to start()
+# (legal from IDLE), awaiting the guest's own health.  This does NOT open the
+# door: enabled=false above still keeps the whole guest-parser path dormant —
+# resident only fixes HOW the parser comes up once enabled.
+resident = true
+
+# Host↔guest parse-channel mTLS material (#655 go-live prep — DORMANT).
+# All three empty (the shipped default) → plaintext-AF_HYPERV bring-up: the
+# parse channel is on-box host↔guest vsock (never a network path), so the
+# plaintext exposure is local-only.  mTLS here is the named HARD GATE before the
+# first live INGEST_FETCH ceremony; activating it requires re-provisioning the
+# guest parser with a server cert + dropping its --allow-plaintext, then setting
+# the three paths below.  The host-side plumbing is already threaded through
+# (the health probe + the content parse round-trip + the version bridge all read
+# these), so activation is config-only — no code change.  Partial material
+# (some-but-not-all) is rejected by the transport's own mTLS validation.
+mtls_cert = ""
+mtls_key = ""
+mtls_ca = ""

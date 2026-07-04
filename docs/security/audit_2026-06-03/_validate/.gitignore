@@ -1,0 +1,3 @@
+# Throwaway mermaid+jsdom validator deps; re-create with `npm install` here.
+node_modules/
+package-lock.json

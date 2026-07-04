@@ -1,0 +1,30 @@
+{
+  "artifact_inventory": [
+    "phase2_gates/evidence/uat25_stability_matrix.json",
+    "phase2_gates/evidence/uat25_failure_injection_matrix.json",
+    "phase2_gates/evidence/uat25_evidence_normalization.json",
+    "phase2_gates/evidence/uat25_summary.md"
+  ],
+  "baseline": {
+    "branch": "feature/p1-uat1-launcher",
+    "post_head": "21b59adb735f3676c52004c3513f1f835ff4fd49",
+    "pre_head": "21b59adb735f3676c52004c3513f1f835ff4fd49"
+  },
+  "milestone": "Operational Exit Milestone 3",
+  "normalized_schema": {
+    "required_fields": [
+      "milestone",
+      "startup_profile",
+      "run_count",
+      "disposition",
+      "runs[].step_bools",
+      "scenarios[].scenario_id",
+      "scenarios[].injected_condition",
+      "scenarios[].expected_fail_closed_fingerprint_codes",
+      "scenarios[].observed_fingerprint_codes",
+      "baseline_restore.restored"
+    ]
+  },
+  "schema_version": "1.0.0",
+  "timestamp": "2026-02-25T16:20:52.699937+00:00"
+}

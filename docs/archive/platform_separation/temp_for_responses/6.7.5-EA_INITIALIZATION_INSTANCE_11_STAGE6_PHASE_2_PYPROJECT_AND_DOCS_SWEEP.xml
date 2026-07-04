@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  EA DISPATCH — INSTANCE 11
+  Stage 6 / Phase 2 — pyproject.toml Finalization + Docs Sweep
+  Authored: 2026-05-07 by Guide-#10
+  Authorized by LA: 2026-05-07 (verbal authorization: "Yes. You are authorized to proceed to Phase 2.")
+  Prerequisite: EA-10 Phase 1 APPROVED by Guide-#10 (all 10 exit criteria met; commits 9a4fbd0 / 7ede5d8 / 73a03f9 / 4b82cf3).
+-->
+<ea_dispatch
+  instance="11"
+  guide_instance="10"
+  stage="6"
+  phase="2"
+  phase_name="Stage 6 Items 6.4 + 6.5 — pyproject.toml Finalization and BlarAI Docs Sweep"
+  risk="LOW"
+  authored_date="2026-05-07"
+  authored_by="Guide-#10">
+
+  <!-- ===================================================================
+       §1  MANDATORY FIRST ACTION — COMPREHENSION GATE
+       Present all 8 sections exactly as structured below.
+       STOP and WAIT for Guide-#10 APPROVED verdict (delivered by LA)
+       before touching any file, any Vikunja task, or any git command.
+       =================================================================== -->
+  <comprehension_gate mandatory="true">
+    <rule>
+      Present sections CG1–CG8 as your first and ONLY output.
+      Do NOT begin work. Do NOT call any tools. Do NOT modify any file.
+      Await an explicit APPROVED or APPROVED_WITH_ADJUSTMENTS verdict from Guide-#10.
+      If verdict is REJECTED or contains binding adjustments, apply them before proceeding.
+    </rule>
+
+    <required_sections>
+
+      <section id="CG1" title="Phase 2 scope summary">
+        Describe Phase 2 in 3–5 sentences:
+        - What Stage 6 spec items 6.4 and 6.5 require (not spec-quoted verbatim; your interpretation).
+        - That 6.1 / 6.2 / 6.3 / 6.6 are DEFERRED per 6.1.v2 and are NOT in scope for this phase.
+        - That the 37-ticket hardening backlog in Project 10 is NOT the source of Phase 2 work; no hardening-backlog closes in Phase 2.
+        - That a Phase 2 tracking task will be created in Vikunja Project 10 at start (before pause).
+      </section>
+
+      <section id="CG2" title="Pre-Flight Step 0 expected state (all 4 checks)">
+        For each check, state what you expect to observe and what constitutes a PASS vs HARD STOP:
+
+        Check 0a — .platform/ directory contents:
+          Expected: exactly 2 entries — audit_archive/ and vikunja_project_ids.yaml.
+          Any count other than 2 → HARD STOP; report to Guide-#10 before proceeding.
+
+        Check 0b — 3 platform-extraction git tags:
+          Expected: pre-platform-extract, post-platform-extract, platform-extracted all present in BlarAI repo.
+          Any missing → HARD STOP.
+
+        Check 0c — Working tree state:
+          BlarAI main expected at 73a03f9 (Phase 1 BlarAI commit). Any commit hash other than this on
+          BlarAI main → HARD STOP; report to Guide-#10.
+          devplatform main expected at 4b82cf3 (Phase 1 unpause commit). Any other hash → HARD STOP.
+          BlarAI working tree: 9 .claude/agents/*.md files with ' D' status (unstaged deletions) —
+          EXPECTED; LA WIP; untouched throughout Phase 2.
+          devplatform working tree: 2 stale flag files (critical_pending.flag + vikunja_down.flag)
+          in tools/fleet_observability/ — EXPECTED; untouched throughout Phase 2.
+
+        Check 0d — Fleet pause state:
+          Expected: fleet_paused=false in devplatform/tools/autonomy_budget/state.json at boot.
+          fleet_paused=true at boot → HARD STOP; investigate before proceeding.
+      </section>
+
+      <section id="CG3" title="Item 6.4 exact change plan">
+        State the exact edit to devplatform/pyproject.toml:
+        - Read the file first. Confirm no placeholder comments, TODOs, or obviously provisional lines
+          beyond what is already known (version=0.1.0, description already present).
+        - The only anticipated addition: an `authors` field in the [project] block, inserted after
+          the `description` line:
+            authors = [
+                {name = "Blair", email = "mr.blair.do@gmail.com"},
+            ]
+        - If the file already has an authors field: note it in the gate response and mark 6.4 as
+          already satisfied; no edit needed.
+        - If other placeholder bits are found that were NOT anticipated here: enumerate them in the
+          gate response; do NOT modify them without Guide-#10 authorization.
+        - Confirm: no other pyproject.toml sections will be added, removed, or reordered.
+      </section>
+
+      <section id="CG4" title="Item 6.5 verification plan">
+        State the exact sweep command and your interpretation of results:
+
+        Command:
+          Get-ChildItem C:\Users\mrbla\BlarAI\docs -File |
+            Where-Object { $_.Name -match "CLAUDE_|CO_LEAD_|DEC[0-9]+|DOMAIN[0-9]|FLEET_|COWORK" }
+
+        Expected result: empty (no output).
+
+        If output is empty: PASS — record in STATUS.md, no file relocations needed.
+        If output is non-empty: HARD STOP — list every matched filename in close report to Guide-#10;
+          do NOT relocate any file without explicit Guide-#10 disposition per file.
+
+        Note: the sweep is read-only. No BlarAI/docs/ file is touched in Phase 2 unless a non-empty
+        sweep result triggers Guide-#10 relocation disposition (which would require a new dispatch
+        addendum before execution).
+      </section>
+
+      <section id="CG5" title="Commit plan (4 commits, files per commit, exact messages)">
+        List all 4 commits in execution order:
+
+        Commit 1 — devplatform main (Pre-Flight Step 1):
+          Files: tools/autonomy_budget/state.json (pause_fleet output)
+          Message: chore(ops): pause fleet -- Stage 6 Phase 2 items 6.4+6.5 -- EA-11
+          Staged via: git add tools/autonomy_budget/state.json
+
+        Commit 2 — devplatform main (Item 6.4):
+          Files: pyproject.toml (authors field added)
+          Message: feat(project): finalize pyproject.toml -- add authors field (Stage 6 Item 6.4)
+          Staged via: git add pyproject.toml
+
+        Commit 3 — BlarAI main (STATUS.md):
+          Files: docs/platform_separation/STATUS.md (E10 evolution entry + Stage 6 table update)
+          Message: docs(stage6_phase2): record Items 6.4+6.5 complete in STATUS.md (E10)
+          Staged via: git add docs/platform_separation/STATUS.md
+
+        Commit 4 — devplatform main (Post-Flight Step):
+          Files: tools/autonomy_budget/state.json (resume_fleet output)
+          Message: chore(ops): unpause fleet -- Stage 6 Phase 2 items 6.4+6.5 -- EA-11 done
+          Staged via: git add tools/autonomy_budget/state.json
+
+        No other files. No git add . or git add -A anywhere.
+        Commit 2 omitted only if 6.4 is already satisfied (authors field pre-existing).
+        Commit 3 omitted only if 6.5 sweep is non-empty and Phase 2 halts pending disposition
+          (close report is emitted instead; STATUS.md not updated until disposition resolved).
+      </section>
+
+      <section id="CG6" title="A33 standing workaround acknowledgment">
+        Acknowledge: mcp__vikunja__complete_task is PERMANENTLY SUSPENDED in Phase 2.
+        Vikunja A33 data-loss bug: complete_task sends only {"done": True}; Vikunja backend
+        zeroes absent fields (description="", priority=0). Fix tracked at Ticket WW (id 318).
+        All closes (Phase 2 tracking task + any incidental closes) use Option B:
+          1. get_task(task_id) — capture title, description, priority.
+          2. update_task(task_id, title=t, description=d, priority=p, done=True).
+        Both title and done=True MUST be explicit in every update_task close call.
+      </section>
+
+      <section id="CG7" title="Standing artifacts acknowledgment">
+        Acknowledge the following artifacts are UNTOUCHED throughout Phase 2:
+        - BlarAI working tree: 9 .claude/agents/*.md files with ' D' status (unstaged deletions).
+          These are LA's WIP. Explicit-add discipline ensures they are never staged.
+        - devplatform working tree: critical_pending.flag + vikunja_down.flag in
+          tools/fleet_observability/ — stale 2026-05-04 Vikunja-down artifacts. Untracked; safe.
+        Neither set of artifacts requires any remediation action by EA-11.
+      </section>
+
+      <section id="CG8" title="All 9 required acks confirmed">
+        Confirm each ack by label (g10-ea11_n1 through g10-ea11_n9) with one sentence each.
+        See §5 Required Acks for the full text.
+      </section>
+
+    </required_sections>
+  </comprehension_gate>
+
+
+  <!-- ===================================================================
+       §2  CONTEXT AND INHERITED STATE
+       =================================================================== -->
+  <context>
+
+    <inheritance>
+      Cumulative binding-atom chain: 132 atoms through Stage 5 close.
+      Phase 1 (EA-10) acks in g10-ea10_n* namespace do NOT add to the 132-atom count
+      per the no-amend doctrine (dn30); they are Phase-local binding constraints.
+      Phase 2 acks use namespace g10-ea11_n* (Guide-#10, EA instance 11).
+    </inheritance>
+
+    <repo_state>
+      BlarAI main HEAD: 73a03f9
+        Commit: "docs(stage6_phase1): A32+A33 anomaly entries + CLAUDE.md Defunct label inventory addition"
+        Authored: 2026-05-07 (EA-10 Phase 1 BlarAI commit)
+
+      devplatform main HEAD: 4b82cf3
+        Commit: "chore(ops): unpause fleet -- Stage 6 Phase 1 quick-wins batch -- EA-10 done"
+        Authored: 2026-05-07 (EA-10 Phase 1 Post-Flight)
+
+      Fleet state: unpaused (fleet_paused=false, last_updated_utc=2026-05-07T20:05:56Z)
+    </repo_state>
+
+    <vikunja_state>
+      Project 10 (DevPlatform-Meta) at Phase 2 dispatch:
+        Total: 37  |  Done: 13  |  Open: 24  |  High-priority open: 4
+      High-priority open (priority=3): A(282), X(289), II(299), VV(317)
+      Phase 2 does NOT close any of these 24 hardening backlog tickets.
+      Phase 2 Vikunja activity: create 1 tracking task (Phase 2 start) + close it (Phase 2 end).
+    </vikunja_state>
+
+    <platform_geometry>
+      .platform/ directory (BlarAI repo, correct post-E8 state):
+        audit_archive/           — preserved, untouched
+        vikunja_project_ids.yaml — preserved, untouched
+      docs/active_tasks.yaml     — lives at BlarAI/docs/ post-E8 (NOT .platform/)
+      docs/sprints/              — lives at BlarAI/docs/ post-E8 (NOT .platform/)
+    </platform_geometry>
+
+    <deferred_items>
+      Per 6.1.v2 (LA directive 2026-04-24): Items 6.1, 6.2, 6.3, 6.6 are DEFERRED.
+      Doctrine splits (CLAUDE.md, copilot-instructions.md, AGENTS.md) await a separate
+      explicitly-approved session. EA-11 does NOT touch these items.
+      24h soak (Item 6.7): DEFERRED — LA accepted 45-min baseline at E2 (dn31 prohibition).
+      Item 6.8 (fleet handoff), 6.9 (archive), 6.10 (final STATUS.md close): future phases.
+    </deferred_items>
+
+    <anomaly_A33_standing_workaround>
+      complete_task MCP tool is SUSPENDED until Ticket WW (id 318) is resolved.
+      All ticket closes in Phase 2 and all subsequent phases use Option B:
+        step 1: get_task(task_id) → capture title, description, priority
+        step 2: update_task(task_id, title=t, description=d, priority=p, done=True)
+      done=True MUST be explicit (Go zero-value=false would reopen the ticket).
+      title MUST be explicit (required field; omitting creates a silent empty-title).
+    </anomaly_A33_standing_workaround>
+
+  </context>
+
+
+  <!-- ===================================================================
+       §3  PRE-FLIGHT
+       =================================================================== -->
+  <pre_flight>
+
+    <step id="0" name="4-check verification" timing="Before any tool call or file edit">
+      <instruction>
+        Run each check in order. Report all 4 results in the gate response.
+        HARD STOP on any unexpected FAIL unless a prior Guide-#10 disposition has waived it.
+      </instruction>
+
+      <check id="0a" label=".platform/ contents">
+        <command>Get-ChildItem C:\Users\mrbla\BlarAI\.platform | Select-Object Name</command>
+        <expected>Exactly 2 items: audit_archive, vikunja_project_ids.yaml</expected>
+        <on_unexpected>HARD STOP. Report actual contents to Guide-#10.</on_unexpected>
+      </check>
+
+      <check id="0b" label="3 platform-extraction git tags">
+        <command>git -C C:\Users\mrbla\BlarAI tag --list "pre-platform-extract" "post-platform-extract" "platform-extracted"</command>
+        <expected>3 lines, one per tag</expected>
+        <on_unexpected>HARD STOP. Report missing tags to Guide-#10.</on_unexpected>
+      </check>
+
+      <check id="0c" label="Repo HEADs and working tree">
+        <commands>
+          <cmd>git -C C:\Users\mrbla\BlarAI log --oneline -1</cmd>
+          <cmd>git -C C:\Users\mrbla\devplatform log --oneline -1</cmd>
+          <cmd>git -C C:\Users\mrbla\BlarAI status --short</cmd>
+          <cmd>git -C C:\Users\mrbla\devplatform status --short</cmd>
+        </commands>
+        <expected>
+          BlarAI HEAD: 73a03f9
+          devplatform HEAD: 4b82cf3
+          BlarAI working tree: only the 9 .claude/agents/*.md ' D' lines (unstaged deletions) — no
+            other modifications or staged changes.
+          devplatform working tree: only the 2 untracked flag files — no staged changes.
+        </expected>
+        <on_unexpected>
+          HEAD mismatch on either repo → HARD STOP; report actual HEAD to Guide-#10.
+          Unexpected staged changes → HARD STOP; report diff to Guide-#10.
+          Additional untracked files beyond the 2 known flags → note them; not a HARD STOP unless
+            they are in paths that Phase 2 commits touch.
+        </on_unexpected>
+      </check>
+
+      <check id="0d" label="Fleet pause state">
+        <command>Get-Content C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json | ConvertFrom-Json | Select fleet_paused, fleet_paused_reason, last_updated_utc</command>
+        <expected>fleet_paused=false</expected>
+        <on_unexpected>fleet_paused=true at boot → HARD STOP; investigate before proceeding.</on_unexpected>
+      </check>
+    </step>
+
+    <step id="0.5" name="Create Phase 2 Vikunja tracking task" timing="After Step 0 PASS, before Step 1">
+      <instruction>
+        Create a tracking task in Project 10 (DevPlatform-Meta) before pausing the fleet.
+        Vikunja mutations are NOT gated by fleet_paused state.
+      </instruction>
+      <task_spec>
+        title:       "Stage 6 Phase 2: pyproject.toml finalization + docs sweep (Items 6.4+6.5)"
+        project_id:  10
+        priority:    2  (MEDIUM)
+        description: "EA-11 Phase 2 execution. Items in scope: 6.4 (devplatform pyproject.toml — add authors field; confirm no placeholder bits), 6.5 (BlarAI/docs/ platform-layer sweep — expected empty). Items 6.1/6.2/6.3/6.6 DEFERRED per 6.1.v2. Commits: pause + 6.4 edit + STATUS.md E10 + unpause. Reference: docs/platform_separation/07_STAGE6_HARDENING.xml items 6.4–6.5."
+        labels_to_apply_after_create:  [id 1 Active, id 5 Infrastructure]
+      </task_spec>
+      <note>
+        Capture the created task's Vikunja ID immediately. All subsequent comments and the
+        final close reference this ID. If create_task fails with a connection error, stop
+        and report before proceeding — do not skip tracking.
+      </note>
+    </step>
+
+    <step id="1" name="Pause fleet" timing="After Step 0.5, before any file edit">
+      <command>
+        python -c "import sys; sys.path.insert(0, r'C:\Users\mrbla\devplatform'); from tools.autonomy_budget import state; state.pause_fleet('Stage 6 Phase 2 items 6.4+6.5 -- EA-11', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      </command>
+      <verify>fleet_paused=True, fleet_paused_reason="Stage 6 Phase 2 items 6.4+6.5 -- EA-11", last_updated_by=ea_code</verify>
+      <commit>
+        <repo>devplatform</repo>
+        <files_to_stage>tools/autonomy_budget/state.json</files_to_stage>
+        <message>chore(ops): pause fleet -- Stage 6 Phase 2 items 6.4+6.5 -- EA-11</message>
+        <constraint>git add tools/autonomy_budget/state.json — no other files</constraint>
+      </commit>
+      <on_failure>If pause_fleet() raises AttributeError or ImportError, use manual fallback:
+        edit state.json directly (set fleet_paused=true, fleet_paused_reason="Stage 6 Phase 2 -- EA-11",
+        last_updated_by="ea_code", last_updated_utc=current UTC ISO 8601 Z). Commit. Report the
+        fallback in the close report.
+      </on_failure>
+    </step>
+
+  </pre_flight>
+
+
+  <!-- ===================================================================
+       §4  WORK ITEMS
+       =================================================================== -->
+  <work_items>
+
+    <item id="6.4" name="Finalize devplatform pyproject.toml">
+      <spec_reference>07_STAGE6_HARDENING.xml §work_items item id="6.4"</spec_reference>
+      <description>
+        Remove any placeholder bits from Stage 1.7 / Stage 3.4. Add proper version, description, author.
+        "version" (0.1.0) and "description" are already present in the current file.
+        The anticipated missing element is the `authors` field.
+      </description>
+
+      <execution_steps>
+        <step>Read C:\Users\mrbla\devplatform\pyproject.toml in full.</step>
+        <step>Scan for any TODO comments, PLACEHOLDER markers, provisional version strings, or
+          obviously incomplete stubs. If found beyond what this dispatch anticipates: enumerate in
+          close report, do NOT edit without Guide-#10 authorization.</step>
+        <step>If authors field is absent: add it immediately after the description line in [project]:
+            authors = [
+                {name = "Blair", email = "mr.blair.do@gmail.com"},
+            ]
+        </step>
+        <step>If authors field is already present: note it; no edit. Mark 6.4 as pre-satisfied.
+          Skip commit 2.</step>
+        <step>Do NOT add [project.urls], license, readme, or any other PEP 621 fields not
+          explicitly enumerated in this dispatch.</step>
+        <step>After edit: read the file back to verify the diff is exactly the authors addition
+          and nothing else changed.</step>
+      </execution_steps>
+
+      <commit>
+        <repo>devplatform</repo>
+        <branch>main</branch>
+        <files_to_stage>pyproject.toml</files_to_stage>
+        <message>feat(project): finalize pyproject.toml -- add authors field (Stage 6 Item 6.4)</message>
+        <constraint>git add pyproject.toml — no other files. Verify git diff --staged before commit.</constraint>
+        <skip_condition>Omit this commit if 6.4 was pre-satisfied (authors already present).</skip_condition>
+      </commit>
+
+      <add_vikunja_comment>
+        Add a comment to the Phase 2 tracking task after commit 2 (or after 6.4 pre-satisfied
+        determination):
+        "Item 6.4 complete. pyproject.toml authors field added (devplatform commit &lt;SHA&gt;). [OR: 6.4 pre-satisfied — authors field already present; no edit needed.]"
+      </add_vikunja_comment>
+    </item>
+
+    <item id="6.5" name="BlarAI docs/ platform-layer sweep">
+      <spec_reference>07_STAGE6_HARDENING.xml §work_items item id="6.5"</spec_reference>
+      <description>
+        Sweep BlarAI/docs/ for any platform-layer doctrine files that were missed in Stage 3.2
+        or Stage 5.5 cleanup. Expected result: empty (all such files were migrated in earlier stages).
+      </description>
+
+      <execution_steps>
+        <step>Run the sweep:
+          Get-ChildItem C:\Users\mrbla\BlarAI\docs -File |
+            Where-Object { $_.Name -match "CLAUDE_|CO_LEAD_|DEC[0-9]+|DOMAIN[0-9]|FLEET_|COWORK" }
+        </step>
+        <step>If empty (no output): PASS. Record in STATUS.md update (E10 entry). Proceed to
+          STATUS.md commit.</step>
+        <step>If non-empty: HARD STOP. Do NOT relocate any file. List every matched filename
+          in close report to Guide-#10 with full path and file size. Await disposition per-file
+          before any relocation. STATUS.md commit is deferred until disposition resolves.</step>
+      </execution_steps>
+
+      <note>
+        The sweep is pattern-based and conservative. The pattern CLAUDE_|CO_LEAD_|DEC[0-9]+|DOMAIN[0-9]|FLEET_|COWORK
+        matches exactly the patterns prescribed in the Stage 6 spec. EA-11 does NOT expand or
+        narrow this pattern without Guide-#10 authorization.
+        Platform-separation tracking files (platform_separation/, STATUS.md, GUIDE_HANDOFF_LATEST.xml,
+        07_STAGE6_HARDENING.xml, etc.) are legitimately in BlarAI/docs/ and are NOT subject to the
+        sweep — they are BlarAI audit artifacts, not platform-doctrine files.
+      </note>
+
+      <add_vikunja_comment>
+        Add a comment to the Phase 2 tracking task after sweep execution:
+        "Item 6.5 sweep complete. Result: PASS (empty — no platform-layer files found in BlarAI/docs/). [OR: HARD STOP — N files found: &lt;list&gt;. Awaiting Guide-#10 disposition.]"
+      </add_vikunja_comment>
+    </item>
+
+    <item id="STATUS_UPDATE" name="STATUS.md E10 evolution entry">
+      <description>
+        Update BlarAI/docs/platform_separation/STATUS.md to record Phase 2 completion.
+        Two changes in a single edit:
+          (a) Stage 6 table row — update the Status column and Key Evidence column.
+          (b) §11 Post-Stage-5-close evolution — append E10 entry after E9.
+      </description>
+
+      <edit_spec>
+        <change id="a" location="Stage 6 table row (near top of file, §2 progress table)">
+          Current:
+            | 6 Hardening | PENDING | | | | Doctrine split, 24h soak passed |
+          New:
+            | 6 Hardening | IN-PROGRESS | | devplatform &lt;6.4-commit-SHA&gt; | BlarAI &lt;this-commit-SHA&gt; | Items 6.4+6.5 complete; 6.1-6.3/6.6 DEFERRED per 6.1.v2; 6.7-6.10 pending |
+          Note: use the actual commit SHAs once known. devplatform 6.4 commit SHA from commit 2.
+          BlarAI commit SHA = this commit (commit 3). If 6.4 was pre-satisfied, devplatform
+          column references pause commit SHA (commit 1) as the operative devplatform touch for Phase 2.
+        </change>
+
+        <change id="b" location="§11 Post-Stage-5-close evolution, after E9 block">
+          Append:
+
+          **E10 — Stage 6 Phase 2 (Items 6.4+6.5) complete** (devplatform commits &lt;pause-SHA&gt; [+ &lt;6.4-SHA&gt;], BlarAI commit &lt;STATUS-SHA&gt;, 2026-MM-DD): Item 6.4 — devplatform/pyproject.toml finalized: `authors` field added ({name="Blair", email="mr.blair.do@gmail.com"}). [OR: 6.4 pre-satisfied — authors field was already present.] Item 6.5 — BlarAI/docs/ platform-layer sweep: PASS (empty, no files matching CLAUDE_|CO_LEAD_|DEC[0-9]+|DOMAIN[0-9]|FLEET_|COWORK found). Hardening backlog unchanged: 37 total / 13 done / 24 open.
+        </change>
+      </edit_spec>
+
+      <commit>
+        <repo>BlarAI</repo>
+        <branch>main</branch>
+        <files_to_stage>docs/platform_separation/STATUS.md</files_to_stage>
+        <message>docs(stage6_phase2): record Items 6.4+6.5 complete in STATUS.md (E10)</message>
+        <constraint>git add docs/platform_separation/STATUS.md — no other files. No CLAUDE.md edits.</constraint>
+        <skip_condition>Omit only if 6.5 sweep returned non-empty (HARD STOP path); emit close
+          report instead with HARD STOP details for Guide-#10 disposition.</skip_condition>
+      </commit>
+    </item>
+
+  </work_items>
+
+
+  <!-- ===================================================================
+       §5  REQUIRED ACKS
+       All 9 must be confirmed in the comprehension gate (section CG8).
+       =================================================================== -->
+  <required_acks>
+
+    <ack id="g10-ea11_n1">
+      BlarAI main HEAD is 73a03f9 and devplatform main HEAD is 4b82cf3 at Phase 2 boot.
+      Any deviation → HARD STOP; report actual HEAD to Guide-#10 before any action.
+    </ack>
+
+    <ack id="g10-ea11_n2">
+      .platform/ directory in BlarAI repo contains exactly 2 entries: audit_archive/ and
+      vikunja_project_ids.yaml. This is the correct post-E8 state. Any count other than 2 → HARD STOP.
+    </ack>
+
+    <ack id="g10-ea11_n3">
+      The unpause function is resume_fleet() — NOT unpause_fleet(). Calling unpause_fleet() raises
+      AttributeError. sys.path.insert(0, r'C:\Users\mrbla\devplatform') is required before import
+      when running as a subprocess.
+    </ack>
+
+    <ack id="g10-ea11_n4">
+      Item 6.4 scope is limited to: read pyproject.toml, add authors field if absent, verify no
+      other placeholder bits. No other fields added. No version bump. No section reorder. No edits
+      to [tool.pytest.ini_options] or optional-dependencies sections.
+    </ack>
+
+    <ack id="g10-ea11_n5">
+      Item 6.5 sweep is read-only. If non-empty: HARD STOP, enumerate files, await Guide-#10
+      disposition. EA-11 does NOT relocate any BlarAI/docs/ file without Guide-#10 authorization.
+    </ack>
+
+    <ack id="g10-ea11_n6">
+      A33 standing workaround: complete_task is SUSPENDED. All closes use Option B:
+      get_task → preserve title/description/priority → update_task(task_id, title=t, description=d,
+      priority=p, done=True). done=True and title must both be explicit in every close call.
+    </ack>
+
+    <ack id="g10-ea11_n7">
+      Explicit-add discipline throughout Phase 2: git add specifies exact filenames only.
+      git add . and git add -A are never used. git diff --staged is run before each commit
+      to verify only the expected file(s) are staged.
+    </ack>
+
+    <ack id="g10-ea11_n8">
+      Standing artifacts are untouched: the 9 .claude/agents/*.md ' D' (unstaged deletions)
+      on BlarAI, and the 2 stale flag files on devplatform. Explicit-add discipline ensures
+      they are never staged. No remediation in Phase 2.
+    </ack>
+
+    <ack id="g10-ea11_n9">
+      The Phase 2 Vikunja tracking task is created in Project 10 (DevPlatform-Meta) at Step 0.5,
+      before the fleet pause. It is closed at Post-Flight via Option B (update_task + done=True).
+      The tracking task ID is captured immediately after creation and referenced in all comments.
+    </ack>
+
+  </required_acks>
+
+
+  <!-- ===================================================================
+       §6  POST-FLIGHT
+       =================================================================== -->
+  <post_flight>
+
+    <step id="PF1" name="Close Phase 2 Vikunja tracking task" timing="After commit 3 (STATUS.md)">
+      <instruction>
+        Before unpausing, close the Phase 2 tracking task via Option B (A33 workaround).
+        Do NOT call complete_task.
+      </instruction>
+      <procedure>
+        1. get_task(task_id) — capture title, description, priority from the created task.
+        2. update_task(task_id, title=&lt;captured-title&gt;, description=&lt;captured-description&gt;,
+                       priority=&lt;captured-priority&gt;, done=True)
+        3. Verify: get_task(task_id) → done=True, description preserved, priority preserved.
+      </procedure>
+    </step>
+
+    <step id="PF2" name="Unpause fleet" timing="LAST action before emitting close report">
+      <command>
+        python -c "import sys; sys.path.insert(0, r'C:\Users\mrbla\devplatform'); from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      </command>
+      <verify>fleet_paused=False, fleet_paused_reason=null, last_updated_by=ea_code</verify>
+      <commit>
+        <repo>devplatform</repo>
+        <branch>main</branch>
+        <files_to_stage>tools/autonomy_budget/state.json</files_to_stage>
+        <message>chore(ops): unpause fleet -- Stage 6 Phase 2 items 6.4+6.5 -- EA-11 done</message>
+        <constraint>git add tools/autonomy_budget/state.json — no other files</constraint>
+      </commit>
+      <function_name_warning>
+        resume_fleet() — NOT unpause_fleet(). Calling unpause_fleet() raises AttributeError.
+      </function_name_warning>
+    </step>
+
+  </post_flight>
+
+
+  <!-- ===================================================================
+       §7  EXIT CRITERIA (verifiable by Guide-#10)
+       =================================================================== -->
+  <exit_criteria>
+
+    <criterion id="EC1">
+      Pre-Flight Step 0 4-check verification PASS at session boot (after any Guide-#10
+      dispositions on check failures).
+    </criterion>
+
+    <criterion id="EC2">
+      Pre-Flight Step 1 pause commit landed on devplatform main.
+      Verification: git -C C:\Users\mrbla\devplatform log --oneline -4 | grep "pause fleet"
+    </criterion>
+
+    <criterion id="EC3">
+      Item 6.4 result documented:
+        (a) If edit made: devplatform pyproject.toml has authors field; commit on devplatform main.
+            Verification: git -C C:\Users\mrbla\devplatform show &lt;commit&gt; -- pyproject.toml
+        (b) If pre-satisfied: close report notes pre-existing authors field; no commit 2 in chain.
+    </criterion>
+
+    <criterion id="EC4">
+      Item 6.5 result documented:
+        (a) PASS path: close report confirms empty sweep output.
+        (b) HARD STOP path: close report lists matched files; Guide-#10 disposition pending.
+    </criterion>
+
+    <criterion id="EC5">
+      STATUS.md E10 evolution entry appended AND Stage 6 table row updated (if 6.5 PASS path).
+      BlarAI commit on main. Verification: git -C C:\Users\mrbla\BlarAI show &lt;commit&gt; --stat
+    </criterion>
+
+    <criterion id="EC6">
+      Phase 2 Vikunja tracking task created in Project 10 AND closed via Option B (done=True,
+      description preserved). Verification: mcp__vikunja__get_task(task_id) → done=true.
+    </criterion>
+
+    <criterion id="EC7">
+      Post-Flight unpause commit landed on devplatform main; state.json fleet_paused=False.
+      Verification: git -C C:\Users\mrbla\devplatform log --oneline -1 | grep "unpause fleet"
+    </criterion>
+
+    <criterion id="EC8">
+      EA-11 emits Phase 2 close report listing: all commit SHAs, Vikunja tracking task ID,
+      6.4 result, 6.5 result, E10 entry text, exit-criteria checklist.
+      The close report is the final output before Guide-#10 cross-verification.
+    </criterion>
+
+  </exit_criteria>
+
+
+  <!-- ===================================================================
+       §8  CLOSE PROTOCOL
+       =================================================================== -->
+  <close_protocol>
+    <step order="1">Verify all exit criteria EC1–EC8 against actual disk/Vikunja state.</step>
+    <step order="2">Emit Phase 2 close report to Guide-#10 (via LA). Structure:
+      - TL;DR (2–3 sentences)
+      - Commit table (repo / SHA / subject / files)
+      - Vikunja mutations (tracking task ID / status / comment IDs)
+      - Item 6.4 result (edit made or pre-satisfied; diff summary)
+      - Item 6.5 result (PASS / HARD STOP + file list)
+      - E10 entry text as committed
+      - Exit-criteria checklist EC1–EC8
+      - HARD STOP items if any (with full details for Guide-#10 disposition)
+    </step>
+    <step order="3">Stand by for Guide-#10 APPROVED verdict. Fleet is unpaused; cron-triggered
+      fleet roles may resume. Phase 3 (HIGH-risk hardening tickets: A/X/II/VV) requires a new
+      dispatch from Guide-#10 before EA-12 spawn.</step>
+  </close_protocol>
+
+
+  <!-- ===================================================================
+       §9  GUIDE-#10 VERIFICATION COMMANDS (run after receiving close report)
+       =================================================================== -->
+  <guide_verification>
+    <cmd label="pyproject authors field">git -C C:\Users\mrbla\devplatform show HEAD~1 -- pyproject.toml</cmd>
+    <cmd label="STATUS.md E10 entry">git -C C:\Users\mrbla\BlarAI show HEAD -- docs/platform_separation/STATUS.md</cmd>
+    <cmd label="devplatform log (4 commits)">git -C C:\Users\mrbla\devplatform log --oneline -4</cmd>
+    <cmd label="BlarAI log (1 commit)">git -C C:\Users\mrbla\BlarAI log --oneline -1</cmd>
+    <cmd label="Fleet unpaused">Get-Content C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json | ConvertFrom-Json | Select fleet_paused, last_updated_utc</cmd>
+    <cmd label="Project 10 after Phase 2 tracking task">mcp__vikunja__project_summary (expect Project 10: 38 total / 14 done / 24 open — create adds +1 total/+1 open, close converts to done; net: +1 total, +1 done, open unchanged at 24)</cmd>
+    <cmd label="Phase 2 tracking task closed">mcp__vikunja__get_task(task_id) → done=true, description preserved</cmd>
+    <cmd label="6.5 sweep cross-check (optional)">Get-ChildItem C:\Users\mrbla\BlarAI\docs -File | Where-Object { $_.Name -match "CLAUDE_|CO_LEAD_|DEC[0-9]+|DOMAIN[0-9]|FLEET_|COWORK" }</cmd>
+  </guide_verification>
+
+</ea_dispatch>

@@ -1,0 +1,20 @@
+{
+  "default_clarify_answer": "1",
+  "jobs": [
+    {
+      "repo": "rocket-calc",
+      "goal": "a space rocket calculator a kid can use",
+      "clarify_answer": "1",
+      "expected": "MERGED"
+    },
+    {
+      "repo": "todo-web",
+      "goal": "a small to-do list web app",
+      "clarify_answer": "web"
+    },
+    {
+      "repo": "notes-cli",
+      "goal": "a command-line note taker"
+    }
+  ]
+}

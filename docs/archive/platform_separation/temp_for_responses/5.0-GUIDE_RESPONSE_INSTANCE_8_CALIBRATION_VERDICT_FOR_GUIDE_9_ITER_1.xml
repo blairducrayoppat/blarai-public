@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Guide-#8 calibration verdict on Guide-#9 iter-1 Variant B comprehension gate.
+  Audience: Lead Architect (forward to Guide-#9 at LA's discretion).
+  Companion to: Guide-#9's iter-1 digest at 5.0-GUIDE_9_CALIBRATION_REVIEW_SUBMISSION_TO_GUIDE_8.xml
+  + Guide-#9's full inline output in the main LA chat (which Guide-#8 has NOT seen — verdict
+  is based on digest content + LA's question framing).
+-->
+<guide_8_calibration_verdict schema_version="1" audience="la_and_guide_9">
+
+  <metadata>
+    <reviewer>Guide-#8 (Claude Code Opus 4.7, predecessor advisory surface)</reviewer>
+    <subject>Guide-#9 iter-1 Variant B comprehension gate calibration</subject>
+    <occasion>LA-directed calibration review per p11/p24 — predecessor reviews successor before retiring</occasion>
+    <emission_date>2026-04-29</emission_date>
+    <constraint>Verdict based on Guide-#9's digest only. Inline §A-§H in main LA chat NOT seen by Guide-#8; some assessments deferred to LA to verify against inline.</constraint>
+  </metadata>
+
+  <top_line_verdict>**CALIBRATED-WITH-NOTES.** Retire-clearance grantable after Guide-#9 confirms or counter-argues 4 specific augmentation items below. Core understanding is solid; gaps are narrow and addressable in a single Guide-#9 follow-up turn.</top_line_verdict>
+
+  <answers_to_la_questions>
+
+    <question id="1" topic="Does Guide-#9 understand the GOALS?">
+      <answer>YES (with caveat).</answer>
+      <evidence>Digest's signals correctly reference Stage 5's structural goals: BlarAI-side platform tool deletion, `.platform/` coordination relocation, merge to main, Item 5.10 LA gate. The 4 LA-decisions surfaced (F.1-F.4) all map to dispatch goals. cs4 reasoning chain demonstrates understanding of Stage 5's intent vs Stage 4's destructive cutover.</evidence>
+      <caveat>The §H per-stage brief in inline output is the canonical artifact for goal-understanding evidence; digest excludes §H. LA should spot-check inline §H reflects the dispatch's `<objective>` block accurately.</caveat>
+    </question>
+
+    <question id="2" topic="Does Guide-#9 understand the TASKS in the stage?">
+      <answer>MOSTLY YES, with 3 specific items not surfaced in the digest.</answer>
+      <evidence>Items explicitly referenced in digest: 5.0.5, 5.1, 5.4, 5.5, 5.6, 5.7, 5.8, 5.10, 5.11, 5.12 + II/JJ deferral.</evidence>
+      <gaps>
+        <item>**5.5.v2** (delete `docs/governance/` + `docs/scheduled/wake_templates/`) — not explicitly referenced. Distinct from 5.5 (which deletes platform-doctrine docs from `docs/` root) and important because `docs/governance/` is where fleet-hygiene + merge-policy + STYLE + parallel-sprints live (the 4 fleet-shared subset of 17). Stage 5.5.v2 fully removes the BlarAI-side copy.</item>
+        <item>**5.5.5** (ownership decisions table) — not referenced. Defines stay_in_blarai vs move_to_devplatform for v2-introduced artifacts; informs every delete decision.</item>
+        <item>**5.8.v2** (test baseline 981/22 vs 755/2) — not referenced. The dispatch's Item 5.8 says "755 passed, 2 skipped"; 5.8.v2 corrects to ~981/22. EA-9 must use the v2 baseline.</item>
+      </gaps>
+      <verdict_for_la>Spot-check inline §H. If §H covers these 3, no gap. If §H doesn't, ask Guide-#9 to add.</verdict_for_la>
+    </question>
+
+    <question id="3" topic="Does Guide-#9 understand the RISKS?">
+      <answer>INCOMPLETE — 4 specific risks not explicitly identified in digest.</answer>
+      <risks_correctly_identified>
+        Item 5.4 path-reference audit completeness (cs4); Item 5.10 LA-merge gate (w10 active); Phase C bug-pattern forward-watch (cs5/dn35); STATUS.md duplication discipline (cs6/d9/A17); auto-stash don't-pop (w8/dn10/A20); Stage 5 close triple-subagent verification (cs7 w14).
+      </risks_correctly_identified>
+      <risks_not_explicitly_identified>
+        <risk id="r1">**Item 5.0.5 archive completeness.** S-2 fix in dispatch — archive must capture `*.log`, `*.jsonl`, `*.json.bak`, `state.json*`, `*.history` from 6 source dirs BEFORE Item 5.1 deletes them. Digest doesn't surface "verify post-archive zip contents before allowing 5.1 to proceed." Risk: silent archive miss → forensic data lost.</risk>
+        <risk id="r2">**Item 5.3 file-move atomicity.** Dispatch uses `Move-Item` with `if (Test-Path $m.To) { throw }` guard but no rollback if mid-move failure. If sprints/ moves but scheduled/ fails, BlarAI is in half-moved state. Digest doesn't surface this.</risk>
+        <risk id="r3">**Item 5.5 / 5.5.v2 delete patterns vs current docs/ state.** Specifically: (a) patterns must NOT match `docs/platform_separation/temp_for_responses/*` per dn13 (audit-artifact preservation); (b) any NEW `docs/CLAUDE_*`, `docs/CO_LEAD_*`, `docs/DEC*`, `docs/DOMAIN*` files added during Stage 4 work need explicit accounting; (c) `docs/F3_BASH_FORK_ERROR_RUNBOOK.md` BlarAI-side copy was forward-bound to Stage 5 candidate-removal per A13 — should be in 5.5 patterns.</risk>
+        <risk id="r4">**Item 5.6 pyproject.toml interaction with 5.8 baseline.** If 5.6 removes too many testpaths (e.g., accidentally drops `tests/` or `services/policy_agent/tests/`), 5.8 baseline regresses. Digest doesn't surface this interaction.</risk>
+      </risks_not_explicitly_identified>
+      <verdict_for_la>These risks are addressable in Guide-#9's EA-9 init pointer (with explicit STOP-and-report instructions for each). Not blocking calibration; should be added before EA-9 init pointer drafting.</verdict_for_la>
+    </question>
+
+    <question id="4" topic="Does Guide-#9 understand how STAGE 5 FITS INTO THE BIGGER PICTURE?">
+      <answer>YES — pipeline structure correctly internalized.</answer>
+      <evidence>
+        Digest references Stage 5 as the last destructive stage before merge (Item 5.10 HALT for LA approval). Forward-bind to Stage 6.7.5 hardening tickets (II/JJ deferral, LL added per A20, 20-ticket backlog total) shows understanding of Stage 5 → Stage 6 transition. Post-deletion soak methodology (w19) inherited from Phase D shows understanding of "Stage 5 close requires post-cleanup verification analogous to Phase D's post-cutover soak." cs7 watchpoint enumeration includes w14 (Stage 5 close triple-subagent) — knowing the closure ritual.
+      </evidence>
+      <gaps>
+        Tag-creation discipline (Item 5.11 — `post-platform-extract` on BlarAI + `platform-extracted` on devplatform) not explicitly mentioned in digest. Minor — likely in inline §H.
+      </gaps>
+    </question>
+
+    <question id="5" topic="Risks (re-asked for emphasis)">
+      <answer>See answer to question #3 above. Specific gaps in r1-r4.</answer>
+    </question>
+
+  </answers_to_la_questions>
+
+  <my_own_calibration_dimensions>
+
+    <dimension id="a" topic="Phase C lessons internalization">
+      <verdict>YES (cs5).</verdict>
+      <evidence>Forward-watch for "any other PS1 script using $RepoRoot for state/log paths" correctly bound as Stage 5.4 audit completion gate. dn35 "no silent in-place fix" correctly applied. New findings get bound under g9-ea9_n* with Stage 5 vs 6.7.5 deferral disposition.</evidence>
+    </dimension>
+
+    <dimension id="b" topic="Mature-not-minimal calibration (p3) vs pragmatic time-cost (p10) — TENSION FLAG">
+      <verdict>MIXED — Guide-#9's Option B (inline reconciliation, ~15 min) over Option A (full audit, 30-45 min) leans pragmatic. p3 favors thoroughness ("thrice over with different subagents if that's possible"); p10 favors pragmatic ("75 min soak captures equivalent stability"). Both are LA preferences in different contexts.</verdict>
+      <recommendation>Hybrid: Option B+ (inline reconciliation PLUS explicit interaction-map check on the compound surface Guide-#9 asked about). Best of both. See cs4 answer below.</recommendation>
+    </dimension>
+
+    <dimension id="c" topic="Inheritance fidelity vs independent value-add">
+      <verdict>CONFIRMED + value-add.</verdict>
+      <evidence>F.1-F.3 match Guide-#8's d4 recommendations (option A / A / DEFER). F.2 added a doc-defect catch (`BlarAI_daily_digest` task name likely should be "Daily Digest" per Title Case Spaces convention) — beyond inheritance, demonstrates independent verification.</evidence>
+    </dimension>
+
+    <dimension id="d" topic="Subagent verification discipline (d8/A18) — NOT EXPLICITLY TESTED">
+      <verdict>UNKNOWN from digest. Should be flagged.</verdict>
+      <recommendation>Guide-#9 should add explicit subagent verification discipline reminder for the Stage 5 close S1/S2/S3 triple-subagent run — claims must be cross-verified against actual `git diff` before accepting verdict. Per A18 + dn14/dn20/dn24.</recommendation>
+    </dimension>
+
+    <dimension id="e" topic="Decision-ask calibration (p7)">
+      <verdict>CALIBRATED.</verdict>
+      <evidence>F.4's calibration_question_for_guide_8 ("is there a compound-drift surface I'm under-weighting?") is a legitimate calibration question, not a delegation of technical evaluation. cs3 confirms Guide-#9 doesn't bottleneck — LA decides; Guide-#9 gives options + recommendation + rationale.</evidence>
+    </dimension>
+
+    <dimension id="f" topic="STATUS staleness handling (rule 5b)">
+      <verdict>CALIBRATED.</verdict>
+      <evidence>Drift #2 disposition correctly invokes rule 5b(a) — STATUS staleness, not procedure breakage. Guide-#9 caught Guide-#8's post-handoff self-unpause and proposed correct EA-9 self-pause as Pre-Flight first action per fleet_pause_sop §1.</evidence>
+    </dimension>
+
+    <dimension id="g" topic="V0 drift verification rigor">
+      <verdict>STRONG.</verdict>
+      <evidence>3 drifts caught with disk-level verification: (1) BlarAI HEAD advanced from ecc8e7c+1 to f63eb3f post-corrections (correctly attributed to LA's review of Guide-#8); (2) devplatform HEAD + state.json self-unpaused at 0e81181 (correctly invokes rule 5b(a) staleness); (3) stash list, worktree state, STATUS.md size — confirmed match. This is the correct discipline that future Guide handoffs should inherit.</evidence>
+    </dimension>
+
+  </my_own_calibration_dimensions>
+
+  <answer_to_guide_9_calibration_question>
+    <intro>Guide-#9's cs4 calibration_question: "is there a compound-drift surface I'm under-weighting (e.g., Item 5.4 audit x Item 5.6 pyproject x Item 5.7 .gitignore x Item 5.10 commit interaction) that would tip the recommendation toward option A?"</intro>
+
+    <answer>YES, narrowly. Three augmentations make Option B better than Option A; without them, Option A is safer.</answer>
+
+    <augmentation id="aug1" priority="HIGH">
+      **Expand Item 5.4 `<files_to_audit>` scope.** Current dispatch lists 3 globs: `devplatform/tools/fleet_ops/*.py`, `fleet_observability/*.py`, `autonomy_budget/*.py`. Phase C demonstrated that `scheduled-tasks/*.ps1` (where wake_launcher's $RepoRoot/$PSScriptRoot path-resolution lived) is a critical surface. Also: `bridge/*.py` (Vikunja bridge daemon, indirect via inbox.json runtime artifact). Bind this scope expansion under g9-ea9_n1 as a spec amendment.
+    </augmentation>
+
+    <augmentation id="aug2" priority="HIGH">
+      **Item 5.4 audit verification at Item 5.10 HALT gate.** The HALT at 5.10 is LA's review checkpoint. Add explicit step: "EA-9 reports Item 5.4 audit findings (file count + paths updated + paths confirmed clean) + LA verifies completeness before approving merge." Catches the drift that pre-flight cannot prevent — specifically, if EA-9's audit was scope-incomplete (didn't catch a stale BlarAI/tools/ reference), 5.10 LA review is the last chance.
+    </augmentation>
+
+    <augmentation id="aug3" priority="MEDIUM">
+      **Stage 5.5 / 5.5.v2 delete-pattern verification against current docs/ state.** Confirm: (a) patterns do NOT match `docs/platform_separation/temp_for_responses/*` (dn13 audit-artifact preservation); (b) all NEW `docs/CLAUDE_*`, `docs/CO_LEAD_*`, `docs/DEC*`, `docs/DOMAIN*` added during Stage 4 work are correctly captured by wildcard patterns (no orphans); (c) `docs/F3_BASH_FORK_ERROR_RUNBOOK.md` BlarAI-side copy is in 5.5 candidate-removal per A13 forward-bind. This is single-pass `ls docs/ | grep -E '^(CLAUDE_|CO_LEAD_|DEC|DOMAIN)' + diff against current dispatch patterns`.
+    </augmentation>
+
+    <conclusion>
+      With aug1-aug3, Option B (inline reconciliation + interaction map) covers ~80% of Option A's compound-drift catching at ~25-30 min total instead of 30-45 min. That's the better trade-off for MEDIUM-risk Stage 5. Without aug1-aug3, Option A is safer because the missed drifts at execution time would cost more than the 15-30 min audit-time difference.
+    </conclusion>
+  </answer_to_guide_9_calibration_question>
+
+  <retire_clearance_decision>
+    <verdict>**GRANT** retire-clearance after Guide-#9 confirms or counter-argues 4 augmentation items.</verdict>
+
+    <required_for_clearance>
+      <item id="rc1">Guide-#9 accepts (or counter-argues) the 3 cs4/F.4 augmentations (aug1-aug3) for the audit posture decision.</item>
+      <item id="rc2">Guide-#9 confirms inline §H per-stage brief covers Items 5.5.v2, 5.5.5, and 5.8.v2 (Q2 gaps). If §H doesn't, Guide-#9 adds.</item>
+      <item id="rc3">Guide-#9 adds explicit subagent verification discipline reminder (d8/A18) to the Stage 5 close triple-subagent playbook AND the EA-9 init pointer (per dimension d).</item>
+      <item id="rc4">Guide-#9 adds explicit STOP-and-report instructions for r1-r4 risks (Item 5.0.5 archive completeness, Item 5.3 atomicity, Item 5.5/5.5.v2 pattern verification, Item 5.6/5.8 baseline preservation) in the EA-9 init pointer.</item>
+    </required_for_clearance>
+
+    <not_required_for_clearance>
+      Items not blocking retire-clearance (acceptable as-is or deferrable to Stage 6.7.5):
+      - cs7 watchpoint omission of w22 (forward-looking only, not Stage 5-active)
+      - F.2 added observation about "BlarAI_daily_digest" doc-defect (good catch; can be a separate Stage 6.7.5 doc-correction ticket if LA wants)
+      - Tag-creation specifics for Item 5.11 (presumably in inline §H)
+    </not_required_for_clearance>
+
+    <calibration_quality_assessment>
+      Guide-#9's iter-1 demonstrates correct internalization of: cumulative-ack chain discipline (116 atoms, no naming defect propagation), V0 drift verification with disk-level checks, stop-after-gate discipline, fleet_pause_sop §1, A20 stash-narrative correction inheritance, Phase C bug-pattern forward-watch, comprehension-gate-stop-and-wait. Quality is at-or-above the Guide-#7 → Guide-#8 calibration baseline. Small gaps in risk enumeration and item-specific scope are normal first-iteration fingerprints; they correct quickly with this verdict's notes.
+    </calibration_quality_assessment>
+
+    <retire_timeline>
+      Guide-#8 retires after Guide-#9 emits a follow-up turn confirming or counter-arguing rc1-rc4. Estimated Guide-#9 follow-up turn: 1 turn, ~5-10 min real time. After that, Guide-#8's calibration-review responsibility per LA correction is discharged.
+    </retire_timeline>
+  </retire_clearance_decision>
+
+</guide_8_calibration_verdict>

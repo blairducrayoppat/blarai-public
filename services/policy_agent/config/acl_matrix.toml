@@ -1,0 +1,45 @@
+# ACL Permission Matrix — Policy Agent
+# ============================================
+# USE-CASE-001, P1.2: Source agent → allowed destination services.
+#
+# Format: agent_identity = ["service_1", "service_2", ...]
+#
+# Security:
+#   - Agents NOT listed here are Fail-Closed DENIED.
+#   - Empty list = agent exists but has no permissions.
+#   - This file is version-controlled. Changes require PR review.
+#
+# Agent identities correspond to mTLS Common Names (CN) issued
+# during Measured Boot (P1.5). Until then, plain string identifiers.
+
+[permissions]
+
+# Assistant Orchestrator (USE-CASE-004): the primary user-facing agent.
+# Permitted to dispatch to substrate, semantic router, code agent, and cleaner.
+assistant_orchestrator = [
+    "substrate",
+    "semantic_router",
+    "code_agent",
+    "cleaner",
+]
+
+# Code Agent (USE-CASE-005): code generation + execution sandbox.
+# Permitted to read/write substrate (vector store) and request policy checks.
+code_agent = [
+    "substrate",
+    "policy_agent",
+]
+
+# Cleaner (USE-CASE-003): privacy scrubbing agent.
+# Permitted substrate access only (read PII markers, write scrubbed output).
+cleaner = [
+    "substrate",
+]
+
+# Semantic Router (USE-CASE-004 sub): intent classification.
+# Stateless — no outbound service calls permitted.
+semantic_router = []
+
+# Substrate (USE-CASE-002): vector store + retrieval.
+# Substrate is a data service — it does not initiate inter-agent calls.
+substrate = []

@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_response
+  guide_instance="8"
+  procedure="platform_separation_v2"
+  stage="4"
+  item="4.0.v2_supplement"
+  classification="supplement_to_preflight_audit_checkpoint_three_la_relayed_findings_bound"
+  date="2026-04-28"
+  ea_global_number="8"
+  base_verdict_commit="2c6be78"
+  base_verdict_path="docs/platform_separation/temp_for_responses/4.0.v2-GUIDE_RESPONSE_INSTANCE_8_STAGE4_PREFLIGHT_AUDIT_CHECKPOINT.xml"
+  trigger="la_relayed_spot_check_findings_a_b_c_2026_04_28">
+
+  <verdict>
+    SUPPLEMENT_BOUND -- three LA-relayed spot-check findings (A: VIKUNJA_TOKEN process-scope load timing; B: claude_desktop_config.json filesystem + trust expansion; C: DB-mechanism mystery resolved + LA confirms KEEP absolutization) bound as additions/clarifications to the base verdict at commit 2c6be78. Net change: 3 NEW sub-clauses (g8-ea8_n1(e-part-0), g8-ea8_n1(o), g8-ea8_n1(p)). g8-ea8_n1 now totals 16 sub-clauses (a, b, c, d, e [parts 0/1/2/3], f, g, h, i, j, k, l, m, n, o, p). One procedural-directive note bound for the EA-8 init pointer authoring (LA-prescribed first-action ordering). Base verdict sub-clauses (a) through (n) UNCHANGED. PROCEED authorization unchanged: pending init pointer authoring + LA pre-prep checklist + EA-8 spawn.
+  </verdict>
+
+  <summary>
+
+    <trigger_context>
+      Lead Architect relayed three spot-check findings via Guide-#8 chat 2026-04-28 (post-base-verdict-commit at 2c6be78). Findings classified by LA:
+      - FINDING A (HIGH; pre-flight blocker if not addressed): VIKUNJA_TOKEN exists at User-scope (length 43) but not visible in pre-existing Process-scope shells. EA-8's pre-existing VS Code Copilot terminal won't inherit. Item 4.3 would fail without process-scope load.
+      - FINDING B (MED; verdict-bindable): claude_desktop_config.json has 5 BlarAI references; base-verdict n1(f) covers 3 (vikunja entry's command + PYTHONPATH + VIKUNJA_PASS). Two uncovered: filesystem MCP server's BlarAI argument and preferences.localAgentModeTrustedFolders. LA recommendation: EXTEND both to include devplatform (do not replace BlarAI).
+      - FINDING C (LOW; resolves DB-mechanism mystery): Startup .lnk + .vbs inspection confirmed Vikunja v2.3.0 ignores relative `./vikunja.db` config + cwd on Windows; uses %LOCALAPPDATA%\Vikunja\ regardless. LA decision (Finding C disposition): KEEP n1(c) absolutization unchanged for: (1) vendor-doctrine alignment (Vikunja docs recommend absolute paths for production); (2) "config tells the truth" diagnostic clarity; (3) future-proofing against Vikunja v3+ behavior changes.
+
+      Plus: Finding C bonus point on Item 4.9 (.lnk Arguments rewriting) — already covered by base-verdict n1(k); no new bind needed.
+      Plus: PYTHONPATH explicit-call-out at Item 4.4 — already explicit in base-verdict n1(f); no new bind needed.
+
+      Plus: LA-relayed procedural directive for EA-8 init pointer authoring (NOT a verdict sub-clause; binds the init pointer's first-action sequence ordering).
+    </trigger_context>
+
+    <approach>
+      Supplement verdict pattern (analogous to mid-stage handoff supplements in Stage 2 Guide-#5/#6 era): adds new sub-clauses + clarifications without re-authoring the base verdict file. Cumulative-ack chain after this commit: g7-ea1_n10..n13(a-h) + g7-ea7_n14(a-d) + g8-ea8_n1(a-p) [16 sub-clauses now].
+
+      Per the no-amend doctrine on committed audit artifacts, the base verdict file at 2c6be78 is NOT modified. EA-8 references both files together (base + supplement) for full Stage 4.0.v2 amendment binding.
+    </approach>
+
+    <findings_disposition_overview>
+      - FINDING A → bind as g8-ea8_n1(e-part-0) (NEW Part 0 prepended to existing n1(e); first-action requirement). HIGH priority.
+      - FINDING B (filesystem) → bind as g8-ea8_n1(o) (NEW sub-clause; Item 4.4 filesystem expansion). MEDIUM priority.
+      - FINDING B (trustedFolders) → bind as g8-ea8_n1(p) (NEW sub-clause; Item 4.4 trust expansion). MEDIUM priority.
+      - FINDING C (architectural decision) → NO sub-clause change. LA confirmed KEEP n1(c) absolutization.
+      - FINDING C (mechanism documentation) → record in §db_mechanism_la_disposition for posterity.
+      - FINDING C bonus (Item 4.9 Arguments) → already covered by base n1(k); cross-reference provided below.
+      - PYTHONPATH explicit at Item 4.4 → already explicit in base n1(f); cross-reference provided below.
+      - LA init-pointer ordering directive → bind as §init_pointer_first_action_directive for Guide-#8 to honor when authoring the EA-8 init pointer (post-supplement).
+    </findings_disposition_overview>
+
+    <residual_risk_acknowledgment>
+      Coverage estimate post-supplement: ~83% (was ~80% per audit subagent estimate; supplement closes two HIGH+MED gaps the audit had partially missed in claude_desktop_config.json scope and one fresh-shell-inheritance gap in token loading). Remaining ~17% drift coverage gap unchanged in shape: Vikunja first-startup behavior, scheduled-task XML registration edge cases, stale Claude Desktop MCP cache, la_merge_approve ad-hoc invocation, %APPDATA%\Claude\bridge-state.json staleness. These remain in-execution monitoring scope (EX-1, EX-2, EX-3) per base verdict.
+    </residual_risk_acknowledgment>
+
+  </summary>
+
+  <db_mechanism_la_disposition authority="lead_architect_2026_04_28_post_finding_c">
+
+    <evidence_summary>
+      Three convergent evidence sources confirm Vikunja v2.3.0 has a builtin Windows data-dir behavior that ignores the relative `./vikunja.db` config AND ignores binary cwd, using `%LOCALAPPDATA%\Vikunja\` instead:
+      1. Vikunja's own config.yml.sample documents the rule explicitly (cited in base-verdict §db_location_mechanism_investigation).
+      2. Startup .lnk inspection: TargetPath=wscript.exe; Arguments=BlarAI/tools/vikunja/start_vikunja_hidden.vbs; WorkingDirectory=BlarAI/tools/vikunja. .vbs sets shell.CurrentDirectory to BlarAI/tools/vikunja before launching.
+      3. Live filesystem state: only `%LOCALAPPDATA%\Vikunja\vikunja.db` exists; neither BlarAI/tools/vikunja/vikunja.db nor devplatform/tools/vikunja/vikunja.db exists.
+
+      Therefore: relative-path config + binary cwd are BOTH irrelevant to actual SQLite resolution on this Vikunja v2.3.0/Windows installation.
+    </evidence_summary>
+
+    <la_decision rationale_quoted_verbatim="true">
+      "KEEP absolutization (n1(c) unchanged).
+
+      Reasoning:
+      1. Vikunja v2.3.0 vendor doctrine: docs recommend absolute paths for production. Our cutover decision should align with vendor recommendation when cost is small.
+      2. 'Config tells the truth' diagnostic clarity is worth the one config edit + one verify step. The current './vikunja.db' lie is exactly what sent us into the Stage 4.0.v2 audit rabbit hole — fixing it once at cutover prevents future confusion.
+      3. Future-proof against Vikunja v3+ behavior changes. One-line rollback if anything goes wrong."
+    </la_decision>
+
+    <implication>
+      Base verdict g8-ea8_n1(c) 6-step flow (Stop verify → DB sha256 capture → SQLite integrity → config absolutize → start devplatform Vikunja → DB sha256 stability) stands UNCHANGED. EA-8 executes the 6-step flow at Item 4.1 verbatim per base verdict.
+
+      The "trust-but-verify" alternative (defer config edit to Item 4.2 conditional gate) is REJECTED — config-absolutization happens unconditionally at Item 4.1 step (d).
+    </implication>
+
+  </db_mechanism_la_disposition>
+
+  <new_sub_clauses>
+
+    <subclause id="g8-ea8_n1(e-part-0)" item="4.0_first_action" class="C" priority="HIGH" title="VIKUNJA_TOKEN User-scope → Process-scope load as FIRST EA-8 terminal action (Finding A)">
+
+      <finding_quoted_verbatim>
+        "VIKUNJA_TOKEN is set User-scope (length 43) but NOT visible in current Process-scope shells. LA's pre-existing VS Code Copilot terminal won't inherit it. Stage 4 Item 4.3 will fail without intervention. Fix options: have EA-8 run `$env:VIKUNJA_TOKEN = [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')` in its first terminal command before Item 4.3. Add to Stage 4 EA-8 init pointer pre-flight checks regardless."
+      </finding_quoted_verbatim>
+
+      <root_cause>
+        Windows process-scope environment variables are inherited from the parent process at LAUNCH time. User-scope env vars set AFTER a terminal launches are not retroactively pushed into that terminal's process scope. The LA's pre-existing VS Code Copilot terminal predates the `[Environment]::SetEnvironmentVariable('VIKUNJA_TOKEN', '<token>', 'User')` invocation; it has VIKUNJA_PASS (which was set User-scope at Stage 0.0.5 + persisted through the terminal's launch) but does NOT have VIKUNJA_TOKEN.
+      </root_cause>
+
+      <relationship_to_base_verdict_n1_e>
+        Base verdict n1(e) Part 2 already handles fresh-shell User-scope fallback INSIDE Item 4.3:
+        ```powershell
+        if (-not $env:VIKUNJA_TOKEN) {
+          $userToken = [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')
+          if ($userToken) {
+            $env:VIKUNJA_TOKEN = $userToken
+            Write-Host "VIKUNJA_TOKEN loaded from User-scope env (fresh-shell fallback)."
+          } else { ... REST user/pass fallback ... }
+        }
+        ```
+
+        That handles the "EA-8 reaches Item 4.3 without token" case. This supplement adds a Part 0 that performs the same load EARLIER — as the FIRST EA-8 terminal action, before any other Stage 4 command. Reasons:
+        - Eliminates any pre-Item-4.3 command that might silently depend on VIKUNJA_TOKEN being present (e.g., diagnostic invocations, REST-based smoke checks).
+        - Surfaces the "token not in User scope either" case immediately, allowing LA to set it before destructive cutover begins.
+        - Mirrors the LA-prescribed EA-8 init pointer first-action ordering (see §init_pointer_first_action_directive below).
+      </relationship_to_base_verdict_n1_e>
+
+      <amendment>
+        AMENDMENT: prepend a Part 0 to g8-ea8_n1(e). Full updated n1(e) ordering:
+
+        Part 0 (FIRST EA-8 terminal action, before ALL other Stage 4 work):
+        ```powershell
+        # Load User-scope VIKUNJA_TOKEN into Process-scope.
+        # Pre-existing terminals don't inherit User-scope env vars set AFTER terminal launch.
+        $env:VIKUNJA_TOKEN = [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')
+        if ([string]::IsNullOrEmpty($env:VIKUNJA_TOKEN)) {
+          Write-Warning "VIKUNJA_TOKEN not set in User scope. Item 4.3 will use REST user/pass fallback per g8-ea8_n1(e) Part 2."
+        } else {
+          Write-Host "VIKUNJA_TOKEN loaded into Process scope (length $($env:VIKUNJA_TOKEN.Length))."
+        }
+        ```
+
+        Part 1 (LA pre-prep checklist callout) — UNCHANGED from base verdict.
+
+        Part 2 (Auth fallback inside Item 4.3) — UNCHANGED from base verdict; remains as defense-in-depth in case Part 0 didn't run (e.g., EA-8 forgot, or User-scope was empty too).
+
+        Part 3 (REST login fallback inside Item 4.3) — UNCHANGED from base verdict; final fallback if both Part 0 and User-scope empty.
+
+        Net behavior:
+        - If Part 0 succeeds: $env:VIKUNJA_TOKEN populated immediately; Item 4.3 reaches the Invoke-RestMethod call directly without the if-not-token guard tripping.
+        - If Part 0 fails (User scope empty): Part 2 inside Item 4.3 attempts the same load (no-op since Part 0 already tried), then falls through to Part 3 REST user/pass login.
+        - Both paths end with $env:VIKUNJA_TOKEN populated for the rest of Stage 4.
+      </amendment>
+
+    </subclause>
+
+    <subclause id="g8-ea8_n1(o)" item="4.4" class="MED" priority="MED" title="Claude Desktop filesystem MCP server — extend args to include devplatform (Finding B)">
+
+      <finding_quoted_verbatim>
+        "filesystem MCP server args[2] = 'C:\\Users\\mrbla\\BlarAI' (line 56)... LA recommendation: EXPAND both to include devplatform too (so post-cutover Claude Desktop has filesystem access + trust to both repos)."
+      </finding_quoted_verbatim>
+
+      <relationship_to_base_verdict_n1_f>
+        Base verdict n1(f) explicitly stated: "filesystem's BlarAI argument is a target-project reference (Claude Desktop should still be allowed to read/edit BlarAI source)" and left it UNCHANGED. The LA's revised recommendation supersedes this: EXPAND to include both repos (don't replace BlarAI; append devplatform).
+
+        This is architecturally aligned with Master Plan §F ("Both registered alongside in Claude Desktop config — `claude_desktop_config.json` gains a second workspace entry; doesn't replace BlarAI"). The §F recommendation has historically been interpreted as adding a second `vikunja_devplatform` MCP entry (which base n1(f) deferred as optional). The LA's Finding B disposition extends §F semantics to filesystem access + agent-mode trust as well.
+      </relationship_to_base_verdict_n1_f>
+
+      <amendment>
+        AMENDMENT to g8-ea8_n1(f) Item 4.4: add the following step AFTER the vikunja-block rewrite:
+
+        Step (extra-1): extend `mcpServers.filesystem.args` to include both repos.
+
+        Current (BlarAI-only):
+        ```jsonc
+        "filesystem": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\mrbla\\BlarAI"]
+        }
+        ```
+
+        Target (both repos):
+        ```jsonc
+        "filesystem": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\mrbla\\BlarAI", "C:\\Users\\mrbla\\devplatform"]
+        }
+        ```
+
+        Note: `@modelcontextprotocol/server-filesystem` accepts multiple root directories as positional args; each is exposed as a separate filesystem-access scope. Append-do-not-replace preserves Claude Desktop's existing filesystem access to BlarAI source.
+
+        Verify post-edit:
+        ```powershell
+        $cfg = Get-Content "$env:APPDATA\Claude\claude_desktop_config.json" -Raw | ConvertFrom-Json
+        $cfg.mcpServers.filesystem.args
+        ```
+        Expected: 4 elements: `-y`, `@modelcontextprotocol/server-filesystem`, the BlarAI path, the devplatform path.
+      </amendment>
+
+      <rationale>
+        Post-cutover, Claude Desktop sessions may need to inspect either repo (LA reviewing devplatform code; LA reviewing BlarAI source for context; cross-repo refactoring during Stage 6 hardening). Filesystem access to both is strictly better than to one with no incremental cost.
+      </rationale>
+
+    </subclause>
+
+    <subclause id="g8-ea8_n1(p)" item="4.4" class="MED" priority="MED" title="Claude Desktop trustedFolders — extend to include devplatform (Finding B)">
+
+      <finding_quoted_verbatim>
+        "preferences.localAgentModeTrustedFolders = ['C:\\Users\\mrbla\\BlarAI'] (line 63)... LA recommendation: EXPAND both to include devplatform too."
+      </finding_quoted_verbatim>
+
+      <amendment>
+        AMENDMENT to g8-ea8_n1(f) Item 4.4: add the following step AFTER n1(o):
+
+        Step (extra-2): extend `preferences.localAgentModeTrustedFolders` to include both repos.
+
+        Current (BlarAI-only):
+        ```jsonc
+        "preferences": {
+          "localAgentModeTrustedFolders": ["C:\\Users\\mrbla\\BlarAI"]
+        }
+        ```
+
+        Target (both repos):
+        ```jsonc
+        "preferences": {
+          "localAgentModeTrustedFolders": ["C:\\Users\\mrbla\\BlarAI", "C:\\Users\\mrbla\\devplatform"]
+        }
+        ```
+
+        Verify post-edit:
+        ```powershell
+        $cfg = Get-Content "$env:APPDATA\Claude\claude_desktop_config.json" -Raw | ConvertFrom-Json
+        $cfg.preferences.localAgentModeTrustedFolders
+        ```
+        Expected: 2 elements: BlarAI path, devplatform path.
+      </amendment>
+
+      <rationale>
+        Local Agent mode in Claude Desktop requires explicit folder trust to allow file operations without per-call confirmation. Without trust on devplatform, post-cutover any LA-initiated Local Agent invocation against devplatform code would be blocked or require confirmation prompts. Append-do-not-replace preserves BlarAI trust.
+      </rationale>
+
+    </subclause>
+
+  </new_sub_clauses>
+
+  <existing_sub_clauses_unchanged>
+
+    <preamble>
+      Three findings touched on existing base-verdict sub-clauses; recording status for clarity.
+    </preamble>
+
+    <unchanged id="g8-ea8_n1(c)" reason="LA confirmed Finding C disposition: KEEP absolutization">
+      Base-verdict 6-step flow (Stop verify → DB sha256 → SQLite integrity → config absolutize → start devplatform Vikunja → DB sha256 stability) UNCHANGED. EA-8 executes verbatim per base verdict.
+    </unchanged>
+
+    <unchanged id="g8-ea8_n1(f)" reason="PYTHONPATH explicit-call-out already in base verdict">
+      Finding B includes "Plus: explicitly call out PYTHONPATH rewrite at Item 4.4 (currently implicit in spec)". Base verdict n1(f) already enumerates PYTHONPATH explicitly as field #3 with concrete before/after diff. No additional amendment needed; LA finding is already addressed.
+    </unchanged>
+
+    <unchanged id="g8-ea8_n1(k)" reason="Item 4.9 Arguments rewriting already in base verdict">
+      Finding C bonus: "spec's regex covers TargetPath + WorkingDirectory but verify Arguments also gets rewritten (Arguments is a separate property on .lnk)". Base verdict n1(k) Part 1 already includes the line `$sc.Arguments = $sc.Arguments -replace [regex]::Escape("C:\Users\mrbla\BlarAI"), "C:\Users\mrbla\devplatform"`. All three .lnk properties (TargetPath, WorkingDirectory, Arguments) are rewritten. No additional amendment needed.
+    </unchanged>
+
+  </existing_sub_clauses_unchanged>
+
+  <init_pointer_first_action_directive authority="lead_architect_2026_04_28">
+
+    <preamble>
+      LA-relayed procedural directive for Guide-#8 to honor when authoring the EA-8 init pointer (separately, post-supplement-commit). NOT a verdict sub-clause; binds the init pointer's first-action sequence ordering. Recorded here in the supplement so the directive is preserved alongside the verdict's binding artifacts.
+    </preamble>
+
+    <directive_quoted_verbatim>
+      "Note for the EA-8 init pointer (when you author it): the VIKUNJA_TOKEN process-scope load command should be the FIRST shell command in EA-8's session (Item 4.0.0 area), BEFORE the .gitignore checkout from rr8.
+
+      Order: (1) load VIKUNJA_TOKEN into process-scope, (2) verify it loaded, (3) git checkout -- .gitignore on devplatform, (4) verify clean tree, (5) proceed with Item 4.0 close-..."
+    </directive_quoted_verbatim>
+
+    <implementation_for_init_pointer>
+      The EA-8 init pointer's "first-action sequence" section (which precedes Item 4.0 of the Stage 4 XML) shall encode the following ordered steps verbatim:
+
+      Step 1 — VIKUNJA_TOKEN process-scope load (per g8-ea8_n1(e) Part 0):
+      ```powershell
+      $env:VIKUNJA_TOKEN = [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')
+      if ([string]::IsNullOrEmpty($env:VIKUNJA_TOKEN)) {
+        Write-Warning "VIKUNJA_TOKEN not set in User scope. Item 4.3 will use REST user/pass fallback per g8-ea8_n1(e) Part 2."
+      } else {
+        Write-Host "VIKUNJA_TOKEN loaded into Process scope (length $($env:VIKUNJA_TOKEN.Length))."
+      }
+      ```
+
+      Step 2 — verify the load:
+      ```powershell
+      "VIKUNJA_TOKEN length: $($env:VIKUNJA_TOKEN.Length) (expected: 43 per LA pre-prep, or empty if REST fallback will be used)"
+      ```
+
+      Step 3 — devplatform .gitignore cleanup (per rr8 / g7-ea7_n14(a)):
+      ```powershell
+      Push-Location C:\Users\mrbla\devplatform
+      git status --porcelain  # expected before: " M .gitignore"
+      git checkout -- .gitignore
+      Pop-Location
+      ```
+
+      Step 4 — verify devplatform working tree clean post-checkout:
+      ```powershell
+      Push-Location C:\Users\mrbla\devplatform
+      $status = git status --porcelain
+      if ($status) { throw "devplatform working tree not clean post-checkout: `n$status" }
+      Write-Host "devplatform working tree: clean"
+      Pop-Location
+      ```
+
+      Step 5 — proceed with Item 4.0 of the Stage 4 XML (close all OTHER AI surfaces; preserve EA-8's own session per pragmatic interpretation).
+
+      The LA's truncated text "(5) proceed with Item 4.0 close-..." is interpreted as "close all AI development surfaces" per the existing Item 4.0 spec scope (the canonical phrasing of Item 4.0 in 05_STAGE4_CUTOVER.xml). If LA intended a different terminal phrase, Guide-#8 will revise the init pointer per LA clarification before EA-8 spawn.
+
+      Steps 1-4 collectively form what the init pointer terms "Item 4.0.0" (the new pre-Item-4.0 first-action block). Step 5 enters the Stage 4 XML proper at Item 4.0.
+    </implementation_for_init_pointer>
+
+    <ack_to_emit_at_start_of_ea_8_iter_1_gate_addendum>
+      EA-8 acknowledges (in addition to base-verdict acknowledgments):
+      (j) g8-ea8_n1(e-part-0): VIKUNJA_TOKEN process-scope load is the FIRST EA-8 terminal command in the session, preceding rr8 .gitignore checkout, preceding Item 4.0.
+      (k) g8-ea8_n1(o) + g8-ea8_n1(p): Item 4.4 expands (does NOT replace) Claude Desktop's filesystem args + trustedFolders to include both repos.
+      (l) Init pointer Item 4.0.0 first-action sequence (5 ordered steps) per §init_pointer_first_action_directive above.
+      (m) Cumulative-ack chain post-supplement: g7-ea1_n10..n13(a-h) + g7-ea7_n14(a-d) + g8-ea8_n1(a-p) [16 sub-clauses; previously 14].
+    </ack_to_emit_at_start_of_ea_8_iter_1_gate_addendum>
+
+  </init_pointer_first_action_directive>
+
+  <forward_carry_unchanged_from_base>
+
+    <ex_items unchanged="true">
+      EX-1 (Vikunja DB-path runtime verification mid-cutover), EX-2 (VIKUNJA_TOKEN auth fallback documentation), EX-3 (S4U elevation handling) UNCHANGED from base verdict §forward_carry_to_stage_4_ea_in_execution. Note: EX-2 documentation now references Part 0 success path additionally — if Part 0 loaded the token cleanly, Part 2 fallback wasn't exercised; document accordingly.
+    </ex_items>
+
+    <stage_5_forward_items unchanged="true">
+      f5_5 (gitignore vikunja.db pattern preservation), f5_6 (LocalAppData backup retention) UNCHANGED.
+    </stage_5_forward_items>
+
+    <stage_6_7_5_tickets unchanged="true">
+      TICKET F (LocalAppData doctrine documentation; partially pre-resolved), TICKET G (python.exe absolute-path migration), TICKET E expansion sub-item (iv) UNCHANGED.
+
+      No new Stage 6.7.5 tickets from this supplement — the three findings are all closed in-scope at Stage 4.
+    </stage_6_7_5_tickets>
+
+  </forward_carry_unchanged_from_base>
+
+  <required_acknowledgments>
+
+    <preamble>
+      EA-8 must acknowledge in its iter-1 comprehension gate response the FULL set of acknowledgments from base verdict + this supplement.
+    </preamble>
+
+    <ack_to_emit_at_start_of_ea_8_iter_1_gate>
+      Base verdict §required_acknowledgments items (a) through (i) UNCHANGED. Supplement-induced additions:
+
+      (j) g8-ea8_n1(e-part-0) verbatim per §new_sub_clauses above. VIKUNJA_TOKEN process-scope load is the FIRST EA-8 terminal command.
+
+      (k) g8-ea8_n1(o) verbatim. Claude Desktop filesystem MCP args extended to include both repos (append; do not replace).
+
+      (l) g8-ea8_n1(p) verbatim. Claude Desktop trustedFolders extended to include both repos (append; do not replace).
+
+      (m) Init pointer Item 4.0.0 first-action sequence (5 ordered steps). EA-8 executes the sequence verbatim before entering Item 4.0 of the Stage 4 XML.
+
+      (n) Cumulative-ack chain count update: g8-ea8_n1 now has 16 sub-clauses (a, b, c, d, e [parts 0/1/2/3], f, g, h, i, j, k, l, m, n, o, p). Prior count was 14.
+
+      (o) DB-mechanism architectural decision REAFFIRMED per LA Finding C disposition: KEEP n1(c) absolutization. EA-8 will NOT propose dropping the config edit at Item 4.1.
+    </ack_to_emit_at_start_of_ea_8_iter_1_gate>
+
+  </required_acknowledgments>
+
+  <proceed_authorization>
+
+    PROCEED authorization UNCHANGED from base verdict. Two prerequisites still pending:
+
+    1. Guide-#8 authors the Stage 4 EA-8 init pointer at `docs/platform_separation/temp_for_responses/4.0-EA_INITIALIZATION_INSTANCE_8_STAGE4_CUTOVER.xml`. Init pointer must encode (in addition to base-verdict requirements):
+       - Item 4.0.0 first-action sequence (5 ordered steps per §init_pointer_first_action_directive above).
+       - Cumulative-ack chain restated VERBATIM with all 16 g8-ea8_n1 sub-clauses.
+       - Note that g8-ea8_n1(o) + g8-ea8_n1(p) extend (not replace) Claude Desktop filesystem + trust to both repos.
+
+    2. LA pre-prep checklist completed (UNCHANGED from base verdict).
+
+    Stage 4 EA-8 spawn happens AFTER both prerequisites complete + LA-explicit "go" signal.
+
+  </proceed_authorization>
+
+  <next_action_for_la>
+
+    <step_1>
+      Review this supplement at `docs/platform_separation/temp_for_responses/4.0.v2-GUIDE_RESPONSE_INSTANCE_8_SUPPLEMENT_TO_PREFLIGHT_AUDIT_CHECKPOINT.xml`. Particular attention:
+      - g8-ea8_n1(e-part-0) — first-action token load semantics
+      - §init_pointer_first_action_directive — confirm the 5-step ordering matches your relayed intent (especially Step 5's "proceed with Item 4.0 close-..." truncation interpretation).
+    </step_1>
+
+    <step_2>
+      Per existing stop-and-wait gate, signal one of:
+      - "approve init pointer authoring" → Guide-#8 authors `4.0-EA_INITIALIZATION_INSTANCE_8_STAGE4_CUTOVER.xml` next turn (encoding base verdict + supplement + Item 4.0.0 first-action sequence + LA pre-prep checklist + 75-ack chain + rr1-rr8 + f5_1-f5_6 + 7 hardening tickets verbatim).
+      - "revise supplement" + change request → Guide-#8 re-authors and re-commits before init pointer.
+      - "investigate <item>" → Guide-#8 defers init pointer pending further investigation.
+    </step_2>
+
+    <step_3>
+      After init pointer commit + LA pre-prep checklist completion, EA-8 spawns in fresh VS Code Copilot Opus 4.7 session. EA-8 emits iter-1 comprehension gate; Guide-#8 reviews; verdict APPROVED → EA-8 begins Item 4.0.0 → Item 4.0 → Stage 4 cutover.
+    </step_3>
+
+    <pause_state_note>
+      Fleet remains paused (UNCHANGED from base verdict). state.json sha256 byte-identical baseline preserved.
+    </pause_state_note>
+
+  </next_action_for_la>
+
+</guide_response>

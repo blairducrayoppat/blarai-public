@@ -1,0 +1,2 @@
+READY mode=llmpipeline device=NPU ir=phase2_gates\evidence\issue34450\exports\cell_i
+OK elapsed=16.45s

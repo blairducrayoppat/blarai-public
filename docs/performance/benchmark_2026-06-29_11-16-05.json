@@ -1,0 +1,129 @@
+{
+  "benchmark": "gpu_inference_qwen3-14b",
+  "config_stamp": {
+    "timestamp": "2026-06-29T11:16:05",
+    "model_name": "qwen3-14b",
+    "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "quantization": "INT4",
+    "device": "GPU",
+    "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+    "num_assistant_tokens": 3,
+    "draft_model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "driver_version": "",
+    "prompt_set_version": "v1",
+    "prefill_probe_version": "pp-v1",
+    "measure_prefill": false,
+    "num_runs": 2,
+    "num_warmup": 1,
+    "run_cooldown_s": 0,
+    "enable_prefix_caching": true
+  },
+  "results": {
+    "spec_on": {
+      "config": "Speculative decoding ON",
+      "speculative_decoding_requested": true,
+      "speculative_decoding_achieved": true,
+      "load_ms": 10699.0,
+      "aggregate": {
+        "mean_tps": 15.82,
+        "median_tps": 16.79,
+        "p95_tps": 20.87,
+        "mean_ttft_ms": 492.5,
+        "median_ttft_ms": 481.4,
+        "p95_ttft_ms": 589.2,
+        "mean_total_ms": 5335.3,
+        "median_total_ms": 4185.1,
+        "p95_total_ms": 12092.9,
+        "total_runs": 8,
+        "error_runs": 0
+      },
+      "raw_runs": [
+        {
+          "prompt_index": 0,
+          "token_count": 8,
+          "latency_first_token_ms": 589.2,
+          "latency_total_ms": 953.8,
+          "throughput_tok_per_sec": 8.39,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 48,
+          "latency_first_token_ms": 483.0,
+          "latency_total_ms": 3145.0,
+          "throughput_tok_per_sec": 15.26,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 95,
+          "latency_first_token_ms": 491.7,
+          "latency_total_ms": 5226.2,
+          "throughput_tok_per_sec": 18.18,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 477.3,
+          "latency_total_ms": 12072.1,
+          "throughput_tok_per_sec": 20.87,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 8,
+          "latency_first_token_ms": 482.8,
+          "latency_total_ms": 849.8,
+          "throughput_tok_per_sec": 9.41,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 48,
+          "latency_first_token_ms": 473.3,
+          "latency_total_ms": 3117.5,
+          "throughput_tok_per_sec": 15.4,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 95,
+          "latency_first_token_ms": 462.5,
+          "latency_total_ms": 5225.2,
+          "throughput_tok_per_sec": 18.18,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 480.0,
+          "latency_total_ms": 12092.9,
+          "throughput_tok_per_sec": 20.84,
+          "error": null
+        }
+      ],
+      "prefill": {
+        "measured": false,
+        "mean_pp": 0.0,
+        "median_pp": 0.0,
+        "p95_pp": 0.0,
+        "mean_input_tokens": 0.0,
+        "probe_version": "pp-v1",
+        "total_runs": 0,
+        "error_runs": 0,
+        "raw_runs": []
+      }
+    }
+  },
+  "prompts": {
+    "version": "v1",
+    "texts": [
+      "What is the capital city of France?",
+      "How many bytes are in one kilobyte?",
+      "Explain what a transformer neural network is in plain language.",
+      "What is quantization in the context of machine learning models, and why does it help with inference speed?"
+    ]
+  }
+}

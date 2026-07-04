@@ -1,0 +1,91 @@
+{
+  "harness": "minp_ab",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+  "config": {
+    "min_ps": [
+      0.0,
+      0.05,
+      0.1
+    ],
+    "temperature": 0.8,
+    "seed": 42,
+    "max_new_tokens": 200,
+    "do_sample": true,
+    "note": "non-default sampling mode; production is greedy (temp=0)"
+  },
+  "rows": [
+    {
+      "min_p": 0.0,
+      "prompt_index": 0,
+      "wall_s": 17.68,
+      "n_words": 149,
+      "distinct_trigram_ratio": 1.0,
+      "text": ":Okay, the user wants a paragraph about an autumn forest walk. Let me start by visualizing the scene. Autumn forests have vibrant colors, so I should mention the leaves\u2014maybe gold, amber, crimson. The crunch underfoot is a sensory detail. I need to include sounds, like rustling leaves or maybe a stream. Smells could be damp earth or woodsy scents. Maybe add some wildlife, like a squirrel or birds. Also, the light during autumn, maybe golden hour. I should create a peaceful, immersive atmosphere. Let me check if I'm covering all senses: sight (colors, light), sound (crunch, rustle), smell (earth, foliage), touch (cool air, soft ground). Maybe mention the temperature, like a chill in the air. Avoid clich\u00e9s but keep it vivid. Make sure the flow is smooth, moving through the forest. Maybe start with stepping into the forest, then describe the surroundings, then add some movement like a breeze"
+    },
+    {
+      "min_p": 0.0,
+      "prompt_index": 1,
+      "wall_s": 17.36,
+      "n_words": 163,
+      "distinct_trigram_ratio": 0.9503,
+      "text": " problem, but I need to make sure the explanation is accurate. Let me think... I remember that when a bicycle is moving, it's not just the rider's balance but some physical principles involved. There's something about the gyroscopic effect from the spinning wheels, right? Like how a gyroscope resists changes to its orientation. Also, the caster effect, which is when the front wheel is positioned so that its contact point is behind the steering axis. That might help in self-correction. Wait, but I've heard that maybe the gyroscopic effect isn't the main reason. Some studies suggest that the rider's ability to steer and adjust the bike's direction plays a big role. So maybe it's a combination of both the caster effect and the rider's input? I should also mention that when moving, the bike is more stable because of the forward motion and the rider's ability to make quick corrections. Hmm, but I need to make sure I'm not mixing up different factors."
+    },
+    {
+      "min_p": 0.0,
+      "prompt_index": 2,
+      "wall_s": 20.38,
+      "n_words": 162,
+      "distinct_trigram_ratio": 1.0,
+      "text": ": \ud83c\udf0a\n\nOkay, I need to describe an imaginary city built on the surface of the ocean. Let me start by brainstorming some ideas. First, how would such a city be structured? Maybe it's a floating city, like a series of platforms or islands made from some special materials. Since it's on the ocean, it needs to be stable and resistant to waves and storms.\n\nI should think about the materials used. Maybe they use advanced technology, like self-repairing materials or buoyant structures. Also, maybe they have some kind of anchor system to keep the city from drifting. Then, there's the aspect of sustainability. The city would need to generate its own power, maybe from wave energy, solar panels, or wind turbines. \n\nWhat about the architecture? Buildings might be designed to withstand the ocean environment, with rounded edges to reduce wind resistance. Maybe they have green spaces, like floating gardens or vertical gardens. Also, transportation within the city \u2013 maybe they use"
+    },
+    {
+      "min_p": 0.05,
+      "prompt_index": 0,
+      "wall_s": 23.29,
+      "n_words": 160,
+      "distinct_trigram_ratio": 0.9937,
+      "text": ":Okay, the user wants a paragraph about an autumn forest walk. Let me start by visualizing the scene. Autumn forests have vibrant colors, so I should mention the leaves\u2014maybe gold, amber, crimson. The crunch underfoot is a sensory detail. I need to include other senses too: maybe the smell of fallen leaves, the chill in the air. Maybe some sounds, like rustling leaves or a distant stream. Also, the light during autumn, perhaps golden hour. I should create a serene, peaceful mood. Avoid clich\u00e9s but keep it vivid. Check for flow and make sure each sentence connects. Let me structure it: start with the path, describe the surroundings, include sensory details, maybe a stream or animals, and end with the feeling of the walk. Need to keep it concise, as it's a short paragraph. Avoid overly complex words but keep it descriptive. Make sure to convey the tranquility and beauty of the season.\n</think>\n\nThe forest path is a tape"
+    },
+    {
+      "min_p": 0.05,
+      "prompt_index": 1,
+      "wall_s": 25.71,
+      "n_words": 164,
+      "distinct_trigram_ratio": 0.9877,
+      "text": " problem, I need to explain how a bicycle stays upright when moving. Let me start by recalling what I know about bicycles and physics. I remember that when you're riding a bike, if you start to lean to one side, you turn the handlebars in that direction, which helps you stay balanced. But why does that work?\n\nHmm, maybe it's related to the concept of angular momentum? Wait, I think I've heard that the spinning wheels have some kind of gyroscopic effect. But I'm not sure how that plays into keeping the bike upright. Maybe that's not the main factor. \n\nOh right, there's something about the front wheel's trail. The trail is the distance between the point where the front wheel touches the ground and the point where the steering axis would meet the ground. If the trail is positive, the wheel tends to self-align, which helps in stability. But how does that connect to the rider's input?\n\nThen there's the rider's role. When"
+    },
+    {
+      "min_p": 0.05,
+      "prompt_index": 2,
+      "wall_s": 26.37,
+      "n_words": 156,
+      "distinct_trigram_ratio": 0.9935,
+      "text": ": \ud83c\udf0a\n\nOkay, I need to describe an imaginary city built on the surface of the ocean. Let me start by brainstorming some ideas. First, how would such a city be structured? Maybe it's a floating city, like a series of platforms or islands. But since it's on the surface, maybe it's more like a massive structure that's buoyant.\n\nI should think about the materials used. Maybe advanced technology, like lightweight but strong materials, or maybe something more magical if it's a fantasy setting. But the user didn't specify, so maybe a mix of futuristic tech and some unique design elements.\n\nWhat about the purpose of the city? Is it a tourist spot, a research facility, a refuge from rising sea levels? Maybe it's a self-sustaining eco-city. That could be a good angle. Also, considering the ocean environment, the city would need to handle waves, storms, and maybe even marine life interactions.\n\nTransportation within the city:"
+    },
+    {
+      "min_p": 0.1,
+      "prompt_index": 0,
+      "wall_s": 26.88,
+      "n_words": 154,
+      "distinct_trigram_ratio": 1.0,
+      "text": ":Okay, the user wants a paragraph about an autumn forest walk. Let me start by visualizing the scene. Autumn forests have vibrant colors, so I should mention the leaves\u2014maybe crimson, gold, amber. The crunch underfoot is important for sensory detail. I need to include other elements like sunlight filtering through the trees, perhaps a stream or some wildlife. Also, the atmosphere: cool air, maybe a breeze. I should evoke a sense of tranquility and the transition of seasons. Let me check if there's a specific tone they want\u2014probably peaceful and descriptive. Avoid clich\u00e9s but keep it vivid. Make sure the paragraph flows smoothly, connecting the elements naturally. Alright, let me piece it together.\n</think>\n\nThe forest in autumn is a tapestry of fiery hues, with crimson maples, golden oaks, and amber birches casting dappled shadows beneath a crisp, sunlit canopy. Each step crunches over a carpet of fallen leaves, their edges curled and brittle"
+    },
+    {
+      "min_p": 0.1,
+      "prompt_index": 1,
+      "wall_s": 27.8,
+      "n_words": 163,
+      "distinct_trigram_ratio": 0.9814,
+      "text": " problem, I need to explain how a bicycle stays upright when moving. Let me start by recalling what I know about bicycles and physics. I remember that when you're riding a bike, if you start to lean to one side, you turn the handlebars in that direction, which helps you stay balanced. But why does that work?\n\nHmm, maybe it's related to the concept of angular momentum? Wait, I think that's more for things like a spinning top or a gyroscope. But I'm not sure if that's the main reason for bicycles. Maybe it's more about the rider making adjustments. When you move forward, if the bike starts to tip, you turn the handlebars to counteract that. This is called steering or leaning into the turn. The wheels are also important\u2014when you turn, the contact point of the wheels changes, which affects the balance.\n\nOh, there's something called the caster effect. I think that's when the front wheel is turned so that the"
+    },
+    {
+      "min_p": 0.1,
+      "prompt_index": 2,
+      "wall_s": 27.87,
+      "n_words": 156,
+      "distinct_trigram_ratio": 0.9935,
+      "text": ": \ud83c\udf0a\n\nOkay, I need to describe an imaginary city built on the surface of the ocean. Let me start by brainstorming some ideas. First, how would such a city be structured? Maybe it's a floating city, like a series of platforms or islands. But since it's on the surface, maybe it's more like a massive structure that's buoyant.\n\nI should think about the materials used. Maybe advanced technology, like lightweight but strong materials, or maybe something more magical if it's a fantasy setting. But the user didn't specify, so maybe a mix of futuristic tech and some unique design elements.\n\nWhat about the purpose of the city? Is it a tourist spot, a research facility, a refuge from rising sea levels? Maybe it's a self-sustaining eco-city. That could be a good angle. Also, considering the ocean environment, the city would need to handle waves, storms, and maybe even marine life interactions.\n\nTransportation within the city:"
+    }
+  ]
+}

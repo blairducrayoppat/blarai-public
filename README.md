@@ -1,0 +1,290 @@
+# BlarAI
+
+**A personal, locally-run, security-first AI system engineered for decades of use on consumer hardware.**
+
+BlarAI runs an agentic AI assistant entirely on a single laptop — the language
+model on the integrated GPU, the knowledge base and audit log encrypted on the
+local disk, and **zero external network dependency by default**. It is not a
+prototype or a wrapper around a cloud API. It is a long-term platform, designed
+to survive hardware generations, with a security and governance architecture
+treated as the primary engineering artifact rather than an afterthought.
+
+The design premise is uncompromising: a system that holds decades of a person's
+private data must assume every component can fail or be subverted, must fail
+*closed* when it does, and must be able to prove — cryptographically and in a
+tamper-evident audit trail — what it did and why.
+
+---
+
+## Target hardware
+
+BlarAI is built and measured against one machine, and every number in this
+repository is real measurement on it:
+
+| Component | Specification |
+|-----------|---------------|
+| CPU | Intel Core Ultra 7 258V (Lunar Lake) |
+| GPU | Intel Arc 140V (Xe2) integrated |
+| NPU | Intel AI Boost (used for encoder offload) |
+| Memory | 32 GB LPDDR5X — **31.323 GB effective** ceiling after firmware reservation |
+| Trust root | TPM 2.0 (STMicroelectronics), Windows CNG Platform Crypto Provider |
+| Host OS | Windows 11 Pro + Hyper-V |
+
+The 31.323 GB effective ceiling is a hard architectural constraint. Every model,
+cache, and co-residency decision below is sized against it and validated by
+on-device measurement, not estimation.
+
+---
+
+## Inference stack
+
+All language-model inference runs on the Arc 140V GPU via **OpenVINO GenAI**
+(2026.2.1). BlarAI does not use llama.cpp, Ollama, or any cloud runtime — it is
+an Intel/OpenVINO-native stack tuned for Lunar Lake.
+
+- **Primary model — Qwen3-14B, INT4 (GPU).** 40 layers, 5120 hidden, 8 KV heads
+  (GQA), ~9.1 GB of INT4-symmetric weights. A single shared model instance backs
+  both the Policy Agent (classification) and the Assistant Orchestrator
+  (conversation) — one weight load, distinct KV-caches — so the security gate and
+  the conversational agent never double the RAM cost.
+- **Speculative decoding.** A Qwen3-0.6B draft, pruned to 6 layers and quantized
+  INT8, drives speculative decoding for roughly 2× throughput. The pruned draft
+  was chosen over a full 0.6B draft specifically because it *streams* token by
+  token — a deliberate trade of ~20% peak throughput for a responsive, live-typing
+  feel on every reply.
+- **Embeddings — bge-small-en-v1.5, NPU-offloaded.** The shared 384-dim encoder
+  (substrate retrieval, knowledge bank, and leakage detection all ride one
+  session) runs on the NPU by default. Measured **13.6× faster** than the CPU path
+  on 512-token document windows (168.9 ms → 12.4 ms) at 0.999996 cosine parity,
+  while freeing both the P-cores and the GPU-contended 14B. Fail-soft: a box
+  without a working NPU falls back to CPU automatically.
+- **Voice loop.** Whisper STT (GPU) + Kokoro TTS, with speak-to-submit and
+  streaming synthesis. Whisper-on-NPU was measured and found *not* viable on the
+  current driver — recorded honestly, STT stays on GPU.
+- **Vision.** Qwen3-VL-8B provides local image understanding, host-side, load-on-
+  demand.
+- **Local image generation (UC-010).** Text→image and image+text→image on the
+  Arc 140V via OpenVINO `Text2ImagePipeline` / `Image2ImagePipeline`, using an
+  uncensored SDXL INT8 finetune (RealVisXL V5.0) for photoreal plus a base SDXL +
+  runtime LoRA for illustration and cartoon styles. Because SDXL and the 14B
+  cannot always co-reside under the 31.323 GB ceiling, generation is choreographed
+  against memory: the diffusion pipeline is evicted after every generate, and a
+  high-resolution refine will evict the shared 14B and lazily reload it. The
+  Phase-0 memory gate measured a **~26.0 GB co-resident peak (5.3 GB headroom)**;
+  base 1024² generation completes in ~10.7 s.
+
+---
+
+## Governance and security architecture
+
+This is the part of BlarAI that matters. The capabilities above are table stakes;
+the differentiator is that every one of them operates behind a deterministic,
+fail-closed governance boundary.
+
+### The Policy Agent — every tool call is adjudicated
+
+BlarAI's Policy Agent is a resident semantic gatekeeper that intercepts and
+adjudicates **every** tool call, data-access request, and egress attempt any
+agent generates. It uses a hybrid model:
+
+1. Each action is reduced to a **Canonical Action Representation (CAR)** and
+   evaluated by a deterministic checker (allowlist + schema + semantic-distance
+   constraints).
+2. Only actions the deterministic layer admits proceed; a probabilistic
+   classifier backstops semantic intent.
+3. An approved action is bound to a signed **Decision Artifact** — an
+   instance-scoped, single-use JWT carrying a 128-bit nonce, a 5-second hard TTL,
+   and a monotonic epoch for lazy revocation. Destination code validates the
+   receipt before executing. No receipt, no execution.
+
+The deterministic-first design is a direct response to a documented weakness: a
+sub-8B classifier alone is empirically insufficient against adversarial
+out-of-distribution payloads, so schema enforcement — not the model — is the
+non-bypassable layer.
+
+### Fail-closed everywhere
+
+Unclassified, ambiguous, or unverifiable inputs are blocked by default and
+escalated to the operator. Stores refuse to start rather than open in a degraded
+state. A missing or invalid signature blocks boot. This is enforced in code
+(`fail_closed = true`), not by convention.
+
+### Hardware-rooted trust and at-rest encryption
+
+- **TPM 2.0 trust root (ADR-018).** SGX, referenced in the original architecture,
+  is absent from Lunar Lake; the trust root was migrated to non-exportable TPM 2.0
+  keys via the Windows CNG Platform Crypto Provider. The signing primitive is
+  implemented and hardware-verified.
+- **At-rest encryption (ADR-025).** Application-layer AES-GCM over the session and
+  substrate/knowledge databases, under a TPM-sealed Data Encryption Key with an
+  offline recovery-key ceremony. Stores open with `secure_delete=ON` so discarded
+  content is zeroed at rest.
+- **Signed model manifests.** Model weights are SHA-256-manifested and
+  signature-verified at load (fail-closed), covering the nested diffusers-OV
+  layout as well as the flat 14B.
+
+### Isolation and egress
+
+- **Hyper-V guest isolation** with `AF_HYPERV` vsock for host↔guest communication
+  — **no TCP/IP inside the guest**. Hostile web bytes are parsed inside a NIC-less
+  guest (the launcher asserts zero NICs at start, fail-closed); only cleaned text
+  crosses the vsock boundary.
+- **One governed egress door (ADR-027).** By default BlarAI makes no external
+  calls. When network features are enabled, all outbound traffic flows through a
+  single sanctioned path (`shared/security/guarded_fetch`, the only module
+  permitted to import an HTTP client, enforced by an import scan) against a
+  deny-by-default allowlist. The first standing allowlist entry is `kagi.com`, for
+  the model-callable `web_search` tool; every other host is denied by rule. A
+  tamper-evident, segmented audit log (ADR-029) records every decision, kept
+  forever in individually-verifiable sealed segments.
+
+### Provenance-based trust and prompt-injection defense
+
+Trust follows provenance (ADR-023). Content is tagged `TRUSTED_LOCAL`,
+`TRUSTED_MEMORY`, `UNTRUSTED_EXTERNAL`, `UNTRUSTED_KNOWLEDGE`, or `UNTRUSTED_WEB`.
+Untrusted content is datamarked at ingest, action-locked (it can steer words, not
+fire tools), and passed through spotlighting and a cosine-similarity leakage
+detector before any response leaves the system. Trusted local files carry zero
+daily friction; the injection defenses fire only when genuinely untrusted content
+is present. The design keeps consent at the grain a human can actually judge —
+egress and privacy decisions go to the operator (a turn-scoped Windows-Hello
+envelope gates model-initiated egress), while danger is routed to deterministic
+controls rather than a per-item rubber-stamp.
+
+---
+
+## Tool calling, evaluation, and testing
+
+- **Native JSON tool calling.** Tool calls use the Qwen3-native JSON form with
+  strict, fail-closed parse-time schema validation. An xgrammar structural-tags
+  constraint (which makes a malformed or unknown-tool call structurally impossible
+  at the decoder) is built and proven to compose with speculative decoding and
+  streaming; it is currently gated off pending an upstream runtime fix, with
+  parse-time validation as the guard in the interim — recorded transparently in
+  config, not hidden.
+- **Model-quality eval harness.** A golden-set eval suite (`evals/`) covers Policy
+  Agent classification, tool calling, and governance behavior, with committed
+  per-case baselines and regression exit codes that have teeth. First
+  model-in-the-loop PA classification measured 26/30 (86.7%) — and, importantly,
+  all four misses were *over-denials* of benign actions, never a dangerous
+  false-allow.
+- **Standing test gate.** **4919 passed / 0 skipped / 120 deselected**, plus the
+  model-quality eval gate green, on the merged main line. Hardware, WinUI, and
+  slow tiers are deselected from the standing gate and run separately. Test policy
+  and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
+
+---
+
+## Surfaces
+
+- **WinUI desktop app** — the primary operator interface: streaming chat, voice
+  conversation, inline generated-image rendering and a gallery, and a knowledge
+  ingest/approval flow.
+- **Knowledge bank** — an operator-curated, approval-gated encrypted store
+  (`knowledge.db`, a sibling of the substrate under the same DEK) with hybrid
+  retrieval (cosine + BM25, reciprocal-rank fusion) over approved content only.
+- **Headless coding-agent dispatch (ADR-034 / ADR-035)** — BlarAI can decompose a
+  natural-language goal into tasks with verifiable acceptance criteria and dispatch
+  them to a local coding fleet, orchestrating a host-level model swap (the 14B and
+  the fleet's larger model cannot co-reside) with never-zero teardown and
+  idempotent crash recovery. Local subprocess only, zero egress.
+
+---
+
+## Project structure
+
+```
+shared/              Shared libraries — security (guarded_fetch, egress guard,
+                     tpm_signer), inference, config, IPC, provenance, evals feed
+services/
+  policy_agent/          USE-CASE-001 — deterministic + probabilistic adjudication
+  assistant_orchestrator/ USE-CASE-004 — conversation, tool loop, PGOV governance
+  semantic_router/       Intent routing
+launcher/            Hyper-V VM manager, boot sequencing, deployment
+evals/               Golden-set model-quality eval suites (regression exit codes)
+docs/
+  adrs/                  Architecture Decision Records (ADR-005..035)
+  DECISION_REGISTER.md   SSOT index of runtime decisions + ADRs
+  IMPLEMENTATION_PLAN.md Milestone tracking
+  TEST_GOVERNANCE.md     Test policy, marker taxonomy, baseline
+  ledger/                Per-entry milestone ledger
+tests/               Integration + security posture tests
+BUILD_JOURNAL.md     The running narrative of how BlarAI was built
+LESSONS.md           Distilled, numbered lessons (the compounding surface)
+PERFORMANCE_LOG.md   Reproducible, community-grade inference measurements
+```
+
+---
+
+## The Use Cases
+
+BlarAI's full vision is seven Use Cases. Two are operational, one is live, and the
+rest are defined and staged.
+
+| # | Use Case | Status |
+|---|----------|--------|
+| 001 | Policy-Driven Security & Access Orchestration (Policy Agent) | **Operational** |
+| 002 | Personal Knowledge Substrate | Knowledge bank live; layered store merged |
+| 003 | Local Data Normalization with Mobile LAN Ingress (Cleaner) | Ingest flow merged; fetch limb governed |
+| 004 | Context-Aware Private Assistant with Modular Skills | **Operational** |
+| 005 | Interactive Local Software Engineer (headless) | Dispatch integration live |
+| 009 | Autonomous System Maintainer | Defined |
+| 010 | Local Generative Imaging (text→image, image+text→image) | **Live** |
+
+Canonical definitions live in `Use Cases_FINAL.md`.
+
+---
+
+## Phase history
+
+| Phase | Status | Summary |
+|-------|--------|---------|
+| 1 — Architectural Definition | Closed | Use Cases locked; canonical architecture defined |
+| 2 — Empirical Validation | Closed | All hardware gates passed; core backend complete |
+| 3 — UI Design & Scaffolding | Closed | Desktop shell; UI backend |
+| 4 — Operational Gap Closure | Closed | UAT sign-off; operational baseline |
+| 5 — Post-Operational Development | **Active** | Capability program: eval harness, native tool calls, NPU offload, image generation, web search, dispatch |
+
+---
+
+## On the build journal
+
+`BUILD_JOURNAL.md` and `LESSONS.md` are load-bearing parts of this repository, not
+decoration. They are the honest record of how BlarAI was built — and they keep the
+failures in. A benchmark that corrected two wrong assumptions in two minutes; a
+"2× faster" measurement that turned out to be a hot GPU and was walked back to the
+true 1.4×; a prompt-injection defense that failed its own test and was parked on a
+branch rather than shipped; a security fix that three passing test sweeps missed
+and a live screen caught. The judgment behind each call is the point. Sanitized
+journals do not compound; this one is meant to.
+
+---
+
+## Status and provenance
+
+BlarAI is a **personal, single-operator system**, built **AI-assisted under human
+governance** — every substantive change is reviewed against the real code, the
+tests are re-run, and it is verified live on the actual hardware before it is
+committed. It is shared publicly as a portfolio artifact: a worked example of
+building and governing a local AI system to a mature-not-minimal standard. It is
+not a supported product, and the security properties described here are engineering
+intent backed by tests and measurement, not a third-party audit.
+
+---
+
+## License
+
+BlarAI is licensed under the **PolyForm Noncommercial License 1.0.0** — free for
+individuals and noncommercial use (personal projects, hobby use, education,
+research, evaluation). See [LICENSE.md](LICENSE.md).
+
+**Commercial use requires a separate paid license** — including use by or for any
+organization in its business, building products or services on top of the
+software, or use as part of revenue-generating work. See
+[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).
+
+To obtain a commercial license, contact **Blair DuCray-Oppat —
+mr.blair.do@gmail.com**.
+
+Copyright (c) 2026 Blair DuCray-Oppat. All rights not expressly granted under the
+PolyForm Noncommercial License 1.0.0 are reserved.

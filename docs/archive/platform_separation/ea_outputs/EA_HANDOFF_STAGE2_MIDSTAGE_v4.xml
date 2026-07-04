@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_handoff_stage2_midstage_v4>
+
+  <metadata>
+    <emitted_at_utc>2026-04-25T22:30:00Z</emitted_at_utc>
+    <predecessor_ea>stage_2_ea_instance_4</predecessor_ea>
+    <successor_ea>stage_2_ea_instance_5</successor_ea>
+    <branch_at_handoff>chore/platform-extraction</branch_at_handoff>
+    <head_at_handoff_before_this_commit>9d17e7f</head_at_handoff_before_this_commit>
+    <head_at_handoff_after_this_commit>(this commit -- one parent ahead of 9d17e7f; the v4 handoff XML is the only file in the diff)</head_at_handoff_after_this_commit>
+    <note>This file SUPPLEMENTS v1 (commit 17086a8), v2 (commit 3b9b1b8), and v3 (commit ccdd82b). All four handoff XMLs stay on disk for audit history. v4 records the proactive handoff issued by Stage-2 EA Instance 4 after closing the remaining 7 of 13 Item-2.4 entrypoint files (including the LARGEST single lift -- vikunja_mcp/server.py with full Master Plan §D.1 hardening), applying the f1 chokepoint helper fix, completing Item 2.5 (6 PS1 modifications + 2 SKIP per Appendix A.1), iterating through 3 correction passes (g5-7 / g5-8 / g5-9 + an encoding regression catch), and verifying Item 2.5.v2 with an AST-driven probe achieving 20/20 PASS. Per binding ack i1-4 in 2.5-EA_ACKNOWLEDGMENTS_PROCEED_TO_ITEM_2.4.xml, this is a docs-only commit; ALL refactor + verification work remains UNCOMMITTED in the working tree for the successor.</note>
+    <fleet_paused>true</fleet_paused>
+    <items_completed>2.1, 2.2, 2.3, 2.4 (all 13 entrypoint-side files), f1 (chokepoint helper fix), 2.5 (6 PS1 + 2 SKIP), 2.5.v2 (functional verification 20/20 PASS)</items_completed>
+    <items_remaining>2.6, 2.7, 2.7.v2, 2.8, 2.9, 2.10</items_remaining>
+    <stop_reason>proactive_handoff_pre_context_exhaustion (predecessor-self-directed; per i1-4 + Guide-#5 disposition 2.4-GUIDE_RESPONSE_INSTANCE_5_2.5.v2_APPROVED_V4_HANDOFF_AUTHORIZED.xml: clean breakpoint at 2.5.v2 close with 282 passed + all axes GREEN + invariants intact; Item 2.6 has 4 substantive deliverables (extended grep + g5-4 + D3 + o1) of comparable complexity to file 13; emit handoff PROACTIVELY before strain forces emergency partial-commit attempt)</stop_reason>
+  </metadata>
+
+  <ground_truth_at_handoff>
+    <git_status_porcelain captured_before_v4_commit="true"><![CDATA[
+ M docs/platform_separation/GUIDE_PROMPT.xml
+ D "docs/platform_separation/Temp for responses/0.10 blocked on two corrections - 01_STAGE0_PREFLIGHT.xml"
+ D "docs/platform_separation/Temp for responses/0.7 re-verify - 01_STAGE0_PREFLIGHT.xml"
+ M pyproject.toml
+ M tools/autonomy_budget/blarai_next_task_resolver.py
+ M tools/autonomy_budget/config.yaml
+ M tools/autonomy_budget/config_loader.py
+ M tools/autonomy_budget/self_check.py
+ M tools/autonomy_budget/tests/test_config_loader.py
+ M tools/fleet_observability/credential_rotation_reminder.py
+ M tools/fleet_observability/daily_digest.py
+ M tools/fleet_observability/dashboard_maintainer.py
+ M tools/fleet_observability/weekly_summary.py
+ M tools/fleet_observability/welcome_back_digest.py
+ M tools/gate_stale_cleaner/cleaner.py
+ M tools/gate_stale_cleaner/run_live.py
+ M tools/scheduled-tasks/agents-cadence-monitor.ps1
+ M tools/scheduled-tasks/escalation_watchdog.ps1
+ M tools/scheduled-tasks/la_merge_approve.ps1
+ M tools/scheduled-tasks/test_async_post_gate.ps1
+ M tools/scheduled-tasks/toast_watchdog.ps1
+ M tools/scheduled-tasks/wake_launcher.ps1
+ M tools/vikunja_mcp/server.py
+?? docs/platform_separation/ea_outputs/EA_2.5.v2_VERIFICATION_EVIDENCE.txt
+?? docs/platform_separation/ea_outputs/EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_GUIDE.xml
+?? docs/platform_separation/ea_outputs/EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_LA.md
+?? docs/platform_separation/temp_for_responses/
+?? scripts/verify_25_v2.ps1
+?? tools/_project_context.py
+?? tools/_vikunja_client.py
+?? tools/autonomy_budget/projects/
+?? tools/tests/
+]]></git_status_porcelain>
+    <git_log_oneline_4 captured_before_v4_commit="true"><![CDATA[
+9d17e7f (HEAD -> chore/platform-extraction) docs(platform_separation): Guide instance 4→5 handoff -- Stage 2 mid-stage at item 2.4
+ccdd82b docs(platform_separation): Stage 2 mid-stage EA handoff v3 -- item 2.4 partial (6 of 13 entrypoints), resume at file 7 (self_check.py)
+3b9b1b8 docs(platform_separation): Stage 2 mid-stage EA handoff v2 -- items 2.1+2.2+2.3 complete (uncommitted), resume at 2.4
+17086a8 docs(platform_separation): Stage 2 mid-stage EA handoff -- items 2.1+2.2 complete (uncommitted), resume at 2.3
+]]></git_log_oneline_4>
+    <fleet_paused_field source="tools/autonomy_budget/state.json"><![CDATA[
+"fleet_paused": true,
+"fleet_paused_reason": "platform separation v2 in progress",
+"last_updated_by": "copilot_agent",
+"last_updated_utc": "2026-04-24T20:46:12Z"
+]]></fleet_paused_field>
+    <stash_zero_untouched>stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 -- DO NOT TOUCH (byte-identical timestamp held since v3 emission)</stash_zero_untouched>
+    <pytest_baseline>282 passed, 1 warning in 2.16s (scope: tools/) -- HELD throughout EA-4 session; matches v3 baseline exactly (zero regression).</pytest_baseline>
+    <vikunja_process_count expected="0" not_re_polled_at_v4="true"/>
+    <scheduled_tasks taskpath="\BlarAI\" expected="13/13 Disabled" not_re_polled_at_v4="true"/>
+    <delta_vs_v3>
+      Working-tree delta from v3 ground truth:
+        - +7 M (Item 2.4 remaining: self_check.py, blarai_next_task_resolver.py, cleaner.py, plus prior verify-only files now showing M because the f1 fix touched a chokepoint that propagated to a few + the server.py refactor; net new M files since v3 capture: blarai_next_task_resolver.py, self_check.py, cleaner.py, vikunja_mcp/server.py)
+        - +6 M (Item 2.5: agents-cadence-monitor.ps1, escalation_watchdog.ps1, la_merge_approve.ps1, test_async_post_gate.ps1, toast_watchdog.ps1, wake_launcher.ps1)
+        - +1 M (docs/platform_separation/GUIDE_PROMPT.xml -- Guide-pointer update from prior disposition cycles, NOT EA-4 source-edit work)
+        - +1 ?? scripts/verify_25_v2.ps1 (AST-driven probe; out-of-scope per Appendix A.1 -- inherits as ??)
+        - +1 ?? docs/platform_separation/ea_outputs/EA_2.5.v2_VERIFICATION_EVIDENCE.txt (probe stdout snapshot; ALL_GREEN 20/20)
+        - +1 ?? docs/platform_separation/ea_outputs/EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_GUIDE.xml (intermediate completion report from earlier in session)
+        - +1 ?? docs/platform_separation/ea_outputs/EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_LA.md (intermediate completion report from earlier in session)
+        - +1 ?? docs/platform_separation/temp_for_responses/ (entire directory containing Guide-#5 disposition XMLs and intermediate response files inside)
+      Counts at v4 emission: 21 M + 2 D + 9 ?? entries (vs v3's 10 M + 0 D + 8 ?? -- numbers differ because v3 captured only its own delta from v2; this v4 captures the full cumulative working tree).
+    </delta_vs_v3>
+  </ground_truth_at_handoff>
+
+  <work_completed_inherited>
+    <item id="2.1" inherited_from="v1+v2+v3" status="DONE_uncommitted">VikunjaClient + 6 scope tests (tools/_vikunja_client.py, tools/tests/test_vikunja_client_scope.py).</item>
+    <item id="2.2" inherited_from="v1+v2+v3" status="DONE_uncommitted">ProjectContext resolver + 9 tests (tools/_project_context.py, tools/tests/test_project_context.py).</item>
+    <item id="2.3" inherited_from="v2+v3" status="DONE_uncommitted">Per-project allowlist overlay seam (config_loader.py + projects/blarai.yaml + 6 overlay tests).</item>
+    <item id="2.4_partial_v3" inherited_from="v3" status="DONE_uncommitted">First 6 of 13 Item-2.4 entrypoint files: credential_rotation_reminder.py, welcome_back_digest.py, daily_digest.py, weekly_summary.py, dashboard_maintainer.py, gate_stale_cleaner/run_live.py. See v3 §work_completed_this_session for verbatim diff details.</item>
+    <pyproject_change inherited_from="v1+v2+v3">tools/tests added to testpaths (additive, defaults preserved).</pyproject_change>
+    <note>Refer to v1 (commit 17086a8), v2 (commit 3b9b1b8), and v3 (commit ccdd82b) for verbatim file lists, test names, and diff content. v4 does not duplicate the inherited items.</note>
+  </work_completed_inherited>
+
+  <work_completed_this_session>
+
+    <!-- ========================================================================== -->
+    <!-- ITEM 2.4 -- remaining 7 of 13 entrypoint-side files refactored / dispositioned -->
+    <!-- ========================================================================== -->
+
+    <item id="2.4_remaining_close" name="argparse + ProjectContext refactor of files 7-13 (closes Item 2.4)" status="DONE_uncommitted">
+
+      <files_dispositioned count="7">
+
+        <file path="tools/autonomy_budget/self_check.py" loc_changed="~10" disposition="REFACTORED_library_pattern">
+          <change>NO argparse (library, called by agents in-process). Added `project_context: "_project_context.ProjectContext | None" = None` kwarg to run(). When provided AND `config_path is None`, derives config_path from `ctx.root / "tools" / "autonomy_budget" / "config.yaml"`. Existing config_path / state_path / lifts_path kwargs preserved (5 tests in test_self_check.py use them; unaffected).</change>
+          <verification>get_errors clean; test_self_check.py 5 tests pass (included in 282 baseline).</verification>
+        </file>
+
+        <file path="tools/autonomy_budget/blarai_next_task_resolver.py" loc_changed="~5" disposition="REFACTORED_default_change">
+          <change>Constructor signature: replaced hardcoded `repo_root: Path | str = Path(r"C:/Users/mrbla/BlarAI")` default with `_project_context.DEFAULT_BLARAI_ROOT` reference. Module constant PROJECT_BLARAI_CORE_DEVELOPMENT: int = 3 LEFT IN PLACE per scope; cross-project move deferred to Item 2.6 (observation o1 routing decision).</change>
+          <verification>get_errors clean; existing tests pass.</verification>
+        </file>
+
+        <file path="tools/gate_stale_cleaner/cleaner.py" loc_changed="~3" disposition="REFACTORED_minimal">
+          <change>Verified no module-level REPO_ROOT, no hardcoded BlarAI paths, no direct load_config calls. Only change: chokepoint routing alignment for downstream f1 fix propagation. Function signatures unchanged.</change>
+          <verification>get_errors clean.</verification>
+        </file>
+
+        <file path="tools/fleet_observability/_vikunja_client.py" disposition="DEFER_to_item_2.6_g5_4">
+          <change>NO Item-2.4 changes. Per Guide-#5 g5-4 disposition (legacy fold-vs-shim decision deferred to Item 2.6). Successor handles in 2.6.</change>
+        </file>
+
+        <file path="tools/fleet_ops/diff_builder.py" disposition="VERIFIED_NO_CHANGE">
+          <change>Verified takes repo_root explicitly per existing tests; no module-level hardcoded BlarAI paths. NO change required for Item 2.4.</change>
+        </file>
+
+        <file path="tools/autonomy_budget/active_tasks.py" disposition="VERIFIED_NO_CHANGE">
+          <change>Verified no module-level REPO_ROOT requiring extraction; functions take repo_root explicitly already. NO change required for Item 2.4 (file 12).</change>
+        </file>
+
+        <file path="tools/vikunja_mcp/server.py" loc_changed="~120" disposition="REFACTORED_LARGEST_LIFT_with_§D.1_hardening">
+          <change>The biggest single refactor in Stage 2 (file 13). Resolved ProjectContext at startup via env-based `ctx = _project_context.resolve()` (NO CLI flags -- MCP servers spawned by Claude Desktop with no argv control; honors BLARAI_PROJECT_ROOT env var). Refactored handlers to route through `tools._vikunja_client.VikunjaClient` chokepoint. Applied Master Plan §D.1 hardening: `list_tasks(project_id: int | None = None)` → `list_tasks(*, project_id: int)` (None default leaks BlarAI scope across project boundaries). Same hardening applied to `search_tasks` and any other handler with project_id default.</change>
+          <verification>get_errors clean; all 19 MCP handlers verified routing through chokepoint (list_projects, create_project, get_project, update_project, delete_project, list_tasks, create_task, get_task, update_task, complete_task, delete_task, list_labels, create_label, add_label_to_task, list_task_comments, add_task_comment, search_tasks, bulk_create_tasks, project_summary).</verification>
+        </file>
+      </files_dispositioned>
+
+      <compile_validation>get_errors run on all 7 files: NO errors. pytest tools/ → 282 passed (matches pre-Item-2.4 baseline; zero regression).</compile_validation>
+    </item>
+
+    <!-- ========================================================================== -->
+    <!-- f1 -- chokepoint helper fix (post Guide-#5 review)                          -->
+    <!-- ========================================================================== -->
+
+    <item id="f1" name="chokepoint helper fix" status="DONE_uncommitted">
+      <change>Per Guide-#5 disposition 2.4-GUIDE_RESPONSE_INSTANCE_5_F1_AND_2.5_CORRECTIONS_APPROVED.xml: corrected helper signature/routing in tools/_vikunja_client.VikunjaClient to close f1 finding. Subsequent 3-iteration correction pass (g5-7 / g5-8 / g5-9 + encoding regression catch) brought the helper into Guide-acceptable state.</change>
+      <satisfies>Guide-#5 f1 finding (now SATISFIED per APPROVED disposition).</satisfies>
+    </item>
+
+    <!-- ========================================================================== -->
+    <!-- ITEM 2.5 -- 6 PS1 modifications + 2 SKIP per Appendix A.1                   -->
+    <!-- ========================================================================== -->
+
+    <item id="2.5" name="PowerShell scripts -- canonical -BlarAIRoot param + env-fallback + McpConfigPath derivation" status="DONE_uncommitted">
+
+      <canonical_param_pattern><![CDATA[
+[Parameter(Mandatory=$false)]
+[Alias('BlarAIRoot')]
+[string]$RepoRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })
+]]></canonical_param_pattern>
+
+      <files_modified count="6">
+        <file path="tools/scheduled-tasks/wake_launcher.ps1" pattern="alias_on_existing_RepoRoot">Existing $RepoRoot param augmented with [Alias('BlarAIRoot')] + env-fallback default expression. Hardcoded BlarAI path usages replaced with $RepoRoot. NO McpConfigPath derivation in this script (N/A axis).</file>
+        <file path="tools/scheduled-tasks/agents-cadence-monitor.ps1" pattern="alias_on_existing_RepoRoot_with_McpConfig">Same canonical pattern. Per Guide-#5 g5-9: $McpConfigPath = Join-Path $RepoRoot '.mcp.json' (derivation flows from $RepoRoot, not hardcoded).</file>
+        <file path="tools/scheduled-tasks/escalation_watchdog.ps1" pattern="alias_on_existing_RepoRoot">Same canonical pattern. NO McpConfigPath.</file>
+        <file path="tools/scheduled-tasks/toast_watchdog.ps1" pattern="alias_on_existing_RepoRoot">Same canonical pattern. NO McpConfigPath.</file>
+        <file path="tools/scheduled-tasks/la_merge_approve.ps1" pattern="alias_on_existing_RepoRoot_with_McpConfig">Same canonical pattern. Per g5-9: $McpConfigPath derived from $RepoRoot.</file>
+        <file path="tools/scheduled-tasks/test_async_post_gate.ps1" pattern="alias_on_canonical_BlarAIRoot_inverted">A11 anomaly (queued for 2.10 STATUS): this file's primary param is $BlarAIRoot (not $RepoRoot), so the alias direction is inverted: `[Alias('RepoRoot')] [string]$BlarAIRoot = ...`. Functionally equivalent (verified in 2.5.v2 axis 3). NO McpConfigPath.</file>
+      </files_modified>
+
+      <files_skipped count="2">
+        <file path="tools/scheduled-tasks/critical_notify.ps1" reason="Appendix A.1 -- alerting script; preserve byte-for-byte payload semantics; out-of-scope for canonical param refactor.">SKIP per Appendix A.1.</file>
+        <file path="tools/scheduled-tasks/escalation_notify.ps1" reason="Appendix A.1 -- alerting script; same rationale as critical_notify.ps1.">SKIP per Appendix A.1.</file>
+      </files_skipped>
+
+      <correction_iterations>
+        Three correction passes applied to converge on Guide-#5-acceptable state:
+        - g5-7: env-fallback default expression added (was: bare hardcoded default).
+        - g5-8: alias attribute order corrected.
+        - g5-9: McpConfigPath derivation pulled from $RepoRoot (was: separate hardcoded path) for the 2 scripts that use it.
+        Plus one encoding regression catch (UTF-8 BOM accidentally introduced and then removed). All g5-7 / g5-8 / g5-9 marked SATISFIED in 2.5.v2 evidence.
+      </correction_iterations>
+    </item>
+
+    <!-- ========================================================================== -->
+    <!-- ITEM 2.5.v2 -- AST-driven 4-axis functional verification                    -->
+    <!-- ========================================================================== -->
+
+    <item id="2.5.v2" name="Per-PS1 functional verification (4-category test matrix)" status="DONE_uncommitted">
+
+      <probe_artifact path="scripts/verify_25_v2.ps1">
+        AST-driven re-runnable probe. Methodology: PowerShell Parser
+        ([System.Management.Automation.Language.Parser]::ParseFile) extracts ONLY the primary
+        RepoRoot/BlarAIRoot ParameterAst.Extent.Text per script (preserving [Alias()] +
+        [string] type attributes + the entire default expression). Wraps in single-param
+        scriptblock to ISOLATE env-fallback / alias / explicit precedence semantics from peer
+        mandatory params (Role on wake_launcher with ValidateSet, Branch / TrackingTaskId /
+        FleetReportsTaskId on la_merge_approve). Env cleanup (Remove-Item Env:BLARAI_ROOT)
+        between tests prevents cross-test contamination.
+      </probe_artifact>
+
+      <axes_tested>
+        <axis n="1" name="baseline">No flag, no env → hardcoded default 'C:\Users\mrbla\BlarAI'.</axis>
+        <axis n="2" name="env_fallback">$env:BLARAI_ROOT='C:\test\envroot', no flag → env value takes precedence.</axis>
+        <axis n="3" name="alias_binding">Invoke with -BlarAIRoot 'C:\explicit' → primary param receives 'C:\explicit'.</axis>
+        <axis n="4" name="McpConfigPath_derivation" scope="agents-cadence-monitor + la_merge_approve only">Append `$McpConfigPath = Join-Path $RepoRoot '.mcp.json'`; invoke with -BlarAIRoot 'C:\test' → $McpConfigPath = 'C:\test\.mcp.json'.</axis>
+      </axes_tested>
+
+      <results>
+        20/20 PASS:
+          wake_launcher.ps1          RepoRoot   PASS PASS PASS [N/A axis 4]
+          agents-cadence-monitor.ps1 RepoRoot   PASS PASS PASS PASS (axis 4: C:\test\.mcp.json)
+          escalation_watchdog.ps1    RepoRoot   PASS PASS PASS [N/A axis 4]
+          toast_watchdog.ps1         RepoRoot   PASS PASS PASS [N/A axis 4]
+          la_merge_approve.ps1       RepoRoot   PASS PASS PASS PASS (axis 4: C:\test\.mcp.json)
+          test_async_post_gate.ps1   BlarAIRoot PASS PASS PASS [N/A axis 4]
+        Trailer: "ALL_GREEN: 6 scripts x 3 axes (18) + 2 scripts x McpConfigPath axis (2) = 20 checks PASS"
+      </results>
+
+      <evidence_artifact path="docs/platform_separation/ea_outputs/EA_2.5.v2_VERIFICATION_EVIDENCE.txt">
+        Probe stdout capture via Tee-Object. Inherits as ?? in EA-5 working tree.
+      </evidence_artifact>
+
+      <guide_5_disposition>APPROVED per docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_2.5.v2_APPROVED_V4_HANDOFF_AUTHORIZED.xml. Probe methodology rated PASS_HIGH_QUALITY. v4 handoff authorized.</guide_5_disposition>
+    </item>
+
+  </work_completed_this_session>
+
+  <work_remaining>
+
+    <item id="2.6" name="Vikunja chokepoint extended grep + g5-4 legacy disposition + D3 closure + observation o1 routing decision" priority="DO_NEXT" comparable_complexity_to="file_13_MCP_server">
+
+      <deliverable n="1" name="extended_grep_12_patterns">
+        Run extended grep across tools/ for all chokepoint-violation patterns (12 patterns total per Master Plan §6.2):
+          - https?://localhost:3456 (any direct URL hit)
+          - requests\.(get|post|put|patch|delete) (raw HTTP)
+          - urllib\. / urllib3\. / aiohttp\. / httpx\. (alternate HTTP clients)
+          - api/v1/ / api/v2/ (Vikunja API path fragments)
+          - Authorization.*Bearer (auth header literals)
+          - X-Api-Token (alt auth header)
+          - VIKUNJA_API_TOKEN (env var literal)
+          - .vikunja.yaml (config path)
+          - LiveVikunjaClient (legacy class name)
+          - vikunja_mcp\.client (alternative client paths)
+          - tools/_vikunja_client (sanity check chokepoint inclusion is correct)
+          - assert any other Vikunja-touching patterns
+        ALL hits MUST be inside tools/_vikunja_client.VikunjaClient or its tests OR LegacyVikunjaClient with explicit shim disposition. Any other call site is a chokepoint violation.
+      </deliverable>
+
+      <deliverable n="2" name="g5_4_legacy_fold_disposition" file="tools/fleet_observability/_vikunja_client.py">
+        Per Guide-#5 g5-4: decide final disposition of LiveVikunjaClient:
+          (a) THIN SHIM -- delegate all methods through tools/_vikunja_client.VikunjaClient. Bounded diff (~30 LOC delete + ~20 LOC delegate).
+          (b) FULL FOLD -- delete LiveVikunjaClient, update ~6 callers (credential_rotation_reminder, welcome_back_digest, daily_digest, weekly_summary, dashboard_maintainer, gate_stale_cleaner/run_live) to instantiate tools._vikunja_client.VikunjaClient directly.
+        v3 recommendation: (a) thin shim for now to keep diff bounded; full fold in Stage 5 cleanup. Successor: confirm or override after extended grep.
+      </deliverable>
+
+      <deliverable n="3" name="D3_dashboard_maintainer_113_closure" file="tools/fleet_observability/dashboard_maintainer.py" line="113">
+        Private-method abuse: `live._request("POST", f"/tasks/{...}", json={...})`. Item 2.4 left this for 2.6. Successor: add a public method to VikunjaClient (e.g., `update_task_dashboard_field(task_id, field, value)` or `raw_post(path, json)`) and route this call site through it. NO more private-method calls allowed.
+      </deliverable>
+
+      <deliverable n="4" name="observation_o1_handler_guards_vs_VikunjaClient_routing" structural_design_decision="true">
+        Per observation o1 (raised in Item 2.4 review): when the same tool needs to call multiple Vikunja endpoints, where do the project_id guards live? Two designs:
+          (A) HANDLER GUARDS -- each MCP handler explicitly checks project_id before calling VikunjaClient. Pro: explicit. Con: duplicated code; easy to miss a handler.
+          (B) VikunjaClient ROUTING -- VikunjaClient's _require_project_id guard catches everything. Pro: single chokepoint. Con: handler authors don't see the guard.
+        Recommendation: design (B) -- already implemented; o1 is asking whether to also keep (A) as defense-in-depth or rely on (B) alone. Decide and document the rationale.
+      </deliverable>
+    </item>
+
+    <item id="2.7" name="Test gate -- pytest ≥282 + V1-V7 verifications">
+      <command><![CDATA[python -m pytest -q]]></command>
+      <baseline>≥282 passing (HELD throughout EA-4 session). Stage 2 should NET-ADD tests: V8 defaults preservation tests, V1-V7 V matrix tests per Master Plan §V.</baseline>
+      <V_matrix>V1=ProjectContext resolution (covered by 9 tests in test_project_context.py); V2=VikunjaClient scope guard (covered by 6 tests in test_vikunja_client_scope.py); V3=overlay merge (covered by 6 tests in test_config_loader.py); V4=CLI flag exposure (NEW; one parametrized test per refactored entrypoint); V5=PS1 -BlarAIRoot (NEW; pester or pytest-via-subprocess); V6=MCP server project_id rejection (NEW; mock-based); V7=cross-project byte-identity (NEW; run with two project overlays and diff outputs).</V_matrix>
+    </item>
+
+    <item id="2.7.v2" name="Verify test count + V matrix authoring V4-V7 NEW">After 2.7: enumerate test count delta (v4 → final); confirm V1-V7 each have at least one passing test. Author the V4-V7 NEW tests if not yet covered.</item>
+
+    <item id="2.8" name="$BLARAI_PID=3 hard gate preflight (per g4-5)">
+      <command><![CDATA[python -c "from tools import _project_context; ctx = _project_context.resolve(); assert ctx.vikunja_project_id == 3, f'expected 3, got {ctx.vikunja_project_id}'; print('OK ctx.vikunja_project_id =', ctx.vikunja_project_id)"]]></command>
+      <on_drift>STOP. Do NOT proceed to commit. Report to LA: registry .platform/vikunja_project_ids.yaml has wrong value or resolution chain is broken.</on_drift>
+    </item>
+
+    <item id="2.9" name="SINGLE Stage-2 commit">
+      <scope>One commit folding ALL Stage-2 work: items 2.1+2.2+2.3 (currently uncommitted from v1/v2 session) + items 2.4+f1+2.5+2.5.v2 (currently uncommitted from EA-3+EA-4 sessions) + items 2.6+2.7 (uncommitted from EA-5 session) + Item 2.8 preflight evidence. Pyproject.toml MUST be in this commit (per binding ack i1-3).</scope>
+      <commit_template><![CDATA[chore(platform_separation): Stage 2 multi-project refactor (DEC-15 platform extraction)
+
+Items 2.1-2.8 of 03_STAGE2_REFACTOR_MULTIPROJECT.xml.
+
+Adds:
+  - tools/_vikunja_client.VikunjaClient with _require_project_id guard (chokepoint)
+  - tools/_project_context.ProjectContext + 5-step resolver
+  - tools/autonomy_budget/projects/blarai.yaml overlay
+  - --project-root / --project-id flags on 13 Python entrypoints
+  - -BlarAIRoot alias + BLARAI_ROOT env-fallback on 6 PS1 helpers
+  - V1-V7 verification matrix (tests/)
+
+Refactors:
+  - 13 Python entrypoints to thread ProjectContext
+  - All Vikunja API call sites through VikunjaClient chokepoint
+  - MCP server handlers to require explicit project_id (Master Plan §D.1)
+
+Defaults preserved byte-for-byte for the BlarAI-only invocation:
+  - cwd-inside-BlarAI + no flags + no env -> ctx.vikunja_project_id == 3 (V8)
+  - All test invocations and scheduled-task XMLs unchanged
+
+Test baseline: <X> passing (pre: 282; net add: <delta>).
+
+Fleet stays paused; no merge to main; stash@{0} untouched.
+]]></commit_template>
+      <forbidden>NO partial commits. NO emergency single-commit attempts that omit pending V matrix tests or any item 2.6/2.7 file.</forbidden>
+    </item>
+
+    <item id="2.10" name="Append-only STATUS.md update">
+      <approach>Append a Stage 2 closure entry to docs/platform_separation/STATUS.md (do not rewrite existing entries). Reference the Stage-2 commit hash from 2.9, list the 13 entrypoints + 6 PS1 (+ 2 SKIP) + MCP server + V matrix tests, declare Stage 2 CLOSED.</approach>
+      <required_inclusions_per_g5_10>
+        STATUS append MUST include:
+          - A11 alias-vs-rename anomaly entry (test_async_post_gate.ps1 inverted alias direction; functionally equivalent per 2.5.v2 axis 3 PASS).
+          - g5-7 / g5-8 / g5-9 / g5-10 dispositions (g5-7/8/9 SATISFIED; g5-10 SATISFIED by this STATUS append itself).
+          - f1 disposition (chokepoint helper fix SATISFIED).
+          - Encoding regression footnote (UTF-8 BOM transient; resolved).
+          - 2.5.v2 closure (20/20 PASS evidence pointer).
+      </required_inclusions_per_g5_10>
+    </item>
+  </work_remaining>
+
+  <standing_rules_carried_forward>
+    <rule>Fleet stays paused throughout (verify state.json on each substantive edit; never call state.resume_fleet).</rule>
+    <rule>No merge to main until LA explicitly approves; the chore/platform-extraction branch stays alive.</rule>
+    <rule>stash@{0} (wake_launcher auto-stash sdo 20260424_013002) is UNTOUCHED -- DO NOT git stash pop or git stash drop. Byte-identical timestamp held since v3 emission.</rule>
+    <rule>$BLARAI_PID preflight at 2.8 MUST resolve to exactly 3. STOP and report to LA on any drift.</rule>
+    <rule>SINGLE Stage-2 commit at 2.9 only. Until then, all refactor work stays uncommitted in the working tree (auto-stash hazard does NOT apply because fleet is paused). Mid-stage docs-only handoff commits (v1/v2/v3/v4 + Guide handoff commit) are the exempt pattern.</rule>
+    <rule>Per binding ack i1-4: if successor approaches context exhaustion before 2.9, emit v5 mid-stage handoff XML following same schema, commit ONLY that file, stop. NO partial-commit refactor work. NO emergency single-commit attempts.</rule>
+    <rule>Successor MUST start with comprehension gate per copilot-instructions.md §Execution_Agent. Read v1 + v2 + v3 + v4 + Guide-#5 dispositions in docs/platform_separation/temp_for_responses/ + 03_STAGE2_REFACTOR_MULTIPROJECT.xml; then present comprehension summary to LA and wait for approval.</rule>
+  </standing_rules_carried_forward>
+
+  <critical_carryovers>
+    <binding_acknowledgments_27_total>
+      <ack id="i1-1..i1-7">Original i1 binding acks from 2.5-EA_ACKNOWLEDGMENTS_PROCEED_TO_ITEM_2.4.xml; all FORWARD-ACTIVE.</ack>
+      <ack id="i1-4" priority="CRITICAL">Mid-stage handoff discipline: no partial-commit refactor; emit v(N+1) handoff XML at any context-exhaustion threat at clean breakpoint; docs-only commit only. THIS v4 EMISSION HONORS i1-4.</ack>
+      <ack id="g4-1..g4-7">All Guide-#4 binding acks from prior iteration; FORWARD-ACTIVE.</ack>
+      <ack id="g4-5">$BLARAI_PID=3 hard gate at 2.8 MUST hold; STOP+report on drift.</ack>
+      <ack id="g5-1..g5-6">Guide-#5 prior binding acks; FORWARD-ACTIVE.</ack>
+      <ack id="g5-7" status="SATISFIED">PS1 env-fallback default expression -- satisfied by Item 2.5 corrections + 2.5.v2 axis 2 PASS for all 6 PS1 scripts.</ack>
+      <ack id="g5-8" status="SATISFIED">PS1 alias attribute order -- satisfied by Item 2.5 corrections + 2.5.v2 axis 3 PASS for all 6 PS1 scripts.</ack>
+      <ack id="g5-9" status="SATISFIED">McpConfigPath derivation flows from $RepoRoot for agents-cadence-monitor + la_merge_approve -- satisfied by Item 2.5 corrections + 2.5.v2 axis 4 PASS (2/2 scripts).</ack>
+      <ack id="g5-10" status="FORWARD_to_2.10">STATUS append at Item 2.10 MUST include A11 anomaly + g5-7/8/9/10 dispositions + f1 disposition + encoding-regression footnote + 2.5.v2 closure pointer. Successor enforces.</ack>
+      <ack id="f1" status="SATISFIED">Chokepoint helper fix -- satisfied per Guide-#5 APPROVED disposition.</ack>
+    </binding_acknowledgments_27_total>
+    <forward_obligations>
+      - 2.6 deliverables 1-4 (extended grep + g5-4 + D3 + o1) per work_remaining.
+      - 2.7 V matrix V4-V7 NEW tests authoring.
+      - 2.8 BLARAI_PID hard gate preflight + on-drift STOP.
+      - 2.9 single Stage-2 commit (pyproject.toml MUST be in commit).
+      - 2.10 STATUS append per g5-10 required_inclusions.
+    </forward_obligations>
+  </critical_carryovers>
+
+  <successor_pickup_verification>
+    <check id="V0a" name="branch">git branch --show-current → chore/platform-extraction</check>
+    <check id="V0b" name="HEAD">git log --oneline -1 → (this v4 commit hash; one parent ahead of 9d17e7f)</check>
+    <check id="V0c" name="working_tree_M_count">git status --porcelain | Where-Object {$_ -match '^ M'} | Measure-Object → 21 entries (the M list in ground_truth_at_handoff)</check>
+    <check id="V0d" name="working_tree_D_count">git status --porcelain | Where-Object {$_ -match '^ D'} | Measure-Object → 2 entries (Temp for responses deletions)</check>
+    <check id="V0e" name="working_tree_untracked_count">git status --porcelain | Where-Object {$_ -match '^\?\?'} | Measure-Object → 9 entries (3 ea_outputs files + temp_for_responses/ dir + scripts/verify_25_v2.ps1 + 2 tools/_*.py + 2 tools/ subdirs)</check>
+    <check id="V0f" name="probe_artifact_present">Test-Path scripts/verify_25_v2.ps1 → True (re-runnable; pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/verify_25_v2.ps1 → ALL_GREEN 20/20)</check>
+    <check id="V0g" name="evidence_artifact_present">Test-Path docs/platform_separation/ea_outputs/EA_2.5.v2_VERIFICATION_EVIDENCE.txt → True</check>
+    <check id="V0h" name="fleet_paused">Read tools/autonomy_budget/state.json → fleet_paused=true, fleet_paused_reason="platform separation v2 in progress", last_updated_by="copilot_agent", last_updated_utc="2026-04-24T20:46:12Z"</check>
+    <check id="V0i" name="stash_byte_identical">git stash list → stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002</check>
+    <check id="V0j" name="pytest_baseline">.venv\Scripts\python.exe -m pytest tools/ --tb=short -q → 282 passed, 1 warning (zero regression vs EA-4 session)</check>
+    <check id="V0k" name="guide5_disposition_present">Test-Path docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_2.5.v2_APPROVED_V4_HANDOFF_AUTHORIZED.xml → True</check>
+    <on_any_failure>STOP. Do NOT proceed. Report which V0 check failed with the actual observed value vs expected.</on_any_failure>
+  </successor_pickup_verification>
+
+  <successor_immediate_next_actions>
+    <step n="1">Read this v4 + v3 + v2 + v1 fully. Read Guide-#5 dispositions in docs/platform_separation/temp_for_responses/ (especially 2.4-GUIDE_RESPONSE_INSTANCE_5_2.5.v2_APPROVED_V4_HANDOFF_AUTHORIZED.xml + 2.4-GUIDE_RESPONSE_INSTANCE_5_F1_AND_2.5_CORRECTIONS_APPROVED.xml). Read 03_STAGE2_REFACTOR_MULTIPROJECT.xml for Item 2.6 spec.</step>
+    <step n="2">Run successor_pickup_verification V0a-V0k. STOP on any failure.</step>
+    <step n="3">Present comprehension gate to LA. Wait for approval.</step>
+    <step n="4">After approval, execute Item 2.6 in this order: (a) deliverable 1 extended grep first (12 patterns) -- gives full picture of chokepoint violations; (b) deliverable 4 observation o1 routing decision (structural; affects 2/3); (c) deliverable 2 g5-4 legacy fold-vs-shim disposition; (d) deliverable 3 D3 dashboard_maintainer:113 closure (depends on 2/4 outcome).</step>
+    <step n="5">Then items 2.7 → 2.10 in order. Author V4-V7 NEW tests at 2.7.v2. Run 2.8 BLARAI_PID hard gate. Single Stage-2 commit at 2.9. STATUS append per g5-10 at 2.10.</step>
+    <step n="6">Emit v5 handoff if context tightens before 2.9 (NEVER attempt emergency partial-commit).</step>
+  </successor_immediate_next_actions>
+
+  <handoff_metadata_for_audit>
+    <session_token_budget_consumed_at_emission>~85% (estimate based on conversation length: file 13 MCP server lift + f1 fix + Item 2.5 6-PS1 + 3 correction iterations + Item 2.5.v2 probe development + execution + this v4 authoring)</session_token_budget_consumed_at_emission>
+    <pattern_validation_evidence>get_errors on all 7 Item-2.4-remaining files: zero errors. pytest tools/ --tb=short -q: 282 passed, 1 warning, 2.16s. AST-driven 2.5.v2 probe: ALL_GREEN 20/20. f1 fix accepted by Guide-#5.</pattern_validation_evidence>
+    <decision_log_for_successor>
+      <d>For vikunja_mcp/server.py (file 13 LARGEST): chose env-based ProjectContext resolution at startup (NO CLI argv since MCP servers spawned by Claude Desktop). Honors BLARAI_PROJECT_ROOT env var. Alternative considered: separate CLI entry point script. Rejected because MCP protocol has no provision for argv passthrough.</d>
+      <d>For Master Plan §D.1 list_tasks/search_tasks hardening: chose keyword-only required project_id (`*, project_id: int`). Strict, no None default. Alternative considered: project_id with Optional[int] default but raise ValueError on None. Rejected because keyword-only-required catches violations at MCP-handler invocation time, not at request handling time -- earlier failure is safer.</d>
+      <d>For Item 2.5 PS1 alias direction on test_async_post_gate.ps1 (A11): kept the file's original primary $BlarAIRoot intact and added [Alias('RepoRoot')] (inverted vs the other 5). Alternative considered: rename primary to $RepoRoot for consistency. Rejected because the rename would change the script's parameter signature and break any external caller using -BlarAIRoot positionally; alias-on-existing preserves backwards compat AND functional equivalence (verified in 2.5.v2 axis 3). A11 anomaly entry queued for 2.10 STATUS per g5-10.</d>
+      <d>For Item 2.5 critical_notify.ps1 + escalation_notify.ps1 SKIP: Appendix A.1 explicitly classifies alerting scripts as out-of-scope to preserve byte-for-byte payload semantics. Alternative considered: add canonical param anyway since unused. Rejected because future maintenance might assume the param means something and break alerting behavior.</d>
+      <d>For Item 2.5.v2 probe methodology: chose AST-driven single-param extraction over full-file invocation. Critical insight (encoded as user-memory lesson): full-text param block extraction inherits mandatory peer params (Role with ValidateSet, Branch, etc.) and triggers interactive "Supply values" prompts. Solution: $paramBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq $primary } | Select-Object -First 1 → .Extent.Text → wrap in single-param scriptblock. Probe is reproducible at scripts/verify_25_v2.ps1.</d>
+    </decision_log_for_successor>
+  </handoff_metadata_for_audit>
+
+</ea_handoff_stage2_midstage_v4>

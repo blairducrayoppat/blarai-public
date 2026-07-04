@@ -1,0 +1,62 @@
+{
+  "benchmark_id": "substrate_encryption_sprint14_ea3",
+  "timestamp_utc": "2026-06-06T02:15:23Z",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) — NOT used for this measurement; encryption is CPU-side only",
+    "ram_gb": 32,
+    "platform": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "python_version": "3.11.9",
+    "cryptography_version": "46.0.5",
+    "aes_acceleration": "AES-NI available on Lunar Lake (hardware-accelerated AES-256-GCM)"
+  },
+  "methodology": {
+    "fixture": "~107 chunks synthetic substrate (50 doc chunks, 57 turns), created with fake bag-of-words embedder to avoid GPU model load cost",
+    "query_set": ["budget plan", "sister Maria", "car service", "project alpha", "garden", "meetings"],
+    "retrieval_config": "k_docs=2, k_turns=4 (production defaults)",
+    "boot_cache_runs": 5,
+    "retrieval_runs": "120 total (20 runs x 6 queries)",
+    "not_measured": [
+      "GPU/OpenVINO inference (not on this path — encryption is CPU-side AES-GCM, not GPU)",
+      "Real bge-small-en-v1.5 ONNX embedder load (fake embedder used to isolate crypto overhead)",
+      "Disk I/O for DB open (measured from object construction, includes SQLite open + schema check + cache decrypt)",
+      "Memory footprint of the embedding cache (107 * 384 * 4 bytes = ~164 KB)"
+    ]
+  },
+  "measurements": {
+    "pre_encryption_baseline_retrieval_ms": {
+      "description": "SubstrateStore (plaintext) retrieve() latency, same fixture, same queries",
+      "median_ms": 0.397,
+      "mean_ms": 0.435,
+      "n_samples": 60
+    },
+    "boot_cache_decrypt_ms": {
+      "description": "One-time cost at store construction: decrypt all 107 embeddings from disk into in-RAM cache",
+      "mean_ms": 1.45,
+      "median_ms": 1.39,
+      "per_embedding_ms": 0.014,
+      "n_embeddings": 107,
+      "n_runs": 5,
+      "note": "Paid ONCE at unlock; subsequent queries operate on plaintext in-memory vectors"
+    },
+    "per_query_retrieval_ms": {
+      "description": "EncryptedSubstrateStore retrieve() latency: embed query + cosine over in-RAM cache + decrypt top-k text",
+      "mean_ms": 0.528,
+      "median_ms": 0.521,
+      "p95_ms": 0.648,
+      "n_samples": 120
+    },
+    "delta_vs_baseline": {
+      "retrieval_median_delta_ms": 0.124,
+      "retrieval_mean_delta_ms": 0.093,
+      "note": "~0.1ms per-query overhead from top-k text decrypt; boot-cache decrypt is one-time at unlock"
+    }
+  },
+  "interpretation": {
+    "boot_overhead": "1.45ms one-time at unlock for 107 embeddings. Scales linearly — 10k embeddings ~130ms, still sub-second.",
+    "per_query_overhead": "~0.1ms per query (top-k text decrypt). Immaterial vs LLM TTFT (~940ms measured on this hardware).",
+    "embedding_cache_design": "Encrypting embeddings at rest (closing the vec2text semantic-shadow leak) costs nothing at query time because decryption is a single boot-time pass. The encrypted-at-rest + plaintext-in-RAM design gives full at-rest protection at negligible runtime cost."
+  }
+}

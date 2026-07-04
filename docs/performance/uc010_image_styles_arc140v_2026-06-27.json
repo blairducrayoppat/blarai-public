@@ -1,0 +1,65 @@
+{
+  "title": "UC-010 three image styles (photoreal / illustration / cartoon) — cold end-to-end 1024px generation on Arc 140V, production path (#703)",
+  "date": "2026-06-27",
+  "question": "Through the real BlarAI image_gen path with PRODUCTION safety settings (signed nested manifest verified + cartoon LoRA SHA-256 pin), what is the cold end-to-end (lazy pipeline load + INT8 GPU compile + 30-step generate) latency for each of the three shipped image styles on the Arc 140V, and do the three styles produce visibly distinct output? Captured for the #703 illustrate/cartoon feature go-live.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake, Series 2)",
+    "igpu": "Intel Arc 140V (Xe2, 16 GB shared)",
+    "ram_total_gb": 31.32,
+    "ram_type": "LPDDR5X unified"
+  },
+  "software": {
+    "os": "Windows 11 Pro 26200",
+    "openvino": "2026.1.0-21367 (releases/2026/1)",
+    "openvino_genai": "2026.1.0.0-2957",
+    "gpu_driver": "32.0.101.8826 (last recorded 2026-06-24; NOT re-verified this run)",
+    "runtime": "shared.inference.image_gen (BlarAI production engine) via ov_genai.Text2ImagePipeline, BlarAI runtime .venv (Python 3.11)",
+    "production_settings": "require_signed_manifest=true (detached manifest.json.sig verified at load) + cartoon LoRA SHA-256 integrity pin b4c8132f...fe89 verified before runtime apply"
+  },
+  "models": {
+    "photoreal": {
+      "command": "/imagine",
+      "name": "RealVisXL V5.0 (SDXL-arch finetune)",
+      "precision": "OpenVINO INT8 weight-only",
+      "on_disk_gb": 3.3,
+      "adapter": "none",
+      "dir": "models/sdxl-uncensored/openvino-int8-gpu"
+    },
+    "illustration": {
+      "command": "/illustrate",
+      "name": "Stable Diffusion XL 1.0 base (NO finetune, NO LoRA)",
+      "precision": "OpenVINO INT8 weight-only",
+      "on_disk_gb": 3.3,
+      "adapter": "none - flat-vector look comes from the prompt template alone",
+      "dir": "models/sdxl-illustration/openvino-int8-gpu"
+    },
+    "cartoon": {
+      "command": "/cartoon",
+      "name": "Stable Diffusion XL 1.0 base + DoctorDiffusion vector LoRA",
+      "precision": "OpenVINO INT8 weight-only base",
+      "on_disk_gb": 3.3,
+      "adapter": "DD-vector-v2.safetensors (228,456,908 bytes / ~218 MB), applied at RUNTIME via ov_genai.AdapterConfig (alpha 0.8), NEVER fused into the base weights",
+      "dir": "models/sdxl-illustration/openvino-int8-gpu + /lora/DD-vector-v2.safetensors"
+    }
+  },
+  "method": "device=GPU (Arc 140V), 1024x1024, 30 steps, EULER_ANCESTRAL_DISCRETE scheduler, guidance_scale 7.0, hires-fix disabled. Each style configured fresh, generated ONE image, then image_gen.unload() before the next style (the per-generate eviction path is exercised). So each reported latency is COLD end-to-end = lazy pipeline load + INT8 GPU compile + 30-step generate, single run (NOT averaged). Prompts: photoreal='a golden retriever puppy sitting in a sunny meadow'; illustration/cartoon='vector illustration of a coffee cup with steam, flat design, bold outlines, solid color background'.",
+  "results": [
+    {"style": "photoreal", "command": "/imagine", "cold_e2e_s": 43.8, "output_png_bytes": 1458874, "is_available": true},
+    {"style": "illustration", "command": "/illustrate", "cold_e2e_s": 39.8, "output_png_bytes": 680139, "is_available": true},
+    {"style": "cartoon", "command": "/cartoon", "cold_e2e_s": 60.6, "output_png_bytes": 236797, "is_available": true}
+  ],
+  "findings": [
+    "All three styles generated successfully through the production path; the signed nested manifest verified for every model and the cartoon LoRA SHA-256 pin verified before the runtime adapter was applied (is_available=true for all three).",
+    "Cartoon is the slowest (60.6 s) because the runtime LoRA application adds a compile/blend cost on top of the base SDXL load - this is the price of NOT fusing (fusing the LoRA into the base weights collapses prompt conditioning on this INT8 pipeline, the #703 root-cause finding, so the runtime-adapter path is deliberate).",
+    "Output PNG size tracks visual style: cartoon 237 KB (flat minimalist, high compression) < illustration 680 KB (flat-vector, bold fills) < photoreal 1.46 MB (high-entropy photographic detail). The byte sizes corroborate three genuinely distinct styles, not three renders of one model.",
+    "Illustration (base SDXL + flat prompt, no adapter) is the FASTEST at 39.8 s - no finetune-load nor LoRA-apply overhead beyond the base model."
+  ],
+  "not_measured": [
+    "Steady-state generate-ONLY latency: these are COLD numbers (load + INT8 compile + generate per style, because each style is evicted between runs). Prior UC-010 entries measured generate-only ~10.7 s at 1024px; the steady-state per-style generate here would be similar, but was not isolated this run.",
+    "Averaged runs (n=1 per style).",
+    "Resident RAM footprint this run (not sampled; the #666 Phase-0 spike and the 2026-06-24 Playground entry carry the memory math).",
+    "INT8 vs FP16 quality/speed not compared.",
+    "GPU power / thermals not captured.",
+    "Image quality not benchmarked numerically; subjective verdict (operator + author): all three on-target and distinct."
+  ]
+}

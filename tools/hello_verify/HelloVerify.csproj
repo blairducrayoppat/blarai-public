@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BlarAI Windows-Hello approval helper (Vikunja #649, follow-on to #639 /
+    ADR-024 §2.5). A tiny console executable that fronts the WinRT
+    Windows.Security.Credentials.UI.UserConsentVerifier so the Python
+    BiometricApprovalVerifier (shared/security/hello_verifier.py) can request a
+    fingerprint/PIN/face approval for a Policy-Agent ESCALATE verdict by spawning
+    this exe as a subprocess and reading its exit code.
+
+    NOT a new external/supply-chain dependency: this targets the SAME Windows App
+    SDK / Windows SDK projection the primary WinUI surface already targets
+    (services/ui_winui/BlarAI.Desktop.csproj uses the identical
+    net8.0-windows10.0.19041.0 TFM). The WinRT UserConsentVerifier type comes from
+    the Windows SDK projection bundled with that TFM — no NuGet package, no
+    winsdk/winrt Python wheel. The console subprocess is the surface-independent
+    way to reach Hello: UserConsentVerifier raises a SYSTEM-modal Hello dialog, so
+    the same exe serves the TUI and WinUI surfaces identically (the AO runs in the
+    launcher process for both).
+
+    Console (not WinExe) on purpose: the helper is driven by subprocess and must
+    return a meaningful process exit code; the visible Hello prompt is the system
+    dialog the OS raises, not a window this app owns.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Mirror the WinUI TFM so the WinRT UserConsentVerifier projection resolves
+         from the same Windows SDK the WinUI already builds against. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>BlarAI.HelloVerify</RootNamespace>
+    <AssemblyName>BlarAI.HelloVerify</AssemblyName>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Self-contained is NOT set: this is a thin helper run on a box that already
+         has the .NET 8 desktop runtime the WinUI app uses. Framework-dependent keeps
+         the build fast and the output tiny; the launcher resolves the exe by path. -->
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,587 @@
+{
+  "act": 2,
+  "title": "Coverage is which seam you exercise — testing rigor",
+  "subtitle": "A test proves only the boundary it actually drives",
+  "aigp_intro": "This act trains the discipline the AIGP Body of Knowledge places in Domain III — governing AI development, especially its competencies around testing, release, and monitoring. Fourteen lessons, all paid for on one system, converge on a single idea: a test is evidence only about the seam it actually exercises, in the configuration it actually ran, in an environment it actually controlled. The framework home is NIST AI RMF's MEASURE function and its TEVV practice (test, evaluation, verification and validation), with the verification-versus-validation distinction doing the heaviest lifting: built-to-spec greens kept arriving while the deployed composition — the boot wiring, the production posture, the connecting path — stayed unproven until something drove it for real.",
+  "aigp_domains": [
+    "Domain III — Understanding How to Govern AI Development"
+  ],
+  "lessons": [
+    {
+      "number": 46,
+      "prologue": false,
+      "fragment": null,
+      "title": "A control wired into a function but not into the boot path is still \"built but wired into nothing\" — a green suite proves the mechanism, never that the running system invokes it.",
+      "failure": "The Sprint-13 tamper-evident audit stream — the record of every policy decision, hash-chained so tampering shows — was built correctly and proven by 38 \"teeth-tests\", all green. It was still inert. The production Policy Agent is constructed in one factory function that called `from_config` without passing the audit sink (the component that writes the records), so the running system would have persisted exactly zero decisions. The 2026-06-03 security audit had named this exact anti-pattern — a TPM (Trusted Platform Module security chip) trust root with no callers, a leakage detector fed an empty list — and here it recurred inside the very sprint built to close such gaps. The green suite hid it: every test proved the mechanism in isolation, none asked whether the live boot invokes it. Reading the production construction site caught it; the fix added a regression test asserting the boot factory yields `has_audit_log == True`.",
+      "evidence": [
+        "2026-06-05 — The anti-pattern the sprint was built to kill, caught inside the sprint",
+        "commit a8284d1 (EA-2 audit stream, two rounds: 17adf05 the sink, 42b3e56 the merge-gate live-wiring catch)"
+      ],
+      "lesson": "A green test suite proves the mechanism works, never that the running system invokes it. A control wired into a function but not into the boot path is still \"built but wired into nothing.\" When tests prove a component in isolation, ask separately whether the live system actually constructs and calls it — and write the test that breaks the day the wiring is removed.",
+      "growth": "The mechanism of this failure is structural, and it will follow you to any codebase: a test builds its own copy of the thing it tests, so it silently bypasses the one place that decides what production actually constructs — the factory, the boot script, the dependency-injection wiring. A suite of such tests can be perfect and still say nothing about the running system, because \"does it work?\" and \"is it ever called?\" are independent questions, and only the first is what unit tests answer. Train the second question as a reflex: when a capability ships, find the single site where production constructs the system and confirm, by reading it, that the new control is passed in. Then pin it — one assertion against the real construction path that goes red the day someone removes the wiring.",
+      "growth_question": "The 38 tests all passed. What question were they answering — and what different question does \"is this control active in production?\" require?",
+      "diagram": "flowchart TD\n  TESTS[\"38 teeth-tests build<br/>their own sink\"] --> GREEN[\"All green: mechanism<br/>proven in isolation\"]\n  FACT[\"Production factory calls<br/>from_config without the sink\"] --> PA[\"Live Policy Agent boots\"]\n  PA --> ZERO[\"Would persist exactly<br/>zero decisions\"]\n  GREEN -.-> BLIND[\"No test asks: does the<br/>boot path wire the sink?\"]\n  CATCH[\"Caught by reading the factory;<br/>lock: has_audit_log == True\"] -.-> FACT",
+      "stat": [
+        {
+          "before": "38",
+          "after": "exactly zero decisions",
+          "label": "tests green vs records persisted"
+        }
+      ],
+      "aigp_text": "This is NIST AI RMF's verification-versus-validation distinction inside TEVV (test, evaluation, verification and validation): the 38 tests verified the audit mechanism was built to spec, but never validated that the deployed system performs the real job — persisting decision records at runtime. For Domain III, governing the release of an AI system means confirming controls are operative in the shipped configuration, not merely present in the codebase; an audit trail that exists but is never invoked provides no accountability.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV): verification vs. validation",
+        "NIST AI RMF — trustworthy characteristic: accountable and transparent"
+      ],
+      "aigp_takeaway": "Verification proves a control was built; validation proves the deployed system invokes it. An uninvoked audit control provides zero accountability."
+    },
+    {
+      "number": 55,
+      "prologue": false,
+      "fragment": null,
+      "title": "Never run the test suite against live user data — and the isolation a suite needs must be set before import, not in a fixture.",
+      "failure": "While verifying each merge of the at-rest encryption work, the agent repeatedly ran the full test suite against the operator's live environment. Tests that call service startup resolved the real `%LOCALAPPDATA%\\BlarAI\\` directory and wrote dev-key-encrypted rows into the operator's actual `sessions.db`; the next production launch could not decrypt them and the backend refused to start (`[7199c5ab]`). The bitter irony: the suite was being run to verify a test-isolation fix, and was itself the polluter — harmless only because no real data existed yet. The first fix, function-scope autouse fixtures (per-test setup hooks), came too late in the lifecycle: pytest imports test modules during collection, so an import-time constant like `SESSION_DB_PATH` had already resolved against the real path before any fixture ran. The damaged database was preserved as `sessions.db.test-damaged.bak`, never deleted.",
+      "evidence": [
+        "2026-06-06 — The suite that polluted the very thing it was verifying",
+        "commit 7b339ed merged dabb712 (EA-8 package fixtures)",
+        "commit fea373b merged e08a7db (EA-9 root conftest + regression lock)"
+      ],
+      "lesson": "Never run a test suite against live user data. And the isolation a suite needs must be set at process startup, before any import: a root `conftest.py` that redirects the user-data environment variables at module load — the earliest code pytest executes — because a fixture can never re-point a constant that already resolved when the test module was imported.",
+      "growth": "Two mechanisms conspired here, and both generalize. First, a test process inherits the real environment unless something redirects it, so any test that reaches service startup can reach real user data by default — safety has to be added; it is never the starting state. Second, lifecycle order beats intent: module-level constants resolve at import time, and test frameworks import modules during collection, before any per-test setup runs, so a guard placed in a fixture fires after the damage is already done. In any future project, ask where the earliest-executing code lives — for pytest, a root `conftest.py` at module load — and put the redirection there, keeping later-firing guards as a second layer. Then prove the teeth: disable the guard deliberately and watch the lock fail naming the real path. A discipline that depends on you remembering to redirect is not a control.",
+      "growth_question": "If a per-test fixture redirects the data directory before every test runs, what could possibly have resolved the real path even earlier?",
+      "diagram": "flowchart TD\n  START[\"pytest run begins\"] --> IMP[\"Collection imports<br/>test modules\"]\n  IMP --> CONST[\"SESSION_DB_PATH resolves<br/>the real %LOCALAPPDATA% path\"]\n  CONST --> FIX1[\"Function-scope fixture<br/>redirects env — too late\"]\n  FIX1 --> WRITE[\"service.start() writes dev-key<br/>rows into the live sessions.db\"]\n  WRITE --> BRICK[\"Next launch cannot decrypt:<br/>backend refuses to start\"]\n  ROOT[\"Fix: root conftest.py redirects<br/>env at module load\"] -.-> IMP",
+      "aigp_text": "The AIGP Body of Knowledge's Domain III.B asks practitioners to govern the collection and use of data in testing, and this failure is its negative image: the testing process itself wrote into the operator's production data store. NIST AI RMF names privacy-enhanced among its trustworthy-AI characteristics; a TEVV (test, evaluation, verification and validation) regime that can corrupt real user data fails that characteristic at the level of process design. The durable control was structural — isolation enforced by the earliest-executing code — not procedural reliance on memory.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — trustworthy characteristic: privacy-enhanced"
+      ],
+      "aigp_takeaway": "Test processes must be structurally isolated from production data — set before import, proven by a fail-loud lock, never left to memory."
+    },
+    {
+      "number": 56,
+      "prologue": false,
+      "fragment": null,
+      "title": "A harness that mocks the boundary the bug lives past is a unit test in integration clothing — and not knowing your own coverage is part of the coverage problem.",
+      "failure": "A green 2163-test default suite missed a one-line production-only bug: the launcher wired the gateway to the Policy Agent's port (5000) instead of the Orchestrator's (5001), so the first human prompt came back \"Unsupported message type: PROMPT_REQUEST.\" The unit tests mock that seam (replace the boundary with a stand-in), and the bug lived in the seam. The twist: a deliberate three-layer scenario harness (#563) already existed — and missed the bug for the same reason, its dispatcher layer driving a fake gateway and its window layer a fake backend, so the real gateway-to-Orchestrator routing was exercised by nothing at any layer. A `slow` marker had quietly hidden two integration files of bit-rotted tests from CI (the automated test run) besides. The agent compounded it, telling the operator the GUI had \"no tests at all\" after scoping the check to the C# project — forgetting the harness built a sprint earlier.",
+      "evidence": [
+        "2026-06-06 — Mocks pass, seams break — and the harness that mocked the seam too",
+        "commits 0834d44 / 8206800 (TEST_GOVERNANCE.md §2.7 coverage mandate)"
+      ],
+      "lesson": "Coverage is which seam a test exercises, never how integration-flavoured it looks. A harness that mocks the boundary the bug lives past is a unit test in integration clothing; a marker that hides a test is not coverage; and a claim about your own coverage is worth as little as any other unverified claim. The fix became doctrine: every major subsystem gets a test that reaches its real production seam.",
+      "growth": "The mechanism: a mock is a claim that the boundary behaves the way the test author assumed — it can never be evidence that it does. So every mocked boundary is a documented blind spot, and the seams easiest to mock (cross-service wiring, ports, real sockets, the GUI against a real backend) are precisely where production-only defects concentrate, because nothing else exercises them either. In your next project, audit coverage by seam, not by count: list the boundaries where components actually meet in production and ask, for each, which test crosses it with both sides real. Check what your skip and deselection markers exclude — an excluded test contributes nothing, however green the suite around it. And before stating what your own tests cover, look; coverage claims rot like any other memory.",
+      "growth_question": "The suite was 2163 tests green and the first human prompt failed. What, precisely, had those 2163 tests been exercising — and what had none of them touched?",
+      "diagram": "flowchart TD\n  UT[\"Unit tests\"] --> M1[\"Mock the gateway seam\"]\n  DL[\"Harness dispatcher layer\"] --> M2[\"Drives a fake gateway\"]\n  WL[\"Harness window layer\"] --> M3[\"Drives a fake backend\"]\n  M1 --> GAP[\"Real gateway-to-Orchestrator<br/>routing: exercised by nothing\"]\n  M2 --> GAP\n  M3 --> GAP\n  GAP --> BUG[\"Launcher wires gateway to<br/>PA port 5000, not AO 5001\"]\n  BUG --> FAIL[\"First human prompt:<br/>Unsupported message type\"]",
+      "stat": [
+        {
+          "value": "2163",
+          "label": "green tests, blind at the seam"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's MEASURE function houses TEVV (test, evaluation, verification and validation) and asks that risks be assessed with methods whose coverage is honestly characterized. A 2163-test green signal that never exercised the production routing seam is a measurement-quality failure: the metric implied assurance it did not contain. Domain III.C — governing release and monitoring — is served by the resulting doctrine: a subsystem is not done until a test exercises its real production seam, making \"valid and reliable\" a property of the test regime, not just the model.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — trustworthy characteristic: valid and reliable"
+      ],
+      "aigp_takeaway": "A mock is an assumption, not evidence. Map coverage by which production seams tests actually cross, not by test count."
+    },
+    {
+      "number": 65,
+      "prologue": false,
+      "fragment": null,
+      "title": "A correct downstream fix can mask an upstream defect by moving its symptom past the gate that used to catch it — so test the seam between configuration and connection, not each side alone.",
+      "failure": "The launcher pointed the gateway at the Policy Agent's port (5000) instead of the Orchestrator's (5001). Once, that misroute would have fail-closed loudly at boot: the gateway's startup handshake would have gone unanswered. But three days earlier a correct fix (EA-4f) had taught the Policy Agent to answer `HANDSHAKE_REQUEST` — repairing a real defect, and simultaneously teaching the wrong door to answer the gateway's \"are you there?\". The failure migrated from \"won't boot\" to \"boots clean, every prompt fails,\" past every gate. The repair extracted a single `resolve_gateway_port` function, regression-locked the gateway's port against the Orchestrator's own config so two declarations of one physical port can never drift, and was reproduced red before green: stand the real Policy Agent on 5000, watch the handshake succeed and the prompt come back rejected, then flip the port and watch it stream.",
+      "evidence": [
+        "2026-06-06 — The fix for the prompt that went to the wrong door",
+        "commit 762fbf9 merged ecbd991 (#620)"
+      ],
+      "lesson": "A correct downstream fix can mask an upstream defect by moving its symptom past the gate that used to catch it — the most dangerous regression is the one a good fix makes quiet. When a fix makes a formerly-loud failure quiet, ask what that path was implicitly verifying; and test the wire itself, because both endpoints can be individually correct while the connection between them is wrong.",
+      "growth": "The mechanism is that controls often work by accident: the loud boot failure was never designed as a misroute detector, it just happened to be one, so nobody knew a tripwire existed to lose. When a fix widens what a component accepts — answering more message types, tolerating more inputs — it narrows what failures the system surfaces, and that trade is invisible unless you ask for it. Build the habit: after any fix that turns a hard failure into a success, name what used to fail and check whether anything still detects the condition that caused it. And test connections as first-class subjects — a configuration that names a port and a service that listens on one are two declarations of a single fact, so write the test that asserts they agree and drives traffic across the assembled wire.",
+      "growth_question": "The handshake fix was correct, and after it a wrong port stopped failing at boot. What had the old loud failure been checking that nobody had ever written down?",
+      "diagram": "sequenceDiagram\n  participant L as Launcher (prod host-mode)\n  participant G as Gateway\n  participant PA as Policy Agent (port 5000)\n  participant AO as Orchestrator (port 5001)\n  L->>G: wire prompt port to 5000\n  G->>PA: HANDSHAKE_REQUEST\n  Note over PA: EA-4f taught the PA<br/>to answer this\n  PA-->>G: handshake OK\n  Note over G: boot looks healthy\n  G->>PA: PROMPT_REQUEST\n  PA-->>G: Unsupported message type\n  Note over AO: the right door:<br/>never contacted",
+      "stat": [
+        {
+          "before": "won't boot",
+          "after": "boots fine, every prompt fails",
+          "label": "where the failure migrated"
+        },
+        {
+          "before": "5000",
+          "after": "5001",
+          "label": "one line, wrong door"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's MANAGE function covers implementing risk responses and then monitoring residual risk — and this failure shows why the second half exists: a correct response (the handshake fix) silently created a new residual blind spot by disabling an implicit detector. For Domain III.C, governing maintenance means evaluating a change's effect on the system's failure visibility, not only its target defect; TEVV (test, evaluation, verification and validation) under MEASURE then closes the loop by exercising the connecting seam end to end.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MANAGE (residual-risk monitoring)",
+        "NIST AI RMF — MEASURE (TEVV)"
+      ],
+      "aigp_takeaway": "Every fix that quiets a loud failure may disable an implicit detector — re-ask what that failure was silently verifying."
+    },
+    {
+      "number": 68,
+      "prologue": false,
+      "fragment": null,
+      "title": "A lock you cannot run green yet must still verify everything the missing resource does not gate — so its first real run is a confirmation, not a discovery.",
+      "failure": "Two regression locks needed hardware a headless agent session lacks: the boot-cascade smoke test needs the GPU; the GUI harness needs a display. Shipping them unrun and \"verifying later\" would have made their first-ever run a debugging session. Instead, each maximized what could run green without the missing resource. The boot-cascade smoke ran the real production functions in production order — real certificate provisioning, the real service start, real handshake, a real prompt round-trip through the real policy check — with only the GPU inference stubbed (a stand-in replacing the model). The GUI work compiled the real window with `dotnet build` (\"Build succeeded. 0 Warning(s). 0 Error(s).\"), added fifteen automation IDs to `MainWindow.xaml`, and proved all 15 tests collectable in 0.08 s, leaving only the genuinely display-bound run deferred to the dev machine.",
+      "evidence": [
+        "2026-06-07 — The Two Locks That Let the Next Sprint Modify Instead of Discover",
+        "commit 2df25d8 (merge 469a442)",
+        "2026-06-07 — The GUI harness the sprint-15 live-verify session should have had",
+        "commit 2c4d85e (merge aed13ad)"
+      ],
+      "lesson": "A lock you cannot run green yet must still verify everything the missing resource does not gate, so its first real run is a confirmation, not a discovery. \"Built, not verified\" is honest only when the unverified part is precisely the part that needs the hardware — a lock whose first run debugs the lock never locked anything.",
+      "growth": "The mechanism: an unrun test accumulates two kinds of unknowns — defects in the system and defects in the test itself — and the missing resource only excuses the first kind. Harness bugs, import errors, wrong assertions, and broken setup have nothing to do with the GPU or the display; deferring them until the hardware session means spending scarce hardware time debugging your own scaffolding. The discipline that transfers: when a verification needs a resource you do not have, decompose it — what does the resource actually gate? Run everything else now: compile the artifact, collect the tests, drive the real code paths against a stand-in for only the missing piece, and write down exactly what remains unproven. The deferred run then has one job — confirming the irreducible hardware-bound step — and a failure there is information, not noise.",
+      "growth_question": "When a never-run test finally meets its hardware, how many kinds of failure can that first run produce — and how many of them actually needed the hardware to find?",
+      "diagram": "flowchart TD\n  NEED[\"Lock needs hardware the<br/>session lacks (GPU, display)\"] --> ASK[\"Decompose: what does the<br/>resource actually gate?\"]\n  ASK --> NOW[\"Everything else: run NOW\"]\n  ASK --> LATER[\"Only the resource-bound<br/>step is deferred\"]\n  NOW --> S1[\"Boot-cascade smoke: real funcs,<br/>real order, GPU stub only\"]\n  NOW --> S2[\"dotnet build the real window:<br/>0 Error(s)\"]\n  NOW --> S3[\"All 15 GUI tests collect<br/>in 0.08s\"]\n  LATER --> CONF[\"First hardware run:<br/>confirmation, not discovery\"]",
+      "stat": [
+        {
+          "value": "0.08s",
+          "label": "15 GUI tests collect clean"
+        },
+        {
+          "value": "Build succeeded. 0 Warning(s). 0 Error(s).",
+          "label": "compiled without the display"
+        }
+      ],
+      "aigp_text": "TEVV (test, evaluation, verification and validation) under NIST AI RMF's MEASURE function distinguishes verification (built to spec) from validation (performs in the real context). Staged locks exemplify the split deliberately: structural verification — real functions, real order, real assertions — completes without the hardware, so the later hardware run is pure validation of the one resource-bound property. For Domain III.A, governing the building of an AI system includes governing its test assets: an unexercised test is itself an unverified artifact.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV): verification vs. validation"
+      ],
+      "aigp_takeaway": "Stub only what the missing resource gates; verify everything else now, so the first hardware run confirms rather than discovers."
+    },
+    {
+      "number": 70,
+      "prologue": false,
+      "fragment": null,
+      "title": "A regression lock only locks if the gate that actually runs includes its scope.",
+      "failure": "Sprint 16 existed to build locks that actually fire. Its production-parity tests landed green in `tests/integration/` — and the canonical standing-gate command (`shared/ services/ launcher/`) excluded that directory, so a green gate said nothing about whether the lane passed. Wiring the fix surfaced the same gap one layer worse: `tests/security/` — the posture guards that fail loudly if dev-mode ships as the default, if the test-isolation conftest is removed, or if an external-network import appears — was in neither the gate nor `testpaths`. The most consequential locks in the repository were orphaned. The close folded both into the standing gate (2187 green became 2212) and set the default pytest filter (`addopts`) to deselect only the `hardware`, `winui`, and `slow` markers, so the locks fire on the ordinary run, not only when someone remembers a long command.",
+      "evidence": [
+        "2026-06-07 — Closing the debt the sprint existed to close"
+      ],
+      "lesson": "A regression lock only locks if the gate that actually runs includes its scope. Where a lock lives and where the standing gate looks are two separate facts that must be reconciled, or the lock is decorative — a green gate run proves nothing about a lane it never selects.",
+      "growth": "The mechanism is an aliasing problem: \"the tests pass\" silently means \"the tests the gate selects pass,\" and nothing forces the selection to grow when the test estate does. Every suite has an effective scope — directories, markers, default filters — and every lock added outside it inherits a false sense of protection from the green signal beside it. In any project, treat the gate's selection as a configuration artifact to audit: when you add a lock, run the standing command and confirm the new tests appear in its counts; periodically diff what exists on disk against what the gate collects, because orphaned directories accumulate exactly where new kinds of test (integration, security posture) get invented. The strongest position is making the default command the complete one, so protection does not depend on remembering the long version.",
+      "growth_question": "The new lock was green and the standing gate was green. What third fact has to be true before those two greens protect anything?",
+      "diagram": "flowchart TD\n  GATE[\"Standing gate command:<br/>shared/ services/ launcher/\"] --> GREEN[\"Gate green\"]\n  LANE[\"tests/integration/<br/>production-parity lane\"] --> OUT[\"Outside the gate's selection\"]\n  SEC[\"tests/security/ posture guards<br/>(dev-mode default, isolation)\"] --> OUT\n  OUT --> DEC[\"Locks exist, never fire:<br/>green gate says nothing\"]\n  FIX[\"Close: fold both lanes in;<br/>addopts deselects markers\"] --> NEW[\"2187 to 2212 green —<br/>locks fire on the ordinary run\"]",
+      "stat": [
+        {
+          "before": "2187",
+          "after": "2212",
+          "label": "gate after folding the lanes"
+        }
+      ],
+      "aigp_text": "ISO/IEC 42001's management-system discipline asks an organization to know which controls are actually in effect — its Statement of Applicability makes inclusion and exclusion an explicit, justified record rather than an accident of configuration. An orphaned test lane is the anti-pattern: a control documented and built, but excluded from the check that runs, with no record of the exclusion. NIST AI RMF's GOVERN function carries the same idea — policies and accountability structures must make the operative control set visible.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "ISO/IEC 42001 — Statement of Applicability (controls included/excluded as an explicit record)",
+        "NIST AI RMF — GOVERN"
+      ],
+      "aigp_takeaway": "Where a lock lives and where the gate looks are separate facts — reconcile them, or the lock is decorative."
+    },
+    {
+      "number": 74,
+      "prologue": false,
+      "fragment": null,
+      "title": "A `@hardware`/`@slow` tier must SKIP on every axis it needs, not just the headline one.",
+      "failure": "The model-loaded production-boot tier was supposed to be safe to run anywhere under its `hardware` marker (a tag letting the standing gate deselect tests that need real hardware): skip if under-provisioned, never fail. Its skip guard checked only `tpm_signer.is_available()`. The dev box has a real TPM 2.0 (Trusted Platform Module security chip), so the guard passed, the tier ran — and FAILED at the Policy Agent's measured-boot weight gate with `PA_CFG_KGM_PATH_NOT_FOUND`, because that worktree had no models on disk. A tier that fails on a TPM-present-but-models-absent machine turns \"I ran the hardware suite on an incomplete box\" into a red instead of a skip — exactly the noise the marker exists to prevent. The fix widened the guard to the full prerequisite set — TPM reachable AND production model material present AND the audit key provisioned — caught only because the agent actually ran `-m hardware` on its own box.",
+      "evidence": [
+        "2026-06-07 — The production boot that two services boot differently"
+      ],
+      "lesson": "A `@hardware`/`@slow` tier must SKIP on every axis it needs, not just the headline one. The marker's point is that the tier is safe to run anywhere, so the skip guard must cover the full prerequisite set — chip AND keys AND model material — and you only learn it does by running the tier on an under-provisioned box. A hardware tier you never tried to run is as untrustworthy as a stand-in tier you never ran green.",
+      "growth": "The mechanism: a skip guard encodes the author's mental list of prerequisites, and that list anchors on whatever the tier is named for — \"hardware\" suggested the chip, so the chip got checked, while models and keys rode along as unexamined assumptions. Conditional tests are themselves code with their own failure modes, and a guard nobody has watched fire in both directions is as unverified as an assertion nobody has watched go red. The transferable habit: enumerate every external precondition a conditional test consumes — devices, files, credentials, network, provisioned state — and make the guard check the complete set, ideally by reusing the same resolution logic production uses. Then prove it empirically: run the tier on a box missing each prerequisite and confirm a clean skip, because the false red you prevent is the credibility of every future red.",
+      "growth_question": "The marker said \"hardware\" and the guard checked the chip. How many other things did that test actually need from its environment — and what checked those?",
+      "diagram": "flowchart TD\n  RUN[\"pytest -m hardware<br/>on the dev box\"] --> GUARD[\"Skip guard checks only<br/>tpm_signer.is_available()\"]\n  GUARD --> TPM[\"Real TPM 2.0 present:<br/>guard passes, tier runs\"]\n  TPM --> GATE[\"PA measured-boot weight gate:<br/>no models in this worktree\"]\n  GATE --> RED[\"FAILED:<br/>PA_CFG_KGM_PATH_NOT_FOUND\"]\n  RED --> NOISE[\"A red where the marker<br/>promised a skip\"]\n  FIX[\"Fix: guard checks TPM and<br/>model material and audit key\"] --> CLEAN[\"Skips cleanly wherever the<br/>cascade cannot complete\"]",
+      "aigp_text": "NIST AI RMF's MEASURE function calls for assessing and tracking risks with methods that stay valid across contexts, and \"valid and reliable\" heads its trustworthy-AI characteristics. A test tier that reports failure because the measurement environment was incomplete is an unreliable instrument: it manufactures false signal that erodes trust in true signal. Governing testing under Domain III includes governing the test estate's own quality — the conditions under which each check is meaningful must be encoded, and themselves verified.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — trustworthy characteristic: valid and reliable"
+      ],
+      "aigp_takeaway": "A skip guard must cover every prerequisite — and proving it means running the tier on a box that lacks them."
+    },
+    {
+      "number": 77,
+      "prologue": false,
+      "fragment": null,
+      "title": "A red test is a claim about your test before it is a claim about the code.",
+      "failure": "Walking the whole boot-security chain as one automated cascade, the rotation assertion — \"a second per-boot certificate mint must produce distinct cert material\" — went red: two PEM certificate files byte-identical, identical serial numbers, even though the minting code calls `x509.random_serial_number()`. For a moment it looked like a real fail-to-rotate defect, escalation-worthy. The actual fault was in the test's own ordering: `provision_per_boot_certs` rotates in place, overwriting the same `certs/` paths, and the test captured the first boot's cert bytes after the second mint had already overwritten the file — diffing the current file against itself. The rotation had been real the whole time. The fix was three lines (capture the first boot's bytes immediately, before the re-mint); the near-miss was reporting a fail-to-rotate bug that did not exist. The real-TPM tier already had the ordering right, which is how the agent knew where to look.",
+      "evidence": [
+        "2026-06-07 — Walking the whole trust chain at once, and the rotation check that lied to me"
+      ],
+      "lesson": "A red test is a claim about your test before it is a claim about the code. Scrutinise the harness's own timing, ordering, and assumptions before escalating a red as a code defect — the proactive-fix mandate is for confirmed defects, and an unconfirmed red can manufacture one that isn't there.",
+      "growth": "The mechanism: a test is a second program observing the first, and it can be wrong in all the ways programs are wrong — race its subject, read state at the wrong moment, assert on the wrong object. When a test goes red, two hypotheses are live: the code is broken, or the observation is. The pull toward the first is strong because a defect is the interesting story and the test was \"just checking\" — but the test is the newer, less-exercised code, which makes it the statistically likelier fault. Build the reflex: before escalating any red, re-derive what the test actually measured at the moment it measured it — what file, what bytes, what ordering — and look for a sibling check that disagrees (here, the hardware tier with correct ordering). Escalate only what survives that scrutiny; false alarms spend credibility you will want later.",
+      "growth_question": "Two certificates compared byte-identical. Before concluding the rotation is broken, what question should you ask about when — and what — the test actually read?",
+      "diagram": "sequenceDiagram\n  participant T as Rotation test\n  participant P as provision_per_boot_certs\n  participant C as certs/ paths\n  T->>P: boot 1 mint\n  P->>C: write cert A in place\n  T->>P: boot 2 re-mint\n  P->>C: overwrite — same paths, cert B\n  T->>C: only NOW capture boot-1 bytes\n  C-->>T: cert B\n  T->>C: capture boot-2 bytes\n  C-->>T: cert B\n  Note over T: red: byte-identical, same<br/>serial — rotation looked broken\n  Note over T: fix: capture boot-1 bytes<br/>before the re-mint",
+      "stat": [
+        {
+          "value": "byte-identical",
+          "label": "the file diffed against itself"
+        },
+        {
+          "value": "three lines",
+          "label": "the fix after scrutiny"
+        }
+      ],
+      "aigp_text": "TEVV (test, evaluation, verification and validation) under NIST AI RMF's MEASURE function is only as good as the measurement's own validity — \"valid and reliable\" applies to the instrument before it applies to the system. A red produced by the test's own ordering is a measurement artifact; escalating it would have spent governance attention on a defect that did not exist. Domain III practice includes qualifying the evaluation itself: confirm the observation before the finding, because a testing program's credibility is part of its control value.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — trustworthy characteristic: valid and reliable"
+      ],
+      "aigp_takeaway": "When a test goes red, the test is a suspect too — confirm the observation before escalating the finding."
+    },
+    {
+      "number": 78,
+      "prologue": false,
+      "fragment": null,
+      "title": "Mechanism-exists is not disaster-tested — the missing catastrophe test is the actual deliverable.",
+      "failure": "The offline DEK (data-encryption-key) recovery wrap — the break-glass path for when the TPM security chip dies or the hardware is migrated — had shipped in Sprint 14, and the §5.5 tracker even recorded the mechanism as DONE. Yet every existing test faked \"the chip is gone\" by monkeypatching a live sealer (patching its unseal method to raise an error mid-test) — the sealing key still one attribute-set away in the same process. That is not hardware migration. What was missing was the fresh-machine lock: provision on machine A, carry only the keystore file and the recovery key to a machine B whose sealer cannot unseal at all, and decrypt real data byte-for-byte out the far side. The new `tests/security/test_key_recovery.py` — 34 tests with `_NoTpmSealer` and `_DeadChipSealer` stand-ins — models the dead machine honestly, including the refusals: wrong key, tampered wrap, foreign ciphertext, all fail closed.",
+      "evidence": [
+        "2026-06-07 — The recovery key was already there; what was missing was proof it works on a dead machine"
+      ],
+      "lesson": "Mechanism-exists is not disaster-tested — the missing catastrophe test is the actual deliverable. When a control's whole reason to exist is a rare catastrophe (dead chip, hardware migration), the load-bearing test reconstructs that catastrophe end to end — fresh environment, only the surviving artifacts, real data out — not a monkeypatch of the failure symptom.",
+      "growth": "The mechanism: simulating a failure's symptom is cheap, so that is what test suites accumulate — an exception raised here, a return value forced there — while the disaster itself removes everything the convenient simulation keeps: the same process, the same memory, the keys an attribute away. The gap matters most for break-glass paths, because they run for the first time on the worst day, with no second chance and nobody calm. For any recovery control you own — backups, key escrow, failover, restore-from-export — ask what the real catastrophe leaves behind, and build the test that starts from exactly that and nothing more: a fresh environment, only the artifacts that would survive, and success defined as the real data coming out the far side. If that test has never run, the recovery story is a hypothesis with a deadline.",
+      "growth_question": "Every test \"killed\" the chip by making a live object raise an error. What does a genuinely dead machine NOT have that every one of those tests still had?",
+      "diagram": "flowchart TD\n  OLD[\"Old tests: monkeypatch a live<br/>sealer to raise mid-test\"] --> SAME[\"Same process — sealing key<br/>one attribute-set away\"]\n  SAME --> NOTMIG[\"Not hardware migration\"]\n  A[\"Machine A: provision keystore,<br/>encrypt real data\"] --> CARRY[\"Carry ONLY the keystore file<br/>and the recovery key\"]\n  CARRY --> B[\"Machine B: _NoTpmSealer —<br/>no chip can unseal\"]\n  B --> REC[\"unseal_via_recovery\"]\n  REC --> OUT[\"FieldCipher payload decrypts<br/>byte-for-byte\"]",
+      "stat": [
+        {
+          "before": "DONE",
+          "after": "34 tests",
+          "label": "tracker claim vs disaster proof"
+        }
+      ],
+      "aigp_text": "NIST AI RMF lists secure and resilient among its trustworthy-AI characteristics, and the OECD principle of robustness, security and safety carries the same demand: the system must withstand the adverse event it was designed for, not a simulation of its symptom. Under MEASURE, TEVV (test, evaluation, verification and validation) validation means proving the recovery does its real job in the real context — a fresh machine, surviving artifacts only. A DONE tracker entry for a recovery control never exercised against its disaster is documentation outrunning evidence.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — trustworthy characteristic: secure and resilient",
+        "OECD AI Principles — robustness, security and safety"
+      ],
+      "aigp_takeaway": "Break-glass controls are validated only by reconstructing the catastrophe end to end: fresh environment, surviving artifacts only, real data out."
+    },
+    {
+      "number": 79,
+      "prologue": false,
+      "fragment": null,
+      "title": "A static config lock and a runtime posture guard are not redundant — they catch different regressions.",
+      "failure": "`test_secure_defaults.py` had guarded `dev_mode = false` since Sprint 12 — a static lock that reads the shipped TOML config file and asserts the file still declares production. Real, but only half: it proves the config on disk is secure and stops there. It cannot prove a production boot actually resolves `dev_mode` to False at runtime, nor that production-only fail-closed behaviours engage — an inverted override default, a stray `BLARAI_DEV_MODE` environment leak into the resolver, or a service quietly ignoring the override would sail past the file lock and surface only at the operator's terminal. The Sprint-16 coverage audit logged the gap as GAP-12 (#600); the Sprint-17 fix added the dynamic complement — twelve gate-tier assertions through the exact resolution chain the launcher runs, the sharpest being that in production posture with no keystore configured, the session store refuses to start, where dev mode happily builds a software-backed one.",
+      "evidence": [
+        "2026-06-07 — The posture the file swears to versus the posture the boot resolves"
+      ],
+      "lesson": "A static config lock and a runtime posture guard are not redundant — they catch different regressions. When a security flag has a resolution path (environment, override, mode default) and behaviours that branch on it, lock BOTH ends: the declared default and the resolved runtime value, each paired with a dev-mode control so neither assertion can pass vacuously.",
+      "growth": "The mechanism: between a configuration file and the behaviour it governs runs a resolution pipeline — environment variables, overrides, mode defaults, code that consults the flag — and every stage is a place where the file's truth can fail to become the system's truth. A static check pins only the first link; the regressions that hurt live in the links after it. When you protect any security-relevant setting, trace its full path from declaration to the behaviour that branches on it, and assert at both ends: the artifact says the right thing, and the running system acts the right way. Pair every positive assertion with a control case proving the opposite posture behaves differently — otherwise a bug that makes resolution always return the \"safe\" value would render your production assertions vacuously green, guarding nothing.",
+      "growth_question": "The file on disk says `dev_mode = false`, and a test proves it. List the steps between that file and the running process — which of them does the test see?",
+      "diagram": "flowchart TD\n  FILE[\"default.toml declares<br/>dev_mode = false\"] --> ENV[\"BLARAI_DEV_MODE env leak?\"]\n  ENV --> OVR[\"dev_mode_override default?\"]\n  OVR --> RES[\"resolve_dev_mode() at boot\"]\n  RES --> BEH[\"Behaviour fork: prod with no<br/>keystore REFUSES to start\"]\n  SL[\"Static lock reads the file —<br/>pins only the first link\"] -.-> FILE\n  RG[\"Runtime guard: twelve assertions<br/>through the real chain\"] -.-> RES\n  RG -.-> BEH",
+      "stat": [
+        {
+          "value": "twelve",
+          "label": "runtime assertions, zero skips"
+        }
+      ],
+      "aigp_text": "The verification-versus-validation distinction inside NIST AI RMF's TEVV (test, evaluation, verification and validation) maps exactly onto the two locks: the static check verifies the configuration artifact matches spec; the runtime guard validates that the deployed system actually resolves and enforces the secure posture. EU AI Act high-risk obligations pair accuracy, robustness and cybersecurity with record-keeping for the same reason — a documented posture and a demonstrated one are different evidence. Domain III release governance wants both ends locked.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV): verification vs. validation",
+        "EU AI Act — accuracy, robustness and cybersecurity (high-risk obligation, concept level)"
+      ],
+      "aigp_takeaway": "Lock the declared default AND the resolved runtime posture — a file that swears production cannot prove the boot agrees."
+    },
+    {
+      "number": 81,
+      "prologue": false,
+      "fragment": null,
+      "title": "A posture test must own the outcome it asserts on, not borrow it from the environment.",
+      "failure": "Stream J's production-posture guard was twelve green tests in its isolated worktree (a separate working copy of the repository). The merge gate, re-run on the real main tree, turned one red within nine seconds: `test_assistant_orchestrator_production_security_gate_fires` — DID NOT RAISE. The test proved the security-material gate fail-closes \"because the manifest isn't there\" — true in a `git worktree`, which has no `models/` directory (the multi-gigabyte weights are not in git), false on the dev machine, where the real manifest sits at `models/qwen3-14b/openvino-int4-gpu/manifest.json`. It was measuring whether the box happened to have models installed. The first fix repeated the mistake one layer down: pinning the specific failure code re-introduced host-dependence, since a provisioned box trips on the JWT certificate-authority key (`AO_CFG_JWT_CA_PATH_MISSING`) and a bare worktree on the manifest. The final fix forces the precondition and asserts the invariant — the gate fires — accepting either code.",
+      "evidence": [
+        "2026-06-07 — The posture test that passed because the worktree was empty",
+        "fix on branch sprint17/j-posture-fix (merge-gate catch, stream J / C5)"
+      ],
+      "lesson": "A posture test must own the outcome it asserts on, not borrow it from the environment. Force the precondition explicitly AND assert the invariant (the gate is engaged, the control fail-closes), never the environment-decided detail — and never trust a builder's in-worktree green, because the builder may have run on a tree that structurally could not show the failure.",
+      "growth": "The mechanism: every test runs inside an environment, and any precondition the test does not set explicitly is being set implicitly by whatever machine it runs on — absent files, installed models, provisioned keys. A test that passes because of those accidents is measuring the host, not the code, and it will flip the moment it runs somewhere else. Worse, the dependency can hide a layer down: even after forcing the right precondition, asserting an environment-decided detail (which specific error fires first) re-imports the same fragility. The transferable discipline has two halves. Construct, in the test, every condition your assertion depends on — never lean on \"the test tree happens to lack X.\" And assert at the level of the invariant you actually care about, not the incidental path the environment chose to reach it. Then run the test on a second, differently-provisioned machine before trusting it.",
+      "growth_question": "The test passed twelve-for-twelve in the worktree and failed in nine seconds on the main tree. What was different — and which of the two environments was the test actually written against?",
+      "diagram": "flowchart TD\n  TEST[\"Posture test: expects the<br/>Known-Good Manifest absent\"] --> WT[\"git worktree: no models/<br/>(weights are not in git)\"]\n  TEST --> MAIN[\"Main tree: real manifest at<br/>models/qwen3-14b/...\"]\n  WT --> G[\"Gate fires — twelve green\"]\n  MAIN --> R[\"Gate resolves clean:<br/>DID NOT RAISE\"]\n  R --> HOST[\"The test measured the host,<br/>not the code\"]\n  FIX[\"Fix: force the precondition,<br/>assert the invariant\"] --> INV[\"Gate fires with either code:<br/>KGM or JWT-CA\"]",
+      "stat": [
+        {
+          "before": "twelve tests",
+          "after": "nine seconds",
+          "label": "worktree green; main-tree red"
+        }
+      ],
+      "aigp_text": "For TEVV (test, evaluation, verification and validation) under NIST AI RMF's MEASURE function to produce valid and reliable evidence, results must be reproducible across environments — a check whose verdict depends on the host's provisioning state is not a measurement of the system. The merge-gate practice of re-running the suite on the integrated tree is the process control that catches it, the kind of procedural rigor Domain I.C (policies and procedures throughout the AI life cycle) expects a testing regime to encode.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — trustworthy characteristic: valid and reliable"
+      ],
+      "aigp_takeaway": "Force every precondition and assert the invariant — a test that borrows its outcome from the host measures the host."
+    },
+    {
+      "number": 87,
+      "prologue": false,
+      "fragment": null,
+      "title": "A process leak that makes tests defensively skip looks like correct behaviour — verify the resource was released by a separate mechanism, because a stable skip count is not a safety net.",
+      "failure": "The standing gate had reported a clean 2342 passed / 0 skipped for weeks — then occasionally ~2333 / 9, with no code change. The natural read: someone had BlarAI open, so the boot-cascade tests defensively skipped. The truth: the WinUI harness's bare `proc.terminate()` killed `BlarAI.Desktop.exe` but orphaned the Python backend child it spawns, which kept holding loopback port 5001. The next gate run saw a held port and skipped — correctly, defensively, silently. The \"live instance\" was a ghost: a leaked child with no parent, no window, serving no one, and the suite reported the failure as a perfectly reasonable skip. The fix: a `terminate_process_tree` helper (`tests/harness/process_tree.py`) reaps the full descendant tree, plus a session-scoped fail-loud detector in the root `conftest.py` that fires only on a free-to-held port delta — the one transition meaning \"this session leaked.\"",
+      "evidence": [
+        "2026-06-08 — The skip that wasn't a skip: when a process-leak masquerades as a coverage decision",
+        "commits 5698936 + 2c1f373 merged f6193d1"
+      ],
+      "lesson": "A process leak that makes tests defensively skip looks like correct behaviour — no assertion error, no exception, just a reasonable-sounding skip, with the defect upstream in the teardown that should have released the resource. A skip-guard on a shared resource needs its release verified by a separate fail-loud mechanism; never trust the skip count to stay put.",
+      "growth": "The mechanism: defensive skips translate an environmental anomaly into a non-failure, so any upstream defect that creates the anomaly gets laundered into \"expected behaviour\" — the suite's politeness becomes the bug's camouflage. And cleanup code is the least-tested code you own: teardown runs after the assertions, its failures rarely fail anything, and a terminate that kills the parent while orphaning children looks identical to one that worked. The transferable habits: treat skip counts as a monitored signal with an expected value, where any drift is a defect until explained; and for every guard that skips on a held shared resource, add a separate detector that distinguishes \"the resource was busy when we arrived\" from \"we are the ones who left it busy.\" Choosing fail-loud over silent cleanup is the difference between a regression you see and one you absorb.",
+      "growth_question": "The gate sometimes said 9 skips instead of 0, and every skip was individually correct. If the skip logic is right, where else can the defect be?",
+      "diagram": "flowchart TD\n  H[\"WinUI harness run ends\"] --> T[\"Bare proc.terminate() kills<br/>BlarAI.Desktop.exe only\"]\n  T --> O[\"Python backend child orphaned —<br/>still holds loopback 5001\"]\n  O --> NEXT[\"Next standing-gate run\"]\n  NEXT --> SEES[\"Port 5001 held: reads as<br/>a live BlarAI instance\"]\n  SEES --> SKIP[\"Boot-cascade tests skip:<br/>2342/0 drifts to ~2333/9\"]\n  F1[\"Fix 1: terminate_process_tree<br/>reaps the descendant tree\"] -.-> T\n  F2[\"Fix 2: fail-loud detector on<br/>the free-to-held delta\"] -.-> NEXT",
+      "stat": [
+        {
+          "before": "2342 passed / 0 skipped",
+          "after": "~2333 passed / 9 skipped",
+          "label": "the drift with no code change"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's MEASURE function includes tracking risk signals over time, and MANAGE includes monitoring residual risk after responses — a skip count is exactly such a signal, and its silent drift was a monitoring failure dressed as test hygiene. The fix exemplifies the accountable and transparent characteristic: the fail-loud detector makes a leaked resource a named, attributable failure rather than an ambient condition. Domain III.C's release-and-monitoring lens treats a drifting baseline as a finding, not noise.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — MANAGE (residual-risk monitoring)"
+      ],
+      "aigp_takeaway": "Defensive skips can launder an upstream leak into expected behaviour — monitor the skip count and fail loud on resource leaks."
+    },
+    {
+      "number": 88,
+      "prologue": false,
+      "fragment": null,
+      "title": "A `dev_mode` round-trip proves the routing, not the posture — and the gap between them is the seam production burns on.",
+      "failure": "Two existing tests touched the gateway-to-Orchestrator path, and both quietly stepped around the hard part. `test_prompt_round_trip_host_mode` stood up the real listener and a real gateway — with the GPU stubbed and `dev_mode=True`, so no model and no mTLS (mutual TLS, where both ends present certificates). `test_sprint12_real_model` drove the real Qwen3-14B model — through an in-process `_FakeTransport`, so no socket, no handshake. Each was honest about its coverage; neither exercised the composed production walk: real socket, real `CERT_REQUIRED` mTLS, the signature-verified manifest boot, real generation, real policy check. `dev_mode=True` is the single line that made both tests easy and both incomplete. When the new production-posture tier (`dev_mode=False`) first ran on the chip, the boot fail-closed on a test config whose relative model paths resolved under a tmp dir — `AO_CFG_KGM_PATH_NOT_FOUND` — the signed-manifest gate proving it works before the round-trip did.",
+      "evidence": [
+        "2026-06-08 — The two ways `dev_mode` lies, and the worktree that wasn't where I wrote",
+        "commit e51119d merged b1d7c96 (C1+C2 build)",
+        "commit e3dbee0 merged dedf341 (path fix)"
+      ],
+      "lesson": "A `dev_mode` round-trip proves the routing, not the posture — and the gap between them is the seam production burns on. The production-posture tier (`dev_mode=False`, real mTLS, signed manifest required) is a separate lock: build it explicitly, and mark it `@hardware` so the gate is honest about what has actually run on the chip.",
+      "growth": "The mechanism: a dev-mode flag exists to make development convenient, which means it disables exactly the expensive parts — handshakes, signature checks, hardware-bound material — and those are the security posture. Tests gravitate toward the convenient configuration for the same reason developers do, so a suite can accumulate genuine end-to-end coverage of the routed path while the enforced path stays unexercised, every test individually honest and the composition untested. The transferable questions: for each flag that simplifies your test setup, what does it turn off, and where does that turned-off behaviour get proven? Routing (does a request travel the path?) and posture (are the controls enforced along it?) are separate claims needing separate locks. And when the posture tier first fail-closes on its own scaffolding, read it as the control working — then fix the scaffolding, not the gate.",
+      "growth_question": "Both existing tests were honest about their coverage, and both set `dev_mode=True`. What, exactly, does that one line remove from what the tests can prove?",
+      "diagram": "flowchart TD\n  T1[\"test_prompt_round_trip_host_mode\"] --> H1[\"Real socket, real gateway —<br/>dev_mode=True: no mTLS, no model\"]\n  T2[\"test_sprint12_real_model\"] --> H2[\"Real Qwen3-14B turn —<br/>_FakeTransport: no socket\"]\n  H1 --> GAP[\"The composed production walk:<br/>proven by neither\"]\n  H2 --> GAP\n  GAP --> C1[\"C1: dev_mode=False both ends —<br/>CERT_REQUIRED mTLS, signed<br/>manifest, real generation\"]",
+      "stat": [
+        {
+          "value": "18.4 s",
+          "label": "Qwen3-14B load, production posture"
+        },
+        {
+          "value": "3.10 s",
+          "label": "first token over real mTLS"
+        }
+      ],
+      "aigp_text": "Validation in the TEVV sense (test, evaluation, verification and validation, under NIST AI RMF's MEASURE function) means demonstrating the system does its real job in its real context — for a security posture, that context is the production configuration: mutual TLS enforced, the model's signed manifest verified at boot. This maps to the EU AI Act's high-risk concept of accuracy, robustness and cybersecurity, which attaches to the system as deployed, not as conveniently tested. Domain III.C release governance asks that the gate name honestly which posture has actually run.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV): validation",
+        "EU AI Act — accuracy, robustness and cybersecurity (high-risk obligation, concept level)"
+      ],
+      "aigp_takeaway": "Routing coverage and posture coverage are separate claims — the production configuration needs its own lock, run on real hardware."
+    },
+    {
+      "number": 90,
+      "prologue": false,
+      "fragment": null,
+      "title": "A mocked seam plus a standalone test of the seamed component do not cover the path that connects them — only a test that drives both in sequence does.",
+      "failure": "Two Sprint-18 streams surfaced the same blind spot independently. C3: the Orchestrator's unit tests mock `SemanticRouter.classify()` (replace it with a stand-in), and the one real-router test exercises the router standalone — so the cross-service router-to-Orchestrator path had zero coverage. Grepping the Orchestrator turn revealed worse: the router is called nowhere in the 750-line `_handle_connection` — the seam was not merely untested but unbuilt, ticketed as Vikunja #632 for the built-ahead-versus-gap call. C4: `BlarAIApp`, the terminal user interface, had comprehensive coverage — and every test drove it against a `MagicMock` or a hand-rolled echo server, so `BlarAIApp` to `TransportGateway` to Orchestrator had never run as a system in any automated test. Both gaps closed the same way: a single test driving both real components in sequence on the real path.",
+      "evidence": [
+        "2026-06-08 — The mocked seam that hid the wiring gap",
+        "commit a57a634 merged be75335 (C3)",
+        "2026-06-08 — The TUI was only ever tested against a mock",
+        "commit b59c246 merged 798c8a1 (C4)"
+      ],
+      "lesson": "A mocked seam plus a standalone test of the seamed component do not cover the path that connects them — only a test that drives both in sequence does. \"Component covered\" and \"seam covered\" are different claims, and the gap between them is silent until one side changes — or until you discover the connection was never built at all.",
+      "growth": "The mechanism: coverage composes the way you wish it would only if something exercises the composition. A mock on one side and a standalone test on the other each verify a half against an assumption about the other half — and the two assumptions are never tested against each other, so the connecting path can drift, break, or (as here) simply not exist while both halves stay green. Notice the deeper tell: a mocked seam can hide not just a defect but an absence, because the mock answers whether or not anything real ever would. The transferable audit: list each boundary in your architecture and ask not \"is each side tested?\" but \"which single test drives both real sides in sequence?\" If the answer is none, you hold two component claims and zero system claims about that path — and grep for the call before assuming the path even exists.",
+      "growth_question": "The router had a real test and the Orchestrator had hundreds. What did the project actually know about the path between them — and how would it learn the path didn't exist?",
+      "diagram": "flowchart TD\n  R[\"SemanticRouter\"] --> RT[\"One real test:<br/>router standalone\"]\n  AO[\"Orchestrator turn\"] --> AOT[\"Unit tests mock<br/>SemanticRouter.classify()\"]\n  RT --> SEAM[\"Router-to-Orchestrator path:<br/>zero coverage\"]\n  AOT --> SEAM\n  SEAM --> GREP[\"grep the 750-line turn handler:<br/>router invoked zero times\"]\n  GREP --> ABSENT[\"Seam not just untested —<br/>unbuilt (Vikunja #632)\"]\n  ABSENT --> FIX[\"C3: one test drives real router<br/>then real AO turn in sequence\"]",
+      "stat": [
+        {
+          "value": "zero times",
+          "label": "router invoked in the turn"
+        },
+        {
+          "value": "6.4 ms",
+          "label": "real bge-small classify"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's MAP function establishes the system's context — its components and how they connect — and MEASURE's TEVV (test, evaluation, verification and validation) must then exercise those connections, not only the parts. Two component greens with a mocked seam between them is a coverage claim that overstates itself; here it concealed an unbuilt integration. The Body of Knowledge v2.1's shift from \"AI model\" to \"AI model and system\" points the same way: Domain III governance attaches to the assembled system, and its seams are first-class objects of testing.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — MAP"
+      ],
+      "aigp_takeaway": "Two tested components with a mocked seam between them is zero system coverage — one test must drive both in sequence."
+    },
+    {
+      "number": 92,
+      "prologue": false,
+      "fragment": null,
+      "title": "The bug lives in the seam, not the parts.",
+      "failure": "#638 handed the builder three capability-token containment fixes and named the mechanism for one: add a 'jti' spent-set to enforce single-use of the short-lived signed permission tokens (JWTs — JSON Web Tokens) the Policy Agent mints. The store was built — class, wiring, validation stage, tests — before the reviewing guide course-corrected: single-use was already enforced by the nonce, every token's unique 128-bit number; a replay presents the same nonce and is rejected. The ticket had described the property and guessed at the mechanism. Tearing the redundant store out led to the real bug, subtler than a missing control: the nonce store forgets seen values after 5.0 seconds, while tokens stayed valid for 30 — two defaults set independently, in different files, never made to agree. A token replayed in the 5-to-30-second window passed both checks. The single-use guarantee had a 25-second hole precisely because each component was individually correct.",
+      "evidence": [
+        "2026-06-09 — The replay window between two correct components"
+      ],
+      "lesson": "Two components that are each individually correct can still leave a hole where they meet, if the contract between them was never specified: a 5-second nonce window and a 30-second token were both reasonable alone and together left a 25-second replay window. When a control depends on two independently-defaulted values agreeing, tie them to one source of truth rather than trusting them to stay in step.",
+      "growth": "Two mechanisms to carry forward. First: tickets inherited from decks and briefs describe properties but guess mechanisms — verify the named mechanism against the code before building it, or you will duplicate a working control and walk past the real defect (pairs with lesson 76's verify-the-enforcement-point-on-disk). Second, the seam: each component's defaults are chosen locally, reviewed locally, tested locally, so nobody owns the invariant that spans them — and it silently fails to hold. Hunt deliberately for pairs of values that must agree (a cache lifetime versus a token validity, a timeout versus a retry budget, a buffer versus a message size) and ask where the agreement is enforced. The durable fix is structural: derive one value from the other, promote the constant to a single source of truth, and keep a contrast test that documents the exact bug the alignment removes — so any future drift fails loudly.",
+      "growth_question": "The nonce store is correct, the token lifetime is correct, and every component test is green — where can a 25-second replay window possibly be living?",
+      "diagram": "sequenceDiagram\n  participant C as Token holder\n  participant V as AO jwt_validator\n  participant N as NonceStore (TTL 5s)\n  Note over C: PA mints token —<br/>valid 30s, unique nonce\n  C->>V: present token at t=0\n  V->>N: nonce unseen — record it\n  V-->>C: ACCEPT\n  Note over N: t=5s — TTL evicts the nonce\n  C->>V: replay the SAME token at t=12s\n  V->>N: nonce unseen (forgotten)\n  V-->>C: ACCEPT again — the 25s hole\n  Note over V,N: fix: nonce TTL derived from<br/>token validity plus margin",
+      "stat": [
+        {
+          "before": "5s",
+          "after": "30s",
+          "label": "nonce memory vs token life"
+        },
+        {
+          "value": "25-second",
+          "label": "the replay hole between them"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's MEASURE function assesses the AI system, not only its parts — and a replay window that exists only in the interaction of two correct components is precisely what component-level evaluation misses. 'Secure and resilient,' the trustworthy characteristic at stake, is a property of the assembled system. Verifying the ticket's claimed mechanism against the code, then pinning the seam with a single source of truth and a regression lock, exemplifies Domain III.A — interface contracts specified, not assumed.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "OECD AI Principles — robustness, security and safety"
+      ],
+      "aigp_takeaway": "Component-correct is not system-correct: specify the contract at every seam, and pin values that must agree to one source of truth."
+    },
+    {
+      "number": 114,
+      "prologue": false,
+      "fragment": null,
+      "title": "A test double must preserve the variance the assertion depends on",
+      "failure": "Stage A of the UC-002/003 ingest program (#655) fixed an overdue defect: the memory substrate had been embedding 2048-character chunks through a 128-token window — an embedding is the numeric vector a model assigns to text — so roughly three quarters of every stored chunk never informed its vector. New knowledge chunks embed at 512 tokens, and a regression test was written to lock the untouched 128-token path. The first stub session — a stand-in for the real model — emitted hidden[s,d] = ids[s] * scale[d], and L2 normalisation, which rescales every vector to length one, cancelled the token dimension entirely: the 128-vs-512 test could not fail no matter what the code did. The stub had to become non-separable before the property was even visible. Within hours an adversarial review returned the favour: the 'vector' retrieval tests were all satisfiable by BM25 keyword scoring alone — the suite passed with the cosine limb deleted.",
+      "evidence": [
+        "2026-06-10 — A third failure posture, and the index that lives only in RAM",
+        "commits 8efbffc, f5e8bfc"
+      ],
+      "lesson": "A test double must preserve the variance the assertion depends on. A stub whose output was mathematically separable in token and dimension let normalisation cancel exactly the truncation effect the regression lock existed to detect — green against a broken property. When a lock guards a numeric property, prove the lock can fail — break the guarded limb on purpose and watch it go red — before trusting that it passes.",
+      "growth": "A test is a difference detector, and it can only detect differences its inputs express. Doubles built for convenience often collapse the input space — constant outputs, symmetric data, mathematically separable structure — and every collapsed dimension is a property your suite silently stops checking, while staying green. The countermeasure is a mutation-style self-check: before trusting any new lock, make the guarded property false on purpose — comment out the limb, flip the constant, truncate the input — and confirm the test actually fails; if it stays green, the test or its double is blind. Be especially suspicious when assertions sit downstream of transformations like normalisation, rounding, sorting, or aggregation, because each one can absorb the variance you meant to measure. This project proved the recursion within hours: the author's own retrieval tests failed the same standard — the suite passed with the vector-similarity limb deleted — and only deliberate breakage exposed it.",
+      "growth_question": "Your new regression test is green — what experiment would prove it is even capable of failing, and what structural property of your stub could make that impossible?",
+      "aigp_text": "Test, evaluation, verification, and validation — TEVV, inside NIST AI RMF's MEASURE function — depends on instruments that can actually register the risk they monitor, and an assertion that cannot fail is a measurement that cannot measure. The 'valid and reliable' trustworthy characteristic applies to the evidence-generating apparatus, not only the model. Proving each lock can fail before trusting its green exemplifies Domain III.B — governing the data used in testing, where a convenience stub quietly decided what the suite could see.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "NIST AI RMF — trustworthy characteristics (valid and reliable)"
+      ],
+      "aigp_takeaway": "A test that cannot fail measures nothing: break the guarded property on purpose and watch the lock go red before trusting its green.",
+      "diagram": "flowchart TD\n  A[\"stub embedder output:<br/>hidden = ids x scale<br/>(separable in token, dim)\"] --> B[\"L2 normalisation:<br/>every vector rescaled<br/>to length one\"]\n  B --> C[\"token dimension<br/>cancels out entirely\"]\n  C --> D[\"128-token and 512-token<br/>vectors come out identical\"]\n  D --> E[\"regression lock stays green<br/>no matter what the code does\"]\n  F[\"fix: non-separable stub<br/>(ids + d) mod 13\"] --> G[\"truncation now changes<br/>the vector\"]\n  G --> H[\"lock proven able to fail\"]",
+      "stat": [
+        {
+          "before": "128 tokens",
+          "after": "512 tokens",
+          "label": "embedding window — the numeric property the regression lock guards"
+        },
+        {
+          "value": "three quarters",
+          "label": "of every stored chunk never informed its vector under the 128-token window (roughly)"
+        }
+      ]
+    },
+    {
+      "number": 118,
+      "prologue": false,
+      "fragment": null,
+      "title": "When an exception class subclasses a builtin, every `except` of the subclass is a claim that the base class cannot reach that spot",
+      "failure": "The Stage C guest parser merged green at 131 new tests, and an adversarial review still found a one-frame way to kill it. The chain: ParseChannelError subclasses ValueError, Python's built-in invalid-value error — deliberate, so callers catching the channel error also catch malformed-envelope errors. The parser's _send_error echoed the peer-supplied request_id — a correlation tag — into its error reply, and caught only ParseChannelError around the encode, behind a comment reading '# pragma: no cover — tiny body, cannot overflow.' The premise was false: the id had no length cap, so a request_id of ~65,200 characters fit the incoming 64 KB frame, the echoed reply exceeded the 65,536-byte limit, and the message framer — the component that packs replies into size-capped frames — raised plain ValueError: the base class. The subclass-only catch let it escape all the way up and take down the whole listener. One hostile frame, a third of the supervisor's three-crash budget.",
+      "evidence": [
+        "2026-06-11 — Catching the subclass while the base class escaped",
+        "commit 3091d98"
+      ],
+      "lesson": "Catching the subclass while the framer raises the base class made the catch narrower than the raise surface it guarded — the inversion that stings, because catching ValueError would have subsumed the subclass and been safe. And the pragma comment asserting the path unreachable is precisely what kept coverage tooling from ever asking. A 'cannot happen' claim on an error path deserves adversarial pricing, not exemption from it.",
+      "growth": "Exception hierarchies are asymmetric: a base-class catch subsumes its children, but a subclass catch excludes its parent — so every narrow except clause embeds a claim about what the guarded call can raise, and the claim rots as code changes. Audit yours: list the raise surface of the call inside the try and confirm the catch is at least as wide; where a 'cannot happen' comment excuses a path from coverage, read it as an invitation to adversarial review, not a settled fact. Then fix in layers: restore the contract structurally so nothing escapes, kill the bad input at the earliest frame so the overflow becomes unreachable from the wire, and add an outermost catch-all that turns 'one bad connection costs at most that connection' into an invariant rather than an inventory of today's raisers. Last, prove the locks fire — check the broken code back out and watch the reproducer escape.",
+      "growth_question": "A try block's guarded call can raise the base class, and the except names only the subclass — what claim is that catch silently making, and who ever tests it?",
+      "aigp_text": "Adversarial review after a green merge is NIST AI RMF MEASURE work — TEVV includes evaluating what the test suite itself failed to ask, and here it priced a 'cannot happen' claim and found a one-frame denial of service. The layered fix — structural containment, earliest-frame rejection, an invariant catch-all that logs only the exception class so no page content leaks — serves the 'secure and resilient' trustworthy characteristic and the OECD principle of robustness, security and safety, exemplifying Domain III.A's governance of how the system is built.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "OECD AI Principles — robustness, security and safety"
+      ],
+      "aigp_takeaway": "A subclass-only catch claims the base class cannot occur; price every 'cannot happen' adversarially — the catch must cover the raise surface.",
+      "diagram": "flowchart TD\n    A[\"Hostile frame:<br/>request_id ~65,200 chars<br/>fits the 64 KB frame\"] --> B[\"_send_error echoes the id<br/>into the ERROR envelope\"]\n    B --> C[\"MessageFramer.encode:<br/>65,658 exceeds 65,536\"]\n    C --> D[\"raises plain ValueError —<br/>the BASE class\"]\n    D --> E[\"except ParseChannelError —<br/>the SUBCLASS, too narrow\"]\n    E --> F[\"escapes serve_connection\"]\n    F --> G[\"main() catches only<br/>KeyboardInterrupt\"]\n    G --> H[\"listener dies — one frame,<br/>a third of the 3-crash budget\"]",
+      "stat": [
+        {
+          "value": "131",
+          "label": "tests green at merge — the adversarial review still found a one-frame listener kill"
+        },
+        {
+          "value": "65658",
+          "label": "the escaped error: 'Message size 65658 exceeds limit 65536' — reproduced exactly before fixing"
+        },
+        {
+          "value": "256",
+          "label": "PARSE_REQUEST_ID_MAX_CHARS — over-long ids now die on the first frame, never recorded"
+        }
+      ]
+    },
+    {
+      "number": 119,
+      "prologue": false,
+      "fragment": null,
+      "title": "A passing test suite proves the code does what the tests ask, never that the tests ask the right question",
+      "failure": "The Stage C parse channel had a guest that listened and a host that could not reach it — and every test was green. The guest parser was up on the Alpine VM, bound to a plaintext AF_VSOCK listener (the Linux VM-side socket family) on port 50001. The host smoke harness got connection refused: it was knocking at 127.0.0.1:50001 — the loopback address, the host's way of talking to itself — where nothing listened. The conflation had sat in shared/ipc/vsock.py since the transport was first written. It could express three postures — dev (loopback, no mTLS, the mutual certificate authentication), host-mode (loopback plus mTLS), guest-mode (AF_HYPERV, the host-to-VM socket family, plus mTLS) — so the only way to get 'no mTLS' was dev_mode=True, which also forced loopback. Two independent properties, one switch; no fourth posture for AF_HYPERV without encryption. Three call sites used dev_mode = not has_mtls, quietly routing a guest-bound, certificate-less connection to the host's doorstep.",
+      "evidence": [
+        "2026-06-11 — The door the loopback tests never knocked on"
+      ],
+      "lesson": "The loopback tests were green because they exercised the loopback path; the boundary hop had no test because the API had no way to name it. When two independent properties — transport family and encryption on or off — are welded to one switch, the suite can be exhaustive over that switch and still carry a blind spot the size of the missing fourth combination. Build the explicit opt-in before you need it, so the thing you must test has a name.",
+      "growth": "A test suite explores the states its API can express; a configuration the API cannot name is one no test can construct, so coverage silently stops at the design's own vocabulary. That is why the live round-trip was not redundant with a fully green suite — it was the only probe that could fail in the dimension the unit tests could not address. When you find two independent properties welded to one switch, decouple them and enumerate the full cross-product: four combinations here, of which the suite had been exhaustive over three. Make the dangerous one an explicit, default-off opt-in that a stronger setting always overrides — certificate material present means the plaintext flag is inert — and make it log loudly, because a plaintext boundary crossing should never be silent. Then put the whole truth table behind one predicate, so it is one place to read and one place to test.",
+      "growth_question": "Every test is green and the live connection is refused — what dimension of behavior could the suite not even express, and what welded that dimension shut?",
+      "aigp_text": "NIST AI RMF's MEASURE function houses TEVV — test, evaluation, verification, and validation — and this is its core distinction lived: a green suite verified the code against the questions the tests could ask, while only the live boundary round-trip could validate the real job in the real context. Shipping the bring-up with mTLS as an explicit, tracked residual — flagged, default-off, loudly logged — is MANAGE's residual-risk communication. Both exemplify Domain III.A, governing how the system and its test vocabulary are designed.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV: verification vs validation)",
+        "NIST AI RMF — MANAGE"
+      ],
+      "aigp_takeaway": "Coverage stops at the API's vocabulary: name every meaningful configuration explicitly, or the suite is exhaustive over the wrong space.",
+      "diagram": "flowchart TD\n    A[\"Host needs AF_HYPERV<br/>to the guest, no certs yet\"] --> B[\"Only switch for no mTLS:<br/>dev_mode=True\"]\n    B --> C[\"dev_mode also forces<br/>AF_INET loopback\"]\n    C --> D[\"Harness knocks at<br/>127.0.0.1:50001\"]\n    D --> E[\"connection refused —<br/>nothing listens on the host\"]\n    F[\"Guest listener up:<br/>AF_VSOCK port 50001\"] -.->|\"never reached\"| E\n    G[\"Fix: allow_plaintext_hyperv<br/>opt-in, default off\"] --> H[\"AF_HYPERV, no encryption wrap —<br/>mTLS always wins, logs loudly\"]",
+      "stat": [
+        {
+          "before": "3",
+          "after": "4",
+          "label": "transport postures the API can name — the missing fourth was the untestable blind spot"
+        },
+        {
+          "value": "15",
+          "label": "new mocked-socket tests pinning family, protocol, and SSL selection across all four modes"
+        }
+      ]
+    }
+  ]
+}

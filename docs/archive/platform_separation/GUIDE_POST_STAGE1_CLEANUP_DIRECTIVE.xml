@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Guide-to-Executor directive for the post-Stage-1-close cleanup pass.
+  Issued by Guide instance 2, authorized by Lead Architect.
+  Audience: the still-open Stage 1 Executor session.
+  Companion brief for Lead Architect: GUIDE_POST_STAGE1_CLEANUP_BRIEF.md (same folder).
+-->
+<guide_resume_instruction issued_at_utc="2026-04-24T23:35:00Z" guide_instance="2" intent="post-stage-1-close cleanup pass">
+
+  <context>
+    Stage 1 is COMPLETE and approved. Closure was verified by Guide instance 2 against
+    devplatform commit eaa005f and BlarAI commit 1d06135. This directive authorizes one
+    between-stages cleanup pass before Stage 2 kickoff. Four issues require resolution.
+    All four are well-scoped edits; none re-open Stage 1 work or affect Stage 1 closure status.
+  </context>
+
+  <authority>
+    Lead Architect (LA) explicitly authorized using this still-open Executor session for
+    between-stages cleanup. Stage XMLs are normally locked during execution per
+    GUIDE_PROMPT.xml hard_boundaries, but LA approval grants this between-stages window.
+    STATUS.md will record the work as a between-stages cleanup commit with anomaly entries.
+  </authority>
+
+  <work_items>
+
+    <item id="C1" name="F1 fix -- generalize _project_context.py project_id lookup (Stage 2 XML item 2.2)">
+      <file>C:\Users\mrbla\BlarAI\docs\platform_separation\03_STAGE2_REFACTOR_MULTIPROJECT.xml</file>
+      <location>
+        Inside &lt;item id="2.2" name="Create project-root resolution helper"&gt;,
+        inside the &lt;file path="C:\Users\mrbla\BlarAI\tools\_project_context.py"&gt; block,
+        in the resolve() function, the project_id assignment.
+      </location>
+      <change>
+        REPLACE this block:
+          project_id = (
+              cli_project_id
+              if cli_project_id is not None
+              else registry.get("blarai")
+              or registry.get("project_id")
+          )
+
+        WITH this block:
+          # Schema convention: each project's reverse-lookup yaml has a
+          # "&lt;projectname&gt;_project_id" key (e.g., "blarai_project_id" for the
+          # project rooted at C:\Users\mrbla\BlarAI). The generic "project_id"
+          # key remains as a backwards-compat fallback for projects that opt
+          # out of the prefixed convention.
+          name_key = f"{root.name.lower()}_project_id"
+          project_id = (
+              cli_project_id
+              if cli_project_id is not None
+              else registry.get(name_key)
+              or registry.get("project_id")
+          )
+      </change>
+      <reason>
+        The yaml schema BlarAI/.platform/vikunja_project_ids.yaml contains "blarai_project_id: 3"
+        (per Stage 1.5 XML), so registry.get("blarai") returns None and resolve() raises
+        ValueError. Generalizing to a name-derived key works for BlarAI today and for any
+        future project (devplatform_meta, others) without further code changes.
+      </reason>
+    </item>
+
+    <item id="C2" name="F2 codification -- add &lt;vikunja_access_protocol&gt; block to Stages 2, 3, 4 XMLs">
+      <files>
+        <f>C:\Users\mrbla\BlarAI\docs\platform_separation\03_STAGE2_REFACTOR_MULTIPROJECT.xml</f>
+        <f>C:\Users\mrbla\BlarAI\docs\platform_separation\04_STAGE3_COPY_TOOLS.xml</f>
+        <f>C:\Users\mrbla\BlarAI\docs\platform_separation\05_STAGE4_CUTOVER.xml</f>
+      </files>
+      <location>
+        Insert immediately AFTER the closing &lt;/comprehension_gate&gt; tag in each file,
+        BEFORE the &lt;v2_updates&gt; block. Use identical block content in all three files.
+      </location>
+      <block_to_insert><![CDATA[
+  <vikunja_access_protocol added_on="2026-04-24" rationale="Stage 1 Anomaly A5 -- Executor surfaces vary in MCP-tool exposure; REST is documented as functionally equivalent fallback">
+    <intro>
+      Stage operations that read or write Vikunja MAY use either Model Context Protocol (MCP)
+      tools OR direct Representational State Transfer (REST) against the Vikunja API. Both
+      paths are byte-equivalent at the Vikunja server. Preference: MCP when the Executor
+      surface exposes mcp__vikunja__* tools; REST is the documented fallback when MCP is not
+      surfaced.
+    </intro>
+    <preferred path="MCP">
+      Tool prefixes: mcp__vikunja__list_projects, mcp__vikunja__create_project,
+      mcp__vikunja__list_tasks, mcp__vikunja__create_task, mcp__vikunja__update_task,
+      mcp__vikunja__add_task_comment, mcp__vikunja__list_labels, mcp__vikunja__add_label_to_task.
+      Precondition: Vikunja v2.3.0 server running on http://localhost:3456 (start via
+      Start-Process C:\Users\mrbla\BlarAI\tools\vikunja\vikunja-v2.3.0-windows-4.0-amd64.exe;
+      poll /api/v1/info before first call).
+    </preferred>
+    <fallback path="REST">
+      Direct REST via Invoke-RestMethod. Authentication flow:
+        $cred = Get-Content C:\Users\mrbla\BlarAI\.vscode\mcp.json -Raw | ConvertFrom-Json
+        $pass = $cred.mcpServers.vikunja.env.VIKUNJA_PASS   # read-only; do NOT write back
+        $body = @{ username='blarai'; password=$pass } | ConvertTo-Json
+        $token = (Invoke-RestMethod -Uri 'http://localhost:3456/api/v1/login' -Method POST `
+                    -Body $body -ContentType 'application/json').token
+        $headers = @{ Authorization = "Bearer $token" }
+        # Subsequent calls: GET/PUT/POST against /api/v1/projects, /api/v1/tasks,
+        # /api/v1/labels, etc.
+    </fallback>
+    <credential_source>
+      Single canonical source for Vikunja credentials: C:\Users\mrbla\BlarAI\.vscode\mcp.json
+      key path mcpServers.vikunja.env.VIKUNJA_PASS. Both MCP path and REST path read this
+      same value. The User-scoped VIKUNJA_PASS env var (persisted at Stage 0.0.5) is used
+      by the MCP server process itself; for direct PowerShell scripts, read from the
+      .vscode/mcp.json file as shown above.
+    </credential_source>
+    <safety>
+      Neither path satisfies Master Plan section D.1 enforcement -- D.1 is enforced by
+      tools/_vikunja_client.py (created in Stage 2.1) for fleet RUNTIME tools, not for
+      stage-execution operations. Stage operations using either path must still pass
+      explicit project_id when the operation is project-scoped.
+    </safety>
+  </vikunja_access_protocol>
+      ]]></block_to_insert>
+      <reason>
+        Stage 1 EA hit MCP-tool unavailability and successfully fell back to REST
+        (Anomaly A5). Codifying the fallback eliminates A5-style anomalies at every
+        subsequent stage and makes the procedure resilient to Executor-environment variance.
+      </reason>
+    </item>
+
+    <item id="C3" name="F3 fix -- correct $BLARAI_PID regex at three preflight sites">
+      <change>
+        At each of the three locations below, REPLACE this regex pattern:
+          'blarai:\s*(\d+)'
+        WITH this regex pattern:
+          'blarai_project_id:\s*(\d+)'
+        The surrounding PowerShell code is unchanged; only the Select-String pattern argument changes.
+      </change>
+      <locations>
+        <loc file="C:\Users\mrbla\BlarAI\docs\platform_separation\03_STAGE2_REFACTOR_MULTIPROJECT.xml">item 2.8 &lt;preflight&gt; block</loc>
+        <loc file="C:\Users\mrbla\BlarAI\docs\platform_separation\04_STAGE3_COPY_TOOLS.xml">item 3.7 &lt;preflight&gt; block</loc>
+        <loc file="C:\Users\mrbla\BlarAI\docs\platform_separation\05_STAGE4_CUTOVER.xml">item 4.7 &lt;preflight&gt; block</loc>
+      </locations>
+      <reason>
+        The yaml schema you wrote at Stage 1.5 (per the locked XML's prescription) is
+        "blarai_project_id: 3", so the regex 'blarai:\s*(\d+)' does not match. Without this
+        fix, every Stage 2.8 / 3.7 / 4.7 preflight would throw "BLARAI_PID not found in
+        registry; complete Stage 1.4 first." despite Stage 1 being correctly complete.
+      </reason>
+    </item>
+
+    <item id="C4" name="F4 fix -- promote agent_gates_bus to fleet-level in devplatform/projects/registry.yaml">
+      <file>C:\Users\mrbla\devplatform\projects\registry.yaml</file>
+      <change>
+        REMOVE this line from the blarai_auxiliary_projects: map:
+          blarai_agent_gates: 6
+
+        ADD a new entry to the top-level projects: section, AFTER the fleet_reports: entry:
+          agent_gates_bus:
+            vikunja_project_id: 6
+            note: "Shared gate bus across all platform-managed projects. Labels 9-14 (Gate:Pending-SDO through Gate:Escalation) post against this project. All projects' SDO / Co-Lead / EA gate states route here. Per BlarAI/CLAUDE.md section Vikunja Conventions (Agent Gates bus, project 6)."
+      </change>
+      <reason>
+        Project 6 IS the Agent Gates bus per BlarAI/CLAUDE.md -- a fleet-level shared
+        resource referenced by labels 9-14. Misclassifying as "blarai_auxiliary" would
+        mislead future tooling that queries the registry for fleet-level resources. After
+        multi-project, devplatform_meta will route gates here too. The Vikunja-side project
+        name ("BlarAI Agent Gates") stays as-is -- not renaming it server-side is out of
+        scope for this cleanup.
+      </reason>
+    </item>
+
+    <item id="C6" name="Q7 follow-on -- promote architecture_decisions to fleet-level in devplatform/projects/registry.yaml">
+      <file>C:\Users\mrbla\devplatform\projects\registry.yaml</file>
+      <change>
+        REMOVE this line from the blarai_auxiliary_projects: map:
+          architecture_decisions: 5
+
+        ADD a new entry to the top-level projects: section, AFTER the agent_gates_bus: entry
+        (which itself is added in C4):
+          architecture_decisions:
+            vikunja_project_id: 5
+            note: "Cross-project Architecture Decision Record (ADR) tracking. Vikunja project name lacks any project prefix, indicating fleet-level scope. ADR proposals from any platform-managed project route here for review and cataloguing. BlarAI's project-specific ADRs (ADR-010, ADR-011, ADR-012, etc.) remain documented in BlarAI/docs/; this Vikunja project tracks the cross-project ADR workflow. Promoted from blarai_auxiliary_projects per Stage 1 closure review Q7."
+      </change>
+      <reason>
+        Vikunja project_id=5 is named "Architecture Decisions" with no project prefix. Per
+        the same naming logic that flagged Project 6 (the Agent Gates bus) as fleet-level,
+        the lack of prefix here is the strongest available signal that this project is
+        intended for cross-project ADR tracking, not BlarAI-specific. After multi-project,
+        devplatform_meta ADR proposals would also route here. Worst case (if Stage 6
+        investigation reveals it's actually BlarAI-specific), the cost to re-classify is
+        low; meanwhile the fleet-level classification is the more defensible default given
+        the name.
+      </reason>
+    </item>
+
+    <item id="C7" name="Q8 follow-on -- annotate remaining blarai_auxiliary_projects with provisional-classification notes">
+      <file>C:\Users\mrbla\devplatform\projects\registry.yaml</file>
+      <change>
+        After C4 and C6 land, the blarai_auxiliary_projects: map will contain three entries:
+          blarai_infrastructure: 4
+          blarai_fleet_dashboard: 7
+          blarai_drafts: 9
+
+        REPLACE the entire blarai_auxiliary_projects: block (header + entries) with:
+
+          # BlarAI-scoped auxiliary projects.
+          # Provisional classification -- actual usage (active task count, last-update date)
+          # not yet investigated at Stage 1. Stage 6 hardening (per item 6.7.5 follow-on
+          # pattern) should query each via Vikunja API (REST or MCP per vikunja_access_protocol)
+          # and decide one of:
+          #   - Keep as auxiliary (active BlarAI work confirmed)
+          #   - Archive in Vikunja (no active tasks in 90+ days)
+          #   - Reclassify (e.g., promote to fleet-level if the name turned out to be misleading)
+          blarai_auxiliary_projects:
+            # Likely BlarAI Hyper-V VM / OpenVINO / hardware infrastructure tracking.
+            # BlarAI prefix supports project-scoped classification. Verify at Stage 6.
+            blarai_infrastructure: 4
+            # AMBIGUOUS: name has BlarAI prefix but "Fleet Dashboard" concept is fleet-level.
+            # Could be BlarAI's view of the fleet, OR a fleet dashboard misclassified with the
+            # prefix. Verify at Stage 6 (decide keep / archive / reclassify).
+            blarai_fleet_dashboard: 7
+            # Likely BlarAI scratchpad/drafts project. BlarAI prefix supports project-scoped
+            # classification. Verify at Stage 6.
+            blarai_drafts: 9
+      </change>
+      <reason>
+        Task-count and last-updated data for these three projects is not available at Stage 1
+        (would require starting Vikunja and calling list_tasks per project, which is out of
+        scope for this between-stages cleanup). Premature classification risks dropping
+        active work. Mature path: keep them in auxiliaries (preserves discoverability),
+        document the provisional status with YAML comments (visible to anyone reading the
+        registry), and defer firm classification to Stage 6 when full investigation is on
+        the agenda anyway. Schema stays as `key: int` -- no structural change for future
+        tooling that reads the auxiliaries map.
+      </reason>
+    </item>
+
+    <item id="C5" name="STATUS.md anomaly logging + execution log entry">
+      <file>C:\Users\mrbla\BlarAI\docs\platform_separation\STATUS.md</file>
+      <changes>
+        <add_to_section name="Anomalies / Deviations from Plan">
+          Append three new entries at the END of the section (after A3):
+
+          ### A6 -- Stage 2 XML _project_context.py + preflight regex defects (Stage 1 close + 1) -- LOW (fixed)
+
+          - **What was different**: Stage 2 XML item 2.2 inline _project_context.py used `registry.get("blarai")` but Stage 1.5's prescribed yaml schema is `blarai_project_id: 3` (Risk F1 surfaced by Guide instance 2 at Stage 1 closure review). Same key-mismatch defect appears in the regex `'blarai:\s*(\d+)'` used at Stage 2.8 / 3.7 / 4.7 BLARAI_PID preflight (Risk F3).
+          - **What was done**: Between-stages cleanup commit on `chore/platform-extraction` generalized _project_context.py resolve() to derive the lookup key from `root.name` (works for BlarAI today and any future project), and updated all three preflight regexes to `'blarai_project_id:\s*(\d+)'`. No code yet exists in the repo (Stage 2 EA writes _project_context.py at item 2.1); the XML defect would have caused ValueError at first runtime call.
+          - **Why safe**: Edits are to locked planning artifacts (stage XMLs) between stages, with explicit Lead Architect authorization. Stage 1 closure status unchanged. Stage 2 EA will paste the corrected code.
+          - **Follow-up**: None.
+
+          ### A7 -- &lt;vikunja_access_protocol&gt; codification at Stages 2, 3, 4 (Stage 1 close + 1) -- LOW (procedural amendment)
+
+          - **What was different**: Stage 1 EA hit MCP-tool unavailability in the Executor surface and fell back to REST (Anomaly A5). Without codification, every subsequent Vikunja-touching stage would re-discover the same gap and re-file an A5-style anomaly.
+          - **What was done**: Added a `&lt;vikunja_access_protocol&gt;` block (immediately after `&lt;/comprehension_gate&gt;`) at Stages 2, 3, 4 documenting MCP as preferred and REST as documented fallback, with credential source named at `C:\Users\mrbla\BlarAI\.vscode\mcp.json` (`mcpServers.vikunja.env.VIKUNJA_PASS`).
+          - **Why safe**: Both paths are byte-equivalent server-side. Neither bypasses Master Plan section D.1 enforcement (which is for fleet RUNTIME, not stage execution).
+          - **Follow-up**: None.
+
+          ### A8 -- agent_gates_bus reclassification (Stage 1 close + 1) -- LOW (registry hygiene)
+
+          - **What was different**: Stage 1 EA recorded Vikunja `project_id=6` ("BlarAI Agent Gates") under `blarai_auxiliary_projects` in `devplatform/projects/registry.yaml`. Per BlarAI/CLAUDE.md section Vikunja Conventions, project 6 IS the Agent Gates bus -- a fleet-level shared resource referenced by labels 9-14 -- not a BlarAI auxiliary.
+          - **What was done**: Promoted to top-level `projects.agent_gates_bus` alongside `fleet_reports` in registry.yaml. Vikunja-side project name unchanged.
+          - **Why safe**: Registry classification only. No Vikunja API calls. Future devplatform_meta gate-state postings will land at the correct project.
+          - **Follow-up**: Optional -- Stage 6 hardening could rename the Vikunja project from "BlarAI Agent Gates" to "Agent Gates" via `mcp__vikunja__update_project` for naming hygiene. Not required.
+
+          ### A9 -- architecture_decisions promotion to fleet-level (Stage 1 close + 1) -- LOW (registry classification)
+
+          - **What was different**: Stage 1 EA recorded Vikunja `project_id=5` ("Architecture Decisions") under `blarai_auxiliary_projects` in `devplatform/projects/registry.yaml`. The Vikunja project name has no project prefix (unlike `BlarAI Infrastructure`, `BlarAI Drafts`, etc.), strongly suggesting cross-project / fleet-level intent for ADR (Architecture Decision Record) tracking.
+          - **What was done**: Promoted to top-level `projects.architecture_decisions` alongside `fleet_reports` and `agent_gates_bus` in registry.yaml. Vikunja-side project name unchanged.
+          - **Why safe**: Registry classification only. No Vikunja API calls. If Stage 6 investigation turns up evidence that this project is actually BlarAI-specific, re-classification is a one-line revert.
+          - **Follow-up**: Stage 6 hardening should confirm classification by inspecting actual ADR content in the Vikunja project. Specifically: if all ADR tasks reference BlarAI-internal architecture (Hyper-V, OpenVINO, USE-CASE-XXX), re-demote; if any reference fleet/platform/devplatform_meta, the fleet-level classification stands.
+
+          ### A10 -- blarai_auxiliary_projects provisional-classification notes (Stage 1 close + 1) -- LOW (registry hygiene)
+
+          - **What was different**: After A8 (`agent_gates_bus` promotion) and A9 (`architecture_decisions` promotion), the `blarai_auxiliary_projects:` map has three remaining entries: `blarai_infrastructure: 4`, `blarai_fleet_dashboard: 7`, `blarai_drafts: 9`. Their actual usage (task counts, last-update dates) was not investigated at Stage 1 because that requires starting Vikunja and is out of scope for between-stages cleanup.
+          - **What was done**: Annotated each entry with YAML comments documenting provisional classification basis, ambiguity (notably project 7 "BlarAI Fleet Dashboard"), and a Stage 6 hardening directive to query Vikunja and decide keep/archive/reclassify per project. Schema stays as `key: int` -- no structural change for future tooling reading the auxiliaries map.
+          - **Why safe**: Comments only; no behavioral change. Future tooling reads the same int-valued keys. Premature reclassification or archive without task-count data could drop active work.
+          - **Follow-up**: Stage 6 EA should: (a) start Vikunja temporarily, (b) call `list_tasks` (or REST equivalent per `vikunja_access_protocol`) for each of project 4, 7, 9, (c) decide per project: keep / archive / reclassify, (d) update `registry.yaml`, (e) stop Vikunja again. Optionally create a DevPlatform-Meta investigation ticket per the existing 6.7.5 pattern if deferring further.
+        </add_to_section>
+
+        <append_to_execution_log>
+          [2026-04-24 Stage 1 close + 1] Between-stages cleanup pass (consolidated, Q7/Q8 included). Stage 1 EA, authorized by Lead Architect via Guide instance 2. Edits: _project_context.py generalization (Stage 2 XML 2.2), &lt;vikunja_access_protocol&gt; block (Stages 2, 3, 4), $BLARAI_PID regex (Stages 2.8, 3.7, 4.7), agent_gates_bus reclassification + architecture_decisions promotion + auxiliary-projects annotation (devplatform registry.yaml). Anomalies recorded: A6, A7, A8, A9, A10 (all LOW). Stage 1 closure status: UNCHANGED (still COMPLETE).
+        </append_to_execution_log>
+      </changes>
+    </item>
+
+  </work_items>
+
+  <commits>
+    <commit repo="BlarAI" branch="chore/platform-extraction" scope="C1+C2+C3+C5">
+      <message>chore(platform_separation): between-stages cleanup -- Stage 2 XML defect fixes + REST fallback codification + STATUS A6/A7/A8/A9/A10</message>
+      <files_touched>
+        docs/platform_separation/03_STAGE2_REFACTOR_MULTIPROJECT.xml
+        docs/platform_separation/04_STAGE3_COPY_TOOLS.xml
+        docs/platform_separation/05_STAGE4_CUTOVER.xml
+        docs/platform_separation/STATUS.md
+      </files_touched>
+    </commit>
+    <commit repo="devplatform" branch="main" scope="C4+C6+C7">
+      <message>fix(registry): promote agent_gates_bus + architecture_decisions to fleet-level; annotate remaining auxiliaries pending Stage 6 review</message>
+      <files_touched>
+        projects/registry.yaml
+      </files_touched>
+    </commit>
+    <ordering>
+      BlarAI commit first OR devplatform commit first -- order does not matter (different
+      repos, no dependency between the two commits).
+    </ordering>
+  </commits>
+
+  <verification_required_before_signaling_complete>
+    <cmd label="C1 fix in place">Select-String -Path C:\Users\mrbla\BlarAI\docs\platform_separation\03_STAGE2_REFACTOR_MULTIPROJECT.xml -Pattern 'name_key = f"\{root\.name\.lower\(\)\}_project_id"'   # expect 1 match</cmd>
+    <cmd label="C2 vikunja_access_protocol present in all three">Get-ChildItem C:\Users\mrbla\BlarAI\docs\platform_separation\0[345]_STAGE*.xml | ForEach-Object { [PSCustomObject]@{ File = $_.Name; Hits = (Select-String -Path $_.FullName -Pattern 'vikunja_access_protocol' -SimpleMatch).Count } }   # expect 2 hits per file (open + close tag)</cmd>
+    <cmd label="C3 new regex present in all three">Get-ChildItem C:\Users\mrbla\BlarAI\docs\platform_separation\0[345]_STAGE*.xml | Select-String -Pattern "blarai_project_id:\\\\s\*\(\\\\d\+\)"   # expect 1 match per file</cmd>
+    <cmd label="C3 old regex GONE in all three">Get-ChildItem C:\Users\mrbla\BlarAI\docs\platform_separation\0[345]_STAGE*.xml | Select-String -Pattern "'blarai:\\\\s\*\(\\\\d\+\)'"   # expect 0 matches</cmd>
+    <cmd label="C4 agent_gates_bus at top-level">Select-String -Path C:\Users\mrbla\devplatform\projects\registry.yaml -Pattern '^  agent_gates_bus:'   # expect 1 match</cmd>
+    <cmd label="C4 blarai_agent_gates removed from auxiliaries">Select-String -Path C:\Users\mrbla\devplatform\projects\registry.yaml -Pattern 'blarai_agent_gates:'   # expect 0 matches</cmd>
+    <cmd label="C6 architecture_decisions at top-level (with vikunja_project_id: 5)">(Get-Content C:\Users\mrbla\devplatform\projects\registry.yaml -Raw) -match '(?ms)^  architecture_decisions:\s*\n\s*vikunja_project_id:\s*5'   # expect True</cmd>
+    <cmd label="C6 architecture_decisions: 5 (auxiliaries-style) removed">Select-String -Path C:\Users\mrbla\devplatform\projects\registry.yaml -Pattern '^    architecture_decisions:\s*5\s*$'   # expect 0 matches</cmd>
+    <cmd label="C7 auxiliaries map has 3 'Verify at Stage 6' comments">(Select-String -Path C:\Users\mrbla\devplatform\projects\registry.yaml -Pattern 'Verify at Stage 6').Count   # expect 3</cmd>
+    <cmd label="C7 three auxiliary entries still present (4, 7, 9)">Select-String -Path C:\Users\mrbla\devplatform\projects\registry.yaml -Pattern '^    blarai_(infrastructure|fleet_dashboard|drafts):'   # expect 3 matches</cmd>
+    <cmd label="STATUS A6-A10 logged">Select-String -Path C:\Users\mrbla\BlarAI\docs\platform_separation\STATUS.md -Pattern '^### A(6|7|8|9|10) '   # expect 5 matches</cmd>
+    <cmd label="Two clean commits landed">cd C:\Users\mrbla\BlarAI; git log --oneline -1; cd C:\Users\mrbla\devplatform; git log --oneline -1</cmd>
+    <cmd label="Both trees clean post-commit">cd C:\Users\mrbla\BlarAI; git status --porcelain; cd C:\Users\mrbla\devplatform; git status --porcelain   # both empty</cmd>
+    <cmd label="Fleet still paused, Vikunja still stopped">python -c "import json; print(json.load(open('C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json'))['fleet_paused'])"; Get-Process vikunja* -ErrorAction SilentlyContinue   # True; empty</cmd>
+  </verification_required_before_signaling_complete>
+
+  <out_of_scope>
+    <item>Do NOT touch Stage 1 work products (devplatform skeleton, registry contents beyond C4, vikunja_project_ids.yaml, .gitignore, placeholder docs). Stage 1 is closed.</item>
+    <item>Do NOT edit Stage 0 XML or Stage 1 XML -- those are already executed; their defects (if any) are post-procedure review concerns.</item>
+    <item>Do NOT edit Stage 5 XML or Stage 6 XML -- F1/F2/F3/F4 do not surface there. (Stage 5 doesn't read $BLARAI_PID; Stage 6 doesn't make Vikunja calls beyond the 6.7.5 ticket creation which can use either MCP or REST per A7.)</item>
+    <item>Do NOT call mcp__vikunja__update_project to rename "BlarAI Agent Gates" -- that is an optional Stage 6 hygiene task (A8 follow-up), not in scope here.</item>
+    <item>Do NOT touch state.json. Fleet stays paused for the entire procedure.</item>
+    <item>Do NOT touch stash@{0}. Same reason as Stage 1 acknowledgment.</item>
+    <item>Do NOT delete or modify GUIDE_POST_STAGE1_CLEANUP_DIRECTIVE.xml or GUIDE_POST_STAGE1_CLEANUP_BRIEF.md (this directive and its companion brief). They are audit artifacts.</item>
+  </out_of_scope>
+
+  <stage_complete_report_template>
+    Paste back to Lead Architect:
+    1. Outputs of all 14 verification commands above.
+    2. The two new commit hashes (BlarAI side and devplatform side).
+    3. Any deviation from this directive flagged for STATUS.md (anomaly A11+ if needed).
+    After Lead Architect relays back to me and I verify, the path is clear for Guide-handoff
+    emission and Stage 2 kickoff.
+  </stage_complete_report_template>
+
+</guide_resume_instruction>

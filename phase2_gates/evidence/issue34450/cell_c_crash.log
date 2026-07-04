@@ -1,0 +1,20 @@
+# command: C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_npu_draft.py --target C:\Users\mrbla\BlarAI\models\qwen3-14b\openvino-int4-gpu --draft C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_c
+# started: 2026-04-25T19:31:14Z
+# draft sha256 (xml): 3b0dd0bb85608d772ea87988dfae3e23ea824ffa7ddcb99ac2580a695d1a323c
+# draft sha256 (bin): 939ef806e1ff1117e13fa15bddaa2a09301e6355a41e9af4d190c694393e913c
+
+READY
+target=C:\Users\mrbla\BlarAI\models\qwen3-14b\openvino-int4-gpu
+draft=C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_c
+PYTHON_EXCEPTION:RuntimeError:Exception from src\inference\src\cpp\core.cpp:113: | Exception from src\inference\src\dev\plugin.cpp:53: | Exception from src\core\src\pass\stateful_to_stateless.cpp:112: | Stateful models without `beam_idx` input are not supported in StatefulToStateless transformation |  |  | 
+Traceback (most recent call last):
+  File "C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_npu_draft.py", line 62, in main
+    _pipeline = LLMPipeline(
+                ^^^^^^^^^^^^
+RuntimeError: Exception from src\inference\src\cpp\core.cpp:113:
+Exception from src\inference\src\dev\plugin.cpp:53:
+Exception from src\core\src\pass\stateful_to_stateless.cpp:112:
+Stateful models without `beam_idx` input are not supported in StatefulToStateless transformation
+
+
+

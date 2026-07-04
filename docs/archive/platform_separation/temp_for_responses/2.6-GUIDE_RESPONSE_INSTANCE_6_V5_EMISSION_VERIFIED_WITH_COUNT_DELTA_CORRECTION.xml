@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="post_emission_verification">
+  <verdict>V5_EMISSION_VERIFIED_AND_APPROVED</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <work_item>v5 mid-stage handoff emission post-verification (Guide-#6 emission_protocol steps 1-5 retrospective audit)</work_item>
+  <reviewed_at_utc>2026-04-26T01:45:00Z</reviewed_at_utc>
+  <guide_instance>6</guide_instance>
+  <reviewing>
+    <ea_instance>5</ea_instance>
+    <ea_artifact_committed>docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v5.xml at commit f863a22 (333 insertions, sole file in diff)</ea_artifact_committed>
+  </reviewing>
+
+  <summary>
+    EA-5's v5 mid-stage handoff is APPROVED. Independent disk verification confirms all 4
+    g6-ea5 acknowledgments are SATISFIED on disk: (n1) duplicate D4 comment block in
+    server.py is deleted (single 44-line block at lines 13-57; module imports begin at
+    line 60); (n2) D2 incompleteness is comprehensively encoded in v5 XML
+    (work_completed_this_session §2.6_D2_PARTIAL marks status="PARTIAL_uncommitted_INCOMPLETE_PER_GUIDE_6"
+    with full why_incomplete + guide_6_escalation citation + closure_path_for_ea_6 verbatim
+    6-caller list + BEFORE/AFTER pattern; work_remaining §2.6_D2_completion has priority="FIRST";
+    ack g5-4 in critical_carryovers/binding_acknowledgments tagged
+    priority="CRITICAL_FORWARD_ACTIVE" with full verbatim text); (n3) v5 commit is docs-only
+    (`git show --stat f863a22` shows ONE file in diff: EA_HANDOFF_STAGE2_MIDSTAGE_v5.xml,
+    333 insertions); (n4) D4 decision retention acknowledged with forward-applicability
+    clause. v5 XML schema fidelity to v1/v2/v3/v4 is excellent — all required sections
+    present (metadata, ground_truth_at_handoff, work_completed_inherited, work_completed_this_session,
+    work_remaining, standing_rules_carried_forward, critical_carryovers, successor_pickup_verification
+    with V0a-V0l (V0l is a thoughtful new addition pre-empting count_delta confusion),
+    successor_immediate_next_actions with 9 steps + if_budget_tight clause, handoff_metadata_for_audit
+    with decision_log + files_touched_this_session_summary). Invariants preserved: HEAD
+    advanced from 9277d61 → f863a22 with single docs-only commit; stash@{0}
+    sdo 20260424_013002 byte-identical; state.json fleet_paused=true with
+    last_updated_by="copilot_agent" + last_updated_utc="2026-04-24T20:46:12Z" preserved (no
+    resume_fleet/pause_fleet cycle); pyproject.toml stays in M list per i1-3.
+
+    ONE substantive finding: the +1 M working-tree delta is MISATTRIBUTED in both Guide-#6's
+    inter-deliverable review file AND EA-5's v5 XML count_delta_vs_guide_6_prediction block.
+    Both attribute the +1 to docs/platform_separation/GUIDE_PROMPT.xml. The actual +1 is on
+    tools/fleet_observability/_vikunja_client.py — which became M for the first time when
+    EA-5 added the conditional load_config fallback (D2 partial) + new update_task public
+    method (D3 enabler). GUIDE_PROMPT.xml has been M throughout the entire chain (v3 → v4 →
+    9277d61 → v5) and is not a delta. The substantive work is unaffected; this is purely a
+    documentation accuracy issue in the audit chain. CORRECTION RECORDED in this verification
+    file (which becomes the audit anchor); v5 XML and Guide-#6 inter-deliverable review file
+    are immutable per no-amend doctrine but their misattribution is forward-corrected here.
+
+    THREE additional minor documentation defects in v5 XML (LOW severity; non-blocking):
+    (a) git_log_oneline_5 block at line 60 has predecessor v4 hash as "(predecessor of
+    9277d61)" instead of the actual hash d0c6df1; (b) v4 commit message in same block is
+    paraphrased rather than verbatim; (c) the v5 XML was authored before the v5 commit
+    landed, so head_at_handoff_after_this_commit is descriptive ("this commit -- one parent
+    ahead of 9277d61") rather than the actual hash f863a22. None of these affect EA-6's
+    substantive work; all are forward-corrected in this verification file's
+    &lt;corrections_for_audit_chain&gt; block.
+
+    Stage 2 single-commit discipline holds through v5 emission. EA-6 spawning is now
+    appropriate. EA-6's first substantive action remains D2-completion 6-caller closure as
+    documented in v5 XML work_remaining §2.6_D2_completion; no additional pre-EA-6 work is
+    required from the LA or Guide.
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="v5_commit_landed_docs_only" verdict="VERIFIED_CLEAN">
+      `git log --oneline -1` → f863a22 (HEAD)
+      `git show --stat f863a22`:
+        commit f863a22... Author Blair... Date 2026-04-26
+        message: "docs(platform_separation): Stage 2 mid-stage EA handoff v5 -- D3 + D4
+                  decision (DIVERGE) closed; D2 partial (load_config conditional but 6
+                  callers still zero-arg, w15 escalation per g5-4); D1+2.7-2.10 deferred
+                  to successor"
+        diff: docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v5.xml | 333 +++
+        1 file changed, 333 insertions(+)
+      ONE file in diff. Docs-only. Commit message matches Guide-#6 emission_protocol step 4
+      template. i1-4 + dn15 honored.
+    </check>
+
+    <check id="server_py_dup_cleanup" verdict="VERIFIED_CLEAN">
+      Read tools/vikunja_mcp/server.py lines 1-75:
+        Lines 13-57: single 44-line decision block (DIVERGE rationale + 4-point analysis +
+                     disposition).
+        Line 58: closing `"""` of the module docstring.
+        Line 59: blank.
+        Line 60: `from __future__ import annotations`.
+        Line 61-71: standard imports + `from tools._vikunja_client import _require_project_id`.
+      NO duplicate block. NO line-59 to line-103 second copy. Cleanup landed correctly.
+      The Guide-#6 correction-1 is SATISFIED on disk.
+    </check>
+
+    <check id="v5_xml_d2_incompleteness_encoded" verdict="VERIFIED_COMPREHENSIVE">
+      Read v5 XML §work_completed_this_session §2.6_D2_PARTIAL (lines 129-154):
+        - status="PARTIAL_uncommitted_INCOMPLETE_PER_GUIDE_6" ✓
+        - why_incomplete block: clearly explains 6 zero-arg callers still trigger conditional
+          fallback ✓
+        - guide_6_escalation block: cites Guide-#6 review file + ack g5-4 verbatim ✓
+        - closure_path_for_ea_6 block: BEFORE/AFTER pattern verbatim, 6-caller list verbatim,
+          pytest sanity check ✓
+
+      Read v5 XML §work_remaining §2.6_D2_completion (lines 170-179):
+        - priority="FIRST" ✓
+        - do_this_first block: directs EA-6 to execute as first substantive action ✓
+        - success_criteria block: 4 criteria including grep-zero-hits + pytest-282 ✓
+        - ack_g5_4_satisfied_when block: clear transition rule from FORWARD-ACTIVE to SATISFIED ✓
+
+      Read v5 XML §critical_carryovers §binding_acknowledgments (lines 261-272):
+        - g5-4 tagged priority="CRITICAL_FORWARD_ACTIVE" ✓
+        - forward_active_g5_4_full_text block (lines 274-282): verbatim ack g5-4 text + cite
+          to Guide-#6 escalation ✓
+
+      Encoding is COMPREHENSIVE. EA-6 cannot miss D2-completion as the first action.
+    </check>
+
+    <check id="invariants_preserved_through_v5" verdict="VERIFIED">
+      git stash list: stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 — byte-identical.
+      state.json: fleet_paused=true; reason "platform separation v2 in progress";
+                  last_updated_by="copilot_agent"; last_updated_utc="2026-04-24T20:46:12Z" — preserved.
+      pytest baseline (per EA-5 claim, not re-run): 282 passed. Credible: dup cleanup is
+      docstring-only with no runtime effect; D2/D3/D4 substantive edits don't change call
+      contracts in a way existing tests would catch (chokepoint guards still active; D3
+      named-method preserves request semantics; D2 conditional preserves zero-arg behavior).
+    </check>
+
+    <check id="v5_xml_schema_fidelity" verdict="EXCELLENT">
+      All required sections present per v1/v2/v3/v4 pattern + thoughtful additions:
+        - metadata block with predecessor/successor framing ✓
+        - ground_truth_at_handoff with full git status reproduction + count_at_v5_emission +
+          count_delta_vs_guide_6_prediction (CONTAINS MISATTRIBUTION — see correction below) ✓
+        - work_completed_inherited (carry forward from v1/v2/v3/v4) ✓
+        - work_completed_this_session with explicit 2.6_D4 + 2.6_D3 + 2.6_D2_PARTIAL +
+          2.6_D4_dup_cleanup sub-items ✓
+        - work_remaining with 2.6_D2_completion FIRST + D1 + 2.7 + 2.7.v2 + 2.8 + 2.9 + 2.10 ✓
+        - standing_rules_carried_forward (v6 added to mid-stage handoff cadence) ✓
+        - critical_carryovers with full ack chain ✓
+        - successor_pickup_verification with V0a-V0l (V0l NEW; pre-empts count_delta confusion) ✓
+        - successor_immediate_next_actions with 9 steps + if_budget_tight clause ✓
+        - handoff_metadata_for_audit with decision_log (5 entries) + files_touched_this_session_summary ✓
+    </check>
+
+    <check id="all_4_g6_ea5_acks_satisfied" verdict="VERIFIED">
+      EA-5 marked all 4 g6-ea5_to_emit acknowledgments as SATISFIED in v5 XML
+      §critical_carryovers §binding_acknowledgments (lines 267-270):
+        - g6-ea5_to_emit_n1 (D4 dup cleanup): SATISFIED — VERIFIED on disk (single 44-line
+          block at lines 13-57; dup at 59-103 deleted).
+        - g6-ea5_to_emit_n2 (D2 incompleteness encoding): SATISFIED — VERIFIED in v5 XML
+          (comprehensive 5-block encoding across work_completed_this_session +
+          work_remaining + critical_carryovers).
+        - g6-ea5_to_emit_n3 (single docs-only commit): SATISFIED — VERIFIED via git show
+          --stat (1 file, 333 insertions).
+        - g6-ea5_to_emit_n4 (D4 decision retention): ACKNOWLEDGED — VERIFIED in v5 XML
+          §work_completed_this_session §2.6_D4 with forward-applicability clause.
+    </check>
+
+  </independent_disk_verification>
+
+  <corrections_for_audit_chain>
+
+    <correction id="C1" severity="LOW" topic="+1 M delta misattribution in BOTH Guide-#6 and EA-5 v5 XML">
+      <guide_6_error>
+        Guide-#6 inter-deliverable review file
+        (2.6-GUIDE_RESPONSE_INSTANCE_6_INTER_DELIVERABLE_REVIEW_EA_5_D2_INCOMPLETE_V5_AUTHORIZED.xml)
+        &lt;check id="invariants_preserved" verdict="PASS"&gt; predicted "32 entries (21 M + 2 D + 9 ??)"
+        and claimed "the 4 files EA-5 edited this session (server.py, legacy _vikunja_client.py,
+        dashboard_maintainer.py, plus implicit re-saves) all already appear as M from prior 2.4
+        work and remain M." This was INCORRECT for tools/fleet_observability/_vikunja_client.py:
+        per the v4 git_status_porcelain block (verbatim reproduction in EA-5 init pointer +
+        v4 handoff XML), the legacy file was NOT M at v4 emission. EA-4 explicitly deferred it
+        to 2.6 per g5-4 (file 12 disposition NO CHANGE in 2.4 closure), so it remained matching
+        HEAD. EA-5's session edits (D2 conditional load_config + D3 update_task method) made
+        it M for the first time. Correct prediction would have been 22 M + 2 D + 9 ?? = 33
+        entries.
+      </guide_6_error>
+      <ea_5_error>
+        EA-5 v5 XML §ground_truth_at_handoff §count_delta_vs_guide_6_prediction (lines 55-57)
+        says: "Delta: +1 M on docs/platform_separation/GUIDE_PROMPT.xml (a docs-governance
+        file owned by the LA; modified between Guide-#6's audit timestamp and v5 emission, OR
+        Guide-#6's count omitted it because the file is considered governance not refactor).
+        EA-5 has NOT touched GUIDE_PROMPT.xml in this session; the M state is inherited from
+        prior cycles." This attribution is INCORRECT: GUIDE_PROMPT.xml has been M at every
+        prior v3/v4 ground_truth snapshot AND at the LA's 9277d61 commit AND at v5 emission.
+        It is NOT a delta. The actual +1 delta is on tools/fleet_observability/_vikunja_client.py
+        from EA-5's session edits (which the v5 XML correctly identifies elsewhere in
+        delta_vs_v4 lines 87-93 as "the 4 EA-5-edited files were ALREADY M from prior 2.4
+        work" — but this same statement was incorrect: the legacy file was NOT already M).
+      </ea_5_error>
+      <correct_attribution>
+        Independent disk verification at v5 emission timestamp:
+          - 22 M files (21 from v4 unchanged + 1 NEW: tools/fleet_observability/_vikunja_client.py)
+          - 2 D files (LA-side housekeeping deletions, unchanged from v4)
+          - 9 ?? files (unchanged from v4 — temp_for_responses/ continues to grow with new
+            files but the directory itself is the single ?? entry)
+          - Total: 33 entries
+        The +1 M delta vs v4 (NOT vs Guide-#6's prediction of 32, which was itself incorrect):
+        tools/fleet_observability/_vikunja_client.py.
+      </correct_attribution>
+      <impact_on_ea_6>
+        EA-6's V0c verification will observe 22 M + 2 D + 9 ?? = 33 entries. EA-6 should
+        cross-reference both v5 XML §count_delta_vs_guide_6_prediction (which misattributes
+        to GUIDE_PROMPT.xml) AND this Guide-#6 verification file's correct_attribution block
+        (which correctly identifies tools/fleet_observability/_vikunja_client.py). Functionally,
+        EA-6 will discover the legacy file's M state when reading work_completed_this_session
+        §2.6_D2_PARTIAL + §2.6_D3 (both correctly identify the legacy file as edited), so the
+        misattribution does not block EA-6's work. It is a documentation accuracy issue
+        affecting only the count_delta block.
+      </impact_on_ea_6>
+      <forward_correction>
+        Both v5 XML and Guide-#6 inter-deliverable review file are immutable per no-amend
+        doctrine. THIS verification file is the audit anchor for the correction. EA-6 init
+        pointer (forthcoming) will reference both files + this correction explicitly so EA-6's
+        iteration-1 comprehension gate can restate the correct attribution.
+      </forward_correction>
+    </correction>
+
+    <correction id="C2" severity="LOW" topic="v4 commit hash placeholder in v5 XML git_log_oneline_5">
+      <issue>v5 XML lines 58-64 git_log_oneline_5 block uses "(predecessor of 9277d61)" as
+        the v4 commit identifier instead of the actual hash d0c6df1. EA-5 likely omitted it
+        because the git log -3 output at v5 emission time only showed 3 entries deep
+        (9277d61, d0c6df1, 9d17e7f) and EA-5 wanted to show 5 entries; rather than re-running
+        git log -5 for accuracy, they used a parenthetical placeholder.</issue>
+      <correct_value>v4 commit hash: d0c6df1.</correct_value>
+      <forward_correction>EA-6 init pointer documents the actual v4 hash in its git history
+        block; this Guide-#6 verification anchors the correction.</forward_correction>
+    </correction>
+
+    <correction id="C3" severity="LOW" topic="v4 commit message paraphrased in v5 XML git_log_oneline_5">
+      <issue>v5 XML lines 60 paraphrases v4 commit message as "items 2.1+2.2+2.3+2.4 + f1 +
+        2.5 + 2.5.v2 complete (uncommitted), resume at 2.6". Actual v4 commit message:
+        "Stage 2 mid-stage EA handoff v4 -- item 2.4 closed (all 13) + f1 fix + items 2.5 +
+        2.5.v2 complete (all uncommitted), resume at 2.6".</issue>
+      <correct_value>verbatim from `git log --oneline -3`: "d0c6df1 docs(platform_separation):
+        Stage 2 mid-stage EA handoff v4 -- item 2.4 closed (all 13) + f1 fix + items 2.5 +
+        2.5.v2 complete (all uncommitted), resume at 2.6"</correct_value>
+      <forward_correction>Same as C2.</forward_correction>
+    </correction>
+
+    <correction id="C4" severity="LOW" topic="head_at_handoff_after_this_commit descriptive instead of hash">
+      <issue>v5 XML metadata line 10 has head_at_handoff_after_this_commit as
+        "(this commit -- one parent ahead of 9277d61; the v5 handoff XML is the only file in
+        the diff)" instead of the actual hash. This is because v5 XML was authored BEFORE
+        the v5 commit itself landed (the XML cannot reference its own commit hash from
+        within the same commit).</issue>
+      <correct_value>v5 commit hash: f863a22.</correct_value>
+      <forward_correction>EA-6 init pointer documents the actual v5 hash; this verification
+        anchors the correction.</forward_correction>
+    </correction>
+
+  </corrections_for_audit_chain>
+
+  <commendations_for_ea_5>
+    <commendation topic="comprehensive D2 incompleteness encoding">
+      EA-5 encoded the D2 incompleteness across FIVE separate v5 XML blocks (work_completed_this_session
+      §2.6_D2_PARTIAL with 4 sub-blocks; work_remaining §2.6_D2_completion with 4 sub-blocks;
+      critical_carryovers §binding_acknowledgments g5-4 entry; critical_carryovers
+      §forward_active_g5_4_full_text; successor_pickup_verification §V0j + §V0k). EA-6
+      cannot miss D2-completion as the first action. This is exactly the "mature not minimal"
+      encoding discipline the LA's mandate requires.
+    </commendation>
+    <commendation topic="V0l count_delta_acknowledged check is a thoughtful schema addition">
+      EA-5 added a NEW V0l verification check in successor_pickup_verification block that
+      pre-empts EA-6 confusion about the 33-vs-32 count discrepancy. The check itself misnames
+      the delta source (per correction C1) but the principle is excellent — anticipating
+      the successor's possible source of confusion and providing an explicit acknowledgment
+      slot.
+    </commendation>
+    <commendation topic="schema fidelity to v1/v2/v3/v4">
+      All required sections present, with the same nested structure pattern. The
+      handoff_metadata_for_audit decision_log has 5 entries documenting the substantive
+      decisions of the session (D4 divergence rationale, D2 incompleteness framing, D4 dup
+      cleanup, v5 emission timing, count_delta_acknowledged). Excellent audit-chain
+      preservation.
+    </commendation>
+    <commendation topic="invariant preservation through 4-cycle handoff chain">
+      stash@{0} timestamp 20260424_013002 has been byte-identical from v3 emission through
+      v4 → Guide-#5→6 → v5 — four major handoff cycles. state.json invariants
+      (last_updated_by, last_updated_utc) preserved verbatim through the same span. Zero
+      resume_fleet/pause_fleet calls. This is the kind of discipline that makes Stage 2's
+      single-commit-at-2.9 viable.
+    </commendation>
+  </commendations_for_ea_5>
+
+  <required_corrections>
+    <!--
+      Empty: v5 emission is APPROVED. The 4 corrections above (C1-C4) are documentation-
+      accuracy issues in the audit chain, not substantive work defects. They are forward-
+      corrected in this file and in the (forthcoming) EA-6 init pointer. v5 XML and
+      Guide-#6 inter-deliverable review file are immutable per no-amend doctrine.
+    -->
+  </required_corrections>
+
+  <next_action_for_la>
+    LA may now spawn EA-6 with the standard attachment set + v5 handoff XML + this Guide-#6
+    verification file + Guide-#6 inter-deliverable review file (which contains the v5
+    authorization) + the prior Guide-#6 EA-5 init pointer + the v4 quality review file +
+    the 9 Guide-#5 disposition files + STATUS.md + cross-references. Guide-#6 will draft
+    the EA-6 init pointer in the NEXT turn (per stop-after-gate discipline; no downstream
+    artifact in this verification turn).
+
+    EA-6's first substantive action remains D2-completion 6-caller closure as documented in
+    v5 XML work_remaining §2.6_D2_completion. The init pointer Guide-#6 will draft will
+    encode all 4 corrections above + the count_delta correction + the BEFORE/AFTER 6-caller
+    closure pattern + the standing instruction that EA-6 treat the v5 XML's
+    count_delta_vs_guide_6_prediction block as misattributed (per C1) and trust this
+    Guide-#6 verification file's correct_attribution block instead.
+  </next_action_for_la>
+
+  <proceed_authorization>
+    APPROVED — v5 emission is verified clean on substantive work; documentation defects are
+    forward-corrected here in the audit chain. EA-5 has retired. LA may now signal Guide-#6
+    to draft the EA-6 init pointer (next turn). After init pointer is drafted, LA spawns
+    EA-6 with the attachment set; EA-6 runs V0a-V0l + emits iteration-1 comprehension gate;
+    Guide-#6 reviews per ea_comprehension_gate_review procedure; EA-6 begins D2-completion
+    6-caller closure as first substantive action.
+
+    Standing reminders unchanged: single Stage-2 commit at item 2.9 only; mid-stage handoff
+    XMLs (v1/v2/v3/v4/v5/+v6 if needed) are the EXEMPT docs-only commits; fleet stays paused
+    (NEVER state.resume_fleet); no merge to main; stash@{0} untouched; STATUS append-only at
+    item 2.10.
+  </proceed_authorization>
+
+</guide_review_response>

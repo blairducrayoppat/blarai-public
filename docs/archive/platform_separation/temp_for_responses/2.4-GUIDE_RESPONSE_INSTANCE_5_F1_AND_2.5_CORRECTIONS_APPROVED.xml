@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="corrections_verification">
+  <verdict>APPROVED</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <work_item>2.4 closure (f1 fix corrections) + 2.5 (PS1 corrections) -- post-correction re-verification</work_item>
+  <reviewed_at_utc>2026-04-25T21:30:00Z</reviewed_at_utc>
+  <guide_instance>5</guide_instance>
+  <reviewing>
+    <ea_instance>4</ea_instance>
+    <ea_work>Three required corrections (g5-7 dup tests, g5-8 env-fallback, g5-9 McpConfigPath) + encoding regression fix</ea_work>
+  </reviewing>
+
+  <summary>
+    Independent disk verification confirms ALL three required corrections from the prior
+    APPROVED_WITH_ADJUSTMENTS are correctly applied, plus EA-4 proactively caught and fixed an
+    encoding regression. Invariants HOLD (HEAD still 9d17e7f, zero new commits; stash byte-
+    identical; fleet_paused=true preserved; pytest tools/ confirms 282 passed). The work is
+    clean and ready to proceed to Item 2.5.v2 with the expanded env-fallback functional test
+    scope. No further corrections required.
+
+    Specifically:
+    (1) g5-7: tools/tests/test_vikunja_client_scope.py is now 75 lines (was 95 with duplicates);
+        the two new tests (test_require_project_id_rejects_zero, test_require_project_id_rejects_negative)
+        appear ONCE each at lines 57-74. The duplicate copy at lines 76-94 is GONE.
+    (2) g5-8: All 6 modified PS1 scripts now have the canonical env-fallback default expression
+        `$(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })` on the
+        primary param. Verified per-file by direct read.
+    (3) g5-9: $McpConfigPath REMOVED from param block in both agents-cadence-monitor.ps1 and
+        la_merge_approve.ps1; computed at script-body entry as `$McpConfigPath = Join-Path
+        $RepoRoot '.mcp.json'` with explanatory comment citing g5-9 + WORKFLOW_INTEGRITY_REVIEW
+        Section 3 G-1 fix #1.
+    (4) Encoding regression: la_merge_approve.ps1 + agents-cadence-monitor.ps1 comments use
+        "Section 3" (ASCII) not "§3" (non-ASCII). EA-4's proactive catch-and-fix is good
+        defensive practice.
+    (5) g5-10: A11 commitment self-tracked as EA-4 todo 15 for 2.10 STATUS append; will be
+        verified at 2.10 closure.
+
+    EA-4 may proceed directly to Item 2.5.v2 verification.
+  </summary>
+
+  <independent_disk_verification>
+
+    <check id="invariants" verdict="PASS">
+      git log --oneline -1: 9d17e7f (zero new commits since EA-4 began this turn).
+      git status: 30 entries (unchanged from prior verification).
+      git stash list: stash@{0}: ...wake_launcher auto-stash sdo 20260424_013002 -- byte-identical.
+      pytest tools/ --tb=short -q: 282 passed in 2.68s.
+      Single-commit discipline (w13) holds; fleet pause invariant holds; stash invariant holds.
+    </check>
+
+    <check id="g5_7_dup_tests_cleaned" verdict="PASS_PERFECT">
+      Read tools/tests/test_vikunja_client_scope.py end-to-end: now exactly 75 lines (was 95).
+      Lines 57-63: test_require_project_id_rejects_zero (single definition).
+      Lines 66-74: test_require_project_id_rejects_negative (single definition).
+      File ends at line 75 (no second copy). The duplicate block at the prior lines 76-94
+      is DELETED. pytest still 282 (no count change because duplicates were collapsing).
+    </check>
+
+    <check id="g5_8_env_fallback_in_all_6_ps1" verdict="PASS_VERIFIED_PER_FILE">
+      Direct disk-read of all 6 modified PS1 scripts confirms canonical env-fallback default:
+
+        wake_launcher.ps1 line 31:
+          [string]$RepoRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' })
+        agents-cadence-monitor.ps1 line 18: same expression
+        escalation_watchdog.ps1 line 33: same expression
+        toast_watchdog.ps1 line 15: same expression
+        la_merge_approve.ps1 line 39: same expression
+        test_async_post_gate.ps1 line 26: same expression
+          (note: canonical primary $BlarAIRoot direction with [Alias('RepoRoot')] + shim
+          $RepoRoot = $BlarAIRoot at line 30 -- intentional alias-direction inversion vs the
+          5 alias-on-existing-RepoRoot scripts; A11 documented deviation per g5-10.)
+
+      Per Stage 2 XML 2.5.v2 + iteration-2 g4-2 binding ack canonical signature_pattern_ps1.
+      EA-4's claim "AST-verified env-fallback present on every script; runtime semantics
+      verified across all 3 precedence cases" is supported by direct file reads.
+    </check>
+
+    <check id="g5_9_mcp_config_path_derivation" verdict="PASS_VERIFIED_PER_FILE">
+      agents-cadence-monitor.ps1:
+        - Param block (lines 13-19): $McpConfigPath REMOVED. Param block now contains
+          $ActiveMinutes, $IdleMinutes, $AgentGatesProject, [Alias('BlarAIRoot')] [string]$RepoRoot.
+        - Lines 23-26: comment block "Stage 2.5 g5-9: derive $McpConfigPath from $RepoRoot ...
+          (WORKFLOW_INTEGRITY_REVIEW.md Section 3 G-1 fix #1.)" + computation
+          `$McpConfigPath = Join-Path $RepoRoot '.mcp.json'`.
+
+      la_merge_approve.ps1:
+        - Param block (lines 33-40): $McpConfigPath REMOVED. Param block now contains
+          $Branch, $TrackingTaskId, $FleetReportsTaskId, $Summary, [Alias('BlarAIRoot')] [string]$RepoRoot.
+        - Lines 44-47: comment block + computation
+          `$McpConfigPath = Join-Path $RepoRoot '.mcp.json'`.
+
+      Functional impact: callers passing `-BlarAIRoot 'C:\Users\mrbla\devplatform'` now get
+      $McpConfigPath = 'C:\Users\mrbla\devplatform\.mcp.json' (cross-project consistency).
+      WORKFLOW_INTEGRITY_REVIEW Section 3 G-1 fix #1 explicit instruction honored.
+    </check>
+
+    <check id="encoding_regression_self_caught" verdict="PASS_PROACTIVE_CATCH">
+      Both modified comment blocks use "Section 3" (ASCII-clean) instead of the non-ASCII "§3"
+      character. EA-4 caught and fixed this transient regression themselves before reporting,
+      noting it in the report as "One transient regression (la_merge_approve.ps1 non-ASCII
+      § in comment) caught + fixed (replaced with 'Section'); both McpConfigPath comments now
+      ASCII-clean." Good defensive practice -- non-ASCII characters in PS1 source can interact
+      badly with default Windows code pages depending on how the script is invoked. ASCII-only
+      avoids that class of issue.
+    </check>
+
+    <check id="g5_10_a11_self_tracking" verdict="PASS_QUEUED">
+      EA-4 reports A11 commitment "Queued as todo 15 for 2.10 STATUS append." Self-tracking
+      commitment. Will be verified at 2.10 closure when STATUS.md is appended with the Stage 2
+      closure entry. No action needed now.
+    </check>
+
+  </independent_disk_verification>
+
+  <required_corrections>
+    <!-- Empty: all three prior corrections (g5-7, g5-8, g5-9) cleanly applied + verified on disk. -->
+  </required_corrections>
+
+  <required_acknowledgments>
+    <!--
+      No new acknowledgments required this iteration. The prior g5-7/g5-8/g5-9/g5-10 acks are
+      now satisfied by clean disk evidence + EA-4's emitted reports. EA-4 may proceed directly
+      to Item 2.5.v2 work.
+    -->
+  </required_acknowledgments>
+
+  <continue_recommendation_unchanged>
+    PROCEED to Item 2.5.v2 verification with the expanded env-fallback functional test scope
+    per the prior Guide-#5 disposition:
+      - Per-PS1 baseline: invoke with no -BlarAIRoot/-RepoRoot, confirm hardcoded default
+        applies (BlarAI path).
+      - Per-PS1 env-fallback: with $env:BLARAI_ROOT set, invoke with no -BlarAIRoot/-RepoRoot,
+        confirm env value takes precedence over hardcoded default.
+      - Per-PS1 alias binding: invoke with -BlarAIRoot 'X', confirm primary param ($RepoRoot
+        on 5 scripts; $BlarAIRoot on test_async_post_gate) receives 'X'.
+      - For agents-cadence-monitor + la_merge_approve: invoke with -BlarAIRoot 'C:\test',
+        confirm $McpConfigPath resolves to 'C:\test\.mcp.json' (g5-9 functional verification).
+    After 2.5.v2 closes, RE-EVALUATE budget honestly at the 2.5.v2 → 2.6 boundary. 2.6 is
+    structurally comparable to file 13 (extended grep + g5-4 closure + D3 closure +
+    observation o1 handler-guards-vs-VikunjaClient-routing). If budget is healthy, push into
+    2.6; if even slightly tight, emit v4 mid-stage handoff per i1-4 / dn15 (docs-only commit,
+    no partial-commit refactor).
+  </continue_recommendation_unchanged>
+
+  <proceed_authorization>
+    APPROVED -- f1 fix + Item 2.5 corrections are fully verified on disk. EA-4 may proceed
+    directly to Item 2.5.v2 verification. Standing reminders unchanged: single Stage-2 commit
+    at 2.9 (now containing f1 fix + corrected PS1 work + future 2.5.v2 verification evidence
+    + 2.6 + 2.7 + 2.7.v2 + 2.8 work); fleet stays paused (NEVER state.resume_fleet); no merge
+    to main; stash@{0} untouched; append-only STATUS at 2.10 (now including A11 alias-vs-rename
+    anomaly entry per g5-10); g5-4 legacy file disposition pending at 2.6; D3 dashboard_maintainer
+    closure at 2.6; observation o1 handler-guards-vs-VikunjaClient-routing decision at 2.6.
+    On 2.5.v2 closure, paste the verification evidence back to LA for Guide-#5 review + the
+    2.5.v2 → 2.6 boundary budget re-evaluation.
+  </proceed_authorization>
+
+</guide_review_response>

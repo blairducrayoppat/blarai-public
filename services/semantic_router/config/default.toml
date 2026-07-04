@@ -1,0 +1,28 @@
+# Semantic Router Configuration — Default Profile
+# USE-CASE-004: CPU-Based Intent Classification
+
+[service]
+name = "semantic_router"
+version = "0.1.0"
+log_level = "INFO"
+
+[model]
+runtime = "onnx"
+device = "CPU"
+model_path = "models/bge-small-en-v1.5/onnx-fp16/model.onnx"
+max_input_length = 128
+confidence_threshold = 0.50
+confidence_margin = 0.04
+
+[security]
+fail_closed = true
+jwt_ca_cert_path = "certs/pa_public.pem"   # ADR-021: PA JWT public key (ceremony-generated, per-chip, gitignored)
+
+[ipc]
+vsock_cid = 2
+vsock_port = 5002
+mtls_cert_path = "certs/router_client.pem"
+mtls_key_path = "certs/router_client_key.pem"
+ca_cert_path = "certs/ca.pem"
+policy_agent_port = 5000
+timeout_ms = 5000

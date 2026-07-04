@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<stage_exit_report
+    stage="0"
+    stage_name="Pre-flight"
+    project="Platform Separation v2"
+    source_xml="docs/platform_separation/01_STAGE0_PREFLIGHT.xml"
+    generated_utc="2026-04-24T21:37:00Z"
+    author_role="Execution_Agent"
+    status="HALT_AT_0.10_AWAITING_GUIDE_APPROVAL">
+
+  <summary>
+    <items_total>16</items_total>
+    <items_complete>15</items_complete>
+    <items_pending>1</items_pending>
+    <pending>0.10 — STATUS.md commit (blocked on Guide approval of proposed content below)</pending>
+    <branch_at_exit>chore/platform-extraction</branch_at_exit>
+    <head_at_exit>d0dc1c7</head_at_exit>
+    <fleet_state>paused; 13/13 BlarAI scheduled tasks Disabled</fleet_state>
+  </summary>
+
+  <completed_work_items>
+    <item id="0.0"   status="PASS"/>
+    <item id="0.0.5" status="PASS_WITH_ANOMALY" anomaly_ref="A1"/>
+    <item id="0.5.5" status="PASS"/>
+    <item id="0.6.v2" status="PASS"/>
+    <item id="0.10.v2" status="PASS_WITH_ANOMALY" anomaly_ref="A2"/>
+    <item id="0.10.v3" status="PASS"/>
+    <item id="0.1"   status="PASS"/>
+    <item id="0.2"   status="PASS"/>
+    <item id="0.3"   status="PASS"/>
+    <item id="0.4"   status="PASS"/>
+    <item id="0.5"   status="PASS"/>
+    <item id="0.6"   status="PASS"/>
+    <item id="0.7"   status="PASS_WITH_ANOMALY" anomaly_ref="A3"
+          notes="Initial run blocked by S4U LogonType on 'Agents Cadence Monitor' in non-elevated shell. Lead Architect manually disabled in elevated PowerShell. Re-verify confirmed 13/13 Disabled."/>
+    <item id="0.8"   status="PASS"/>
+    <item id="0.9"   status="PASS"/>
+    <item id="0.10"  status="HALT" reason="Awaiting Guide approval of proposed STATUS.md content"/>
+  </completed_work_items>
+
+  <verify_outputs>
+    <output item="0.3" command="git bundle verify C:\Users\mrbla\backups\BlarAI_pre_extract.bundle"><![CDATA[
+d0dc1c7947f36ec84d15ef13bd589179225ca764 HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+]]></output>
+    <output item="0.5" description="OOG zip created and verified"><![CDATA[
+OOG backup: C:\Users\mrbla\backups\blarai_oog_20260424_171721.zip
+True
+60366033
+]]>
+      <source_paths>
+        <path>tools\vikunja</path>
+        <path>tools\vikunja_mcp\bridge</path>
+        <path>scheduled</path>
+        <path>.mcp.json</path>
+        <path>.vscode\mcp.json</path>
+        <path>.vscode\tasks.json</path>
+        <path>%APPDATA%\Claude\claude_desktop_config.json</path>
+      </source_paths>
+    </output>
+    <output item="0.6" description="Scheduled-task XMLs exported to C:\Users\mrbla\backups\scheduled_tasks_export\"><![CDATA[
+13
+]]></output>
+    <output item="0.7-reverify" description="Post-elevation fix re-verify"><![CDATA[
+---0.7 re-verify (expect empty)---
+---disabled count---
+13
+]]></output>
+    <output item="0.8" description="Manifest content"><![CDATA[
+Platform separation pre-flight manifest - 2026-04-24T17:37:11.2802478-04:00
+C051CCFB8FBC6CA31E03F48537816F56CC3FAFC927CEAFAEC9825C9EC65D7707  BlarAI_pre_extract.bundle
+15B4B9A138974F500FFAE9682350F333DC228AC94A1DB184E26A220508A129A8  blarai_oog_20260424_171721.zip
+]]></output>
+    <output item="0.9" description="Branch creation"><![CDATA[
+Switched to a new branch 'chore/platform-extraction'
+chore/platform-extraction
+]]>
+      <branch_head>d0dc1c7 (no commits added on chore/platform-extraction yet — branch points at the pause commit, the desired Stage 0 anchor)</branch_head>
+    </output>
+  </verify_outputs>
+
+  <proposed_status_md_content
+      target_file="docs/platform_separation/STATUS.md"
+      commit_blocked_until="Guide approval">
+
+    <stage_ledger_row>
+      <stage>0 — Pre-flight</stage>
+      <date_utc>2026-04-24</date_utc>
+      <blarai_commit>d0dc1c7 (branch chore/platform-extraction @ HEAD)</blarai_commit>
+      <devplatform_commit>—</devplatform_commit>
+      <key_evidence>
+        Tag `pre-platform-extract` (object `ce2ec58`) on `d0dc1c7`;
+        bundle `BlarAI_pre_extract.bundle` SHA256 `C051CCFB…D7707`;
+        OOG zip `blarai_oog_20260424_171721.zip` SHA256 `15B4B9A1…29A8`;
+        13 scheduled-task XMLs at `C:\Users\mrbla\backups\scheduled_tasks_export\`;
+        13/13 fleet tasks Disabled;
+        manifest `pre_extract_manifest.txt`;
+        Vikunja Fleet Reports `project_id=8`;
+        `state.json schema_version=1` confirmed;
+        `VIKUNJA_PASS` persisted to User env (length 23).
+      </key_evidence>
+    </stage_ledger_row>
+
+    <recovery_anchors>
+      <anchor>
+        <name>Git tag (annotated)</name>
+        <path>pre-platform-extract on commit d0dc1c7</path>
+        <hash>tag object SHA ce2ec58</hash>
+      </anchor>
+      <anchor>
+        <name>Git bundle</name>
+        <path>C:\Users\mrbla\backups\BlarAI_pre_extract.bundle</path>
+        <hash>SHA256 C051CCFB8FBC6CA31E03F48537816F56CC3FAFC927CEAFAEC9825C9EC65D7707</hash>
+      </anchor>
+      <anchor>
+        <name>OOG zip</name>
+        <path>C:\Users\mrbla\backups\blarai_oog_20260424_171721.zip</path>
+        <size_bytes>60366033</size_bytes>
+        <hash>SHA256 15B4B9A138974F500FFAE9682350F333DC228AC94A1DB184E26A220508A129A8</hash>
+      </anchor>
+      <anchor>
+        <name>Scheduled-task XML exports</name>
+        <path>C:\Users\mrbla\backups\scheduled_tasks_export\</path>
+        <count>13</count>
+      </anchor>
+      <anchor>
+        <name>Backup manifest</name>
+        <path>C:\Users\mrbla\backups\pre_extract_manifest.txt</path>
+        <contents>2 hash lines (bundle + zip)</contents>
+      </anchor>
+    </recovery_anchors>
+
+    <current_state_update>
+      <active_branch previous="main">chore/platform-extraction</active_branch>
+      <head>d0dc1c7 (pause-fleet commit; matches main)</head>
+      <fleet_status>Paused (fleet_paused=true, reason "platform separation v2 in progress"); 13/13 scheduled tasks Disabled</fleet_status>
+      <stage_0>COMPLETE (pending STATUS.md commit + Guide approval)</stage_0>
+    </current_state_update>
+  </proposed_status_md_content>
+
+  <anomalies>
+
+    <anomaly id="A1" severity="LOW" stage="0" work_item="0.0.5">
+      <title>mcpServers key path</title>
+      <what_was_different>
+        XML command reads `$cfg.servers.vikunja.env.VIKUNJA_PASS`. Actual key in `.mcp.json` is `mcpServers` (capitalized, plural).
+      </what_was_different>
+      <what_was_done>
+        Used `$cfg.mcpServers.vikunja.env.VIKUNJA_PASS`. Literal was read and persisted to User env (length 23).
+      </what_was_done>
+      <why_safe>
+        Read-only access to the JSON config; no mutation of `.mcp.json`. Functional outcome identical to XML intent.
+      </why_safe>
+      <follow_up>
+        Post-procedure review of stage XML 0.0.5 command block. Stage XMLs are locked during execution.
+      </follow_up>
+    </anomaly>
+
+    <anomaly id="A2" severity="LOW" stage="0" work_item="0.10.v2">
+      <title>Vikunja CLI env-injection deviation</title>
+      <xml_command><![CDATA[python tools/vikunja_mcp/cli.py list-projects | Select-String "Fleet Reports"]]></xml_command>
+      <actual_command><![CDATA[$env:VIKUNJA_PASS = (Get-Content C:\Users\mrbla\BlarAI\.mcp.json -Raw | ConvertFrom-Json).mcpServers.vikunja.env.VIKUNJA_PASS; python tools/vikunja_mcp/cli.py list-projects | Select-String "Fleet Reports"]]></actual_command>
+      <reason_for_adjustment>
+        `tools/vikunja_mcp/cli.py` reads `VIKUNJA_PASS` from the process environment at startup. In the active shell (which had not been relaunched since 0.0.5 persisted the variable to User scope) the variable was not present in `$env:`, so the CLI would have failed authentication. A one-shot session-scoped injection from the same `.mcp.json` literal made the CLI invocation succeed without modifying any persisted state.
+      </reason_for_adjustment>
+      <semantic_equivalence>
+        The injected value is byte-identical to the literal that the MCP runtime would have supplied; the CLI behavior, output, and the captured evidence (`Fleet Reports` project_id=8) are identical to running it after a shell relaunch.
+      </semantic_equivalence>
+      <follow_up>
+        None — the User-scoped env var will be picked up by future shells naturally; no XML change recommended.
+      </follow_up>
+    </anomaly>
+
+    <anomaly id="A3" severity="HIGH" stage="0" work_item="0.7">
+      <title>Agents Cadence Monitor S4U elevation requirement</title>
+      <what_was_different>
+        12 of 13 fleet tasks disabled cleanly in non-elevated PowerShell. `Agents Cadence Monitor` failed with "Access is denied" because its LogonType is **S4U** (Service for User), while the other 12 are **Interactive**. S4U tasks require an elevated shell to modify.
+      </what_was_different>
+      <what_was_done>
+        Lead Architect opened elevated PowerShell and ran `Disable-ScheduledTask -TaskPath '\BlarAI\' -TaskName 'Agents Cadence Monitor'`. Verified `State=Disabled`. All 13 tasks now Disabled.
+      </what_was_done>
+      <why_safe>
+        LogonType was not changed — preserves S4U property for post-cutover behavior. No semantic change to the task.
+      </why_safe>
+      <implication_for_stage_4 severity="CRITICAL">
+        `Unregister-ScheduledTask` + `Register-ScheduledTask -Xml` for `Agents Cadence Monitor` at Stage 4.7 will also require elevation. The Stage 4 Executor MUST open an elevated shell for that task's re-registration, OR pre-disable in non-elevated shell and elevate only for Unregister+Register. Do NOT enter Stage 4's destructive block without anticipating this.
+      </implication_for_stage_4>
+      <follow_up>
+        Post-soak investigation of why `Agents Cadence Monitor` is S4U while every other fleet task is Interactive. May be intentional (cadence flipper needs to fire regardless of login state). Capture rationale in a DevPlatform-Meta Vikunja ticket per Stage 6.7.5 pattern.
+      </follow_up>
+    </anomaly>
+
+  </anomalies>
+
+  <halt_directive>
+    <action_pending>Commit proposed content above to docs/platform_separation/STATUS.md.</action_pending>
+    <blocked_on>Guide approval of proposed content (relayed via Lead Architect).</blocked_on>
+    <do_not>Do NOT modify STATUS.md until approval is relayed.</do_not>
+  </halt_directive>
+
+</stage_exit_report>

@@ -1,0 +1,50 @@
+{
+  "title": "Playground v2.5 OpenVINO-INT8 — CPU text2image latency (dispatch asset-gen, UC-010 Phase 2b)",
+  "date": "2026-06-25",
+  "grade": "proof / single-run (NOT a rigorous multi-run benchmark)",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu_present": "Intel Arc 140V (Xe2) — NOT used for this run (GPU occupied by the dispatch 30B coder in OVMS)",
+    "ram_gb": 31.323
+  },
+  "software": {
+    "device": "CPU",
+    "openvino": "2026.2.1",
+    "optimum_intel": "2.0.0",
+    "diffusers": "0.37.1",
+    "torch": "2.12.1",
+    "rembg": "rembg[cpu] (u2net session)",
+    "python": "3.11.9",
+    "venv": "isolated build venv (blarai-build/img-convert/venv311), NOT the BlarAI runtime .venv"
+  },
+  "model": {
+    "name": "Playground v2.5 (playgroundai/playground-v2.5-1024px-aesthetic)",
+    "architecture": "SDXL",
+    "precision": "INT8 (OpenVINO IR)",
+    "pipeline": "OVStableDiffusionXLPipeline (optimum-intel)"
+  },
+  "methodology": {
+    "scheduler": "model default (EDMDPMSolverMultistep)",
+    "guidance_scale": 3.0,
+    "negative_prompt": "flat-vector quality/style steer (no content terms)",
+    "runs": "single run per configuration; seeds 42/7",
+    "note": "latency is wall-clock for pipe(...) only; model load reported separately"
+  },
+  "measurements": {
+    "model_load_s": 9,
+    "text2image": [
+      { "resolution": "512x512", "steps": 20, "gen_s": 141 },
+      { "resolution": "768x768", "steps": 28, "gen_s": 473 },
+      { "resolution": "768x768", "steps": 28, "gen_s": 482 },
+      { "resolution": "768x768", "steps": 28, "gen_s": 485 }
+    ],
+    "rembg_cutout_s": "<1 (u2net, CPU)"
+  },
+  "not_measured": [
+    "GPU latency (the GPU was occupied by the dispatch 30B; the GPU asset path is the Phase-3 swap sequence)",
+    "co-resident memory cost (this is a standalone CPU run)",
+    "multi-run variance / warm-vs-cold cache",
+    "1024x1024 latency (the model's native resolution; not run on CPU for time)"
+  ],
+  "finding": "CPU generation is usable for a standalone proof but slow (~8 min at 768x768/28 steps). The gen->rembg->cutout pipeline is proven; rembg removes the cluttered background in <1s when the generation yields a distinct subject. Generation prompt/setting tuning is the quality lever (over-emphasising empty space pales the subject; under-constraining lets the mosaic clutter fill the frame) and iterates much faster on the GPU (the Phase-3 path)."
+}

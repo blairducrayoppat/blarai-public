@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_comprehension_gate>
+  <meta>
+    <stage_id>STAGE_2</stage_id>
+    <stage_xml>03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+    <ea_instance>3</ea_instance>
+    <iteration>2</iteration>
+    <emitted_at_utc>2026-04-25T23:15:00Z</emitted_at_utc>
+    <responding_to>
+      <guide_review>2.4-GUIDE_RESPONSE_TO_EA_INITIALIZATION_03_STAGE2_REFACTOR_MULTIPROJECT.xml</guide_review>
+      <guide_instance>4</guide_instance>
+      <verdict>APPROVED_WITH_ADJUSTMENTS</verdict>
+      <corrections_addressed>1,2,3,4,5,6,7,8 (all 8)</corrections_addressed>
+    </responding_to>
+    <branch>chore/platform-extraction</branch>
+    <head>3b9b1b8</head>
+  </meta>
+
+  <pickup_verification_recap>
+    <result_v0a>chore/platform-extraction (PASS)</result_v0a>
+    <result_v0b>3b9b1b8 docs(platform_separation): Stage 2 mid-stage EA handoff v2 ... (PASS)</result_v0b>
+    <result_v0c>8 entries: M pyproject.toml, M tools/autonomy_budget/config.yaml, M tools/autonomy_budget/config_loader.py, M tools/autonomy_budget/tests/test_config_loader.py, ?? tools/_project_context.py, ?? tools/_vikunja_client.py, ?? tools/autonomy_budget/projects/, ?? tools/tests/ (PASS)</result_v0c>
+    <result_v0d>All 7 paths True (PASS)</result_v0d>
+    <result_v0e>280 passed in 2.62s (PASS)</result_v0e>
+    <result_v0f>fleet_paused=true, reason "platform separation v2 in progress" (PASS)</result_v0f>
+    <result_v0g>stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 -- NOT POPPED (PASS)</result_v0g>
+  </pickup_verification_recap>
+
+  <required_acknowledgments_verbatim>
+    <ack id="g4-1">I will incorporate all 8 corrections into a re-emitted comprehension gate before any item 2.4 work begins.</ack>
+    <ack id="g4-2">I will use `-BlarAIRoot` (not `-ProjectRoot`) for all 7 PS1 parameters per v2 canonical signature pattern at 2.4.v2.</ack>
+    <ack id="g4-3">I will explicitly enumerate the 12 Python entrypoints (9 load_config callers from v2-1 + 3 v2.4.v2 additions) and the 7 PS1 scripts (with la_merge_approve at the correct `tools/scheduled-tasks/` path).</ack>
+    <ack id="g4-4">I will include `tools/vikunja_mcp/server.py` MCP handlers in item 2.4 audit and extend item 2.6 grep patterns per C4/C6 source citations.</ack>
+    <ack id="g4-5">If item 2.8 `$BLARAI_PID` preflight returns empty or any value other than 3, I will STOP and report to Lead Architect — no silent regex or yaml adaptation.</ack>
+    <ack id="g4-6">I will use descriptive risk labels (no numeric prefix overlap with AUDIT_RISK_REVIEW or verification-block IDs).</ack>
+    <ack id="g4-7">I will not begin item 2.4 work, create branches, or run mutation commands until the re-emitted gate is reviewed and explicitly authorized by Guide instance 4.</ack>
+  </required_acknowledgments_verbatim>
+
+  <preexisting_binding_acknowledgments_carryforward>
+    <critical_carryovers>
+      <ack n="1">Stage 2 produces exactly ONE commit (item 2.9). All intermediate work stays uncommitted.</ack>
+      <ack n="2">Fleet stays paused throughout Stage 2. NEVER call state.resume_fleet(). Fleet remains paused through Stage 4 cutover.</ack>
+      <ack n="3">No merge to main during Stage 2. Branch chore/platform-extraction is the only working surface.</ack>
+      <ack n="4">stash@{0} (wake_launcher auto-stash on main) is NOT to be popped or applied.</ack>
+      <ack n="5">No edits to CLAUDE.md, AGENTS.md, .github/copilot-instructions.md, or any A1-A10 governance doc during Stage 2.</ack>
+      <ack n="6">All Vikunja access flows through tools/_vikunja_client.py. list_tasks / search_tasks MUST receive int project_id. bool is rejected before int (cleanup-C3).</ack>
+      <ack n="7">_project_context.resolve() is the single source for ProjectContext in every refactored entrypoint. Hardcoded C:\Users\mrbla\BlarAI paths in entrypoints are a BUG.</ack>
+      <ack n="8">V8 defaults preservation: pre-existing pytest discovery, fleet behavior on the BlarAI path, and CLI default behavior all unchanged when --project-root is omitted.</ack>
+      <ack n="9">STATUS.md updates at item 2.10 are APPEND-ONLY. Do not edit prior Stage entries.</ack>
+    </critical_carryovers>
+    <plus_guide_3>
+      <ack n="g3-1">Single Stage 2 commit only.</ack>
+      <ack n="g3-2">V1-V7 + V8 verification block before closing handoff.</ack>
+      <ack n="g3-3">Item 2.10 STATUS.md edit is append-only.</ack>
+    </plus_guide_3>
+    <plus_iteration_1_acks>
+      <ack n="i1-1">V0a-V0g pickup verification block must be re-executed (and outputs reported) at the start of every successor session before substantive work begins.</ack>
+      <ack n="i1-2">All 10 acknowledgments above (9 from predecessor + 3 from Guide instance 3, deduped) are binding through Stage 4 cutover.</ack>
+      <ack n="i1-3">V1-V7 closure verification (per EA_HANDOFF_STAGE2.xml) plus per-item V8 (defaults-preservation) must be executed and outputs included in the final closing handoff at Stage 2 completion.</ack>
+      <ack n="i1-4">If a successor approaches context exhaustion before item 2.9, it MUST emit a v3 (or higher) mid-stage handoff XML following the same schema as v1/v2, commit ONLY that file (docs-only commit), and stop. NO partial-commit refactor work. NO emergency single-commit attempts that omit pending items.</ack>
+    </plus_iteration_1_acks>
+  </preexisting_binding_acknowledgments_carryforward>
+
+  <comprehension_summary>
+
+    <part_a_objective>
+      Complete the BlarAI-side platform-aware refactor of `tools/` so every entrypoint
+      (Python + PowerShell + MCP server) accepts an optional project root + project-id,
+      defaults preserve current BlarAI behavior, all Vikunja access (CLI, scheduled tasks,
+      AND MCP handlers per C4) routes through `tools/_vikunja_client.py` with mandatory
+      `int project_id`, and the 280-test baseline holds. Stage 2 closes with exactly one
+      commit at item 2.9 (folding the 8 already-on-disk paths from items 2.1+2.2+2.3 plus
+      all 2.4-2.8 work) and an append-only STATUS.md update at item 2.10. Branch
+      chore/platform-extraction; no merge to main; fleet stays paused; stash@{0} untouched.
+    </part_a_objective>
+
+    <part_b_work_plan>
+
+      <item id="2.4" title="Python entrypoints: argparse --project-root + --project-id (type=int) + _project_context.resolve()">
+        <python_entrypoints_canonical_12>
+          <ent n="1" source="v2-1">tools/autonomy_budget/self_check.py</ent>
+          <ent n="2" source="v2-1">tools/fleet_observability/credential_rotation_reminder.py</ent>
+          <ent n="3" source="v2-1" notes="2 invocations">tools/fleet_observability/daily_digest.py</ent>
+          <ent n="4" source="v2-1">tools/fleet_observability/dashboard_maintainer.py</ent>
+          <ent n="5" source="v2-1" notes="2 invocations">tools/fleet_observability/weekly_summary.py</ent>
+          <ent n="6" source="v2-1">tools/fleet_observability/welcome_back_digest.py</ent>
+          <ent n="7" source="v2-1" notes="legacy; ALSO touched by item 2.6 -- consistent treatment per Guide-#4">tools/fleet_observability/_vikunja_client.py</ent>
+          <ent n="8" source="v2-1">tools/gate_stale_cleaner/cleaner.py</ent>
+          <ent n="9" source="v2-1">tools/gate_stale_cleaner/run_live.py</ent>
+          <ent n="10" source="2.4.v2">tools/autonomy_budget/blarai_next_task_resolver.py</ent>
+          <ent n="11" source="2.4.v2">tools/fleet_ops/diff_builder.py</ent>
+          <ent n="12" source="2.4.v2">tools/autonomy_budget/active_tasks.py</ent>
+        </python_entrypoints_canonical_12>
+        <plus_mcp_server source="Guide-#5 / C4">
+          <target>tools/vikunja_mcp/server.py</target>
+          <requirement>Every Vikunja-touching MCP tool handler (FastMCP / JSON-RPC) MUST route through tools/_vikunja_client.py. MCP handlers do not take CLI args; instead the server resolves ProjectContext via _project_context.resolve() at startup (or per-handler from env/config) so an LLM session cannot bypass scope.</requirement>
+        </plus_mcp_server>
+        <signature_pattern_python>
+          parser.add_argument('--project-root', type=str, default=None)
+          parser.add_argument('--project-id', type=int, default=None)
+          ctx = _project_context.resolve(args.project_root, args.project_id)
+        </signature_pattern_python>
+      </item>
+
+      <item id="2.4.v2" title="Verify --help on all 12 Python entrypoints + MCP handler routing">
+        <action>For each of the 12 entrypoints: run `python -m &lt;module&gt; --help` and confirm both flags appear. For tools/vikunja_mcp/server.py: spawn the server and confirm list_tasks / search_tasks handlers route through tools/_vikunja_client.py (no direct HTTP).</action>
+      </item>
+
+      <item id="2.5" title="PowerShell scripts: add -BlarAIRoot parameter (audit scope = 3 directories)">
+        <audit_scope>tools/scheduled-tasks/, tools/fleet_ops/, tools/fleet_observability/</audit_scope>
+        <ps1_canonical_7>
+          <ps1 n="1" source="2.5.v2">tools/scheduled-tasks/wake_launcher.ps1</ps1>
+          <ps1 n="2" source="G-1" notes="rename internal $RepoRoot -> $BlarAIRoot">tools/scheduled-tasks/agents-cadence-monitor.ps1</ps1>
+          <ps1 n="3" source="G-1" notes="rename internal $RepoRoot -> $BlarAIRoot">tools/scheduled-tasks/escalation_watchdog.ps1</ps1>
+          <ps1 n="4" source="G-1" notes="rename internal $RepoRoot -> $BlarAIRoot">tools/scheduled-tasks/toast_watchdog.ps1</ps1>
+          <ps1 n="5" source="G-4 + Guide-#2 path correction" notes="rename internal $RepoRoot -> $BlarAIRoot">tools/scheduled-tasks/la_merge_approve.ps1</ps1>
+          <ps1 n="6" source="2.4.v2 additional_tools / Guide-#1">tools/fleet_observability/escalation_notify.ps1</ps1>
+          <ps1 n="7" source="2.4.v2 additional_tools / Guide-#1">tools/scheduled-tasks/test_async_post_gate.ps1</ps1>
+        </ps1_canonical_7>
+        <signature_pattern_ps1>
+          param(
+            [string]$BlarAIRoot = $(if ($env:BLARAI_ROOT) { $env:BLARAI_ROOT } else { 'C:\Users\mrbla\BlarAI' }),
+            ...existing params...
+          )
+        </signature_pattern_ps1>
+        <audit_scope_side_effect>
+          tools/fleet_observability/critical_notify.ps1 also exists in the expanded audit scope.
+          NOT on canonical 7. Will inspect at item 2.5 and surface refactor-or-defer decision in
+          closing handoff. Awaiting Guide direction if it should be added.
+        </audit_scope_side_effect>
+      </item>
+
+      <item id="2.5.v2" title="Verify each of the 7 PS1 accepts -BlarAIRoot and defaults preserve BlarAI behavior" />
+
+      <item id="2.6" title="Vikunja chokepoint audit + replacement (extended grep patterns per Guide-#5/C6)">
+        <grep_patterns_extended>
+          <pattern source="XML">requests.*localhost:3456</pattern>
+          <pattern source="XML">/api/v1/projects/.*/tasks</pattern>
+          <pattern source="XML">/api/v1/tasks/all</pattern>
+          <pattern source="C6">httpx</pattern>
+          <pattern source="C6">aiohttp</pattern>
+          <pattern source="C6">urllib</pattern>
+          <pattern source="C6">127.0.0.1:3456</pattern>
+          <pattern source="C6">os.environ\["VIKUNJA_URL"\]</pattern>
+          <pattern source="C6">$env:VIKUNJA_URL</pattern>
+          <pattern source="C6">f"\{base\}/api/v1/</pattern>
+          <pattern source="C6">websocket | websockets | ws://</pattern>
+        </grep_patterns_extended>
+        <triage_rule>Triage every hit; do not pre-filter. Replace each direct HTTP call with VikunjaClient. Any list/search call site that cannot supply int project_id is a BUG -- fix, not defer.</triage_rule>
+        <legacy_consistency_rule>tools/fleet_observability/_vikunja_client.py is touched by BOTH item 2.4 (load_config caller refactor -> argparse + ProjectContext) AND item 2.6 (chokepoint decision: route through new tools/_vikunja_client.py OR fold in entirely). Treat consistently across both items; surface decision in closing handoff. legacy-name-collision-watch active.</legacy_consistency_rule>
+      </item>
+
+      <item id="2.7" title="pytest tools/ --tb=short -q (must show >= 280 passed)" />
+      <item id="2.7.v2" title="V1-V7 closure assertions per EA_HANDOFF_STAGE2.xml" />
+
+      <item id="2.8" title="Defaults-preservation smoke + $BLARAI_PID preflight (w3)">
+        <preflight>
+          $BLARAI_PID = (Get-Content C:\Users\mrbla\BlarAI\.platform\vikunja_project_ids.yaml | Select-String 'blarai_project_id:\s*(\d+)').Matches.Groups[1].Value
+        </preflight>
+        <expected>3</expected>
+        <on_drift>STOP and report to Lead Architect. NO silent regex/yaml adaptation. (Guide-#8)</on_drift>
+        <smoke>python -m tools.fleet_observability.daily_digest --project-root C:\Users\mrbla\BlarAI --project-id $BLARAI_PID</smoke>
+      </item>
+
+      <item id="2.9" title="Single Stage 2 commit">
+        <command>git add -A   (or git add tools/ pyproject.toml docs/)</command>
+        <hard_requirement>pyproject.toml MUST be included in the commit.</hard_requirement>
+      </item>
+
+      <item id="2.10" title="Append-only STATUS.md Stage 2 COMPLETE marker">
+        <fields>commit hash, files-touched count, V1-V7+V8 verification summary</fields>
+        <hard_requirement>Append-only. Do NOT edit prior Stage entries.</hard_requirement>
+      </item>
+
+    </part_b_work_plan>
+
+    <part_d_verification_strategy>
+      <per_python_entrypoint_v8>Run with no flags after refactor; confirm behavior matches pre-refactor baseline. Repeat for all 12 entrypoints.</per_python_entrypoint_v8>
+      <per_ps1_v8>Invoke with no -BlarAIRoot after refactor; confirm BlarAI default path resolves and script behavior matches pre-refactor baseline. Repeat for all 7 PS1.</per_ps1_v8>
+      <mcp_handler_check>At 2.4.v2: spawn tools/vikunja_mcp/server.py; verify list_tasks and search_tasks handlers route through tools/_vikunja_client.py (no direct HTTP, no scope bypass).</mcp_handler_check>
+      <cross_item_v1_v7>At 2.7 / 2.7.v2: execute V1-V7 assertions per EA_HANDOFF_STAGE2.xml.</cross_item_v1_v7>
+      <preflight_w3>At 2.8: $BLARAI_PID == 3 hard gate.</preflight_w3>
+      <commit_gate>Post-2.9: re-run pytest tools/; git status clean; commit hash captured for 2.10.</commit_gate>
+    </part_d_verification_strategy>
+
+    <part_e_risks>
+      <risk label="argparse-conflict-watch">Existing scripts may already define --project-root / --project-id; detect and reconcile rather than blindly add.</risk>
+      <risk label="load_config-defaults-preservation-watch" anchor="obs v2-1">Regression in any of 9 load_config callers; mitigated by keyword-only project_overlay_path but verify per-entrypoint.</risk>
+      <risk label="R12-PS1-coverage-watch" anchor="AUDIT_RISK_REVIEW R12 + WORKFLOW_INTEGRITY G-1/G-4">All 7 PS1 scripts must accept -BlarAIRoot; item 2.5 must verify post-refactor.</risk>
+      <risk label="legacy-name-collision-watch" anchor="obs v2-2 + Guide-#4">tools/fleet_observability/_vikunja_client.py vs tools/_vikunja_client.py -- import-confusion + dual-touch (2.4 + 2.6) consistency hazard.</risk>
+      <risk label="mcp-server-bypass-watch" anchor="C4 / Guide-#5">If tools/vikunja_mcp/server.py handlers don't route through tools/_vikunja_client.py, an LLM session can issue scope-leaking queries.</risk>
+      <risk label="grep-pattern-coverage-watch" anchor="C6 / Guide-#5">Item 2.6 must use the extended pattern set; narrow grep misses real call sites.</risk>
+      <risk label="overlay-extension-watch" anchor="obs v2-5">If 2.4 surfaces need for additional project-scoped config keys, extend _apply_project_overlay per-key (additive); never introduce generic deep-merge.</risk>
+      <risk label="warning-emission-watch" anchor="v1-1">yaml type-stub lint warning is benign; do NOT add stubs as runtime dep.</risk>
+      <risk label="w3-blarai-pid-preflight-watch" anchor="GUIDE_HANDOFF_LATEST w3 + STATUS A6 + Guide-#8">Item 2.8 $BLARAI_PID must resolve to exactly 3; empty or other value -> STOP and report.</risk>
+      <risk label="fleet-pause-stash-discipline" anchor="i1-2 + acks 2/4">Fleet remains paused throughout (V0f confirmed); stash@{0} untouched (V0g confirmed); never call state.resume_fleet() during Stage 2.</risk>
+      <risk label="single-commit-context-exhaustion" anchor="i1-4">If context exhausts before 2.9 -> emit v3 mid-stage handoff XML (docs-only commit), no partial-commit refactor.</risk>
+    </part_e_risks>
+
+    <part_f_rollback_acknowledgment source="Guide-#7">
+      If post-item-2.9 verification fails (V1-V7 closure or per-item V8), rollback is
+      `git reset --hard HEAD~1` on chore/platform-extraction (level-1 per RECOVERY.md;
+      branch is local, not pushed). Branch is preserved for audit per copilot-instructions
+      preservation_rule. Fleet stays disabled -- no runtime impact from rollback.
+    </part_f_rollback_acknowledgment>
+
+  </comprehension_summary>
+
+  <on_disk_evidence_for_guide_corrections>
+    <evidence id="Guide-#1-and-#2" verified_at_utc="2026-04-25T23:10:00Z">
+      Get-ChildItem -Recurse -Filter "*.ps1" results:
+        - tools/scheduled-tasks/la_merge_approve.ps1     (CONFIRMED -- not in tools/fleet_ops/)
+        - tools/fleet_observability/escalation_notify.ps1 (CONFIRMED present)
+        - tools/scheduled-tasks/test_async_post_gate.ps1  (CONFIRMED present)
+        - tools/fleet_observability/critical_notify.ps1   (SURFACED -- audit-scope side effect, not on canonical 7)
+    </evidence>
+  </on_disk_evidence_for_guide_corrections>
+
+  <stop_discipline>
+    STOPPING. Iteration-2 comprehension gate emitted with all 8 Guide-instance-4 corrections
+    incorporated. Awaiting Guide instance 4 re-review. No item 2.4 work, branch creation, or
+    mutation commands will be issued until explicit PROCEED authorization.
+  </stop_discipline>
+
+  <open_question_for_guide>
+    tools/fleet_observability/critical_notify.ps1 surfaced via expanded PS1 audit scope.
+    Not enumerated in 2.4.v2 additional_tools or G-1/G-4. Should it be added to canonical 7
+    (becoming 8), or surfaced as defer-decision in closing handoff? Awaiting direction.
+  </open_question_for_guide>
+
+</ea_comprehension_gate>

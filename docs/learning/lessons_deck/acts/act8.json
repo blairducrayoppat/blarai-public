@@ -1,0 +1,209 @@
+{
+  "act": 8,
+  "title": "The freshest arc — June 2026, on the way to going online",
+  "subtitle": "the knowledge bank, the cleaner pipeline, the guarded egress door, and the VM boundary — the newest lessons, not yet folded into the numbered list",
+  "aigp_intro": "This act carries the newest lessons — June 2026 work not yet folded into the journal's numbered list, so these units carry no numbers; numbers are assigned only at fold-in. The arc is BlarAI's turn toward going online: the first knowledge bank and cleaner pipeline, the guarded egress door cut into the air-gap, and the host-to-VM parse channel. The governance themes are deployment-and-use questions: third-party components admitted deliberately, controls activated versus merely merged, and the line between demonstrating a capability and deciding to run it. Mappings here stay draft until the integrating session verifies them — the review discipline NIST AI RMF's GOVERN function asks an organization to make routine.",
+  "aigp_domains": [
+    "Domain III — Understanding How to Govern AI Development",
+    "Domain IV — Understanding How to Govern AI Deployment and Use",
+    "Domain I — Understanding the Foundations of AI Governance"
+  ],
+  "lessons": [
+    {
+      "number": null,
+      "prologue": false,
+      "fragment": null,
+      "title": "'We wrote a control' is not 'we watched the control work' — validation, not just verification.",
+      "failure": "#634 wired the exfil-screen — the outbound-secrets filter — onto the egress guard, but every proof of the stack had run against loopback, traffic that never leaves the machine. The control guarding external traffic had never been watched firing on any. #643's technique: stand up a throwaway listener on the box's own LAN address and connect to it same-host — external to the guard (a non-loopback address, permitted only because the test allowlists it) yet local to the operating system; the packet never leaves the machine, no router, no internet. Against that real external path the screen did its job: a planted PEM private-key header (the text format private keys ship in) tripped the kill-switch with the label in the reason, and the secret bytes never reached the listener; a clean payload round-tripped. Eleven tests, 5/5 reliable runs, merged 14d21c3 — the air-gap not even brushed.",
+      "evidence": [
+        "2026-06-09 — Proving the welded door by knocking on the same wall",
+        "commit 14d21c3"
+      ],
+      "lesson": "For the air-gap-removal record, the egress stack is no longer just built and wired — it is proven to fire against non-loopback traffic, with throwaway data, entirely on-box. That is the difference between 'we wrote a control' and 'we watched the control work': validation, not just verification, which is the bar the whole gate is held to.",
+      "growth": "A control's evidence has a traffic class, and evidence gathered on the easy class — loopback, mocks, synthetic calls — does not transfer to the class the control exists for. The craft worth carrying everywhere is constructing a proving seam: a path that genuinely exercises the real class without paying its risk. Here, the box's own LAN address is external to the guard's logic but never leaves the machine; elsewhere it is a staging tenant, a sandboxed account, a canary record, a planted secret that is not a real one. When you cannot find such a seam, say plainly that the control is unproven against its real traffic — do not let unit-test green stand in. Before any gate, ask of each control: against what traffic class has this fired, who watched, and is the evidence recorded? Pairs with lesson 2 ('show me it running') raised to the security layer.",
+      "growth_question": "The egress guard's unit tests are green on loopback — what claim about real external traffic do they license, and how could you earn the rest without ever touching the internet?",
+      "diagram": "flowchart TD\n  A[\"throwaway listener on the<br/>box's own LAN IP\"] --> B[\"same-host connect:<br/>one machine, two views\"]\n  B --> C[\"guard sees non-loopback —<br/>the class it exists to guard\"]\n  B --> D[\"OS sees local traffic —<br/>no router, no internet\"]\n  C --> E[\"probe 1: planted PEM<br/>private-key header\"]\n  E --> F[\"kill-switch trips with<br/>the label in the reason,<br/>bytes never arrive\"]\n  C --> G[\"probe 2: clean payload<br/>round-trips\"]\n  C --> H[\"probe 3: unbound port —<br/>denied before any<br/>OS connection\"]",
+      "stat": [
+        {
+          "value": "11 tests",
+          "label": "stack proven against real external path"
+        },
+        {
+          "value": "5/5",
+          "label": "reliable runs, air-gap never brushed"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's TEVV distinguishes verification — built to spec — from validation — does the real job in the real context — and this work names that exact bar for itself. Watching the screen block a planted secret on real non-loopback traffic, then recording it for the gate, is validation evidence assembled before deployment. That exemplifies Domain IV.B, performing key activities to assess the AI model and system, and the OECD principle of robustness, security and safety.",
+      "aigp_domains": [
+        "Domain IV — Understanding How to Govern AI Deployment and Use"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV: verification vs validation)",
+        "OECD AI Principles — robustness, security and safety"
+      ],
+      "aigp_takeaway": "A control counts at deployment when it was watched firing against the traffic class it guards — validation, gathered safely, on the record."
+    },
+    {
+      "number": null,
+      "prologue": false,
+      "fragment": null,
+      "title": "A decision-informing review earns its keep when the decision-maker uses it to make the bar stricter.",
+      "failure": "The #612 capstone deep-dive did exactly what it was built to do — not rubber-stamp the posture, but turn residuals into decisions. Across one day the Lead Architect elevated four hardening items from 'deferrable, fails-safe' to gate-blocking for #598, the air-gap-removal decision: capability-token containment (#638), the ESCALATE human-review consumer (#639), the named-pipe peer check (#640), and the data-map access-control and integrity set (#637). All four fail safe today; none was strictly required to keep the air-gapped system safe; the executive summary had filed them as post-gate hardening. #637 is the sharpest case: its own ticket marks its five items 'not gate-blocking, ACCEPTED-RESIDUAL,' and he elevated them to the gate anyway. #638 — the one control in the set that failed open (erring permissive: a 30-second token window against a 5-second spec) — was built and merged the same day (9ecea5a, standing gate green).",
+      "evidence": [
+        "2026-06-09 — Tightening the gate from inside the deep-dive",
+        "commit 9ecea5a"
+      ],
+      "lesson": "The honest residual register handed the decision-maker the cautious side of the framing, and he took it: items the builders had graded acceptable became preconditions to the air-gap coming down rather than follow-ups after. A decision-informing review earns its keep precisely when the decision-maker uses it to make the bar stricter, not just to confirm what is already there.",
+      "growth": "Reviews drift toward ratification because the materials inherit the builder's framing: every residual arrives pre-labelled 'accepted,' so the only available motion is agreement. The countermeasure is structural — present each residual with both sides live, what accepting costs and what elevating costs, so the person with authority can move the bar in either direction. Audit your own briefings with that test: if nothing in the packet makes tightening as easy as confirming, you have built a ceremony, not a review. The arc also shows legitimate motion the other way — a bar raised in the morning was suspended for more thought by evening — which is the decision-maker actually steering, in both directions. This is lesson 85's 'signed is not safe until understood' bearing fruit: the understanding pass was scheduled before the irreversible decision, and what the human learned changed the outcome — four times in one day.",
+      "growth_question": "If every residual in a pre-deployment briefing arrives already labelled 'accepted, not gate-blocking,' what decision is the decision-maker still actually able to make?",
+      "diagram": "flowchart TD\n  A[\"capstone deep-dive, run<br/>before the air-gap sign-off\"] --> B[\"honest residual register:<br/>four items filed 'deferrable,<br/>fails-safe, post-gate'\"]\n  B --> C[\"the cautious side of the<br/>framing handed over, live\"]\n  C --> D[\"Lead Architect elevates all<br/>four to gate-blocking\"]\n  D --> E[\"ticket 637 had said<br/>ACCEPTED-RESIDUAL —<br/>elevated anyway\"]\n  D --> F[\"ticket 638, the one failing<br/>open: 30s window vs 5s spec\"]\n  F --> G[\"built and merged same day,<br/>standing gate green\"]\n  B -.-> H[\"avoided: residuals arrive<br/>pre-labelled 'accepted' —<br/>only agreement possible\"]",
+      "stat": [
+        {
+          "before": "30s",
+          "after": "5s",
+          "label": "fail-open token window, closed same day"
+        },
+        {
+          "value": "four",
+          "label": "deferrable items elevated to gate-blocking"
+        }
+      ],
+      "aigp_text": "The EU AI Act's high-risk obligations include human oversight — and oversight is meaningful only when the human can change the outcome, not merely sign it. Here the operator used an honest residual register to convert four accepted-residuals into deployment preconditions, including the one failing open. That is NIST AI RMF's MANAGE function — prioritizing and responding to risks — driven by the overseer, and Domain IV.A in action: evaluating key factors and risks relevant to the decision to deploy.",
+      "aigp_domains": [
+        "Domain IV — Understanding How to Govern AI Deployment and Use"
+      ],
+      "aigp_frameworks": [
+        "EU AI Act — human oversight (concept level)",
+        "NIST AI RMF — MANAGE"
+      ],
+      "aigp_takeaway": "Human oversight is real when the review can tighten the bar; a briefing that can only confirm is ceremony."
+    },
+    {
+      "number": null,
+      "prologue": false,
+      "fragment": null,
+      "title": "Read the silicon instead of guessing it — when the record is silent, probe the actual chip.",
+      "failure": "The #611 live-memory feasibility study left exactly one question it could not answer from public sources: does this chip — an Intel Core Ultra 7 258V (Lunar Lake) — expose Intel Key Locker, the feature that wraps an encryption key into a CPU-internal handle so the raw key never sits in readable memory, and the headline candidate mitigation for the live-memory threat? Public datasheets confirm Key Locker on Tiger Lake through Raptor Lake and say nothing about Lunar Lake, a deliberately feature-trimmed design — so inference was not safe. The agent read the silicon directly: a self-contained probe (scripts/probe_keylocker.py) of CPUID — the instruction a processor answers about its own features — self-validated against the vendor string before trusting anything, then read CPUID.(7,0).ECX[23] = 0. Key Locker is NOT exposed on this silicon. That limb of #611 closed for good — novel data nothing public had stated.",
+      "evidence": [
+        "2026-06-09 — Reading the silicon instead of guessing it"
+      ],
+      "lesson": "When a security decision hinges on a hardware capability and the public record is silent, a five-second read of the actual chip beats an afternoon of inference — and the agent on the box can simply do it rather than route it to the operator. The probe sharpened the verdict from 'low feasibility, two reasons' to 'dead end here, three reasons.'",
+      "growth": "Spec sheets describe product families and marketing tiers; the chip in your machine is a specific part with specific features fused on or off, and inference from adjacent generations fails exactly on feature-trimmed designs like this one. This sharpens lesson 18 — verify the silicon, not the spec sheet — from reactive to proactive: there a phantom capability (SGX) survived in the design for years; here the open question was closed with a direct read before anything was built on it. The trigger to recognize: a plan branches on 'does the platform support X' and you are reasoning from documentation gaps — that is the moment to measure, not infer. Then make the measurement durable: bake the measured values into a re-runnable script so the question stays closed across hardware generations, and share what the public record lacked — a negative result is data too.",
+      "growth_question": "Your mitigation plan hinges on a CPU feature the public record neither confirms nor denies for your exact chip — what settles the question, and how long does it actually take?",
+      "diagram": "flowchart TD\n  A[\"question: does this chip<br/>expose Intel Key Locker?\"] --> B[\"public record: confirmed on<br/>Tiger through Raptor Lake,<br/>silent on Lunar Lake\"]\n  B --> C[\"feature-trimmed design:<br/>inference is not safe\"]\n  C --> D[\"read the silicon: CPUID<br/>probe, machine-code shim,<br/>no compiler, no install\"]\n  D --> E[\"self-validate before trust:<br/>vendor string, AES-NI bit\"]\n  E --> F[\"read CPUID.(7,0).ECX<br/>bit 23 = 0\"]\n  F --> G[\"Key Locker NOT exposed —<br/>the limb closes for good\"]\n  G --> H[\"novel data: nothing public<br/>stated this for Lunar Lake\"]",
+      "stat": [
+        {
+          "before": "an afternoon of inference",
+          "after": "a five-second read",
+          "label": "settling the capability question"
+        },
+        {
+          "value": "ECX[23] = 0",
+          "label": "Key Locker absent on this silicon"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's MAP function establishes context — the system, its capabilities, its environment — and a hardware capability is context to be measured, not assumed. Closing the Key Locker question with a direct, re-runnable, self-validating probe, and recording the negative result as shareable data, exemplifies Domain III.A: governing the designing and building of the system on the platform that exists rather than the one inferred. The measurement discipline itself is what MEASURE's TEVV asks of any load-bearing claim.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MAP",
+        "NIST AI RMF — MEASURE (TEVV)"
+      ],
+      "aigp_takeaway": "Hardware capability is measured context: probe the actual chip, record the result, and the question closes for good."
+    },
+    {
+      "number": null,
+      "prologue": false,
+      "fragment": null,
+      "title": "A cheaper integration is not worth a dishonest audit surface — output the validator never saw gets its own honest status, never a borrowed approval.",
+      "failure": "Stage B of the #655 ingest program built the operator-facing flow — paste an article, see a cleaned preview in chat, reply /approve or /reject — and the decision that took longest was ontological: what is the preview? It echoes into the transcript like an assistant message, but it is deterministic tool output that was never PGOV-validated (PGOV being the policy gate every model reply must pass). Pretending otherwise corrupts two ledgers at once: the turn record claims a validation that never ran, and the history budget re-feeds a 256 KB article into a 40 KB window. The tempting route — let the preview ride the normal prompt arc by pre-caching a synthetic approved verdict — would have given both UI surfaces wiring parity for free. It was dropped because it forges a PGOV approval for text PGOV never saw.",
+      "evidence": [
+        "2026-06-10 — The front door gets a doorbell: explicit commands, one pending slot, and a turn that is not a turn",
+        "commit dd466b9"
+      ],
+      "lesson": "The shipped representation tells the truth: the preview persists as an assistant turn (a stored reply message) with a new status, pgov_status='informational' — not approved, not denied, simply never adjudicated. Two safety properties then fall out of honesty for free, both regression-locked: the prompt-history filter forwards only 'approved' assistant turns, so previews never re-enter the model's context, and the UI's denial styling keys on 'denied' only. A cheaper integration was not worth a dishonest audit surface.",
+      "growth": "Integration shortcuts that reuse an existing arc usually work by asserting a state that is not true — a verdict, a status, a type — and every downstream consumer that trusts the field inherits the lie: the record misleads auditors, and machinery built for the borrowed status (history forwarding, styling, budgets) fires on content it was never meant for. When you feel the pull of 'mark it approved so it flows,' you are forging a record. The honest move is to mint a category that says what the thing actually is, then audit every consumer of the field against the new value — here both the history filter and the denial styling already keyed on explicit values, so honesty cost zero UI changes — and regression-lock the properties with tests that fail the moment they stop being true. A status field is a claim; treat your data model as an audit surface.",
+      "growth_question": "Caching a synthetic 'approved' verdict would let the preview flow through the existing arc for free — what record does that create, and which consumers will believe it?",
+      "aigp_text": "Among NIST AI RMF's trustworthy-AI characteristics, 'accountable and transparent' covers the claims a system's records make about its own operation — and a turn record asserting a validation that never ran is a transparency failure built into the data model. The EU AI Act attaches record-keeping and logging obligations to high-risk systems; the concept-level point is that records must reflect what actually happened, not what made integration cheap. Minting an honest 'informational' status and regression-locking its safety properties exemplifies Domain III.A — governing how the system is designed and built.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — trustworthy characteristics (accountable and transparent)",
+        "EU AI Act — record-keeping (concept level)"
+      ],
+      "aigp_takeaway": "Never borrow an approval status for convenience; mint the honest category and let the safety properties follow from truthful records.",
+      "diagram": "flowchart TD\n  A[\"cleaned preview text:<br/>tool output, no PGOV run\"] --> B[\"how should it persist?\"]\n  B --> C[\"rejected: pre-cache a<br/>synthetic approved verdict\"]\n  C --> D[\"turn record claims a<br/>validation that never ran\"]\n  C --> E[\"history filter re-feeds<br/>256 KB into 40 KB window\"]\n  B --> F[\"shipped: assistant turn,<br/>pgov_status informational\"]\n  F --> G[\"filter forwards approved<br/>only - preview never returns\"]\n  F --> H[\"denial styling keys on<br/>denied - reloads plain\"]",
+      "stat": [
+        {
+          "value": "256 KB",
+          "label": "article a borrowed 'approved' status would re-feed into the 40 KB prompt-history window"
+        }
+      ]
+    },
+    {
+      "number": null,
+      "prologue": false,
+      "fragment": null,
+      "title": "Close an SSRF in both the layer that resolves and the layer that connects — and when a fix narrows an attack without closing it, name the residual rather than implying coverage.",
+      "failure": "A merge-gate review of the freshly-cut egress door — run while it was still deny-by-default, so nothing was ever live — surfaced two real defects and one gap. The real one was an SSRF (server-side request forgery — steering a fetcher at internal addresses) the first layer only half-closed: _validate_url refuses a raw-IP literal host, but a named host that DNS-resolves to an internal address sailed straight through, and the pin recorder pinned every resolved IP except loopback — so a name pointed at 169.254.169.254, the cloud-metadata classic, got its internal address pinned and the connect admitted. The second defect: the 8-MiB body cap was decorative — client.get() reads the entire body into memory before the slice runs, so a hostile host streaming gigabytes would exhaust memory first. The gap: injection-scan flags were logged, then died in the log; FetchResult had nowhere to carry them.",
+      "evidence": [
+        "2026-06-10 — Three things the merge gate caught before the door ever opened",
+        "commits 0a3fc04, ca3eca4, 36128c0"
+      ],
+      "lesson": "Close an SSRF in both the layer that resolves and the layer that connects — neither alone covers the other's blind spot: the guard now never pins a blocked range, and the door re-resolves and rechecks before any widen, catching the name-to-loopback case the guard rightly permits for internal traffic. When a fix narrows an attack without closing it — DNS rebinding here — name the residual in code and journal; a half-closed hole documented is honest, implied-closed is a trap.",
+      "growth": "Layered security works when each layer covers a blind spot the other can name, not as redundancy for its own sake: a resolver-side rule cannot govern what the client does at connect time, a connect-time check cannot retroactively unpin an address, and a global guard must stay lenient about loopback for internal traffic — so the door has to be stricter than the guard it sits behind. Before you claim a vulnerability class closed, map which layer catches which case. Then scope the claim honestly: the pre-fetch recheck and the connect are two separate DNS lookups, so a rebinding attacker can answer each differently — a time-of-check-to-time-of-use gap the fix narrows but does not close; the robust close was named as follow-up work, not shipped half-built. Expect one wrinkle: a new control can turn tests red in ways that look like regressions — here 'documentation' IP addresses classify as private, so happy-path tests failed because the control was working.",
+      "growth_question": "Your URL validator refuses raw-IP hosts and your guard pins every resolved address — what request walks through both layers, and what was each layer blind to?",
+      "aigp_text": "NIST AI RMF's MANAGE function covers prioritizing and responding to risks, including residual-risk monitoring and communication — and this review is MANAGE in miniature: the response closes what it can in two layers, and the residual, DNS rebinding, is named in code and journal with the robust fix specified, never implied closed. The trustworthy-AI characteristic exercised is secure and resilient. Catching the defects while the door was still deny-by-default, before any exposure window existed, exemplifies Domain III.A — governing the building of the system before release.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MANAGE",
+        "NIST AI RMF — trustworthy characteristics (secure and resilient)"
+      ],
+      "aigp_takeaway": "Defense in depth means each layer covers the other's named blind spot — and an unclosed residual gets named, never implied closed.",
+      "diagram": "flowchart TD\n  A[\"URL with a named host,<br/>no raw-IP literal\"] --> B[\"_validate_url passes it:<br/>checks literals only\"]\n  B --> C[\"DNS resolves the name<br/>to 169.254.169.254\"]\n  C --> D[\"old pin rule: pin every<br/>IP except loopback\"]\n  D --> E[\"numeric connect matches<br/>a pin: internal reached\"]\n  C --> F[\"close 1, guard layer:<br/>never pin blocked ranges\"]\n  C --> G[\"close 2, door layer:<br/>resolve and recheck<br/>before any widen\"]\n  F -.-> H[\"residual named: DNS<br/>rebinding TOCTOU remains\"]\n  G -.-> H",
+      "stat": [
+        {
+          "value": "8 MiB",
+          "label": "the body cap that was decorative — the entire response was read into memory before the slice ran"
+        }
+      ]
+    },
+    {
+      "number": null,
+      "prologue": false,
+      "fragment": "2026-06-09_pcr-bound-seal-poc.md",
+      "title": "When the platform refuses your test action, the refusal may be the very property you set out to prove — reframe the block as evidence, don't engineer around it.",
+      "failure": "The ask was four words — 'test Pluton PCR-seal' — and the premise was wrong: Pluton is present, but the TPM role (Trusted Platform Module, the dedicated security chip) is filled by a discrete STMicroelectronics part. The honest target was the one unproven claim: that a secret sealed under a PCR policy — PCRs (Platform Configuration Registers) being the chip's tamper-evident measurement slots — is refused when the measured state differs. The seal-and-unseal round-tripped byte-for-byte, first run. The negative test was the trap: the dynamic design — extend the live PCR, watch the object refuse to open — came back TPM_E_COMMAND_BLOCKED; Windows blocks user-mode PCR extends outright. The reflex was 'find the way around it'; the right read was the opposite: that block is the property. The clean proof sealed a second object to a different PCR-23 value; the chip refused it with TPM_RC_POLICY_FAIL (0x09D), mutating no PCR at all.",
+      "evidence": [
+        "2026-06-10 — The lock I proved, then declined to fit"
+      ],
+      "lesson": "A measured-boot seal is only worth anything because a process cannot reach in and forge PCR state through the operating system — and there was Windows enforcing exactly that, in the tester's face, with an error code. When the platform refuses your test action, the refusal may be the very property you set out to prove: record the block as evidence, and design the proof that needs no forbidden move.",
+      "growth": "A negative security test encodes an attacker's move, and a security platform exists to block attacker moves — so a blocked test is sometimes the system passing, not the test failing. The trap is goal-fixation: 'my test must run' overrides 'what is this refusal telling me?' Train the reframe: when blocked, ask whose move you were simulating; if the block is the control working, it goes in the record as a finding, and you find the equivalent proof that needs no forbidden action — here, a second object sealed to a different PCR value, same enforcement, zero mutation. The fragment pairs it with verifying the premise: the literal task named the wrong chip, the literal negative test named the wrong obstacle, and both corrections came from reading what the system was actually saying. Sharpens lesson 82's price-the-alarm-against-existing-evidence reflex into test design itself.",
+      "growth_question": "Your negative security test cannot run because the operating system blocks the action — is that an obstacle to the proof, or the proof itself?",
+      "diagram": "flowchart TD\n  A[\"seal a secret under<br/>PolicyPCR, PCR 23\"] --> B[\"unseal: round-trips<br/>byte-for-byte, first run\"]\n  B --> C[\"negative test, design 1:<br/>extend the live PCR,<br/>watch the object refuse\"]\n  C --> D[\"Windows TBS answers<br/>TPM_E_COMMAND_BLOCKED:<br/>no user-mode extend\"]\n  D -.-> E[\"reflex, rejected: find<br/>the way around it\"]\n  D --> F[\"right read: the block IS<br/>the property — no process<br/>may forge PCR state\"]\n  F --> G[\"clean proof: seal object 2<br/>to a DIFFERENT PCR-23 value\"]\n  G --> H[\"chip refuses it:<br/>TPM_RC_POLICY_FAIL 0x09D,<br/>no PCR mutated\"]\n  F --> I[\"blocked extend recorded<br/>as a finding, not a footnote\"]",
+      "stat": [
+        {
+          "value": "TPM_E_COMMAND_BLOCKED",
+          "label": "the refusal that was the property"
+        },
+        {
+          "value": "TPM_RC_POLICY_FAIL (0x09D)",
+          "label": "the chip refusing the mismatched object"
+        }
+      ],
+      "aigp_text": "TEVV — test, evaluation, verification, and validation inside NIST AI RMF's MEASURE function — includes proving the system refuses what it must refuse. Reading TPM_E_COMMAND_BLOCKED as enforcement evidence rather than an obstacle is mature evaluation design; keeping the probe transient, read-only, and on a throwaway register is safe assessment method. The trustworthy characteristic exercised is 'secure and resilient,' and the work exemplifies Domain III.A — governing the design and building of a hardware-rooted trust mechanism.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "OECD AI Principles — robustness, security and safety"
+      ],
+      "aigp_takeaway": "A blocked test action can be the control passing — record the refusal as evidence and prove the property without the forbidden move."
+    }
+  ]
+}

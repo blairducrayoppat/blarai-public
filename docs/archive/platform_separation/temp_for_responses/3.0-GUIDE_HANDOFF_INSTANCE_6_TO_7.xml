@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AUDIT COPY (instance 6 → 7).
+  Mirror of docs/platform_separation/GUIDE_HANDOFF_LATEST.xml at the moment of emission
+  (2026-04-26T07:45:00Z). The LATEST file will be overwritten by the next Guide-instance handoff;
+  this dated audit copy is the permanent record for the 6→7 transition. DO NOT MODIFY (per dn9 + dn23).
+  Pattern matches predecessor 2.5-GUIDE_HANDOFF_INSTANCE_5_TO_6.xml.
+-->
+<guide_handoff_brief schema_version="1" audience="successor_guide_only">
+
+  <metadata>
+    <predecessor_instance>6</predecessor_instance>
+    <successor_instance>7</successor_instance>
+    <handoff_timestamp_utc>2026-04-26T07:45:00Z</handoff_timestamp_utc>
+    <procedure_phase>Stage 2 CLOSED at commit 947cbd5 (Item 2.10.1 narrative corrections, parent 89213ee STATUS append, parent-of-parent 3d1ac35 single Stage-2 commit). EA-6 has retired correctly. Stage 3 (Copy tools per docs/platform_separation/04_STAGE3_COPY_TOOLS.xml) NOT YET SPAWNED. Guide-#7's first substantive task is to author the Stage 3 EA initialization pointer per the established pattern (Guide-#5 wrote EA-4 + EA-5 init pointers; Guide-#6 wrote the EA-6 init pointer + 11 Guide-#6 disposition files spanning Item 2.6+). The 5 mid-stage handoff XMLs (v1-v5) at ea_outputs/ + 11 Guide-#6 dispositions at temp_for_responses/ + 9 Guide-#5 dispositions + the v4 quality review + STATUS.md (now 246 lines through Stage 2 close) form the audit chain Guide-#7 inherits.</procedure_phase>
+    <branch_at_handoff_blarai>chore/platform-extraction @ 947cbd5 (Stage 2 close; 3 docs-only commits ahead of 3d1ac35 substantive Stage-2 commit)</branch_at_handoff_blarai>
+    <branch_at_handoff_devplatform>main @ eaa005f (UNCHANGED throughout Stage 2; Stage 2 was BlarAI-side only per stage XML scope; not re-verified this instance)</branch_at_handoff_devplatform>
+    <status_md_last_commit>947cbd5 (Stage 2 closure footnote narrative corrections; STATUS.md is now 246 lines including 12-item Stage 2 Closure Footnotes section + A11 anomaly + Stage Ledger row Stage 2 PENDING → COMPLETE + Current State table updated for Stage 2 close)</status_md_last_commit>
+    <fleet_pause_state verified_by_predecessor="confirmed at every disposition cycle">paused with original reason "platform separation v2 in progress" + last_updated_by="copilot_agent" + last_updated_utc="2026-04-24T20:46:12Z" -- preserved verbatim through 2.5+ days of multi-EA procedure (Stage 1.4 close 2026-04-24 → Stage 2.10.1 close 2026-04-26). NEVER state.resume_fleet was called across the entire Stage 2 procedure.</fleet_pause_state>
+    <worktree_state verified_by_predecessor="confirmed at 947cbd5">clean (zero entries; git status --porcelain returns empty). All 33-entry pre-2.9 working-tree state was folded into 3d1ac35 single Stage-2 commit; subsequent 89213ee + 947cbd5 are docs-only commits. No uncommitted work at this handoff.</worktree_state>
+    <pytest_baseline>351 passed (pre-Stage-2 282 + V matrix V4-V7 NET-ADD +69 = 351). Held throughout 2.10.1 docstring/narrative work; runtime-no-op for those edits.</pytest_baseline>
+    <stash_zero>stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002 -- byte-identical timestamp held since v3 emission; 11-cycle preservation through v3 → v4 → Guide-5/6 → v5 → 2.7 → 2.7.v2 → docstring/2.8 → 2.9 → 2.10 → 2.10.1. NEVER touched. The cleanest single-axis discipline win in the procedure.</stash_zero>
+    <trigger_reason>la_request "emit handoff" + stage_boundary_recommendation per GUIDE_PROMPT.xml &lt;trigger name="stage_boundary_recommendation"&gt; (HIGH-risk Stage 2 close; "successor benefits from a clean slate at high-risk boundaries"). Guide-#6 proactively recommended handoff at Stage 2 close + LA approved with "emit handoff" signal; Option B (handoff to Guide-#7) selected over Option A (continue with Guide-#6).</trigger_reason>
+  </metadata>
+
+  <active_conversational_topic>
+    Stage 2 has just CLOSED at all 4 axes (structural + narrative + audit-chain + invariant) per the final Guide-#6 verdict file
+    (docs/platform_separation/temp_for_responses/2.6-GUIDE_RESPONSE_INSTANCE_6_STAGE_2_CLOSED_HANDOFF_RECOMMENDATIONS.xml).
+    EA-6 has retired correctly after emitting the closing handoff to LA in chat (with a final paraphrase-error pattern at the V matrix
+    section, flagged in the Guide-#6 verdict but NOT blocking; chat-only, not committed).
+
+    The LA's IMMEDIATE next steps per Option B selection:
+      (1) LA spawns fresh Guide-#7 chat with: GUIDE_PROMPT.xml + STATUS.md + GUIDE_HANDOFF_LATEST.xml + Variant B chat-init block.
+      (2) Guide-#7 runs Variant B comprehension gate (re-reads all 11-item source-doc set + 11 Guide-#6 disposition files +
+          9 Guide-#5 disposition files + 5 EA mid-stage handoffs + this handoff brief).
+      (3) Guide-#7 authors the Stage 3 EA initialization pointer per the established pattern (Guide-#5 wrote EA-4 + EA-5 init pointers;
+          Guide-#6 wrote the EA-6 init pointer; Guide-#7 writes the Stage 3 EA init pointer).
+      (4) LA spawns Stage 3 EA with the init pointer + 04_STAGE3_COPY_TOOLS.xml + standard attachment set.
+
+    Guide-#7's IMMEDIATE substantive task (after Variant B gate): author the Stage 3 EA init pointer.
+  </active_conversational_topic>
+
+  <decisions_made_with_la>
+
+    <decision id="d1" title="Stage 2 closure structure: 3 docs-only commits + 1 substantive commit">
+      <what>Stage 2 closed via 4 commits in sequence:
+        - f863a22 (v5 mid-stage handoff XML, EA-5 emitted at item 2.6 → 2.10 transition)
+        - 3d1ac35 (single Stage-2 substantive commit; 69 files / +12955 -74; pyproject.toml in diff per i1-3; commit message verbatim from v5 §work_remaining §2.9 commit_template with X=351 / pre 282 / +69 fill-ins)
+        - 89213ee (Stage 2 close STATUS append; +59/-5 STATUS.md changes; Guide-#6 Item-2.9 verdict XML archived per artifact-management guidance)
+        - 947cbd5 (Stage 2 closure footnote narrative corrections; 5 N-corrections per Guide-#6 authorization; STATUS.md narratives now match verbatim disposition record)
+        Total ack chain depth: 41 v4-era + 4 g6-ea5 + 10 g6-ea6 = 55 acks all SATISFIED at appropriate Item closures.</what>
+      <successor_instruction>Guide-#7 inherits this 4-commit chain. The single Stage-2 substantive commit (3d1ac35) is the canonical reference for "what Stage 2 did" -- 69 files including chokepoint helpers, ProjectContext resolver, per-project allowlist, --project-root/--project-id flags on 13 Python entrypoints, -BlarAIRoot env-fallback on 6 PS1 helpers, 4 V matrix tests, MCP server D4 DIVERGE retention, D2-completion 6-caller closure. Stage 3 (Copy tools) operates on this baseline.</successor_instruction>
+    </decision>
+
+    <decision id="d2" title="V4 vikunja-process drift Option B AUTHORIZED (rule 5b(a) STATUS-staleness)">
+      <what>At Item 2.7 V1-V7 closure assertion run, V4 returned 1 (vikunja-v2.3.0-windows-4.0-amd64.exe PID 18304 running on host) where V1-V7 closure assertion expected 0. Guide-#6 dispositioned per rule 5b(a) STATUS-staleness (NOT procedure breakage per 5b(b)): Vikunja-running on host preserves LA's parallel-workflow productivity (Guide/Co-Lead chats + manual webUI ticket work); Stage 2 XML does NOT require Vikunja stopped (Stage 2 is pure code refactor; no DB access); Stage 4.1 preflight has explicit fail-fast guard (`if ($running) { throw 'Vikunja is still running. Stop it before migrating the DB.' }`) for V4=0 restoration ahead of cutover.</what>
+      <successor_instruction>Vikunja IS running on host throughout Stage 3. Stage 3 is pure copy-tools work (no Vikunja DB access). NO action required at Stage 3 entry. Stage 4 EA's preflight (or LA's panic-card procedure) handles V4=0 restoration before cutover. STATUS.md "Vikunja server" line currently reads "Running on host (per g6-ea6_n8 Option B disposition...; will be stopped at Stage 4.0/4.1 preflight per Stage 4 XML guard, restoring the Stage-0.4 invariant ahead of the destructive cutover block)."</successor_instruction>
+    </decision>
+
+    <decision id="d3" title="D4 DIVERGE-APPROVED retained; Stage 5+ class-method routing follow-up">
+      <what>EA-5 + EA-6 chose to KEEP all 7 _require_project_id call sites at handler entry in tools/vikunja_mcp/server.py (DIVERGE from Guide-#6's original chokepoint-only B recommendation). Rationale: chokepoint VikunjaClient class is currently a stub (no HTTP delegation); server.py's _api_*+httpx path never traverses VikunjaClient class methods; function-level _require_project_id calls ARE the chokepoint integration, not redundancy on top of it; class-method routing (the "true B" interpretation) would be a multi-deliverable refactor outside Item 2.6 D4 scope. Guide-#6 APPROVED the divergence with substantive 4-point analysis (Guide-#6 review file 2.6-GUIDE_RESPONSE_INSTANCE_6_INTER_DELIVERABLE_REVIEW_EA_5_D2_INCOMPLETE_V5_AUTHORIZED.xml). Forward-applicable until VikunjaClient class HTTP delegation lands at Stage 5+.</what>
+      <successor_instruction>Stage 3 EA does NOT re-open D4. The D4 decision (chokepoint-function-as-integration via _require_project_id imports) holds through Stage 4 cutover. At Stage 5 or later cleanup, when full chokepoint HTTP delegation is wired, the MCP-bus components (server.py + cli.py + bridge/daemon.py) become candidates for class-method routing migration. Stage 6.7.5-pattern DevPlatform-Meta hardening ticket suggested.</successor_instruction>
+    </decision>
+
+    <decision id="d4" title="D2-completion Option A (HOIST cfg above LiveVikunjaClient constructor)">
+      <what>EA-5 D2 PARTIAL (made load_config conditional in legacy fleet_observability/_vikunja_client.py.__init__) left the w15 hazard active because the 6 zero-arg production callers still triggered the conditional fallback. Guide-#6 dispositioned Option A (hoist cfg above constructor in the 3 divergent files daily_digest + weekly_summary + run_live; apply AFTER pattern `base_url=cfg["vikunja"]["base_url"]` uniformly across all 6 callers; preserve assignee variable name 3-3 split: 3 client + 3 live). Verified post-D2-completion: zero production zero-arg LiveVikunjaClient() invocations; ack g5-4 transitions FORWARD-ACTIVE → SATISFIED.</what>
+      <successor_instruction>Stage 3 inherits the post-D2-completion baseline. The legacy fleet_observability/_vikunja_client.py:40 conditional fallback remains as defensive safety net for ad-hoc/test usage but is unreachable from production. Full fold of LiveVikunjaClient (deletion of the legacy class entirely) is deferred to Stage 5 cleanup.</successor_instruction>
+    </decision>
+
+    <decision id="d5" title="F-D1-1 + F-D1-2 NO-ACTION dispositions at D1 grep">
+      <what>Item 2.6 D1 extended-grep verification net (12 patterns) surfaced two finding families outside the chokepoint-internal/legacy-shim-internal/test-only triage rule. Both authorized NO-ACTION: F-D1-1 (vikunja_mcp/* MCP-bus 19 hits across server.py + cli.py + bridge/daemon.py) → third chokepoint family parallel to chokepoint VikunjaClient + legacy LiveVikunjaClient; §D.1 enforcement preserved at function-level (D4) + at user/protocol-input level (cli.py + bridge/daemon.py); class-method routing deferred to Stage 5+. F-D1-2 (openvino_contrib_agent 7 hits; urllib + GitHub PAT for GitHub API) → out-of-domain by definition; Stage 5.1 keep_in_blarai list preserves it permanently.</what>
+      <successor_instruction>Stage 3 EA does NOT re-investigate F-D1-1 or F-D1-2. Both are forward-staged. Stage 6.7.5-pattern DevPlatform-Meta hardening ticket suggested for F-D1-1 post-Stage-5 (when VikunjaClient HTTP delegation lands). F-D1-2 is openvino_contrib_agent's own concern, not a platform-extraction concern.</successor_instruction>
+    </decision>
+
+    <decision id="d6" title="5 N-corrections to STATUS.md footnote narratives at 2.10.1 (per dn19)">
+      <what>EA-6's initial Stage 2 Closure Footnotes section at 89213ee had 5 narrative errors (LOW-MED severity for footnotes 2 + 7; HIGH severity for 11 + 12.g6-ea6_n7 + 12.g6-ea6_n8). EA-6 framed as rule 5b(a) STATUS-staleness; Guide-#6 OVERRODE per dn19 (in-scope code defect, NOT external state staleness). The N-corrections were applied at 947cbd5 follow-on commit with verbatim text from disposition files. Audit chain in STATUS.md now matches the authoritative records in temp_for_responses/. Recurring paraphrase-introduced-error pattern: caught at v5 count_delta + file 13 docstring + 2.10 footnotes. Each prior cycle was corrected via in-scope follow-on; the closing-handoff chat narrative also has paraphrase errors at V matrix file names but is chat-only (not committed; informational only).</what>
+      <successor_instruction>Guide-#7: the EA-6 closing-handoff chat narrative (in this conversation log; LA can scroll up) misnames test_v_matrix_v5 / v6 / v7 files and paraphrases their descriptions inaccurately. The CORRECT names + descriptions are in STATUS.md (post-947cbd5) Stage Ledger row entry + Stage 2 Closure Footnotes section. If Guide-#7 needs to reference the V matrix in any Stage 3 or later artifact, READ STATUS.md or the test files directly; do NOT rely on the EA-6 chat-narrative paraphrases.</successor_instruction>
+    </decision>
+
+    <decision id="d7" title="Artifact management: KEEP temp_for_responses/ + ea_outputs/ in git">
+      <what>LA asked at Stage 2 close whether docs/platform_separation/temp_for_responses/ + docs/platform_separation/ea_outputs/ should be committed or gitignored. Guide-#6 disposition: KEEP IN GIT. These are the audit chain (Guide-EA disposition exchanges + EA mid-stage handoffs + completion reports + verification evidence). The procedure design explicitly treats them as audit artifacts (dn13: "Do NOT delete or 'clean up' the Guide disposition files in temp_for_responses/. They are committed audit artifacts"). Without them, future maintainers (Stage 6 hardening, post-procedure investigation) have NO record of WHY decisions were made. Stage 6.9 archive plan moves docs/platform_separation/ → docs/archive/platform_separation/ as the long-term home.</what>
+      <successor_instruction>Guide-#7 authors Stage 3 EA init pointer + future Guide-#7 dispositions in the SAME directory pattern: temp_for_responses/3.X-...xml for Guide responses; ea_outputs/EA_HANDOFF_STAGE3_*.xml for EA mid-stage handoffs. Continues the established naming convention. All committed in git per artifact-management guidance.</successor_instruction>
+    </decision>
+
+    <decision id="d8" title="Closing-handoff timing: BEFORE LA spawns successor, NOT during EA-6 chat">
+      <what>EA-6 asked at Item 2.10 close whether to (a) emit closing handoff now or (b) wait for LA acknowledgment. Guide-#6 answer: NEITHER directly -- apply the 5 N-corrections at 2.10.1 FIRST, THEN emit closing handoff. The closing handoff narrative summarizes Stage 2 work; emitting before corrections risks the summary inheriting the same narrative errors. Order: 947cbd5 commit → EA-6 closing handoff in chat → LA "emit handoff" signal → Guide-#6 handoff brief (THIS file) → Guide-#7 spawn → Stage 3 EA init pointer.</what>
+      <successor_instruction>Guide-#7 inherits the same closing-handoff timing discipline at Stage 3 close (and beyond). The pattern: substantive work → STATUS append → narrative corrections (if surfaced by Guide review) → EA closing handoff → Guide handoff brief → Successor spawn → Next-stage EA init pointer.</successor_instruction>
+    </decision>
+
+  </decisions_made_with_la>
+
+  <open_watchpoints>
+    <intro>All watchpoints inherited from prior Guide instances (instance 5→6 brief had 18). Status updates per this Guide-#6 instance:</intro>
+
+    <watchpoint id="w1" severity="CRITICAL" recheck_at="Stage 4.0 / 4.7" carry_forward_from="instance 1 → 6">
+      Agents Cadence Monitor LogonType=S4U; Stage 4.7 Unregister + Register requires elevated PowerShell.
+      <risk_id>A3</risk_id>
+    </watchpoint>
+
+    <watchpoint id="w2" severity="HIGH" recheck_at="Stage 4.7" carry_forward_from="instance 1 → 6">
+      G-2 false-green via bare WorkingDirectory rewrite at Stage 4.7. Successor must surface to Stage 4 EA.
+      <risk_id>G-2</risk_id>
+    </watchpoint>
+
+    <watchpoint id="w3" severity="HIGH" recheck_at="Stage 4.0/4.1 preflight" status_change="introduced_in_instance_6">
+      Vikunja running on host per g6-ea6_n8 Option B disposition. Stage 4.1 has explicit fail-fast guard
+      ('if ($running) { throw "Vikunja is still running. Stop it before migrating the DB." }'). LA's panic-card
+      procedure (per ROLLBACK_NOVICE_GUIDE.md §2) handles V4=0 restoration ahead of cutover. NO action at
+      Stage 3 entry.
+      <risk_id>g6-ea6_n8 / V4-closure-drift</risk_id>
+    </watchpoint>
+
+    <watchpoint id="w4" severity="MED" recheck_at="Stage 5+" status_change="introduced_in_instance_6">
+      F-D1-1 MCP-bus class-method routing migration: when VikunjaClient HTTP delegation lands at Stage 5+ cleanup
+      (or via separate domain ticket), the MCP-bus components (server.py + cli.py + bridge/daemon.py) become
+      candidates for class-method routing migration. Stage 6.7.5-pattern DevPlatform-Meta hardening ticket
+      suggested. NOT a Stage 3 concern.
+      <risk_id>g6-ea6_n7 / F-D1-1 / D4-DIVERGE-forward</risk_id>
+    </watchpoint>
+
+    <watchpoint id="w5" severity="LOW" recheck_at="Stage 6.7.5" carry_forward_from="instance 2 → 6">
+      blarai_auxiliary_projects 4 / 7 / 9 investigation at Stage 6 (per Anomaly A10 + Stage 6 hardening directive).
+    </watchpoint>
+
+    <watchpoint id="w6" severity="LOW" recheck_at="Stage 6 (optional)" status_change="introduced_in_instance_6">
+      A11 alias-vs-rename optional cleanup (rename --blarai-root → --project-root with deprecation warning).
+      Documented as anomaly per g5-10. Stage 6 hardening ticket if naming hygiene benefit outweighs migration cost.
+    </watchpoint>
+
+    <watchpoint id="w7" severity="LOW" recheck_at="Post-soak" carry_forward_from="instance 1 → 6">
+      VIKUNJA_PASS literal rotation (F-1).
+    </watchpoint>
+
+    <watchpoint id="w8" severity="MED" recheck_at="before any git stash pop / forever" carry_forward_from="instance 1 → 6">
+      Stale wake_launcher auto-stash at stash@{0} (timestamp sdo 20260424_013002). DO NOT POP through any
+      remaining stage. 11-cycle byte-identity preservation now; will become 12-cycle when Stage 3 EA emits
+      its first artifact. The cleanest single-axis discipline win in the procedure.
+    </watchpoint>
+
+    <watchpoint id="w9" severity="HIGH" recheck_at="Stage 4.0.5" carry_forward_from="instance 1 → 6">
+      Worktree precondition (`git worktree list` empty) re-verify at Stage 4.0.5 ahead of destructive cutover.
+    </watchpoint>
+
+    <watchpoint id="w10" severity="HIGH" recheck_at="Stage 5.10" carry_forward_from="instance 1 → 6">
+      No merge to chore/platform-extraction → main until LA explicitly approves per R10. Merge gate at
+      Stage 5.10 with explicit Lead Architect approval. The chore/platform-extraction branch is preserved
+      across Stages 3-5 work; merge happens AFTER Stage 5 cleanup completes.
+    </watchpoint>
+
+    <watchpoint id="w11" severity="MED" recheck_at="every EA report at every cycle" status_change="introduced_in_instance_6">
+      EA-6's paraphrase-introduced-error pattern. EA-6 was structurally sharp throughout but had recurring
+      LOW-MED severity narrative errors at v5 count_delta misattribution + file 13 "8 vs 7" docstring drift +
+      2.10 footnotes 5-error inventory + closing-handoff chat narrative V5/V6/V7 misnaming. Each prior cycle
+      was corrected via in-scope follow-on commits. Mature response: independent disk verification on every
+      EA report; never trust paraphrased narratives without checking the disposition files. Future EAs may
+      exhibit similar pattern; Guide-#7 should maintain the discipline.
+    </watchpoint>
+
+    <watchpoint id="w12" severity="MED" recheck_at="Stage 3 EA every commit" carry_forward_from="instance 5 → 6">
+      Single-commit discipline (mid-stage handoff commits are docs-only). Stage 3 EA's only valid commits
+      before Item 3.X final commit are docs-only mid-stage handoff XMLs at context-exhaustion threat
+      (per i1-4 inheritance). The Stage 3 final commit folds all refactor + verification work. NO partial-
+      commit refactor; NO emergency single-commit attempts.
+    </watchpoint>
+
+  </open_watchpoints>
+
+  <anomalies_not_yet_in_status>
+    <intro>STATUS.md is fully updated through 947cbd5. No anomalies pending logging.
+      A11 (alias-vs-rename) is recorded; the 12-item Stage 2 Closure Footnotes section
+      captures all dispositions. Guide-#7 inherits a clean STATUS state.</intro>
+    None.
+  </anomalies_not_yet_in_status>
+
+  <la_profile>
+    <intro>All 18 traits from instance 5→6 brief carry forward. Re-confirmed during instance 6 work.
+      One new observation as p19.</intro>
+
+    <trait id="p1" carry_forward="true">Non-dev "vibe coder". Re-confirmed throughout Stage 2 procedure.</trait>
+    <trait id="p2" carry_forward="true">Prefers XML-formatted Guide-to-EA directives via temp_for_responses/.</trait>
+    <trait id="p3" carry_forward="true">**"Mature not minimal" motto.** STRONGLY re-confirmed. The discipline is the procedural backbone.</trait>
+    <trait id="p4" carry_forward="true">Tables faster than prose.</trait>
+    <trait id="p5" carry_forward="true">Forensic analysis discipline; appreciates independent disk verification on EA reports.</trait>
+    <trait id="p6" carry_forward="true">Paste-attachment hazards. Not exercised this instance.</trait>
+    <trait id="p7" carry_forward="true">IDE focus reminders are context only (e.g., system-reminder noting LA opened 07_STAGE6_HARDENING.xml in IDE during Stage 2 close).</trait>
+    <trait id="p8" carry_forward="true">One numbered list per response block. Maintained throughout.</trait>
+    <trait id="p9" carry_forward="true">Welcomes proactive handoff recommendations at boundaries. LA accepted Option B handoff at Stage 2 close per stage_boundary_recommendation.</trait>
+    <trait id="p10" carry_forward="true">Spell out acronyms on first use.</trait>
+    <trait id="p11" carry_forward="true">Guided expertise vs menu-of-options. LA appreciated tabular comparison + Guide recommendation in disposition cycles.</trait>
+    <trait id="p12" carry_forward="true">Per-request file-write grants only. Guide writes to temp_for_responses/ are pre-authorized per the GUIDE_PROMPT v2.1 carve-out.</trait>
+    <trait id="p13" carry_forward="true">Two-file pattern (XML directive + Markdown brief). Single-file XML pattern was sufficient throughout instance 6 dispositions.</trait>
+    <trait id="p14" carry_forward="true">**"temp_for_responses" folder convention** (lowercase, underscores -- the v2.1 GUIDE_PROMPT update).</trait>
+    <trait id="p15" carry_forward="true">LA verifies XML output meticulously. Sharp catches at e.g. the count_delta misattribution at v5 emission.</trait>
+    <trait id="p16" carry_forward="true">**"Critical operation" + "mature not minimal" = thoroughness signal.** Re-confirmed; LA explicitly asked "is the work mature not minimal?" at multiple Item closures across Stage 2.</trait>
+    <trait id="p17" carry_forward="true">**Strategic context-budget conversations.** LA initiated handoff timing conversation at Stage 2.6 boundary (Option B Guide-5→6); same pattern at Stage 2.10 close (Option B Guide-6→7 chosen here).</trait>
+    <trait id="p18" carry_forward="true">**LA accepts Guide overrides on EA recommendations when justified.** Multiple instances during Stage 2: f1 disposition Option (a) override; D2-completion Option A authorization; rule 5b(a) vs dn19 override on docstring fix; rule 5b(a) vs dn19 override on STATUS narrative corrections.</trait>
+
+    <trait id="p19" introduced_in="instance 6">**LA's procedural meta-question discipline at stage transitions.** At Stage 2 close, LA proactively asked "should we have it produce any handoff documents? Doesn't look like it produced anything for you nor for the next EA." This was a sharp procedural meta-question that revealed the 3-handoff-types delineation (EA → LA closing; Guide → Guide brief; Guide → next-EA init pointer). Pattern: LA asks meta-questions at stage transitions; Guide answers with explicit role delineation. The LA is not asking because they don't know -- they're verifying that the Guide knows. Future Guide instances should expect similar verification questions and answer with clear role/scope delineation.</trait>
+  </la_profile>
+
+  <active_risk_ids>
+    <intro>Risk IDs that proved active during instance 6 work. Carryforward + status updates + new.</intro>
+
+    <risk id="V1" status="resolved_at_stage_0_carryforward">Worktree contamination. Re-verified clean at every Stage 2 cycle.</risk>
+    <risk id="A3" status="active_watchpoint_for_stage_4">S4U elevation; CRITICAL for Stage 4.7. See w1.</risk>
+    <risk id="V7" status="no_attempt_throughout_stage_2">resume_fleet vs unpause_fleet. Function-name discipline held; NEVER state.resume_fleet called across the entire Stage 2 procedure.</risk>
+    <risk id="G-2" status="not_yet_triggered">Stage 4.7 false-green via bare WorkingDirectory. Watchpoint w2 -- carries to Stage 4.</risk>
+    <risk id="C1-R5" status="SATISFIED_at_2.8">$BLARAI_PID resolution. ctx.vikunja_project_id == 3 returned PASS at Item 2.8 hard gate.</risk>
+    <risk id="F-1" status="half_mitigated">VIKUNJA_PASS literal. Full closure at post-soak.</risk>
+    <risk id="V5" status="mitigated_at_stage_1.4.v2">Vikunja label-ID drift.</risk>
+    <risk id="A4" status="partially_resolved">Multi-BlarAI-projects discovery; Stage 6.7.5 finalization.</risk>
+    <risk id="A5" status="codified_into_protocol">REST vs MCP for Vikunja access. vikunja_access_protocol block in Stages 2/3/4.</risk>
+    <risk id="F1" status="resolved_in_cleanup">_project_context.py schema mismatch.</risk>
+    <risk id="F3" status="resolved_in_cleanup">$BLARAI_PID preflight regex.</risk>
+    <risk id="f1-NEW-Stage-2.4.v2" status="SATISFIED">Chokepoint guard accepted 0 + negatives. Closed at v4 + 2 NET-ADD tests.</risk>
+    <risk id="C4-mcp-server" status="SATISFIED">tools/vikunja_mcp/server.py file 13 §D.1 hardening complete.</risk>
+    <risk id="C6-extended-grep" status="SATISFIED_at_D1">12-pattern grep verification at Item 2.6 D1 surfaced 2 NO-ACTION dispositions.</risk>
+    <risk id="multi-file-entrypoint-verification" status="active_principle_for_successor">Per dn14 + p16. EA-6 maintained discipline; Guide-#7 should continue.</risk>
+    <risk id="single-commit-discipline" status="SATISFIED_at_2.9">3d1ac35 single Stage-2 commit folded all working-tree work cleanly.</risk>
+    <risk id="legacy-vikunja-client-dual-touch" status="SATISFIED_at_D2-completion">tools/fleet_observability/_vikunja_client.py disposition closed via Option A (HOIST + AFTER pattern in 6 callers).</risk>
+    <risk id="critical_notify_scope_expansion" status="SATISFIED">EA-4 confirmed Appendix A.1 SKIP per direct file read.</risk>
+    <risk id="risk-label-hygiene-carryforward" status="active_principle">Compound labels with reference prefixes acceptable when anchor disambiguates. Maintained throughout.</risk>
+    <risk id="o1-handler-guards-vs-routing" status="SATISFIED_at_D4_DIVERGE">Structural design decision: chokepoint-function-as-integration retained.</risk>
+    <risk id="D3-dashboard-maintainer-private-api" status="SATISFIED_at_D3">live._request → live.update_task closure complete.</risk>
+    <risk id="A11-alias-vs-rename" status="documented_anomaly_optional_stage_6_cleanup">test_async_post_gate.ps1 inverted alias direction. STATUS.md A11 entry recorded.</risk>
+    <risk id="ea_paraphrase_pattern" status="active_watchpoint_for_successor" introduced_in="instance 6">EA-6 had recurring LOW-MED severity paraphrase-introduced errors at v5 / file 13 / 2.10 footnotes / closing-handoff chat. Each corrected via in-scope follow-on. Future EAs may exhibit similar; Guide-#7 maintains independent-disk-verification discipline. See w11.</risk>
+    <risk id="V4-vikunja-process-drift" status="active_at_Stage_4_preflight" introduced_in="instance 6">V4=1 (vikunja running on host) per Option B; restoration at Stage 4.1 fail-fast guard. See w3.</risk>
+    <risk id="g6_ea6_n_acks_status" introduced_in="instance 6">10 g6-ea6 acks (n1 through n10) all SATISFIED at appropriate Item closures: n1+n5 D2-completion; n2 count_delta acknowledgment; n3 v5 doc defects; n4 v6-handoff-readiness; n6 path-confusion; n7 D1 NO-ACTION; n8 V4 disposition; n9 docstring fix; n10 narrative corrections.</risk>
+  </active_risk_ids>
+
+  <source_doc_revisions>
+    <intro>Source-doc revisions during instance 6 lifetime. STATUS.md was updated; all 7 stage XMLs + MASTER_PLAN + AUDIT_RISK_REVIEW + WORKFLOW_INTEGRITY_REVIEW + RECOVERY + INFRA_DELTA_v2 + ROLLBACK_NOVICE_GUIDE UNCHANGED. 11 Guide-#6 disposition XMLs added to docs/platform_separation/temp_for_responses/. server.py D4 docstring corrected at 3d1ac35 + 2.10.1 narrative corrections at 947cbd5.</intro>
+
+    <revision path="docs/platform_separation/STATUS.md" status="MODIFIED">
+      <commits>3d1ac35 (initial Stage 2 STATUS untouched at this commit; folded with Stage 2 substantive work) + 89213ee (Stage 2 close STATUS append: +59/-5; 12-item Stage 2 Closure Footnotes section added; A11 anomaly added; Stage Ledger Stage 2 row PENDING → COMPLETE; Current State table updated for Stage 2 close) + 947cbd5 (5 N-corrections to footnote narratives)</commits>
+      <note>STATUS.md is now 246 lines (was 192 pre-Stage-2-close). All Stage 2 dispositions documented in the 12-item footnote set. Append-only discipline preserved; A1-A10 untouched; Recovery Anchors / Vikunja Project IDs / How to Resume sections untouched.</note>
+    </revision>
+
+    <revision path="docs/platform_separation/temp_for_responses/" status="11 Guide-#6 disposition XMLs added">
+      <commits>3d1ac35 (folded all temp_for_responses/ ?? entries) + 89213ee (Guide-#6 Item-2.9 verdict XML archived per artifact-management guidance)</commits>
+      <files_added_this_instance>
+        1. 2.6-EA_INITIALIZATION_INSTANCE_5_STAGE2_RESUME_AT_ITEM_2.6.xml (EA-5 init pointer with v4 quality review C1-C4 corrections + 33-ack chain restatement)
+        2. 2.6-GUIDE_RESPONSE_INSTANCE_6_ITERATION_1_APPROVED_EA_5.xml (EA-5 iter-1 gate APPROVED)
+        3. 2.6-GUIDE_RESPONSE_INSTANCE_6_INTER_DELIVERABLE_REVIEW_EA_5_D2_INCOMPLETE_V5_AUTHORIZED.xml (D2/D3/D4 review + v5 handoff authorization + D4 DIVERGE-APPROVED)
+        4. 2.6-GUIDE_RESPONSE_INSTANCE_6_V5_EMISSION_VERIFIED_WITH_COUNT_DELTA_CORRECTION.xml (v5 emission verification + 4 v5 doc defects C1-C4)
+        5. 2.6-EA_INITIALIZATION_INSTANCE_6_STAGE2_RESUME_AT_ITEM_2.6_D2_COMPLETION.xml (EA-6 init pointer with C1-C4 + D1-D5 corrections + 41-ack chain restatement)
+        6. 2.6-GUIDE_RESPONSE_INSTANCE_6_ITERATION_1_APPROVED_EA_6.xml (EA-6 iter-1 gate APPROVED with variable-name-preservation commendation)
+        7. 2.6-GUIDE_RESPONSE_INSTANCE_6_CFG_RESOLUTION_DIVERGENCE_DISPOSITION_OPTION_A_HOIST.xml (D2-completion Option A authorization)
+        8. 2.6-GUIDE_RESPONSE_INSTANCE_6_D2_COMPLETION_VERIFIED_PROCEED_TO_D1.xml (D2-completion verification)
+        9. 2.6-GUIDE_RESPONSE_INSTANCE_6_D1_NO_ACTION_DISPOSITIONS_AUTHORIZED.xml (F-D1-1 + F-D1-2 NO-ACTION authorization)
+        10. 2.6-GUIDE_RESPONSE_INSTANCE_6_V4_VIKUNJA_PROCESS_DRIFT_OPTION_B_AUTHORIZED.xml (V4 vikunja-process Option B authorization)
+        11. 2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_7_CLOSURE_AFFIRMED_PROCEED_TO_2_7_V2.xml (Item 2.7 closure affirmation)
+        12. 2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_7_V2_VERIFIED_DOCSTRING_FIX_AUTHORIZED.xml (Item 2.7.v2 verification + g6-ea6_n9 docstring fix authorization per dn19)
+        13. 2.6-GUIDE_RESPONSE_INSTANCE_6_DOCSTRING_FIX_AND_2_8_VERIFIED_PROCEED_TO_2_9.xml (docstring fix + 2.8 BLARAI_PID gate verification)
+        14. 2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_9_VERIFIED_ARTIFACT_GUIDANCE_PROCEED_TO_2_10.xml (2.9 commit verification + artifact-management guidance per LA's question)
+        15. 2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_10_VERIFIED_NARRATIVE_CORRECTIONS_AUTHORIZED.xml (2.10 commit verification + 5 N-corrections authorization per dn19)
+        16. 2.6-GUIDE_RESPONSE_INSTANCE_6_STAGE_2_CLOSED_HANDOFF_RECOMMENDATIONS.xml (Stage 2 closed verification + handoff recommendations per stage_boundary_recommendation)
+      </files_added_this_instance>
+      <note>16 disposition files total this instance (some predate the strict Guide-#6 series; the count includes EA-5 + EA-6 init pointers and the EA-5 iter-1 gate review). Successor Guide-#7 reads ALL of these as part of Variant B comprehension gate (in addition to the 9 Guide-#5 disposition files + 5 EA mid-stage handoffs at ea_outputs/).</note>
+    </revision>
+
+    <revision path="tools/vikunja_mcp/server.py" status="DOCSTRING-FIXED-IN-PLACE">
+      <commits>3d1ac35 (Stage 2 substantive commit; the corrected "all 7" docstring text was applied here per g6-ea6_n9 in-source authorization)</commits>
+      <note>D4 decision block at lines 13-57 now says "all 7" (was "all 8") and removes the phantom "additional project-scoped handler" reference. Optional project_summary clarification note added per Guide-#6 g6-ea6_n9 suggestion (taken by EA-6).</note>
+    </revision>
+
+    <revision_no_change>No changes to 7 stage XMLs (01_STAGE0_PREFLIGHT through 07_STAGE6_HARDENING), 00_MASTER_PLAN.md, AUDIT_RISK_REVIEW.md, WORKFLOW_INTEGRITY_REVIEW.md, RECOVERY.md, VERIFICATION_COMMANDS.md, INFRA_DELTA_v2.md, ROLLBACK_NOVICE_GUIDE.md, GUIDE_PROMPT.xml, GUIDE_USAGE.md, CLAUDE.md, .github/copilot-instructions.md, devplatform/projects/registry.yaml, BlarAI/.platform/vikunja_project_ids.yaml. Stage 2 was strictly tools/-side + STATUS-side work; no procedure-doc revisions needed.</revision_no_change>
+  </source_doc_revisions>
+
+  <first_action_for_successor>
+    <step n="1">After your Variant B comprehension gate is complete, briefly acknowledge the handoff and flag any STATUS drift or git advance since 2026-04-26T07:45:00Z. Compare branch_at_handoff_blarai (chore/platform-extraction @ 947cbd5), status_md_last_commit (947cbd5), worktree_state (clean) against actual repo state. Expected new commits since this handoff: only the LA's commit of GUIDE_HANDOFF_LATEST.xml itself (this file).</step>
+
+    <step n="2">**Read the 16 Guide-#6 disposition files in addition to the Variant B 11-item mandatory reads:** all files at docs/platform_separation/temp_for_responses/ that begin with "2.6-" (Guide-#6 era) plus 2.4-EA_INITIALIZATION_INSTANCE_4 (EA-4 init pointer; carries v4 era context) plus 2.5-GUIDE_RESPONSE_INSTANCE_5_V4_QUALITY_REVIEW_DEFECTS_FOUND (v4 quality review). Plus the 8 prior Guide-#5 disposition files (2.4-GUIDE_RESPONSE_INSTANCE_5_*) for full Item 2.4 + 2.5 + 2.5.v2 audit context. Plus the 5 EA mid-stage handoffs at ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v1..v5.xml.
+
+    Total audit-chain reading: 16 (Guide-#6) + 9 (Guide-#5) + 5 (EA mid-stage handoffs) + 4 (EA comprehension gates iter-1/iter-2) + 4 (initialization pointers EA-3/4/5/6) = ~38 files. Significant reading overhead; the Variant B comprehension gate is robust by design. Plan ~30-60 minutes of disciplined reading.</step>
+
+    <step n="3">**Draft the Stage 3 EA initialization pointer XML** following the same pattern as 2.6-EA_INITIALIZATION_INSTANCE_6_STAGE2_RESUME_AT_ITEM_2.6_D2_COMPLETION.xml. Adapt for:
+      - EA instance N (TBD; Stage 3 EA = next EA after EA-6; suggest "Stage 3 EA instance 1" since each stage's EA chain restarts)
+      - Stage 3 entry per docs/platform_separation/04_STAGE3_COPY_TOOLS.xml
+      - Required reading order: 04_STAGE3_COPY_TOOLS.xml + STATUS.md (post-947cbd5) + 5 EA mid-stage handoffs + 16 Guide-#6 dispositions + 9 Guide-#5 dispositions + AUDIT_RISK_REVIEW + WORKFLOW_INTEGRITY_REVIEW + INFRA_DELTA_v2 + RECOVERY + EA_HANDOFF_STAGE2 (V1-V7 source) + 00_MASTER_PLAN
+      - Required first actions: V0a-V0M pickup verification (HEAD = 947cbd5; working tree clean; pytest 351; stash byte-identical 11-cycle going to 12-cycle on first edit; state.json invariants; fleet still paused; Vikunja running per Option B; no merge to main) + iteration-1 comprehension gate emission
+      - Stage 3 work scope per 04_STAGE3_COPY_TOOLS.xml: copy platform-tool dirs to devplatform; update devplatform pyproject.toml; verify devplatform pytest baseline matches BlarAI; Stage 3 single commit at item 3.X (TBD; check Stage 3 XML for specifics)
+      - Carry-forward acks: 41 v4-era + 4 g6-ea5 (SATISFIED audit-history) + 10 g6-ea6 (SATISFIED audit-history). All 55 acks carry forward as audit chain; new acks emerge per Stage 3 dispositions.
+      - Forward-active items: w1-w12 watchpoints; D4 decision retention; D2-completion preserves; F-D1-1 + F-D1-2 forward to Stage 5+.
+      Naming convention: align to procedure-stage prefix per p14. Suggested:
+        docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml</step>
+
+    <step n="4">Provide the LA with: (a) the file path of the init pointer; (b) a short chat-paste message for the new Stage 3 EA chat ("Execute the attached..."); (c) the attachment list (analogous to the 27-file EA-6 attachment list, plus the new Stage 3 init pointer + 04_STAGE3_COPY_TOOLS.xml + 5 EA mid-stage handoffs + the 16 Guide-#6 dispositions + 9 Guide-#5 dispositions).</step>
+
+    <step n="5">Wait for the LA to spawn the Stage 3 EA + paste back the Stage 3 EA iteration-1 comprehension gate. Review per the GUIDE_PROMPT.xml ea_comprehension_gate_review procedure. APPROVED authorizes Stage 3 EA to begin Item 3.1. Then ongoing review of Stage 3 work + possible mid-stage handoff if Stage 3 EA hits its own context boundary.</step>
+
+    <prime_stage_3_init_pointer_watchpoints>
+      <point id="s7w1" severity="HIGH">Stage 3 EA init pointer must restate ALL 55 binding acks VERBATIM with status flags. Do NOT summarize or paraphrase. Stage 3 EA must restate them in iteration-1 gate.</point>
+      <point id="s7w2" severity="HIGH">Stage 3 EA init pointer must explicitly forward the EA-6 paraphrase-error pattern as a discipline reminder (per w11). Future EAs may exhibit similar; mature response is independent disk verification + in-scope follow-on commits.</point>
+      <point id="s7w3" severity="MED">Stage 3 EA init pointer must include the V0 pickup verification block (V0a-V0M+ as appropriate). Stage 3 EA's iteration-1 gate must report V0 results.</point>
+      <point id="s7w4" severity="MED">Stage 3 EA init pointer must include explicit forward acks for Stage 4 carryforward: w1 S4U elevation; w2 G-2 false-green; w3 V4=1 Stage 4.1 preflight; w9 worktree precondition; w10 no-merge-to-main.</point>
+      <point id="s7w5" severity="LOW">Stage 3 EA init pointer should reference the 12-item Stage 2 Closure Footnotes in STATUS.md as the canonical source for Stage 2 disposition narratives (NOT EA-6's chat-narrative paraphrases per w11).</point>
+    </prime_stage_3_init_pointer_watchpoints>
+  </first_action_for_successor>
+
+  <do_not_list>
+    <intro>Carry forward all 20 prohibitions from instance 5→6 brief (dn1-dn20). Add 4 new (dn21-dn24) for instance 6 work products + EA-6 paraphrase-pattern continuation.</intro>
+
+    <prohibition id="dn1" carry_forward="true">Do NOT re-chase STATUS.md line 11 v2-banner HEAD staleness. Known chicken-and-egg.</prohibition>
+    <prohibition id="dn2" carry_forward="true">Pre-execution invariant past-tense issue resolved at Stage 1 EA close.</prohibition>
+    <prohibition id="dn3" carry_forward="true">Do NOT edit, or allow any Stage 3-5 EA to edit, BlarAI's CLAUDE.md, .github/copilot-instructions.md, or AGENTS.md. V8 / 6.1.v2 deferred.</prohibition>
+    <prohibition id="dn4" carry_forward="true">Do NOT confuse fleet pause with Vikunja server stop. Different concerns.</prohibition>
+    <prohibition id="dn5" carry_forward="true" status_change="ACTIVE -- Stage 3 in-scope; MED risk (Stage 3 is MED-risk per Stage map)">Do NOT relax acknowledgment-wait for Stage 3 EA. Strict verbatim enforcement.</prohibition>
+    <prohibition id="dn6" carry_forward="true">Do NOT debug a "physform-extraction" typo. Chat-only artifact in a prior EA summary.</prohibition>
+    <prohibition id="dn7" carry_forward="true">Do NOT regenerate or revise Stage 0 / Stage 1 / Stage 2 baseline JSON / exit reports / mid-stage handoffs. Frozen audit artifacts.</prohibition>
+    <prohibition id="dn8" carry_forward="true">Do NOT emit a handoff after only a partial Stage UNLESS LA-requested OR per i1-4 trigger.</prohibition>
+    <prohibition id="dn9" carry_forward="true">Do NOT modify this handoff brief or any predecessor handoff brief in git history. Permanent records.</prohibition>
+    <prohibition id="dn10" carry_forward="true">Do NOT allow any Stage 3-5 EA to run `git stash pop` / `git stash apply` on stash@{0}.</prohibition>
+    <prohibition id="dn11" carry_forward="true">Do NOT delete, modify, or "improve" GUIDE_POST_STAGE1_CLEANUP_DIRECTIVE.xml or GUIDE_POST_STAGE1_CLEANUP_BRIEF.md. Audit artifacts.</prohibition>
+    <prohibition id="dn12" carry_forward="true">Do NOT assume LA's file-write permission to Guide carries forward across instances or across topics within an instance. Per the GUIDE_PROMPT v2.1 carve-out, temp_for_responses/ writes are pre-authorized for Guide responses; otherwise per-request grants only.</prohibition>
+    <prohibition id="dn13" carry_forward="true">Do NOT delete or "clean up" the Guide disposition files in temp_for_responses/. They are committed audit artifacts (or will be at next stage close).</prohibition>
+    <prohibition id="dn14" carry_forward="true" status_change="STRONGLY-REINFORCED-by-instance-6">**Do NOT trust the EA's "I did X" reports without disk-level verification.** EA-6 caught at v5 count_delta + file 13 docstring + 2.10 footnotes 5-error inventory + closing-handoff chat narrative -- recurring paraphrase-pattern. Each prior cycle was corrected via in-scope follow-on. Future EAs may exhibit similar.</prohibition>
+    <prohibition id="dn15" carry_forward="true">**Do NOT accept a partial-commit Stage-N mid-stage handoff.** Mid-stage handoff XMLs (vN+) are docs-only commits. Partial-commit refactor work is REJECT.</prohibition>
+    <prohibition id="dn16" carry_forward="true">**Do NOT silently approve scope expansion.** Default disposition for any audit-surfaced PS1 (e.g., critical_notify) is no-action with Appendix A.1 citation. Scope expansion requires explicit LA approval after a discovered runtime BlarAI path. (Distinct from defect closure in already-in-scope work, which is LA-authorized fix in current item per dn19.)</prohibition>
+    <prohibition id="dn17" carry_forward="true">**Do NOT shortcut analysis to save context window.** The LA explicitly chose "mature not minimal." Depth wins over speed.</prohibition>
+    <prohibition id="dn18" carry_forward="true">**Do NOT confuse the legacy fleet_observability/_vikunja_client.py with the new chokepoint tools/_vikunja_client.py.** Path-confusion would cause significant procedural drift -- always cite full paths when discussing either file.</prohibition>
+    <prohibition id="dn19" carry_forward="true" status_change="STRONGLY-REINFORCED-by-instance-6">**Do NOT defer in-scope defect closures to a different stage when the fix is trivial.** Distinguish ADDITIVE scope expansion (defer; LA approval) from DEFECT CLOSURE (LA-authorized fix in current item). Used at instance 6: f1 Option (a) override; D2-completion Option A; docstring fix in-source; STATUS narrative corrections.</prohibition>
+    <prohibition id="dn20" carry_forward="true">**Do NOT skip the "mature not minimal" disk-verification step on EA reports that look clean.** EA reports do miss things; independent verification on EVERY EA report; never trust report alone.</prohibition>
+
+    <prohibition id="dn21" introduced_in="instance 6">**Do NOT spawn Stage 3 EA without first authoring the Stage 3 EA initialization pointer.** Per the established Guide-authors-init-pointer pattern across EA-4/5/6, the Guide instance authors the init pointer BEFORE the EA spawn. Skipping this defeats the bootstrap discipline.</prohibition>
+
+    <prohibition id="dn22" introduced_in="instance 6">**Do NOT skip the Variant B comprehension gate for Guide-#7 (or any successor).** Read all 11-item document set + 16 Guide-#6 disposition files + 9 Guide-#5 disposition files + 5 EA mid-stage handoffs + 4 EA comprehension gates + 4 initialization pointers = ~38 audit artifacts to internalize. The Variant B gate is robust BY DESIGN; shortcuts here propagate ignorance forward.</prohibition>
+
+    <prohibition id="dn23" introduced_in="instance 6">**Do NOT modify the GUIDE_HANDOFF_LATEST.xml file (this file) once it's committed.** It's the audit anchor for instance 6→7 transition. The successor briefing happens within Guide-#7's own work, not by editing this brief.</prohibition>
+
+    <prohibition id="dn24" introduced_in="instance 6">**Do NOT skip independent disk verification on Stage 3 EA narrative summaries** (and beyond). EA-6's paraphrase-introduced-error pattern is now established; future EAs may exhibit similar. Mature response: verify every EA report against disk; surface paraphrase errors via in-scope follow-on commits; do NOT let paraphrase-induced errors propagate into committed audit-chain narratives.</prohibition>
+  </do_not_list>
+
+</guide_handoff_brief>

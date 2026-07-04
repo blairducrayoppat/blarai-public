@@ -1,0 +1,14 @@
+
+[32;1mScript                    [0m[32;1m Primary   [0m[32;1m Axis1_Baseline[0m[32;1m Axis2_EnvFallback[0m[32;1m Axis3_Al[0m
+[32;1m                          [0m[32;1m           [0m[32;1m               [0m[32;1m                  [0m[32;1m iasBindi[0m
+[32;1m                          [0m[32;1m           [0m[32;1m               [0m[32;1m                  [0m[32;1m ng[0m
+[32;1m------                    [0m [32;1m-------   [0m [32;1m--------------[0m [32;1m-----------------[0m [32;1m--------[0m
+wake_launcher.ps1          RepoRoot   PASS           PASS              PASS    
+agents-cadence-monitor.ps1 RepoRoot   PASS           PASS              PASS    
+escalation_watchdog.ps1    RepoRoot   PASS           PASS              PASS    
+toast_watchdog.ps1         RepoRoot   PASS           PASS              PASS    
+la_merge_approve.ps1       RepoRoot   PASS           PASS              PASS    
+test_async_post_gate.ps1   BlarAIRoot PASS           PASS              PASS    
+
+
+ALL_GREEN: 6 scripts x 3 axes (18) + 2 scripts x McpConfigPath axis (2) = 20 checks PASS

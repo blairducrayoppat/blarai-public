@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sprint 11 EA-1 prompt -- DEC Bundle Authoring (devplatform)
+  Authored by SDO 2026-05-12 per docs/P5_TASK11_SDO_CONTINUATION_v1.0.xml.
+  Staged for Co-Lead Phase 2 completion review before EA Code pickup.
+  Per LA SDV v2 amendment (Vikunja #410 comment 550): EA-1 + EA-2 authorized
+  to execute in parallel; SDO authors both prompts before either fires.
+-->
+<ea_prompt sprint_id="11" ea_number="1" descriptor="dec-bundle">
+
+  <parent_head>560e40d</parent_head>
+  <devplatform_parent_head>9e5555c</devplatform_parent_head>
+
+  <parent_head_capture_note>
+    Captured at SDO authoring time. EA must re-capture at the start of execution
+    via `git rev-parse HEAD` on BOTH repos and substitute live values into the
+    comprehension comment. If either head has advanced, EA proceeds against the
+    live head (rebase if needed) and notes the delta in the comprehension comment.
+  </parent_head_capture_note>
+
+  <required_attachments>
+    <attachment path="docs/sprints/sprint_11/strategic_design_vision.md" reason="Authoritative scope; SS5.3 gray-area pre-decisions: DEC home (devplatform/docs/decisions/), DEC numbering, trusted_scope LOC threshold values (3000 LOC, 100 files) sourced from devplatform tools/autonomy_budget/config.yaml"/>
+    <attachment path="docs/P5_TASK11_SDO_CONTINUATION_v1.0.xml" reason="Sprint 11 continuation; lessons L-12, L-13, L-15, L-19, L-22, L-24 cited herein; cross-repo working-set discipline; ledger Q1-1 schema for EA-1 ledger entry"/>
+    <attachment path="C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md" reason="Operational reference for DEC-16; DEC-16 SSDecision text RATIFIES what this doc already specifies, NOT changes it. Read end-to-end before authoring DEC-16."/>
+    <attachment path="C:\Users\mrbla\BlarAI\docs\ledger\README.md" reason="Q1-1 per-file ledger schema for DEC-17; DEC-17 SSDecision RATIFIES the post-2026-04-22 convention this file documents."/>
+    <attachment path="C:\Users\mrbla\devplatform\docs\governance\merge-policy.md" reason="Trusted_scope merge policy operational reference for DEC-18."/>
+    <attachment path="C:\Users\mrbla\devplatform\tools\autonomy_budget\config.yaml" reason="DEC-18 single source of truth for runaway_loc_threshold (3000) + runaway_file_threshold (100); DEC-18 cites these values VERBATIM from config; if config and DEC text drift, DEC text is the defect."/>
+    <attachment path="C:\Users\mrbla\BlarAI\docs\sprints\sprint_8\Strategic_Work_Analysis_and_Gap_Report_Sprint_8_*.md" reason="Sprint 8 SWAGR -- SS14.1 + gap #1. Confirm exact filename via Glob at EA start."/>
+    <attachment path="C:\Users\mrbla\BlarAI\docs\sprints\sprint_9\Strategic_Work_Analysis_and_Gap_Report_Sprint_9_*.md" reason="Sprint 9 SWAGR -- gap #1 + gap #7."/>
+    <attachment path="C:\Users\mrbla\BlarAI\docs\sprints\sprint_10\Strategic_Work_Analysis_and_Gap_Report_Sprint_10_*.md" reason="Sprint 10 SWAGR -- SS15.3 + SS5.4."/>
+  </required_attachments>
+
+  <pre_flight>
+    Sprint 11 EA-1 is the FIRST BlarAI sprint authoring formal numbered DECs.
+    DEC home is `C:\Users\mrbla\devplatform\docs\decisions\` per SDV SS5.3
+    pre-decision. The directory DOES NOT YET EXIST on devplatform (verified at
+    SDO authoring time); EA-1 creates it implicitly via the first file write.
+
+    DEC numbering: continuous integer sequence DEC-16, DEC-17, DEC-18. Verify
+    NO conflicts:
+
+      cd C:\Users\mrbla\devplatform; git grep -lE 'DEC-1[678]' -- docs
+      cd C:\Users\mrbla\BlarAI; git grep -lE 'DEC-1[678]' -- docs
+
+    Expected: empty on both. If either returns content referencing one of
+    these DEC numbers, STOP and escalate -- do NOT renumber unilaterally.
+
+    Fleet-Pause SOP. PAUSE the fleet before any checkout or git work:
+
+      $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.pause_fleet('Sprint 11 EA-1 DEC bundle authoring', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      cd C:\Users\mrbla\BlarAI; git commit --allow-empty -m "chore(ops): pause fleet -- Sprint 11 EA-1 DEC bundle authoring"
+
+    Resume LAST, before exit:
+      $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      cd C:\Users\mrbla\BlarAI; git commit --allow-empty -m "chore(ops): unpause fleet -- Sprint 11 EA-1 done"
+
+    API-NAME GOTCHA: function is `resume_fleet`, NOT `unpause_fleet`.
+
+    Parallel execution context (LA SDV v2). EA-2 may be running concurrently
+    against disjoint working sets (BlarAI runbooks + devplatform Co-Lead wake
+    template). DO NOT touch any EA-2 working-set path (see negative_constraints).
+  </pre_flight>
+
+  <comprehension_gate>
+    BEFORE any edits, checkouts, or branch creation, post a comprehension
+    comment to Vikunja tracking task #410 prefixed `[agent:ea_code][phase:comprehension]`
+    containing ALL of:
+
+    1. Milestone objective in your own words: what three DECs you are authoring,
+       on which repo, why now (3-sprint micro-DEC carry-over closure), who
+       consumes them downstream.
+
+    2. Per-deliverable work-item summary. WI-1 through WI-6 -- one sentence each
+       in your own words.
+
+    3. Files to create/modify (absolute paths). EXACTLY FOUR files:
+       - C:\Users\mrbla\devplatform\docs\decisions\DEC-16_parallel-sprint-authorization_v1.md (new)
+       - C:\Users\mrbla\devplatform\docs\decisions\DEC-17_ledger-format-q1-1-permanence_v1.md (new)
+       - C:\Users\mrbla\devplatform\docs\decisions\DEC-18_trusted-scope-loc-threshold_v1.md (new)
+       - C:\Users\mrbla\BlarAI\docs\ledger\TS_sprint11_ea1_dec-bundle.md (new; TS = UTC YYYYMMDD_HHMMSS captured at EA start)
+
+    4. Source files to read (read-only). All required_attachments above.
+
+    5. EXACT deliverable structure -- recite VERBATIM. For each DEC file:
+       front-matter -> SSMotivation -> SSDecision -> SSAlternatives considered ->
+       SSCross-references. Each DEC >= 60 lines.
+
+       For the BlarAI ledger entry: Q1-1 schema per docs/ledger/README.md.
+       Frontmatter (ledger_id, date, sprint_id=11, entry_type=EA, predecessor,
+       branch=feature/p5-task11-ea1-ledger, merge_commit=null, disposition=COMPLETE)
+       -> SSSummary -> SSDeliverables -> SSFiles Changed -> SSQuality Gate ->
+       SSDEC References.
+
+    6. ORACLE expectation (verbatim, executed at EA close after both commits land):
+
+       cd C:\Users\mrbla\devplatform
+       git diff PRE_HEAD...HEAD --name-only
+       Expected (sorted):
+         docs/decisions/DEC-16_parallel-sprint-authorization_v1.md
+         docs/decisions/DEC-17_ledger-format-q1-1-permanence_v1.md
+         docs/decisions/DEC-18_trusted-scope-loc-threshold_v1.md
+
+       cd C:\Users\mrbla\BlarAI
+       git diff main...feature/p5-task11-ea1-ledger --name-only
+       Expected:
+         docs/ledger/TS_sprint11_ea1_dec-bundle.md
+
+       Any other path on either side -> ORACLE violation; STOP and report.
+
+    7. Working-set declaration (L-15). Verbatim: "I write to exactly four
+       absolute paths: three devplatform DEC files + one BlarAI ledger file.
+       I read the operational governance docs and SWAGR sections cited in each
+       DEC. I touch no other file in either repo. If I discover a defect in
+       any source file or a contradiction between governance text and
+       operational reality, I STOP and escalate via the comprehension comment;
+       I do NOT 'reconcile' by unilaterally editing either side."
+
+    8. Mature-not-minimal acknowledgment (L-22). Verbatim: "Mature not minimal:
+       each DEC >= 60 lines; aggregate >= 180 lines. SSMotivation and
+       SSAlternatives considered are SUBSTANTIVE (multi-paragraph each);
+       SSDecision is a plain-statement paragraph. Padding to hit the floor is
+       rejected."
+
+    9. DEC ratification discipline (L-24). Verbatim: "These DECs RATIFY existing
+       practice. Each DEC's SSDecision describes what the fleet ALREADY does
+       per the cited governance doc -- DEC text aligns to operational mechanics,
+       NOT the inverse. If I find a contradiction between cited governance doc
+       and operational reality, I STOP and escalate. I do NOT 'reconcile' by
+       editing either side."
+
+    10. Cross-repo ordering acknowledgment (L-19). Verbatim: "EA-1 is primarily
+        a devplatform-side commit (3 DEC files in one commit) plus a small
+        BlarAI-side ledger entry. Cross-repo ordering: devplatform commit lands
+        FIRST (direct-to-main per Stage 6.7.5); then BlarAI ledger entry lands
+        SECOND, citing the devplatform commit hash."
+
+    11. BlarAI-side path choice (SDO pre-decision). SDO has pre-selected the
+        tiny BlarAI feature branch path: feature/p5-task11-ea1-ledger containing
+        only the ledger entry, merged via Co-Lead trusted_scope. EA recites this
+        choice in the comprehension comment.
+
+    12. No-freelance-cross-repo-refactor acknowledgment (L-19). Verbatim:
+        "Sprint 11 is documentation + investigation + (one optional new BlarAI
+        helper script in EA-2). DO NOT refactor any devplatform fleet code in
+        this EA."
+
+    13. Risks and ambiguities. State any unresolved understanding before
+        starting.
+
+    After posting the comprehension comment, apply label `Gate:Pending-SDO`
+    (id 9) on Vikunja task #410 and STOP. WAIT for SDO Phase 1a review verdict
+    before doing any work. Do NOT bundle downstream work with the comprehension
+    comment.
+  </comprehension_gate>
+
+  <milestone>
+    <objective>Author three formal numbered DEC documents on devplatform main
+      (DEC-16 parallel-sprint authorization + shared-artifact audit discipline;
+      DEC-17 Q1-1 per-file ledger format permanence; DEC-18 trusted_scope LOC
+      threshold policy) as a single thematic devplatform commit, plus one
+      BlarAI-side ledger entry recording the devplatform commit hash. DECs
+      RATIFY existing operational practice -- they do NOT change practice.
+      Close the 3-sprint micro-DEC carry-over backlog.</objective>
+    <ea_number>1</ea_number>
+    <branch>feature/p5-task11-ea1-ledger (BlarAI side); devplatform direct-to-main for DEC files</branch>
+    <ledger_entry>docs/ledger/TS_sprint11_ea1_dec-bundle.md</ledger_entry>
+    <size>M</size>
+    <size_rationale>Three DEC files authored from scratch with cross-reference grounding to existing governance docs; aggregate ~180-240 lines across the DECs plus a ~40-60 line ledger entry.</size_rationale>
+  </milestone>
+
+  <work_items>
+
+    <wi id="1">
+      WI-1: Pre-flight conflict check. Verify no prior DEC-16/17/18 reservation:
+        cd C:\Users\mrbla\devplatform; git grep -lE 'DEC-1[678]' -- docs
+        cd C:\Users\mrbla\BlarAI; git grep -lE 'DEC-1[678]' -- docs
+      Expected: empty on both. If either non-empty, STOP and escalate.
+      Verify reference files exist via Test-Path:
+        - C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md
+        - C:\Users\mrbla\devplatform\docs\governance\merge-policy.md
+        - C:\Users\mrbla\devplatform\tools\autonomy_budget\config.yaml
+        - C:\Users\mrbla\BlarAI\docs\ledger\README.md
+      All four MUST return True. Capture verbatim output in the ledger entry's
+      SSQuality Gate section.
+    </wi>
+
+    <wi id="2">
+      WI-2: Author DEC-16 (Parallel-Sprint Authorization + Shared-Artifact Audit
+      Discipline). New file:
+        C:\Users\mrbla\devplatform\docs\decisions\DEC-16_parallel-sprint-authorization_v1.md
+
+      Sections (all required):
+        SSMotivation (>= 2 substantive paragraphs): cite Sprint 8 SWAGR SS14.1 +
+          Sprint 9 SWAGR gap #7 + Sprint 10 SWAGR SS5.4. State that two of the
+          three preceding sprints exercised parallel-sprint execution
+          operationally (via set_parallel_sprints_authorized) without a formal
+          numbered DEC.
+        SSDecision (1 paragraph): state that the operational mechanism
+          tools.autonomy_budget.state.set_parallel_sprints_authorized(...) is
+          the AUTHORITATIVE entry point, gated by LA approval; SDO scanners
+          and Co-Lead Phase 3 hooks read the boolean before cross-sprint
+          scheduling. Also state the shared-artifact audit discipline runs
+          at SDO Phase 2 authoring time for every EA in every parallel sprint.
+          RATIFICATION: text aligns to what parallel-sprints.md already
+          specifies; this DEC formalizes, not changes.
+        SSAlternatives considered (>= 2): e.g. (a) leave informal -- rejected
+          because three sprints of de-facto practice compounds auditor
+          confusion; (b) per-sprint authorization annotation in
+          active_tasks.yaml only -- rejected because state.json is the runtime
+          source-of-truth and YAML duplication invites drift; pick candidates
+          matching operational reality.
+        SSCross-references (absolute paths, each Test-Path verified):
+          - C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md
+          - C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json
+          - Sprint 8 SWAGR SS14.1, Sprint 9 SWAGR gap #7, Sprint 10 SWAGR SS5.4
+
+      Length floor: >= 60 lines.
+    </wi>
+
+    <wi id="3">
+      WI-3: Author DEC-17 (Q1-1 Per-File Ledger Format Permanence). New file:
+        C:\Users\mrbla\devplatform\docs\decisions\DEC-17_ledger-format-q1-1-permanence_v1.md
+
+      Sections:
+        SSMotivation (>= 2 paragraphs): cite Sprint 8 SWAGR gap #1 + Sprint 9
+          SWAGR gap #1 + Sprint 10 SWAGR SS15.3. State the three-sprint recurring
+          shape: post-2026-04-22 the monolithic POST_OPERATIONAL_MATURATION_LEDGER.md
+          was frozen at Entry 52; new entries land as per-file under docs/ledger/;
+          each sprint's SWAGR continued to surface the rule as "convention"
+          rather than codified DEC.
+        SSDecision (1 paragraph): state that all ledger entries authored on or
+          after 2026-04-22 land as per-file markdown under
+          C:\Users\mrbla\BlarAI\docs\ledger\ using the schema documented in
+          docs/ledger/README.md; the monolithic file remains FROZEN archive for
+          Entries 1-52 and is NEVER appended to. RATIFICATION: aligns to what
+          docs/ledger/README.md already specifies.
+        SSAlternatives considered (>= 2): e.g. (a) revert to monolithic with
+          daily merge resolution -- rejected (Sprint 8 EA-1 / Sprint 9 EA-1
+          collision is the canonical unresolvable case); (b) per-sprint
+          subdirectories -- rejected (flat timestamp-keyed structure preserves
+          chronology without navigation overhead).
+        SSCross-references:
+          - C:\Users\mrbla\BlarAI\docs\ledger\README.md
+          - C:\Users\mrbla\BlarAI\docs\POST_OPERATIONAL_MATURATION_LEDGER.md (frozen archive)
+          - Sprint 8 SWAGR gap #1, Sprint 9 SWAGR gap #1, Sprint 10 SWAGR SS15.3
+
+      Length floor: >= 60 lines.
+    </wi>
+
+    <wi id="4">
+      WI-4: Author DEC-18 (Trusted_Scope LOC Threshold Policy). New file:
+        C:\Users\mrbla\devplatform\docs\decisions\DEC-18_trusted-scope-loc-threshold_v1.md
+
+      Sections:
+        SSMotivation (>= 2 paragraphs): cite Sprint 8 SWAGR SS14.1. State the
+          operational pattern: la_merge_approve.ps1 reads runaway_loc_threshold
+          (3000) and runaway_file_threshold (100) from
+          tools/autonomy_budget/config.yaml and escalates to LA on threshold
+          breach. The thresholds have governed trusted_scope merges across
+          Sprints 8/9/10 without formal DEC ratification; DEC-14.5 introduced
+          the concept, DEC-18 formalizes the specific values.
+        SSDecision (1 paragraph): state that trusted_scope merges proceed
+          without LA inline approval IF AND ONLY IF combined diff < 3000 LOC
+          AND < 100 files AND no out-of-working-set file is touched; on any
+          breach, la_merge_approve.ps1 escalates per DEC-14.5. Values live in
+          config.yaml as SINGLE SOURCE OF TRUTH; DEC-18 text quotes the values
+          verbatim but config is authoritative for any future tuning.
+        SSAlternatives considered (>= 2): e.g. (a) lower thresholds (1000/30)
+          -- rejected because actual Sprint 8/9/10 trusted_scope merges
+          averaged 200-800 LOC; (b) no LOC ceiling, file-count only -- rejected
+          because a single-file >5000 LOC refactor is exactly the runaway
+          shape DEC-14.5 catches.
+        SSCross-references:
+          - C:\Users\mrbla\devplatform\docs\governance\merge-policy.md
+          - C:\Users\mrbla\devplatform\tools\autonomy_budget\config.yaml (SoT)
+          - C:\Users\mrbla\devplatform\tools\autonomy_budget\la_merge_approve.ps1
+          - Sprint 8 SWAGR SS14.1
+
+      Length floor: >= 60 lines.
+    </wi>
+
+    <wi id="5">
+      WI-5: Commit devplatform side. Single thematic commit:
+        cd C:\Users\mrbla\devplatform
+        git add docs/decisions/DEC-16_parallel-sprint-authorization_v1.md
+        git add docs/decisions/DEC-17_ledger-format-q1-1-permanence_v1.md
+        git add docs/decisions/DEC-18_trusted-scope-loc-threshold_v1.md
+        git commit -m "[sprint:11][role:ea_code][phase:completion] DEC bundle: parallel-sprint authorization + ledger Q1-1 permanence + trusted_scope LOC threshold"
+      (Full commit body cites the three DECs + the SWAGR sections they close +
+      notes that the BlarAI ledger entry follows in a separate BlarAI commit.)
+      Capture the resulting commit hash; insert into the BlarAI ledger entry
+      SSDEC References.
+    </wi>
+
+    <wi id="6">
+      WI-6: BlarAI-side ledger entry on feature branch. Path:
+        C:\Users\mrbla\BlarAI\docs\ledger\TS_sprint11_ea1_dec-bundle.md
+      where TS = UTC YYYYMMDD_HHMMSS captured at EA start.
+
+      Frontmatter (Q1-1 schema):
+        ---
+        ledger_id: TS_sprint11_ea1_dec-bundle
+        date: YYYY-MM-DD
+        sprint_id: 11
+        entry_type: EA
+        predecessor: ledger_id of last existing entry in docs/ledger/ at EA start
+        branch: feature/p5-task11-ea1-ledger
+        merge_commit: null
+        disposition: COMPLETE
+        ---
+
+      Body sections:
+        SSSummary (3-5 sentences).
+        SSDeliverables (bulleted list of three DEC files + this ledger entry).
+        SSFiles Changed (two sub-tables: devplatform commit hash + 3 paths;
+          BlarAI commit + this ledger file).
+        SSQuality Gate (verbatim outputs from WI-1 pre-flight).
+        SSDEC References (three entries: DEC-16/17/18 -> devplatform commit hash).
+
+      Then commit on BlarAI:
+        cd C:\Users\mrbla\BlarAI
+        git checkout -b feature/p5-task11-ea1-ledger
+        git add docs/ledger/TS_sprint11_ea1_dec-bundle.md
+        git commit -m "[sprint:11][role:ea_code][phase:completion] Sprint 11 EA-1 ledger entry -- DEC bundle"
+
+      Do NOT merge to BlarAI main yourself. Leave for Co-Lead trusted_scope merge.
+    </wi>
+
+  </work_items>
+
+  <negative_constraints>
+    DO NOT, under any circumstances:
+
+    1. Touch existing governance docs. parallel-sprints.md, merge-policy.md,
+       ledger/README.md, autonomy_budget/config.yaml, autonomy_budget/state.json,
+       la_merge_approve.ps1 are ALL READ-ONLY inputs. If a discrepancy surfaces
+       between governance text and operational reality, STOP and escalate.
+
+    2. Amend ADRs or any other DEC. EA-1 authors DEC-16/17/18 only.
+
+    3. Edit CLAUDE.md, AGENTS.md, copilot-instructions.md, or any doctrine file
+       on either repo. Doctrine work is EA-5's purview.
+
+    4. Touch any EA-2 working-set path (per LA parallel authorization):
+       - C:\Users\mrbla\BlarAI\docs\runbooks\active_state_refresh.md
+       - C:\Users\mrbla\BlarAI\tools\active_state_refresh.{py,ps1}
+       - C:\Users\mrbla\devplatform\docs\scheduled\wake_templates\co_lead_architect.md
+
+    5. Touch any future-EA path. No edits to docs/sprints/_templates/ (EA-3),
+       docs/sprints/sprint_11/test_baseline_drift_investigation.md (EA-4),
+       .github/copilot-instructions.md, tools/vikunja_mcp/README.md,
+       docs/scheduled/wake_templates/sprint_auditor.md (EA-5).
+
+    6. Touch any production source code or test file. No edits to services/,
+       shared/, launcher/, tests/, pyproject.toml, conftest.py on either repo.
+
+    7. Refactor any devplatform fleet code. EA-1 ONLY writes new DEC files
+       under docs/decisions/.
+
+    8. Renumber DECs unilaterally. If WI-1 grep surfaces a prior reservation,
+       STOP and escalate via comprehension comment.
+
+    9. Bundle downstream work with the comprehension comment. Post comprehension;
+       apply Gate:Pending-SDO; STOP. Wait for SDO Phase 1a verdict.
+
+    10. Push to a remote main without going through Co-Lead trusted_scope merge
+        for BlarAI side. Devplatform DEC commit is direct-to-main per Stage 6.7.5
+        (committed locally; Co-Lead picks up any remote-push concerns).
+  </negative_constraints>
+
+  <mature_not_minimal>
+    Each of three DECs >= 60 lines. Aggregate DEC content >= 180 lines.
+    BlarAI ledger entry >= 40 lines. SSMotivation: >= 2 substantive paragraphs.
+    SSDecision: 1 plain-statement paragraph. SSAlternatives considered: >= 2
+    alternatives with multi-sentence rationale each. SSCross-references:
+    bulleted list of >= 4 entries (absolute paths + SWAGR sections).
+    Padding to hit the floor is rejected.
+  </mature_not_minimal>
+
+  <cross_repo_ordering>
+    EA-1 commits to devplatform main FIRST (direct-to-main per Stage 6.7.5),
+    capturing the resulting commit hash. THEN commits to BlarAI on the
+    feature/p5-task11-ea1-ledger branch with the ledger entry citing the
+    devplatform commit hash in its body. Co-Lead merges the BlarAI feature
+    branch via trusted_scope at Phase 3.
+  </cross_repo_ordering>
+
+  <oracle>
+    At EA close, after both commits land:
+
+      cd C:\Users\mrbla\devplatform
+      git diff PRE_HEAD...HEAD --name-only
+      Expected (sorted):
+        docs/decisions/DEC-16_parallel-sprint-authorization_v1.md
+        docs/decisions/DEC-17_ledger-format-q1-1-permanence_v1.md
+        docs/decisions/DEC-18_trusted-scope-loc-threshold_v1.md
+
+      cd C:\Users\mrbla\BlarAI
+      git diff main...feature/p5-task11-ea1-ledger --name-only
+      Expected:
+        docs/ledger/TS_sprint11_ea1_dec-bundle.md
+
+    Any other path on either side = ORACLE violation. EA captures both diffs
+    verbatim in the completion comment on Vikunja task #410.
+  </oracle>
+
+  <completion>
+    After ORACLE passes, post `[agent:ea_code][phase:completion]` comment on
+    Vikunja tracking task #410 containing:
+      1. Both commit hashes (devplatform DEC commit + BlarAI ledger commit).
+      2. Both git diff --name-only outputs verbatim.
+      3. Line counts for each of the three DEC files + the ledger entry.
+      4. The TS timestamp used across all four files.
+      5. Confirmation that all Test-Path checks in WI-1 returned True.
+      6. Confirmation that no negative constraint was violated.
+
+    Apply label Gate:Pending-SDO (id 9) on task #410. STOP. WAIT for SDO
+    Phase 1b completion-review verdict.
+
+    Resume the fleet LAST BEFORE posting the completion comment -- ensures
+    the fleet is unpaused for SDO's review-wake to fire cleanly.
+  </completion>
+
+  <budget_envelope>
+    Effective session cap: 60 min (+ active Budget Lift if granted).
+    TTG: 2 h wall-clock.
+    Trusted_scope merge eligibility: yes (Sprint 11 EA-1 working set is 4 new
+    files; aggregate <= ~300 LOC; well under DEC-18 thresholds).
+  </budget_envelope>
+
+  <links>
+    - Continuation: docs/P5_TASK11_SDO_CONTINUATION_v1.0.xml
+    - Sprint 11 SDV (v2): docs/sprints/sprint_11/strategic_design_vision.md
+    - DEC-13 report format: docs/DEC13_REPORT_QUEUE_PROPOSAL_v1.xml
+    - LA SDV v2 parallel-EA amendment: Vikunja #410 comment 550 (2026-05-11)
+  </links>
+
+</ea_prompt>

@@ -1,0 +1,22 @@
+# command: C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_compile.py --ir C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_b --device NPU --mode llmpipeline
+# started: 2026-04-25T19:49:02Z
+# ir xml sha256: 467f67b16f9806b0e592125509cbfacffba821948aa317624fcb11877f54b1e7
+# ir bin sha256: 0d81347d108386358254ed080cd47ce593f826c39ac896b0d689b4b1d1b187af
+
+READY mode=llmpipeline device=NPU ir=C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_b
+[ERROR] 15:49:08.567 [vpux-compiler] Got Diagnostic at loc(fused<{name = "module", type = "Module"}>["module"]) : StopLocationVerifierPass Pass failed : Found 40 duplicated names after full verification
+loc(fused<{name = "module", type = "Module"}>["module"]): error: StopLocationVerifierPass Pass failed : Found 40 duplicated names after full verification
+[ERROR] 15:49:08.570 [vpux-compiler] Failed Pass StopLocationVerifierPass on Operation loc(fused<{name = "module", type = "Module"}>["module"])
+PYTHON_EXCEPTION:RuntimeError:Exception from src\inference\src\cpp\core.cpp:113: | Exception from src\inference\src\dev\plugin.cpp:53: | Exception from src\plugins\intel_npu\src\plugin\npuw\compiled_model.cpp:516: | Failed to compile Model0_kv1152_FCEW000__0 for all devices in [NPU] |  |  | 
+Traceback (most recent call last):
+  File "C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_compile.py", line 78, in main
+    _pipe = LLMPipeline(str(args.ir), args.device)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Exception from src\inference\src\cpp\core.cpp:113:
+Exception from src\inference\src\dev\plugin.cpp:53:
+Exception from src\plugins\intel_npu\src\plugin\npuw\compiled_model.cpp:516:
+Failed to compile Model0_kv1152_FCEW000__0 for all devices in [NPU]
+
+
+
+FAILED elapsed=6.47s

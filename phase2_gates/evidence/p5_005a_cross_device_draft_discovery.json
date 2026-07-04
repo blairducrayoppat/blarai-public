@@ -1,0 +1,33 @@
+{
+  "milestone": "P5-FEASIBILITY-005a",
+  "name": "Cross-device draft model API discovery",
+  "timestamp_utc": "2026-02-27T17:56:09.585245+00:00",
+  "commit_hash": "1f9ddfdeca60a4a711b9aba591ea1df96f174b6e",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "openvino_version": "2026.0.0-20965-c6d6a13a886-releases/2026/0",
+  "openvino_genai_version": "2026.0.0.0-2820-dab5b993a38",
+  "target_model": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-1.7b\\openvino-int4",
+  "draft_models": {
+    "gpu": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-1.7b\\openvino-int4",
+    "npu": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-1.7b\\openvino-int4-npu"
+  },
+  "draft_on_npu_target_on_gpu": {
+    "supported": true,
+    "error": null,
+    "latency_total_ms": 23185.094200000094,
+    "output_preview": "<think>\nOkay, the user just asked for a"
+  },
+  "draft_on_cpu_target_on_gpu": {
+    "supported": true,
+    "error": null,
+    "latency_total_ms": 9263.139999999112,
+    "output_preview": "<think>\nOkay, the user wants a short sentence"
+  },
+  "draft_on_gpu_target_on_gpu": {
+    "supported": true,
+    "error": null,
+    "latency_total_ms": 8649.132800001098,
+    "output_preview": "<think>\nOkay, the user wants a short sentence"
+  }
+}

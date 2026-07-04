@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_prompt version="1.0" task="121" ea_number="5" authored_by="sdo" authored_at="2026-04-23">
+
+  <!--
+    BlarAI — EA Code Execution Prompt
+    Sprint 9 / Task 121: Governance Documentation — EA-5: Governance Landing Page
+    Branch: feature/p5-task9-ea5-governance-landing-page
+    Ledger path (Q1-1 per-file convention — 2026-04-22):
+      docs/ledger/<YYYYMMDD_HHMMSS>_sprint9_ea5_governance-landing-page.md
+    Predecessor ledger_id: 20260423_030132_sprint9_ea4_ops-deployment-rules
+
+    IMPORTANT (L-12): Before ANY authoring begins, the EA MUST post a comprehension
+    gate on Vikunja Task 121 prefixed [agent:ea_code][phase:comprehension] and STOP.
+    Do not start drafting until SDO explicitly approves with
+    [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+
+    IMPORTANT (L-15): This is a PURE DOCUMENTATION milestone.
+    DO NOT modify any file outside docs/governance/ and the single ledger entry.
+    If a production source change appears necessary to make a doc accurate, STOP,
+    note the gap in the doc's "Open Questions / Deferred Items" section, and
+    continue authoring — do NOT modify source.
+
+    IMPORTANT (L-16): Sprint 8 is writing **/tests/; Sprint 9 writes docs/governance/**.
+    Working sets are disjoint; collisions must not occur. If a Sprint 8 merge
+    lands between your branch and main, rebase — do not resolve by editing docs.
+
+    IMPORTANT (L-17): boot-sequence.md is a PHANTOM forward-reference target.
+    The landing page MUST list it with "(forthcoming / GOV-15)" — do NOT create
+    or stub it.
+
+    IMPORTANT (L-18): This is the SYNTHESIS EA. Do NOT edit any prior governance
+    doc (STYLE.md, pgov-validation.md, ipc-protocol.md, streaming-output.md,
+    gpu-runtime.md, error-recovery.md, circuit-breaker.md, context-spotlighting.md,
+    session-state.md, configuration-management.md, observability.md,
+    deployment-verification.md, rule-engine.md, fleet-hygiene.md). If you discover
+    a defect, note it in the ledger's Notes section as a follow-up for SDO to
+    triage; do not fix it inline.
+  -->
+
+  <!-- ===== SECTION 1: PARENT HEAD (L-13) ===== -->
+
+  <parent_head>232cfc9</parent_head>
+  <!-- Verified by SDO via `git rev-parse HEAD` immediately before authoring.
+       HEAD: 232cfc9 (Merge feature/iss-239-merge-policy-absolute-paths into main).
+       EA MUST verify this matches current main HEAD before branching.
+       If HEAD has advanced, rebase onto current main — do not force-checkout 232cfc9. -->
+
+  <!-- ===== SECTION 2: COMPREHENSION GATE (L-12) ===== -->
+
+  <comprehension_gate>
+    <instruction>
+      READ THIS ENTIRE PROMPT before posting your comprehension gate.
+      Then READ every file listed in required_attachments.
+      Then POST a comprehension gate comment on Vikunja Task 121, prefixed:
+
+        [agent:ea_code][phase:comprehension]
+
+      Your comprehension comment MUST contain ALL of the following sections (verbatim
+      section headers required, in this exact order, no numbered prefixes):
+
+        A. MILESTONE OBJECTIVE (3-5 sentences in your own words)
+        B. WORK ITEMS (one sentence for each WI-1..WI-2 — do NOT group)
+        C. FILES TO CREATE (list every new file with exact path — should be
+           exactly TWO: docs/governance/README.md and the ledger entry)
+        D. FILES TO MODIFY (should be empty — this EA creates only)
+        E. FILES TO READ (every governance doc + STYLE.md + Sprint 9 SDV + the
+           two deferred tickets' bodies + this prompt)
+        F. NEGATIVE CONSTRAINTS YOU UNDERSTAND (enumerate NC-1..NC-8 from §5 in
+           your own words — MUST list every NC individually)
+        G. OPEN QUESTIONS (any ambiguity requiring SDO clarification)
+        H. STRUCTURAL RECITATION (§ 7 line-by-line — verbatim section-header
+           outline of the README's sections, in document order)
+        I. DOC INVENTORY (enumerate every file in docs/governance/ as of parent
+           HEAD, with one-line abstract per file, to confirm you have read them)
+
+      If you cannot produce every section with substantive content, STOP and ask
+      in the comprehension gate comment rather than guessing.
+    </instruction>
+    <stop_condition>
+      After posting the comprehension gate, STOP. Do not touch any file, do not
+      branch, do not create docs. Wait for SDO to post
+      [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+      If SDO returns REVISE, address feedback and re-post the gate (same prefix).
+    </stop_condition>
+  </comprehension_gate>
+
+  <!-- ===== SECTION 3: MILESTONE ===== -->
+
+  <milestone>
+    <objective>
+      Author the governance landing page at docs/governance/README.md: a
+      synthesis document that indexes every doc now present in docs/governance/,
+      flags the two deferred domains (GOV-01 credential lifecycle, GOV-10 weight
+      integrity) with their ISS-4 Pluton-blocked rationale, flags the phantom
+      forward-reference (boot-sequence.md / GOV-15), notes the pending
+      TEST_GOVERNANCE.md migration (GOV-MIGRATE), and provides an audience-
+      taxonomy matrix showing which docs serve which of the five personas. The
+      landing page is synthesis-only: it adds no new governance content, only
+      navigation and index structure. It MUST conform to STYLE.md's Doc Template
+      conventions (adapted for an index doc — see WI-1 structure), clear the
+      150-line substantive floor, and cite STYLE.md as the authority for the
+      governance class. Scope held strictly to docs/governance/README.md plus
+      one ledger entry; zero prior governance doc edited (L-18); zero production
+      code modified (L-15).
+    </objective>
+
+    <sprint_context>
+      Sprint 9 governance docs rollout (Task 121, DEC-15 sprint_id=9).
+      EA-1..EA-4 authored 12 domain governance docs + STYLE.md. An additional
+      fleet-hygiene.md landed during the sprint from an adjacent fleet-hygiene
+      maturation stream (commit series ending a6ba981..c2a2ca2) — this EA MUST
+      include it in the landing-page inventory even though it was not in the
+      original 14-domain plan. EA-5 closes the sprint by authoring the landing
+      page. There is no EA-6.
+    </sprint_context>
+
+    <predecessor_ledger_id>20260423_030132_sprint9_ea4_ops-deployment-rules</predecessor_ledger_id>
+
+    <branch>feature/p5-task9-ea5-governance-landing-page</branch>
+
+    <ledger_path>docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea5_governance-landing-page.md</ledger_path>
+    <!-- Q1-1 per-file convention. Use `date -u +"%Y%m%d_%H%M%S"` at commit
+         time to produce the timestamp. One ledger entry for the entire EA-5. -->
+  </milestone>
+
+  <!-- ===== SECTION 4: WORK ITEMS ===== -->
+
+  <work_items>
+
+    <work_item id="WI-1" size="M" priority="high">
+      <title>docs/governance/README.md (landing page)</title>
+      <vikunja_subtask>none — synthesis doc, not a GOV-NN ticket</vikunja_subtask>
+      <scope>
+        New file. Index + navigation doc for the governance class. Synthesis
+        only — contains no new normative content. Every claim the landing page
+        makes about a domain must be backed by the linked doc.
+      </scope>
+      <structure>
+        STYLE.md-adapted layout for an index doc. Required sections IN THIS
+        ORDER (verbatim headers):
+
+          # Governance Documentation Index
+          ## Audience
+          ## How to Read This Directory
+          ## Governance Domain Inventory
+          ### Security and Wire Protocol
+          ### Runtime Behavior and Resilience
+          ### Operational State
+          ### Ops, Deployment, and Rules
+          ### Fleet Hygiene
+          ## Audience Taxonomy Matrix
+          ## Deferred Domains
+          ## Phantom and Forthcoming References
+          ## Pending Migrations
+          ## Style Authority
+          ## Open Questions / Deferred Items
+
+        Level-3 subheaders INSIDE "Governance Domain Inventory" cluster the
+        domain docs by EA-# origin. Each cluster has a one-paragraph abstract
+        + an enumerated bullet list of the domain docs in that cluster with:
+          - link (relative, resolves),
+          - one-line abstract per doc (≤ 25 words),
+          - owning EA + GOV ticket ID.
+
+        The "Audience Taxonomy Matrix" MUST be a markdown table:
+
+          | Doc | Operator | Developer | Auditor | Incident Responder | Future Agent |
+          |-----|----------|-----------|---------|--------------------|--------------|
+
+        with a ✓ / — marking per cell indicating whether that doc's Audience
+        section names the persona as a primary reader. The EA builds this
+        table by grepping each doc's Audience section, NOT by re-judging.
+      </structure>
+      <key_topics>
+        - Domain-by-domain index: every file in docs/governance/ as of parent
+          HEAD, grouped by EA-# origin
+        - Audience taxonomy matrix (source-of-truth = each doc's own Audience
+          section — do NOT second-guess)
+        - Deferred domains: GOV-01 (credential lifecycle) and GOV-10 (weight
+          integrity) with one-sentence ISS-4 deferral rationale + link to the
+          Pluton investigation ticket (Vikunja #101)
+        - Phantom references: boot-sequence.md (GOV-15, Vikunja #124) must be
+          listed with "(forthcoming — see GOV-15)" and NOT linked (file does
+          not exist)
+        - Pending migrations: TEST_GOVERNANCE.md → docs/governance/test.md
+          under GOV-MIGRATE (Vikunja #123), deferred until Sprint 8 closes
+        - Navigation footer: links to CLAUDE.md "Key Documents" table, the
+          `docs/adrs/` directory, and `docs/runbooks/`
+      </key_topics>
+      <source_anchors>
+        <!-- The landing page has no production-source anchors — it anchors to
+             other governance docs, to STYLE.md, and to deferred tickets. -->
+        - docs/governance/STYLE.md — style authority for the governance class
+        - Each governance doc's title (# line) and Audience section
+        - docs/sprints/sprint_9/strategic_design_vision.md §5 — scope ledger
+        - Vikunja tickets #14 (GOV-01), #23 (GOV-10), #101 (ISS-4), #123
+          (GOV-MIGRATE), #124 (GOV-15)
+      </source_anchors>
+      <line_floor>
+        ≥ 150 substantive lines (comments/blank lines excluded). Matrix rows
+        count as substantive. Padding (e.g., repeating abstracts) does NOT.
+      </line_floor>
+      <acceptance>
+        - Every file currently in docs/governance/ (at branch parent HEAD)
+          appears in the inventory — no omissions. Count verified by
+          LINE-FLOOR gate output.
+        - Every GOV-NN ticket from the Sprint 9 SDV §5.1 plan is accounted
+          for: either linked (executed) or listed in Deferred Domains with
+          rationale
+        - Audience Taxonomy Matrix renders as a markdown table with exactly
+          5 persona columns + 1 doc column
+        - Deferred domains section cites ISS-4 (Vikunja #101) as the common
+          blocker
+        - Phantom reference (boot-sequence.md) marked "(forthcoming — see
+          GOV-15)" without a resolving link
+        - TEST_GOVERNANCE.md migration (GOV-MIGRATE, #123) noted as
+          post-Sprint-8 work with the destination path `docs/governance/test.md`
+        - All five audience personas addressed in the top-level Audience
+          section (above the matrix)
+        - STYLE.md cited as the style authority (Style Authority section)
+        - Line floor ≥ 150 substantive lines cleared
+      </acceptance>
+    </work_item>
+
+    <work_item id="WI-2" size="S" priority="high">
+      <title>Ledger entry (Q1-1 per-file convention)</title>
+      <scope>
+        One new file at docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea5_governance-landing-page.md
+        using the predecessor file (20260423_030132_sprint9_ea4_ops-deployment-rules.md)
+        as the format template.
+      </scope>
+      <required_sections>
+        - Frontmatter (ledger_id, date, sprint_id=9, entry_type=EA,
+          predecessor=20260423_030132_sprint9_ea4_ops-deployment-rules,
+          branch=feature/p5-task9-ea5-governance-landing-page,
+          merge_commit=null, disposition=COMPLETE)
+        - ## Task 121 / EA-5: Governance Landing Page (heading)
+        - ### Summary (3-5 sentence narrative — what you synthesized, how the
+          matrix was built, any doc you could not classify cleanly)
+        - ### Deliverables (table: WI | Artifact | Lines | Notes)
+        - ### Files Changed (every file touched, with line counts — expect
+          exactly two: README.md + this ledger entry)
+        - ### Quality Gates (LINE-FLOOR, STYLE.md-adapted conformance,
+          ORACLE L-15, L16-DISJOINT, L-18 prior-doc untouched check)
+        - ### Notes / Observations (any governance doc whose Audience section
+          was ambiguous for the matrix; fleet-hygiene.md was NOT in the
+          original 14-plan but is included — flag for Sprint 9 SCR awareness;
+          any phantom or deferred references that need SDO follow-up)
+      </required_sections>
+      <acceptance>
+        - Frontmatter complete with all required keys
+        - README.md listed in Deliverables with its final line count
+        - All L-15 / L-16 / L-18 compliance items explicitly addressed
+        - fleet-hygiene.md inclusion flagged in Notes
+        - ORACLE gate output quoted verbatim
+      </acceptance>
+    </work_item>
+
+  </work_items>
+
+  <!-- ===== SECTION 5: NEGATIVE CONSTRAINTS ===== -->
+
+  <negative_constraints>
+    <nc id="NC-1">
+      DO NOT modify any file under src/, services/*/src/, launcher/, shared/,
+      tests/, or pyproject.toml. This milestone is docs-only (L-15).
+    </nc>
+    <nc id="NC-2">
+      DO NOT edit any prior governance doc. STYLE.md, pgov-validation.md,
+      ipc-protocol.md, streaming-output.md, gpu-runtime.md, error-recovery.md,
+      circuit-breaker.md, context-spotlighting.md, session-state.md,
+      configuration-management.md, observability.md, deployment-verification.md,
+      rule-engine.md, and fleet-hygiene.md are ALL read-only for this EA (L-18).
+      If a defect surfaces, record it in the ledger's Notes section for SDO
+      triage — do NOT patch inline.
+    </nc>
+    <nc id="NC-3">
+      DO NOT create or stub boot-sequence.md or any other phantom-referenced
+      doc. List boot-sequence.md in the Phantom and Forthcoming References
+      section WITHOUT a resolving link (L-17).
+    </nc>
+    <nc id="NC-4">
+      DO NOT invent new normative governance claims. The landing page is an
+      index; every claim about a domain must be a summary of (or direct quote
+      from) the linked doc's own text. If summarizing feels too speculative,
+      quote instead.
+    </nc>
+    <nc id="NC-5">
+      DO NOT create multiple ledger entries for this EA. One file only,
+      following the Q1-1 per-file timestamp convention. DO NOT append to the
+      frozen docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+    </nc>
+    <nc id="NC-6">
+      DO NOT author new ADRs, DECs, decision records, or protocol specs. The
+      landing page references existing decision records (STYLE.md, ADRs, DECs
+      cited in prior docs) but adds none.
+    </nc>
+    <nc id="NC-7">
+      DO NOT second-guess each doc's Audience section when building the
+      Audience Taxonomy Matrix. If doc X's Audience section does not name
+      persona Y, the matrix cell is "—". If the doc uses a different label
+      for a persona (e.g., "SRE" vs "Operator"), make a conservative mapping
+      and record the mapping rule in the ledger's Notes section.
+    </nc>
+    <nc id="NC-8">
+      L-16 Sprint 8 coexistence: DO NOT touch anything under **/tests/ or
+      anywhere else outside docs/governance/README.md + the single ledger file.
+      Sprint 8 and Sprint 9 working sets are disjoint and must stay so.
+    </nc>
+  </negative_constraints>
+
+  <!-- ===== SECTION 6: RISKS + PRE-EMPTIVE RESOLUTIONS ===== -->
+
+  <risks>
+    <risk id="I.1" severity="medium">
+      <description>
+        fleet-hygiene.md was NOT in the Sprint 9 SDV §5.1 14-doc plan; it landed
+        from an adjacent fleet-hygiene maturation stream. The EA may either
+        omit it (incomplete inventory) or misattribute its provenance.
+      </description>
+      <resolution>
+        Include fleet-hygiene.md in the inventory under "### Fleet Hygiene" as
+        its own cluster (single-member). Attribute provenance honestly: "Added
+        out-of-sprint-plan from fleet-hygiene maturation stream (git log cites
+        commits a6ba981..c2a2ca2 / 04d5e55)." Flag in ledger Notes for
+        Sprint 9 SCR awareness. Do NOT try to backfill it into an EA-1..EA-4
+        cluster — it has a distinct origin.
+      </resolution>
+    </risk>
+
+    <risk id="I.2" severity="medium">
+      <description>
+        Audience Taxonomy Matrix construction is mechanical but error-prone —
+        the EA may hand-judge rather than mechanically reading each doc's
+        Audience section, producing a matrix that doesn't match ground truth.
+      </description>
+      <resolution>
+        Build the matrix by opening each governance doc, reading its Audience
+        section verbatim, and marking ✓ only where the section names the
+        persona (case-insensitive, substring match acceptable). Record the
+        exact matching rule in the ledger Notes. If a doc uses a near-synonym
+        (e.g., "SRE" for "Operator", "on-call" for "Incident Responder"),
+        apply a conservative mapping documented in Notes.
+      </resolution>
+    </risk>
+
+    <risk id="I.3" severity="medium">
+      <description>
+        Deferred-ticket bodies (GOV-01, GOV-10, GOV-MIGRATE, GOV-15, ISS-4)
+        may not be read carefully, causing the landing page to state a wrong
+        deferral rationale or blocker.
+      </description>
+      <resolution>
+        Read each Vikunja ticket body (use mcp__vikunja__get_task for each:
+        #14 GOV-01, #23 GOV-10, #101 ISS-4, #123 GOV-MIGRATE, #124 GOV-15).
+        Quote or paraphrase the ticket body, not your memory of it. Cite the
+        ticket ID in-doc for each deferred / phantom entry so the reader can
+        verify independently.
+      </resolution>
+    </risk>
+
+    <risk id="I.4" severity="low">
+      <description>
+        Line-floor pressure: a pure index doc may struggle to clear 150
+        substantive lines without padding. The Audience Taxonomy Matrix + 14
+        inventory entries + deferred + phantom + migration sections should get
+        there naturally, but the risk is real.
+      </description>
+      <resolution>
+        Depth comes from the per-doc abstracts (one well-chosen sentence per
+        doc × 14 docs is ~14 lines; two-sentence abstracts are appropriate for
+        the largest docs). The matrix is ~16 lines. If the doc comes in at
+        140-149 lines after substantive authoring, STOP and flag to SDO in the
+        completion report — do NOT pad with filler.
+      </resolution>
+    </risk>
+
+    <risk id="I.5" severity="low">
+      <description>
+        Parent-head drift: main may advance between authoring and EA pickup
+        (both Sprint 8 EA-5 and fleet-infrastructure commits could land).
+      </description>
+      <resolution>
+        EA MUST verify `git rev-parse HEAD` matches 232cfc9 before branching.
+        If main has advanced, rebase onto current main. Do NOT force-checkout
+        232cfc9 (L-13). Predecessor ledger_id in frontmatter does not change.
+        Re-run the inventory pass against the post-rebase `ls docs/governance/`
+        — if new docs appeared, include them.
+      </resolution>
+    </risk>
+
+    <risk id="I.6" severity="low">
+      <description>
+        The landing page's relative links may not resolve from the
+        docs/governance/README.md location (e.g., linking with a
+        docs/governance/ prefix instead of bare filename).
+      </description>
+      <resolution>
+        README.md sits INSIDE docs/governance/, so links to sibling docs use
+        bare filenames: `[IPC Protocol](ipc-protocol.md)` NOT
+        `[IPC Protocol](docs/governance/ipc-protocol.md)`. Links to CLAUDE.md
+        or runbooks use `../CLAUDE.md` or `../runbooks/`. Verify each link
+        resolves by opening the relative path from the README's directory
+        before committing.
+      </resolution>
+    </risk>
+  </risks>
+
+  <!-- ===== SECTION 7: STRUCTURAL RECITATION (L-12) ===== -->
+
+  <structural_recitation>
+    <!-- The EA's comprehension gate MUST reproduce the below outline verbatim
+         as Section H of its comprehension comment. Section headers are exact,
+         in document order. -->
+
+    LANDING PAGE STRUCTURE (docs/governance/README.md):
+
+      # Governance Documentation Index
+      ## Audience
+      ## How to Read This Directory
+      ## Governance Domain Inventory
+      ### Security and Wire Protocol
+      ### Runtime Behavior and Resilience
+      ### Operational State
+      ### Ops, Deployment, and Rules
+      ### Fleet Hygiene
+      ## Audience Taxonomy Matrix
+      ## Deferred Domains
+      ## Phantom and Forthcoming References
+      ## Pending Migrations
+      ## Style Authority
+      ## Open Questions / Deferred Items
+
+    CLUSTER-TO-EA MAPPING (Inventory subsections):
+      Security and Wire Protocol      → EA-1 (GOV-04, GOV-02, GOV-03)
+      Runtime Behavior and Resilience → EA-2 (GOV-05, GOV-06, GOV-07)
+      Operational State               → EA-3 (GOV-08, GOV-09, GOV-11)
+      Ops, Deployment, and Rules      → EA-4 (GOV-12, GOV-13, GOV-14)
+      Fleet Hygiene                   → out-of-plan addition (commits
+                                          a6ba981..c2a2ca2 / 04d5e55)
+
+    AUDIENCE PERSONAS (STYLE.md §Audience Taxonomy):
+      - Operator
+      - Developer
+      - Auditor
+      - Incident Responder
+      - Future Agent (Claude or successor)
+  </structural_recitation>
+
+  <!-- ===== SECTION 8: QUALITY GATES ===== -->
+
+  <quality_gates>
+    <gate id="LINE-FLOOR">
+      <command>wc -l docs/governance/README.md</command>
+      <pass_criteria>
+        README.md ≥ 150 substantive lines (comments/blank lines subtracted).
+        Report both raw line count and substantive line count in completion.
+      </pass_criteria>
+    </gate>
+
+    <gate id="STYLE-ADAPTED-CONFORMANCE">
+      <command>grep -c "^## " docs/governance/README.md</command>
+      <pass_criteria>
+        README.md reports ≥ 9 level-2 headers (Audience; How to Read;
+        Governance Domain Inventory; Audience Taxonomy Matrix; Deferred
+        Domains; Phantom and Forthcoming References; Pending Migrations;
+        Style Authority; Open Questions / Deferred Items).
+        Title (# ...) is level-1 and not counted; level-3 cluster headers
+        also not counted by this grep.
+      </pass_criteria>
+    </gate>
+
+    <gate id="INVENTORY-COMPLETENESS">
+      <command>
+        ls docs/governance/*.md | xargs -n 1 basename
+        grep -oE '\[[^]]+\]\([a-z-]+\.md\)' docs/governance/README.md | sort -u
+      </command>
+      <pass_criteria>
+        Every .md file in docs/governance/ (except README.md itself) must
+        appear as a resolving link at least once in README.md. No extra
+        links to nonexistent files except the phantom boot-sequence.md
+        which is explicitly UNLINKED.
+      </pass_criteria>
+    </gate>
+
+    <gate id="ORACLE">
+      <command>git diff main...HEAD --name-only</command>
+      <pass_criteria>
+        Output contains ONLY:
+          - docs/governance/README.md
+          - docs/ledger/&lt;timestamp&gt;_sprint9_ea5_governance-landing-page.md
+        No src/, tests/, shared/, launcher/, services/ paths. No .py files.
+        No edits to prior governance docs. L-15 + L-18 compliance
+        MACHINE-VERIFIED by this gate.
+      </pass_criteria>
+    </gate>
+
+    <gate id="L16-DISJOINT">
+      <command>git diff main...HEAD --name-only | grep -E "(tests/|conftest)" | wc -l</command>
+      <pass_criteria>
+        Output: 0. Zero test-file overlap with Sprint 8's working set.
+      </pass_criteria>
+    </gate>
+
+    <gate id="MATRIX-SHAPE">
+      <command>grep -A 50 "## Audience Taxonomy Matrix" docs/governance/README.md | grep -c "^|"</command>
+      <pass_criteria>
+        ≥ 16 pipe-prefixed lines (1 header + 1 separator + 14 doc rows,
+        15 if fleet-hygiene is a distinct row — 16 expected). Matrix must
+        have exactly 6 columns (Doc + 5 personas).
+      </pass_criteria>
+    </gate>
+  </quality_gates>
+
+  <!-- ===== SECTION 9: VERIFICATION ===== -->
+
+  <verification>
+    <step>1. Run all quality gates (§8). Paste output verbatim into completion report.</step>
+    <step>2. Open README.md and click-walk each relative link by opening the
+      target path from the README's directory. Any 404 = RED.</step>
+    <step>3. For each governance doc, open it, find its Audience section, and
+      confirm the matrix row for that doc matches the Audience section's named
+      personas. Mismatch = RED; fix the matrix (not the doc).</step>
+    <step>4. Confirm every ticket ID cited in Deferred Domains and Phantom
+      References resolves via mcp__vikunja__get_task (no typos). Wrong ticket
+      ID = RED.</step>
+    <step>5. ORACLE gate absolute: git diff main...HEAD --name-only shows
+      exactly two files. If more, something was edited inadvertently — STOP
+      and report before proceeding.</step>
+    <step>6. fleet-hygiene.md attribution check: confirm the provenance note
+      in the Fleet Hygiene cluster cites the correct commit range. Use
+      `git log --oneline -- docs/governance/fleet-hygiene.md` to verify.</step>
+  </verification>
+
+  <!-- ===== SECTION 10: COMMIT + COMPLETION REPORT ===== -->
+
+  <commit_template>
+    <branch_create>git checkout -b feature/p5-task9-ea5-governance-landing-page 232cfc9</branch_create>
+    <staged_files>
+      git add docs/governance/README.md
+      git add docs/ledger/&lt;timestamp&gt;_sprint9_ea5_governance-landing-page.md
+    </staged_files>
+    <commit_message>[agent:ea_code] Sprint 9 EA-5: governance landing page (README synthesis)</commit_message>
+  </commit_template>
+
+  <completion_report>
+    <location>docs/sprints/sprint_9/reports/&lt;YYYYMMDD_HHMMSS&gt;_ea_code_completion_v1.md</location>
+    <required_sections>
+      - Summary (3-5 sentences)
+      - Deliverables table (WI | Artifact | Lines | Notes)
+      - Gate results (each of the six quality gates with command + output)
+      - Inventory cross-check (every file in docs/governance/ mapped to its
+        cluster + its matrix row)
+      - Matrix construction notes (mapping rules used for near-synonym
+        persona labels; any doc whose Audience section was ambiguous)
+      - Cross-references (predecessor ledger, SDV §5.1 plan vs delivered,
+        this prompt)
+      - Follow-ups (any discovered defects in prior governance docs;
+        fleet-hygiene.md out-of-plan flag for Sprint 9 SCR)
+    </required_sections>
+  </completion_report>
+
+  <!-- ===== SECTION 11: MATURE-NOT-MINIMAL ===== -->
+
+  <mature_not_minimal>
+    The landing page is the front door to the governance class for years.
+    Operators, auditors, and future agents will open it first. The 150-line
+    floor is the minimum — the landing page earns its line count through
+    the Audience Taxonomy Matrix (14 rows × substantive mapping) and the
+    per-doc abstracts (one tight sentence per doc that names the doc's
+    actual decision surface, not a bland "this doc covers X").
+
+    What polish looks like here:
+      - Abstracts that name the specific decision or boundary the doc owns
+        (e.g., "owns the 13-constraint TOML validation matrix" beats
+        "covers runtime configuration")
+      - Cluster intros that explain WHY the three docs cluster together
+        (shared source files, shared failure mode, etc.) — traceable to
+        the Sprint 9 SDV §7 clustering rationale
+      - Matrix that actually reflects each doc's stated Audience section,
+        not a generic "everyone reads everything" wash
+      - Deferred-domains section that names the blocker (ISS-4 Pluton
+        feasibility) and the owning ticket, so the reader knows WHO to
+        ping and WHEN to re-check
+      - Phantom reference (boot-sequence.md) called out honestly rather
+        than silently omitted
+
+    What polish is NOT:
+      - Padding the abstracts with filler
+      - Re-explaining each doc's content (that's what the link is for)
+      - Speculative discussion of docs that don't exist yet
+      - Re-asserting normative claims that the linked docs own
+  </mature_not_minimal>
+
+  <!-- ===== SECTION 12: REQUIRED ATTACHMENTS ===== -->
+
+  <required_attachments>
+    <!-- The EA MUST read every file in this list BEFORE posting its
+         comprehension gate. Reading order is not prescribed, but all must be
+         read. -->
+
+    <!-- Style authority + all in-scope governance docs -->
+    <file>docs/governance/STYLE.md</file>
+    <file>docs/governance/pgov-validation.md</file>
+    <file>docs/governance/ipc-protocol.md</file>
+    <file>docs/governance/streaming-output.md</file>
+    <file>docs/governance/gpu-runtime.md</file>
+    <file>docs/governance/error-recovery.md</file>
+    <file>docs/governance/circuit-breaker.md</file>
+    <file>docs/governance/context-spotlighting.md</file>
+    <file>docs/governance/session-state.md</file>
+    <file>docs/governance/configuration-management.md</file>
+    <file>docs/governance/observability.md</file>
+    <file>docs/governance/deployment-verification.md</file>
+    <file>docs/governance/rule-engine.md</file>
+    <file>docs/governance/fleet-hygiene.md</file>
+
+    <!-- Predecessor ledger (format template) -->
+    <file>docs/ledger/20260423_030132_sprint9_ea4_ops-deployment-rules.md</file>
+
+    <!-- Ledger convention -->
+    <file>docs/ledger/README.md</file>
+
+    <!-- SDV -->
+    <file>docs/sprints/sprint_9/strategic_design_vision.md</file>
+
+    <!-- Continuation -->
+    <file>docs/P5_TASK9_SDO_CONTINUATION_v1.0.xml</file>
+
+    <!-- CLAUDE.md navigation target (README footer links back here) -->
+    <file>CLAUDE.md</file>
+
+    <!-- Deferred / phantom / migration ticket bodies (read via
+         mcp__vikunja__get_task, not filesystem) -->
+    <vikunja_ticket>#14 (GOV-01 Credential Lifecycle — deferred)</vikunja_ticket>
+    <vikunja_ticket>#23 (GOV-10 Weight Integrity — deferred)</vikunja_ticket>
+    <vikunja_ticket>#101 (ISS-4 Pluton — common blocker)</vikunja_ticket>
+    <vikunja_ticket>#123 (GOV-MIGRATE TEST_GOVERNANCE consolidation — pending)</vikunja_ticket>
+    <vikunja_ticket>#124 (GOV-15 boot-sequence.md — phantom)</vikunja_ticket>
+  </required_attachments>
+
+</ea_prompt>
