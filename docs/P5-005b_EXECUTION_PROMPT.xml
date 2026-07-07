@@ -1,0 +1,400 @@
+<![CDATA[<execution_prompt milestone="P5-005b" version="1.0" date="2026-02-28">
+
+<metadata>
+  <milestone_id>P5-FEASIBILITY-005b</milestone_id>
+  <title>Extended Context Window + Optimization Characterization for Qwen3-14B on Arc 140V</title>
+  <parent_milestone>P5-FEASIBILITY-005a (commit e6a64c4, disposition QWEN3_14B_WITH_SPEC_DECODING)</parent_milestone>
+  <branch_instruction>Create branch `feature/p5-feasibility-005b-context-optimization` from `feature/p5-feasibility-005-unified-model` (HEAD e6a64c4)</branch_instruction>
+  <harness_declaration>NO_FULL_HARNESS</harness_declaration>
+  <session_type>Execution_Agent</session_type>
+  <scope_boundary>Build and execute the P5-005b benchmark harness. Do NOT modify production services, shared constants, or launcher code. This is evidence-collection only.</scope_boundary>
+</metadata>
+
+<objective>
+  Determine the maximum safe context window and best optimization configuration for
+  Qwen3-14B + speculative decoding (Qwen3-0.6B draft) on Intel Arc 140V (Xe2) GPU
+  with ~16 GB shared LPDDR5X memory.
+
+  The current MAX_OUTPUT_TOKENS=4,096 cap was set based on an obsolete study
+  (P5-FEASIBILITY-001) that analyzed Qwen2.5-1.5B on NPU — a model and device no
+  longer in the architecture (ADR-011 moved all LLM inference to GPU, NPU retired).
+  
+  This milestone produces the empirical data required for the Lead Architect to set
+  a new context window cap via a future ADR amendment. No cap changes are made in
+  this milestone.
+</objective>
+
+<prior_art_summary>
+  <p5_005a_results>
+    P5-005a (commit e6a64c4) ran 18 test configurations across prompt bands [128, 256, 512, 1024, 2048, 3072, 4096].
+    Key findings relevant to P5-005b:
+
+    BEST 14B CONFIG — T-09 (14B + 0.6B draft GPU, runtime_properties={}, num_assistant_tokens=5):
+      Band 128:  13.08 tps, TTFT 415ms, RSS 9296 MB
+      Band 256:  15.82 tps, TTFT 415ms, RSS 9340 MB
+      Band 512:  13.77 tps, TTFT 400ms, RSS 9365 MB
+      Band 1024: 13.24 tps, TTFT 396ms, RSS 9571 MB
+      Band 2048:  8.99 tps, TTFT 459ms, RSS 9731 MB
+      Band 3072: 10.48 tps, TTFT 498ms, RSS 9889 MB
+      Band 4096:  9.58 tps, TTFT 529ms, RSS 10057 MB
+      Speedup vs baseline: 3.18x at band 512
+
+    14B BASELINE — T-01 (no draft, no optimizations):
+      Band 512:  4.33 tps, TTFT 463ms, RSS 9100 MB
+      Band 4096: 3.36 tps, TTFT 686ms, RSS 9539 MB
+
+    CRITICAL FINDINGS FROM P5-005a AUDIT:
+    1. INT8 KV cache (KV_CACHE_PRECISION=u8) HURTS decode TPS on Arc 140V — do NOT use.
+    2. XAttention (GPU_ENABLE_SDPA_OPTIMIZATION) was NEVER tested without INT8 KV — T-03
+       combined both; INT8 contaminated the measurement. Must be isolated.
+    3. Speculative decoding tests (T-09..T-12) ran with runtime_properties={} — never
+       combined with XAttention. This is the biggest untested combination.
+    4. Only num_assistant_tokens=5 was tested — no sweep performed.
+    5. No data exists beyond 4,096 tokens — the entire extended-context decision space is unmapped.
+    6. T-03/T-04 were effectively identical configs due to prefix_cache_api_present=False.
+  </p5_005a_results>
+
+  <kv_cache_memory_math>
+    Qwen3-14B architecture (from models/qwen3-14b/openvino-int4-gpu/config.json):
+      num_hidden_layers=40, num_key_value_heads=8, head_dim=128, max_position_embeddings=40960
+
+    Qwen3-0.6B architecture (from models/qwen3-0.6b/openvino-int4-gpu/config.json):
+      num_hidden_layers=28, num_key_value_heads=8, head_dim=128
+
+    Theoretical KV bytes/token (FP16):
+      14B: 2 * 8 * 128 * 2 * 40 = 163,840 bytes/token (160 KiB/token)
+      0.6B: 2 * 8 * 128 * 2 * 28 = 114,688 bytes/token (112 KiB/token)
+      Combined ceiling: 272 KiB/token
+
+    Empirical KV growth from T-09: RSS grew 761 MB over 3,968 tokens ≈ 196 KiB/token observed.
+
+    Memory projections (14B + 0.6B draft, base model load ~9,262 MB):
+      Context  4,096: Total ~10,350 MB theoretical / ~10,046 MB empirical   (MEASURED ✓)
+      Context  8,192: Total ~11,438 MB theoretical / ~10,830 MB empirical   (within budget)
+      Context 12,288: Total ~12,526 MB theoretical / ~11,614 MB empirical   (comfortable)
+      Context 16,384: Total ~13,614 MB theoretical / ~12,398 MB empirical   (feasible)
+      Context 20,480: Total ~14,702 MB theoretical / ~13,182 MB empirical   (tight)
+      Context 24,576: Total ~15,790 MB theoretical / ~13,966 MB empirical   (ceiling zone)
+      Context 32,768: Total ~17,966 MB theoretical / ~15,534 MB empirical   (OOM expected)
+
+    GPU shared memory ceiling: ~16 GB (dynamic allocation from 32 GB LPDDR5X system RAM).
+  </kv_cache_memory_math>
+
+  <p5_001_obsolescence>
+    The original DO-NOT-EXPAND decision (docs/FEASIBILITY_CONTEXT_WINDOW.md) was based on:
+    1. NPU latency scaling concerns — no longer applicable (ADR-011: GPU only)
+    2. 1,024 MB Orchestrator memory budget — was for Qwen2.5-1.5B in system RAM; GPU has ~16 GB
+    3. Qwen2.5-1.5B architecture (2 KV heads, 28 layers) — replaced by Qwen3-14B (8 KV heads, 40 layers)
+    All three premises are invalidated. A new empirical study is required.
+  </p5_001_obsolescence>
+</prior_art_summary>
+
+<hardware_environment>
+  <soc>Intel Core Ultra 7 258V (Lunar Lake)</soc>
+  <gpu>Intel Arc 140V (Xe2) — ~16 GB shared LPDDR5X via DVMT dynamic allocation</gpu>
+  <ram>32 GB LPDDR5X-8533 (effective ceiling 31.323 GB per ADR-005)</ram>
+  <os>Windows 11 Pro</os>
+  <runtime>OpenVINO GenAI 2026.0 (openvino 2026.0.0-20965, openvino_genai 2026.0.0.0-2820-dab5b993a38)</runtime>
+  <venv>.venv (activated, all dependencies installed from P5-005a session)</venv>
+  <power_requirement>AC power REQUIRED — enforce_ac_power_or_fail_closed() must pass</power_requirement>
+</hardware_environment>
+
+<models_on_disk>
+  <model role="target" path="models/qwen3-14b/openvino-int4-gpu" size_mb="~9100" />
+  <model role="draft" path="models/qwen3-0.6b/openvino-int4-gpu" size_mb="~250" />
+  <!-- The following models exist but are NOT used in P5-005b: -->
+  <!-- models/qwen3-8b/openvino-int4-gpu (8B — excluded, 14B is the selected target) -->
+  <!-- models/qwen3-1.7b/openvino-int4 (1.7B — excluded, 0.6B draft won in P5-005a) -->
+</models_on_disk>
+
+<test_plan>
+  <total_tests>8 configurations (Groups A through D)</total_tests>
+  <execution_policy>
+    - WARMUP_RUNS = 2, MEASURED_RUNS = 5, MAX_NEW_TOKENS = 128 (same as P5-005a)
+    - temperature=0.0, do_sample=False, top_k=1, top_p=1.0 (deterministic)
+    - Each band wrapped in try/except for OOM-safe iteration
+    - On OOM or allocation failure at a band: record the error fingerprint, RSS at failure,
+      and the band value, then CONTINUE to next test (do not abort the entire run)
+    - pipeline gc.collect() + sleep(2) between test configs (same as P5-005a)
+    - AC power enforcement at script start (fail-closed)
+    - Evidence written atomically after each test completes (incremental save)
+  </execution_policy>
+
+  <group id="A" name="Extended Context Baseline" count="2">
+    <purpose>Map the unknown territory beyond 4,096 tokens. Characterize TPS degradation curve, TTFT scaling, and RSS growth at extended context lengths.</purpose>
+    <note>Bands 128-4096 are already measured in P5-005a. Only run new bands here. Include band 4096 as overlap anchor for cross-study calibration.</note>
+
+    <test id="A-01" name="14B Baseline Extended">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>None</draft_model>
+      <runtime_properties>{}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>N/A (not speculative)</num_assistant_tokens>
+      <bands>[4096, 6144, 8192, 12288, 16384, 20480]</bands>
+      <purpose>Baseline degradation curve + memory growth confirmation without speculative decoding</purpose>
+    </test>
+
+    <test id="A-02" name="14B + 0.6B Draft Extended">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>models/qwen3-0.6b/openvino-int4-gpu</draft_model>
+      <draft_device>GPU</draft_device>
+      <runtime_properties>{}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>5</num_assistant_tokens>
+      <assistant_confidence_threshold>0.0</assistant_confidence_threshold>
+      <bands>[4096, 6144, 8192, 12288, 16384, 20480]</bands>
+      <purpose>T-09 equivalent at extended context — the primary measurement for context expansion feasibility</purpose>
+    </test>
+  </group>
+
+  <group id="B" name="Missing Optimization Combinations" count="2">
+    <purpose>Fill critical gaps from P5-005a: XAttention was never tested without INT8 KV, and speculative decoding was never combined with XAttention.</purpose>
+
+    <test id="B-01" name="14B + XAttention Only">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>None</draft_model>
+      <runtime_properties>{"GPU_ENABLE_SDPA_OPTIMIZATION": true}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>N/A (not speculative)</num_assistant_tokens>
+      <bands>[512, 2048, 4096, 8192]</bands>
+      <purpose>Isolate XAttention benefit without INT8 KV contamination. Compare to T-01 baseline.</purpose>
+    </test>
+
+    <test id="B-02" name="14B + 0.6B Draft + XAttention">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>models/qwen3-0.6b/openvino-int4-gpu</draft_model>
+      <draft_device>GPU</draft_device>
+      <runtime_properties>{"GPU_ENABLE_SDPA_OPTIMIZATION": true}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>5</num_assistant_tokens>
+      <assistant_confidence_threshold>0.0</assistant_confidence_threshold>
+      <bands>[512, 2048, 4096, 8192]</bands>
+      <purpose>The untested combination of the two best independent boosters. If this outperforms A-02, it becomes the new best config and gets extended in Group D.</purpose>
+    </test>
+  </group>
+
+  <group id="C" name="Speculation Depth Tuning" count="3">
+    <purpose>P5-005a only tested num_assistant_tokens=5. At longer contexts, the draft acceptance rate may shift. Sweep 3, 7, 10 to find the optimal depth.</purpose>
+
+    <test id="C-01" name="14B + 0.6B Draft (NAT=3)">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>models/qwen3-0.6b/openvino-int4-gpu</draft_model>
+      <draft_device>GPU</draft_device>
+      <runtime_properties>{}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>3</num_assistant_tokens>
+      <assistant_confidence_threshold>0.0</assistant_confidence_threshold>
+      <bands>[512, 4096, 8192]</bands>
+      <purpose>Check if less speculation is faster at long context</purpose>
+    </test>
+
+    <test id="C-02" name="14B + 0.6B Draft (NAT=7)">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>models/qwen3-0.6b/openvino-int4-gpu</draft_model>
+      <draft_device>GPU</draft_device>
+      <runtime_properties>{}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>7</num_assistant_tokens>
+      <assistant_confidence_threshold>0.0</assistant_confidence_threshold>
+      <bands>[512, 4096, 8192]</bands>
+      <purpose>Check if more speculation helps at long context</purpose>
+    </test>
+
+    <test id="C-03" name="14B + 0.6B Draft (NAT=10)">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>models/qwen3-0.6b/openvino-int4-gpu</draft_model>
+      <draft_device>GPU</draft_device>
+      <runtime_properties>{}</runtime_properties>
+      <pipeline_kwargs>{}</pipeline_kwargs>
+      <num_assistant_tokens>10</num_assistant_tokens>
+      <assistant_confidence_threshold>0.0</assistant_confidence_threshold>
+      <bands>[512, 4096, 8192]</bands>
+      <purpose>Check aggressive speculation at long context</purpose>
+    </test>
+  </group>
+
+  <group id="D" name="Best Config Extended Run" count="1" conditional="true">
+    <purpose>After Groups A-C complete and data is analyzed in-script, take the winning configuration and run it at the full extended range to characterize the best config across maximum context.</purpose>
+    <selection_logic>
+      1. From Groups B+C, identify the config with highest mean TPS at band 4096.
+      2. If B-02 at band 4096 > A-02 at band 4096, the best config uses XAttention.
+      3. From Group C, identify the best num_assistant_tokens value at band 4096.
+      4. Combine: best_runtime_properties + best_num_assistant_tokens.
+      5. If no improvement over A-02 at band 4096, use A-02's config for D-01 (NAT=5, no XAttention).
+    </selection_logic>
+
+    <test id="D-01" name="Best Config Extended">
+      <model>models/qwen3-14b/openvino-int4-gpu</model>
+      <draft_model>models/qwen3-0.6b/openvino-int4-gpu</draft_model>
+      <draft_device>GPU</draft_device>
+      <runtime_properties>DETERMINED AT RUNTIME from selection_logic</runtime_properties>
+      <num_assistant_tokens>DETERMINED AT RUNTIME from selection_logic</num_assistant_tokens>
+      <assistant_confidence_threshold>0.0</assistant_confidence_threshold>
+      <bands>[4096, 8192, 12288, 16384, 20480]</bands>
+      <purpose>Characterize the winning configuration at maximum extended context. This is the primary data artifact for the Lead Architect's cap decision.</purpose>
+    </test>
+  </group>
+</test_plan>
+
+<harness_implementation_requirements>
+  <create_file>phase2_gates/scripts/run_p5_feasibility_005b.py</create_file>
+  <base_on>phase2_gates/scripts/run_p5_feasibility_005a.py (attached — reuse infrastructure functions)</base_on>
+
+  <reuse_from_005a>
+    Reuse these verbatim (copy or refactor into shared imports if preferred):
+    - now_iso(), git_head(), write_json_atomic(), read_json()
+    - write_markdown_summary() (adapt header text to P5-005b)
+    - normalize_error(), detect_power_envelope(), enforce_ac_power_or_fail_closed()
+    - percentile(), stats(), RssSampler
+    - run_single_generation(), call_generate_with_optional_stream(), summarize_runs()
+    - path_has_model(), model_paths_ok(), available_devices(), supported_gpu_properties()
+    - build_user_content_to_token_len(), build_chat_prompt()
+    - create_pipeline()
+  </reuse_from_005a>
+
+  <changes_from_005a>
+    1. PROMPT_BANDS: Remove hardcoded constant. Each test specifies its own band list.
+    2. make_generation_config(): Accept num_assistant_tokens as a parameter (int), not hardcoded 5.
+       Signature: make_generation_config(assisted: bool = False, num_assistant_tokens: int = 5) -> Any
+    3. test_specifications(): Replace the 18-test matrix with the 8-test P5-005b matrix defined above.
+       Each test dict must include: id, name, model_path, runtime_properties, pipeline_kwargs,
+       draft_model_path, draft_device, bands (list[int]), num_assistant_tokens (int|None),
+       assistant_confidence_threshold (float|None), is_speculative (bool), group (str: A|B|C|D).
+    4. OOM-safe band iteration: In run_test(), wrap each band's generation loop in a try/except
+       that catches ALL exceptions (including RuntimeError for GPU allocation failures).
+       On band failure: record error fingerprint + RSS + band value in the point dict,
+       set point status to "oom_or_error", and CONTINUE to next band (do NOT break).
+       After the band loop, if ANY band succeeded, keep test status as "completed".
+    5. Group D selection logic: After Groups A-C execute, the harness must:
+       a) Extract mean TPS at band 4096 from A-02, B-02, and C-01/C-02/C-03.
+       b) Determine best runtime_properties (XAttention on/off) by comparing B-02 vs A-02.
+       c) Determine best num_assistant_tokens by comparing C-01/C-02/C-03 at band 4096.
+       d) Configure D-01 with the winning combination.
+       e) Log the selection rationale in the evidence JSON.
+    6. Quality gate (evaluate_umdfg equivalent): Define P5-005b-specific gates:
+       G-01: A-02 completed with ≥3 valid bands above 4096
+       G-02: D-01 completed with ≥3 valid bands
+       G-03: OOM boundary identified (at least one band failed in Group A or D)
+             OR all bands through 20480 passed (ceiling not reached)
+       G-04: Peak RSS at highest successful band ≤ 15,507 MB (MEMORY_BUDGET_MB)
+       G-05: Best config TPS at band 8192 ≥ 5.0 (minimum viability for code agent)
+    7. Evidence output:
+       - JSON: phase2_gates/evidence/p5_005b_context_optimization_matrix.json
+       - Summary: phase2_gates/evidence/p5_005b_context_optimization_summary.md
+    8. MEMORY_WARN_MB = 15_800.0 (tighter than 005a's 26,000 — we are probing the ceiling)
+       On RSS > MEMORY_WARN_MB: record warning but do NOT abort the test. Let the next
+       band attempt naturally OOM to find the true boundary.
+  </changes_from_005a>
+
+  <coding_standards>
+    - Python 3.12+, strict type hints, PEP 8
+    - from __future__ import annotations
+    - Deterministic execution: temperature=0.0, do_sample=False, top_k=1, top_p=1.0
+    - All evidence written atomically (write_json_atomic pattern)
+    - Incremental save after each test completes
+    - No external network calls (privacy mandate)
+    - No modifications to files outside phase2_gates/scripts/ and phase2_gates/evidence/
+  </coding_standards>
+</harness_implementation_requirements>
+
+<expected_outputs>
+  <evidence>
+    <file>phase2_gates/evidence/p5_005b_context_optimization_matrix.json</file>
+    <file>phase2_gates/evidence/p5_005b_context_optimization_summary.md</file>
+  </evidence>
+
+  <summary_md_must_include>
+    1. TPS degradation table: all tests × all bands (TPS mean, TTFT mean, RSS peak)
+    2. OOM boundary identification: last successful band + first failing band per config
+    3. Group D selection rationale: which config won and why
+    4. Best configuration tuple: (XAttention yes/no, num_assistant_tokens, max_safe_context_band)
+    5. Memory growth curve data: RSS at each band for A-02 and D-01
+    6. Quality gate pass/fail matrix
+  </summary_md_must_include>
+
+  <json_structure>
+    Top-level keys: milestone, timestamp_utc, metadata (env snapshot), prior_art_reference,
+    benchmark_policy, tests (list of test result dicts), d01_selection_rationale,
+    quality_gate, finished_utc.
+    Each test result: id, name, group, config details, points (per-band), status.
+    Each point: prompt_length_user_tokens_target, prompt_length_user_tokens_actual,
+    formatted_prompt_tokens, runs (list), summary (stats), status (ok|oom_or_error),
+    error_fingerprint (if failed).
+  </json_structure>
+</expected_outputs>
+
+<execution_checklist>
+  <step order="1">Create branch feature/p5-feasibility-005b-context-optimization from current HEAD (e6a64c4).</step>
+  <step order="2">Create phase2_gates/scripts/run_p5_feasibility_005b.py implementing the full harness per requirements above.</step>
+  <step order="3">Verify the script compiles: python -m py_compile phase2_gates/scripts/run_p5_feasibility_005b.py</step>
+  <step order="4">Ensure AC power is connected and no GPU-intensive processes are running.</step>
+  <step order="5">Execute: .\.venv\Scripts\python.exe phase2_gates/scripts/run_p5_feasibility_005b.py</step>
+  <step order="6">After execution completes, verify evidence artifacts exist and are non-empty.</step>
+  <step order="7">Review summary.md output for correctness — all quality gates evaluated, no structural gaps.</step>
+  <step order="8">Commit with message: "P5-005b: extended context + optimization characterization for Qwen3-14B"</step>
+  <step order="9">Do NOT merge to main. Do NOT modify production code. Do NOT update shared/constants.py.</step>
+  <step order="10">Report final disposition and highlight: OOM boundary, best config, TPS at 8192/16384.</step>
+</execution_checklist>
+
+<commit_template>
+P5-005b: extended context + optimization characterization for Qwen3-14B
+
+Harness: phase2_gates/scripts/run_p5_feasibility_005b.py
+Evidence: phase2_gates/evidence/p5_005b_context_optimization_matrix.json
+Summary: phase2_gates/evidence/p5_005b_context_optimization_summary.md
+
+Groups:
+  A — Extended context baseline (14B solo + 14B+0.6B draft) to 20480 tokens
+  B — XAttention isolation + XAttention+draft combination
+  C — num_assistant_tokens sweep (3, 7, 10)
+  D — Best config extended run (auto-selected)
+
+Disposition: [AGENT FILLS IN]
+Best config: [AGENT FILLS IN]
+OOM boundary: [AGENT FILLS IN]
+Max safe context: [AGENT FILLS IN]
+</commit_template>
+
+<doc_update_requirements>
+  After commit, update these documents (minimal additions only):
+  1. docs/POST_OPERATIONAL_MATURATION_LEDGER.md — Add P5-005b entry following existing format.
+  2. docs/IMPLEMENTATION_PLAN.md — Add section 1.11 (or next available) for P5-005b snapshot.
+  Do NOT update docs/FEASIBILITY_CONTEXT_WINDOW.md — that is frozen as the P5-001 record.
+  Do NOT update docs/GAP_TO_OPERATIONAL_REPORT.md — that is frozen as the Phase 4 record.
+  Do NOT update .github/copilot-instructions.md — that is SDO-only.
+</doc_update_requirements>
+
+<constraints>
+  <constraint>Single-session scope: execute P5-005b only. Do not start P5-005c or any follow-on work.</constraint>
+  <constraint>No production code changes: services/, shared/, launcher/ are READ-ONLY for this session.</constraint>
+  <constraint>No cap changes: MAX_OUTPUT_TOKENS remains 4,096. This milestone collects evidence only.</constraint>
+  <constraint>Fail-closed evidence: if the harness cannot complete, emit partial evidence with explicit
+    UNSAMPLED region declarations and quality-gate FAIL disposition.</constraint>
+  <constraint>If the benchmark runs longer than expected, do NOT silently reduce MEASURED_RUNS or skip
+    bands. Run what you can; declare what was skipped.</constraint>
+  <constraint>Windows 11 Pro host: use backslash paths and PowerShell-compatible commands.</constraint>
+  <constraint>No external network calls from generated code (privacy mandate).</constraint>
+  <constraint>Do NOT generate SDO prompts or continuation prompts. That is SDO-only scope.</constraint>
+</constraints>
+
+<rollback_plan>
+  If the benchmark harness causes system instability (OOM crash, GPU hang):
+  1. Do NOT delete the branch — preserve for forensic audit.
+  2. Record the failure state in partial evidence JSON (whatever was written before crash).
+  3. Note the last successful band and test in the commit message.
+  4. The branch can be re-executed after system recovery without losing prior test data
+     (the harness writes incrementally).
+</rollback_plan>
+
+<required_attachments>
+  The following files MUST be attached to the Execution Agent chat session:
+  1. .github/copilot-instructions.md (governance rules)
+  2. phase2_gates/scripts/run_p5_feasibility_005a.py (base harness — full file)
+  3. phase2_gates/evidence/p5_005a_unified_draft_feasibility_matrix.json (prior results data)
+  4. docs/adrs/ADR-011-All-LLM-Inference-GPU-NPU-Retirement.md (device allocation authority)
+  5. docs/adrs/ADR-005-Empirical-Memory-Ceiling-Correction.md (memory ceiling reference)
+  6. shared/constants.py (current cap values for reference)
+</required_attachments>
+
+</execution_prompt>
+]]>

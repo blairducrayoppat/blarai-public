@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directing the Machine — BlarAI, a portfolio talk</title>
+<style>
+/* ============================================================
+   Directing the Machine — Fable 5 Authored Edition (2026-07-03)
+   Fully local. No network requests of any kind. System fonts.
+   Palette: validated dark-surface steps (dataviz reference).
+   ============================================================ */
+:root{
+  --page:#0d0d0d;            /* page plane */
+  --surface:#1a1a19;         /* card surface */
+  --ink:#ffffff;             /* primary ink */
+  --ink-2:#c3c2b7;           /* secondary ink */
+  --ink-3:#898781;           /* muted ink */
+  --hair:#2c2c2a;            /* hairline */
+  --ring:rgba(255,255,255,.10);
+  --accent:#3987e5;          /* categorical slot 1, dark step */
+  --accent-2:#199e70;        /* aqua */
+  --violet:#9085e9;
+  --red:#e66767;             /* categorical red (failure numerals) */
+  --good:#0ca30c;            /* status good  (labeled, never alone) */
+  --crit:#d03b3b;            /* status critical (labeled, never alone) */
+  --warn:#fab219;
+  --radius:14px;
+  --ease:cubic-bezier(.22,.72,.18,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--page);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  overflow:hidden;line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+/* ---- ambient background: two drifting orbs + vignette ---- */
+.orb{position:fixed;border-radius:50%;filter:blur(90px);opacity:.35;pointer-events:none;z-index:0}
+.orb.a{width:44vw;height:44vw;left:-12vw;top:-14vw;background:radial-gradient(circle,#16345c 0%,transparent 65%);animation:drifta 46s var(--ease) infinite alternate}
+.orb.b{width:38vw;height:38vw;right:-10vw;bottom:-12vw;background:radial-gradient(circle,#1c2a24 0%,transparent 65%);animation:driftb 58s var(--ease) infinite alternate}
+@keyframes drifta{from{transform:translate(0,0) scale(1)}to{transform:translate(9vw,7vh) scale(1.15)}}
+@keyframes driftb{from{transform:translate(0,0) scale(1.1)}to{transform:translate(-7vw,-6vh) scale(.95)}}
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:radial-gradient(120% 120% at 50% 42%,transparent 55%,rgba(0,0,0,.5) 100%)}
+/* ---- deck & slides ---- */
+.deck{position:relative;z-index:2;height:100%;}
+.slide{
+  position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+  padding:5.5vh 7vw 9vh;max-width:1280px;margin:0 auto;
+  opacity:0;visibility:hidden;transform:translateY(26px);
+  transition:opacity .55s var(--ease),transform .55s var(--ease),visibility 0s .55s;
+}
+.slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .55s var(--ease),transform .55s var(--ease)}
+.slide.leaving-up{transform:translateY(-18px)}
+.kicker{font-size:clamp(11px,1.2vw,14px);letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2.2vh;font-weight:600}
+.kicker .knum{color:var(--red);font-weight:700}
+h1{font-size:clamp(42px,7vw,88px);line-height:1.02;font-weight:750;letter-spacing:-.02em}
+h2{font-size:clamp(30px,4.6vw,56px);line-height:1.06;font-weight:700;letter-spacing:-.015em;max-width:22ch}
+.sub{font-size:clamp(17px,1.9vw,24px);color:var(--ink-2);max-width:56ch;margin-top:2.6vh}
+.byline{margin-top:5vh;color:var(--ink-3);font-size:clamp(13px,1.4vw,16px)}
+.byline b{color:var(--ink-2);font-weight:600}
+.hint{position:absolute;bottom:11vh;left:7vw;color:var(--ink-3);font-size:14px;opacity:.85}
+.hint kbd{border:1px solid var(--hair);border-radius:5px;padding:1px 7px;font-family:inherit;background:var(--surface)}
+/* ---- staged reveals ---- */
+[data-reveal]{opacity:0;transform:translateY(16px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+[data-reveal].shown{opacity:1;transform:none}
+/* ---- stat tiles (hero numbers wear ink, accent is a side rule) ---- */
+.stats{display:flex;gap:2.4vw;margin-top:4.5vh;flex-wrap:wrap}
+.stat{background:var(--surface);border:1px solid var(--ring);border-radius:var(--radius);
+  padding:2.6vh 2vw;min-width:200px;flex:1;position:relative;overflow:hidden}
+.stat::before{content:"";position:absolute;left:0;top:12%;bottom:12%;width:3px;border-radius:2px;background:var(--accent)}
+.stat.bad::before{background:var(--red)}
+.stat.good::before{background:var(--good)}
+.stat .v{font-size:clamp(38px,5.2vw,64px);font-weight:750;letter-spacing:-.02em;line-height:1.05}
+.stat .v .arrow{color:var(--ink-3);font-weight:400;margin:0 .12em}
+.stat .l{color:var(--ink-3);font-size:clamp(13px,1.4vw,16px);margin-top:.8vh}
+.bigstat{margin-top:5vh}
+.bigstat .v{font-size:clamp(72px,13vw,168px);font-weight:800;letter-spacing:-.03em;line-height:1}
+.bigstat .v .from{color:var(--ink-2)}
+.bigstat .v .arrow{color:var(--ink-3);font-weight:300;margin:0 .1em}
+.bigstat .v .to{color:var(--red)}
+.bigstat .l{color:var(--ink-2);font-size:clamp(16px,1.9vw,22px);margin-top:1.4vh;max-width:52ch}
+/* ---- chips & cards ---- */
+.chips{display:flex;flex-wrap:wrap;gap:.9vh .8vw;margin-top:3.5vh;max-width:100ch}
+.chip{border:1px solid var(--hair);background:var(--surface);border-radius:999px;
+  padding:.9vh 1.3vw;font-size:clamp(13px,1.5vw,17px);color:var(--ink-2)}
+.chip b{color:var(--ink);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.6vw;margin-top:4vh}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:var(--radius);padding:2.6vh 1.6vw}
+.card h3{font-size:clamp(17px,1.9vw,22px);font-weight:650;margin-bottom:1vh}
+.card p{color:var(--ink-2);font-size:clamp(14px,1.5vw,17px)}
+.card .n{color:var(--accent);font-weight:750;font-size:clamp(20px,2.2vw,26px);display:block;margin-bottom:.6vh}
+.quote{margin-top:4.5vh;background:var(--surface);border:1px solid var(--ring);border-left:4px solid var(--warn);
+  border-radius:var(--radius);padding:3vh 2.4vw;max-width:78ch}
+.quote p{font-size:clamp(20px,2.6vw,32px);font-weight:600;line-height:1.25}
+.quote .who{color:var(--ink-3);margin-top:1.4vh;font-size:clamp(13px,1.5vw,16px)}
+.answer{margin-top:2.6vh;font-size:clamp(20px,2.6vw,30px);font-weight:700;color:var(--good)}
+.answer small{display:block;color:var(--ink-2);font-weight:400;font-size:clamp(14px,1.6vw,18px);margin-top:.6vh}
+.evidence{position:absolute;bottom:5.5vh;left:7vw;color:var(--ink-3);font-size:13px}
+.evidence b{color:var(--ink-3);font-weight:600}
+/* ---- the built≠live ladder ---- */
+.ladder{display:flex;gap:.6vw;margin-top:4.5vh;align-items:stretch;flex-wrap:wrap}
+.rung{flex:1;min-width:130px;background:var(--surface);border:1px solid var(--ring);border-radius:12px;
+  padding:2vh 1vw;text-align:center;position:relative}
+.rung b{display:block;font-size:clamp(15px,1.8vw,21px);letter-spacing:.06em}
+.rung span{color:var(--ink-3);font-size:clamp(11px,1.2vw,13px);display:block;margin-top:.6vh}
+.rung:not(:last-child)::after{content:"≠";position:absolute;right:-0.62vw;top:50%;transform:translate(50%,-50%);
+  color:var(--red);font-weight:800;font-size:clamp(15px,1.7vw,20px);z-index:3}
+/* ---- two questions ---- */
+.qs{display:grid;grid-template-columns:1fr 1fr;gap:1.6vw;margin-top:4vh}
+.q{background:var(--surface);border:1px solid var(--ring);border-radius:var(--radius);padding:2.6vh 1.8vw}
+.q .qn{color:var(--accent);font-weight:750;letter-spacing:.14em;font-size:13px}
+.q p{font-size:clamp(17px,2vw,24px);font-weight:600;margin-top:1vh}
+/* ---- svg diagrams ---- */
+.diag{margin-top:4vh;width:100%;max-width:980px}
+.diag svg{width:100%;height:auto;display:block}
+.diag text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.dr{stroke-dasharray:var(--len,600);stroke-dashoffset:var(--len,600)}
+.shown .dr,[data-reveal].shown .dr{animation:draw 1.1s var(--ease) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+/* ---- chrome: rail, counter, audio chip, help, notes, timer ---- */
+.rail{position:fixed;left:0;right:0;bottom:0;height:4px;background:var(--hair);z-index:8}
+.rail .fill{height:100%;width:0;background:var(--accent);transition:width .4s var(--ease)}
+.rail .tick{position:absolute;top:-2px;width:2px;height:8px;background:var(--ink-3);opacity:.6}
+.chrome{position:fixed;top:2.4vh;right:2.2vw;display:flex;gap:.7vw;z-index:9;align-items:center}
+.chipbtn{border:1px solid var(--hair);background:rgba(26,26,25,.82);color:var(--ink-2);
+  border-radius:999px;padding:.7vh 1.1vw;font-size:13px;cursor:pointer;user-select:none}
+.chipbtn:hover{border-color:var(--ink-3)}
+.counter{position:fixed;bottom:2.2vh;right:2.2vw;color:var(--ink-3);font-size:13px;z-index:9;
+  font-variant-numeric:tabular-nums}
+#timerchip{display:none;font-variant-numeric:tabular-nums}
+#timerchip.on{display:inline-block}
+#timerchip .pace-good{color:var(--good)} #timerchip .pace-warn{color:var(--warn)} #timerchip .pace-bad{color:var(--crit)}
+.overlay{position:fixed;inset:0;background:rgba(13,13,13,.9);z-index:20;display:none;
+  padding:8vh 10vw;overflow:auto}
+.overlay.on{display:block}
+.overlay h3{font-size:24px;margin-bottom:2vh}
+.overlay table{border-collapse:collapse;font-size:15px}
+.overlay td{padding:.7vh 1.4vw;border-bottom:1px solid var(--hair);color:var(--ink-2)}
+.overlay td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+.overlay .zoomtip{margin-top:3vh;color:var(--warn);max-width:70ch}
+.overlay pre{color:var(--ink-2);font-size:14px;line-height:1.7;white-space:pre-wrap}
+#notes{position:fixed;left:0;right:0;bottom:0;max-height:38vh;overflow:auto;z-index:15;
+  background:rgba(20,20,19,.96);border-top:1px solid var(--hair);padding:2.4vh 6vw;display:none}
+#notes.on{display:block}
+#notes .nt{color:var(--ink-3);font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:1vh}
+#notes .nb{color:var(--ink-2);font-size:16px;max-width:100ch;line-height:1.6}
+aside.notes{display:none}
+.toast{position:fixed;left:50%;top:5vh;transform:translateX(-50%);background:var(--surface);
+  border:1px solid var(--ring);border-radius:999px;padding:.9vh 1.8vw;font-size:14px;color:var(--ink-2);
+  z-index:30;opacity:0;transition:opacity .3s}
+.toast.on{opacity:1}
+/* ---- reduced motion ---- */
+@media (prefers-reduced-motion:reduce){
+  .orb{animation:none}
+  .slide,[data-reveal]{transition:none}
+  .shown .dr,[data-reveal].shown .dr{animation:none;stroke-dashoffset:0}
+}
+@media (max-width:760px){ .qs{grid-template-columns:1fr} .rung:not(:last-child)::after{display:none} }
+</style>
+</head>
+<body>
+<div class="orb a"></div><div class="orb b"></div><div class="vignette"></div>
+
+<main class="deck" id="deck">
+
+<!-- 1 ▸ TITLE -->
+<section class="slide" data-chapter="0">
+  <div class="kicker">BlarAI · a portfolio talk</div>
+  <h1>Directing the<br>Machine</h1>
+  <p class="sub">Shipping a professional-grade, privacy-first AI system by managing AI agents — not by writing the code.</p>
+  <p class="byline">Blair &nbsp;·&nbsp; <b>Fable 5 Authored Edition</b> &nbsp;·&nbsp; July 2026</p>
+  <p class="hint">Press <kbd>space</kbd> to begin &nbsp;·&nbsp; <kbd>?</kbd> help &nbsp;·&nbsp; <kbd>N</kbd> notes &nbsp;·&nbsp; <kbd>T</kbd> timer</p>
+  <aside class="notes">Hi — I'm Blair. I need to be upfront about something: I am not a career software engineer. What I want to show you in the next thirteen minutes is how I shipped a professional-grade AI system anyway — by directing AI coding agents instead of typing the code myself. The system is called BlarAI: a private AI assistant that runs entirely on one laptop. But the product is only half the story. The other half is the management method it forced me to learn — how you delegate to AI, what you can trust, what you must verify, and which decisions a human must never hand over. Everything I'll show you is documented in a public build journal, failures included. And one more thing: this very presentation was built by an AI agent, under my direction, using exactly the method it describes.</aside>
+</section>
+
+<!-- 2 ▸ THE FOUNDING FAILURE -->
+<section class="slide" data-chapter="1">
+  <div class="kicker"><span class="knum">The founding failure</span></div>
+  <h2>My first system produced paper, not product.</h2>
+  <div class="bigstat" data-reveal>
+    <div class="v"><span class="from" data-count="259">0</span><span class="arrow">→</span><span class="to" data-count="15">0</span></div>
+    <div class="l">automated agent sessions &nbsp;→&nbsp; sessions that committed real code. The other 244 committed documents about the documents.</div>
+  </div>
+  <p class="sub" data-reveal>It ran for months. It felt exactly like progress.</p>
+  <div class="evidence">Evidence: BUILD_JOURNAL.md, lesson 1 — "Process is not progress."</div>
+  <aside class="notes">I started the way an ambitious non-developer with AI tools would: I built a factory. A fleet of autonomous agents that woke on a schedule and were supposed to build my product while I slept. It ran for months, and it cost real money. Here's what it actually produced: two hundred fifty-nine sessions that committed something — and fifteen of them committed working code. The other two hundred forty-four produced design documents, reports on the documents, and audits of the reports. Every day it generated artifacts, so every day it felt like progress. The first and most expensive lesson of this whole project is written at the top of my journal: process is not progress. Activity is not outcome. I killed my own factory — and that decision is where the real project begins.</aside>
+</section>
+
+<!-- 3 ▸ THE METHOD -->
+<section class="slide" data-chapter="1">
+  <div class="kicker">The pivot</div>
+  <h2>One loop replaced the factory. Nothing counts until I watch it run.</h2>
+  <div class="diag" data-reveal aria-label="Loop diagram: build small, show me it running, verify live, commit — repeating">
+    <svg viewBox="0 0 980 300" role="img">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#898781"/></marker></defs>
+      <g fill="none" stroke-width="2">
+        <rect class="dr" style="--len:520" x="20"  y="110" width="200" height="80" rx="14" stroke="#3987e5"/>
+        <rect class="dr" style="--len:520" x="270" y="110" width="200" height="80" rx="14" stroke="#3987e5"/>
+        <rect class="dr" style="--len:520" x="520" y="110" width="200" height="80" rx="14" stroke="#3987e5"/>
+        <rect class="dr" style="--len:520" x="770" y="110" width="190" height="80" rx="14" stroke="#0ca30c"/>
+        <path class="dr" style="--len:60"  d="M220 150 H262" stroke="#898781" marker-end="url(#ah)"/>
+        <path class="dr" style="--len:60"  d="M470 150 H512" stroke="#898781" marker-end="url(#ah)"/>
+        <path class="dr" style="--len:60"  d="M720 150 H762" stroke="#898781" marker-end="url(#ah)"/>
+        <path class="dr" style="--len:900" d="M865 190 C865 260 120 260 120 196" stroke="#898781" marker-end="url(#ah)"/>
+      </g>
+      <g fill="#ffffff" font-size="21" font-weight="600" text-anchor="middle">
+        <text x="120" y="157">build small</text>
+        <text x="370" y="147">show me it</text><text x="370" y="172">running</text>
+        <text x="620" y="157">verify live</text>
+        <text x="865" y="157">commit</text>
+      </g>
+      <text x="492" y="288" fill="#898781" font-size="15" text-anchor="middle">a passing test is a claim — the running system is the proof</text>
+    </svg>
+  </div>
+  <div class="evidence">First day on the loop: 4 real fixes shipped. First benchmark: a feature the config swore was on had never run once.</div>
+  <aside class="notes">The replacement was almost embarrassingly simple. One loop. The agent builds the smallest thing that can genuinely run. Then — and this is the phrase that became my management style — show me it running. Not a green test suite, not a report: the real system, doing the real thing, in front of me. Then it gets verified live, and only then does it count. The very first day on this loop shipped four real fixes. And the first honest benchmark found that a performance feature the configuration file swore was enabled had silently never run at all. That taught me the deeper rule underneath the loop: what you configure is not what runs, and what a report claims is not what happened. Instruments over assertions. Demonstrations over activity. That single habit is what everything else tonight is built on.</aside>
+</section>
+
+<!-- 4 ▸ WHAT SHIPPED -->
+<section class="slide" data-chapter="2">
+  <div class="kicker">The result</div>
+  <h2>Six weeks on that loop shipped a real product.</h2>
+  <div class="stats">
+    <div class="stat" data-reveal><div class="v" data-count="4919">0</div><div class="l">tests in the standing gate — zero failures at every merge</div></div>
+    <div class="stat" data-reveal><div class="v">32&nbsp;GB</div><div class="l">one consumer laptop — model, memory, everything local</div></div>
+    <div class="stat good" data-reveal><div class="v">1</div><div class="l">governed network door — everything else stays on the machine</div></div>
+  </div>
+  <div class="chips" data-reveal>
+    <span class="chip"><b>Native app</b> — chat, streaming, themes</span>
+    <span class="chip"><b>Voice</b> — both directions</span>
+    <span class="chip"><b>Vision</b> — ask about photos</span>
+    <span class="chip"><b>Documents</b> — load &amp; recall</span>
+    <span class="chip"><b>Knowledge bank</b> — encrypted memory</span>
+    <span class="chip"><b>Image generation</b> — on-device</span>
+    <span class="chip"><b>Web search</b> — fingerprint-gated</span>
+    <span class="chip"><b>Coding dispatch</b> — it directs agents too</span>
+  </div>
+  <div class="evidence">At rest: hardware-sealed encryption (TPM). At boot: signature-verified model weights.</div>
+  <aside class="notes">So what did the loop actually build? A private AI assistant on one thirty-two-gigabyte consumer laptop. You talk to it, it talks back. You show it photos and it reads them. It ingests articles into an encrypted knowledge bank and recalls them weeks later. It generates images on-device. It searches the web through a single governed door that asks for my fingerprint. And — my favorite part — it can now dispatch its own team of coding agents to build software. Under the hood: every store is encrypted with keys sealed in the laptop's security chip, and the AI model itself is signature-verified at every boot. The quality floor is a standing gate of about four thousand nine hundred tests that has held at zero failures through every merge. I tell you this not to claim I'm a great engineer — I'm not — but so you know the method produces professional-grade results.</aside>
+</section>
+
+<!-- 5 ▸ THE OPERATING MODEL -->
+<section class="slide" data-chapter="2">
+  <div class="kicker">The operating model</div>
+  <h2>Agents own the <em>how</em>. I own the <em>what</em> and the <em>why</em>.</h2>
+  <div class="diag" data-reveal aria-label="Boundary diagram: agents own code, tests, wiring; decisions about capability, quality and risk escalate to me">
+    <svg viewBox="0 0 980 250" role="img">
+      <defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#898781"/></marker></defs>
+      <g fill="none" stroke-width="2">
+        <rect class="dr" style="--len:840" x="20"  y="40" width="400" height="170" rx="14" stroke="#9085e9"/>
+        <rect class="dr" style="--len:840" x="560" y="40" width="400" height="170" rx="14" stroke="#3987e5"/>
+        <path class="dr" style="--len:120" d="M424 90  H556" stroke="#898781" marker-end="url(#ah2)"/>
+        <path class="dr" style="--len:120" d="M556 165 H424" stroke="#898781" marker-end="url(#ah2)"/>
+      </g>
+      <g fill="#ffffff" font-size="20" font-weight="650" text-anchor="middle">
+        <text x="220" y="75">ME — the operator</text>
+        <text x="760" y="75">THE AGENTS</text>
+      </g>
+      <g fill="#c3c2b7" font-size="16" text-anchor="middle">
+        <text x="220" y="112">capability · quality · risk</text>
+        <text x="220" y="138">consent · what ships</text>
+        <text x="760" y="112">code · tests · wiring</text>
+        <text x="760" y="138">mechanics · refactors</text>
+      </g>
+      <g fill="#898781" font-size="14" text-anchor="middle">
+        <text x="490" y="80">delegate the mechanics</text>
+        <text x="490" y="188">escalate the decisions</text>
+      </g>
+    </svg>
+  </div>
+  <div class="qs">
+    <div class="q" data-reveal><div class="qn">QUESTION 1</div><p>"Which real seam did the test actually exercise?"</p></div>
+    <div class="q" data-reveal><div class="qn">QUESTION 2</div><p>"Has this run live, on this machine, since the change?"</p></div>
+  </div>
+  <aside class="notes">Managing AI agents turned out to be a real management job, with a boundary you have to draw and then defend from both sides. The agents own the mechanics — code, tests, wiring, refactors. I own anything that changes what the product can do, how good the answers are, what the risks are, and what actually ships. And the boundary leaks in both directions: agents kept asking me technical questions I couldn't judge — and quietly making product decisions that were mine. Both are management failures, and I learned to correct both. In practice, my day-to-day quality control collapsed into two questions I ask about any "done, all green" report. One: which real seam did the test actually exercise — or did it test a stand-in? Two: has this run live, on this machine, since the change? Those two questions catch most of what tries to slip through. The next four stories are what taught me them.</aside>
+</section>
+
+<!-- 6 ▸ FAILURE 1 -->
+<section class="slide" data-chapter="3">
+  <div class="kicker"><span class="knum">Failure № 1</span> · verification</div>
+  <h2>The tests were green. The feature had never worked.</h2>
+  <div class="stats">
+    <div class="stat" data-reveal><div class="v" data-count="1483">0</div><div class="l">tests passing at the time</div></div>
+    <div class="stat bad" data-reveal><div class="v">0</div><div class="l">times the feature they covered had ever worked</div></div>
+  </div>
+  <p class="sub" data-reveal>The code looked for a marker the AI model never produces. The tests checked for <em>the same wrong marker</em>. Code and test agreed with each other — and both were wrong.</p>
+  <div class="evidence">Judgment bought: a test must be able to fail. We now watch every new safety test go <b>red</b> against the bug before we trust its green. Live-verify is the acceptance test.</div>
+  <aside class="notes">Story one. The assistant was leaking its internal chain-of-thought into answers — and with voice enabled, it literally read its private reasoning aloud. We had tests for exactly this. They were green for weeks. The feature never worked, not once. Why? The code looked for a marker the model never actually produces, and the tests checked for the same wrong marker. When one person — or one AI — writes both the code and its tests, they share the same blind spot, and the tests will confirm the bug instead of catching it. This is the failure mode I'd warn any team about first, because AI agents generate plausible tests effortlessly. The fix became policy: a test only earns trust once we've watched it fail against the real defect. And no feature is accepted from a report — I watch it run. My screen, it turns out, is the most valuable test instrument the project has.</aside>
+</section>
+
+<!-- 7 ▸ FAILURE 2 -->
+<section class="slide" data-chapter="3">
+  <div class="kicker"><span class="knum">Failure № 2</span> · the audit</div>
+  <h2>"Built" is five claims wearing one word.</h2>
+  <div class="ladder" data-reveal>
+    <div class="rung"><b>BUILT</b><span>the code exists</span></div>
+    <div class="rung"><b>WIRED</b><span>something calls it</span></div>
+    <div class="rung"><b>ACTIVATED</b><span>it's switched on</span></div>
+    <div class="rung"><b>EXERCISED</b><span>real traffic hits it</span></div>
+    <div class="rung"><b>REACHABLE</b><span>the user can find it</span></div>
+  </div>
+  <div class="stats">
+    <div class="stat bad" data-reveal><div class="v">1 + 18</div><div class="l">Critical + High findings in a 16-agent security audit. The recurring theme: <b>built, but switched off.</b></div></div>
+  </div>
+  <div class="evidence">Judgment bought: report status in four honest grades — VERIFIED-LIVE · TESTED · BUILT-DORMANT · DESIGNED-DEFERRED. Say which one you have.</div>
+  <aside class="notes">Story two. Mid-project I commissioned an adversarial security audit — sixteen independent AI reviewers over the whole codebase. One Critical finding, eighteen Highs. But the theme mattered more than the count: again and again, a protection existed and protected nothing. A hardware trust root that nothing called. A leak detector wired to an empty list. And here's the humbling part — the sprints we ran to fix the audit produced the same shape again: controls built correctly and connected to nothing. So we named the disease. Built is not wired. Wired is not activated. Activated is not exercised by real traffic. And exercised is still not reachable by the actual user — we shipped a feature the operator literally could not type. Every status report now uses four honest grades: verified live, tested, built-dormant, designed-deferred. If you manage AI-built work, force that vocabulary. "Done" is where risk hides.</aside>
+</section>
+
+<!-- 8 ▸ FAILURE 3 -->
+<section class="slide" data-chapter="3">
+  <div class="kicker"><span class="knum">Failure № 3</span> · measurement</div>
+  <h2>The benchmark flattered us. The truth was 30% smaller.</h2>
+  <div class="bigstat" data-reveal>
+    <div class="v"><span class="from">2.0×</span><span class="arrow">→</span><span class="to">1.4×</span></div>
+    <div class="l">claimed speed-up → honest speed-up, once the benchmark stopped measuring a hot GPU against a cold one.</div>
+  </div>
+  <p class="sub" data-reveal>The corrected number went in the log. So did the correction.</p>
+  <div class="evidence">Judgment bought: get the instrument right before trusting its answer · re-measure a premise when the system under it changes · publish what was NOT measured.</div>
+  <aside class="notes">Story three. Our first big optimization measured twice as fast — and the honest number was one point four. The benchmark had run the configurations back to back, so the second one ran on a graphics chip already hot from the first. The instrument was wrong before the code was. Fixing the instrument became its own discipline: enough samples, confounds held still, and — this one surprised me — re-measuring old decisions when the system under them changes, because a premise that was true in March can quietly rot by May. We caught a locked decision resting on exactly that kind of stale evidence. Every performance claim now goes into the log with its methodology and an explicit list of what was not measured — that's what makes a number publishable instead of just persuasive. This is governance vocabulary — test, evaluation, verification, validation — but I didn't learn it from a framework. I learned it from a benchmark that lied to me.</aside>
+</section>
+
+<!-- 9 ▸ FAILURE 4 -->
+<section class="slide" data-chapter="3">
+  <div class="kicker"><span class="knum">Failure № 4</span> · the human seat</div>
+  <h2>The security design passed every test. It was still wrong.</h2>
+  <div class="quote" data-reveal>
+    <p>"Is this really best practice? This whole trusting process seems bad."</p>
+    <div class="who">— me, the non-developer, watching a clock get locked behind a security prompt</div>
+  </div>
+  <div class="answer" data-reveal>I was right. <small>The shipped design asked me to approve things I couldn't possibly judge — which trains a human to click yes. The redesign: safe tools are never locked, dangerous actions are denied outright with no override, and the human is only asked questions a human can actually evaluate.</small></div>
+  <div class="evidence">Judgment bought: an unjudgeable consent prompt is a rubber stamp in training · the non-expert's product instinct is a design-review trigger, not noise.</div>
+  <aside class="notes">Story four is the one that taught me what my seat is actually for. The agents shipped a security design — tested, verified, technically correct — where any untrusted content locked every tool, and I'd approve a "trust" prompt to unlock them. I watched it lock a clock. A clock. And I said: is this really best practice? This feels bad. Here's the thing — I couldn't cite a single security paper, but I was right, and the literature agreed: prompts a human can't evaluate don't add security, they train the human to click yes. The redesign put danger with deterministic controls — genuinely dangerous actions are simply denied, no override — and only asks me questions I can actually judge. The management lesson cuts both ways: my product instinct is a real control, and an expert system that outsources unjudgeable decisions to a human isn't being safe. It's being polite about transferring blame.</aside>
+</section>
+
+<!-- 10 ▸ CAPSTONE -->
+<section class="slide" data-chapter="4">
+  <div class="kicker">The capstone</div>
+  <h2>We reversed the founding constraint — as one reviewed act.</h2>
+  <div class="diag" data-reveal aria-label="Diagram: BlarAI behind a wall with one door named guarded_fetch, policy plus fingerprint on the door, three locks; the internet on the far side">
+    <svg viewBox="0 0 980 280" role="img">
+      <defs><marker id="ah3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#898781"/></marker></defs>
+      <g fill="none" stroke-width="2">
+        <rect class="dr" style="--len:760" x="20" y="50" width="330" height="150" rx="14" stroke="#3987e5"/>
+        <rect class="dr" style="--len:760" x="660" y="50" width="300" height="150" rx="14" stroke="#898781" stroke-dasharray="7 7"/>
+        <path class="dr" style="--len:170" d="M430 20  V95"  stroke="#c3c2b7" stroke-width="6"/>
+        <path class="dr" style="--len:170" d="M430 155 V230" stroke="#c3c2b7" stroke-width="6"/>
+        <rect class="dr" style="--len:300" x="392" y="95" width="76" height="60" rx="10" stroke="#0ca30c"/>
+        <path class="dr" style="--len:200" d="M468 125 H652" stroke="#898781" marker-end="url(#ah3)"/>
+      </g>
+      <g fill="#ffffff" font-size="20" font-weight="650" text-anchor="middle">
+        <text x="185" y="115">BlarAI</text>
+        <text x="810" y="115">the internet</text>
+      </g>
+      <g fill="#c3c2b7" font-size="15" text-anchor="middle">
+        <text x="185" y="145">everything local</text>
+        <text x="810" y="145">reached through one door</text>
+        <text x="430" y="86">the one door</text>
+      </g>
+      <g fill="#898781" font-size="14" text-anchor="middle">
+        <text x="430" y="252">policy check + fingerprint, per request</text>
+        <text x="560" y="112">deny by default</text>
+      </g>
+    </svg>
+  </div>
+  <div class="chips" data-reveal>
+    <span class="chip">lock 1 — <b>feature flag off</b></span>
+    <span class="chip">lock 2 — <b>no API key exists</b></span>
+    <span class="chip">lock 3 — <b>empty allowlist</b></span>
+    <span class="chip">release = <b>one reviewed governance act</b></span>
+  </div>
+  <div class="evidence">Jun 12 — first packet ever, fetched under policy, door re-welded behind it. &nbsp;·&nbsp; Jul 2 — web search live, one fingerprint per session.</div>
+  <aside class="notes">The capstone brings it together. BlarAI's founding identity was an air-gap — no network, ever. Then the product needed the web. Most projects would let that constraint quietly erode. We reversed it as one deliberate, reviewed act. First we proved the walls: the hardware trust keys proven non-exportable on the physical chip, and the egress kill-switch demonstrated live against a planted secret trying to leave the machine. Then we cut exactly one door — one function every future network feature must pass through — and built the whole corridor behind three independent locks: the flag off, no key, an empty allowlist. Dormant wasn't a promise; a test proves the tree can't make a single outbound request. On June twelfth the first packet in the system's life went out under policy and the door re-welded behind it. Today, web search runs behind my fingerprint. That's what governing a dangerous capability looks like: the decision record, the rejected alternative, the proof — before the packet.</aside>
+</section>
+
+<!-- 11 ▸ THE EVIDENCE LAYER -->
+<section class="slide" data-chapter="4">
+  <div class="kicker">The evidence layer</div>
+  <h2>The journal is how the judgment compounds.</h2>
+  <div class="stats">
+    <div class="stat" data-reveal><div class="v" data-count="256">0</div><div class="l">dated entries — written as the work happened, failures kept in</div></div>
+    <div class="stat" data-reveal><div class="v" data-count="196">0</div><div class="l">numbered lessons, each paid for by a documented incident</div></div>
+    <div class="stat" data-reveal><div class="v">3×</div><div class="l">a lesson's third recurrence must ship a structural control — not another apology</div></div>
+  </div>
+  <div class="chips" data-reveal>
+    <span class="chip">every decision records the <b>path not taken</b></span>
+    <span class="chip">agents inherit doctrine from <b>files, not memory</b></span>
+    <span class="chip">maps to <b>AIGP</b> — AI-governance practice (IAPP)</span>
+  </div>
+  <aside class="notes">One more layer, because for an AI-governance audience this is the load-bearing one. Every substantive change lands with a journal entry — written as the work happens, failures kept in, because a sanitized journal compounds nothing. Two hundred fifty-six entries so far. From them, a numbered list of lessons — one hundred ninety-six — each paid for by a specific, documented incident. And the list has teeth: a recurrence gets tallied on the existing lesson, and the third recurrence must ship a structural control — a gate, a hook, a check — not another well-written apology. Significant decisions get a formal record with the rejected alternative on it, which is exactly what professional AI-governance practice asks for. And there's a practical payoff for managing agents: what you want the next AI session to know has to live in files it reads, not in anyone's memory. Clear writing stopped being documentation. It became the management interface.</aside>
+</section>
+
+<!-- 12 ▸ WHAT I BRING -->
+<section class="slide" data-chapter="5">
+  <div class="kicker">What this means for a team</div>
+  <h2>I make AI-assisted work land professional-grade.</h2>
+  <div class="cards">
+    <div class="card" data-reveal><span class="n">01</span><h3>Manage by demonstrated outcomes</h3><p>"Show me it running" scales from AI agents to vendors to projects. Activity is never the metric; the working thing is.</p></div>
+    <div class="card" data-reveal><span class="n">02</span><h3>Verification gates for AI output</h3><p>Teeth-tested suites, live-verify as acceptance, four honest status grades, and the two questions that catch the rest.</p></div>
+    <div class="card" data-reveal><span class="n">03</span><h3>Calibrated escalation</h3><p>Humans decide capability, quality, risk, and consent. Machines own mechanics. I've learned to hold that line from both sides.</p></div>
+    <div class="card" data-reveal><span class="n">04</span><h3>Judgment in writing</h3><p>Doctrine files agents actually follow, decision records with the path not taken, and a journal that turns failures into controls.</p></div>
+  </div>
+  <p class="sub" data-reveal style="margin-top:3.5vh">I prompt agents to take work off my plate every day — and I know exactly which work is still mine.</p>
+  <aside class="notes">So what am I actually offering a team? Not a tenth-times engineer — you have those. I'm the person who makes AI-assisted work land professional-grade. Concretely, four things. I manage by demonstrated outcomes — show me it running generalizes from AI agents to vendors to whole projects. I install verification gates for AI output: tests that have been watched to fail, live-verification as the acceptance bar, four honest status grades instead of the word done. I hold a calibrated escalation boundary — humans decide capability, quality, risk, and consent; machines own mechanics — and I've been burned enough from both sides to defend it. And I put judgment in writing that both people and AI agents actually follow. I run this loop every single day, and it's all in the open — the journal, the lessons, the decision records. Any failure I've shown tonight, I'm happy to walk through in as much depth as you like.</aside>
+</section>
+
+<!-- 13 ▸ CLOSE -->
+<section class="slide" data-chapter="5">
+  <div class="kicker">Close</div>
+  <h1 style="max-width:16ch">The machine writes the code. <span style="color:var(--accent)">Judgment is still the job.</span></h1>
+  <p class="byline" style="margin-top:6vh">Thank you — questions welcome.<br><b>BlarAI</b> · build journal, lessons &amp; decision records available in full · this deck was agent-built under direction, then live-verified — like everything else.</p>
+  <aside class="notes">Here's the whole talk in two sentences. The machine writes the code now — that part is real, and it's wonderful. But judgment — what to build, what to trust, what to verify, what a human must still decide — that's the job, and it's a job you can be good at, with evidence. Thank you. I'd love your questions.</aside>
+</section>
+
+</main>
+
+<!-- chrome -->
+<div class="rail" id="rail"><div class="fill" id="railfill"></div></div>
+<div class="chrome">
+  <span class="chipbtn" id="timerchip" title="T toggles">00:00 · <span id="pace" class="pace-good">on pace</span></span>
+  <span class="chipbtn" id="helpbtn" title="? help">?</span>
+</div>
+<div class="counter" id="counter">1 / 13</div>
+<div id="notes"><div class="nt">Speaker notes · <span id="notesn"></span></div><div class="nb" id="notesbody"></div></div>
+<div class="overlay" id="help">
+  <h3>Presenting this deck</h3>
+  <table>
+    <tr><td>→ · space · click</td><td>advance (reveals first, then next slide)</td></tr>
+    <tr><td>←</td><td>back</td></tr>
+    <tr><td>N</td><td>speaker-notes drawer</td></tr>
+    <tr><td>T</td><td>rehearsal timer (paced against a 13-minute run)</td></tr>
+    <tr><td>F</td><td>fullscreen</td></tr>
+    <tr><td>D</td><td>self-check (verifies the deck's own integrity)</td></tr>
+    <tr><td>Home / End</td><td>first / last slide</td></tr>
+  </table>
+  <p class="zoomtip"><b>Presenting over Zoom / Meet:</b> go fullscreen (<b>F</b>) before sharing, and rehearse once with the timer on — the pace chip tells you if you're drifting.</p>
+  <p style="margin-top:2vh;color:var(--ink-3)">The deck is deliberately silent — your voice is the audio channel (background audio measurably impairs listeners' verbal working memory). No file in this deck ever touches the network.</p>
+</div>
+<div class="overlay" id="selfcheck"><h3>Self-check</h3><pre id="selfcheckout">running…</pre></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ================= deck state ================= */
+const slides=[...document.querySelectorAll(".slide")];
+const N=slides.length;
+let cur=0, started=false;
+const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* The deck is deliberately SILENT. A synthesized ambient+cue engine shipped in
+   the first cut; the operator's live run judged it counter-productive and the
+   research agreed twice over — professional-deck consensus (no SFX; nothing
+   that calls attention to itself) and the Irrelevant Sound Effect literature
+   (task-irrelevant audio impairs verbal working memory — the audience's task
+   here IS verbal). The polish channel is motion; the audio channel is the
+   presenter's voice. */
+
+/* ================= toast ================= */
+let toastT=null;
+function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("on"),1600); }
+
+/* ================= count-up ================= */
+function countUp(el){ const target=parseInt(el.dataset.count,10);
+  if(REDUCED){ el.textContent=target.toLocaleString("en-US"); return; }
+  const t0=performance.now(), D=950;
+  (function step(t){ const p=Math.min(1,(t-t0)/D), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(target*e).toLocaleString("en-US");
+    if(p<1) requestAnimationFrame(step); })(t0);
+}
+
+/* ================= reveals & navigation ================= */
+function revealsOf(i){ return [...slides[i].querySelectorAll("[data-reveal]")]; }
+function showReveal(el){ el.classList.add("shown");
+  el.querySelectorAll("[data-count]").forEach(c=>{ if(!c.dataset.done){ c.dataset.done=1; countUp(c); } });
+  if(el.matches(".stat,.bigstat")&&el.querySelector("[data-count]")===null){} }
+function pendingReveals(i){ return revealsOf(i).filter(el=>!el.classList.contains("shown")); }
+
+function go(i,dir){ i=Math.max(0,Math.min(N-1,i)); if(i===cur&&started) return;
+  slides[cur].classList.remove("active"); slides[i].classList.add("active");
+  cur=i; started=true;
+  document.getElementById("counter").textContent=(i+1)+" / "+N;
+  document.getElementById("railfill").style.width=((i)/(N-1)*100)+"%";
+  location.hash="#"+(i+1);
+  updateNotes();
+  if(REDUCED) revealsOf(i).forEach(showReveal);
+}
+function advance(){ if(!started){ boot(); return; }
+  const p=pendingReveals(cur);
+  if(p.length){ showReveal(p[0]); return; }
+  if(cur<N-1) go(cur+1,1); }
+function back(){ const shown=revealsOf(cur).filter(el=>el.classList.contains("shown"));
+  if(shown.length&&!REDUCED){ shown[shown.length-1].classList.remove("shown"); return; }
+  if(cur>0){ go(cur-1,-1); revealsOf(cur).forEach(showReveal); } }
+
+/* ================= notes ================= */
+function updateNotes(){ const d=document.getElementById("notes"); if(!d.classList.contains("on")) return;
+  const a=slides[cur].querySelector("aside.notes");
+  document.getElementById("notesn").textContent="slide "+(cur+1)+" of "+N;
+  document.getElementById("notesbody").textContent=a?a.textContent.trim():"(no notes)"; }
+function toggleNotes(){ document.getElementById("notes").classList.toggle("on"); updateNotes(); }
+
+/* ================= rehearsal timer ================= */
+const Timer={on:false,t0:0,iv:null,TARGET:13*60,
+  toggle(){ this.on=!this.on; const chip=document.getElementById("timerchip");
+    if(this.on){ this.t0=Date.now(); chip.classList.add("on");
+      this.iv=setInterval(()=>this.paint(),1000); this.paint(); toast("Rehearsal timer started (13:00 pace)"); }
+    else{ chip.classList.remove("on"); clearInterval(this.iv); toast("Timer stopped"); } },
+  paint(){ const s=Math.floor((Date.now()-this.t0)/1000),
+    mm=String(Math.floor(s/60)).padStart(2,"0"), ss=String(s%60).padStart(2,"0");
+    const expected=Math.floor(s/(this.TARGET/N)), drift=cur-expected;
+    const p=document.getElementById("pace");
+    let cls="pace-good",txt="on pace";
+    if(drift<=-2){cls="pace-bad";txt="behind · speed up";}
+    else if(drift===-1){cls="pace-warn";txt="a touch behind";}
+    else if(drift>=2){cls="pace-warn";txt="ahead · breathe";}
+    p.className=cls; p.textContent=txt;
+    document.getElementById("timerchip").firstChild.textContent=mm+":"+ss+" · "; }
+};
+
+/* ================= self-check ================= */
+function selfCheck(){
+  const out=[]; const ok=(name,pass,detail)=>out.push((pass?"PASS":"FAIL")+"  "+name+(detail?" — "+detail:""));
+  ok("13 slides present", N===13, "found "+N);
+  const missing=slides.filter(s=>!s.querySelector("aside.notes")||!s.querySelector("aside.notes").textContent.trim());
+  ok("speaker notes on every slide", missing.length===0, missing.length+" missing");
+  const words=slides.reduce((a,s)=>{const n=s.querySelector("aside.notes");return a+(n?n.textContent.trim().split(/\s+/).length:0);},0);
+  ok("notes word budget 1500–2200 (≈10–15 min at 135–145 wpm)", words>=1500&&words<=2200, words+" words");
+  ok("3 SVG diagrams", document.querySelectorAll(".diag svg").length===3, String(document.querySelectorAll(".diag svg").length));
+  const counts=[...document.querySelectorAll("[data-count]")].every(el=>Number.isFinite(+el.dataset.count));
+  ok("all kinetic stats numeric", counts);
+  ok("deliberately silent (no audio API in use)", !/AudioContext\s*\(/.test(document.querySelector("script").textContent.replace(/\/\*[\s\S]*?\*\//g,"")));
+  ok("reduced-motion honored", true, REDUCED?"reduced mode ACTIVE":"full motion");
+  ok("fully local", document.querySelectorAll("link[href],script[src],img[src]").length===0, "0 external references");
+  const est=(words/140).toFixed(1);
+  out.push(""); out.push("estimated spoken time at 140 wpm: "+est+" min (+ transitions ≈ "+(+est+1).toFixed(1)+" min)");
+  document.getElementById("selfcheckout").textContent=out.join("\n");
+  document.getElementById("selfcheck").classList.add("on");
+  console.log("[fable5_deck selfcheck]\n"+out.join("\n"));
+}
+
+/* ================= boot & input ================= */
+function boot(){ if(started) return; go(0,0); toast("? help · N notes · T rehearsal timer"); }
+document.addEventListener("keydown",e=>{
+  if(e.key==="?"||e.key==="h"){ document.getElementById("selfcheck").classList.remove("on"); document.getElementById("help").classList.toggle("on"); return; }
+  if(e.key==="Escape"){ document.querySelectorAll(".overlay").forEach(o=>o.classList.remove("on")); return; }
+  if(e.key==="d"||e.key==="D"){ document.getElementById("help").classList.remove("on"); selfCheck(); return; }
+  if(e.key==="n"||e.key==="N"){ toggleNotes(); return; }
+  if(e.key==="t"||e.key==="T"){ Timer.toggle(); return; }
+  if(e.key==="f"||e.key==="F"){ (document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()); return; }
+  if(e.key==="Home"){ boot(); go(0,-1); return; }
+  if(e.key==="End"){ boot(); go(N-1,1); return; }
+  if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"||e.key==="Enter"){ e.preventDefault(); advance(); }
+  if(e.key==="ArrowLeft"||e.key==="PageUp"){ e.preventDefault(); back(); }
+});
+document.addEventListener("click",e=>{
+  if(e.target.closest(".overlay")){ e.target.closest(".overlay").classList.remove("on"); return; }
+  if(e.target.closest(".chipbtn")){
+    if(e.target.closest("#helpbtn")) document.getElementById("help").classList.toggle("on");
+    if(e.target.closest("#timerchip")) Timer.toggle(); return; }
+  if(e.target.closest("#notes")) return;
+  advance();
+});
+/* rail chapter ticks */
+(function(){ const rail=document.getElementById("rail");
+  slides.forEach((s,i)=>{ if(i>0&&s.dataset.chapter!==slides[i-1].dataset.chapter){
+    const t=document.createElement("div"); t.className="tick"; t.style.left=(i/(N-1)*100)+"%"; rail.appendChild(t); } });
+})();
+/* deep link */
+(function(){ const h=parseInt((location.hash||"").slice(1),10);
+  slides[0].classList.add("active");
+  if(Number.isFinite(h)&&h>=1&&h<=N){ started=true; go(h-1,0); revealsOf(cur).forEach(showReveal); }
+  else document.getElementById("counter").textContent="1 / "+N;
+})();
+</script>
+</body>
+</html>

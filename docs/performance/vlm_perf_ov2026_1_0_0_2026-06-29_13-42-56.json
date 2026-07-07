@@ -1,0 +1,44 @@
+{
+  "harness": "vlm_perf",
+  "model": "qwen3-vl-8b-instruct-int4",
+  "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+  "openvino_version": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "device": "GPU",
+  "config": {
+    "max_new_tokens": 128,
+    "warmup": 1,
+    "runs": 3,
+    "image": "512x512 deterministic gradient",
+    "prompt": "Describe this image in detail, including its colors and patterns.",
+    "do_sample": false
+  },
+  "summary": {
+    "load_compile_s": 7.8,
+    "ttft_ms_median": 201.32,
+    "tpot_ms_median": 62.99,
+    "throughput_median": 15.87
+  },
+  "rows": [
+    {
+      "run": 0,
+      "wall_s": 6.49,
+      "ttft_ms": 225.73,
+      "tpot_ms": 49.33,
+      "throughput_tok_s": 20.27
+    },
+    {
+      "run": 1,
+      "wall_s": 8.21,
+      "ttft_ms": 201.32,
+      "tpot_ms": 62.99,
+      "throughput_tok_s": 15.87
+    },
+    {
+      "run": 2,
+      "wall_s": 11.4,
+      "ttft_ms": 200.63,
+      "tpot_ms": 88.19,
+      "throughput_tok_s": 11.34
+    }
+  ]
+}

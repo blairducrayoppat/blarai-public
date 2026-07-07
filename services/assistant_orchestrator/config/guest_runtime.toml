@@ -1,0 +1,94 @@
+# Assistant Orchestrator Guest Runtime Configuration (Priority-5)
+
+[runtime]
+deployment_mode = "guest"
+
+[service]
+name = "assistant_orchestrator"
+version = "0.3.0"
+log_level = "INFO"
+
+[gpu]
+device = "GPU"                                     # ADR-011: All LLM inference on GPU (Arc 140V)
+model_dir = "models/qwen3-14b/openvino-int4-gpu"  # ADR-012: Qwen3-14B INT4
+weight_manifest = "models/qwen3-14b/openvino-int4-gpu/manifest.json"  # ADR-012
+draft_model_dir = "models/qwen3-0.6b-pruned-6l/openvino-int8-gpu"  # pruned 6-layer INT8 draft -- streams incrementally (chosen 2026-05-22)
+speculative_decoding_enabled = true                         # ADR-012 §2.6
+max_context_tokens = 16384                         # DEC-03
+priority = 1                                       # DEC-AO priority=1 (MEDIUM hint)
+
+[generation]
+max_new_tokens = 256
+temperature = 0.0
+top_k = 50
+top_p = 0.9
+repetition_penalty = 1.1
+do_sample = false
+response_depth_mode = "standard"   # concise | standard | detailed
+
+[preemption]
+timing_multiplier = 5.0
+min_detection_samples = 3
+
+[circuit_breaker]
+max_output_tokens = 4096
+max_tool_call_depth = 5
+
+[pgov]
+cosine_similarity_threshold = 0.85
+# PII output policy: "off" | "block" | "redact". A local, single-user
+# personal assistant exists to surface the user's own data back to them,
+# so "off" is the correct production posture. "block" suppresses any
+# response containing PII. "redact" surfaces PII traced to the user's own
+# documents/messages and replaces untraceable (hallucinated/injected) PII
+# with a visible marker -- see docs/governance/ for the rationale.
+pii_mode = "off"
+delimiter_echo_enabled = true
+tool_allowlist_enabled = true
+leakage_detection_enabled = true
+embedding_model_path = "models/bge-small-en-v1.5/onnx-fp16/model.onnx"
+# Layer 3 default posture (ADR-023, supersedes ADR-013). RE-ENABLED
+# 2026-06-04 (Sprint 12 EA-3): fires only on UNTRUSTED-provenance content;
+# trusted-local + memory never trip it, so secure-by-default is
+# friction-free. See default.toml for the full rationale. (Back-compat:
+# the legacy key block_tools_when_documents_loaded is still read if absent.)
+block_tools_on_untrusted_content = true
+
+[context]
+spotlighting_enabled = true
+max_history_turns = 20
+max_context_tokens = 4096
+
+[substrate]
+# Embedding-cache idle-unload window in seconds (Vikunja #611). See default.toml
+# for the full rationale. Unloads (and zeroes) the decrypted embedding cache after
+# this many seconds of retrieval inactivity, reloading lazily on the next query;
+# 0 or negative disables idle-unload (cache resident for the store's lifetime).
+embed_cache_idle_unload_s = 900
+
+[knowledge]
+# Knowledge bank (UC-002 Substrate v2, Vikunja #655). See default.toml for the
+# full rationale: sibling encrypted store (same DEK), approval-gated ingest,
+# hybrid retrieval over approved chunks only (always UNTRUSTED_EXTERNAL),
+# feature-level loud-disable on failure (AO boot unaffected).
+enabled = true
+db_filename = "knowledge.db"
+retrieve_k = 4
+embed_max_tokens = 512
+staging_max_bytes = 262144
+
+[security]
+fail_closed = true
+dev_mode = true
+jwt_ca_cert_path = ""
+require_signed_manifest = false  # FUT-04: off; dev_mode=true bypasses sig check anyway
+
+[ipc]
+vsock_cid = 2
+vsock_port = 5001
+mtls_cert_path = ""
+mtls_key_path = ""
+ca_cert_path = ""
+policy_agent_port = 5000
+timeout_ms = 5000
+max_message_bytes = 65536

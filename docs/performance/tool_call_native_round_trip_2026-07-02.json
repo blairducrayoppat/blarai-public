@@ -1,0 +1,43 @@
+{
+  "id": "tool_call_native_round_trip_2026-07-02",
+  "date": "2026-07-02",
+  "tickets": ["#717", "#718"],
+  "purpose": "First live verification of Qwen3-native JSON tool calling under the xgrammar structural-tags constraint on the production speculative-decoding pipeline, plus the first model-in-the-loop PA classification measurement (ISS-3).",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) iGPU",
+    "gpu_driver": "32.0.101.8826",
+    "memory": "32 GB LPDDR5X (31.323 GB effective)"
+  },
+  "stack": {
+    "openvino_genai": "2026.2.1",
+    "python": "3.11.9",
+    "model": "Qwen3-14B OpenVINO INT4-GPU",
+    "draft_model": "Qwen3-0.6B pruned-6L INT8 (speculative decoding ON)",
+    "grammar": "xgrammar structural tags via GenerationConfig.structured_output_config, [generation].tool_call_grammar=true"
+  },
+  "methodology": {
+    "tool_round_trip": "tests/harness/test_tool_call_native_round_trip.py — real AO _handle_connection turn (sprint-12 harness pattern), prompt 'What time is it right now?', greedy decoding, spy-wrapped parse_tool_call/execute, N=1 (mechanics verify, not a latency campaign)",
+    "pa_classification": "python -m evals.run --suite pa_classification --include-hardware — 22 deterministic CAR cases + 8 model-mode golden probes through the real Qwen3-14B classifier"
+  },
+  "results": {
+    "model_load_seconds": 10.758,
+    "turn_total_ms": 4795.8,
+    "generations_in_loop": 2,
+    "tool_called": "get_current_time",
+    "emission_form": "native_json",
+    "legacy_fallback_hits": 0,
+    "fail_closed_drops": 0,
+    "pa_deterministic_pass": "22/22",
+    "pa_model_mode_pass": "4/8",
+    "pa_model_mode_miss_shape": "all 4 misses are false DENIES of benign actions (0 false ALLOWs)",
+    "pa_overall_pass_rate": 0.866667,
+    "evidence_artifact": "phase2_gates/evidence/eval_pa_classification_model_897afd9.json"
+  },
+  "not_measured": [
+    "tool round-trip latency distribution (N=1)",
+    "grammar-compile first-token overhead isolation",
+    "co-resident contention",
+    "multi-tool chains (one tool per loop iteration)"
+  ]
+}

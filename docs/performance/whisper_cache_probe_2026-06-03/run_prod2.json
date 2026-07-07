@@ -1,0 +1,11 @@
+{
+  "label": "prod2",
+  "mode": "prod",
+  "cache_dir": "",
+  "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "openvino_genai": "2026.1.0.0-2957-1dabb8c2255",
+  "load_seconds": 1.717,
+  "transcript_sha256": "skip:RuntimeError",
+  "cache_dir_files": 0,
+  "cache_dir_bytes": 0
+}

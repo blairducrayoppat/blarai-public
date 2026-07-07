@@ -1,0 +1,1275 @@
+=== Soak monitor START 2026-04-30T16:55:27Z ===
+
+--- cycle=0 ts=2026-04-30T16:55:27Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 12:56:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+devplatform-logs newest 5:
+  20260430_124502_co_lead_architect.log size=1188 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sdo.log size=1143 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_ea_code.log size=1287 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sprint_auditor.log size=1136 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_123002_sdo.log size=1143 bytes lastWrite=2026-04-30T16:30:04Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=1 ts=2026-04-30T16:56:28Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 12:57:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+devplatform-logs newest 5:
+  20260430_124502_co_lead_architect.log size=1188 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sdo.log size=1143 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_ea_code.log size=1287 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sprint_auditor.log size=1136 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_123002_sdo.log size=1143 bytes lastWrite=2026-04-30T16:30:04Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=2 ts=2026-04-30T16:57:29Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 12:58:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+devplatform-logs newest 5:
+  20260430_124502_co_lead_architect.log size=1188 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sdo.log size=1143 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_ea_code.log size=1287 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sprint_auditor.log size=1136 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_123002_sdo.log size=1143 bytes lastWrite=2026-04-30T16:30:04Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=3 ts=2026-04-30T16:58:30Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 12:59:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+devplatform-logs newest 5:
+  20260430_124502_co_lead_architect.log size=1188 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sdo.log size=1143 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_ea_code.log size=1287 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sprint_auditor.log size=1136 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_123002_sdo.log size=1143 bytes lastWrite=2026-04-30T16:30:04Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=4 ts=2026-04-30T16:59:31Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 12:55:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 12:45:01 lastResult=0 nextRun=04/30/2026 13:00:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:00:00
+devplatform-logs newest 5:
+  20260430_124502_co_lead_architect.log size=1188 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sdo.log size=1143 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_ea_code.log size=1287 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_124502_sprint_auditor.log size=1136 bytes lastWrite=2026-04-30T16:45:02Z
+  20260430_123002_sdo.log size=1143 bytes lastWrite=2026-04-30T16:30:04Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=5 ts=2026-04-30T17:00:32Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=14
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=14880 ParentPID=2108 ParentName=explorer.exe ParentCmdLine=C:\Windows\Explorer.EXE
+  claude PID=14380 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=23748 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=25552 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=19700 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=19900 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=24664 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=976 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=27352 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=12180 ParentPID=14880 ParentName=claude.exe ParentCmdLine="C:\Program Files\WindowsApps\Claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\Claude.exe" 
+  claude PID=23236 ParentPID=12180 ParentName=claude.exe ParentCmdLine=C:\Users\mrbla\AppData\Roaming\Claude\claude-code\2.1.121\claude.exe --output-format stream-json --verbose --input-format stream-json --permission-prompt-tool stdio --setting-sources=user,project,local --strict-mcp-config --permission-mode default
+  claude PID=16776 ParentPID=12180 ParentName=claude.exe ParentCmdLine=C:\Users\mrbla\AppData\Roaming\Claude\claude-code\2.1.121\claude.exe --output-format stream-json --verbose --input-format stream-json --permission-prompt-tool stdio --setting-sources=user,project,local --strict-mcp-config --permission-mode default
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:01:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=6 ts=2026-04-30T17:01:34Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:02:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=7 ts=2026-04-30T17:02:35Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:03:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=8 ts=2026-04-30T17:03:36Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:04:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=9 ts=2026-04-30T17:04:36Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:05:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=10 ts=2026-04-30T17:05:37Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:06:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=11 ts=2026-04-30T17:06:38Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:07:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=12 ts=2026-04-30T17:07:39Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:08:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=13 ts=2026-04-30T17:08:40Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:09:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=14 ts=2026-04-30T17:09:41Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:05:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:10:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=15 ts=2026-04-30T17:10:42Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:11:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=16 ts=2026-04-30T17:11:43Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:12:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=17 ts=2026-04-30T17:12:44Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:13:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=18 ts=2026-04-30T17:13:44Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:14:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=19 ts=2026-04-30T17:14:45Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:10:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:00:01 lastResult=0 nextRun=04/30/2026 13:15:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:15:00
+devplatform-logs newest 5:
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+  20260430_130002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:00:02Z
+  20260430_130002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:00:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=20 ts=2026-04-30T17:15:46Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:16:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=21 ts=2026-04-30T17:16:47Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:17:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=22 ts=2026-04-30T17:17:48Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:18:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=23 ts=2026-04-30T17:18:49Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:19:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=24 ts=2026-04-30T17:19:50Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:20:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=25 ts=2026-04-30T17:20:51Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:21:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=26 ts=2026-04-30T17:21:51Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:22:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=27 ts=2026-04-30T17:22:52Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:23:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=28 ts=2026-04-30T17:23:53Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:24:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=29 ts=2026-04-30T17:24:54Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:20:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:25:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=30 ts=2026-04-30T17:25:55Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:26:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=31 ts=2026-04-30T17:26:56Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:27:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=32 ts=2026-04-30T17:27:57Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:28:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=33 ts=2026-04-30T17:28:58Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:29:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:30:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:30:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=34 ts=2026-04-30T17:29:59Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:25:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:31:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:15:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sdo.log size=1181 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:15:02Z
+  20260430_131502_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:15:02Z
+  cadence_monitor_20260430.log size=872 bytes lastWrite=2026-04-30T17:00:03Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=35 ts=2026-04-30T17:31:00Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:32:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=36 ts=2026-04-30T17:32:00Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:33:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=37 ts=2026-04-30T17:33:01Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:34:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=38 ts=2026-04-30T17:34:02Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:35:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=39 ts=2026-04-30T17:35:02Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=13; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Running lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:36:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=40 ts=2026-04-30T17:36:03Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:37:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=41 ts=2026-04-30T17:37:04Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:38:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=42 ts=2026-04-30T17:38:05Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:39:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=43 ts=2026-04-30T17:39:05Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:35:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:40:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+--- cycle=44 ts=2026-04-30T17:40:06Z ---
+fleet_paused=False reason= last_updated_by=ea_code_blarai_helper last_updated_utc=04/30/2026 15:31:12
+claude.exe count=2
+  claude PID=10016 ParentPID=14152 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+  claude PID=24692 ParentPID=29164 ParentName=pwsh.exe ParentCmdLine="C:\Program Files\PowerShell\7\pwsh.exe" -noexit -command "try { . \"c:\Users\mrbla\AppData\Local\Programs\Microsoft VS Code\10c8e557c8\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1\" } catch {}"
+powershell/pwsh total=12; wake_launcher-children=0
+task='Agents Cadence Monitor' state=Ready lastRun=04/30/2026 13:40:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Credentials Rotation Reminder' state=Ready lastRun=04/28/2026 22:38:44 lastResult=0 nextRun=07/20/2026 04:00:00
+task='Daily Digest' state=Disabled lastRun=04/28/2026 22:12:22 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Dashboard Maintainer' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Escalation Watchdog' state=Ready lastRun=04/30/2026 13:40:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Gate Stale Cleaner' state=Ready lastRun=04/30/2026 01:00:01 lastResult=0 nextRun=05/01/2026 01:00:00
+task='Sprint Auditor' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Toast Watchdog' state=Disabled lastRun=04/29/2026 00:37:01 lastResult=0 nextRun=04/30/2026 13:41:00
+task='Wake Co-Lead Architect' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake EA Code' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Wake SDO' state=Ready lastRun=04/30/2026 13:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+task='Weekly Summary' state=Disabled lastRun=04/28/2026 22:12:56 lastResult=0 nextRun=05/04/2026 04:00:00
+task='Welcome Back Poll' state=Disabled lastRun=04/29/2026 00:30:01 lastResult=0 nextRun=04/30/2026 13:45:00
+devplatform-logs newest 5:
+  20260430_133002_ea_code.log size=1325 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sdo.log size=1181 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_133002_sprint_auditor.log size=1174 bytes lastWrite=2026-04-30T17:30:02Z
+  20260430_131502_co_lead_architect.log size=1226 bytes lastWrite=2026-04-30T17:15:02Z
+BlarAI-logs-path absent (expected)
+BlarAI-watch-paths all absent (expected; 0 recreations)
+
+=== Soak monitor END 2026-04-30T17:41:07Z ===

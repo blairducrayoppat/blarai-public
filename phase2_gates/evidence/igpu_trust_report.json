@@ -1,0 +1,159 @@
+{
+  "tdx_supported": false,
+  "timestamp": "2026-02-23T05:45:31.2270300Z",
+  "tdisp_detected": false,
+  "gate": "VALIDATE_IGPU_TRUST_BOUNDARY",
+  "test_4_3": {
+    "description": "Fallback posture validation — software-enforced trust boundary",
+    "failures": [],
+    "fallback_posture": {
+      "overall_viable": false,
+      "strategy": "Software-enforced trust boundary via Hyper-V VM isolation + vsock IPC + mTLS",
+      "components": [
+        {
+          "component": "Hyper-V VM Isolation",
+          "status": "AVAILABLE",
+          "available": true,
+          "vbs_backing": true
+        },
+        {
+          "component": "vsock (AF_HYPERV) IPC",
+          "status": "AVAILABLE",
+          "available": true
+        },
+        {
+          "schannel_tls12": true,
+          "component": "mTLS capability",
+          "status": "AVAILABLE",
+          "openssl_available": false,
+          "available": 0
+        },
+        {
+          "component": "HVCI (Code Integrity)",
+          "status": "NOT RUNNING",
+          "available": false
+        },
+        {
+          "status": "FULL",
+          "secure_boot": true,
+          "available": true,
+          "component": "Measured Boot / Secure Boot",
+          "tpm_ready": true,
+          "tpm_present": true,
+          "tpm_version": "9.256.0.0\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+        }
+      ]
+    },
+    "test_id": "4.3"
+  },
+  "test_4_2": {
+    "status": "MEASURED",
+    "description": "TDISP enumeration for iGPU trust boundary",
+    "tdisp_info": {
+      "igpu_pcie_info": [
+        {
+          "instance_id": "PCI\\VEN_8086&DEV_64A0&SUBSYS_1F631043&REV_04\\3&11583659&0&10",
+          "device_id": "PCI\\VEN_8086&DEV_64A0&SUBSYS_1F631043&REV_04\\3&11583659&0&10",
+          "status": "OK",
+          "vendor_id": "8086",
+          "class": "Display",
+          "device_id_hex": "64A0",
+          "name": "Intel(R) Arc(TM) 140V GPU (16GB)"
+        }
+      ],
+      "tdisp_detected": false,
+      "reason": "Lunar Lake iGPU is integrated on SoC fabric (not discrete PCIe). TDISP (PCIe 6.0 TEE-IO) not applicable to integrated GPU."
+    },
+    "failures": [
+      {
+        "branch_preserved": "feature/phase2-scaffolding",
+        "timestamp": "2026-02-23T05:45:31.2270300Z",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\igpu_trust_report.json",
+        "gate": "VALIDATE_IGPU_TRUST_BOUNDARY",
+        "actual": "N/A (integrated GPU)",
+        "disposition": "EXPECTED_ABSENT",
+        "escalation": "Lead Architect decision required",
+        "metric": "tdisp_detected",
+        "expected": "true or N/A",
+        "test_id": "4.2"
+      }
+    ],
+    "test_id": "4.2"
+  },
+  "fallback_viable": false,
+  "test_4_1": {
+    "hyperv_features": {
+      "hvci_running": false,
+      "hyperv_present": true,
+      "vbs_enabled": true,
+      "dg_enabled": false
+    },
+    "description": "TDX base support detection",
+    "tdx_info": {
+      "mktme_supported": false,
+      "tme_supported": false,
+      "detection_method": "WMI/Registry heuristic",
+      "tdx_supported": false,
+      "vt_firmware_enabled": false,
+      "is_server_sku": false,
+      "processor_name": "Intel(R) Core(TM) Ultra 7 258V",
+      "secondary_data_execution_prevention": false,
+      "sgx_supported": false,
+      "processor_family": 774
+    },
+    "failures": [
+      {
+        "branch_preserved": "feature/phase2-scaffolding",
+        "timestamp": "2026-02-23T05:45:31.2270300Z",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\igpu_trust_report.json",
+        "gate": "VALIDATE_IGPU_TRUST_BOUNDARY",
+        "actual": "false (client Lunar Lake)",
+        "disposition": "EXPECTED_ABSENT",
+        "escalation": "Lead Architect decision required",
+        "metric": "tdx_supported",
+        "expected": "true (server)",
+        "test_id": "4.1"
+      }
+    ],
+    "test_id": "4.1"
+  },
+  "gate_evaluation": {
+    "tdx_available": false,
+    "blocking_failures": [],
+    "gate": "VALIDATE_IGPU_TRUST_BOUNDARY",
+    "pass": false,
+    "tdisp_available": false,
+    "recommendation": "ESCALATE: iGPU trust boundary cannot be established. Neither hardware (TDX/TDISP) nor software fallback (Hyper-V + vsock + mTLS) is viable. Do NOT delete this branch — preserve for audit.",
+    "warnings": [
+      "TDX and TDISP not available on Lunar Lake client SKU. Software fallback (Hyper-V + vsock + mTLS) is the enforced trust boundary."
+    ],
+    "disposition": "FAIL",
+    "expected_absences": [
+      {
+        "branch_preserved": "feature/phase2-scaffolding",
+        "timestamp": "2026-02-23T05:45:31.2270300Z",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\igpu_trust_report.json",
+        "gate": "VALIDATE_IGPU_TRUST_BOUNDARY",
+        "actual": "false (client Lunar Lake)",
+        "disposition": "EXPECTED_ABSENT",
+        "escalation": "Lead Architect decision required",
+        "metric": "tdx_supported",
+        "expected": "true (server)",
+        "test_id": "4.1"
+      },
+      {
+        "branch_preserved": "feature/phase2-scaffolding",
+        "timestamp": "2026-02-23T05:45:31.2270300Z",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\igpu_trust_report.json",
+        "gate": "VALIDATE_IGPU_TRUST_BOUNDARY",
+        "actual": "N/A (integrated GPU)",
+        "disposition": "EXPECTED_ABSENT",
+        "escalation": "Lead Architect decision required",
+        "metric": "tdisp_detected",
+        "expected": "true or N/A",
+        "test_id": "4.2"
+      }
+    ],
+    "fallback_viable": false
+  }
+}

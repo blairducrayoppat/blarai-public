@@ -1,0 +1,125 @@
+{
+  "artifact": "BlarAI Trust-Root On-Chip Verification",
+  "schema_version": "1.0",
+  "verified_at_utc": "2026-06-09T16:36:46.951069+00:00",
+  "verdict": "ALL_VERIFIED_LIVE",
+  "claim_upgrade": "INFERRED -> VERIFIED-LIVE",
+  "summary": "All four BlarAI trust-root TPM keys are RESIDENT, FUNCTIONAL, and NON-EXPORTABLE on the real chip, each proven directly per key. Upgrades the #612 capstone S-K 'Is It Real?' trust-root claim (item 1) and the SECURITY_ROADMAP 'TPM key state' table from disk-inferred to chip-verified.",
+  "scope_note": "Scopes the trust-root VERIFICATION criterion only. It does NOT open the #598 air-gap GO/NO-GO gate, which still gates on the #612 capstone phase (roadmap S5.13) + the LA sign-off (S5.12), the #106 signed-manifest-runtime remainder, the DORMANT egress machinery (post-#556), and #607.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "tpm": {
+      "role": "active TPM 2.0 (ACPI\\MSFT0101)",
+      "manufacturer": "STMicroelectronics (STM)",
+      "firmware": "9.256.0.0",
+      "spec": "TPM 2.0 / spec 1.59",
+      "also_present": "Microsoft Pluton security processor (PCI\\VEN_8086&DEV_A862) is present on this unit but is NOT serving as the TPM 2.0 role.",
+      "source": "docs/TPM_CAPABILITY_FINDINGS.md (2026-06-03, tpmtool getdeviceinformation)"
+    }
+  },
+  "environment": {
+    "os": "Windows 11 Pro (10.0.26200); note: platform.platform() reports 'Windows-10-10.0.26200-SP0' (a known platform string quirk on Windows 11)",
+    "python": "3.11.9",
+    "cng_provider": "Microsoft Platform Crypto Provider",
+    "shell_context": "elevated (administrator) — the same context the provisioning/boot path uses. is_available() returns False off-box or from an unprovisioned context."
+  },
+  "methodology": {
+    "tool": "shared/security/verify_trust_root.py (read-only entrypoint)",
+    "command": "python -m shared.security.verify_trust_root",
+    "read_only_guarantee": "The probe calls ONLY read-only primitives: is_available, key_exists, sign, verify, export_public_key (signers) and TpmSealer(auto_provision=False).seal/.unseal (sealer). It calls NO ensure_key, NO delete_key, NO NCryptCreatePersistedKey, NO provisioning script. A refused private-key export reads-and-fails and mutates nothing.",
+    "per_key_checks": {
+      "resident": "tpm_signer.key_exists / tpm_sealer.key_exists",
+      "functional_roundtrip": "signers: sign(fixed non-secret test message) -> verify() == True (on-chip ECDSA P-256); sealer: TpmSealer(auto_provision=False).seal(os.urandom(32)) -> unseal() == that throwaway 32-byte blob (on-chip RSA-2048 OAEP-SHA256). The real DEK and the keystore file are never used.",
+      "private_export_refused": "a single direct per-key NCryptExportKey for the PRIVATE blob (ECCPRIVATEBLOB for the ECDSA keys, RSAFULLPRIVATEBLOB for the RSA key) returns a non-SUCCESS status (export REFUSED by the provider). This is the exact CNG call vetted in test_tpm_signer.py:98 / test_tpm_sealer.py:206, pointed at the production key handles — a true per-production-key proof, not verified-by-equivalence."
+    },
+    "not_measured": [
+      "Per-operation TPM signing/sealing latency was not measured in this run (the GOV-10 hot-path budget and timings are tracked separately in PERFORMANCE_LOG.md / docs/performance/).",
+      "PCR-binding policy (NCRYPT_PCP_* / measured-boot binding) was not exercised — these keys are not PCR-bound; that is a future attestation increment (see TPM_CAPABILITY_FINDINGS.md S2/S3).",
+      "Reachability of the four PRODUCTION keys from a NON-elevated shell was not established by this run, and is not required: the boot/provisioning path runs in the elevated context used here."
+    ],
+    "records_only": "booleans, key names, verdicts, and test results ONLY — no private key material, no raw signatures, no DEK, and no throwaway test blob are recorded in this artifact."
+  },
+  "keys": [
+    {
+      "key_name": "BlarAI-PA-JWT-Signing",
+      "type": "ECDSA-P256",
+      "role": "Policy Agent DecisionArtifact JWT minting (5 s TTL)",
+      "resident": true,
+      "functional_roundtrip": true,
+      "public_export_ok": true,
+      "private_export_refused": true,
+      "verdict": "VERIFIED_LIVE"
+    },
+    {
+      "key_name": "BlarAI-Audit-Signing-Key-v1",
+      "type": "ECDSA-P256",
+      "role": "tamper-evident audit stream (hash-chained record signing; separation of duties from the JWT key)",
+      "resident": true,
+      "functional_roundtrip": true,
+      "public_export_ok": true,
+      "private_export_refused": true,
+      "verdict": "VERIFIED_LIVE"
+    },
+    {
+      "key_name": "BlarAI-Manifest-Signing",
+      "type": "ECDSA-P256",
+      "role": "FUT-04 weight-integrity manifest signing (ADR-018; require_signed_manifest=true since Sprint 18)",
+      "resident": true,
+      "functional_roundtrip": true,
+      "public_export_ok": true,
+      "private_export_refused": true,
+      "verdict": "VERIFIED_LIVE"
+    },
+    {
+      "key_name": "BlarAI-DEKSeal",
+      "type": "RSA-2048",
+      "role": "at-rest Data Encryption Key (DEK) envelope, RSA-2048 OAEP-SHA256 (ADR-025)",
+      "resident": true,
+      "functional_roundtrip": true,
+      "public_export_ok": null,
+      "private_export_refused": true,
+      "verdict": "VERIFIED_LIVE",
+      "note": "The sealer exposes no public-export API, so public_export_ok is N/A (null)."
+    }
+  ],
+  "all_verified_live": true,
+  "corroboration": {
+    "hardware_tests": {
+      "command": "pytest shared/tests/test_tpm_signer.py shared/tests/test_tpm_sealer.py shared/tests/test_tpm_record_signer.py shared/tests/test_verify_trust_root.py -m slow",
+      "result": "14 passed, 42 deselected (3.47s)",
+      "includes": [
+        "test_tpm_signer.py::TestTpmHardwareRoundTrip (sign/verify/tamper + private-export-refused) — 2",
+        "test_tpm_sealer.py::TestTpmSealerHardwareRoundTrip (seal/unseal round-trip + private-export-refused) — 5",
+        "test_tpm_record_signer.py::TestTpmRecordSignerHardware (production audit key real sign/verify round-trip, read-only: ensure_key no-ops on the pre-provisioned key, no delete) — 4",
+        "test_verify_trust_root.py::TestVerifyTrustRootHardware (new — probe logic validated on EPHEMERAL keys, never the four production keys) — 3"
+      ]
+    },
+    "ceremony_preflight": {
+      "command": "python -m shared.security.ceremony_preflight",
+      "result": "READY for production boot — all 9 checks OK",
+      "checks": [
+        "TPM sealer (RSA-2048 OAEP) available",
+        "TPM signer (ECDSA P-256) available",
+        "DEK seal key present (BlarAI-DEKSeal)",
+        "Audit signing key present (BlarAI-Audit-Signing-Key-v1)",
+        "JWT signing key present (BlarAI-PA-JWT-Signing)",
+        "Manifest signing key present (BlarAI-Manifest-Signing)",
+        "DEK keystore file present (C:\\Users\\mrbla\\AppData\\Local\\BlarAI\\dek_keystore.json)",
+        "certs/pa_public.pem present",
+        "Production manifest digest verified (openvino_model.bin)"
+      ]
+    }
+  },
+  "downstream_actions": {
+    "capstone_deck_edit_handed_to_deck_builder": "deck_outline.json: (1) line ~972 S-K 'Is It Real?' — move the 'four TPM keys physically chip-resident is INFERRED' clause from NOT-verified to VERIFIED-LIVE (keep the other three NOT-verified items); (2) line ~104 trust-root slide — regrade item 1 from 'TESTED, not VERIFIED-LIVE' to 'VERIFIED-LIVE'; (3) line ~630 transformation slide — drop the 'chip residency is disk-inferred' caveat. Cite this artifact. Re-render capstone_presentation.html / EXECUTIVE_SUMMARY.md / coverage.md from the outline. (verify_trust_root does NOT edit the deck — deck-builder scope.)",
+    "stale_doc_finding": "SECURITY_ROADMAP_air_gap_removal.md:263 'TPM key state' table (dated 2026-06-07 snapshot) marks BlarAI-Manifest-Signing 'NOT PROVISIONED' and 'preflight does not yet probe for it' — both now false. Recommended one-line update: mark all four keys VERIFIED-LIVE (2026-06-09) citing this artifact. Surfaced for the roadmap owner (out of this session's write-scope)."
+  },
+  "references": {
+    "roadmap": "docs/security/SECURITY_ROADMAP_air_gap_removal.md (S5.1 production-posture verification umbrella; 'TPM key state' section)",
+    "capstone_ticket": "#612 (upgrades the S-K 'Is It Real?' trust-root claim, item 1)",
+    "gate_ticket": "#598 (air-gap GO/NO-GO — NOT opened by this verification)",
+    "session_ticket": "#635",
+    "adrs": "ADR-018 (TPM trust-root primitive), ADR-021 (TPM-sealed PA JWT key), ADR-025 (at-rest DEK envelope)",
+    "tpm_findings": "docs/TPM_CAPABILITY_FINDINGS.md"
+  }
+}

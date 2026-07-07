@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_initialization task="4.12a" sub_milestone="Harness Scaffolding" session="EA-1"
+                   date="2026-03-07" role="Execution_Agent">
+
+  <!-- ================================================================
+       Lead Architect → Execution Agent: Sub-Milestone 4.12a Initialization
+       PA Classification Quality Gate — Harness Scaffolding
+       
+       This is EA-1 of 5 sequential sessions for Task 4.12.
+       Scope: structural scaffolding ONLY — NO new test cases.
+       ================================================================ -->
+
+  <directive>
+    <role>You are an Execution Agent for the BlarAI project.</role>
+    <task>Execute sub-milestone 4.12a — Harness Scaffolding for PA Quality Gate Corpus Expansion.</task>
+    <scope>
+      Prepare the quality gate harness for corpus expansion from 40 to 236 cases.
+      Add structural scaffolding: _make_car() helper, BAND_TARGETS for 8K/12K,
+      case_metadata annotation on all 40 existing cases, llm_path_analysis evidence
+      computation, and pre-filter verification loop.
+      This is a TEST-ONLY task — zero production code changes (K-1).
+      DO NOT add any new test cases. TEST_CASES array stays at 40 entries.
+    </scope>
+  </directive>
+
+  <state>
+    <branch>feature/p5-task4-12-corpus-hardening</branch>
+    <head>3229d21</head>
+    <harness_file>phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py</harness_file>
+    <harness_state>Clean, unmodified. 1,720 lines. 40 test cases (IDs 0-39).</harness_state>
+    <predecessor>Task 4.10 complete. DEC-01 through DEC-10 LOCKED. Production profile locked.</predecessor>
+  </state>
+
+  <execution_prompt>
+    <primary>
+      Your authoritative execution prompt is the attached file:
+        docs/Task4.12_v1.xml (v2.2)
+      Read it in FULL before producing any output. Your scope is sub-milestone
+      4.12a ONLY (the first sub_milestone element in the sub_milestones section).
+      The scope, constraints (K-1–K-7), measurements (M-1–M-8), and category
+      definitions in the prompt are the authoritative reference — but you only
+      IMPLEMENT the deliverables listed in sub_milestone 4.12a.
+    </primary>
+  </execution_prompt>
+
+  <required_attachments>
+    <file path="docs/Task4.12_v1.xml" reason="Execution prompt v2.2 — sub-milestone 4.12a section is your scope" />
+    <file path="services/policy_agent/src/gpu_inference.py" reason="DeterministicPolicyChecker rules — READ ONLY, needed for step a2/a3" />
+    <file path="phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py" reason="Harness to modify — the only file you change" />
+    <file path="phase2_gates/evidence/p5_task4_9d_escalate_hardening.json" reason="Current evidence with prefilter_stats — validates 25/15 split" />
+    <file path=".github/copilot-instructions.md" reason="Project rules and coding standards" />
+  </required_attachments>
+
+  <scope_boundaries>
+    <MUST_DO>
+      <item>Read gpu_inference.py DeterministicPolicyChecker and document all 8 rules (step a2)</item>
+      <item>Read existing 40 TEST_CASES and determine which rule catches each case (step a3)</item>
+      <item>Add BAND_TARGETS entries: 8192=(7370,8960) and 12288=(11060,13440) (step a4)</item>
+      <item>Add _make_car() helper function for constructing CAR text from fields (step a5)</item>
+      <item>Add "category" and "expected_path" metadata fields to all 40 existing cases (step a6)</item>
+      <item>Add llm_path_analysis and per_category_llm_path computation to evidence generation (step a7)</item>
+      <item>Change evidence output filename to p5_task4_12_corpus_hardening.json (step a7)</item>
+      <item>Add pre-filter verification loop: iterate cases, call check(), compare expected_path (step a8)</item>
+      <item>Update harness docstring to reflect 236-case scope</item>
+      <item>Run harness to confirm 40/40 agreement, 8/8 adversarial with new evidence schema (step a9)</item>
+      <item>Commit using the commit template in sub_milestone 4.12a</item>
+    </MUST_DO>
+    <MUST_NOT_DO>
+      <item>Do NOT add any new test cases — the TEST_CASES array must remain at exactly 40 entries</item>
+      <item>Do NOT modify any file under services/, shared/, or launcher/ (K-1)</item>
+      <item>Do NOT run the full quality gate with LLM inference (no GPU needed for this session)</item>
+      <item>Do NOT design test cases for Categories A-E (that is EA-2 through EA-4 scope)</item>
+      <item>Do NOT modify DeterministicPolicyChecker, SYSTEM_PROMPT, or classify()</item>
+      <item>Do NOT generate SDO prompts or continuation prompts</item>
+    </MUST_NOT_DO>
+  </scope_boundaries>
+
+  <case_metadata_spec>
+    <description>
+      Each case dict in TEST_CASES must gain two new fields:
+        "category": "original" (for existing 40 cases) | "A"|"B"|"C"|"D"|"E" (for future cases)
+        "expected_path": one of:
+          "LLM" — case bypasses all checker rules, reaches LLM
+          "DENY_NULL_CAR" — caught by Rule 0
+          "DENY_RESTRICTED_PATH" — caught by Rule 1
+          "DENY_EXFILTRATION" — caught by Rule 2
+          "DENY_EXTERNAL_NETWORK" — caught by Rule 3
+          "DENY_AUTHORITY_CLAIM" — caught by Rule 4
+          "ESCALATE_CROSS_AGENT_OWNERSHIP" — caught by Rule 5
+          "ESCALATE_INFRA_CONFIG_WRITE" — caught by Rule 6
+          "ESCALATE_CERT_RENEWAL" — caught by Rule 1 (/certs/renew/ sub-clause)
+      Determine expected_path for each existing case by analyzing its CAR text
+      against the DeterministicPolicyChecker rules documented in step a2.
+      Cross-reference with prefilter_stats in p5_task4_9d_escalate_hardening.json.
+    </description>
+  </case_metadata_spec>
+
+  <evidence_schema>
+    <description>
+      The evidence JSON output must include the "llm_path_analysis" section
+      defined in change C-2 of the execution prompt. For the 40 original cases,
+      this will show: 25 prefiltered, 15 LLM-path (12 ALLOW, 0 DENY, 3 ESCALATE).
+      Per-category breakdown will show only "original" category at this stage.
+    </description>
+  </evidence_schema>
+
+  <verification_commands note="Lead Architect runs these after EA-1 completes">
+    <command description="Confirm commit">
+      git log --oneline -1
+    </command>
+    <command description="Confirm only harness file changed">
+      git diff HEAD~1 --name-only
+    </command>
+    <command description="Confirm test count still 40">
+      python -c "exec(open('phase2_gates/scripts/run_p5_task4_9_pa_quality_gate.py').read().split('TEST_CASES')[0]+'print(len(TEST_CASES))')" 2>nul || echo "Check TEST_CASES count manually"
+    </command>
+    <command description="Run unit tests">
+      pytest services/policy_agent/ shared/ --tb=short -q
+    </command>
+  </verification_commands>
+
+  <handoff>
+    After committing 4.12a, STOP. Do not proceed to 4.12b. The Lead Architect
+    will verify the commit and launch a new EA session (EA-2) for sub-milestone
+    4.12b (Category A — 70 LLM-path DENY cases).
+  </handoff>
+
+</ea_initialization>

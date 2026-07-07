@@ -1,0 +1,56 @@
+{
+  "timestamp_utc": "2026-02-26T06:22:45.305810+00:00",
+  "checks": {
+    "EQG-01": {
+      "passed": true,
+      "detail": "Local measurements attempted for all major matrices; unmeasured points explicitly documented where applicable"
+    },
+    "EQG-02": {
+      "passed": false,
+      "detail": "Critical matrix points require >=30 valid runs"
+    },
+    "EQG-03": {
+      "passed": true,
+      "detail": "Warm/cold are reported as separate mode buckets"
+    },
+    "EQG-04": {
+      "passed": true,
+      "detail": "All matrix metrics include full distribution fields"
+    },
+    "EQG-05": {
+      "passed": true,
+      "detail": "All artifacts include commit/profile/model/timestamp metadata"
+    },
+    "EQG-06": {
+      "passed": true,
+      "detail": "At least one reproducibility rerun exists for each major matrix"
+    },
+    "EQG-07": {
+      "passed": true,
+      "detail": "Aborted/failed runs are retained via invalid_count and deterministic fingerprints in event logs"
+    },
+    "EQG-08": {
+      "passed": true,
+      "detail": "Missing sweep points include explicit reason when zero valid runs"
+    },
+    "EQG-09": {
+      "passed": true,
+      "detail": "PGOV coverage includes FN/FP quantification for pre/post-128 placements"
+    },
+    "EQG-10": {
+      "passed": true,
+      "detail": "PA matrix includes agreement rate + latency distribution by prompt-size band"
+    },
+    "EQG-11": {
+      "passed": false,
+      "detail": "If any gate fails, disposition must be NO_DECISION/INSUFFICIENT_EVIDENCE"
+    },
+    "EQG-12": {
+      "passed": true,
+      "detail": "Addendum will trace-map all claims to empirical artifact files and mark projections provisional"
+    }
+  },
+  "all_pass": false,
+  "disposition": "NO_DECISION",
+  "reason_code": "INSUFFICIENT_EVIDENCE"
+}

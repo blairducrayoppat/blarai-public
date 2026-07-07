@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "blarai-cleaner"
+version = "0.1.0"
+description = "Cleaner — UC-003 Ingest Pipeline: extraction, normalization, adversarial sanitization (ADR-030)"
+requires-python = ">=3.11"
+dependencies = [
+    # trafilatura is approved EXTRACTION-ONLY (ADR-030 §4): its fetch_url /
+    # fetch_response / downloads machinery is forbidden in runtime code and
+    # statically scanned (tests/security/test_no_external_egress.py).
+    # Installed hash-pinned via requirements/ingest-cleaner.txt only.
+    "trafilatura>=2.1,<3",
+    # lxml is a C extension parsing hostile HTML bytes — the supply-chain
+    # security boundary of this service (vetting record:
+    # docs/research/trafilatura_supply_chain_vetting.md §5.2).
+    "lxml>=6.1,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1",
+    "mypy>=1.7",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.mypy]
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -v"

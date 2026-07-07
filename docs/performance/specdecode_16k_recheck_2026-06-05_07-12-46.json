@@ -1,0 +1,83 @@
+{
+  "benchmark": "specdecode_16k_recheck_post_iss1",
+  "purpose": "Re-check spec-decode acceptance at 16K after the 2026-05 ISS-1 fix + pruned-6L INT8 draft swap. Compare vs March Task 4.3 which found acceptance 0.000 at >=16K on the old INT4 28L draft.",
+  "timestamp_utc": "2026-06-05T07:12:46.064947+00:00",
+  "commit": "88c081c3d9c428f0b88a761054234ea7f6114b5a",
+  "config": {
+    "target_model": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft_model": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "openvino_version": "2026.1.0-21367-63e31528c62-releases/2026/1",
+    "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+    "nat": 3,
+    "bands": [
+      2048,
+      8192,
+      16384
+    ],
+    "warmup_runs": 2,
+    "measured_runs": 4,
+    "max_new_tokens": 128,
+    "scheduler_cache_gb": 3,
+    "pipeline_compile_ms": 23273.6,
+    "power_envelope": {
+      "sensor_available": true,
+      "power_plugged": true,
+      "battery_percent": 80.0
+    }
+  },
+  "march_comparison": {
+    "march_acceptance_at_16k": 0.0,
+    "march_draft": "Qwen3-0.6B INT4 28L",
+    "march_source": "phase2_gates/evidence/p5_task4_3_nat_sweep_matrix.json"
+  },
+  "results": [
+    {
+      "band": 2048,
+      "actual_prompt_tokens": 2067,
+      "nat": 3,
+      "valid_runs": 4,
+      "combined_tps_mean": 12.206,
+      "acceptance_rate_aggregate": 0.4717,
+      "acceptance_rate_by_step_last": [
+        0.6415,
+        0.4717,
+        0.3019
+      ],
+      "tokens_drafted_total": 636,
+      "tokens_accepted_total": 300,
+      "peak_rss_mb": 12712.9
+    },
+    {
+      "band": 8192,
+      "actual_prompt_tokens": 8211,
+      "nat": 3,
+      "valid_runs": 4,
+      "combined_tps_mean": 9.563,
+      "acceptance_rate_aggregate": 0.5745,
+      "acceptance_rate_by_step_last": [
+        0.8298,
+        0.5319,
+        0.3617
+      ],
+      "tokens_drafted_total": 564,
+      "tokens_accepted_total": 324,
+      "peak_rss_mb": 12713.7
+    },
+    {
+      "band": 16384,
+      "actual_prompt_tokens": 16403,
+      "nat": 3,
+      "valid_runs": 4,
+      "combined_tps_mean": 4.94,
+      "acceptance_rate_aggregate": 0.4568,
+      "acceptance_rate_by_step_last": [
+        0.6481,
+        0.4259,
+        0.2963
+      ],
+      "tokens_drafted_total": 648,
+      "tokens_accepted_total": 296,
+      "peak_rss_mb": 12714.7
+    }
+  ]
+}

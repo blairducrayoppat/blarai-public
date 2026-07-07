@@ -1,0 +1,820 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_prompt version="1.0" task="9" ea_number="2" authored_by="sdo" authored_at="2026-04-22">
+
+  <!--
+    BlarAI — EA Code Execution Prompt
+    Task 9: Governance Documentation Sprint — EA-2: Runtime Behavior & Resilience
+    Sprint 9 | Branch: feature/p5-task9-ea2-runtime-resilience
+    Ledger entry: EA-2 verifies next-free entry at commit time; target entry follows
+      Sprint 8 + Sprint 9 EA-1 advances — likely 53 or higher. SDO projects no fixed
+      number. EA Code MUST scan docs/POST_OPERATIONAL_MATURATION_LEDGER.md for the
+      highest existing ### Entry N and use N+1 at commit time.
+
+    IMPORTANT (L-12): Before ANY work begins, the EA MUST post a comprehension gate
+    comment on Vikunja Task 121 and STOP. Do not start implementation until SDO
+    explicitly approves. The comprehension gate MUST recite the deliverable structure
+    VERBATIM (see SECTION 2 below).
+
+    IMPORTANT (L-15): This is a PURE DOCUMENTATION milestone.
+    DO NOT modify any file outside docs/governance/ (plus the ledger entry for this EA).
+    If a source-anchoring citation reveals a production-code discrepancy, STOP,
+    document it in your completion report, and wait for SDO direction. Do NOT fix
+    production code here.
+
+    IMPORTANT (L-16): Sprint 9 runs in parallel with Sprint 8 per DEC-15 multi-sprint
+    execution (commit 20db5e7). Working-set boundaries are hard:
+      Sprint 8 writes  **/tests/  (plus conftest.py, pyproject.toml, ledger)
+      Sprint 9 writes  docs/governance/**  (plus ledger at sprint-close entries)
+    If your branch diff shows ANY file outside docs/ (or outside docs/governance/ plus
+    the ledger), the ORACLE gate fails and you MUST halt.
+
+    IMPORTANT (L-17): docs/governance/boot-sequence.md DOES NOT EXIST (phantom reference
+    discovered during Sprint 9 planning; tracked in GOV-15 / Vikunja #124 for future
+    authoring). The GOV-05 (gpu-runtime.md) doc is the one most tempted to cite a
+    boot-sequence governance reference. DO NOT. Cite source files directly.
+
+    IMPORTANT (L-18): STYLE.md already exists on main (committed by Sprint 9 EA-1 at
+    commit b0f0bde). Read docs/governance/STYLE.md before authoring any WI. Conform
+    to its Doc Template, section ordering, line-count floor, source-anchoring, audience
+    taxonomy, markdown conventions, and cross-doc reference rules. Non-conformance is
+    a merge-gate failure.
+  -->
+
+  <!-- ===== SECTION 1: PARENT HEAD (L-13) ===== -->
+
+  <parent_head>29cea32</parent_head>
+  <!-- Verified by SDO via git rev-parse HEAD immediately before authoring
+       (2026-04-22). This HEAD is on main and includes Sprint 9 EA-1's merge
+       (b0f0bde) plus Sprint 8 EA-1 (ef670eb) plus Sprint 8 test-hardening
+       antecedents plus the fleet merge_policy threshold bump (b0f0bde).
+
+       Before branching, EA MUST:
+         1. git fetch origin
+         2. git checkout main && git pull --ff-only
+         3. git rev-parse HEAD  → current main HEAD (may have advanced past 29cea32
+            if Sprint 8 EA-2/3/4/5 has merged in the interim; Sprint 9 EA-1 is
+            already merged and STYLE.md exists on main)
+         4. git checkout -b feature/p5-task9-ea2-runtime-resilience
+       If main has advanced past 29cea32, use the current HEAD (do not force-checkout
+       29cea32). The parent_head field is SDO's authoring snapshot; the branching
+       anchor is "current main HEAD at EA pickup time". -->
+
+  <!-- ===== SECTION 2: COMPREHENSION GATE (L-12 + L-16) ===== -->
+
+  <comprehension_gate>
+    <instruction>
+      READ THIS ENTIRE PROMPT before posting your comprehension gate.
+      Then READ all files listed in required_attachments (SDV §5.1 items 4-6, §5.3, §6,
+      §7; the continuation XML ea_decomposition EA-2 block; docs/governance/STYLE.md
+      verbatim; the three GOV tickets #18/#19/#20; and the primary anchor source files
+      listed per-doc in SECTION 4 below).
+      Then POST a comprehension gate comment on Vikunja Task 121, prefixed:
+
+        [agent:ea_code][phase:comprehension]
+
+      Your comprehension comment MUST contain ALL of the following sections (verbatim
+      section headers required, in this exact order). Do NOT omit or merge headers.
+
+        A. MILESTONE OBJECTIVE (in your own words, 3-5 sentences — must name all three
+           deliverables: gpu-runtime.md, error-recovery.md, circuit-breaker.md; must
+           name the forward-reference to docs/governance/weight-integrity.md from
+           error-recovery.md; must name STYLE.md as the binding style reference)
+        B. WORK ITEMS (one sentence each for ALL work items WI-1 through WI-4 — do not
+           summarize or group)
+        C. FILES TO CREATE (list every new governance doc: gpu-runtime.md,
+           error-recovery.md, circuit-breaker.md — plus the ledger entry line)
+        D. FILES TO MODIFY (enumerate: only docs/POST_OPERATIONAL_MATURATION_LEDGER.md)
+        E. FILES TO READ (per-doc anchoring list — every source file cited in the per-WI
+           anchor lists in SECTION 4 below, plus the ADRs named per-doc: ADR-011,
+           ADR-012 §2.2 / §2.4 / §5, DEC-01..DEC-10)
+        F. DELIVERABLE STRUCTURE (recite VERBATIM: branch name
+           feature/p5-task9-ea2-runtime-resilience, every file path, the section
+           structure from docs/governance/STYLE.md Doc Template, the ledger entry
+           line, the expected commit message format). Recite STYLE.md's Doc Template
+           headers VERBATIM:
+             # {Domain Name} Governance
+             ## Audience
+             ## Prerequisites
+             ## Source References
+             ## Governance Content
+             ## Recovery / Remediation Procedures
+             ## Open Questions / Deferred Items
+        G. ORACLE EXPECTATION (recite VERBATIM the two-step git diff --name-only
+           commands and their expected empty output — both commands below MUST return
+           zero lines):
+             git diff main...feature/p5-task9-ea2-runtime-resilience --name-only | grep -vE "^docs/"
+             git diff main...feature/p5-task9-ea2-runtime-resilience --name-only | grep -vE "^docs/governance/|^docs/POST_OPERATIONAL_MATURATION_LEDGER\.md$|^docs/IMPLEMENTATION_PLAN\.md$"
+        H. STYLE.md CONFORMANCE ACKNOWLEDGMENT (quote L-18 verbatim; confirm you have
+           READ docs/governance/STYLE.md from main HEAD and will conform to its Doc
+           Template, Line-Count Floor, Source Anchoring, Audience Taxonomy, Markdown
+           Conventions, Cross-Doc References, Filename Conventions, and
+           Out-of-Scope-for-docs/governance/ sections)
+        I. CROSS-SPRINT COEXISTENCE ACKNOWLEDGMENT (L-16): quote verbatim —
+           "This sprint runs in parallel with Sprint 8. My writes are confined to
+            docs/governance/. Sprint 8 writes are confined to **/tests/."
+        J. PHANTOM-REFERENCE ACKNOWLEDGMENT (L-17): quote verbatim —
+           "docs/governance/boot-sequence.md DOES NOT EXIST (phantom reference
+            discovered during Sprint 9 planning; tracked in GOV-15 / Vikunja #124
+            for future authoring). If my doc would naturally cite a boot-sequence
+            governance doc, I cite the relevant source files directly (e.g.,
+            services/*/src/boot.py, launcher/__main__.py) and note that
+            boot-sequence governance is future-sprint scope."
+        K. WEIGHT-INTEGRITY FORWARD-REFERENCE ACKNOWLEDGMENT: confirm that
+           error-recovery.md (WI-2) will forward-reference
+           docs/governance/weight-integrity.md as NOT-YET-AUTHORED (Pluton-blocked
+           per GOV-10 / ISS-4) and that EA-2 will NOT author
+           docs/governance/weight-integrity.md itself.
+        L. SOURCE-ANCHORING RECITATION (per SDV §6 / success criterion 6): for each
+           of the three governance docs, recite:
+             - the GOV ticket ID + Vikunja task number
+             - the ADR(s) it will cite (minimum 1 per doc)
+             - at least one source file from the GOV ticket's "Scattered Sources"
+               list (minimum 1 per doc)
+        M. TARGET-AUDIENCE ASSIGNMENT (SDV §5.3, STYLE.md Audience Taxonomy): name the
+           primary audience (operator / developer / auditor / incident responder /
+           future agent) for each of the three governance docs. The "Audience" stanza
+           opens each doc.
+        N. 150-LINE FLOOR ACKNOWLEDGMENT (SDV §5.3 / §6 / STYLE.md Line-Count Floor):
+           each of the three governance docs is ≥ 150 lines of substantive content.
+        O. RISKS AND AMBIGUITIES (list any — at minimum: parallel-with-Sprint-8
+           context; whether source files cited below have shifted since GOV tickets
+           were authored; whether the phantom-boot-sequence temptation materializes in
+           gpu-runtime.md's drafting)
+        P. PRODUCTION FILE PROHIBITION ACKNOWLEDGMENT (quote L-15 verbatim):
+           "DO NOT modify any file outside docs/governance/ (except the ledger
+            docs/POST_OPERATIONAL_MATURATION_LEDGER.md at sprint-close entries and
+            docs/IMPLEMENTATION_PLAN.md at EA-5). If a non-governance file change
+            appears necessary to unblock a doc (e.g., a stale CLAUDE.md claim
+            contradicts a doc you're writing), STOP, document the blocker in your
+            completion report, and wait for SDO direction. Do not make the change
+            unilaterally."
+
+      STOP after posting the comprehension gate. Do NOT proceed to implementation.
+      Wait for SDO [agent:sdo][phase:comprehension-review] VERDICT: APPROVED on
+      Vikunja Task 121 before starting any work.
+    </instruction>
+  </comprehension_gate>
+
+  <!-- ===== SECTION 3: MILESTONE ===== -->
+
+  <milestone>
+    <objective>
+      Author three governance documents under docs/governance/ that consolidate
+      BlarAI's runtime-behavior and resilience surface: gpu-runtime.md (GOV-05 —
+      model-load, speculative decoding, KV-cache, thinking-mode suppression, empirical
+      baselines, model rollback), error-recovery.md (GOV-06 — fail-closed per
+      subsystem, error classes, retry vs escalation matrix, user-facing messages,
+      audit trail), and circuit-breaker.md (GOV-07 — MAX_OUTPUT_TOKENS and
+      MAX_TOOL_CALL_DEPTH breakers, trip behavior, fallback text, reset semantics,
+      PGOV+streaming interaction). Each doc conforms verbatim to docs/governance/
+      STYLE.md's Doc Template. Each doc anchors to the production source files
+      enumerated in SECTION 4 below and to the ADRs locked for the runtime surface
+      (ADR-011, ADR-012). This EA does NOT author docs/governance/weight-integrity.md
+      — that GOV-10 doc is Pluton-blocked pending ISS-4; error-recovery.md
+      forward-references it as a deferred artifact.
+    </objective>
+    <sprint>9</sprint>
+    <ea_number>2</ea_number>
+    <branch>feature/p5-task9-ea2-runtime-resilience</branch>
+    <ledger_entry_reserved>
+      EA Code MUST scan docs/POST_OPERATIONAL_MATURATION_LEDGER.md at commit time for
+      the highest existing ### Entry N and use N+1. The target entry follows Sprint 8
+      advances + Sprint 9 EA-1 — likely 53 or higher at EA-2 commit time. SDO does
+      NOT hard-code a specific number here; the next-free discipline supersedes any
+      projection.
+    </ledger_entry_reserved>
+    <sizing>M (three deliverables; follows STYLE.md precedent committed by EA-1)</sizing>
+    <depends_on>
+      Sprint 9 EA-1 merged to main (commit b0f0bde — docs/governance/STYLE.md,
+      pgov-validation.md, ipc-protocol.md, streaming-output.md exist on main).
+      STYLE.md is the binding style reference for EA-2.
+    </depends_on>
+    <parallel_with>
+      Sprint 8 (Task 82). Working sets disjoint per L-16: Sprint 8 = **/tests/;
+      Sprint 9 = docs/governance/**.
+    </parallel_with>
+  </milestone>
+
+  <!-- ===== SECTION 4: WORK ITEMS ===== -->
+
+  <work_items>
+
+    <!-- ========== WI-1: gpu-runtime.md (GOV-05 / Vikunja #18) ========== -->
+
+    <work_item id="WI-1" ordering="first">
+      <title>Author docs/governance/gpu-runtime.md — GPU Runtime &amp; Speculative Decoding Configuration Governance</title>
+      <gov_ticket>GOV-05 / Vikunja #18 (HIGH — Runtime Surface)</gov_ticket>
+      <audience>operator (primary); developer; auditor</audience>
+      <line_floor>≥ 150 lines of substantive content</line_floor>
+      <anchor_sources>
+        Required (must cite at least these plus the listed ADRs):
+          - services/assistant_orchestrator/src/model_loader.py (Qwen3-14B + draft
+            model loading; cite the load sequence and device binding)
+          - ADR-011 (all LLM inference on GPU — NPU retired from P1 Core Loop)
+          - ADR-012 (Qwen3-14B unified model; speculative decoding mandatory)
+          - ADR-012 §2.2 (num_assistant_tokens=3 lock for speculative decoding)
+          - ADR-012 §2.4 (thinking-mode strategy — PA /no_think, AO thinking allowed
+            with strip)
+          - ADR-012 §5 (Qwen2.5-1.5B retained for rollback)
+        Recommended additional (cite where it strengthens source anchoring):
+          - DEC-01..DEC-10 (Task 4 production configuration decisions — cite the
+            DEC numbers most directly load-bearing for GPU runtime, e.g., memory
+            headroom decisions, KV-cache sizing decisions)
+          - services/assistant_orchestrator/src/circuit_breaker.py (KV-cache
+            interaction with circuit-breaker trip)
+          - phase2_gates/evidence/* (if P5-005b or equivalent empirical baseline
+            evidence exists, cite by path)
+      </anchor_sources>
+      <required_coverage>
+        The doc MUST cover EACH of the following (minimum bar from GOV-05 ticket +
+        SDV §5.1 item 4):
+          1. Model-load procedure for Qwen3-14B INT4 on Arc 140V Xe2 GPU.
+          2. Draft-model load (Qwen3-0.6B INT4) and its device binding.
+          3. Speculative-decoding configuration: num_assistant_tokens=3 lock per
+             ADR-012 §2.2; rationale for the specific value.
+          4. KV-cache management: FP16 retention; approximate sizing (PA ~350-550MB,
+             AO ~1-1.2GB) — cite the source of these numbers.
+          5. Circuit-breaker trip effect on KV-cache: what happens to cached state
+             when MAX_OUTPUT_TOKENS trips mid-stream? (forward-reference
+             circuit-breaker.md — which WI-3 will author).
+          6. Thinking-mode suppression mechanics:
+               /no_think prefix for PA per ADR-012 §2.4
+               stop-token IDs [151645, 151668] for thinking-block truncation
+               AO thinking allowed with strip at transport layer
+          7. XAttention OFF rationale (cite the decision record or the model_loader
+             source lines that set the flag).
+          8. Empirical performance baseline (if available):
+               10.72 tps @ 4K context
+               4.17 tps @ 20K context
+             cite the phase2_gates evidence path or the commit that recorded the
+             measurement. If evidence is not locatable at authoring time, note the
+             gap explicitly and cite the closest available reference.
+          9. Model rollback procedure: Qwen2.5-1.5B retained per ADR-012 §5; runbook
+             steps to switch active model if Qwen3-14B fails validation.
+          10. Memory ceiling awareness: 31.323 GB effective (32 GB LPDDR5X minus
+              693 MB firmware reservation); how runtime stays under it.
+        PHANTOM REFERENCE WARNING (L-17): If the GOV-05 ticket body or any source
+        file mentions a boot-sequence governance doc (docs/governance/boot-sequence.md),
+        DO NOT cite that path. Cite the underlying source file(s) instead
+        (services/assistant_orchestrator/src/model_loader.py,
+        launcher/__main__.py, services/policy_agent/src/* startup entry points)
+        and note that boot-sequence governance is future-sprint scope tracked in
+        GOV-15 / Vikunja #124.
+      </required_coverage>
+      <negative_constraints>
+        - Do NOT cite docs/governance/boot-sequence.md (L-17 phantom — see above).
+        - Do NOT cite or modify docs/TEST_GOVERNANCE.md (deferred to GOV-MIGRATE /
+          Vikunja #123).
+        - Do NOT propose model-switch automation or NPU re-enablement; ADR-011
+          retires the NPU from P1 Core Loop — describe current GPU-only state.
+        - Do NOT modify any file outside docs/governance/ (plus the ledger at WI-4).
+        - Do NOT author circuit-breaker trip semantics inline beyond forward-reference;
+          that is WI-3's territory.
+      </negative_constraints>
+    </work_item>
+
+    <!-- ========== WI-2: error-recovery.md (GOV-06 / Vikunja #19) ========== -->
+
+    <work_item id="WI-2" ordering="after WI-1">
+      <title>Author docs/governance/error-recovery.md — Error Handling &amp; Crash Recovery Governance</title>
+      <gov_ticket>GOV-06 / Vikunja #19 (HIGH — Resilience Surface)</gov_ticket>
+      <audience>incident responder (primary); operator; developer</audience>
+      <line_floor>≥ 150 lines of substantive content</line_floor>
+      <anchor_sources>
+        Required (must cite at least these plus the listed ADRs):
+          - services/assistant_orchestrator/src/error_handling.py (fail-closed error
+            surface — cite the specific exception classes and their escalation paths)
+          - services/assistant_orchestrator/src/model_loader.py (model-load failure
+            handling)
+          - ADR-011 (GPU-only inference — GPU-fault recovery posture)
+          - ADR-012 §5 (Qwen2.5-1.5B rollback path; when to invoke)
+        Recommended additional (cite where it strengthens source anchoring):
+          - services/policy_agent/src/error_handling.py (if exists — PA adjudication
+            error path)
+          - shared/ipc/protocol.py (vsock IPC failure surface)
+          - shared/schemas/car.py (CAR hash-verification failure path)
+          - services/assistant_orchestrator/src/circuit_breaker.py (circuit-breaker
+            as preventative-recovery surface — forward-reference WI-3)
+      </anchor_sources>
+      <required_coverage>
+        The doc MUST cover EACH of the following (minimum bar from GOV-06 ticket +
+        SDV §5.1 item 5):
+          1. Fail-Closed principle per subsystem: PA, AO, IPC, TUI, launcher.
+             For each, cite the source file that enforces fail-closed behavior.
+          2. PA adjudication errors: what triggers; user-visible outcome; log trail.
+          3. AO generation errors: mid-stream crash; partial-output handling;
+             PGOV interaction (does partial output get validated or discarded?).
+          4. JWT / mTLS failure handling: what the sender sees; what the receiver
+             does; whether retries are permitted.
+          5. Model-load failure: Qwen3-14B fails to load → which recovery path?
+             (ADR-012 §5 Qwen2.5-1.5B rollback? fail-closed system halt?) — cite
+             the source file that decides.
+          6. Weight-integrity check failure: FORWARD-REFERENCE
+             docs/governance/weight-integrity.md as NOT-YET-AUTHORED
+             (Pluton-blocked per GOV-10 / ISS-4). DO NOT describe the Pluton
+             ceremony here. Use a clear deferred marker:
+               "Weight-integrity check procedure is governed by the future
+                [weight-integrity.md](weight-integrity.md) doc (GOV-10 /
+                Vikunja #23), currently blocked on ISS-4 Pluton investigation.
+                When that doc lands, this section links to its recovery
+                subsection."
+             Note: linking to a not-yet-authored markdown file produces a broken
+             relative link until GOV-10 lands. That is ACCEPTABLE here because
+             the gap is tracked and the forward-reference is the governance
+             connective tissue.
+          7. vsock IPC failures: connection reset, message truncation, nonce
+             replay detection; cite shared/ipc/*.
+          8. OOM handling: 31.323 GB memory ceiling; what triggers OOM in PA vs
+             AO; recovery (kill + restart; model unload + reload).
+          9. User-facing error messages per error class: exact text surfaced to
+             the operator (cite source files that emit the text).
+          10. Logging and audit trail: where errors land; retention; how an
+              incident responder queries them.
+          11. Automatic retry vs manual escalation matrix: a table enumerating
+              error classes, their retry policy (retry count / backoff / none),
+              and their escalation trigger (alert / halt / Vikunja ticket).
+          12. Boot-time vs runtime failure distinction: a failure during launcher
+              startup vs during live inference — which is recoverable; which
+              requires operator intervention. PHANTOM-REFERENCE WARNING (L-17):
+              do NOT cite a boot-sequence governance doc here; cite
+              launcher/__main__.py and services/policy_agent/src/* startup
+              entry points instead.
+      </required_coverage>
+      <negative_constraints>
+        - Do NOT author docs/governance/weight-integrity.md. It is Pluton-blocked
+          per GOV-10 / ISS-4. Forward-reference it only.
+        - Do NOT cite docs/governance/boot-sequence.md (L-17 phantom).
+        - Do NOT describe Pluton-sealed manifest procedures; that is GOV-10 scope.
+        - Do NOT author circuit-breaker trip semantics inline beyond forward-reference;
+          WI-3 owns that.
+        - Do NOT propose production-code error-handling changes.
+      </negative_constraints>
+    </work_item>
+
+    <!-- ========== WI-3: circuit-breaker.md (GOV-07 / Vikunja #20) ========== -->
+
+    <work_item id="WI-3" ordering="after WI-2">
+      <title>Author docs/governance/circuit-breaker.md — Circuit Breaker Governance</title>
+      <gov_ticket>GOV-07 / Vikunja #20 (HIGH — Runaway Containment)</gov_ticket>
+      <audience>developer (primary); operator; auditor</audience>
+      <line_floor>≥ 150 lines of substantive content</line_floor>
+      <anchor_sources>
+        Required (must cite at least these plus the listed ADR):
+          - services/assistant_orchestrator/src/circuit_breaker.py (full
+            implementation — cite MAX_OUTPUT_TOKENS, MAX_TOOL_CALL_DEPTH constants
+            with their line numbers; cite the trip logic)
+          - ADR-012 §2.4 (thinking-mode strategy — thinking tokens counted or not
+            against MAX_OUTPUT_TOKENS?)
+        Recommended additional (cite where it strengthens source anchoring):
+          - services/assistant_orchestrator/src/pgov.py (PGOV interaction — when
+            PGOV runs relative to circuit-breaker trip)
+          - services/ui_shell/src/streaming.py (streaming interaction — how trip
+            terminates the stream)
+          - services/assistant_orchestrator/src/model_loader.py (KV-cache
+            interaction — what happens to cache on trip)
+      </anchor_sources>
+      <required_coverage>
+        The doc MUST cover EACH of the following (minimum bar from GOV-07 ticket +
+        SDV §5.1 item 6):
+          1. Two independent breakers:
+               MAX_OUTPUT_TOKENS = 4096
+               MAX_TOOL_CALL_DEPTH = 5
+             Cite the constant-definition line in circuit_breaker.py for each.
+             Document the unit and semantics of each (tokens vs nested calls).
+          2. Token-counter semantics: does the counter include thinking tokens?
+             (Per ADR-012 §2.4 AO is thinking-allowed-with-strip — document the
+             observed behavior and cite the code that decides.)
+          3. Tool-call depth counter semantics: what counts as a "tool call"?
+             how is nesting measured? cite source.
+          4. Trip behavior: on trip, what happens?
+               Output truncation (mid-token? at safe boundary?)
+               Fallback message emitted (exact text — cite source)
+               Stream terminated (document semantics relative to UI buffer)
+          5. Exact fallback message text (cite source line where it lives).
+          6. Per-session vs cross-session reset semantics:
+               Does a new session reset the breakers?
+               Does a restart reset them?
+               Is there any persistence of trip state across sessions?
+             Cite source for each answer.
+          7. Threshold-tuning governance:
+               Evidence required before changing MAX_OUTPUT_TOKENS or
+               MAX_TOOL_CALL_DEPTH.
+               Who approves a change (ADR amendment vs DEC vs in-code).
+               Reference Task 7 audit practice if applicable.
+          8. Monitoring:
+               Breaker-trip logging (log level, destination, retention).
+               Operator query: how to ask "did a breaker trip this session?"
+          9. Interaction with PGOV:
+               PGOV runs AFTER generation (cite pgov.py).
+               If breaker trips mid-generation, does PGOV still run on the
+               truncated output? What is the user-visible result?
+          10. Interaction with streaming:
+               Streaming emits tokens incrementally (cite streaming.py).
+               On trip, how is the StreamingDisplay signaled?
+               Does the TUI show a trip indicator?
+          11. Interaction with KV-cache:
+               Does the cache persist across a trip?
+               Is it invalidated?
+               Cite the model_loader or circuit_breaker source that decides.
+          12. Example scenarios (narrative): a 5000-token response that trips
+              MAX_OUTPUT_TOKENS; a 6-level tool-call chain that trips
+              MAX_TOOL_CALL_DEPTH. For each, describe the user experience
+              end-to-end.
+      </required_coverage>
+      <negative_constraints>
+        - Do NOT propose threshold changes; document current thresholds and the
+          governance for changing them.
+        - Do NOT author PGOV stage-level governance; that is pgov-validation.md
+          (already on main). Forward-reference it.
+        - Do NOT author streaming-lifecycle governance; that is streaming-output.md
+          (already on main). Forward-reference it.
+        - Do NOT cite docs/governance/boot-sequence.md (L-17 phantom).
+      </negative_constraints>
+    </work_item>
+
+    <!-- ========== WI-4: Ledger entry ========== -->
+
+    <work_item id="WI-4" ordering="final commit of EA-2">
+      <title>Add Sprint 9 EA-2 entry to docs/POST_OPERATIONAL_MATURATION_LEDGER.md</title>
+      <required_content>
+        Append a new ledger section with header:
+          ### Entry N — Task 9 / EA-2: Sprint 9 Governance Documentation — Runtime Behavior &amp; Resilience
+
+        Where N = (highest existing ### Entry number in the ledger) + 1. EA Code
+        verifies by scanning the ledger at commit time and using the next-free
+        number. SDO does NOT hard-code a projection; Sprint 8 advances + Sprint 9
+        EA-1 have likely pushed N to 53 or higher.
+
+        Body MUST include:
+          - Commit hash of the EA-2 branch HEAD (Co-Lead's merge commit supersedes
+            if the PR is merge-committed rather than fast-forwarded).
+          - Three deliverables authored with their file paths and approximate line
+            counts (wc -l output).
+          - STYLE.md-conformance confirmation (L-18 satisfied).
+          - Source-anchoring summary: ADR cites per doc + anchor-source files per
+            doc.
+          - Parallel-with-Sprint-8 note (L-16 coexistence).
+          - Phantom-reference handling note (L-17): gpu-runtime.md and
+            error-recovery.md DID NOT cite docs/governance/boot-sequence.md;
+            cited source files directly.
+          - Weight-integrity deferral note: error-recovery.md forward-references
+            docs/governance/weight-integrity.md; GOV-10 remains Pluton-blocked
+            pending ISS-4.
+          - Test-baseline confirmation: regression suite unchanged
+            (baseline at SDO authoring time — 755 passed, 2 skipped REGRESSION;
+            may have advanced post-Sprint-8 EA merges — EA Code cites the exact
+            observed count).
+      </required_content>
+    </work_item>
+
+  </work_items>
+
+  <!-- ===== SECTION 5: DELIVERABLE ===== -->
+
+  <deliverable>
+    <branch>feature/p5-task9-ea2-runtime-resilience</branch>
+    <files_to_create>
+      - docs/governance/gpu-runtime.md        (≥ 150 lines; GOV-05 / Vikunja #18)
+      - docs/governance/error-recovery.md     (≥ 150 lines; GOV-06 / Vikunja #19)
+      - docs/governance/circuit-breaker.md    (≥ 150 lines; GOV-07 / Vikunja #20)
+    </files_to_create>
+    <files_to_modify>
+      - docs/POST_OPERATIONAL_MATURATION_LEDGER.md (one new ### Entry N section)
+    </files_to_modify>
+    <section_structure_per_doc>
+      Every governance doc (WI-1, WI-2, WI-3) follows docs/governance/STYLE.md's
+      Doc Template VERBATIM. The required section headers in order:
+
+        # {Domain Name} Governance
+        ## Audience
+        ## Prerequisites
+        ## Source References
+        ## Governance Content
+        ## Recovery / Remediation Procedures
+        ## Open Questions / Deferred Items
+
+      Per STYLE.md "Per-doc-type flex": the
+      "## Recovery / Remediation Procedures" header MAY be omitted entirely (no
+      stub) when a standalone recovery section would duplicate Governance Content
+      or when the domain has no externally-triggered failure mode. For EA-2:
+        - gpu-runtime.md: Recovery section REQUIRED (model rollback runbook is
+          the recovery surface).
+        - error-recovery.md: Recovery section REQUIRED AND IS THE DOC — the
+          distinction between Governance Content and Recovery may be thin; use
+          judgment and STYLE.md's flex rule. If merged, omit the separate
+          Recovery header entirely; do not leave a stub.
+        - circuit-breaker.md: Recovery section OPTIONAL — trip behavior IS the
+          recovery (output truncated + fallback shown); if merging into
+          Governance Content is clearer, omit the separate header.
+
+      The Audience stanza cites from: operator / developer / auditor / incident
+      responder / future agent. Source References cite ADRs and at least one
+      source file from the GOV ticket's Scattered Sources list. Governance
+      Content is the substantive body. Open Questions / Deferred Items notes
+      the weight-integrity.md deferral in error-recovery.md and any phantom
+      boot-sequence gaps in gpu-runtime.md.
+    </section_structure_per_doc>
+  </deliverable>
+
+  <!-- ===== SECTION 6: NEGATIVE CONSTRAINTS (L-15 + L-16 + L-17 + L-18 + SDV §5.2) ===== -->
+
+  <negative_constraints>
+    <constraint source="L-15">
+      Verbatim from the Sprint 9 SDO continuation lessons-learned (adapted for
+      Sprint 9 scope):
+      "DO NOT modify any file outside docs/governance/ (except the ledger
+       docs/POST_OPERATIONAL_MATURATION_LEDGER.md at sprint-close entries and
+       docs/IMPLEMENTATION_PLAN.md at EA-5). If a non-governance file change
+       appears necessary to unblock a doc (e.g., a stale CLAUDE.md claim
+       contradicts a doc you're writing), STOP, document the blocker in your
+       completion report, and wait for SDO direction. Do not make the change
+       unilaterally."
+
+      Specifically PROHIBITED file paths for Sprint 9 EA-2:
+        - **/tests/* (Sprint 8 territory)
+        - shared/** (production code)
+        - services/*/src/** (production code)
+        - launcher/** (production code)
+        - pyproject.toml
+        - conftest.py (anywhere in the tree)
+        - docs/TEST_GOVERNANCE.md (deferred to GOV-MIGRATE / Vikunja #123)
+        - Any ADR file (docs reference ADRs; they do NOT modify them)
+        - docs/IMPLEMENTATION_PLAN.md (reserved for EA-5 at sprint close — NOT
+          for EA-2)
+      If the diff shows any file in the above list, the ORACLE gate fails and
+      the EA MUST halt and escalate to SDO via Task 121 comment before attempting
+      fixes.
+    </constraint>
+    <constraint source="L-16">
+      Verbatim: "DO NOT write under **/tests/, shared/, services/*/src/,
+      launcher/, or any path owned by Sprint 8."
+      Cross-sprint boundary: Sprint 9 writes ONLY docs/governance/** (and the
+      ledger). If during authoring you discover a test that would benefit from
+      addition, or a production-code defect, do NOT add/fix it — that is
+      Sprint 8's or a later sprint's territory. Document the observation in WI-4
+      ledger entry and move on.
+    </constraint>
+    <constraint source="L-17">
+      Verbatim from the Sprint 9 SDO continuation:
+      "docs/governance/boot-sequence.md DOES NOT EXIST (phantom reference
+       discovered during Sprint 9 planning; tracked in GOV-15 / Vikunja #124
+       for future authoring). If your doc would naturally cite a boot-sequence
+       governance doc, cite the relevant source files directly (e.g.,
+       services/*/src/boot.py, launcher/__main__.py) and note that
+       boot-sequence governance is future-sprint scope."
+
+      This constraint applies with particular force to WI-1 (gpu-runtime.md)
+      and WI-2 (error-recovery.md §12 boot-time vs runtime failure). Do NOT
+      backfill by creating docs/governance/boot-sequence.md. Cite source files.
+    </constraint>
+    <constraint source="L-18">
+      STYLE.md already exists on main at docs/governance/STYLE.md (committed by
+      Sprint 9 EA-1 at b0f0bde). Read it BEFORE authoring any WI. Conform to its
+      Doc Template, section ordering, Line-Count Floor, Source Anchoring,
+      Audience Taxonomy, Markdown Conventions, Cross-Doc References, Filename
+      Conventions, and Out-of-Scope-for-docs/governance/ sections verbatim.
+      Do NOT amend or modify STYLE.md in this EA.
+    </constraint>
+    <constraint source="SDV §5.2 — Pluton deferral">
+      Pluton-blocked content is out of scope:
+        - GOV-01 Credentials &amp; Certificate Lifecycle — do NOT author
+          docs/governance/credentials-lifecycle.md in EA-2.
+        - GOV-10 Weight Integrity Verification — do NOT author
+          docs/governance/weight-integrity.md in EA-2. error-recovery.md
+          FORWARD-REFERENCES it only; the file is NOT authored in this sprint.
+      These remain blocked on ISS-4 Pluton investigation.
+    </constraint>
+    <constraint source="SDV §5.2 — no ADR amendment">
+      Governance docs reference ADRs; they do NOT modify ADR content. If a doc
+      surfaces an ADR ambiguity during authoring, document it in the WI-4
+      ledger entry and open a new Vikunja ticket. Do NOT edit any ADR file.
+    </constraint>
+    <constraint source="SDV §5.2 — no TEST_GOVERNANCE.md modification">
+      docs/TEST_GOVERNANCE.md is the legacy test-policy doc; migration into
+      docs/governance/ is deferred to GOV-MIGRATE / Vikunja #123 after
+      Sprint 8 closes. Do NOT modify, move, or delete it in EA-2.
+    </constraint>
+    <constraint source="SDV §5.2 — no governance-portal tooling">
+      Do NOT author or modify any doc-lint tool, governance-portal web view,
+      or markdown-rendering automation. EA-2 authors three prose markdown
+      docs; tooling is out of scope.
+    </constraint>
+    <constraint source="DEC-15 §5.3 — parallel-sprint coexistence">
+      Sprint 9 EA work MUST NOT reference Sprint 8 branches, test files, or
+      commit hashes inside the governance docs. The governance docs are
+      timeless references to production code state, not sprint-execution
+      logs. The ledger entry (WI-4) MAY mention the parallel-with-Sprint-8
+      context because the ledger IS a sprint-execution log.
+    </constraint>
+  </negative_constraints>
+
+  <!-- ===== SECTION 7: QUALITY GATES (L-12 ACTION-3) ===== -->
+
+  <quality_gate>
+    <gate id="MARKDOWN-LINT">
+      Every authored markdown file passes basic structural lint:
+        - exactly one H1 (# ...) per doc
+        - H2 section ordering matches docs/governance/STYLE.md's Doc Template
+          (with per-doc-type flex for Recovery section per STYLE.md)
+        - all fenced code blocks are closed
+        - no broken relative links EXCEPT the sanctioned forward-reference from
+          error-recovery.md to weight-integrity.md (which is a Pluton-blocked
+          deferred file and intentionally produces a broken link until GOV-10
+          lands)
+      Command: eyeball each doc + `grep -E "^# " docs/governance/*.md` to
+      confirm exactly one H1 per file.
+    </gate>
+    <gate id="SOURCE-ANCHOR">
+      Each of WI-1, WI-2, WI-3 cites:
+        - at least 1 ADR (by ADR number — ADR-011 or ADR-012)
+        - at least 1 source file from its GOV ticket's Scattered Sources list
+      Commands:
+        grep -E "ADR-(011|012)" docs/governance/gpu-runtime.md
+        grep -E "services/|shared/|launcher/" docs/governance/gpu-runtime.md
+        grep -E "ADR-(011|012)" docs/governance/error-recovery.md
+        grep -E "services/|shared/|launcher/" docs/governance/error-recovery.md
+        grep -E "ADR-(011|012)" docs/governance/circuit-breaker.md
+        grep -E "services/|shared/|launcher/" docs/governance/circuit-breaker.md
+      Each command must return ≥ 1 match.
+    </gate>
+    <gate id="LINE-FLOOR">
+      Each of WI-1, WI-2, WI-3 is ≥ 150 lines.
+      Command: wc -l docs/governance/gpu-runtime.md docs/governance/error-recovery.md docs/governance/circuit-breaker.md
+      Expected: each ≥ 150.
+    </gate>
+    <gate id="ORACLE">
+      TWO-STEP gate — BOTH commands MUST produce empty output:
+
+        Step 1 (docs-only):
+          git diff main...feature/p5-task9-ea2-runtime-resilience --name-only | grep -vE "^docs/"
+          Expected output: EMPTY (zero lines).
+
+        Step 2 (governance-scoped within docs):
+          git diff main...feature/p5-task9-ea2-runtime-resilience --name-only | grep -vE "^docs/governance/|^docs/POST_OPERATIONAL_MATURATION_LEDGER\.md$|^docs/IMPLEMENTATION_PLAN\.md$"
+          Expected output: EMPTY (zero lines).
+
+      If ANY non-docs file or non-governance docs file appears in either output,
+      the EA has violated Sprint 9's mandate. STOP, post completion with the
+      ORACLE failure, and await SDO guidance. Do NOT attempt auto-fixes.
+
+      NOTE: docs/IMPLEMENTATION_PLAN.md is permitted in Step 2 to keep the
+      filter symmetric with EA-5's scope, but EA-2 MUST NOT actually modify
+      docs/IMPLEMENTATION_PLAN.md — that file is reserved for EA-5 at sprint
+      close. If EA-2's diff includes docs/IMPLEMENTATION_PLAN.md, that is a
+      scope violation and must be reverted before commit.
+    </gate>
+    <gate id="REGRESSION-SAFETY-NET">
+      Sprint 9 does not touch tests, but we confirm the regression baseline is
+      unaffected by Sprint 9 commits:
+        .venv/Scripts/pytest shared/ services/ launcher/ --tb=short -q
+      Expected: ≥ 755 passed, 2 skipped (REGRESSION baseline at SDO authoring
+      time). Sprint 8's in-flight EAs may have advanced the baseline; report
+      the observed count verbatim in the completion comment.
+    </gate>
+  </quality_gate>
+
+  <!-- ===== SECTION 8: VERIFICATION (non-dev LA) ===== -->
+
+  <verification>
+    <instruction>
+      After all WIs are committed and the five quality gates pass, post a
+      completion comment on Vikunja Task 121 prefixed
+      [agent:ea_code][phase:completion] with:
+        - commit hash of the latest commit on the EA-2 branch
+        - output of: git log --oneline main..HEAD
+        - output of: git diff main...HEAD --name-only
+        - output of: wc -l docs/governance/gpu-runtime.md docs/governance/error-recovery.md docs/governance/circuit-breaker.md
+        - output of: pytest run summary (first/last lines)
+        - a per-doc one-sentence synopsis + anchor-source confirmation per doc
+        - ORACLE gate result for BOTH Step 1 and Step 2 (PASS / FAIL; if FAIL,
+          do NOT proceed to merge — escalate to SDO)
+        - Phantom-reference handling confirmation (no boot-sequence.md citations)
+        - Weight-integrity forward-reference confirmation
+      Apply Vikunja label: Gate:Pending-SDO (SDO will review on next cadence).
+    </instruction>
+    <terminal_commands>
+      cd C:\Users\mrbla\BlarAI
+      git log --oneline -1
+      git diff main --name-only
+      .venv/Scripts/pytest shared/ services/ launcher/ --tb=short -q
+      wc -l docs/governance/*.md
+    </terminal_commands>
+    <expected_outputs>
+      git diff main --name-only (on the EA-2 branch vs main):
+        docs/governance/circuit-breaker.md
+        docs/governance/error-recovery.md
+        docs/governance/gpu-runtime.md
+        docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+
+      wc -l (on the three new docs):
+        ≥ 150 lines each for gpu-runtime.md, error-recovery.md, circuit-breaker.md.
+        STYLE.md (already committed) and EA-1's three docs are unchanged.
+
+      pytest summary:
+        ≥ 755 passed, 2 skipped (or higher if Sprint 8 EAs have merged; cite
+        exact observed counts).
+    </expected_outputs>
+  </verification>
+
+  <!-- ===== SECTION 9: COMMIT TEMPLATE ===== -->
+
+  <commit_template>
+    Final EA commit (after all WIs are authored and gates pass):
+
+      docs(task9/ea2): runtime + error-recovery + circuit-breaker governance — 3 new docs, {L} lines total
+
+      - docs/governance/gpu-runtime.md          (GOV-05, HIGH — runtime surface)
+      - docs/governance/error-recovery.md       (GOV-06, HIGH — resilience surface)
+      - docs/governance/circuit-breaker.md      (GOV-07, HIGH — runaway containment)
+      - docs/POST_OPERATIONAL_MATURATION_LEDGER.md (Entry N — Task 9 / EA-2)
+
+      Sprint 9 parallel with Sprint 8 per L-16; ORACLE two-step gate PASS.
+      ADR cites: ADR-011 (GPU inference), ADR-012 §2.2/§2.4/§5 (Qwen3-14B +
+                 speculative decoding + thinking mode + rollback), DEC-01..DEC-10.
+      Anchor sources: services/assistant_orchestrator/src/model_loader.py,
+                      services/assistant_orchestrator/src/error_handling.py,
+                      services/assistant_orchestrator/src/circuit_breaker.py.
+
+      STYLE.md conformance verified. Phantom boot-sequence.md NOT cited
+      (L-17 respected). Weight-integrity.md forward-referenced as GOV-10
+      Pluton-blocked deferred artifact.
+
+      Ledger entry added: Entry N, Sprint 9 EA-2 Runtime Behavior &amp; Resilience.
+
+      EA Code fills {L} at commit time as the sum of wc -l across the three new
+      docs.
+  </commit_template>
+
+  <!-- ===== SECTION 10: MATURE-NOT-MINIMAL ENCODING ===== -->
+
+  <mature_not_minimal>
+    <line_floor>
+      Each of gpu-runtime.md, error-recovery.md, circuit-breaker.md:
+      ≥ 150 lines of SUBSTANTIVE content. Short docs are a signal that the
+      required-coverage list has not been exhaustively addressed. If a doc
+      comes in under 150 lines with ALL required_coverage items addressed, the
+      EA MUST explicitly justify the deficit in the completion comment; this is
+      a reviewable position, not an automatic failure.
+
+      GOV-05 (gpu-runtime.md) is flagged in SDV §9.2 as likely 400+ lines
+      because speculative decoding + KV-cache + thinking-mode suppression +
+      empirical baseline + rollback all live together. Do not under-invest.
+    </line_floor>
+    <cross_referencing>
+      Adjacent cross-referencing is permitted and encouraged. Specifically:
+        - gpu-runtime.md MAY forward-reference circuit-breaker.md (WI-3) for
+          KV-cache-on-trip semantics.
+        - error-recovery.md MAY forward-reference circuit-breaker.md for
+          preventative-recovery framing.
+        - All three MAY reference the already-committed EA-1 docs:
+          pgov-validation.md (e.g., PGOV error as fail-closed example in
+          error-recovery.md), ipc-protocol.md (e.g., vsock failure as IPC
+          error class), streaming-output.md (e.g., streaming termination on
+          circuit-breaker trip).
+      The EA MUST NOT retroactively edit already-committed docs in this EA
+      unless the edit is a pure link-text correction (no content shift). If a
+      genuine content gap emerges in an already-committed doc, document it in
+      WI-4 ledger entry and escalate to SDO for a follow-up EA patch.
+
+      Retroactive-edit prohibition explicitly covers EA-1's committed docs:
+      pgov-validation.md, ipc-protocol.md, streaming-output.md, STYLE.md. If
+      the EA's drafting reveals a gap in any of these, raise it in WI-4 and
+      STOP — do NOT edit them inline.
+    </cross_referencing>
+    <source_anchoring>
+      Every governance doc cites ≥ 1 ADR and ≥ 1 source file with a
+      repo-relative path. Where practical, cite line ranges (e.g.,
+      services/assistant_orchestrator/src/circuit_breaker.py lines 12-38).
+      Line-range citations age; path + section/constant name (e.g.,
+      "circuit_breaker.py MAX_OUTPUT_TOKENS") is more durable where the
+      structure supports it — prefer that form per STYLE.md Source Anchoring.
+    </source_anchoring>
+  </mature_not_minimal>
+
+  <!-- ===== SECTION 11: REQUIRED ATTACHMENTS ===== -->
+
+  <required_attachments>
+    <attachment required="true">docs/P5_TASK9_SDO_CONTINUATION_v1.0.xml (full — read ea_decomposition EA-2 block §5 and lessons L-12/L-13/L-15/L-16/L-17/L-18 §6 verbatim)</attachment>
+    <attachment required="true">docs/sprints/sprint_9/strategic_design_vision.md (§§4, 5.1 items 4-6, 5.2, 5.3, 6, 7, 9, 11)</attachment>
+    <attachment required="true" critical="true">docs/governance/STYLE.md (L-18 CRITICAL — binding style reference committed by EA-1 at b0f0bde; read verbatim and conform)</attachment>
+    <attachment required="true">docs/governance/pgov-validation.md (EA-1 peer doc — for cross-referencing and style precedent)</attachment>
+    <attachment required="true">docs/governance/ipc-protocol.md (EA-1 peer doc — for cross-referencing and style precedent)</attachment>
+    <attachment required="true">docs/governance/streaming-output.md (EA-1 peer doc — for cross-referencing and style precedent)</attachment>
+    <attachment required="true">Vikunja Task 18 (GOV-05 GPU Runtime)</attachment>
+    <attachment required="true">Vikunja Task 19 (GOV-06 Error Recovery)</attachment>
+    <attachment required="true">Vikunja Task 20 (GOV-07 Circuit Breaker)</attachment>
+    <attachment required="true">services/assistant_orchestrator/src/model_loader.py (WI-1 and WI-2 anchor — Qwen3-14B + draft loading + model-load failure path)</attachment>
+    <attachment required="true">services/assistant_orchestrator/src/circuit_breaker.py (WI-3 primary anchor — MAX_OUTPUT_TOKENS, MAX_TOOL_CALL_DEPTH)</attachment>
+    <attachment required="true">services/assistant_orchestrator/src/error_handling.py (WI-2 primary anchor — fail-closed surface)</attachment>
+    <attachment required="true">services/assistant_orchestrator/src/pgov.py (WI-3 anchor — PGOV+circuit-breaker interaction)</attachment>
+    <attachment required="true">services/ui_shell/src/streaming.py (WI-3 anchor — streaming+trip interaction)</attachment>
+    <attachment required="true">shared/ipc/protocol.py (WI-2 anchor — vsock IPC failure surface; read if exists)</attachment>
+    <attachment required="true">shared/schemas/car.py (WI-2 anchor — CAR hash-verification failure)</attachment>
+    <attachment required="true">launcher/__main__.py (WI-1 and WI-2 anchor — boot-time entry; replaces phantom boot-sequence.md citations)</attachment>
+    <attachment required="true">docs/adrs/ (or wherever ADRs live — EA locates ADR-011 and ADR-012)</attachment>
+    <attachment required="true">docs/POST_OPERATIONAL_MATURATION_LEDGER.md (for WI-4 — scan for highest ### Entry N)</attachment>
+    <attachment required="true">CLAUDE.md (for DEC-01..DEC-10 references and the locked architectural decisions table — for WI-1 gpu-runtime.md DEC citations)</attachment>
+    <attachment required="false">phase2_gates/evidence/ (if exists; P5-005b or equivalent empirical baseline evidence for WI-1 performance baseline section)</attachment>
+  </required_attachments>
+
+</ea_prompt>

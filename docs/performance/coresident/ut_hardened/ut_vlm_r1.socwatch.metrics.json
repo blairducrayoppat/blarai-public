@@ -1,0 +1,341 @@
+{
+  "TEMP": {
+    "whole": {
+      "avg": 72.229,
+      "peak": 85.0,
+      "min": 53.0,
+      "unit": "oC",
+      "n_samples": 11339
+    },
+    "baseline": {
+      "avg": 75.798,
+      "peak": 82.0,
+      "min": 71.0,
+      "unit": "oC",
+      "n_samples": 1452
+    },
+    "idle": {
+      "avg": 76.442,
+      "peak": 81.0,
+      "min": 75.0,
+      "unit": "oC",
+      "n_samples": 987
+    },
+    "partner_op": {
+      "avg": 77.621,
+      "peak": 83.0,
+      "min": 76.0,
+      "unit": "oC",
+      "n_samples": 804
+    },
+    "contention": {
+      "avg": 79.511,
+      "peak": 85.0,
+      "min": 78.0,
+      "unit": "oC",
+      "n_samples": 1733
+    }
+  },
+  "HW-CPU-CSTATE": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "ticks",
+      "n_samples": 11444
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "ticks",
+      "n_samples": 1716
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "ticks",
+      "n_samples": 1019
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "ticks",
+      "n_samples": 735
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "ticks",
+      "n_samples": 1559
+    }
+  },
+  "RING-THROT-RSN": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 90456
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 13249
+    }
+  },
+  "IGFX-THROT-RSN": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 90463
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 13249
+    }
+  },
+  "IA-THROT-RSN": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 90456
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 13249
+    }
+  },
+  "PMT-SOC-TEMP": {
+    "whole": {
+      "avg": 73.634,
+      "peak": 80.0,
+      "min": 53.0,
+      "unit": "oC",
+      "n_samples": 90456
+    },
+    "baseline": {
+      "avg": 76.498,
+      "peak": 80.0,
+      "min": 72.0,
+      "unit": "oC",
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg": 77.168,
+      "peak": 79.0,
+      "min": 74.0,
+      "unit": "oC",
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg": 77.297,
+      "peak": 80.0,
+      "min": 75.0,
+      "unit": "oC",
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg": 78.496,
+      "peak": 80.0,
+      "min": 77.0,
+      "unit": "oC",
+      "n_samples": 13249
+    }
+  },
+  "PMT-VCCIA-PWR": {
+    "whole": {
+      "avg_w": 10.193,
+      "peak_w_1s": 18.972,
+      "n_samples": 90455
+    },
+    "baseline": {
+      "avg_w": 9.178,
+      "peak_w_1s": 10.797,
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg_w": 9.15,
+      "peak_w_1s": 10.724,
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg_w": 8.895,
+      "peak_w_1s": 10.571,
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg_w": 10.469,
+      "peak_w_1s": 12.019,
+      "n_samples": 13249
+    }
+  },
+  "PMT-VCCGT-PWR": {
+    "whole": {
+      "avg_w": 5.192,
+      "peak_w_1s": 13.607,
+      "n_samples": 90455
+    },
+    "baseline": {
+      "avg_w": 8.705,
+      "peak_w_1s": 13.541,
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg_w": 8.21,
+      "peak_w_1s": 8.697,
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg_w": 7.336,
+      "peak_w_1s": 13.607,
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg_w": 7.302,
+      "peak_w_1s": 7.735,
+      "n_samples": 13249
+    }
+  },
+  "PMT-NPU-PWR": {
+    "whole": {
+      "avg_w": 0.0,
+      "peak_w_1s": 0.0,
+      "n_samples": 90455
+    },
+    "baseline": {
+      "avg_w": 0.0,
+      "peak_w_1s": 0.0,
+      "n_samples": 19269
+    },
+    "idle": {
+      "avg_w": 0.0,
+      "peak_w_1s": 0.0,
+      "n_samples": 9203
+    },
+    "partner_op": {
+      "avg_w": 0.0,
+      "peak_w_1s": 0.0,
+      "n_samples": 8273
+    },
+    "contention": {
+      "avg_w": 0.0,
+      "peak_w_1s": 0.0,
+      "n_samples": 13249
+    }
+  },
+  "PKG-PWR": {
+    "whole": {
+      "avg_w": 21.568,
+      "peak_w_1s": 30.331,
+      "n_samples": 54058
+    },
+    "baseline": {
+      "avg_w": 26.213,
+      "peak_w_1s": 28.039,
+      "n_samples": 11742
+    },
+    "idle": {
+      "avg_w": 25.74,
+      "peak_w_1s": 28.041,
+      "n_samples": 4874
+    },
+    "partner_op": {
+      "avg_w": 22.534,
+      "peak_w_1s": 30.331,
+      "n_samples": 4719
+    },
+    "contention": {
+      "avg_w": 23.272,
+      "peak_w_1s": 24.851,
+      "n_samples": 8357
+    }
+  },
+  "PMT-NPU-DSTATE-RES": {
+    "whole": {
+      "avg": 134075000000.0,
+      "peak": 134075000000.0,
+      "min": 134075000000.0,
+      "unit": "ticks",
+      "n_samples": 1
+    }
+  }
+}

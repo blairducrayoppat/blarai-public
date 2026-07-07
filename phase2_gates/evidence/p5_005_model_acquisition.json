@@ -1,0 +1,111 @@
+{
+  "milestone": "P5-FEASIBILITY-005",
+  "phase": "1",
+  "name": "Environment setup and model acquisition",
+  "metadata": {
+    "timestamp_utc": "2026-02-27T04:39:35.945026+00:00",
+    "commit_hash": "1f9ddfdeca60a4a711b9aba591ea1df96f174b6e",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "openvino_version": "2026.0.0-20965-c6d6a13a886-releases/2026/0",
+    "openvino_genai_version": "2026.0.0.0-2820-dab5b993a38",
+    "optimum_intel": {
+      "importable": true,
+      "error": null
+    },
+    "available_devices": [
+      "CPU",
+      "GPU",
+      "NPU"
+    ],
+    "ac_power": {
+      "sensor_available": true,
+      "power_plugged": true,
+      "battery_percent": 80.0,
+      "seconds_left": -2
+    },
+    "disk": {
+      "path": "C:\\",
+      "free_bytes": 446405570560,
+      "free_gb": 415.75,
+      "required_min_gb": 20.0,
+      "requirement_met": true
+    }
+  },
+  "feature_discovery": {
+    "openvino_genai_version": "2026.0.0.0-2820-dab5b993a38",
+    "draft_model_api_present": true,
+    "generation_config_has_assistant_fields": true,
+    "generation_config_assistant_fields": [
+      "assistant_confidence_threshold",
+      "num_assistant_tokens",
+      "is_assisting_generation"
+    ],
+    "gpu_supported_properties": [
+      "SUPPORTED_PROPERTIES",
+      "AVAILABLE_DEVICES",
+      "RANGE_FOR_ASYNC_INFER_REQUESTS",
+      "RANGE_FOR_STREAMS",
+      "OPTIMAL_BATCH_SIZE",
+      "MAX_BATCH_SIZE",
+      "DEVICE_ARCHITECTURE",
+      "FULL_DEVICE_NAME",
+      "DEVICE_UUID",
+      "DEVICE_LUID",
+      "DEVICE_TYPE",
+      "DEVICE_GOPS",
+      "OPTIMIZATION_CAPABILITIES",
+      "DEVICE_PCI_INFO",
+      "GPU_DEVICE_ID",
+      "GPU_DEVICE_TOTAL_MEM_SIZE",
+      "GPU_DEVICE_MAX_ALLOC_MEM_SIZE",
+      "GPU_UARCH_VERSION",
+      "GPU_EXECUTION_UNITS_COUNT",
+      "GPU_MEMORY_STATISTICS",
+      "PERF_COUNT",
+      "MODEL_PRIORITY",
+      "GPU_HOST_TASK_PRIORITY",
+      "GPU_QUEUE_PRIORITY",
+      "GPU_QUEUE_THROTTLE",
+      "GPU_ENABLE_SDPA_OPTIMIZATION",
+      "GPU_ENABLE_LORA_OPERATION",
+      "GPU_ENABLE_LARGE_ALLOCATIONS",
+      "GPU_ENABLE_LOOP_UNROLLING",
+      "GPU_DISABLE_WINOGRAD_CONVOLUTION",
+      "CACHE_DIR",
+      "CACHE_MODE",
+      "PERFORMANCE_HINT",
+      "EXECUTION_MODE_HINT",
+      "COMPILATION_NUM_THREADS",
+      "NUM_STREAMS",
+      "PERFORMANCE_HINT_NUM_REQUESTS",
+      "INFERENCE_PRECISION_HINT",
+      "ENABLE_CPU_PINNING",
+      "ENABLE_CPU_RESERVATION",
+      "DEVICE_ID",
+      "DYNAMIC_QUANTIZATION_GROUP_SIZE",
+      "ACTIVATIONS_SCALE_FACTOR",
+      "WEIGHTS_PATH",
+      "CACHE_ENCRYPTION_CALLBACKS",
+      "KV_CACHE_PRECISION",
+      "MODEL_PTR",
+      "CONFIG_FILE"
+    ],
+    "kv_cache_precision_property_present": true,
+    "xattention_property_candidates": [
+      "GPU_ENABLE_SDPA_OPTIMIZATION"
+    ]
+  },
+  "models": [
+    {
+      "model": "qwen3-14b",
+      "hf_id": "Qwen/Qwen3-14B",
+      "output_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+      "status": "failed",
+      "error": "Exception from src\\inference\\src\\cpp\\infer_request.cpp:224:\nException from src\\plugins\\intel_cpu\\src\\node.cpp:817:\n[CPU] FullyConnected node with name '__module.model.layers.28.mlp.gate_proj/ov_ext::linear/MatMul' Check 'ptr' failed at src\\plugins\\intel_cpu\\src\\cpu_memory.cpp:257:\nFailed to allocate 178421760 bytes of memory\n\n\n"
+    }
+  ],
+  "eagle3_investigation": {},
+  "status": "in_progress",
+  "started_utc": "2026-02-27T04:39:36.243888+00:00"
+}

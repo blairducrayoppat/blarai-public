@@ -1,0 +1,35 @@
+{
+  "measurement": "tpm_signing_latency",
+  "date": "2026-06-03",
+  "context": "Tier-0 security hardening — Policy Agent JWT signing key rotation to a non-exportable platform-TPM key (ADR-018 trust root). Governs runtime cost of every authorization decision.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "tpm": "STMicroelectronics TPM 2.0 via Windows CNG 'Microsoft Platform Crypto Provider'",
+    "note": "Microsoft Pluton present but not the active TPM (ISS-4 / docs/TPM_CAPABILITY_FINDINGS.md)"
+  },
+  "method": {
+    "module": "shared.security.tpm_signer",
+    "algorithm": "ECDSA P-256 (ES256)",
+    "signing_input_bytes": 126,
+    "runs": { "provision": 1, "export": 1, "key_exists": 10, "sign": 30 },
+    "timer": "time.perf_counter",
+    "conditions": "single-session, otherwise-idle machine"
+  },
+  "results_ms": {
+    "provision_ensure_key": { "value": 247.5, "when": "once/ceremony" },
+    "export_public_key_pem": { "value": 146.0, "when": "once/ceremony" },
+    "key_exists": { "median": 3.25, "max": 6.81, "when": "per-boot" },
+    "sign_one_jwt": { "median": 93.62, "mean": 88.39, "min": 78.10, "max": 111.48, "when": "per-authorization/runtime" }
+  },
+  "comparison": {
+    "software_es256_sign_ms_approx": 0.1,
+    "tpm_vs_software_ratio_approx": 900,
+    "human_approval_budget_ms": 750
+  },
+  "not_measured": [
+    "concurrent / co-resident TPM load",
+    "cross-boot variance",
+    "other TPM vendors (single ST unit measured)"
+  ],
+  "interpretation": "Boot impact ~3 ms (key-exists check) vs a ~26 s boot dominated by the 14B GPU compile (13.5 s). Real cost is ~94 ms per minted token at runtime — the price of a non-exportable key — within the <=750 ms approval budget. Tiered signing is the lever only if high-frequency autonomous actioning ever demands it."
+}

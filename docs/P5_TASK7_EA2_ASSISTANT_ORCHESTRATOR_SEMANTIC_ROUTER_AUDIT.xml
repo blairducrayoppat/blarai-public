@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BlarAI Phase 5 — Task 7: Test Quality Audit
+  Session: EA-2 — Assistant Orchestrator + Semantic Router Audit
+  Generated: 2026-04-18
+  Author: SDO (Strategic Development Orchestrator)
+  Target: Execution Agent (single-session)
+  Scope: DOCS-ONLY audit of services/assistant_orchestrator and services/semantic_router
+-->
+
+<execution_prompt version="1.0" task="P5-Task-7" milestone="EA-2">
+
+  <comprehension_gate>
+    <instruction>
+      MANDATORY FIRST ACTION: Before any implementation work, read this entire prompt.
+      Then present a structured summary to the Lead Architect:
+        (a) Milestone objective in your own words
+        (b) List of work items with 1-sentence descriptions
+        (c) Files you will create or modify
+        (d) Validation strategy
+        (e) Any risks or ambiguities you see
+      Then STOP and WAIT for Lead Architect approval.
+      Do NOT create a branch, write files, or run commands until explicit approval is received.
+    </instruction>
+  </comprehension_gate>
+
+  <milestone>
+    <id>P5-TASK7-EA2</id>
+    <title>Task 7 / EA-2: Assistant Orchestrator + Semantic Router Audit</title>
+    <type>DOCS-ONLY AUDIT</type>
+    <branch>feature/p5-task7-ea2-assistant-orchestrator-semantic-router-audit</branch>
+    <parent_branch>feature/p5-task7-ea1-policy-agent-audit</parent_branch>
+    <parent_head>8834d2c</parent_head>
+    <predecessor>Task 7 / EA-1 accepted complete (ledger Entry 39, commit 8834d2c)</predecessor>
+    <harness_declaration>NO_FULL_HARNESS</harness_declaration>
+
+    <objective>
+      Audit the assistant_orchestrator and semantic_router test suites against
+      docs/TEST_GOVERNANCE.md and append findings to the existing consolidated
+      artifact at docs/TEST_AUDIT_FINDINGS.md. EA-2 is limited to
+      services/assistant_orchestrator/src, services/assistant_orchestrator/tests,
+      services/semantic_router/src, and services/semantic_router/tests. It must answer
+      the four Task 7 audit questions for these two services only: coverage gaps,
+      stale/dead tests, assertion quality, and boundary correctness. It must also append
+      ledger Entry 40 to docs/POST_OPERATIONAL_MATURATION_LEDGER.md. No production files
+      or test files may be changed.
+    </objective>
+
+    <scope>
+      Overall Task 7 audit surface: 33 test files and 37 production files across 8 test domains.
+      This EA-2 slice is limited to:
+      - services/assistant_orchestrator/src: 6 production Python files (excluding __init__.py)
+      - services/assistant_orchestrator/tests: 5 test files (excluding __init__.py)
+      - services/semantic_router/src: 3 production Python files (excluding __init__.py)
+      - services/semantic_router/tests: 1 test file (excluding __init__.py)
+    </scope>
+
+    <deliverable_rule>
+      EA-1 created docs/TEST_AUDIT_FINDINGS.md and populated policy_agent findings.
+      EA-2 appends assistant_orchestrator and semantic_router findings.
+      EA-3 and EA-4 append additional domain findings.
+      EA-5 normalizes the full document and writes the final Prioritized Gap Report
+      and Pre-existing Skip Analysis.
+    </deliverable_rule>
+
+    <tiered_methodology>
+      Tier 1 (MANDATORY): inventory and coverage mapping
+      Tier 2 (MANDATORY): full per-file scan for stale tests, assertion quality, and boundary correctness
+      Tier 3 (CONDITIONAL FAIL-SAFE): if you cannot complete the assigned scope without quality degradation,
+      STOP and produce a partial report plus recommended re-scope. Do NOT rush remaining files.
+    </tiered_methodology>
+  </milestone>
+
+  <branch_setup>
+    <base_ref>8834d2c</base_ref>
+    <base_branch>feature/p5-task7-ea1-policy-agent-audit</base_branch>
+    <new_branch>feature/p5-task7-ea2-assistant-orchestrator-semantic-router-audit</new_branch>
+    <command>git checkout -b feature/p5-task7-ea2-assistant-orchestrator-semantic-router-audit 8834d2c</command>
+  </branch_setup>
+
+  <files_to_modify>
+    <file path="docs/TEST_AUDIT_FINDINGS.md" action="modify">
+      <description>
+        Append assistant_orchestrator and semantic_router findings to the existing Task 7 artifact.
+      </description>
+    </file>
+    <file path="docs/POST_OPERATIONAL_MATURATION_LEDGER.md" action="modify">
+      <description>
+        Append ledger Entry 40 documenting completion of the assistant_orchestrator +
+        semantic_router audit slice.
+      </description>
+    </file>
+  </files_to_modify>
+
+  <forbidden_changes>
+    <item>Do NOT modify any file under services/assistant_orchestrator/src/</item>
+    <item>Do NOT modify any file under services/assistant_orchestrator/tests/</item>
+    <item>Do NOT modify any file under services/semantic_router/src/</item>
+    <item>Do NOT modify any file under services/semantic_router/tests/</item>
+    <item>Do NOT modify pyproject.toml</item>
+    <item>Do NOT modify docs/TEST_GOVERNANCE.md</item>
+    <item>Do NOT modify docs/IMPLEMENTATION_PLAN.md for this audit slice</item>
+    <item>Do NOT create or modify conftest.py</item>
+    <item>Do NOT add, remove, rename, or fix tests</item>
+    <item>Do NOT run coverage tooling or install dependencies</item>
+    <item>Do NOT touch the pre-existing unrelated untracked files in the worktree</item>
+  </forbidden_changes>
+
+  <work_items>
+
+    <item id="WI-1" title="Inventory assistant_orchestrator and semantic_router production and test files">
+      <description>
+        Build the authoritative file inventory before drawing conclusions.
+      </description>
+      <instructions>
+        Confirm the full assistant_orchestrator production scope is exactly:
+        - circuit_breaker.py
+        - constants.py
+        - context_manager.py
+        - entrypoint.py
+        - gpu_inference.py
+        - pgov.py
+
+        Confirm the full assistant_orchestrator test scope is exactly:
+        - test_circuit_breaker.py
+        - test_context_manager.py
+        - test_entrypoint.py
+        - test_gpu_inference.py
+        - test_pgov.py
+
+        Confirm the full semantic_router production scope is exactly:
+        - constants.py
+        - intents.py
+        - router.py
+
+        Confirm the full semantic_router test scope is exactly:
+        - test_router.py
+
+        Exclude __init__.py from the coverage count, but note its existence if relevant to
+        import-path or staleness findings.
+      </instructions>
+    </item>
+
+    <item id="WI-2" title="Append Coverage Map findings for both services">
+      <description>
+        Add assistant_orchestrator and semantic_router coverage findings to the existing Coverage Map section.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md, preserve all existing EA-1 content.
+        Append new clearly labeled subsections under ## Coverage Map:
+        - ### assistant_orchestrator
+        - ### semantic_router
+
+        Use a format compatible with the existing document. At minimum, each service subsection
+        must map every production file to test file(s) and provide a qualitative coverage assessment
+        with rationale.
+
+        Assessment rules:
+        - COVERED: direct test coverage exists and the module appears to satisfy the governance
+          expectation of primary path plus at least one error/edge path for its public behavior.
+        - PARTIAL: some direct or indirect coverage exists, but important public behavior,
+          error handling, or key branches appear untested or under-tested.
+        - NONE: no meaningful corresponding tests were found; incidental coverage from unrelated
+          tests does not count.
+
+        All 6 assistant_orchestrator production files and all 3 semantic_router production files
+        must be represented.
+      </instructions>
+    </item>
+
+    <item id="WI-3" title="Append Stale Test Inventory findings for both services">
+      <description>
+        Identify stale imports, dead code references, or superseded behavioral assumptions.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md, preserve existing EA-1 content and append under
+        ## Stale Test Inventory:
+        - ### assistant_orchestrator
+        - ### semantic_router
+
+        Review all 5 assistant_orchestrator test files and the semantic_router test file,
+        cross-checking tested symbols, import paths, class names, and expected behavior
+        against current production code.
+
+        Flag:
+        - references to symbols that no longer exist
+        - imports from dead or renamed modules
+        - tests that still encode superseded architectural assumptions
+        - tests whose stated purpose no longer matches current implementation
+
+        If a service has no stale/dead findings, state that explicitly.
+      </instructions>
+    </item>
+
+    <item id="WI-4" title="Append Assertion Quality Findings for both services">
+      <description>
+        Identify weak assertions and tests that prove too little.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md, preserve existing EA-1 content and append under
+        ## Assertion Quality Findings:
+        - ### assistant_orchestrator
+        - ### semantic_router
+
+        Evaluate all in-scope tests for weak assertion patterns, including:
+        - assert True
+        - bare truthiness assertions without checking value/behavior
+        - assert result is not None when the actual semantic value matters
+        - try/except patterns that swallow failures
+        - tests that only inspect internal implementation details rather than observable behavior
+        - tests whose assertions are too shallow to detect meaningful regressions
+
+        For each service:
+        - include a short summary paragraph
+        - include a flat list of specific findings with test file and rationale
+
+        If no material assertion-quality findings exist for a service, state that explicitly.
+      </instructions>
+    </item>
+
+    <item id="WI-5" title="Append Boundary Violations findings for both services">
+      <description>
+        Determine whether assistant_orchestrator and semantic_router tests behave like true unit tests under the governance rules.
+      </description>
+      <instructions>
+        In docs/TEST_AUDIT_FINDINGS.md, preserve existing EA-1 content and append under
+        ## Boundary Violations:
+        - ### assistant_orchestrator
+        - ### semantic_router
+
+        Evaluate whether any in-scope tests:
+        - make real socket connections
+        - perform real filesystem writes beyond acceptable isolated test scaffolding
+        - depend on live services, hardware, or manual setup
+        - should really be integration tests rather than service-level unit tests
+
+        Apply the Task 6 governance rule strictly:
+        service-level tests under services/*/tests/ should be unit tests unless there is a
+        compelling reason they belong elsewhere.
+
+        For each violation or borderline case, record:
+        - test file
+        - observed behavior
+        - why it violates or strains the intended boundary
+        - recommended reclassification or remediation direction
+
+        If no material boundary violations exist for a service, state that explicitly.
+      </instructions>
+    </item>
+
+    <item id="WI-6" title="Maintain the consolidated document contract while appending new findings">
+      <description>
+        Append cleanly to the existing Task 7 artifact without breaking the accepted EA-1 structure.
+      </description>
+      <instructions>
+        docs/TEST_AUDIT_FINDINGS.md must continue to contain exactly these 6 top-level sections
+        in this exact order:
+
+        1. ## Coverage Map
+        2. ## Stale Test Inventory
+        3. ## Assertion Quality Findings
+        4. ## Boundary Violations
+        5. ## Prioritized Gap Report
+        6. ## Pre-existing Skip Analysis
+
+        For EA-2:
+        - Preserve all accepted EA-1 findings.
+        - Append assistant_orchestrator and semantic_router findings only.
+        - Do NOT rewrite or re-litigate EA-1 conclusions.
+        - Sections 5 and 6 must remain exactly:
+          "Deferred to EA-5 synthesis."
+
+        You MAY make minimal preamble/title adjustments if needed to ensure the document
+        no longer reads as policy_agent-only. If you do so, keep the change minimal and do
+        not create any new top-level sections.
+
+        Do NOT write the final prioritized remediation ordering yet.
+        Do NOT disposition any pre-existing skipped tests yet.
+      </instructions>
+    </item>
+
+    <item id="WI-7" title="Record ledger Entry 40">
+      <description>
+        Append Entry 40 documenting completion of the assistant_orchestrator + semantic_router audit slice.
+      </description>
+      <instructions>
+        Follow the existing ledger format.
+
+        Required content:
+        - Title: Entry 40 — Task 7/EA-2: Assistant Orchestrator + Semantic Router Audit (COMPLETE)
+        - Date: 2026-04-18 or actual execution date
+        - Branch: feature/p5-task7-ea2-assistant-orchestrator-semantic-router-audit
+        - Predecessor: Entry 39 — Task 7/EA-1 Policy Agent Audit
+        - Type: AUDIT / DOCS-ONLY
+        - Disposition: COMPLETE
+        - Summary: EA-2 completed; assistant_orchestrator and semantic_router findings appended to
+          docs/TEST_AUDIT_FINDINGS.md; sections 5–6 remain deferred to EA-5.
+        - Files: docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md only
+      </instructions>
+    </item>
+
+    <item id="WI-8" title="Enforce strict DOC_ONLY branch hygiene">
+      <description>
+        Preserve existing out-of-scope worktree state and stage only the two allowed docs files.
+      </description>
+      <instructions>
+        Do NOT use git add .
+
+        Stage only:
+        - docs/TEST_AUDIT_FINDINGS.md
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+
+        The authoritative DOC_ONLY gate for this milestone is the staged diff against 8834d2c.
+        After staging only the two allowed files, the diff must show only those files.
+      </instructions>
+    </item>
+
+    <item id="WI-9" title="Tier 3 fail-safe">
+      <description>
+        If the full assistant_orchestrator + semantic_router audit cannot be completed to quality within one session, stop cleanly.
+      </description>
+      <instructions>
+        If you determine mid-session that you cannot finish all 9 production files and 6 test files
+        without degraded quality:
+        - STOP
+        - leave a partial but clearly labeled report in docs/TEST_AUDIT_FINDINGS.md
+        - record the partial completion status in ledger Entry 40
+        - provide a recommended re-scope for the SDO
+        Do NOT compress the remaining review into superficial findings.
+      </instructions>
+    </item>
+
+  </work_items>
+
+  <context_notes>
+    <note id="CN-1" title="Inherited artifact base">
+      docs/TEST_AUDIT_FINDINGS.md already exists on the accepted EA-1 branch at commit 8834d2c.
+      EA-2 must append to that artifact, not recreate it from main.
+    </note>
+
+    <note id="CN-2" title="Audit standard">
+      docs/TEST_GOVERNANCE.md is the governing standard for this audit. Use its scope definitions,
+      marker policy, boundary rules, and coverage expectations as the audit rubric.
+    </note>
+
+    <note id="CN-3" title="Root pytest configuration">
+      pyproject.toml defines:
+      - testpaths including services/assistant_orchestrator/tests and services/semantic_router/tests
+      - addopts = "--strict-markers -v --import-mode=importlib -m 'not slow'"
+      - registered markers: asyncio, slow
+      No slow-marker usage is expected in these service test directories.
+    </note>
+
+    <note id="CN-4" title="Coverage assessment is qualitative">
+      Numeric coverage tooling is out of scope. This audit is based on careful code-to-test mapping
+      and qualitative adequacy against the Task 6 governance rule:
+      public behavior should have happy-path and error/edge-path test coverage.
+    </note>
+
+    <note id="CN-5" title="semantic_router density">
+      semantic_router has only 3 production files and 1 test file, but it still requires the
+      full four-dimension audit: coverage gaps, stale/dead tests, assertion quality, and boundary correctness.
+    </note>
+
+    <note id="CN-6" title="No code changes allowed">
+      This is a diagnosis-only audit. The EA must not fix any finding, add any test, or modify any source/test file.
+    </note>
+
+    <note id="CN-7" title="Global sections deferred to EA-5">
+      The final Prioritized Gap Report and the final Pre-existing Skip Analysis are not written in this slice.
+      EA-2 must leave those sections exactly deferred.
+    </note>
+  </context_notes>
+
+  <quality_gate>
+    <gate id="COMPILE" order="1">
+      <command>N/A — DOCS-ONLY audit milestone</command>
+      <criteria>No Python files may be created or modified in this milestone.</criteria>
+    </gate>
+
+    <gate id="TEST" order="2">
+      <command>N/A — DOCS-ONLY audit milestone</command>
+      <criteria>
+        Do not run pytest as a standard gate for this slice. Use file inspection as the primary evidence source.
+        If you choose to run a targeted read-only command to confirm a suspected stale reference, report it explicitly.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_1" order="3">
+      <command>Manual audit completion against the 9 production files and 6 test files in scope</command>
+      <criteria>
+        All 6 assistant_orchestrator production files, all 5 assistant_orchestrator test files,
+        all 3 semantic_router production files, and the semantic_router test file are evaluated.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_2" order="4">
+      <command>Review docs/TEST_AUDIT_FINDINGS.md structure</command>
+      <criteria>
+        The document still contains all 6 required top-level sections in order.
+        assistant_orchestrator and semantic_router findings are appended under sections 1–4.
+        Sections 5–6 remain exactly "Deferred to EA-5 synthesis."
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_3" order="5">
+      <command>git diff --staged --name-only 8834d2c</command>
+      <criteria>
+        Output contains ONLY:
+        - docs/TEST_AUDIT_FINDINGS.md
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_4" order="6">
+      <command>Tier 3 fail-safe check</command>
+      <criteria>
+        If the full scope was not completable without quality degradation, the EA stopped,
+        produced a partial report, and recommended a re-scope instead of rushing.
+      </criteria>
+    </gate>
+  </quality_gate>
+
+  <verification>
+    <instruction>
+      The Lead Architect will use terminal commands only. Provide a result set that these commands can confirm.
+    </instruction>
+    <commands>
+      <command>git branch --show-current</command>
+      <expected>feature/p5-task7-ea2-assistant-orchestrator-semantic-router-audit</expected>
+
+      <command>git log --oneline -1</command>
+      <expected>Single EA-2 audit commit on the feature branch</expected>
+
+      <command>git diff 8834d2c --name-only</command>
+      <expected>
+        docs/TEST_AUDIT_FINDINGS.md
+        docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </expected>
+
+      <command>Select-String -Path docs/TEST_AUDIT_FINDINGS.md -Pattern "^## ","^### assistant_orchestrator","^### semantic_router","Deferred to EA-5 synthesis"</command>
+      <expected>
+        Shows the same 6 top-level sections, new assistant_orchestrator and semantic_router subsections,
+        and the unchanged deferred placeholders
+      </expected>
+
+      <command>Select-String -Path docs/POST_OPERATIONAL_MATURATION_LEDGER.md -Pattern "Entry 40" | Select-Object -First 1</command>
+      <expected>Ledger contains Entry 40 for Task 7 / EA-2</expected>
+    </commands>
+  </verification>
+
+  <commit_template>
+    <message>
+Task 7 EA-2: Audit assistant_orchestrator and semantic_router test quality
+
+- Appended assistant_orchestrator findings to docs/TEST_AUDIT_FINDINGS.md
+- Appended semantic_router findings to docs/TEST_AUDIT_FINDINGS.md
+- Preserved deferred sections for Prioritized Gap Report and Pre-existing Skip Analysis
+- Recorded ledger Entry 40 in Post-Operational Maturation Ledger
+
+DOC_ONLY gate: staged diff against 8834d2c contains only docs/TEST_AUDIT_FINDINGS.md
+and docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+    </message>
+  </commit_template>
+
+  <attachments>
+    <instruction>Attach the following files when creating the EA-2 session:</instruction>
+    <required>
+      <file reason="Canonical audit rubric">docs/TEST_GOVERNANCE.md</file>
+      <file reason="Root pytest configuration and marker policy source">pyproject.toml</file>
+      <file reason="Existing consolidated Task 7 findings artifact to append to">docs/TEST_AUDIT_FINDINGS.md</file>
+      <file reason="This execution prompt">docs/P5_TASK7_EA2_ASSISTANT_ORCHESTRATOR_SEMANTIC_ROUTER_AUDIT.xml</file>
+    </required>
+    <recommended>
+      <file reason="Ledger format reference">docs/POST_OPERATIONAL_MATURATION_LEDGER.md</file>
+    </recommended>
+  </attachments>
+
+</execution_prompt>

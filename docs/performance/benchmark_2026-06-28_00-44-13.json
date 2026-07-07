@@ -1,0 +1,479 @@
+{
+  "benchmark": "gpu_inference_Qwen3-8B",
+  "config_stamp": {
+    "timestamp": "2026-06-28T00:44:13",
+    "model_name": "Qwen3-8B",
+    "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-8b\\openvino-int4-gpu",
+    "quantization": "INT4",
+    "device": "GPU",
+    "openvino_version": "2026.1.0-21367-63e31528c62-releases/2026/1",
+    "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+    "num_assistant_tokens": 3,
+    "draft_model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "driver_version": "",
+    "prompt_set_version": "v1",
+    "prefill_probe_version": "pp-v1",
+    "measure_prefill": true,
+    "num_runs": 5,
+    "num_warmup": 2,
+    "run_cooldown_s": 30,
+    "enable_prefix_caching": true
+  },
+  "results": {
+    "spec_off": {
+      "config": "Speculative decoding OFF",
+      "speculative_decoding_requested": false,
+      "speculative_decoding_achieved": false,
+      "load_ms": 22006.9,
+      "aggregate": {
+        "mean_tps": 16.24,
+        "median_tps": 19.79,
+        "p95_tps": 21.12,
+        "mean_ttft_ms": 297.1,
+        "median_ttft_ms": 264.3,
+        "p95_ttft_ms": 478.6,
+        "mean_total_ms": 5355.1,
+        "median_total_ms": 4484.2,
+        "p95_total_ms": 11943.5,
+        "total_runs": 20,
+        "error_runs": 0
+      },
+      "raw_runs": [
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 260.6,
+          "latency_total_ms": 353.7,
+          "throughput_tok_per_sec": 5.65,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 265.4,
+          "latency_total_ms": 2021.9,
+          "throughput_tok_per_sec": 18.79,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 260.8,
+          "latency_total_ms": 6940.1,
+          "throughput_tok_per_sec": 20.89,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 263.2,
+          "latency_total_ms": 11929.8,
+          "throughput_tok_per_sec": 21.12,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 478.6,
+          "latency_total_ms": 570.7,
+          "throughput_tok_per_sec": 3.5,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 264.5,
+          "latency_total_ms": 2028.3,
+          "throughput_tok_per_sec": 18.73,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 262.3,
+          "latency_total_ms": 6976.0,
+          "throughput_tok_per_sec": 20.79,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 265.2,
+          "latency_total_ms": 11903.8,
+          "throughput_tok_per_sec": 21.17,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 290.5,
+          "latency_total_ms": 383.6,
+          "throughput_tok_per_sec": 5.21,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 262.5,
+          "latency_total_ms": 2020.7,
+          "throughput_tok_per_sec": 18.8,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 263.4,
+          "latency_total_ms": 6982.4,
+          "throughput_tok_per_sec": 20.77,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 265.6,
+          "latency_total_ms": 11943.5,
+          "throughput_tok_per_sec": 21.1,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 478.5,
+          "latency_total_ms": 571.5,
+          "throughput_tok_per_sec": 3.5,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 261.5,
+          "latency_total_ms": 2016.2,
+          "throughput_tok_per_sec": 18.85,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 262.6,
+          "latency_total_ms": 6990.0,
+          "throughput_tok_per_sec": 20.74,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 264.3,
+          "latency_total_ms": 11940.5,
+          "throughput_tok_per_sec": 21.1,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 480.5,
+          "latency_total_ms": 573.4,
+          "throughput_tok_per_sec": 3.49,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 263.8,
+          "latency_total_ms": 2016.4,
+          "throughput_tok_per_sec": 18.85,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 264.4,
+          "latency_total_ms": 6994.6,
+          "throughput_tok_per_sec": 20.73,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 264.3,
+          "latency_total_ms": 11945.6,
+          "throughput_tok_per_sec": 21.1,
+          "error": null
+        }
+      ],
+      "prefill": {
+        "measured": true,
+        "mean_pp": 1977.85,
+        "median_pp": 1967.81,
+        "p95_pp": 2028.21,
+        "mean_input_tokens": 970.0,
+        "probe_version": "pp-v1",
+        "total_runs": 5,
+        "error_runs": 0,
+        "raw_runs": [
+          {
+            "input_tokens": 970,
+            "prefill_ms": 478.3,
+            "prefill_tok_per_sec": 2028.21,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 494.4,
+            "prefill_tok_per_sec": 1961.98,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 494.6,
+            "prefill_tok_per_sec": 1961.29,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 492.9,
+            "prefill_tok_per_sec": 1967.81,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 492.4,
+            "prefill_tok_per_sec": 1969.96,
+            "error": null
+          }
+        ]
+      }
+    },
+    "spec_on": {
+      "config": "Speculative decoding ON",
+      "speculative_decoding_requested": true,
+      "speculative_decoding_achieved": true,
+      "load_ms": 9164.7,
+      "aggregate": {
+        "mean_tps": 21.89,
+        "median_tps": 27.37,
+        "p95_tps": 29.73,
+        "mean_ttft_ms": 358.4,
+        "median_ttft_ms": 313.1,
+        "p95_ttft_ms": 551.4,
+        "mean_total_ms": 3956.3,
+        "median_total_ms": 3337.5,
+        "p95_total_ms": 8487.6,
+        "total_runs": 20,
+        "error_runs": 0
+      },
+      "raw_runs": [
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 312.6,
+          "latency_total_ms": 442.8,
+          "throughput_tok_per_sec": 4.52,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 311.3,
+          "latency_total_ms": 1387.0,
+          "throughput_tok_per_sec": 27.4,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 308.4,
+          "latency_total_ms": 5272.0,
+          "throughput_tok_per_sec": 27.5,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 311.2,
+          "latency_total_ms": 8482.0,
+          "throughput_tok_per_sec": 29.71,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 551.4,
+          "latency_total_ms": 681.5,
+          "throughput_tok_per_sec": 2.93,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 313.8,
+          "latency_total_ms": 1390.2,
+          "throughput_tok_per_sec": 27.33,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 302.4,
+          "latency_total_ms": 5293.9,
+          "throughput_tok_per_sec": 27.39,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 312.9,
+          "latency_total_ms": 8475.6,
+          "throughput_tok_per_sec": 29.73,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 551.2,
+          "latency_total_ms": 681.9,
+          "throughput_tok_per_sec": 2.93,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 313.6,
+          "latency_total_ms": 1390.2,
+          "throughput_tok_per_sec": 27.33,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 304.2,
+          "latency_total_ms": 5290.9,
+          "throughput_tok_per_sec": 27.41,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 312.0,
+          "latency_total_ms": 8625.7,
+          "throughput_tok_per_sec": 29.22,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 551.0,
+          "latency_total_ms": 680.9,
+          "throughput_tok_per_sec": 2.94,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 313.9,
+          "latency_total_ms": 1400.1,
+          "throughput_tok_per_sec": 27.14,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 301.0,
+          "latency_total_ms": 5279.5,
+          "throughput_tok_per_sec": 27.46,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 313.3,
+          "latency_total_ms": 8476.6,
+          "throughput_tok_per_sec": 29.73,
+          "error": null
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 2,
+          "latency_first_token_ms": 552.0,
+          "latency_total_ms": 681.6,
+          "throughput_tok_per_sec": 2.93,
+          "error": null
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 38,
+          "latency_first_token_ms": 315.6,
+          "latency_total_ms": 1403.0,
+          "throughput_tok_per_sec": 27.08,
+          "error": null
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 145,
+          "latency_first_token_ms": 302.3,
+          "latency_total_ms": 5303.2,
+          "throughput_tok_per_sec": 27.34,
+          "error": null
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 252,
+          "latency_first_token_ms": 313.3,
+          "latency_total_ms": 8487.6,
+          "throughput_tok_per_sec": 29.69,
+          "error": null
+        }
+      ],
+      "prefill": {
+        "measured": true,
+        "mean_pp": 1884.44,
+        "median_pp": 1748.1,
+        "p95_pp": 2422.36,
+        "mean_input_tokens": 970.0,
+        "probe_version": "pp-v1",
+        "total_runs": 5,
+        "error_runs": 0,
+        "raw_runs": [
+          {
+            "input_tokens": 970,
+            "prefill_ms": 400.4,
+            "prefill_tok_per_sec": 2422.36,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 555.0,
+            "prefill_tok_per_sec": 1747.65,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 555.1,
+            "prefill_tok_per_sec": 1747.58,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 554.9,
+            "prefill_tok_per_sec": 1748.1,
+            "error": null
+          },
+          {
+            "input_tokens": 970,
+            "prefill_ms": 552.2,
+            "prefill_tok_per_sec": 1756.54,
+            "error": null
+          }
+        ]
+      }
+    }
+  },
+  "prompts": {
+    "version": "v1",
+    "texts": [
+      "What is the capital city of France?",
+      "How many bytes are in one kilobyte?",
+      "Explain what a transformer neural network is in plain language.",
+      "What is quantization in the context of machine learning models, and why does it help with inference speed?"
+    ]
+  }
+}

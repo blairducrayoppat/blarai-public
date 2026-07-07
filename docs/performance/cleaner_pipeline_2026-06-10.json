@@ -1,0 +1,106 @@
+{
+  "benchmark": "cleaner_pipeline_clean_html",
+  "config_stamp": {
+    "timestamp": "2026-06-10T19:21:06",
+    "hardware_cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "hardware_gpu": "not used \u2014 pipeline is CPU-only, no model",
+    "os": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "trafilatura_version": "2.1.0",
+    "lxml_version": "6.1.1",
+    "cleaner_version": "1.0.0",
+    "num_runs": 20,
+    "num_warmup": 3,
+    "methodology": "clean_html (bare_extraction with metadata, favor_recall off, comments off; NFC/control/zero-width normalization; injection scan + delimiter strip; verdict) timed per fixture with time.perf_counter over the committed 7-fixture synthesized corpus (services/cleaner/tests/fixtures/); 3 warmup passes then 20 measured corpus passes on the otherwise-idle dev box."
+  },
+  "corpus": {
+    "blog_code.html": {
+      "raw_bytes": 2091
+    },
+    "comments_section.html": {
+      "raw_bytes": 2511
+    },
+    "injection_attack.html": {
+      "raw_bytes": 1942
+    },
+    "listicle_recipes.html": {
+      "raw_bytes": 1917
+    },
+    "news_quantum.html": {
+      "raw_bytes": 2862
+    },
+    "paywall_teaser.html": {
+      "raw_bytes": 1410
+    },
+    "unicode_culture.html": {
+      "raw_bytes": 1849
+    }
+  },
+  "results": {
+    "corpus_pass": {
+      "mean_ms": 14.941,
+      "median_ms": 14.878,
+      "stdev_ms": 3.336,
+      "min_ms": 10.468,
+      "max_ms": 22.434
+    },
+    "per_fixture": {
+      "blog_code.html": {
+        "mean_ms": 1.898,
+        "median_ms": 1.772,
+        "stdev_ms": 0.546,
+        "min_ms": 1.377,
+        "max_ms": 3.68
+      },
+      "comments_section.html": {
+        "mean_ms": 2.265,
+        "median_ms": 1.578,
+        "stdev_ms": 1.417,
+        "min_ms": 1.329,
+        "max_ms": 6.18
+      },
+      "injection_attack.html": {
+        "mean_ms": 2.029,
+        "median_ms": 1.554,
+        "stdev_ms": 1.03,
+        "min_ms": 1.181,
+        "max_ms": 4.404
+      },
+      "listicle_recipes.html": {
+        "mean_ms": 2.067,
+        "median_ms": 1.625,
+        "stdev_ms": 1.092,
+        "min_ms": 1.339,
+        "max_ms": 5.691
+      },
+      "news_quantum.html": {
+        "mean_ms": 2.066,
+        "median_ms": 1.685,
+        "stdev_ms": 0.964,
+        "min_ms": 1.37,
+        "max_ms": 4.956
+      },
+      "paywall_teaser.html": {
+        "mean_ms": 2.374,
+        "median_ms": 1.977,
+        "stdev_ms": 1.115,
+        "min_ms": 1.384,
+        "max_ms": 5.185
+      },
+      "unicode_culture.html": {
+        "mean_ms": 2.234,
+        "median_ms": 1.562,
+        "stdev_ms": 1.256,
+        "min_ms": 1.382,
+        "max_ms": 6.132
+      }
+    }
+  },
+  "not_measured": [
+    "real-world fetched pages (corpus is synthesized; production news pages are 50-500 KB and will extract slower \u2014 re-measure at fetch activation)",
+    "clean_text paste path (trivially cheaper; no extraction stage)",
+    "memory footprint of the lxml/trafilatura stack",
+    "co-resident cost while the 14B model occupies the GPU/RAM",
+    "throughput under the guest-homed (Hyper-V VM) topology of ADR-030 \u00a73 \u2014 these numbers are host-side"
+  ]
+}

@@ -1,0 +1,262 @@
+{
+  "milestone": "P5-FEASIBILITY-005a-EAGLE3",
+  "phase": "acquisition_and_conversion_probe",
+  "metadata": {
+    "timestamp_utc": "2026-03-02T10:01:53.391926+00:00",
+    "commit_hash": "c46439209db6adbf73e0aadf1378f8c82a041b2d",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "openvino_genai_version": "2026.0.0.0-2820-dab5b993a38",
+    "power_envelope": {
+      "sensor_available": true,
+      "power_plugged": true,
+      "battery_percent": 80.0
+    }
+  },
+  "models": {
+    "eagle3_14b": {
+      "label": "14b",
+      "raw_inspection": {
+        "exists": true,
+        "path": "C:\\Users\\mrbla\\BlarAI\\models\\eagle3-qwen3-14b-raw",
+        "files": [
+          {
+            "name": ".cache/",
+            "size_mb": 0.0
+          },
+          {
+            "name": ".gitattributes",
+            "size_mb": 0.001
+          },
+          {
+            "name": "config.json",
+            "size_mb": 0.001
+          },
+          {
+            "name": "License_AngelSlim_model_and_dataset.txt",
+            "size_mb": 0.041
+          },
+          {
+            "name": "pytorch_model.bin",
+            "size_mb": 1162.968
+          },
+          {
+            "name": "README.md",
+            "size_mb": 0.041
+          }
+        ],
+        "total_size_mb": 1163.05,
+        "config": {
+          "architectures": [
+            "LlamaForCausalLMEagle3"
+          ],
+          "attention_bias": false,
+          "attention_dropout": 0.0,
+          "bos_token_id": 151643,
+          "eos_token_id": 151645,
+          "head_dim": 128,
+          "hidden_act": "silu",
+          "hidden_size": 5120,
+          "initializer_range": 0.02,
+          "intermediate_size": 17408,
+          "max_position_embeddings": 40960,
+          "max_window_layers": 40,
+          "model_type": "llama",
+          "num_attention_heads": 40,
+          "num_hidden_layers": 1,
+          "num_key_value_heads": 8,
+          "rms_norm_eps": 1e-06,
+          "rope_scaling": null,
+          "rope_theta": 1000000,
+          "sliding_window": null,
+          "tie_word_embeddings": false,
+          "torch_dtype": "bfloat16",
+          "transformers_version": "4.51.0",
+          "use_cache": true,
+          "use_sliding_window": false,
+          "vocab_size": 151936,
+          "draft_vocab_size": 32000
+        },
+        "architecture": "LlamaForCausalLMEagle3",
+        "model_type": "llama",
+        "num_hidden_layers": 1,
+        "hidden_size": 5120,
+        "vocab_size": 151936,
+        "has_custom_code": false,
+        "has_auto_map": false,
+        "has_safetensors": false,
+        "has_pytorch_bin": true
+      },
+      "class_check": {
+        "architecture": "LlamaForCausalLMEagle3",
+        "found": false,
+        "transformers_version": "4.51.3",
+        "error": "'LlamaForCausalLMEagle3' not in transformers 4.51.3"
+      },
+      "conversion_attempt": {
+        "label": "optimum_14b",
+        "ok": false,
+        "method": "optimum-cli export openvino --task text-generation-with-past --trust-remote-code --weight-format int4",
+        "returncode": 1,
+        "elapsed_s": 72.56,
+        "stdout_tail": "",
+        "stderr_tail": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Scripts\\optimum-cli.exe\\__main__.py\", line 5, in <module>\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\commands\\optimum_cli.py\", line 219, in main\n    service.run()\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\commands\\export\\openvino.py\", line 469, in run\n    main_export(\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\exporters\\openvino\\__main__.py\", line 476, in main_export\n    model = TasksManager.get_model_from_task(\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\exporters\\tasks.py\", line 1207, in get_model_from_task\n    model = model_class.from_pretrained(model_name_or_path, **kwargs)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\models\\auto\\auto_factory.py\", line 571, in from_pretrained\n    return model_class.from_pretrained(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\modeling_utils.py\", line 279, in _wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\modeling_utils.py\", line 4399, in from_pretrained\n    ) = cls._load_pretrained_model(\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\modeling_utils.py\", line 4716, in _load_pretrained_model\n    raise ValueError(\nValueError: The state dictionary of the model you are trying to load is corrupted. Are you sure it was properly saved?\n",
+        "ir_produced": false,
+        "error": "EXIT_CODE_1"
+      },
+      "draft_model_probe": {
+        "label": "draft_model_raw_14b",
+        "ok": false,
+        "elapsed_s": 0.03,
+        "error": "Exception from src\\inference\\src\\cpp\\core.cpp:85:\nCheck 'util::directory_exists(path) || util::file_exists(path)' failed at src\\frontends\\common\\src\\frontend.cpp:116:\nFrontEnd API failed with GeneralFailure:\nir: Could not open the file: \"C:\\Users\\mrbla\\BlarAI\\models\\eagle3-qwen3-14b-raw\\openvino_model.xml\"\n\n",
+        "error_type": "RuntimeError"
+      },
+      "pipeline_probe": null,
+      "disposition": "FRAMEWORK_NOT_SUPPORTED"
+    },
+    "eagle3_8b": {
+      "label": "8b",
+      "raw_inspection": {
+        "exists": true,
+        "path": "C:\\Users\\mrbla\\BlarAI\\models\\eagle3-qwen3-8b-raw",
+        "files": [
+          {
+            "name": ".cache/",
+            "size_mb": 0.0
+          },
+          {
+            "name": ".gitattributes",
+            "size_mb": 0.001
+          },
+          {
+            "name": "assets/",
+            "size_mb": 0.0
+          },
+          {
+            "name": "config.json",
+            "size_mb": 0.001
+          },
+          {
+            "name": "eagle3.py",
+            "size_mb": 0.019
+          },
+          {
+            "name": "generation_config.json",
+            "size_mb": 0.0
+          },
+          {
+            "name": "model.safetensors",
+            "size_mb": 1949.422
+          },
+          {
+            "name": "README.md",
+            "size_mb": 0.004
+          }
+        ],
+        "total_size_mb": 1949.45,
+        "config": {
+          "architectures": [
+            "Eagle3Speculator"
+          ],
+          "auto_map": {
+            "": "eagle3.Eagle3SpeculatorConfig"
+          },
+          "draft_vocab_size": 32000,
+          "has_no_defaults_at_init": false,
+          "norm_before_residual": true,
+          "speculators_config": {
+            "algorithm": "eagle3",
+            "default_proposal_method": "greedy",
+            "proposal_methods": [
+              {
+                "accept_tolerance": 0.0,
+                "proposal_type": "greedy",
+                "speculative_tokens": 3,
+                "verifier_accept_k": 1
+              }
+            ],
+            "verifier": {
+              "architectures": [
+                "Qwen3ForCausalLM"
+              ],
+              "name_or_path": "Qwen/Qwen3-8B"
+            }
+          },
+          "speculators_model_type": "eagle3",
+          "speculators_version": "0.2.0.dev11",
+          "target_hidden_size": null,
+          "torch_dtype": "bfloat16",
+          "transformer_layer_config": {
+            "attention_bias": false,
+            "attention_dropout": 0.0,
+            "head_dim": 128,
+            "hidden_act": "silu",
+            "hidden_size": 4096,
+            "initializer_range": 0.02,
+            "intermediate_size": 12288,
+            "max_position_embeddings": 40960,
+            "mlp_bias": false,
+            "model_type": "llama",
+            "num_attention_heads": 32,
+            "num_hidden_layers": 1,
+            "num_key_value_heads": 8,
+            "pretraining_tp": 1,
+            "rms_norm_eps": 1e-06,
+            "rope_scaling": null,
+            "rope_theta": 1000000,
+            "torch_dtype": "bfloat16",
+            "use_cache": true,
+            "vocab_size": 151936
+          },
+          "transformers_version": "4.53.2"
+        },
+        "architecture": "Eagle3Speculator",
+        "model_type": null,
+        "num_hidden_layers": null,
+        "hidden_size": null,
+        "vocab_size": null,
+        "has_custom_code": true,
+        "has_auto_map": true,
+        "has_safetensors": true,
+        "has_pytorch_bin": false
+      },
+      "class_check": {
+        "architecture": "Eagle3Speculator",
+        "found": false,
+        "transformers_version": "4.51.3",
+        "error": "'Eagle3Speculator' not in transformers 4.51.3"
+      },
+      "conversion_attempt": {
+        "label": "optimum_8b",
+        "ok": false,
+        "method": "optimum-cli export openvino --task text-generation-with-past --trust-remote-code --weight-format int4",
+        "returncode": 1,
+        "elapsed_s": 357.14,
+        "stdout_tail": "",
+        "stderr_tail": "Sliding Window Attention is enabled but not implemented for `sdpa`; unexpected results may be encountered.\nTraceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Scripts\\optimum-cli.exe\\__main__.py\", line 5, in <module>\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\commands\\optimum_cli.py\", line 219, in main\n    service.run()\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\commands\\export\\openvino.py\", line 469, in run\n    main_export(\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\exporters\\openvino\\__main__.py\", line 476, in main_export\n    model = TasksManager.get_model_from_task(\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\optimum\\exporters\\tasks.py\", line 1207, in get_model_from_task\n    model = model_class.from_pretrained(model_name_or_path, **kwargs)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\models\\auto\\auto_factory.py\", line 571, in from_pretrained\n    return model_class.from_pretrained(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\modeling_utils.py\", line 279, in _wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\modeling_utils.py\", line 4399, in from_pretrained\n    ) = cls._load_pretrained_model(\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\mrbla\\BlarAI\\.venv\\Lib\\site-packages\\transformers\\modeling_utils.py\", line 4716, in _load_pretrained_model\n    raise ValueError(\nValueError: The state dictionary of the model you are trying to load is corrupted. Are you sure it was properly saved?\n",
+        "ir_produced": false,
+        "error": "EXIT_CODE_1"
+      },
+      "draft_model_probe": {
+        "label": "draft_model_raw_8b",
+        "ok": false,
+        "elapsed_s": 0.04,
+        "error": "Exception from src\\inference\\src\\cpp\\core.cpp:85:\nCheck 'util::directory_exists(path) || util::file_exists(path)' failed at src\\frontends\\common\\src\\frontend.cpp:116:\nFrontEnd API failed with GeneralFailure:\nir: Could not open the file: \"C:\\Users\\mrbla\\BlarAI\\models\\eagle3-qwen3-8b-raw\\openvino_model.xml\"\n\n",
+        "error_type": "RuntimeError"
+      },
+      "pipeline_probe": null,
+      "disposition": "FRAMEWORK_NOT_SUPPORTED"
+    }
+  },
+  "overall_disposition": "FRAMEWORK_NOT_SUPPORTED",
+  "started_utc": "2026-03-02T10:01:53.391926+00:00",
+  "finished_utc": "2026-03-02T10:09:04.760441+00:00",
+  "summary": {
+    "14b_disposition": "FRAMEWORK_NOT_SUPPORTED",
+    "8b_disposition": "FRAMEWORK_NOT_SUPPORTED",
+    "14b_architecture": "LlamaForCausalLMEagle3",
+    "8b_architecture": "Eagle3Speculator",
+    "14b_ir_produced": false,
+    "8b_ir_produced": false
+  }
+}

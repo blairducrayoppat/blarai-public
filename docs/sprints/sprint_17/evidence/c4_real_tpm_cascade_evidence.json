@@ -1,0 +1,45 @@
+{
+  "gate": "SPRINT17_C4_SECURITY_CASCADE_REAL_TPM",
+  "criterion": "Sprint 17 SDV §4 C4 — Security-cascade integration test (GAP-7), real-TPM tier",
+  "test": "tests/integration/test_security_cascade.py::TestSecurityCascadeRealTpm::test_full_security_cascade_real_tpm",
+  "timestamp": "2026-06-08T04:42:55Z",
+  "disposition": "PASS",
+  "duration_s": 1.20,
+  "pytest_result": "1 passed",
+  "closes": "Sprint-17 SWAGR MINOR-2 — real-TPM cascade reported green by builder I but previously unverified in-tree; this is the independent on-chip re-verification with captured evidence.",
+  "host": {
+    "cpu": "Intel(R) Core(TM) Ultra 7 258V (Lunar Lake)",
+    "os": "Microsoft Windows 11 Pro build 26200",
+    "python": "3.11.9",
+    "tpm": "TPM 2.0 via Microsoft Platform Crypto Provider"
+  },
+  "tpm": {
+    "signer_available": true,
+    "sealer_available": true,
+    "audit_key": "BlarAI-Audit-Signing-Key-v1",
+    "audit_key_present": true,
+    "cascade_scoped_keys_provisioned_and_torn_down": [
+      "BlarAI-Cascade-Test-JWT",
+      "BlarAI-Cascade-Test-DEKSeal"
+    ]
+  },
+  "cascade_steps_verified": [
+    "1. provision-key — real TPM signing-key ceremony (non-exportable key + public-half SPKI export)",
+    "2. cert-gen — provision_per_boot_certs (real per-boot CA + per-service mTLS certs)",
+    "3. boot — DEK envelope build/persist/unseal/reload via real TpmSealer (RSA-2048 OAEP)",
+    "4. per-boot mint — second provisioning rotates to distinct cert material (serial/key/sig)",
+    "5. mTLS handshake — real CERT_REQUIRED mutual TLS over minted certs; peer CN verified == gateway client CN",
+    "6. TPM-signed audit record — AuditLog append + full chain verify via TpmRecordSigner (ECDSA P-256, dedicated audit key)"
+  ],
+  "not_measured": [
+    "Latency/throughput — this is a security-correctness cascade, not a performance benchmark.",
+    "Co-resident cost under concurrent model load — the cascade is security-material only (no GPU/model load)."
+  ],
+  "raw_log": "docs/sprints/sprint_17/evidence/c4_real_tpm_cascade_run.log",
+  "isolation": "tmp_path only; root conftest redirects LOCALAPPDATA/HOME; the real certs/ dir and DEK keystore are not touched.",
+  "agent": "Sprint 17 execution lead — on-chip session 2026-06-07 (UTC 2026-06-08)",
+  "notes": [
+    "Real-TPM tier; the SoftwareSealer stand-in tier remains green in the standing gate (gate-deselected here via the hardware marker).",
+    "Idempotent: reuses the operator's production audit key (BlarAI-Audit-Signing-Key-v1); provisions + tears down only the two cascade-scoped test keys, leaving no stray persisted keys."
+  ]
+}

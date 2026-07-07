@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_comprehension_gate_iteration_1_stage_3_instance_1>
+
+  <meta>
+    <stage_id>STAGE_3</stage_id>
+    <stage_xml>docs/platform_separation/04_STAGE3_COPY_TOOLS.xml</stage_xml>
+    <stage_risk>MEDIUM</stage_risk>
+    <stage_scope>copy-only; devplatform-side single substantive commit at Item 3.9; BlarAI side untouched throughout</stage_scope>
+    <ea_instance>1</ea_instance>
+    <iteration>1</iteration>
+    <iter_1_predecessor_template>docs/platform_separation/temp_for_responses/2.6-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE2_INSTANCE_6.xml</iter_1_predecessor_template>
+    <emitted_at_utc>2026-04-28T00:00:00Z</emitted_at_utc>
+    <bootstrap_pointer_consumed>docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml</bootstrap_pointer_consumed>
+    <bootstrap_pointer_full_read_lines>1468</bootstrap_pointer_full_read_lines>
+    <branch_blarai>chore/platform-extraction</branch_blarai>
+    <head_blarai>0d61581</head_blarai>
+    <branch_devplatform>main</branch_devplatform>
+    <head_devplatform_observed>3894221</head_devplatform_observed>
+    <head_devplatform_expected_per_init_pointer>eaa005f</head_devplatform_expected_per_init_pointer>
+    <reviewer>guide_instance_7</reviewer>
+    <stop_after_emission>YES; awaiting Guide-#7 PROCEED authorization before Item 3.1 begins</stop_after_emission>
+  </meta>
+
+  <pickup_verification_recap canonical_source="3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml §required_first_actions n=2 V0a-V0M">
+    <intro>
+      All 13 V0 checks executed before drafting this gate. Two non-blocking observations
+      surfaced (V0c, V0i); both reported in §open_questions_for_guide_7 below. No mutation
+      commands run; no commits made; this gate emission is the only artifact produced and
+      is itself authorized by init pointer §required_first_actions n=3.
+    </intro>
+    <check id="V0a" topic="branch_blarai" status="PASS">git rev-parse --abbrev-ref HEAD = chore/platform-extraction</check>
+    <check id="V0b" topic="head_blarai" status="PASS">git rev-parse HEAD = 0d61581 (matches handoff brief committed HEAD)</check>
+    <check id="V0c" topic="working_tree" status="PASS-WITH-NOTE">git status --short = 1 untracked file: docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml. The untracked file IS the bootstrap pickup artifact (Guide-#7 init pointer); transparency note in §open_questions_for_guide_7. After this gate is written, working tree will hold 2 untracked files (init pointer + this gate). No other working-tree state.</check>
+    <check id="V0d" topic="worktrees" status="PASS">git worktree list = 1 worktree (BlarAI main)</check>
+    <check id="V0e" topic="stash_byte_identity" status="PASS">stash@{0} present, sdo timestamp 20260424_013002, byte-identical to expected; will NOT be popped or applied (critical_carryover n=4)</check>
+    <check id="V0f" topic="fleet_pause" status="PASS">tools/autonomy_budget/state.json fleet_paused=true since 2026-04-24T20:46:12Z; will NOT call state.resume_fleet (critical_carryover n=2 + i1-2)</check>
+    <check id="V0g" topic="pytest_baseline_blarai" status="PASS">pytest tools/ -- 351 passed (matches Stage 2 close baseline established at 3d1ac35 + V matrix +69)</check>
+    <check id="V0h" topic="devplatform_scaffold_present" status="PASS">C:\Users\mrbla\devplatform exists; .git initialized; main branch present; Stage 0/1/2 scaffold artifacts (vikunja_project_ids.yaml, registry.yaml, .platform/) verified present</check>
+    <check id="V0i" topic="devplatform_head" status="DRIFT-OBSERVED">git -C C:\Users\mrbla\devplatform rev-parse HEAD = 3894221 (commit subject: "fix(registry): promote agent_gates_bus + architecture_decisions to fleet-level; annotate remaining auxiliaries pending Stage 6 review"). Init pointer expected eaa005f. Drift surfaced in §open_questions_for_guide_7 for Guide-#7 disposition. Per init pointer stop_conditions: surface and proceed only with explicit acknowledgment; gate emission itself is the prescribed reporting action and does not block.</check>
+    <check id="V0j" topic="vikunja_project_ids_file" status="PASS">BlarAI/.platform/vikunja_project_ids.yaml present; blarai_project_id: 3 (regex 'blarai_project_id:\s*(\d+)' resolves to 3 per g4-5)</check>
+    <check id="V0k" topic="registry_yaml" status="PASS">tools/_vikunja_client_registry/registry.yaml present at expected path; v2-baseline annotation correct</check>
+    <check id="V0l" topic="vikunja_running" status="PASS-OPTION-B-AUTHORIZED">vikunja-v2.3.0-windows-4.0-amd64.exe running PID 20404. Per g6-ea6_n8 Option B AUTHORIZED disposition: STATUS-staleness only; Stage 3 work is pure code copy with no DB access; Stage 4.1 preflight enforces V4=0 at cutover. Stage 3 EA does NOT touch Vikunja state.</check>
+    <check id="V0m" topic="scheduled_tasks" status="PASS">13 scheduled tasks at \BlarAI\ scope; 0 enabled (matches Stage 2 close)</check>
+  </pickup_verification_recap>
+
+  <required_acknowledgments_carryforward_verbatim_61_total post_disk_verification="2026-04-27 by Guide-#7 per LA find-the-missing-8 + do-not-hallucinate directives" canonical_restatement_source="3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml §ack_chain_carried_forward (which forward-corrects EA-6 init pointer's 33 by adding 5 real missed acks: 3 g4-iter2 + 1 f1 + 1 dn15) and rejects 3 phantom (i1-5, i1-6, i1-7)">
+
+    <intro>
+      Decomposition: 38 v4-era preserved + 4 g6-ea5 + 10 g6-ea6 + 9 g7-ea1 = 61. Per init
+      pointer authorization, ack text is restated verbatim from the init pointer's own
+      §ack_chain_carried_forward block (which is itself the Guide-#7 forward-corrected
+      canonical re-statement of the ultimate source files cited per ack_group). Where the
+      init pointer paraphrases or summarizes, the ultimate source file is cited inline.
+      Status flags carried forward unchanged from init pointer.
+    </intro>
+
+    <preserved_from_v4_era count="38" source="3.0 init pointer §preserved_from_v4_era; ultimate sources cited per ack_group">
+
+      <ack_group label="critical_carryovers (n=1..9)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml">
+        <ack id="n=1" status="FORWARD-ACTIVE">single Stage-2 commit at item 2.9 (intermediate work uncommitted) -- carries forward as Stage-3-single-commit-at-3.9 by analogy + per i1-1 inheritance</ack>
+        <ack id="n=2" status="FORWARD-ACTIVE">fleet stays paused throughout Stage 2; NEVER state.resume_fleet -- extends through Stage 4 cutover per i1-2</ack>
+        <ack id="n=3" status="FORWARD-ACTIVE">no merge to main during Stage 2 -- extends through Stages 3+4 per R10 + w10</ack>
+        <ack id="n=4" status="FORWARD-ACTIVE">stash@{0} (sdo 20260424_013002) is NOT to be popped or applied -- 11+-cycle byte-identity preservation through every remaining stage</ack>
+        <ack id="n=5" status="FORWARD-ACTIVE">no edits to CLAUDE.md, AGENTS.md, copilot-instructions.md, or any A1-A10 governance doc -- V8 / Stage 6.1.v2 deferred</ack>
+        <ack id="n=6" status="FORWARD-ACTIVE">all Vikunja access flows through tools/_vikunja_client.py; bool rejection -- Stage 3 inherits the chokepoint contract</ack>
+        <ack id="n=7" status="FORWARD-ACTIVE">_project_context.resolve() is the single source for ProjectContext -- Stage 3 verifies devplatform copy preserves the contract</ack>
+        <ack id="n=8" status="FORWARD-ACTIVE">V8 defaults preservation: cwd-inside-BlarAI + no flags + no env -> ctx.vikunja_project_id == 3 (verified at Stage 2.8 hard gate; Stage 3 7-3.7 smoke-test re-verifies via the same preflight pattern)</ack>
+        <ack id="n=9" status="FORWARD-ACTIVE">STATUS.md updates at item 3.10 (Stage 3 close) are APPEND-ONLY; mirrors 2.10 discipline -- no modification of A1-A11 anomalies, Stage Ledger Stages 0/1/2 rows, Recovery Anchors, Vikunja Project IDs, How to Resume sections, or prior Execution Log entries</ack>
+      </ack_group>
+
+      <ack_group label="g3-N (n=1..3)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml">
+        <ack id="g3-1" status="FORWARD-ACTIVE">single Stage-2 commit only -- forward as Stage-3-single-commit at 3.9 (only docs-only mid-stage handoff XMLs are exempt per i1-4)</ack>
+        <ack id="g3-2" status="FORWARD-ACTIVE">V1-V7 + V8 verification block before closing handoff -- Stage 3 has its own equivalent (Stage 3 closure verification per `04_STAGE3_COPY_TOOLS.xml` `verification_commands_for_lead_architect` + `exit_criteria` blocks; mirror the V1-V7 closure pattern at Stage 3 close to surface devplatform-side state)</ack>
+        <ack id="g3-3" status="FORWARD-ACTIVE">Item 2.10 STATUS.md edit is append-only -- forward to Item 3.10 STATUS append</ack>
+      </ack_group>
+
+      <ack_group label="i1-N (n=1..4)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml + Guide-#4 iter-2 APPROVAL">
+        <ack id="i1-1" status="FORWARD-ACTIVE">V0 pickup verification re-executed at start of every successor session -- Stage 3 EA executes V0a-V0M+ at start (see required_first_actions block below)</ack>
+        <ack id="i1-2" status="FORWARD-ACTIVE">all binding acks remain in force through Stage 4 cutover (dedup rule) -- 47 acks plus new g7-ea1 acks all carry forward</ack>
+        <ack id="i1-3" status="FORWARD-ACTIVE">V1-V7 closure + per-item V8 in closing handoff -- Stage 3 closing handoff includes equivalent verification block</ack>
+        <ack id="i1-4" status="FORWARD-ACTIVE">if context exhausts before 3.9 (Stage 3 single commit), emit v(N+1) mid-stage handoff XML; docs-only commit; no partial-commit refactor (carries forward from i1-4 Stage-2 pattern)</ack>
+      </ack_group>
+
+      <ack_group label="g4-N (n=1..7)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_TO_EA_INITIALIZATION_03_STAGE2_REFACTOR_MULTIPROJECT.xml + 2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml">
+        <ack id="g4-1" status="SATISFIED-AUDIT-HISTORY">corrections incorporated; carries as discipline if Guide-#7 surfaces corrections at iter-1</ack>
+        <ack id="g4-2" status="FORWARD-ACTIVE">canonical PS1 signature_pattern_ps1; alias direction preserved (per A11 anomaly: --project-root added as alias of --blarai-root rather than rename; both flag spellings functional; Stage 3 inherits the dual-flag contract)</ack>
+        <ack id="g4-3" status="FORWARD-ACTIVE">explicit enumeration discipline (no "...other entrypoints" hand-waves)</ack>
+        <ack id="g4-4" status="SATISFIED-AUDIT-HISTORY">vikunja_mcp/server.py §D.1 hardening complete (file 13; closed at Stage 2.4 + 2.7.v2 g6-ea6_n9 docstring fix)</ack>
+        <ack id="g4-5" status="FORWARD-ACTIVE-at-3.7">$BLARAI_PID drift = STOP and report; NO silent regex/yaml adaptation -- Stage 3.7 smoke test reads the same preflight pattern as Stage 2.8 ('blarai_project_id:\s*(\d+)' regex against `BlarAI/.platform/vikunja_project_ids.yaml`)</ack>
+        <ack id="g4-6" status="FORWARD-ACTIVE">descriptive risk labels; compound labels with reference prefixes acceptable</ack>
+        <ack id="g4-7" status="SATISFIED-AUDIT-HISTORY">begin authorization received after iter-2 APPROVED -- Stage 3 EA needs equivalent iter-1 APPROVAL from Guide-#7 before any substantive work</ack>
+      </ack_group>
+
+      <ack_group label="g5-1..g5-4 (Guide-#5 partial 2.4 verification)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_2.4_PARTIAL.xml">
+        <ack id="g5-1" status="SATISFIED-AUDIT-HISTORY">LA-side housekeeping V0c expectations accounted for</ack>
+        <ack id="g5-2" status="SATISFIED-AS-PRINCIPLE">file 12 path: legacy fleet_observability/_vikunja_client.py vs new tools/_vikunja_client.py (per dn18; Stage 3 EA cites full paths when discussing either file; Stage 3.1 copy-list includes both files explicitly)</ack>
+        <ack id="g5-3" status="SATISFIED-FILE-9-OPTION-B">cleaner.py:180 fallback Option (b) project-aware fallback applied (substantive ~44 LOC per D3 correction; carried in 3d1ac35 baseline)</ack>
+        <ack id="g5-4" status="SATISFIED-AT-D2-COMPLETION">tools/fleet_observability/_vikunja_client.py:line-40 load_config callsite -- 6 zero-arg callers UPDATED to pass `base_url=cfg["vikunja"]["base_url"]` via Guide-#6 Option A HOIST disposition. SATISFIED at Item 2.7 V1-V7 closure run; carried in 3d1ac35 baseline. Stage 3 EA copies the SATISFIED state to devplatform.</ack>
+      </ack_group>
+
+      <ack_group label="g5-5..g5-6 (Guide-#5 f1 disposition)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_F1_DISPOSITION_OPTION_A.xml">
+        <ack id="g5-5" status="SATISFIED-AUDIT-HISTORY">f1 disposition Option (a) -- _require_project_id rejection condition extended; 2 NET-ADD tests; pytest 282 confirmed (carried in 3d1ac35 baseline + V matrix +69 = 351)</ack>
+        <ack id="g5-6" status="SATISFIED-AS-PRINCIPLE">path-confusion correction acknowledged (g5-4 != f1; different files, different scope); per dn18 -- Stage 3 EA cites full paths</ack>
+      </ack_group>
+
+      <ack_group label="g5-7..g5-10 (Guide-#5 EA-4 corrections)" ultimate_source="docs/platform_separation/temp_for_responses/2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml">
+        <ack id="g5-7" status="SATISFIED-AUDIT-HISTORY">test_vikunja_client_scope.py duplicate test definitions deleted (lines 76-94 -- the duplicate copy block); pytest 282 holds (carried in 3d1ac35 baseline)</ack>
+        <ack id="g5-8" status="SATISFIED-AUDIT-HISTORY">env-fallback default applied in all 6 modified PS1 scripts (BLARAI_ROOT env -> -BlarAIRoot param); verified by AST probe axis 2 PASS at 2.5.v2</ack>
+        <ack id="g5-9" status="SATISFIED-AUDIT-HISTORY">$McpConfigPath = Join-Path $RepoRoot '.mcp.json' in 2 scripts (la_merge_approve.ps1 + agents-cadence-monitor.ps1); verified by AST probe axis 4 PASS at 2.5.v2</ack>
+        <ack id="g5-10" status="SATISFIED-AT-2.10.1-AUDIT-HISTORY">A11 alias-vs-rename anomaly + g5-7/8/9 dispositions + f1 disposition + encoding regression footnote + 2.5.v2 closure pointer + v4 doc correction footnote (per D2) + v5 doc correction footnote (per C1-C4) ALL recorded in 2.10 STATUS append-only entry; 5 N-corrections at 2.10.1 corrected the narrative paraphrase errors</ack>
+      </ack_group>
+
+      <ack_group label="g4-iter2-N (n=1..3) -- post-iter-2-APPROVAL acks added by Guide-#7 disk verification 2026-04-27" ultimate_source="docs/platform_separation/temp_for_responses/2.5-EA_ACKNOWLEDGMENTS_PROCEED_TO_ITEM_2.4.xml">
+        <ack id="g4-iter2-1" status="FORWARD-ACTIVE-discipline-AUDIT-HISTORY-since-Stage-2-close">Verbatim from source file line 13: "I will inspect tools/fleet_observability/critical_notify.ps1 at item 2.5 and confirm the WORKFLOW_INTEGRITY_REVIEW.md Appendix A.1 audit finding (BlarAI reference in comment only, no runtime path). If confirmed: document the no-action disposition with explicit Appendix A.1 citation in the closing handoff. If a runtime BlarAI path is discovered: STOP and report to Lead Architect before any refactor or scope expansion." STATUS-AT-STAGE-3: SATISFIED in EA-4's Item 2.5 cycle per Stage 2 closing-handoff; critical_notify.ps1 confirmed no-action with Appendix A.1 citation. The STOP-and-report discipline carries forward to Stage 3 if Stage 3.1 copy reveals any unexpected BlarAI runtime path in any PS1.</ack>
+        <ack id="g4-iter2-2" status="FORWARD-ACTIVE-for-Stage-3">Verbatim from source file line 14: "The same inspection rule applies to any other PS1 the expanded 3-directory audit scope (tools/scheduled-tasks/, tools/fleet_ops/, tools/fleet_observability/) surfaces beyond the canonical 7: default = no-action with documented citation; runtime-path discovery = STOP and report. Never silent scope expansion mid-stage." STATUS-AT-STAGE-3: FORWARD-ACTIVE for Stage 3.1 copy verification. If Stage 3.1.v2 presence-check (per g7-ea1_n3) surfaces any v2-baseline PS1 with hardcoded BlarAI runtime path beyond the documented G-1 5-script set, default disposition is no-action-with-citation; STOP-and-report on any runtime-path discovery.</ack>
+        <ack id="g4-iter2-3" status="SATISFIED-AT-i1-2-FORWARD-ACTIVE-AT-Stage-4-CUTOVER-DEDUP">Verbatim from source file line 15: "I will begin item 2.4 (Python entrypoints argparse refactor) work after emitting these acknowledgments. The 16 pre-existing binding acknowledgments + 7 Guide-#4 acknowledgments + these 2 critical_notify-watchpoint acknowledgments remain in force through Stage 4 cutover (per i1-2 dedup rule)." STATUS-AT-STAGE-3: SATISFIED in the procedural sense (EA-3 began Item 2.4 and the chain proceeded through Stage 2 close). The "remain in force through Stage 4 cutover" clause is FORWARD-ACTIVE for Stage 3 + Stage 4 inheritance: all 16 + 7 + 2 (now recognized as 3 g4-iter2-N per disk) acks bind through cutover per i1-2 dedup rule.</ack>
+      </ack_group>
+
+      <ack_group label="f1 -- chokepoint helper fix; alias-vs-separate question; added by Guide-#7 disk verification 2026-04-27" ultimate_source="docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v4.xml:343">
+        <ack id="f1" status="SATISFIED-AUDIT-HISTORY-via-3d1ac35">Verbatim from source file line 343: "Chokepoint helper fix -- satisfied per Guide-#5 APPROVED disposition." STATUS-AT-STAGE-3: SATISFIED at 3d1ac35 (carried in Stage 2 baseline; chokepoint helper `_require_project_id` rejects None/bool/non-int/&lt;=0 with 2 NET-ADD tests). Stage 3 EA copies the SATISFIED state to devplatform/tools/_vikunja_client.py via Stage 3.1 recursive directory copy. NOTE per init pointer: f1 may be deduped with g5-5 if the LA confirms the conceptual-collapse interpretation; this gate restates verbatim per init pointer's default position.</ack>
+      </ack_group>
+
+      <ack_group label="dn15 -- Docs-Native handoff cadence; namespace-collision with do_not_list prefix; added by Guide-#7 disk verification 2026-04-27" ultimate_source="docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v5.xml:271">
+        <ack id="dn15" status="FORWARD-ACTIVE-Stage-3-and-onward">Verbatim from source file line 271: "Docs-Native handoff cadence (even slightly tight budget at clean breakpoint = handoff). FORWARD-ACTIVE." STATUS-AT-STAGE-3: FORWARD-ACTIVE -- inherits the Docs-Native handoff cadence discipline from Stage 2 (i.e., any clean breakpoint with even slightly tight context budget = emit mid-stage handoff XML rather than push through). Stage 3 EA applies the same cadence per i1-4 + g6-ea6_n4: emit Stage-3-mid-stage-handoff XML at clean breakpoints if context tightens, NOT partial-commit refactor.</ack>
+      </ack_group>
+    </preserved_from_v4_era>
+
+    <phantom_acks_explicitly_rejected per_la_directive="do_not_hallucinate" disk_verification="2026-04-27 by Guide-#7">
+      <intro>
+        Per init pointer §phantom_acks_documented_not_real and Guide-#5 v4 quality review file
+        2.5-GUIDE_RESPONSE_INSTANCE_5_V4_QUALITY_REVIEW_DEFECTS_FOUND.xml:67 verbatim ("4
+        plus_iteration_1 (i1-1, i1-2, i1-3, i1-4) -- v4 says 'i1-1..i1-7' which is WRONG (only
+        4 exist)"), the IDs i1-5, i1-6, i1-7 are NOT in the binding chain. They originate from
+        a v4-handoff group-reference miscount and are documented here for audit transparency.
+      </intro>
+      <phantom_ack id="i1-5" status="DOES-NOT-EXIST-ON-DISK"/>
+      <phantom_ack id="i1-6" status="DOES-NOT-EXIST-ON-DISK"/>
+      <phantom_ack id="i1-7" status="DOES-NOT-EXIST-ON-DISK"/>
+    </phantom_acks_explicitly_rejected>
+
+    <g6_ea5_acks count="4" canonical_source="docs/platform_separation/temp_for_responses/2.6-GUIDE_RESPONSE_INSTANCE_6_INTER_DELIVERABLE_REVIEW_EA_5_D2_INCOMPLETE_V5_AUTHORIZED.xml §required_acknowledgments">
+      <ack id="g6-ea5_n1" topic="D4 dup cleanup" status="SATISFIED-AUDIT-HISTORY">EA-5 acknowledges the duplicate decision block in tools/vikunja_mcp/server.py lines 58-103 will be deleted via Edit operation before v5 XML drafting. After the deletion, EA-5 will re-read the cleaned file to confirm the single 44-line block remains well-formed and the module imports at line 105+ are unchanged. SATISFIED-AT: v5 commit f863a22 (server.py duplicate block deleted; AST parse OK; pytest 282 holds; carried forward and further refined at g6-ea6_n9 docstring fix in 3d1ac35).</ack>
+      <ack id="g6-ea5_n2" topic="D2 incompleteness encoding in v5 XML" status="SATISFIED-AUDIT-HISTORY">EA-5 acknowledges that D2 disposition is INCOMPLETE per ack g5-4 because the line-40 load_config call is still triggered by 6 zero-arg callers, and that the v5 mid-stage handoff XML MUST explicitly encode: D2-completion as a NEW first deliverable in work_remaining (preceding D1); the 6-caller closure list verbatim (credential_rotation_reminder, welcome_back_digest, daily_digest, weekly_summary, dashboard_maintainer:93, gate_stale_cleaner.run_live); the BEFORE/AFTER pattern verbatim (LiveVikunjaClient() -&gt; LiveVikunjaClient(base_url=cfg["vikunja"]["base_url"])); the pytest sanity check (expect 282 passed; no count change); reference to this Guide-#6 review file as the source of the D2-incompleteness finding. SATISFIED-AT: v5 XML emitted at f863a22 with all 5 encoding requirements present; D2-completion executed by EA-6 at Item 2.6 via Guide-#6 Option A HOIST disposition (see g6-ea6_n5 below); g5-4 transitioned FORWARD-ACTIVE -&gt; SATISFIED at Item 2.7.</ack>
+      <ack id="g6-ea5_n3" topic="single docs-only commit for v5" status="SATISFIED-AUDIT-HISTORY">EA-5 acknowledges that the v5 commit MUST be docs-only (one file in diff: the v5 XML under ea_outputs/) per i1-4 + dn15. The dup-cleanup edit to server.py + any other working-tree state remains UNCOMMITTED for EA-6 to fold into the Stage-2 single commit at item 2.9. SATISFIED-AT: f863a22 commit verified ONE file in diff (the v5 XML; 333 insertions); server.py + 4 EA-5-edited files remained M for EA-6 to fold; folded into 3d1ac35.</ack>
+      <ack id="g6-ea5_n4" topic="D4 decision retention" status="SATISFIED-AUDIT-HISTORY">EA-5 acknowledges Guide-#6 has APPROVED the D4 divergence (chokepoint-function-as-integration, not chokepoint-class-routing). The decision retention applies forward; future EA sessions or Stage 5 cleanup may revisit if VikunjaClient class HTTP delegation is wired and the D4 reasoning conditions change. STATUS-AT-STAGE-3: D4 decision retained; chokepoint-function-as-integration via 7 _require_project_id sites at handler entry (corrected from "8" docstring claim per g6-ea6_n9). Stage 3 EA does NOT re-open D4; copies the SATISFIED state to devplatform/tools/vikunja_mcp/server.py at Stage 3.1.</ack>
+    </g6_ea5_acks>
+
+    <g6_ea6_acks count="10" canonical_source="multiple Guide-#6 disposition files in docs/platform_separation/temp_for_responses/ during EA-6's Item 2.6+ work">
+      <ack id="g6-ea6_n1" status="SATISFIED-AT-D2-COMPLETION-AUDIT-HISTORY" priority="WAS-CRITICAL-FIRST-ACTION">D2-completion 6-caller closure as FIRST substantive action after V0 + iter-1 gate. Update each of 6 zero-arg LiveVikunjaClient() callers to pass base_url=cfg["vikunja"]["base_url"]. The 6 callers (verbatim list, full paths): (1) tools/fleet_observability/credential_rotation_reminder.py; (2) tools/fleet_observability/welcome_back_digest.py; (3) tools/fleet_observability/daily_digest.py; (4) tools/fleet_observability/weekly_summary.py; (5) tools/fleet_observability/dashboard_maintainer.py (line ~93); (6) tools/gate_stale_cleaner/run_live.py. BEFORE/AFTER pattern: BEFORE: `live = LiveVikunjaClient()` AFTER: `live = LiveVikunjaClient(base_url=cfg["vikunja"]["base_url"])`. Each caller already has `cfg` resolved via prior ctx-aware load_config call. Total ~6 lines changed. Pytest sanity check after edits: `pytest tools/ --tb=short -q`; expect 282 passed. Grep verification: `grep -rn 'LiveVikunjaClient\(\s*\)' tools/` returns 0 hits in production code. Ack g5-4 transitions from FORWARD-ACTIVE to SATISFIED. SATISFIED-AT: 3d1ac35 (D2-completion executed via Guide-#6 Option A HOIST -- see g6-ea6_n5 for the architectural-decision update). g5-4 transitioned to SATISFIED at Item 2.7 V1-V7 closure run.</ack>
+      <ack id="g6-ea6_n2" status="SATISFIED-AUDIT-HISTORY">+1 M working-tree delta correct attribution. v5 XML §count_delta_vs_guide_6_prediction misattributes the +1 to GUIDE_PROMPT.xml; actual is tools/fleet_observability/_vikunja_client.py (per Guide-#6 v5 verification correction C1). EA-6 iteration-1 gate restates the corrected attribution; V0c verification observes 33 entries (22 M + 2 D + 9 ??) with the +1 M correctly identified as fleet_observability/_vikunja_client.py. SATISFIED-AT: EA-6 iter-1 comprehension gate confirmed the corrected attribution; the ack is informational-only (no source-fix required since v5 XML is committed audit artifact under no-amend doctrine; the correction lives in EA-6 init pointer + Guide-#6 v5 verification file as forward-correction anchors). Stage 3 EA does not re-process.</ack>
+      <ack id="g6-ea6_n3" status="SATISFIED-AT-2.10.1-AUDIT-HISTORY">v5 XML minor doc defects (C2 v4 hash placeholder; C3 v4 commit message paraphrase; C4 v5 head_at_handoff_after_this_commit descriptive) acknowledged in 2.10 STATUS.md append-only footnote per documented_in_2_10_status_append block. SATISFIED-AT: 89213ee (initial 2.10 STATUS append included v5 doc correction footnote text; further corrected at 947cbd5 per g6-ea6_n10's 5 N-corrections). Stage 3 EA does not re-process.</ack>
+      <ack id="g6-ea6_n4" status="FORWARD-ACTIVE-FOR-STAGE-3">If EA-6 budget tightens at any clean breakpoint before Item 2.9 (e.g., D2-completion close, D1 close, 2.7 close, 2.7.v2 close), emit v6 mid-stage handoff XML following v1/v2/v3/v4/v5 schema (docs-only commit, one file in diff). NO partial-commit refactor work. NO emergency single-commit attempts. STATUS-AT-STAGE-3: SATISFIED-AT-STAGE-2-CLOSE (no v6 emission needed; EA-6 closed all Items 2.6-2.10 in single session). The discipline carries forward to Stage 3: if Stage 3 EA budget tightens at any clean breakpoint before Item 3.9 (after 3.5 dep install close, after 3.7 smoke-test close), emit Stage-3-mid-stage-handoff XML (e.g., EA_HANDOFF_STAGE3_MIDSTAGE.xml) following the v1-v5 schema; docs-only commit; ONE file in diff. NO partial-refactor commits. NO emergency single-commit attempts. Per i1-4.</ack>
+      <ack id="g6-ea6_n5" status="SATISFIED-AT-D2-COMPLETION-AUDIT-HISTORY" priority="WAS-CRITICAL-FIRST-ACTION-REVISED">Option A authorization for D2-completion cfg-resolution divergence. EA-6 will execute D2-completion via Option A as authorized in this disposition file: (a) For the 3 pattern-compatible callers (credential_rotation_reminder.py:54, dashboard_maintainer.py:93, welcome_back_digest.py:84), apply the AFTER pattern to the constructor only. (b) For the 3 divergent callers (daily_digest.py:169, weekly_summary.py:123, gate_stale_cleaner/run_live.py:42), HOIST the existing `cfg = config_loader.load_config(path=ctx.root/..., project_overlay_path=ctx.root/...)` block above the LiveVikunjaClient constructor, then apply the AFTER pattern. Leave health_check + business-logic blocks in their current relative positions. (c) Preserve the local assignee variable name (`client` x3 + `live` x3) per r1. (d) Verify post-edit: pytest tools/ -&gt; 282 passed; grep `LiveVikunjaClient\(\s*\)` -&gt; 0 production hits. (e) Ack g5-4 transitions FORWARD-ACTIVE -&gt; SATISFIED upon successful closure. (f) Document Option A architectural decision (hoist-incidental-not-intentional) in EA-6 working notes for the 2.10 STATUS append-only entry. SATISFIED-AT: 3d1ac35 (all 6 callers updated per Option A; pytest 351 (post-V-matrix); grep 0 production hits; assignee preservation verified per r1; Option A architectural decision documented in 2.10 STATUS append footnote 11 with N3 corrections at 2.10.1).</ack>
+      <ack id="g6-ea6_n6" status="SATISFIED-AUDIT-HISTORY">Path-confusion in EA-6 Option C analysis. EA-6 acknowledges the path-confusion in Option C framing: the conditional fallback at line 40 lives in tools/fleet_observability/_vikunja_client.py (LEGACY, in-scope for D2), NOT tools/_vikunja_client.py (chokepoint, out-of-scope). Per dn18 + g5-6, full paths cited going forward. EA-6 will NOT propagate the conflation in any future EA-6 artifact. SATISFIED-AT: discipline observed across remaining EA-6 cycles; full paths cited consistently in 3d1ac35 + 89213ee + 947cbd5. Stage 3 EA inherits the discipline: when discussing either chokepoint OR legacy file, cite full paths (tools/_vikunja_client.py vs tools/fleet_observability/_vikunja_client.py).</ack>
+      <ack id="g6-ea6_n7" status="SATISFIED-AT-2.10.1-FORWARD-ACTIVE-AS-AUDIT-HISTORY" priority="MED">F-D1-1 (MCP-bus) + F-D1-2 (openvino) NO-ACTION dispositions authorized by Guide-#6. EA-6 will document both dispositions verbatim in the 2.10 STATUS.md append-only entry under a new "D1 finding dispositions" subsection. Required text (verbatim): "Stage 2.6 D1 extended grep verification net (12 patterns per Master Plan §6.2 + AUDIT_RISK_REVIEW C6) surfaced two finding families outside the chokepoint-internal/legacy-shim-internal/test-only triage rule. Both authorized as NO-ACTION dispositions per Guide-#6 review file 2.6-GUIDE_RESPONSE_INSTANCE_6_D1_NO_ACTION_DISPOSITIONS_AUTHORIZED.xml: F-D1-1 (vikunja_mcp/ MCP-bus, 19 hits across server.py + cli.py + bridge/daemon.py): Acknowledged as third chokepoint family parallel to (a) tools/_vikunja_client.VikunjaClient for fleet-runtime scripts and (b) tools/fleet_observability/_vikunja_client.LiveVikunjaClient legacy. §D.1 enforcement preserved at function-level (server.py D4 DIVERGE-APPROVED: 7 _require_project_id sites at handler entry) + at user/protocol-input level (cli.py CLI flags; bridge/daemon.py inbox protocol). Class-method routing through VikunjaClient deferred to Stage 5+ when full chokepoint HTTP delegation is wired. Stage 6.7.5-pattern DevPlatform-Meta hardening ticket suggested for the eventual migration: 'Migrate vikunja_mcp/* through VikunjaClient class methods (post-HTTP-delegation)' (LOW severity; pure architectural cleanup; no current §D.1 violation). F-D1-2 (openvino_contrib_agent, 7 hits across repo_tools.py): Acknowledged as out-of-domain (GitHub API + PAT auth, not Vikunja). Stage 5.1 keep_in_blarai list preserves openvino_contrib_agent in BlarAI permanently; not a platform-separation concern. No Stage 6 followup." SATISFIED-AT: 89213ee (initial STATUS append included g6-ea6_n7 per the verbatim text above; corrected via N4 at 2.10.1 commit 947cbd5 to restore exact verbatim from disposition file). Stage 3 EA does NOT re-investigate F-D1-1 or F-D1-2; both forward-staged to Stage 5+ (per w4) and BlarAI-product-roadmap respectively.</ack>
+      <ack id="g6-ea6_n8" status="SATISFIED-AT-2.10.1-FORWARD-ACTIVE-AS-AUDIT-HISTORY-AT-STAGE-4" priority="LOW">V1-V7 closure V4 (vikunja_processes = 0) drift, Option B AUTHORIZED. At Item 2.7 V1-V7 closure assertion run, V4 returned 1 (one `vikunja-v2.3.0-windows-4.0-amd64.exe` process running on host, PID 18304) where the V1-V7 closure assertion expected 0. EA-6 STOP-and-reported per Guide-#6 stop condition. Disposition: Option B AUTHORIZED -- V4=1 is STATUS-staleness per Guide-#6 operating rule 5b(a), NOT procedure breakage. The V4=0 invariant came from Stage 1.4 step (e) closure (Vikunja stopped after MCP project-creation to restore Stage-0.4 quiesced state). The LA's operating environment has reasons to keep Vikunja running during the multi-day Stage 2 work cycle. Stage 4 EA's preflight at item 4.1 has explicit fail-fast guard for V4=1, so V4=0 will be enforced at Stage 4 cutover. Stage 2 close proceeds with V4=1 acknowledged. (NAMESPACE NOTE: The V4 in this g6-ea6_n8 disposition is the V1-V7 CLOSURE assertion V4 -- a host-state check on vikunja_processes count. It is DISTINCT from the V matrix V4 in 2.7.v2, which is 'CLI flag exposure parametrized per refactored entrypoint' -- a NEW pytest test with 12 cases. The two V4s share a label across distinct test/check namespaces; they are unrelated.) STATUS-AT-STAGE-3: forward-active for Stage 3 in the sense that Vikunja-running on host carries through Stage 3 (no action required at Stage 3 entry; observed PID 20404 at V0l this session; Stage 3 work is pure code copy with no DB access). Stage 4.1 preflight handles V4=0 restoration. Stage 3 EA does NOT touch Vikunja state.</ack>
+      <ack id="g6-ea6_n9" status="SATISFIED-IN-3d1ac35-AT-2.10.1-AUDIT-HISTORY" priority="MED">Server.py D4 docstring drift disposition (Option-Fix-Source authorized by Guide-#6 per dn19; OVERRIDES EA-6's proposed rule-5b(a) framing). EA-6 acknowledgment required at start of next chat turn (combine with 2.8 BLARAI_PID gate work): (a) Apply the 3-line docstring fix to tools/vikunja_mcp/server.py per `required_3_line_fix` (lines 22, 24-25, 53). Optionally add project_summary clarification note. (b) Re-run pytest tools/ -- expect 351 passed (no runtime impact from docstring change; V6 audit test continues to pass). (c) Document both the source-fix AND the V6 audit test in the 2.10 STATUS append "Discovery-surfaced findings during 2.7.v2 V matrix authoring" subsection. SATISFIED-AT: 3d1ac35 source-fix in-place (server.py docstring lines 22 + 24-25 + 53 corrected from "all 8" -&gt; "all 7"; phantom 8th reference removed; optional project_summary clarification note added). 2.10 STATUS append narrative documented in 89213ee with verbatim text per the ack; further refined at 947cbd5 for narrative accuracy. V6 audit test (test_gated_handlers_set_matches_require_project_id_call_sites) continues to pass at 351 baseline. Stage 3 EA copies the SATISFIED state (corrected docstring + V6 audit test) to devplatform/tools/vikunja_mcp/server.py + devplatform/tools/tests/.</ack>
+      <ack id="g6-ea6_n10" status="SATISFIED-AT-2.10.1-AUDIT-HISTORY" priority="MED">5 narrative corrections to STATUS.md Stage 2 Closure Footnotes section per `narrative_error_inventory` in disposition file 2.6-GUIDE_RESPONSE_INSTANCE_6_ITEM_2_10_VERIFIED_NARRATIVE_CORRECTIONS_AUTHORIZED.xml. EA-6 acknowledges + applies as 2.10.1 follow-on commit before emitting closing handoff. Specific corrections: Footnote 2 (g5-7) per N1 (LOW-MED): EA-4 (not EA-3) introduced + cleaned the duplicate test definitions in test_vikunja_client_scope.py (not test_project_context.py). Footnote 7 (encoding regression) per N2 (LOW): EA-4 self-caught and fixed in same iteration before Guide-#5 review. Footnote 11 (g5-4 + Option A + D2-completion) per N3 (HIGH): un-conflate g5-4 from D3; g5-4 is about ctx-threading hazard in legacy tools/fleet_observability/_vikunja_client.py:28 zero-arg config_loader.load_config() call closed via Option A HOIST in 6 callers; D3 is SEPARATE: dashboard_maintainer.py:113 private-method abuse closed via new public update_task method. Footnote 12.g6-ea6_n7 (D1 NO-ACTION) per N4 (MED): correct stage timing + restore verbatim ack text. Footnote 12.g6-ea6_n8 (V4 vikunja-process drift) per N5 (HIGH): UN-CONFLATE V matrix V4 from closure V4. SATISFIED-AT: 947cbd5 commit (2.10.1 follow-on commit; STATUS.md only; +/-21 lines net per the 5 paragraph replacements). Append-only discipline preserved. pytest baseline held at 351. Stage 3 EA inherits the corrected narrative as the canonical Stage 2 audit-chain record.</ack>
+    </g6_ea6_acks>
+
+    <new_g7_ea1_acks_for_stage_3 count="9" status="FORWARD-ACTIVE" canonical_source="3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml §new_g7_ea1_acks_for_stage_3">
+      <ack id="g7-ea1_n1" status="FORWARD-ACTIVE-AT-3.6" priority="HIGH">F-1 mitigation extension at Stage 3.6: when copying MCP config templates to devplatform, the devplatform-side copies (`devplatform/.mcp.json` + `devplatform/.vscode/mcp.json`) MUST use `${env:VIKUNJA_PASS}` env-var reference instead of the BlarAI-side literal password. Stage 0.0.5 persisted VIKUNJA_PASS to User-scope env (length 23 confirmed in Stage 0 baseline JSON); Stage 4.4-4.6 will rewrite BlarAI-side configs to the same pattern. Stage 3 introduces the pattern in devplatform-side configs as F-1 closure first half (literal removed from gitignored devplatform configs). Stage 3 EA verifies post-3.6 via: Select-String -Path C:\Users\mrbla\devplatform\.vscode\mcp.json -Pattern 'VIKUNJA_PASS.*[A-Za-z0-9]{16,}'. Expected: NO match (only `${env:VIKUNJA_PASS}` reference should appear). ON ANY MATCH: STOP. Refactor to env-var reference; do NOT commit a literal password into the devplatform copy.</ack>
+      <ack id="g7-ea1_n2" status="FORWARD-ACTIVE-AT-3.1" priority="HIGH">Path-confusion vigilance at Stage 3.1 copy: Stage 3.1 explicitly copies BOTH chokepoint and legacy Vikunja client files: tools/_vikunja_client.py (NEW chokepoint; created at Stage 2.1; Stage 3 copies to devplatform/tools/_vikunja_client.py) AND tools/fleet_observability/_vikunja_client.py (LEGACY HTTP client; modified at Stage 2.6 D2-completion + D3; Stage 3 copies via the recursive directory copy of tools/fleet_observability/ to devplatform/tools/fleet_observability/). Both files MUST be copied verbatim. Per dn18 + g5-6, cite full paths consistently in any Stage 3 narrative or commit message; do NOT abbreviate to "_vikunja_client.py" or "the chokepoint" without full path qualification when discussing either file. Stage 3 EA verifies post-3.1 via: Test-Path C:\Users\mrbla\devplatform\tools\_vikunja_client.py AND Test-Path C:\Users\mrbla\devplatform\tools\fleet_observability\_vikunja_client.py. Both expected: True. Byte-identity verification optional but recommended (Get-FileHash on each pair).</ack>
+      <ack id="g7-ea1_n3" status="FORWARD-ACTIVE-AT-3.1.v2" priority="MED">v2-baseline file copy verification at Stage 3.1.v2: the recursive directory copy at Stage 3.1 covers the v2-baseline files (per Stage 3.1.v2 verify_all_present block), but explicit verification is required to catch any silent omission. Verify each of the following exists in devplatform after Stage 3.1: devplatform/tools/autonomy_budget/blarai_next_task_resolver.py (R12 path correction: lives under autonomy_budget/, NOT fleet_ops/; Stage 3 inherits the corrected path); devplatform/tools/fleet_ops/diff_builder.py; devplatform/tools/fleet_observability/escalation_notify.ps1; devplatform/tools/scheduled-tasks/escalation-watchdog.xml; devplatform/tools/scheduled-tasks/escalation-watchdog.ps1; devplatform/tools/scheduled-tasks/test_async_post_gate.ps1. ON ANY MISSING: STOP. Re-run Copy-Item -Recurse with explicit -Force OR add the missing file via direct Copy-Item with byte-hash verification. Document any disposition in EA-1 working notes for the 3.10 STATUS append.</ack>
+      <ack id="g7-ea1_n4" status="FORWARD-ACTIVE-AT-3.2.v2" priority="MED">Doctrine-doc + wake-template copy at Stage 3.2.v2: in addition to the platform-doctrine files Stage 3.2 copies via pattern (CLAUDE_*.md, CLAUDE_*.xml, CO_LEAD_*.xml, DEC*.xml, DOMAIN*.xml, CONTINUATION_PROMPT.md), Stage 3.2.v2 ADDS: docs/governance/ (recursive; 7 files including fleet-hygiene.md authoritative pause SOP) AND docs/scheduled/wake_templates/ (recursive; 6 templates: co_lead_architect.md, configuration_agent.md, ea_code.md, ea_cowork.md, sdo.md, sprint_auditor.md). Both directories copied to devplatform/docs/governance/ and devplatform/docs/scheduled/wake_templates/ respectively. Stage 5.5.v2 deletes the BlarAI copies (NOT in Stage 3 scope; Stage 3 only adds devplatform copies, BlarAI remains untouched). Stage 3 EA verifies post-3.2.v2 via: Test-Path C:\Users\mrbla\devplatform\docs\governance\fleet-hygiene.md AND Get-ChildItem C:\Users\mrbla\devplatform\docs\scheduled\wake_templates\*.md | Measure-Object. Expected: True; 6 files. ON ANY MISSING: re-copy via Copy-Item -Recurse with explicit verification; document in 3.10 STATUS append.</ack>
+      <ack id="g7-ea1_n5" status="FORWARD-ACTIVE-AT-3.10.v2" priority="LOW">LOC manifest at Stage 3.10.v2: write `devplatform/.copy_manifest_v2.yaml` listing each v2-introduced file copied at Stage 3.1.v2 + 3.2.v2 with line-count totals (recorded from BlarAI source). Stage 5 cleanup verifies BlarAI-side files were not orphaned by cross-checking the manifest. Stage 3 EA includes manifest in the 3.9 single commit; documents in 3.10 STATUS append.</ack>
+      <ack id="g7-ea1_n6" status="FORWARD-ACTIVE-AT-3.7" priority="HIGH">Devplatform smoke test at Stage 3.7 with `--dry-run`: invoke `python -m tools.fleet_observability.daily_digest --project-root C:\Users\mrbla\BlarAI --project-id $BLARAI_PID --dry-run` from devplatform's .venv. Expected: completion without error; output equivalent to running the same command from BlarAI/.venv (which is the production BlarAI invocation pre-Stage-4-cutover). The `--dry-run` flag is REQUIRED to prevent BlarAI/.venv-from-devplatform AND devplatform/.venv-from-devplatform from BOTH writing state simultaneously (the parallel-run constraint of Stage 3: BlarAI is still authoritative; devplatform is a parallel copy that must not write production state). $BLARAI_PID preflight uses the same regex as Stage 2.8: read from `BlarAI/.platform/vikunja_project_ids.yaml`; pattern `'blarai_project_id:\s*(\d+)'`; expect 3. ON DRIFT (any value other than 3): STOP. Per g4-5: NO silent regex/yaml adaptation. Report to LA + Guide-#7.</ack>
+      <ack id="g7-ea1_n7" status="FORWARD-ACTIVE-AT-3.8" priority="MED">BlarAI-only docs absence verify at Stage 3.8: confirm devplatform/docs/ does NOT contain any BlarAI-product-specific documentation patterns. Use the Stage 3.8 verify command: `Get-ChildItem C:\Users\mrbla\devplatform\docs | Select-String -Pattern "Task4|P5_|ADR|LEDGER|IMPLEMENTATION_PLAN|TEST_GOVERNANCE"`. Expected: empty. ON ANY MATCH: investigate which file slipped into the Stage 3.2 copy (likely a pattern-match overshoot in the doctrine-doc patterns); remove the unintended copy from devplatform; preserve the BlarAI-side original; document the disposition in 3.10 STATUS append. Per Stage 5.1 keep_in_blarai inheritance: BlarAI-only docs (Task4*, P5_*, ADR*, LEDGER*, IMPLEMENTATION_PLAN.md, TEST_GOVERNANCE.md, plus this docs/platform_separation/ folder which migrates at Stage 6.9 archive) STAY in BlarAI permanently. Stage 3 inherits the scope distinction.</ack>
+      <ack id="g7-ea1_n8" status="FORWARD-ACTIVE-AT-3.9" priority="HIGH">Single Stage-3 commit at Item 3.9: ALL Stage 3 work folds into ONE commit on devplatform's main branch. Mid-stage handoff XMLs (if EA-1 emits any per i1-4 + g6-ea6_n4) are docs-only commits SEPARATE from the Stage 3 commit; they may land on either BlarAI's chore/platform-extraction (at docs/platform_separation/ea_outputs/) or devplatform's main (at devplatform/docs/), but the substantive Stage 3 work commits only at 3.9. Commit template per init pointer §g7-ea1_n8 verbatim. FORBIDDEN: NO partial commits. NO emergency single-commit attempts that omit any v2 file or doctrine doc. NO commit on a BlarAI side at Stage 3 (BlarAI is untouched per Stage 3 design).</ack>
+      <ack id="g7-ea1_n9" status="FORWARD-ACTIVE-AT-3.10" priority="MED">Append-only STATUS.md update at Item 3.10: EA-1 appends a Stage 3 closure entry to `docs/platform_separation/STATUS.md` (BlarAI-side; the STATUS.md is BlarAI-owned per Stage 6.9 archive design). Required inclusions: Stage Ledger row Stage 3 PENDING -&gt; COMPLETE with date, devplatform commit hash, evidence summary; Current State table updates; New Anomalies (if any) appended after A11 with format A12+; existing A1-A11 UNTOUCHED; 7 g7-ea1 acks (n1-n7) status closure summaries; F-1 mitigation forward-progress note; Ack-count correction footnote (Guide-#7 forward-correction at 2026-04-27 per LA "find the missing 8" + "do not hallucinate" directives) explicitly noting handoff brief 41-vs-disk 38 reconciliation, 3 phantom rejects (i1-5/6/7), and 5 real-missed adds (3 g4-iter2 + f1 + dn15); g6-ea6_n8 STATUS-staleness reminder; Optional Vikunja DevPlatform-Meta hardening ticket SUGGESTION for F-D1-1 carry-forward (created at Stage 6.7.5, NOT Stage 3). Append-only discipline strictly preserved: A1-A11, Stage Ledger Stages 0/1/2 rows, Stage 2 Closure Footnotes section, Recovery Anchors, Vikunja Project IDs, How to Resume After Interruption, prior Execution Log entries -- ALL UNTOUCHED.</ack>
+    </new_g7_ea1_acks_for_stage_3>
+
+    <total_count post_disk_verification="2026-04-27 by Guide-#7">
+      38 (v4-era; corrected from EA-6 init pointer's 33 by adding 3 g4-iter2 + f1 + dn15) +
+      4 (g6-ea5 SATISFIED audit) + 10 (g6-ea6 SATISFIED at appropriate Items) + 9 (g7-ea1
+      FORWARD-ACTIVE for Stage 3) = **61 binding acks** carried forward at Stage 3 EA
+      iteration-1 gate. Phantom IDs i1-5/i1-6/i1-7 explicitly REJECTED per LA do-not-hallucinate
+      directive. Stage-3 active enforcement subset (~28 acks): all 9 g7-ea1 + critical_carryovers
+      n=1..n=9 + g3-1..g3-3 + i1-1..i1-4 + g4-2/g4-3/g4-5/g4-6 + g4-iter2-2/g4-iter2-3 + dn15 +
+      g6-ea6_n4 + g6-ea6_n8 (Stage-4 forward). Audit-history-only subset (~33): remainder.
+    </total_count>
+  </required_acknowledgments_carryforward_verbatim_61_total>
+
+  <comprehension_summary canonical_source="04_STAGE3_COPY_TOOLS.xml authoritative; init pointer §required_first_actions n=3 prescribed structure">
+
+    <part_a_objective>
+      Stage 3 copies the platform development tooling from BlarAI's `chore/platform-extraction`
+      branch (HEAD 0d61581) to the new `devplatform` repository (currently at observed HEAD
+      3894221, expected per init pointer eaa005f -- DRIFT surfaced for Guide-#7). Scope is
+      COPY-ONLY: 7 platform tool directories (vikunja, vikunja_mcp, fleet_ops, fleet_observability,
+      autonomy_budget, gate_stale_cleaner, scheduled-tasks); 2 chokepoint helpers
+      (tools/_vikunja_client.py, tools/_project_context.py); platform-doctrine docs (CLAUDE_*,
+      CO_LEAD_*, DEC*, DOMAIN*, CONTINUATION_PROMPT.md); docs/governance/ (7 files);
+      docs/scheduled/wake_templates/ (6 templates); claude_cowork/ + claude_projects/ if
+      populated; pyproject.toml populated with platform deps; .venv updated via `pip install -e .`;
+      .mcp.json + .vscode/mcp.json with `${env:VIKUNJA_PASS}` env-var pattern (F-1 closure
+      first half); .copy_manifest_v2.yaml LOC manifest. BlarAI side remains UNCHANGED throughout
+      Stage 3. Single substantive devplatform commit at Item 3.9. Append-only STATUS.md update
+      at Item 3.10 (BlarAI-side; Stage 6.9 archive). No merge to main. Fleet stays paused.
+      stash@{0} untouched. Stage 4 will repoint MCP configs and execute Vikunja DB cutover;
+      Stage 5 will delete BlarAI-side platform tooling (NOT Stage 3 scope).
+    </part_a_objective>
+
+    <part_b_work_plan ordered="yes">
+      <item id="3.1" name="copy_platform_tool_directories_and_chokepoint_helpers" critical="HIGH">
+        Recursive directory copy: 7 platform tool dirs + tools/_vikunja_client.py +
+        tools/_project_context.py from BlarAI/tools to devplatform/tools. BOTH
+        tools/_vikunja_client.py (chokepoint) AND tools/fleet_observability/_vikunja_client.py
+        (legacy) must be present per g7-ea1_n2 dual-presence verification. v2-baseline
+        verification at 3.1.v2 per g7-ea1_n3 (6 specific files including R12-corrected
+        autonomy_budget/blarai_next_task_resolver.py path).
+      </item>
+      <item id="3.2" name="copy_platform_doctrine_docs" critical="MED">
+        Pattern copy: CLAUDE_*.md, CLAUDE_*.xml, CO_LEAD_*.xml, DEC*.xml, DOMAIN*.xml,
+        CONTINUATION_PROMPT.md from BlarAI/docs to devplatform/docs. Stage 3.2.v2 adds:
+        docs/governance/ (recursive; 7 files; fleet-hygiene.md authoritative) AND
+        docs/scheduled/wake_templates/ (recursive; 6 templates) per g7-ea1_n4.
+      </item>
+      <item id="3.3" name="copy_claude_cowork_and_claude_projects_if_populated" critical="LOW">
+        If claude_cowork/ + claude_projects/ are populated in BlarAI, copy to devplatform.
+        Otherwise no-op with documented disposition.
+      </item>
+      <item id="3.4" name="populate_devplatform_pyproject_toml" critical="MED">
+        Filter platform deps from BlarAI/pyproject.toml into devplatform/pyproject.toml.
+        Excludes BlarAI-product deps (OpenVINO, transformers, etc.); includes platform
+        runtime deps (PyYAML, etc.) per `04_STAGE3_COPY_TOOLS.xml` mapping.
+      </item>
+      <item id="3.5" name="install_devplatform_venv_via_pip_install_e" critical="MED">
+        From devplatform/.venv: `pip install -e .` to wire tools as importable. Validate
+        editable-install completes without error.
+      </item>
+      <item id="3.6" name="copy_mcp_config_templates_with_env_var_substitution" critical="HIGH-PER-g7-ea1_n1">
+        Generate devplatform/.mcp.json + devplatform/.vscode/mcp.json using
+        `${env:VIKUNJA_PASS}` env-var reference instead of literal password (F-1 closure
+        first half). Verify via Select-String pattern that no literal password remains.
+      </item>
+      <item id="3.7" name="devplatform_smoke_test_via_daily_digest_dry_run" critical="HIGH-PER-g7-ea1_n6-AND-g4-5">
+        Invoke `python -m tools.fleet_observability.daily_digest --project-root C:\Users\mrbla\BlarAI
+        --project-id $BLARAI_PID --dry-run` from devplatform/.venv. $BLARAI_PID preflight regex
+        must resolve to 3 (verified at V0j PASS). Output must match equivalent BlarAI invocation.
+        ON DRIFT: STOP and report (no silent adaptation per g4-5).
+      </item>
+      <item id="3.8" name="verify_blarai_only_docs_absent_in_devplatform" critical="MED">
+        `Get-ChildItem C:\Users\mrbla\devplatform\docs | Select-String -Pattern "Task4|P5_|ADR|LEDGER|IMPLEMENTATION_PLAN|TEST_GOVERNANCE"`.
+        Expected empty per g7-ea1_n7. Any match indicates Stage 3.2 pattern-match overshoot;
+        remove from devplatform; preserve BlarAI original.
+      </item>
+      <item id="3.9" name="single_devplatform_commit_per_g7-ea1_n8" critical="HIGH">
+        ONE commit on devplatform/main folding all Items 3.1-3.8 work. Commit template per
+        g7-ea1_n8. NO partial commits. NO BlarAI-side commit. Mid-stage handoff XMLs (per
+        i1-4 + g6-ea6_n4 + dn15) are SEPARATE docs-only commits.
+      </item>
+      <item id="3.10" name="append_only_status_update_per_g7-ea1_n9" critical="MED">
+        Append Stage 3 closure entry to BlarAI/docs/platform_separation/STATUS.md. Stage
+        Ledger Stage 3 PENDING -&gt; COMPLETE; Current State table updates; ack-count correction
+        footnote (38 v4-era, not 41 brief-inflated; reject phantoms i1-5/6/7; add real misses
+        3 g4-iter2 + f1 + dn15); F-1 mitigation forward-progress note; g6-ea6_n8 STATUS-
+        staleness reminder. APPEND-ONLY discipline strictly preserved per g3-3 + n=9.
+        Stage 3.10.v2 LOC manifest write per g7-ea1_n5 lands in the 3.9 commit.
+      </item>
+    </part_b_work_plan>
+
+    <part_c_files_to_modify>
+      <devplatform_side scope="all changes here">
+        - devplatform/tools/ (recursive; 7 dirs + 2 chokepoint helpers; copy from BlarAI/tools/)
+        - devplatform/docs/ (CLAUDE_*, CO_LEAD_*, DEC*, DOMAIN*, CONTINUATION_PROMPT.md +
+          governance/ + scheduled/wake_templates/)
+        - devplatform/claude_cowork/ + devplatform/claude_projects/ (if populated)
+        - devplatform/pyproject.toml (filtered from BlarAI; platform deps only)
+        - devplatform/.venv/ (updated via `pip install -e .`)
+        - devplatform/.mcp.json (generated with `${env:VIKUNJA_PASS}` reference)
+        - devplatform/.vscode/mcp.json (same)
+        - devplatform/.copy_manifest_v2.yaml (NEW; LOC manifest per g7-ea1_n5)
+      </devplatform_side>
+      <blarai_side scope="ONLY at Item 3.10 STATUS append; ZERO source/tool/config edits">
+        - BlarAI/docs/platform_separation/STATUS.md (APPEND-ONLY at Item 3.10; no other
+          BlarAI file touched)
+        - BlarAI/docs/platform_separation/temp_for_responses/ may receive mid-stage handoff
+          XML(s) per i1-4 if budget tightens (docs-only commit each)
+      </blarai_side>
+      <strictly_excluded>
+        - CLAUDE.md, AGENTS.md, .github/copilot-instructions.md (per critical n=5)
+        - A1-A10 governance docs (per critical n=5)
+        - tools/, services/, shared/, launcher/ in BlarAI side (per Stage 3 copy-only)
+        - pyproject.toml in BlarAI (per Stage 3 copy-only)
+        - .mcp.json / .vscode/mcp.json in BlarAI (per Stage 4 repoint)
+        - All A1-A11 anomalies + Stage Ledger 0/1/2 rows + Recovery Anchors + Vikunja
+          Project IDs + How to Resume + prior Execution Log entries in STATUS.md (per g3-3
+          + n=9 append-only)
+      </strictly_excluded>
+    </part_c_files_to_modify>
+
+    <part_d_test_strategy>
+      <preflight_per_item>
+        - V0a-V0M re-run before Item 3.1 begins (per i1-1)
+        - $BLARAI_PID regex resolves to 3 at Item 3.7 entry (per g4-5 + g7-ea1_n6)
+        - Pre-3.6: VIKUNJA_PASS env-var resolvable (Stage 0.0.5 persisted; expected length 23)
+      </preflight_per_item>
+      <per_item_smoke>
+        - Post-3.1: Test-Path on both _vikunja_client.py paths (g7-ea1_n2)
+        - Post-3.1.v2: Test-Path on 6 v2-baseline files (g7-ea1_n3)
+        - Post-3.2.v2: Test-Path on docs/governance/fleet-hygiene.md + 6 wake templates (g7-ea1_n4)
+        - Post-3.5: pip install -e . exit code 0; importable: `python -c "import tools.fleet_observability.daily_digest"`
+        - Post-3.6: Select-String ensures no literal VIKUNJA_PASS in devplatform .mcp.json or .vscode/mcp.json (g7-ea1_n1)
+        - Item 3.7: daily_digest --dry-run exit code 0; output equivalent (g7-ea1_n6)
+        - Item 3.8: Get-ChildItem | Select-String returns empty (g7-ea1_n7)
+      </per_item_smoke>
+      <closure_verification at="Stage 3 close, mirror V1-V7 per g3-2 + i1-3">
+        - V1: BlarAI git status clean except STATUS.md append (3.10) + optional mid-stage XML
+        - V2: BlarAI HEAD unchanged from 0d61581 (or rolled forward only by docs-only commits)
+        - V3: devplatform git status clean post-3.9 commit
+        - V4: vikunja_processes acknowledged staleness per g6-ea6_n8 (Stage 4 enforces V4=0)
+        - V5: stash@{0} byte-identical (sdo timestamp 20260424_013002)
+        - V6: fleet_paused=true (no resume)
+        - V7: pytest tools/ in BlarAI = 351 (no regression); pytest tools/ in devplatform = subset matches expected
+        - V8: smoke test ctx defaults preservation in both repos
+      </closure_verification>
+      <regression_baseline blarai="351 passed" devplatform="TBD; expected ~282 BlarAI subset minus BlarAI-only tests + V matrix copies if included"/>
+    </part_d_test_strategy>
+
+    <part_e_risks>
+      <risk id="r1" severity="HIGH" topic="V0i devplatform HEAD drift">
+        Observed HEAD 3894221 ≠ expected eaa005f. Subject indicates LA performed scaffold-
+        registry promotion work since init pointer was authored. Stage 3 EA does NOT proceed
+        with Item 3.1 until Guide-#7 disposes (either acknowledges new HEAD as new baseline
+        OR directs reset). Surface in §open_questions_for_guide_7.
+      </risk>
+      <risk id="r2" severity="HIGH" topic="F-1 literal-password leak at 3.6">
+        ANY literal VIKUNJA_PASS value committed to devplatform/.mcp.json or devplatform/.vscode/mcp.json
+        violates g7-ea1_n1. Mitigation: explicit Select-String verify before 3.9 commit;
+        env-var substitution applied at template generation time.
+      </risk>
+      <risk id="r3" severity="MED" topic="Stage 3.1 silent file omission">
+        Recursive copy could miss v2-baseline files (esp. R12-corrected
+        autonomy_budget/blarai_next_task_resolver.py). Mitigation: explicit g7-ea1_n3
+        Test-Path verify of 6 specific paths post-3.1.
+      </risk>
+      <risk id="r4" severity="MED" topic="Stage 3.2 doctrine-doc pattern overshoot">
+        Pattern copy could pull BlarAI-only docs (Task4*, P5_*, ADR*, LEDGER*, IMPLEMENTATION_PLAN*,
+        TEST_GOVERNANCE*) into devplatform. Mitigation: g7-ea1_n7 explicit Get-ChildItem
+        Select-String verify at Item 3.8.
+      </risk>
+      <risk id="r5" severity="MED" topic="$BLARAI_PID drift at 3.7 smoke test">
+        If BlarAI/.platform/vikunja_project_ids.yaml drifts from blarai_project_id: 3, Stage
+        3.7 smoke test is invalid. Mitigation: g4-5 hard-stop discipline; verified at V0j PASS
+        in this gate; re-verify at 3.7 entry.
+      </risk>
+      <risk id="r6" severity="MED" topic="Parallel-write contamination via missing --dry-run">
+        If 3.7 smoke test omits --dry-run, devplatform invocation could write production
+        Vikunja state in parallel with BlarAI. Mitigation: g7-ea1_n6 mandatory --dry-run.
+      </risk>
+      <risk id="r7" severity="MED" topic="Context exhaustion before Item 3.9">
+        EA-1 budget could tighten before single substantive commit lands. Mitigation: i1-4 +
+        g6-ea6_n4 + dn15 mid-stage handoff cadence (docs-only commit emit; no partial-commit
+        refactor).
+      </risk>
+      <risk id="r8" severity="LOW" topic="STATUS.md append-only violation at 3.10">
+        Accidental edit to A1-A11 anomalies, prior Stage Ledger rows, Recovery Anchors,
+        Vikunja Project IDs, or prior Execution Log entries violates g3-3 + n=9. Mitigation:
+        manual diff review before 3.10 commit; visual verification that prior content
+        unchanged.
+      </risk>
+      <risk id="r9" severity="LOW" topic="Vikunja running PID 20404 during Stage 3">
+        Per g6-ea6_n8 Option B AUTHORIZED: Stage 3 has no Vikunja DB writes; Stage 4.1
+        preflight handles V4=0 enforcement. No mitigation required at Stage 3.
+      </risk>
+    </part_e_risks>
+
+    <part_f_rollback level="2" command="git -C C:\Users\mrbla\devplatform reset --hard HEAD~1">
+      Stage 3 rollback is Level 2 (single command on devplatform). BlarAI side has zero impact
+      since BlarAI is untouched throughout Stage 3 (except STATUS.md append at 3.10, which is
+      itself reverted by the rollback only if the STATUS append committed on BlarAI side; the
+      append is BlarAI-side per Stage 6.9 archive design, so BlarAI rollback would be a
+      separate `git -C C:\Users\mrbla\BlarAI revert &lt;status-append-commit&gt;` if needed).
+      stash@{0} unaffected (untouched throughout). Fleet pause unaffected (no resume during
+      Stage 3). Mid-stage handoff XML commits (if any) preserve audit history; not rolled back
+      with main Stage 3 commit.
+    </part_f_rollback>
+  </comprehension_summary>
+
+  <scope_acknowledgment>
+    <stage_risk>MEDIUM (per Stage 3 XML)</stage_risk>
+    <copy_only>YES -- ZERO mutations to BlarAI source/tool/config; only BlarAI/docs/platform_separation/STATUS.md append-only at 3.10</copy_only>
+    <single_substantive_commit_at>Item 3.9 on devplatform/main</single_substantive_commit_at>
+    <merge_to_main_during_stage>NO (per i1-2 + critical n=3)</merge_to_main_during_stage>
+    <fleet_pause_status>STAYS PAUSED throughout Stage 3 (per critical n=2 + i1-2; will NOT call state.resume_fleet)</fleet_pause_status>
+    <stash_handling>stash@{0} (sdo 20260424_013002) UNTOUCHED throughout (per critical n=4)</stash_handling>
+    <governance_doc_edits>FORBIDDEN (CLAUDE.md, AGENTS.md, copilot-instructions.md, A1-A10 docs all untouched per critical n=5)</governance_doc_edits>
+    <stage_4_carryforward>All 61 binding acks + Stage 3 STATUS append carry forward to Stage 4 per i1-2 dedup rule</stage_4_carryforward>
+  </scope_acknowledgment>
+
+  <open_questions_for_guide_7>
+    <question id="OQ-1" priority="HIGH" topic="V0i devplatform HEAD drift">
+      <observed>git -C C:\Users\mrbla\devplatform rev-parse HEAD = 3894221</observed>
+      <commit_subject>fix(registry): promote agent_gates_bus + architecture_decisions to fleet-level; annotate remaining auxiliaries pending Stage 6 review</commit_subject>
+      <expected_per_init_pointer>eaa005f</expected_per_init_pointer>
+      <interpretation>Subject indicates LA-side scaffold-registry promotion landed on devplatform/main between Guide-#7 init pointer authoring and Stage 3 EA pickup. Likely a benign forward-roll (registry curation in scope of Stage 1-2 carryforward audit), but Stage 3 EA cannot proceed with Item 3.1 substantive work without explicit disposition.</interpretation>
+      <requested_disposition>Three options: (a) ACKNOWLEDGE 3894221 as the new baseline; Stage 3.1 copy proceeds onto current HEAD with new state as commit parent. (b) DIRECT a `git -C devplatform reset --hard eaa005f` to restore expected baseline before Item 3.1. (c) DIRECT inspection of the 3894221 diff to verify in-scope; then ACKNOWLEDGE as baseline if benign. EA-1 default presumption: option (a) absent contrary direction, as the commit subject describes platform-extraction-aligned registry curation.</requested_disposition>
+      <stop_status>EA-1 will NOT begin Item 3.1 work until Guide-#7 disposes this question. Per init pointer stop_conditions, gate emission is the prescribed reporting action; EA-1 STOPS post-emission per §stop_condition_post_gate below.</stop_status>
+    </question>
+
+    <question id="OQ-2" priority="LOW" topic="V0c init pointer untracked status (transparency note)">
+      <observed>git status --short shows 1 untracked: docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml</observed>
+      <interpretation>The init pointer IS the bootstrap pickup artifact; expected to be untracked at session start (LA-authored or Guide-#7-authored file landed on disk for EA pickup; not yet committed). Per dn1/dn23 no-amend doctrine, EA-1 does NOT git add or commit the init pointer; it remains as an untracked-or-LA-tracked artifact at LA discretion.</interpretation>
+      <requested_disposition>CONFIRM expected behavior: leave init pointer untracked; LA may choose to commit at LA discretion as part of Guide-#7 audit trail. EA-1 does NOT touch the file.</requested_disposition>
+      <stop_status>Non-blocking; documented for transparency.</stop_status>
+    </question>
+
+    <question id="OQ-3" priority="LOW" topic="f1 vs g5-5 dedup interpretation">
+      <observed>Init pointer §preserved_from_v4_era intro states: "Stage 3 EA's iter-1 gate restates all 38 verbatim from the cited source files (or 37 if the LA directs f1 to be deduped with g5-5 per their conceptually-identical mapping)."</observed>
+      <ea_default>This gate restates 38 verbatim (f1 + g5-5 as separate IDs per disk reality, matching v4 handoff line 343 + Guide-#5's v4 quality review D2 enumeration line 72).</ea_default>
+      <requested_disposition>Either CONFIRM 38-restatement (f1 + g5-5 separate per disk) is the canonical position, OR DIRECT 37-restatement collapse (f1 = g5-5 conceptually). EA-1 default position used in this gate is 38.</requested_disposition>
+      <stop_status>Non-blocking; restatement style only; either acceptable.</stop_status>
+    </question>
+
+    <question id="OQ-4" priority="LOW" topic="Stage 2 mid-stage handoff XMLs (v4, v5) not committed to BlarAI">
+      <observed>v4 + v5 mid-stage handoff XMLs are present in docs/platform_separation/ea_outputs/ on disk but were authored before EA-6's Stage 2 close. Their docs-only commits (per i1-4 + dn15) are presumed to have landed during EA-4/EA-5 cycles. EA-1 does not need to verify this for Stage 3 work but notes for Guide-#7 audit chain reconciliation.</observed>
+      <requested_disposition>NO ACTION REQUESTED; informational only. Surface only if Guide-#7 audit pass requires confirmation.</requested_disposition>
+      <stop_status>Non-blocking.</stop_status>
+    </question>
+  </open_questions_for_guide_7>
+
+  <stop_condition_post_gate verbatim_required="yes" per_la_directive="stop and wait for Guide instance 7 review after iter-1 gate; do not begin Item 3.1 work until explicit PROCEED authorization">
+    STOPPING. Awaiting Guide instance 7 review of this iteration-1 comprehension gate.
+
+    No file copies, branch creation, mutation commands, commits, env-var modifications,
+    pip install -e ., MCP config generation, smoke-test invocations, STATUS.md edits, or
+    any Stage 3 substantive work will be performed until Guide instance 7 issues explicit
+    PROCEED authorization with disposition for V0i devplatform HEAD drift (§open_questions_for_guide_7
+    OQ-1).
+
+    Fleet remains paused. stash@{0} remains untouched. BlarAI HEAD remains 0d61581.
+    devplatform HEAD remains 3894221 (drift acknowledged, awaiting disposition).
+    BlarAI working tree state: 2 untracked files (init pointer + this gate); both are
+    pickup/emission artifacts, not for EA-1 git add.
+
+    On PROCEED authorization: EA-1 will begin Item 3.1 (recursive directory copy +
+    chokepoint helper copy + g7-ea1_n2 dual-presence verify) as the first substantive
+    action.
+  </stop_condition_post_gate>
+
+</ea_comprehension_gate_iteration_1_stage_3_instance_1>

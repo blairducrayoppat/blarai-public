@@ -1,0 +1,7 @@
+# command: C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\repro_compile.py --ir C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_b --device CPU --mode direct
+# started: 2026-04-25T19:48:49Z
+# ir xml sha256: 467f67b16f9806b0e592125509cbfacffba821948aa317624fcb11877f54b1e7
+# ir bin sha256: 0d81347d108386358254ed080cd47ce593f826c39ac896b0d689b4b1d1b187af
+
+READY mode=direct device=CPU ir=C:\Users\mrbla\BlarAI\phase2_gates\evidence\issue34450\exports\cell_b
+OK elapsed=1.56s

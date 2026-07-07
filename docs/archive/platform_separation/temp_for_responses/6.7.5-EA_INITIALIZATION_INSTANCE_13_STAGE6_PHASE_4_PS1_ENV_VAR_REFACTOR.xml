@@ -1,0 +1,810 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BlarAI Platform Separation v2 — Stage 6.7.5 Hardening
+  EA Instance 13 Dispatch — Stage 6 Phase 4
+  Scope: Ticket II (299) + Ticket JJ (300)
+  Authored by: Guide-#10 (claude-code session)
+  Date: 2026-05-07
+  Global EA count: EA-13 (EA-1…EA-12 precede this instance)
+  Ack namespace: g10-ea13_n*
+-->
+<ea_dispatch version="1.0">
+
+  <header>
+    <instance>13</instance>
+    <stage>6</stage>
+    <phase>4</phase>
+    <label>Stage 6 Phase 4 — Ticket II (PS1 env-var refactor) + Ticket JJ (.mcp.json consistency)</label>
+    <authored_by>Guide-#10</authored_by>
+    <date>2026-05-07</date>
+    <blarai_root>C:\Users\mrbla\BlarAI</blarai_root>
+    <devplatform_root>C:\Users\mrbla\devplatform</devplatform_root>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 1 — SCOPE
+       ════════════════════════════════════════════════════════════════════ -->
+  <scope>
+    <summary>
+      Phase 4 closes two paired hardening tickets:
+      - Ticket II (id 299, priority=3/HIGH): Refactor 5 PS1 fleet scripts from
+        .mcp.json credential reads to direct $env:VARNAME pattern (Python parity
+        per vikunja_mcp/cli.py). Also fixes la_merge_approve.ps1:189 trigger-path
+        derivation bug (dynamic-path pattern, per LA option (b2)).
+      - Ticket JJ (id 300, priority=2/MEDIUM): After II, edit BlarAI/.mcp.json
+        VIKUNJA_PASS from literal to template format ("${env:VIKUNJA_PASS}"),
+        making both .mcp.json files consistent. .mcp.json is gitignored — this
+        is a local file edit only, no git commit.
+    </summary>
+
+    <ticket_ii>
+      <vikunja_id>299</vikunja_id>
+      <title>Stage 6.7.5 Ticket II: Refactor 5 PS1 scripts to direct env-var credential pattern</title>
+      <scripts>
+        <script path="devplatform/tools/scheduled-tasks/agents-cadence-monitor.ps1"/>
+        <script path="devplatform/tools/scheduled-tasks/escalation_watchdog.ps1"/>
+        <script path="devplatform/tools/scheduled-tasks/la_merge_approve.ps1"/>
+        <script path="devplatform/tools/scheduled-tasks/test_async_post_gate.ps1"/>
+        <script path="devplatform/tools/scheduled-tasks/wake_launcher.ps1"/>
+      </scripts>
+      <acceptance>All 5 scripts read VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS
+      via $env:VARNAME directly. No script reads credentials from .mcp.json after this change.</acceptance>
+    </ticket_ii>
+
+    <ticket_jj>
+      <vikunja_id>300</vikunja_id>
+      <title>Stage 6.7.5 Ticket JJ: devplatform/.mcp.json template consistency check</title>
+      <file path="BlarAI/.mcp.json"/>
+      <acceptance>BlarAI/.mcp.json VIKUNJA_PASS = "${env:VIKUNJA_PASS}" (template).
+      devplatform/.mcp.json already uses template format. Both files now consistent.</acceptance>
+      <note>BlarAI/.mcp.json is gitignored. This is a local file edit only — no git commit.
+      Verification is confirming env var is set and login still works.</note>
+    </ticket_jj>
+  </scope>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 2 — BACKGROUND AND CONTEXT
+       ════════════════════════════════════════════════════════════════════ -->
+  <background>
+    <a16_summary>
+      STATUS.md §5 entry A16 (lines 228-234): When Stage 4 Phase C applied the F-1 fix
+      (devplatform/.mcp.json VIKUNJA_PASS → template format), 5 PS1 scripts that read
+      .mcp.json via ConvertFrom-Json received the literal string "${env:VIKUNJA_PASS}"
+      as the password — Vikunja login failed code 1011. Emergency fix reverted
+      BlarAI/.mcp.json to literal. PS1 scripts read BlarAI's .mcp.json (via $RepoRoot
+      default = C:\Users\mrbla\BlarAI). Follow-up: Tickets II + JJ.
+    </a16_summary>
+
+    <current_mcp_json_state>
+      BlarAI/.mcp.json:     VIKUNJA_PASS = "<REDACTED-VIKUNJA-PASS>" (literal, plaintext)
+      devplatform/.mcp.json: VIKUNJA_PASS = "${env:VIKUNJA_PASS}" (template, expanded by VS Code)
+    </current_mcp_json_state>
+
+    <credential_source>
+      VIKUNJA_URL, VIKUNJA_USER, VIKUNJA_PASS are set as User-scope Windows environment
+      variables on this machine (provisioned at fleet-install time). They are already
+      present in the process environment — $env:VIKUNJA_PASS returns the actual password
+      without any expansion step needed in PowerShell.
+    </credential_source>
+
+    <python_model>
+      vikunja_mcp/cli.py (lines 8-10):
+        "Auth resolution order:
+          1. Environment variables: VIKUNJA_USER, VIKUNJA_PASS, VIKUNJA_URL
+          2. .env file in workspace root (gitignored)"
+      Python reads os.environ directly. Ticket II brings PS1 scripts to parity.
+    </python_model>
+
+    <la_merge_approve_trigger_path_bug>
+      la_merge_approve.ps1 line 189 (current):
+        $triggerDir = Join-Path $RepoRoot 'tools\scheduled-tasks\triggers'
+      $RepoRoot defaults to C:\Users\mrbla\BlarAI. So the trigger file is written to
+      BlarAI/tools/scheduled-tasks/triggers/co_lead_architect.wake.
+
+      But wake_launcher.ps1 (line 300) reads:
+        $triggerDir = Join-Path $PSScriptRoot 'triggers'
+      $PSScriptRoot = C:\Users\mrbla\devplatform\tools\scheduled-tasks
+      → wake_launcher reads from devplatform/.../triggers/
+
+      The trigger file written by la_merge_approve ends up in the WRONG repo and
+      wake_launcher never sees it. Fix: change line 189 to $PSScriptRoot-based derivation
+      (same pattern as wake_launcher's A19 fix at lines 69+809).
+    </la_merge_approve_trigger_path_bug>
+  </background>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 3 — COMPREHENSION GATE
+       After reading this dispatch, respond with a numbered list CG1-CG8.
+       Do NOT proceed until Guide approves the gate.
+       ════════════════════════════════════════════════════════════════════ -->
+  <comprehension_gate>
+    <instruction>
+      Before doing any work, respond with a comprehension gate covering exactly these items.
+      Stop after the gate. Wait for Guide to issue APPROVED before proceeding.
+    </instruction>
+
+    <items>
+      <item id="CG1">
+        State the two Vikunja ticket IDs and titles you are closing in this phase.
+        State which ticket is the primary code-change work and which is the consistency-check follow-on.
+      </item>
+      <item id="CG2">
+        Describe the credential-pattern change in concrete PowerShell terms:
+        what block of code is being REMOVED from each script (pattern, not full text),
+        and what THREE lines replace it.
+        State the variable names ($vikUrl, $vikUser, $vikPass) and their new source ($env:...).
+      </item>
+      <item id="CG3">
+        Describe the la_merge_approve.ps1:189 trigger-path bug: why does the current code write the
+        trigger to the wrong location, and what is the one-line fix?
+        Name the variable being substituted ($RepoRoot → $PSScriptRoot) and explain the consequence
+        if the bug were left unfixed (wake_launcher never sees the trigger file).
+      </item>
+      <item id="CG4">
+        Describe the wake_launcher.ps1 change: which function contains the credential block,
+        what parameter is being removed from the function signature, what line is the only call site,
+        and confirm it does NOT pass -McpConfigPath (so removing the parameter is safe).
+      </item>
+      <item id="CG5">
+        Describe the JJ deliverable: what file is being changed, what single field is changing,
+        from what value to what value. Confirm it is gitignored (no git commit).
+        What is the verification step to confirm JJ is complete?
+      </item>
+      <item id="CG6">
+        State the pre-flight env-var check command (PowerShell one-liner) that EA must run
+        before editing any file to confirm VIKUNJA_URL, VIKUNJA_USER, VIKUNJA_PASS are
+        all non-null in the current session. If any is null, EA must HARD STOP.
+      </item>
+      <item id="CG7">
+        State the commit plan: branch name, how many commits, which repo each commit lands in,
+        and what the A33 workaround is for closing Vikunja tasks (Option B steps).
+        Confirm .mcp.json changes are NOT committed (gitignored).
+      </item>
+      <item id="CG8">
+        State the fail-open vs fail-closed semantics for each of the 5 scripts post-refactor
+        (what happens if env vars are missing at runtime). Identify which script must be
+        fail-open (because missing work-gate auth = safe to fire Claude) vs which scripts
+        can fail silently (exit 0).
+      </item>
+    </items>
+  </comprehension_gate>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 4 — PRE-FLIGHT CHECKS
+       ════════════════════════════════════════════════════════════════════ -->
+  <preflight>
+
+    <check id="0a" label="Fleet state">
+      Read C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json.
+      Confirm fleet_paused=false before proceeding to pause.
+      If fleet_paused=true: HARD STOP — report to Guide.
+    </check>
+
+    <check id="0b" label="Repo tag cross-check (CORRECTED — both repos)">
+      BlarAI repo (C:\Users\mrbla\BlarAI):
+        Run: git -C "C:\Users\mrbla\BlarAI" tag --list
+        EXPECT exactly these 2 platform-extraction tags (among others):
+          pre-platform-extract
+          post-platform-extract
+        If either is absent: HARD STOP.
+        NOTE: 'platform-extracted' is NOT a BlarAI tag — it is a devplatform tag. Do NOT fail on its absence from BlarAI.
+
+      devplatform repo (C:\Users\mrbla\devplatform):
+        Run: git -C "C:\Users\mrbla\devplatform" tag --list
+        EXPECT: platform-extracted (present at commit ae75507)
+        If absent: HARD STOP.
+    </check>
+
+    <check id="0c" label="Env var verification (MANDATORY — HARD STOP if any null)">
+      Run the following in a fresh PowerShell window:
+        $missing = @()
+        if (-not $env:VIKUNJA_URL)  { $missing += 'VIKUNJA_URL'  }
+        if (-not $env:VIKUNJA_USER) { $missing += 'VIKUNJA_USER' }
+        if (-not $env:VIKUNJA_PASS) { $missing += 'VIKUNJA_PASS' }
+        if ($missing.Count -gt 0) { Write-Host "MISSING: $($missing -join ', ')" } else { Write-Host "ALL SET" }
+
+      If ANY var is missing: HARD STOP. Report to Guide.
+      All three must be non-null/non-empty before any script edit.
+    </check>
+
+    <check id="0d" label="Vikunja login smoke test">
+      Run a test login using the env vars to confirm credentials work:
+        $loginBody = @{ username = $env:VIKUNJA_USER; password = $env:VIKUNJA_PASS } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$env:VIKUNJA_URL/api/v1/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+        Write-Host "Login OK, token prefix: $($resp.token.Substring(0,8))..."
+
+      If login fails: HARD STOP. Report to Guide — env vars may be set but stale/wrong.
+    </check>
+
+    <fleet_pause>
+      Pause the fleet using the Python helper (preferred):
+        python -c "from tools.autonomy_budget import state; state.pause_fleet('Stage 6 Phase 4 Tickets II+JJ', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+
+      Commit immediately in devplatform (on main, before branching):
+        git -C C:\Users\mrbla\devplatform add tools/autonomy_budget/state.json
+        git -C C:\Users\mrbla\devplatform commit -m "chore(ops): pause fleet -- Stage 6 Phase 4 Tickets II+JJ"
+    </fleet_pause>
+
+    <tracking_task>
+      Create a Phase 4 tracking task in Vikunja Project 10 (DevPlatform-Meta):
+        Title: "Stage 6.7.5 Phase 4 tracking: Tickets II+JJ (PS1 env-var refactor + mcp.json consistency)"
+        Priority: 3
+        Labels: Active (id 1), Infrastructure (id 5)
+      Add a comment: "[agent:ea_code][phase:start] Phase 4 execution started. Scope: Ticket II (299) + JJ (300). Pre-flight checks passed."
+      Record the new tracking task ID — needed for PF1 bifurcation at close.
+    </tracking_task>
+
+  </preflight>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 5 — EXECUTION
+       ════════════════════════════════════════════════════════════════════ -->
+  <execution>
+
+    <branch_setup>
+      Create and checkout a feature branch in devplatform:
+        git -C C:\Users\mrbla\devplatform checkout -b feat/stage6-phase4-ps1-env-var-refactor
+    </branch_setup>
+
+    <!-- ─── TICKET II STEP 1: agents-cadence-monitor.ps1 ──────────────── -->
+    <edit id="II-1" file="devplatform/tools/scheduled-tasks/agents-cadence-monitor.ps1">
+      <instruction>
+        UPDATE header comment (lines 8-10):
+          OLD: "# Auth: reads Vikunja credentials from .mcp.json at the repo root
+                # (same pattern as la_merge_approve.ps1). .mcp.json is gitignored and
+                # ACL-locked to the user account that owns the credentials."
+          NEW: "# Auth: reads Vikunja credentials directly from VIKUNJA_URL /
+                # VIKUNJA_USER / VIKUNJA_PASS User-scope env vars (Ticket II)."
+
+        REMOVE the $McpConfigPath derivation line (line ~26):
+          $McpConfigPath = Join-Path $RepoRoot '.mcp.json'
+        (Keep the preceding Stage 2.5 g5-9 comment block if it provides useful context,
+        but if it only explains the .mcp.json derivation, remove it too.)
+
+        REPLACE the Step 1 Vikunja auth block (lines ~34-52, the Test-Path + ConvertFrom-Json block):
+          OLD pattern:
+            # Step 1: Vikunja auth (via .mcp.json)
+            # -------------------------------------------------------------------
+            if (-not (Test-Path $McpConfigPath)) {
+                Write-Log "ABORT: .mcp.json not found at $McpConfigPath"
+                exit 0
+            }
+            try {
+                $mcp = Get-Content $McpConfigPath -Raw | ConvertFrom-Json
+                $vikUrl  = $mcp.mcpServers.vikunja.env.VIKUNJA_URL
+                $vikUser = $mcp.mcpServers.vikunja.env.VIKUNJA_USER
+                $vikPass = $mcp.mcpServers.vikunja.env.VIKUNJA_PASS
+                if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                    Write-Log "ABORT: .mcp.json missing VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS"
+                    exit 0
+                }
+            } catch {
+                Write-Log "ABORT: failed to parse .mcp.json: $_"
+                exit 0
+            }
+
+          NEW (replace with):
+            # Step 1: Vikunja auth (direct env-var — Ticket II)
+            # -------------------------------------------------------------------
+            $vikUrl  = $env:VIKUNJA_URL
+            $vikUser = $env:VIKUNJA_USER
+            $vikPass = $env:VIKUNJA_PASS
+            if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                Write-Log "ABORT: VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS env vars not set"
+                exit 0
+            }
+
+        NOTE: Keep $RepoRoot param in the param block unchanged (may be passed by Task
+        Scheduler callers; removing it from the signature could break registered tasks).
+        It simply becomes unused in this script after removing $McpConfigPath.
+      </instruction>
+    </edit>
+
+    <!-- ─── TICKET II STEP 2: escalation_watchdog.ps1 ─────────────────── -->
+    <edit id="II-2" file="devplatform/tools/scheduled-tasks/escalation_watchdog.ps1">
+      <instruction>
+        REPLACE the credential block (lines ~38-56, the .mcp.json read):
+          OLD pattern (comment + Test-Path + ConvertFrom-Json block):
+            # Vikunja credentials live in the same .mcp.json the wake_launcher reads.
+            $mcpConfigPath = Join-Path $RepoRoot '.mcp.json'
+            if (-not (Test-Path $mcpConfigPath)) {
+                Write-Output "ESCALATION-WATCHDOG: .mcp.json absent at $mcpConfigPath; exit silently."
+                exit 0
+            }
+            try {
+                $mcp = Get-Content $mcpConfigPath -Raw | ConvertFrom-Json
+                $vikUrl  = $mcp.mcpServers.vikunja.env.VIKUNJA_URL
+                $vikUser = $mcp.mcpServers.vikunja.env.VIKUNJA_USER
+                $vikPass = $mcp.mcpServers.vikunja.env.VIKUNJA_PASS
+                if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                    Write-Output "ESCALATION-WATCHDOG: .mcp.json missing Vikunja credentials; exit silently."
+                    exit 0
+                }
+            } catch {
+                Write-Output "ESCALATION-WATCHDOG: failed to parse .mcp.json: $_"
+                exit 0
+            }
+
+          NEW:
+            # Vikunja credentials from env vars (Ticket II).
+            $vikUrl  = $env:VIKUNJA_URL
+            $vikUser = $env:VIKUNJA_USER
+            $vikPass = $env:VIKUNJA_PASS
+            if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                Write-Output "ESCALATION-WATCHDOG: VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS env vars not set; exit silently."
+                exit 0
+            }
+
+        NOTE: line ~106 uses $vikUser: "$laUsername = $vikUser  # current MCP user IS the LA's user"
+        This is PRESERVED — $vikUser is still set by the new block.
+      </instruction>
+    </edit>
+
+    <!-- ─── TICKET II STEP 3: la_merge_approve.ps1 ────────────────────── -->
+    <edit id="II-3" file="devplatform/tools/scheduled-tasks/la_merge_approve.ps1">
+      <instruction>
+        PART A — Credential block:
+
+        REMOVE the McpConfigPath derivation (lines ~44-47):
+          # Stage 2.5 g5-9: derive $McpConfigPath from $RepoRoot so that callers passing
+          # `-BlarAIRoot 'C:\path\to\other-project'` get that project's .mcp.json,
+          # not BlarAI's. (WORKFLOW_INTEGRITY_REVIEW.md Section 3 G-1 fix #1.)
+          $McpConfigPath = Join-Path $RepoRoot '.mcp.json'
+        (Remove all 4 lines entirely — the comment explains .mcp.json derivation which is obsolete.)
+
+        UPDATE the prerequisite comment at line ~24:
+          OLD: "#   - .mcp.json at repo root contains Vikunja credentials"
+          NEW: "#   - VIKUNJA_URL, VIKUNJA_USER, VIKUNJA_PASS env vars set (User-scope)"
+
+        REPLACE Step 2 Vikunja auth block (lines ~86-107, Test-Path + ConvertFrom-Json block):
+          OLD pattern:
+            # Step 2: Vikunja auth
+            Write-Step 'Vikunja: auth'
+            if (-not (Test-Path $McpConfigPath)) {
+                Write-Fail ".mcp.json not found at $McpConfigPath. Merge succeeded ($mergeCommit); Vikunja labels need manual fixup."
+                exit 2
+            }
+            try {
+                $mcp = Get-Content $McpConfigPath -Raw | ConvertFrom-Json
+                $vikEnv = $mcp.mcpServers.vikunja.env
+                $vikUrl = $vikEnv.VIKUNJA_URL
+                $vikUser = $vikEnv.VIKUNJA_USER
+                $vikPass = $vikEnv.VIKUNJA_PASS
+                $loginBody = @{ username = $vikUser; password = $vikPass } | ConvertTo-Json
+                $loginResp = Invoke-RestMethod -Uri "$vikUrl/api/v1/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+                $token = $loginResp.token
+                $authHeaders = @{ 'Authorization' = "Bearer $token"; 'Content-Type' = 'application/json' }
+                Write-Ok "logged in as $vikUser"
+            } catch {
+                Write-Fail "Vikunja auth failed: $_. Merge succeeded ($mergeCommit); labels need manual fixup."
+                exit 3
+            }
+
+          NEW:
+            # Step 2: Vikunja auth
+            Write-Step 'Vikunja: auth'
+            $vikUrl  = $env:VIKUNJA_URL
+            $vikUser = $env:VIKUNJA_USER
+            $vikPass = $env:VIKUNJA_PASS
+            if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                Write-Fail "VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS env vars not set. Merge succeeded ($mergeCommit); Vikunja labels need manual fixup."
+                exit 2
+            }
+            try {
+                $loginBody = @{ username = $vikUser; password = $vikPass } | ConvertTo-Json
+                $loginResp = Invoke-RestMethod -Uri "$vikUrl/api/v1/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+                $token = $loginResp.token
+                $authHeaders = @{ 'Authorization' = "Bearer $token"; 'Content-Type' = 'application/json' }
+                Write-Ok "logged in as $vikUser"
+            } catch {
+                Write-Fail "Vikunja auth failed: $_. Merge succeeded ($mergeCommit); labels need manual fixup."
+                exit 3
+            }
+
+        PART B — Trigger path fix (dynamic-path bug, line ~189):
+          OLD: $triggerDir = Join-Path $RepoRoot 'tools\scheduled-tasks\triggers'
+          NEW: $triggerDir = Join-Path $PSScriptRoot 'triggers'
+
+          Rationale: la_merge_approve.ps1 lives at devplatform/tools/scheduled-tasks/.
+          $PSScriptRoot = C:\Users\mrbla\devplatform\tools\scheduled-tasks.
+          wake_launcher.ps1 reads triggers from $PSScriptRoot\triggers\ (its own PSScriptRoot).
+          Old code wrote to BlarAI/.../triggers/ → wake_launcher never found the file.
+      </instruction>
+    </edit>
+
+    <!-- ─── TICKET II STEP 4: test_async_post_gate.ps1 ───────────────── -->
+    <edit id="II-4" file="devplatform/tools/scheduled-tasks/test_async_post_gate.ps1">
+      <instruction>
+        REPLACE the 4-line credential block at lines ~210-213:
+          OLD:
+            $mcp = Get-Content (Join-Path $RepoRoot '.mcp.json') -Raw | ConvertFrom-Json
+            $vikUrl  = $mcp.mcpServers.vikunja.env.VIKUNJA_URL
+            $vikUser = $mcp.mcpServers.vikunja.env.VIKUNJA_USER
+            $vikPass = $mcp.mcpServers.vikunja.env.VIKUNJA_PASS
+
+          NEW:
+            $vikUrl  = $env:VIKUNJA_URL
+            $vikUser = $env:VIKUNJA_USER
+            $vikPass = $env:VIKUNJA_PASS
+            if (-not $vikUrl -or -not $vikUser -or -not $vikPass) { throw 'VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS env vars not set' }
+
+        NOTE: This is a test script (not a scheduled task), so throw on missing env vars
+        is appropriate — a failed test should be noisy, not silently exit.
+      </instruction>
+    </edit>
+
+    <!-- ─── TICKET II STEP 5: wake_launcher.ps1 ──────────────────────── -->
+    <edit id="II-5" file="devplatform/tools/scheduled-tasks/wake_launcher.ps1">
+      <instruction>
+        Target: Test-WorkAvailable function (line ~290).
+
+        STEP A — Remove $McpConfigPath parameter from function signature (line ~295):
+          OLD: [string]$McpConfigPath = 'C:\Users\mrbla\BlarAI\.mcp.json'
+          NEW: (remove this line entirely)
+
+          VERIFY FIRST: search wake_launcher.ps1 for all call sites of Test-WorkAvailable.
+          The only call site is at line ~853:
+            if (-not (Test-WorkAvailable -Role $Role -RepoRoot $RepoRoot)) {
+          This call does NOT pass -McpConfigPath → safe to remove the parameter.
+          If any OTHER call site passes -McpConfigPath, HARD STOP and report to Guide.
+
+        STEP B — Replace Step 2 credential block (lines ~374-400):
+          OLD pattern (inside Test-WorkAvailable, Step 2):
+            # Step 2: Vikunja label probe.
+            if (-not (Test-Path $McpConfigPath)) {
+                Write-Log "WORK-GATE: .mcp.json absent at $McpConfigPath; fail-open (run Claude)."
+                return $true
+            }
+            try {
+                $mcp = Get-Content $McpConfigPath -Raw | ConvertFrom-Json
+                $vikUrl  = $mcp.mcpServers.vikunja.env.VIKUNJA_URL
+                $vikUser = $mcp.mcpServers.vikunja.env.VIKUNJA_USER
+                $vikPass = $mcp.mcpServers.vikunja.env.VIKUNJA_PASS
+                if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                    Write-Log "WORK-GATE: .mcp.json missing Vikunja credentials; fail-open (run Claude)."
+                    return $true
+                }
+            } catch {
+                Write-Log "WORK-GATE: failed to parse .mcp.json; fail-open. $_"
+                return $true
+            }
+            try {
+                $loginBody = @{ username = $vikUser; password = $vikPass } | ConvertTo-Json
+                $loginResp = Invoke-RestMethod -Uri "$vikUrl/api/v1/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+                $token = $loginResp.token
+                $authHeaders = @{ 'Authorization' = "Bearer $token" }
+            } catch {
+                Write-Log "WORK-GATE: Vikunja login failed; fail-open. $_"
+                return $true
+            }
+
+          NEW (replace entire block above):
+            # Step 2: Vikunja label probe.
+            $vikUrl  = $env:VIKUNJA_URL
+            $vikUser = $env:VIKUNJA_USER
+            $vikPass = $env:VIKUNJA_PASS
+            if (-not $vikUrl -or -not $vikUser -or -not $vikPass) {
+                Write-Log "WORK-GATE: VIKUNJA_URL / VIKUNJA_USER / VIKUNJA_PASS env vars not set; fail-open (run Claude)."
+                return $true
+            }
+            try {
+                $loginBody = @{ username = $vikUser; password = $vikPass } | ConvertTo-Json
+                $loginResp = Invoke-RestMethod -Uri "$vikUrl/api/v1/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+                $token = $loginResp.token
+                $authHeaders = @{ 'Authorization' = "Bearer $token" }
+            } catch {
+                Write-Log "WORK-GATE: Vikunja login failed; fail-open. $_"
+                return $true
+            }
+
+          IMPORTANT: Maintain fail-open semantics (return $true) for wake_launcher.
+          If env vars missing → fail-open. If login fails → fail-open.
+          Rationale: work-gate auth failure should fire Claude (miss some work) rather than
+          silently block all work. This matches the pre-refactor .mcp.json-absent behaviour.
+      </instruction>
+    </edit>
+
+    <!-- ─── POST-EDIT VERIFICATION ────────────────────────────────────── -->
+    <verification id="V1" label="No remaining .mcp.json credential reads in 5 scripts">
+      Run:
+        $pattern = 'mcpServers|ConvertFrom-Json.*mcp|\.mcp\.json|McpConfigPath'
+        Get-ChildItem C:\Users\mrbla\devplatform\tools\scheduled-tasks -Filter '*.ps1' |
+          Select-String -Pattern $pattern |
+          Where-Object { $_.Filename -in @('agents-cadence-monitor.ps1','escalation_watchdog.ps1','la_merge_approve.ps1','test_async_post_gate.ps1','wake_launcher.ps1') }
+
+      EXPECT: zero matches.
+      If any matches remain: fix them before committing.
+    </verification>
+
+    <verification id="V2" label="Vikunja login still works from PowerShell env vars">
+      Run the same login smoke test from Check 0d:
+        $loginBody = @{ username = $env:VIKUNJA_USER; password = $env:VIKUNJA_PASS } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$env:VIKUNJA_URL/api/v1/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+        Write-Host "Login OK: $($resp.token.Substring(0,8))..."
+
+      EXPECT: success. If fails: HARD STOP.
+    </verification>
+
+    <!-- ─── COMMIT: TICKET II ─────────────────────────────────────────── -->
+    <commit id="C1" repo="devplatform" branch="feat/stage6-phase4-ps1-env-var-refactor">
+      Stage exactly the 5 edited files (explicit-add):
+        git -C C:\Users\mrbla\devplatform add tools/scheduled-tasks/agents-cadence-monitor.ps1
+        git -C C:\Users\mrbla\devplatform add tools/scheduled-tasks/escalation_watchdog.ps1
+        git -C C:\Users\mrbla\devplatform add tools/scheduled-tasks/la_merge_approve.ps1
+        git -C C:\Users\mrbla\devplatform add tools/scheduled-tasks/test_async_post_gate.ps1
+        git -C C:\Users\mrbla\devplatform add tools/scheduled-tasks/wake_launcher.ps1
+
+      Commit message (use heredoc):
+        "refactor(fleet-ps1): Ticket II -- direct env-var creds, 5 PS1 scripts; la_merge_approve:189 trigger path fix"
+
+      Do NOT use git add . or git add -A. Only the 5 named files.
+    </commit>
+
+    <!-- ─── TICKET JJ: BlarAI/.mcp.json ──────────────────────────────── -->
+    <edit id="JJ-1" file="BlarAI/.mcp.json">
+      <instruction>
+        Change the VIKUNJA_PASS value in C:\Users\mrbla\BlarAI\.mcp.json:
+          OLD: "VIKUNJA_PASS": "<REDACTED-VIKUNJA-PASS>"
+          NEW: "VIKUNJA_PASS": "${env:VIKUNJA_PASS}"
+
+        This makes BlarAI/.mcp.json consistent with devplatform/.mcp.json.
+        VIKUNJA_URL and VIKUNJA_USER stay as literals (non-secret values).
+
+        IMPORTANT: .mcp.json is gitignored in BlarAI. Do NOT stage or commit this file.
+        Verify it is gitignored:
+          git -C C:\Users\mrbla\BlarAI check-ignore -v .mcp.json
+        EXPECT: .gitignore line listed. If not gitignored: HARD STOP — report to Guide.
+      </instruction>
+    </edit>
+
+    <verification id="V3" label="JJ verification — template value present, env var is set">
+      1. Confirm the edit landed:
+           Select-String -Path C:\Users\mrbla\BlarAI\.mcp.json -Pattern 'VIKUNJA_PASS'
+           EXPECT: matches "${env:VIKUNJA_PASS}" (not the literal password)
+
+      2. Confirm the env var is set (so MCP server gets the actual value):
+           Write-Host "VIKUNJA_PASS set: $($null -ne $env:VIKUNJA_PASS -and $env:VIKUNJA_PASS.Length -gt 0)"
+           EXPECT: True
+
+      3. Confirm BlarAI file is NOT staged:
+           git -C C:\Users\mrbla\BlarAI status --short .mcp.json
+           EXPECT: empty output (file is gitignored, not staged)
+    </verification>
+
+    <!-- ─── VIKUNJA: CLOSE TICKETS II AND JJ (A33 WORKAROUND — OPTION B) -->
+    <vikunja_close id="VK1" label="Close Ticket II (id 299) — A33 Option B">
+      A33 bug: mcp__vikunja__complete_task zeroes absent fields. Use Option B:
+        1. get_task(task_id=299) — capture title, description, priority
+        2. update_task(task_id=299, title=&lt;captured&gt;, description=&lt;captured&gt;, priority=&lt;captured&gt;, done=True)
+        3. add_task_comment(task_id=299, comment="[agent:ea_code][phase:completion] Ticket II complete.
+           5 PS1 scripts refactored to direct env-var credential pattern.
+           la_merge_approve.ps1:189 trigger path fixed ($PSScriptRoot-based).
+           Verification: V1 (no .mcp.json reads), V2 (login OK).
+           devplatform commit: &lt;SHA of C1&gt;")
+    </vikunja_close>
+
+    <vikunja_close id="VK2" label="Close Ticket JJ (id 300) — A33 Option B">
+        1. get_task(task_id=300) — capture title, description, priority
+        2. update_task(task_id=300, title=&lt;captured&gt;, description=&lt;captured&gt;, priority=&lt;captured&gt;, done=True)
+        3. add_task_comment(task_id=300, comment="[agent:ea_code][phase:completion] Ticket JJ complete.
+           BlarAI/.mcp.json VIKUNJA_PASS changed from literal to template format.
+           Both .mcp.json files (BlarAI + devplatform) now use ${env:VIKUNJA_PASS}.
+           Verification: V3 (template present, env var set, file not staged).")
+    </vikunja_close>
+
+    <!-- ─── STATUS.md UPDATE ─────────────────────────────────────────── -->
+    <edit id="STATUS-1" file="BlarAI/docs/platform_separation/STATUS.md">
+      <instruction>
+        1. Update Stage 6 table row (find the Phase 3 row and add Phase 4):
+           Add column entries for Phase 4: devplatform commit SHA(s), BlarAI commit SHA(s).
+           (No BlarAI git commit for this phase — JJ is gitignored file only.)
+
+        2. Append evolution entry E12 to the Stage 6 evolution log section:
+           "Stage 6 Phase 4 (Tickets II+JJ) complete. II: 5 PS1 fleet scripts refactored
+           to direct VIKUNJA_URL/USER/PASS env-var credential pattern (Python parity).
+           la_merge_approve.ps1:189 trigger path fixed ($PSScriptRoot-based, was $RepoRoot —
+           trigger now writes to devplatform/.../triggers/ where wake_launcher reads it).
+           JJ: BlarAI/.mcp.json VIKUNJA_PASS → template format; both .mcp.json files consistent.
+           Backlog: 40 total / 20 done / 20 open after Phase 4 tracking task close."
+
+        Commit in BlarAI (on main — no feature branch needed for STATUS.md):
+          git -C C:\Users\mrbla\BlarAI add docs/platform_separation/STATUS.md
+          git -C C:\Users\mrbla\BlarAI commit -m "docs(stage6_phase4): record Phase 4 complete in STATUS.md (E12)"
+      </instruction>
+    </edit>
+
+    <!-- ─── MERGE FEATURE BRANCH ─────────────────────────────────────── -->
+    <merge>
+      In devplatform, merge the feature branch to main (no-ff):
+        git -C C:\Users\mrbla\devplatform checkout main
+        git -C C:\Users\mrbla\devplatform merge --no-ff feat/stage6-phase4-ps1-env-var-refactor -m "feat(fleet-ps1): Stage 6 Phase 4 -- direct env-var creds + trigger path fix (Tickets II+JJ)"
+
+      Record the merge commit SHA — needed for close report.
+    </merge>
+
+    <!-- ─── UNPAUSE FLEET ─────────────────────────────────────────────── -->
+    <fleet_unpause>
+      Unpause using the Python helper (the function is resume_fleet, NOT unpause_fleet):
+        python -c "from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+
+      Commit in devplatform (on main):
+        git -C C:\Users\mrbla\devplatform add tools/autonomy_budget/state.json
+        git -C C:\Users\mrbla\devplatform commit -m "chore(ops): unpause fleet -- Stage 6 Phase 4 complete"
+    </fleet_unpause>
+
+    <!-- ─── PF1 BIFURCATION: TRACKING TASK ───────────────────────────── -->
+    <pf1_bifurcation>
+      PF1 = Phase 4 tracking task created at pre-flight.
+
+      PASS path (all edits complete, V1+V2+V3 passed, II+JJ tickets closed, STATUS.md committed,
+      merge done, fleet unpaused):
+        Close tracking task via A33 Option B:
+          get_task → update_task(done=True, fields preserved) → add_task_comment with Phase 4 summary
+
+      HARD STOP path (any verification check failed before completion):
+        Add comment to tracking task summarizing what failed and current state.
+        Do NOT close tracking task (leave done=false).
+        Per AOAM §4: "On failure, comment with summary — do NOT mark complete."
+    </pf1_bifurcation>
+
+  </execution>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 6 — CLOSE REPORT FORMAT
+       ════════════════════════════════════════════════════════════════════ -->
+  <close_report_format>
+    At completion, produce a close report covering:
+    1. Phase 4 PASS / HARD STOP verdict
+    2. Pre-flight results (Check 0a/0b/0c/0d)
+    3. Edits per script (lines changed, before/after summary for each of 5 scripts)
+    4. V1 verification result (no .mcp.json reads)
+    5. V2 verification result (login smoke test)
+    6. V3 verification result (JJ .mcp.json template check)
+    7. Commit SHAs: devplatform pause commit, devplatform C1 commit, devplatform merge commit, devplatform unpause commit, BlarAI STATUS.md commit
+    8. Vikunja state: II (299) done=?, JJ (300) done=?, tracking task done=?
+    9. Backlog: total / done / open
+
+    Write report to:
+      C:\Users\mrbla\BlarAI\docs\platform_separation\temp_for_responses\6.7.5-EA_INSTANCE_13_STAGE6_PHASE_4_CLOSE_REPORT.md
+    Then post a SHORT summary (5-10 lines) to chat.
+  </close_report_format>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 7 — STANDING CONSTRAINTS
+       ════════════════════════════════════════════════════════════════════ -->
+  <constraints>
+
+    <constraint id="C-A33">
+      complete_task MCP tool is SUSPENDED due to A33 data-loss bug (Ticket WW id 318).
+      Always use Option B: get_task → update_task(task_id, title, description, priority, done=True).
+      Never call mcp__vikunja__complete_task for any task in this phase.
+    </constraint>
+
+    <constraint id="C-NOEDIT">
+      These frozen verdict files must NOT be edited under any circumstances (no-amend doctrine):
+        docs/platform_separation/temp_for_responses/3.0.v2-GUIDE_RESPONSE_INSTANCE_7_STAGE3_COMPREHENSIVE_AUDIT_CHECKPOINT.xml
+        docs/platform_separation/temp_for_responses/3.1.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_1_V2_VERIFIED_SPEC_CORRECTION_AUTHORIZED.xml
+        docs/platform_separation/temp_for_responses/3.2.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_2_V2_RECLASSIFICATION_REQUIRED_SELECTIVE_COPY_AUTHORIZED.xml
+        docs/platform_separation/temp_for_responses/3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml
+    </constraint>
+
+    <constraint id="C-EXPLICIT-ADD">
+      All git add commands must name files explicitly.
+      Never use git add . or git add -A. This prevents accidental staging of
+      sensitive files (.env, credentials.env, .mcp.json, state.json when not intended).
+    </constraint>
+
+    <constraint id="C-GITIGNORE">
+      BlarAI/.mcp.json is gitignored. Never stage or commit it.
+      Verify with: git -C C:\Users\mrbla\BlarAI check-ignore -v .mcp.json
+    </constraint>
+
+    <constraint id="C-MAIN">
+      PS1 script edits go on feat/stage6-phase4-ps1-env-var-refactor branch in devplatform.
+      STATUS.md update goes directly to BlarAI main (consistent with prior phases).
+      Merge devplatform feature branch to main after all edits, verifications, and ticket closures.
+    </constraint>
+
+  </constraints>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 8 — SCOPE EXCLUSIONS
+       ════════════════════════════════════════════════════════════════════ -->
+  <exclusions>
+    <item>VV (317): cross-repo path resolution audit + smoke tests — Phase 5, not this phase.</item>
+    <item>WW (318): complete_task MCP bug fix — standing open ticket, not this phase.</item>
+    <item>GUIDE_HANDOFF_LATEST.xml: any updates to subagent_verification_protocol.md reference
+          are Co-Lead scope at next Guide transition, not EA scope.</item>
+    <item>Any other hardening backlog ticket not named above.</item>
+  </exclusions>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 9 — ACKNOWLEDGEMENTS (g10-ea13_n*)
+       Guide-#10 acknowledges the following binding constraints carried
+       into this phase. EA must confirm all 9 in comprehension gate.
+       ════════════════════════════════════════════════════════════════════ -->
+  <acknowledgements>
+
+    <ack id="g10-ea13_n1">
+      Fleet-pause SOP: pause_fleet(...) + commit BEFORE any branch checkout or
+      multi-file edit; resume_fleet(...) (NOT unpause_fleet — AttributeError) + commit
+      as LAST action. Mandatory for this phase (multi-file edits across 5 scripts).
+    </ack>
+
+    <ack id="g10-ea13_n2">
+      Explicit-add discipline: all git add commands name files explicitly. Never git add .
+      or git add -A. No exceptions, including during unpause commit.
+    </ack>
+
+    <ack id="g10-ea13_n3">
+      A33 workaround: mcp__vikunja__complete_task is SUSPENDED. Use Option B for all
+      task closures: get_task → update_task(done=True, title preserved, description
+      preserved, priority preserved). This applies to Tickets II (299), JJ (300),
+      and the Phase 4 tracking task.
+    </ack>
+
+    <ack id="g10-ea13_n4">
+      Check 0b is two-repo: BlarAI has exactly 2 extraction tags (pre-platform-extract +
+      post-platform-extract). devplatform has platform-extracted at ae75507. Absence of
+      platform-extracted from BlarAI is NOT a defect — it was always a devplatform tag.
+    </ack>
+
+    <ack id="g10-ea13_n5">
+      No-amend doctrine: the 4 frozen verdict files (3.0.v2, 3.1.v2, 3.2.v2, 3.10)
+      must not be edited or amended under any circumstances.
+    </ack>
+
+    <ack id="g10-ea13_n6">
+      Pre-flight env-var check is MANDATORY and must run BEFORE any file edit. If any of
+      VIKUNJA_URL, VIKUNJA_USER, VIKUNJA_PASS is null: HARD STOP. These env vars come from
+      User-scope Windows environment (provisioned at fleet-install). They are the sole
+      credential source after Ticket II removes .mcp.json dependency.
+    </ack>
+
+    <ack id="g10-ea13_n7">
+      la_merge_approve.ps1:189 trigger-path fix is part of Ticket II scope (LA option b2).
+      Old: Join-Path $RepoRoot 'tools\scheduled-tasks\triggers' → writes to BlarAI, never
+      found by wake_launcher. New: Join-Path $PSScriptRoot 'triggers' → writes to
+      devplatform/tools/scheduled-tasks/triggers/ where wake_launcher reads it.
+    </ack>
+
+    <ack id="g10-ea13_n8">
+      PF1 bifurcation per AOAM §4: PASS path = close tracking task (done=True via Option B);
+      HARD STOP path = add comment with failure summary, leave tracking task open (done=false).
+    </ack>
+
+    <ack id="g10-ea13_n9">
+      JJ produces no git commit. BlarAI/.mcp.json is gitignored. Completion evidence is
+      V3 verification (template string present, env var set, file not staged in git).
+      JJ is closed in Vikunja (Option B) after V3 passes, not after a git commit.
+    </ack>
+
+  </acknowledgements>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       SECTION 10 — GUIDE CROSS-VERIFICATION CHECKLIST
+       (For Guide-#10 use — not EA scope)
+       ════════════════════════════════════════════════════════════════════ -->
+  <guide_verification>
+    <note>Guide-#10 independently verifies ALL of the following after EA close report is received.</note>
+
+    <check>devplatform: git log --oneline HEAD shows unpause commit → merge commit → C1 commit → pause commit (in reverse chronological order)</check>
+    <check>devplatform: git show &lt;C1_SHA&gt; -- tools/scheduled-tasks/*.ps1 (5 files changed, no .mcp.json reads remain)</check>
+    <check>devplatform: git show &lt;C1_SHA&gt; -- tools/scheduled-tasks/la_merge_approve.ps1 shows PSScriptRoot on the trigger path line</check>
+    <check>devplatform: git show &lt;C1_SHA&gt; -- tools/scheduled-tasks/wake_launcher.ps1 shows $McpConfigPath parameter removed and env var block present</check>
+    <check>BlarAI: git log --oneline HEAD shows STATUS.md commit</check>
+    <check>BlarAI: git show &lt;STATUS_SHA&gt; -- docs/platform_separation/STATUS.md shows E12 entry</check>
+    <check>state.json: fleet_paused=false, last_updated_by=ea_code</check>
+    <check>Vikunja: Ticket 299 done=true, description/priority preserved</check>
+    <check>Vikunja: Ticket 300 done=true, description/priority preserved</check>
+    <check>Vikunja: Phase 4 tracking task done=true</check>
+    <check>Vikunja: project_summary shows 40 total / 20 done / 20 open</check>
+
+    <backlog_expectation>
+      Before Phase 4: 39 total / 17 done / 22 open
+      Phase 4 adds: tracking task (+1 total/+1 done once closed), closes II+JJ (+2 done)
+      After Phase 4: 40 total / 20 done / 20 open
+    </backlog_expectation>
+  </guide_verification>
+
+</ea_dispatch>

@@ -1,0 +1,80 @@
+{
+  "stage": 0,
+  "stage_name": "Pre-flight",
+  "completed_utc": "2026-04-24T21:55:25Z",
+  "branch_at_completion": "chore/platform-extraction",
+  "head_at_completion": "d0dc1c7",
+  "tag": {
+    "name": "pre-platform-extract",
+    "object_sha": "ce2ec58",
+    "commit": "d0dc1c7"
+  },
+  "recovery_anchors": {
+    "bundle": {
+      "path": "C:\\Users\\mrbla\\backups\\BlarAI_pre_extract.bundle",
+      "sha256": "C051CCFB8FBC6CA31E03F48537816F56CC3FAFC927CEAFAEC9825C9EC65D7707",
+      "size_bytes": 446552451,
+      "verify": "OK — complete history, sha1, HEAD=d0dc1c7947f36ec84d15ef13bd589179225ca764"
+    },
+    "oog_zip": {
+      "path": "C:\\Users\\mrbla\\backups\\blarai_oog_20260424_171721.zip",
+      "sha256": "15B4B9A138974F500FFAE9682350F333DC228AC94A1DB184E26A220508A129A8",
+      "size_bytes": 60366033,
+      "source_paths": [
+        "tools\\vikunja",
+        "tools\\vikunja_mcp\\bridge",
+        "scheduled",
+        ".mcp.json",
+        ".vscode\\mcp.json",
+        ".vscode\\tasks.json",
+        "%APPDATA%\\Claude\\claude_desktop_config.json"
+      ]
+    },
+    "task_xml_exports": {
+      "path": "C:\\Users\\mrbla\\backups\\scheduled_tasks_export\\",
+      "count": 13
+    },
+    "manifest": {
+      "path": "C:\\Users\\mrbla\\backups\\pre_extract_manifest.txt",
+      "lines": 2,
+      "covers": ["bundle", "oog_zip"]
+    }
+  },
+  "fleet_state": {
+    "fleet_paused": true,
+    "fleet_paused_reason": "platform separation v2 in progress",
+    "scheduled_tasks_disabled_count": 13,
+    "scheduled_tasks_total_count": 13,
+    "logon_type_breakdown": {
+      "Interactive": 12,
+      "S4U": 1,
+      "S4U_task_name": "Agents Cadence Monitor"
+    }
+  },
+  "vikunja": {
+    "fleet_reports_project_id": 8,
+    "server_running_at_capture_time": true,
+    "server_running_at_stage0_close": false,
+    "captured_via_item": "0.10.v2 (interleaved before 0.4 Vikunja stop)",
+    "verified_via": "tools/vikunja_mcp/cli.py list-projects | Select-String 'Fleet Reports'",
+    "stage_1_note": "Stage 1.4 F4 fix requires restarting Vikunja temporarily, doing MCP project_id lookup, then stopping again."
+  },
+  "state_json_schema": {
+    "schema_version": 1,
+    "required_fields_present": true,
+    "path": "tools/autonomy_budget/state.json"
+  },
+  "env": {
+    "vikunja_pass_persisted_to_user_scope": true,
+    "length": 23,
+    "source": ".mcp.json -> mcpServers.vikunja.env.VIKUNJA_PASS"
+  },
+  "preconditions_verified": {
+    "git_worktrees_empty": true,
+    "tree_clean_at_pause": true,
+    "pause_commit": "d0dc1c7",
+    "pause_commit_message": "chore(ops): pause fleet -- platform separation v2",
+    "fleet_paused_reason_value": "platform separation v2 in progress"
+  },
+  "anomalies_reference": "See docs/platform_separation/STATUS.md §Anomalies / Deviations from Plan for A1, A2, A3."
+}

@@ -1,0 +1,59 @@
+# BlarAI UC-003 Stage C — GUEST parser extraction stack (Alpine 3.21 guest)
+#
+# PURPOSE: the in-guest pin set for the guest-homed trafilatura parser
+# (ADR-030 §3; Vikunja #655 Stage C).  This is the SIBLING of the host-side
+# requirements/ingest-cleaner.txt: SAME versions, two deliberate deltas —
+#
+#   1. lxml is EXCLUDED.  The guest gets lxml from Alpine's package manager
+#      (`apk add py3-lxml` -> lxml 5.3.0 on Alpine 3.21 / Python 3.12; #655
+#      comment 1045 facts).  PyPI's lxml pin in ingest-cleaner.txt (6.1.1
+#      cp311-win_amd64) targets the HOST stack and is neither needed nor
+#      wanted in the musl guest; apk owns lxml there.  trafilatura 2.1.0's
+#      lxml floor (>=5.3.0) is satisfied exactly.
+#   2. NO --hash entries.  pip's hash-checking mode requires a hash for every
+#      requirement, and the guest needs platform wheels (musllinux cp312 for
+#      regex, and pip will prefer musllinux for charset-normalizer) whose
+#      hashes are not pre-pinned.  Integrity is enforced instead by the
+#      two-link chain documented in docs/security/
+#      guest_parser_provisioning_record.md:
+#        PyPI -> host : scripts/stage_parser_wheels.ps1 verifies every
+#                       universal wheel against the hash-pinned
+#                       ingest-cleaner.txt entries and LOUDLY records the
+#                       sha256 of any platform wheel outside that set;
+#        host -> guest: a SHA256SUMS manifest generated at staging time is
+#                       verified in-guest (sha256sum -c) before pip install.
+#
+# INSTALL (in-guest, by scripts/guest/provision_parser.sh ONLY):
+#   venv/bin/python -m pip install --no-index --no-deps \
+#       --find-links /opt/blarai/parser/wheels \
+#       -r /opt/blarai/parser/wheels/guest-parser.txt
+#
+# --no-deps is deliberate: this file lists the FULL closure (the
+# ingest-cleaner.txt 18-package closure minus lxml = 17 packages), so pip
+# never resolves anything implicitly — and never tries to pull a PyPI lxml
+# over the apk one.
+#
+# USAGE POSTURE (binding, same as the host file): trafilatura is approved for
+# EXTRACTION ONLY.  Its fetch functions (fetch_url / fetch_response /
+# trafilatura.downloads) are FORBIDDEN — fetching belongs to the single
+# PA-gated host-side egress door (shared/security/guarded_fetch).  The guest
+# is NIC-less (launcher zero-NIC assertion), so a fetch attempt in the guest
+# has no path out even before the code-level locks.
+
+trafilatura==2.1.0
+courlan==1.4.0
+dateparser==1.4.0
+htmldate==1.10.0
+justext==3.0.2
+lxml_html_clean==0.4.5
+tld==0.13.2
+tzlocal==5.3.1
+babel==2.18.0
+certifi==2026.1.4
+charset-normalizer==3.4.4
+python-dateutil==2.9.0.post0
+pytz==2025.2
+regex==2026.1.15
+six==1.17.0
+tzdata==2025.3
+urllib3==2.6.3

@@ -1,0 +1,2 @@
+# The probe writes a ~496 MB OpenVINO cache blob here on a re-run; never commit it.
+_cache/

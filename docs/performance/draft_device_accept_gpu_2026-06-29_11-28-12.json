@@ -1,0 +1,188 @@
+{
+  "probe": "draft_device_accept",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "config": {
+    "target": "C:\\Users\\mrbla\\blarai\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft": "C:\\Users\\mrbla\\blarai\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "draft_device": "GPU",
+    "num_assistant_tokens": 3,
+    "max_new_tokens": 256,
+    "warmup": 1,
+    "runs": 2,
+    "load_compile_s": 9.8,
+    "prompt_set": "v1",
+    "do_sample": false
+  },
+  "summary": {
+    "draft_device": "GPU",
+    "sd_metrics_available": true,
+    "total_generated": 1934,
+    "total_accepted": 1156,
+    "total_draft_proposed": 21176,
+    "acceptance_rate_accepted_per_draft": 0.0546,
+    "acceptance_rate_accepted_per_generated": 0.5977,
+    "throughput_tok_s_mean": 20.624
+  },
+  "per_prompt": [
+    {
+      "run": 0,
+      "prompt_index": 0,
+      "wall_s": 9.564,
+      "generated": 246,
+      "accepted": 163,
+      "draft_generated": 1511,
+      "ttft": {
+        "mean": 83.0499,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 38.6507,
+        "std": 23.1198
+      },
+      "throughput": {
+        "mean": 25.8728,
+        "std": 15.4764
+      }
+    },
+    {
+      "run": 0,
+      "prompt_index": 1,
+      "wall_s": 12.25,
+      "generated": 256,
+      "accepted": 146,
+      "draft_generated": 1865,
+      "ttft": {
+        "mean": 84.0261,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 47.6653,
+        "std": 28.4895
+      },
+      "throughput": {
+        "mean": 20.9796,
+        "std": 12.5395
+      }
+    },
+    {
+      "run": 0,
+      "prompt_index": 2,
+      "wall_s": 11.205,
+      "generated": 256,
+      "accepted": 156,
+      "draft_generated": 2194,
+      "ttft": {
+        "mean": 85.4465,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 43.563,
+        "std": 25.2744
+      },
+      "throughput": {
+        "mean": 22.9552,
+        "std": 13.3182
+      }
+    },
+    {
+      "run": 0,
+      "prompt_index": 3,
+      "wall_s": 13.032,
+      "generated": 256,
+      "accepted": 146,
+      "draft_generated": 2556,
+      "ttft": {
+        "mean": 91.1603,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 50.6968,
+        "std": 34.0204
+      },
+      "throughput": {
+        "mean": 19.7251,
+        "std": 13.2367
+      }
+    },
+    {
+      "run": 1,
+      "prompt_index": 0,
+      "wall_s": 7.114,
+      "generated": 152,
+      "accepted": 97,
+      "draft_generated": 2742,
+      "ttft": {
+        "mean": 84.69,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 46.4668,
+        "std": 28.3946
+      },
+      "throughput": {
+        "mean": 21.5208,
+        "std": 13.1507
+      }
+    },
+    {
+      "run": 1,
+      "prompt_index": 1,
+      "wall_s": 14.47,
+      "generated": 256,
+      "accepted": 146,
+      "draft_generated": 3096,
+      "ttft": {
+        "mean": 85.8415,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 56.3591,
+        "std": 33.7174
+      },
+      "throughput": {
+        "mean": 17.7433,
+        "std": 10.6151
+      }
+    },
+    {
+      "run": 1,
+      "prompt_index": 2,
+      "wall_s": 13.259,
+      "generated": 256,
+      "accepted": 156,
+      "draft_generated": 3425,
+      "ttft": {
+        "mean": 85.6816,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 51.6087,
+        "std": 31.0107
+      },
+      "throughput": {
+        "mean": 19.3766,
+        "std": 11.643
+      }
+    },
+    {
+      "run": 1,
+      "prompt_index": 3,
+      "wall_s": 15.269,
+      "generated": 256,
+      "accepted": 146,
+      "draft_generated": 3787,
+      "ttft": {
+        "mean": 92.6869,
+        "std": 0.0
+      },
+      "tpot": {
+        "mean": 59.4665,
+        "std": 40.3694
+      },
+      "throughput": {
+        "mean": 16.8162,
+        "std": 11.4158
+      }
+    }
+  ]
+}

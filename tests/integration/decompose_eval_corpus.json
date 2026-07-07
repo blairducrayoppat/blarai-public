@@ -1,0 +1,519 @@
+{
+ "_README": "Red-team adversarial corpus (3 domain lenses + synthesis, wf_5bc7e0bd). must_collapse: a 14B over-decomposition that must right-size (no structural junk). must_survive: a goal whose test/validate/check/scan-looking tasks are real FEATURES.",
+ "must_collapse": [
+  {
+   "goal": "write an is_palindrome function",
+   "slugs": [
+    "define-is-palindrome",
+    "implement-is-palindrome",
+    "test-is-palindrome-racecar",
+    "test-is-palindrome-hello",
+    "test-is-palindrome-empty",
+    "verify-edge-cases",
+    "acceptance-tests",
+    "create-file"
+   ],
+   "exact": 1,
+   "note": "the live shakedown (#670 Problem 3): is_palindrome over-split into implement + acceptance-tests; must right-size to exactly 1 carrying a test criterion"
+  },
+  {
+   "goal": "write a slugify function",
+   "slugs": [
+    "define-slugify",
+    "implement-slugify",
+    "test-slugify-spaces",
+    "test-slugify-unicode",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 1
+  },
+  {
+   "goal": "add input validation to the signup form",
+   "slugs": [
+    "create-signup-form-component",
+    "add-input-validation",
+    "define-validation-schema",
+    "test-empty-email",
+    "test-bad-email-format",
+    "test-password-mismatch",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "max": 2
+  },
+  {
+   "goal": "build a product search endpoint",
+   "slugs": [
+    "implement-search-endpoint",
+    "define-search-query-params",
+    "scaffold-search-route",
+    "stub-search-service",
+    "test-search-returns-results",
+    "test-search-empty-query",
+    "verify-pagination"
+   ],
+   "exact": 1,
+   "overkeep": 1,
+   "note": "verify-pagination is a standalone per-case test, shape-identical to a verify-<feature>; over-kept (ideal: dropped). The feature survives; safe direction."
+  },
+  {
+   "goal": "implement a /health-check endpoint",
+   "slugs": [
+    "implement-health-check-endpoint",
+    "create-health-check-handler",
+    "setup-health-check-route",
+    "test-health-check-200",
+    "test-health-check-503",
+    "verify-health-check-response-shape"
+   ],
+   "max": 2,
+   "note": "ideal 1; create-<root>-handler scaffold-fold is deferred (Tier-3)"
+  },
+  {
+   "goal": "add a coupon code field to checkout",
+   "slugs": [
+    "add-coupon-code-field",
+    "create-file-coupon-validator",
+    "declare-coupon-state",
+    "implement-apply-coupon-handler",
+    "test-valid-coupon",
+    "test-invalid-coupon",
+    "test-expired-coupon"
+   ],
+   "exact": 2
+  },
+  {
+   "goal": "build an orders dashboard page",
+   "slugs": [
+    "build-orders-dashboard",
+    "create-orders-table-component",
+    "setup-dashboard-route",
+    "stub-orders-api-client",
+    "tests",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 2
+  },
+  {
+   "goal": "create a GraphQL resolver for user profiles",
+   "slugs": [
+    "create-user-profile-resolver",
+    "define-user-profile-type",
+    "declare-resolver-map-entry",
+    "test-resolver-returns-profile",
+    "test-resolver-missing-user",
+    "verifies-auth-required"
+   ],
+   "exact": 1
+  },
+  {
+   "goal": "write a function that parses an ISO-8601 duration string into seconds",
+   "slugs": [
+    "define-parse-iso8601-duration",
+    "implement-iso8601-duration-parser",
+    "test-iso8601-pt1h",
+    "test-iso8601-p1dt12h",
+    "test-iso8601-pt0s",
+    "verify-edge-cases",
+    "acceptance-tests",
+    "create-file-duration-py"
+   ],
+   "exact": 1
+  },
+  {
+   "goal": "implement min-max normalization for a numeric feature column",
+   "slugs": [
+    "create-file-normalize",
+    "implement-minmax-normalize",
+    "add-tests-for-normalize",
+    "test-constant-column",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 1,
+   "overkeep": 1,
+   "note": "test-constant-column is a standalone scenario test with no enumeration partner / shared token; over-kept (ideal: dropped)."
+  },
+  {
+   "goal": "build a CSV-to-Parquet conversion pipeline",
+   "slugs": [
+    "scaffold-pipeline-module",
+    "implement-csv-reader",
+    "implement-parquet-writer",
+    "implement-pipeline-orchestration",
+    "test-roundtrip",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 3
+  },
+  {
+   "goal": "write a training loop for a small MLP classifier",
+   "slugs": [
+    "implement-data-loader",
+    "implement-training-loop",
+    "implement-eval-step",
+    "test-loss-decreases",
+    "test-overfits-tiny-batch",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 3
+  },
+  {
+   "goal": "implement a Levenshtein edit-distance function",
+   "slugs": [
+    "create-file-edit-distance",
+    "stub-edit-distance",
+    "implement-edit-distance",
+    "test-kitten-sitting",
+    "test-empty-strings",
+    "test-identical",
+    "acceptance-tests"
+   ],
+   "exact": 1,
+   "overkeep": 1,
+   "note": "test-kitten-sitting is a standalone per-case test; over-kept (ideal: dropped)."
+  },
+  {
+   "goal": "build a unit-test generator that emits pytest cases from a function signature",
+   "slugs": [
+    "define-test-generator-module",
+    "build-unit-test-generator",
+    "implement-signature-parser",
+    "test-generates-for-simple-fn",
+    "test-generates-for-no-args",
+    "test-generates-for-varargs",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 2
+  },
+  {
+   "goal": "add input validation to the signup form (dev-tools lens)",
+   "slugs": [
+    "define-validation-schema",
+    "add-input-validation",
+    "add-client-side-validation",
+    "validate-email-format",
+    "validate-password-strength",
+    "test-rejects-invalid-email",
+    "test-accepts-valid-form",
+    "acceptance-tests"
+   ],
+   "max": 4,
+   "note": "ideal 2-3; validate-* domain-verb enumeration fold deferred (Tier-3)"
+  },
+  {
+   "goal": "build a fuzzer for the JSON parser",
+   "slugs": [
+    "setup-fuzz-harness",
+    "build-json-fuzzer",
+    "implement-corpus-seeding",
+    "fuzz-nested-objects",
+    "fuzz-unicode-strings",
+    "verify-no-crashes",
+    "acceptance-tests"
+   ],
+   "max": 4,
+   "note": "ideal 2; fuzz-* domain-verb enumeration fold deferred (Tier-3)"
+  },
+  {
+   "goal": "create a mock factory for the payment gateway",
+   "slugs": [
+    "stub-payment-gateway-interface",
+    "create-payment-mock-factory",
+    "add-fixture-for-declined-card",
+    "add-fixture-for-successful-charge",
+    "test-mock-returns-declined",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "max": 3,
+   "note": "ideal 1-2; add-fixture-for-<case> enumeration fold deferred (Tier-3)"
+  },
+  {
+   "goal": "add a custom linter rule that flags bare except clauses",
+   "slugs": [
+    "scaffold-linter-plugin",
+    "write-a-linter-rule",
+    "add-rule-config-option",
+    "test-flags-bare-except",
+    "test-allows-typed-except",
+    "verify-edge-cases",
+    "acceptance-tests"
+   ],
+   "exact": 2
+  }
+ ],
+ "must_survive": [
+  {
+   "goal": "build a unit-test generator",
+   "slugs": [
+    "build-a-unit-test-generator",
+    "implement-function-discovery",
+    "add-pytest-template-renderer"
+   ],
+   "survives": [
+    "unit-test-generator"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "write a linter rule",
+   "slugs": [
+    "write-a-linter-rule",
+    "implement-rule-visitor",
+    "add-rule-fixer"
+   ],
+   "survives": [
+    "linter-rule"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "implement a /health-check endpoint",
+   "slugs": [
+    "implement-health-check-endpoint",
+    "add-db-health-probe",
+    "add-readiness-check"
+   ],
+   "survives": [
+    "health-check-endpoint"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "add input validation to the signup form",
+   "slugs": [
+    "add-input-validation",
+    "implement-validation-rules",
+    "add-validation-error-display"
+   ],
+   "survives": [
+    "input-validation"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "add a payment-validation service",
+   "slugs": [
+    "add-payment-validation-service",
+    "implement-luhn-check",
+    "add-expiry-validation"
+   ],
+   "survives": [
+    "payment-validation-service"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "build a test-data seeding endpoint for staging",
+   "slugs": [
+    "build-test-data-seed-endpoint",
+    "implement-seed-fixtures",
+    "add-seed-idempotency-guard"
+   ],
+   "survives": [
+    "test-data-seed-endpoint"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "create a validation middleware for the API",
+   "slugs": [
+    "create-validation-middleware",
+    "implement-schema-loader",
+    "add-error-formatter"
+   ],
+   "survives": [
+    "validation-middleware"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "add an audit-log viewer to the admin dashboard",
+   "slugs": [
+    "add-audit-log-viewer",
+    "implement-audit-log-query",
+    "add-monitor-refresh-toggle"
+   ],
+   "survives": [
+    "audit-log-viewer"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "write a standalone test harness that fuzzes a JSON parser",
+   "slugs": [
+    "write-a-fuzz-test-harness"
+   ],
+   "survives": [
+    "fuzz-test-harness"
+   ],
+   "min": 1
+  },
+  {
+   "goal": "build a data-validation library for tabular schemas",
+   "slugs": [
+    "build-a-data-validation-library",
+    "implement-schema-checker",
+    "add-assertion-helpers"
+   ],
+   "survives": [
+    "data-validation-library"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "implement a model-output sanity-check / monitoring pass over inference logs",
+   "slugs": [
+    "implement-output-monitor",
+    "add-drift-audit",
+    "implement-anomaly-scan"
+   ],
+   "survives": [
+    "output-monitor"
+   ],
+   "min": 3
+  },
+  {
+   "goal": "build a security scanner that audits dependencies for CVEs",
+   "slugs": [
+    "build-security-scanner",
+    "add-cve-database-sync"
+   ],
+   "survives": [
+    "security-scanner"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "create a health monitor that asserts SLA thresholds",
+   "slugs": [
+    "create-health-monitor",
+    "add-assertion-rules"
+   ],
+   "survives": [
+    "health-monitor"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "write an assertion library with fluent matchers",
+   "slugs": [
+    "write-assertion-library",
+    "add-custom-matcher-support"
+   ],
+   "survives": [
+    "assertion-library"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "implement a /health-check endpoint with a verify sibling",
+   "slugs": [
+    "implement-health-check-endpoint",
+    "verify-health-check-returns-json"
+   ],
+   "survives": [
+    "health-check-endpoint"
+   ],
+   "min": 1
+  },
+  {
+   "goal": "build a standalone signature-verification tool",
+   "slugs": [
+    "verify-signature"
+   ],
+   "survives": [
+    "signature"
+   ],
+   "min": 1
+  },
+  {
+   "goal": "add an email verification step to signup",
+   "slugs": [
+    "verify-email-address",
+    "send-welcome-email"
+   ],
+   "survives": [
+    "verify-email-address"
+   ],
+   "min": 2,
+   "note": "adversarial-pass regression lock"
+  },
+  {
+   "goal": "build email verification and SMS verification",
+   "slugs": [
+    "verify-email-address",
+    "verify-sms-code"
+   ],
+   "survives": [
+    "verify-email-address",
+    "verify-sms-code"
+   ],
+   "min": 2,
+   "note": "two DISTINCT verify-features; neither may vanish"
+  },
+  {
+   "goal": "add OTP verification to login",
+   "slugs": [
+    "verify-otp-code",
+    "build-login-form"
+   ],
+   "survives": [
+    "verify-otp-code"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "add an age gate before checkout",
+   "slugs": [
+    "verify-age",
+    "build-checkout"
+   ],
+   "survives": [
+    "verify-age"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "add an authorization layer",
+   "slugs": [
+    "verify-user-permissions",
+    "build-admin-panel"
+   ],
+   "survives": [
+    "verify-user-permissions"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "add update integrity checks",
+   "slugs": [
+    "verify-manifest",
+    "download-updates"
+   ],
+   "survives": [
+    "verify-manifest"
+   ],
+   "min": 2
+  },
+  {
+   "goal": "an app with a settings window and a main window",
+   "slugs": [
+    "create-settings-window",
+    "create-main-window"
+   ],
+   "survives": [
+    "settings",
+    "main"
+   ],
+   "min": 2,
+   "note": "#670 Part-1 boundary: two genuine screens stay two tasks; the deterministic ruler must NOT merge distinct windows (the deferred Part-2 over-collapse risk). The prompt rule splits on separate pages/screens, services, or top-level commands — this locks the floor so a future ruler change can't silently over-collapse."
+  }
+ ]
+}

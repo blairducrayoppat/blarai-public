@@ -1,0 +1,713 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_prompt version="1.0" task="121" ea_number="3" authored_by="sdo" authored_at="2026-04-22">
+
+  <!--
+    BlarAI — EA Code Execution Prompt
+    Sprint 9 / Task 121: Governance Documentation — EA-3: Operational State
+    Branch: feature/p5-task9-ea3-operational-state
+    Ledger path (Q1-1 per-file convention — 2026-04-22):
+      docs/ledger/<YYYYMMDD_HHMMSS>_sprint9_ea3_operational-state.md
+    Predecessor ledger_id: 20260422_181301_sprint9_ea2_runtime-resilience
+
+    IMPORTANT (L-12): Before ANY authoring begins, the EA MUST post a comprehension
+    gate on Vikunja Task 121 prefixed [agent:ea_code][phase:comprehension] and STOP.
+    Do not start drafting until SDO explicitly approves with
+    [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+
+    IMPORTANT (L-15): This is a PURE DOCUMENTATION milestone.
+    DO NOT modify any file outside docs/governance/ and this single ledger entry.
+    If a production source change appears necessary to make a doc accurate, STOP,
+    note the gap in the doc's "Open Questions / Deferred Items" section, and
+    continue authoring — do NOT modify source.
+
+    IMPORTANT (L-16): Sprint 8 is writing **/tests/; Sprint 9 writes docs/governance/**.
+    Working sets are disjoint; collisions must not occur. If a Sprint 8 merge
+    lands between your branch and main, rebase — do not resolve by editing docs.
+
+    IMPORTANT (L-17): boot-sequence.md is a PHANTOM forward-reference target.
+    If you need to link to a concept that boot-sequence.md would someday cover,
+    cite "boot-sequence.md (forthcoming / GOV-15)" — do NOT create or stub it.
+
+    IMPORTANT (L-18): docs/governance/STYLE.md is the BINDING style authority.
+    All three docs MUST conform to its Doc Template and cite it in Prerequisites.
+  -->
+
+  <!-- ===== SECTION 1: PARENT HEAD (L-13) ===== -->
+
+  <parent_head>df686b8</parent_head>
+  <!-- Verified by SDO via `git rev-parse HEAD` immediately before authoring.
+       Full HEAD: df686b8 (Co-Lead completion report for Sprint 8 EA-2 auto-merge).
+       EA MUST verify this matches current main HEAD before branching.
+       If HEAD has advanced, rebase onto current main — do not force-checkout df686b8. -->
+
+  <!-- ===== SECTION 2: COMPREHENSION GATE (L-12) ===== -->
+
+  <comprehension_gate>
+    <instruction>
+      READ THIS ENTIRE PROMPT before posting your comprehension gate.
+      Then READ every file listed in required_attachments.
+      Then POST a comprehension gate comment on Vikunja Task 121, prefixed:
+
+        [agent:ea_code][phase:comprehension]
+
+      Your comprehension comment MUST contain ALL of the following sections (verbatim
+      section headers required, in this exact order, no numbered prefixes):
+
+        A. MILESTONE OBJECTIVE (3-5 sentences in your own words)
+        B. WORK ITEMS (one sentence for each WI-1..WI-4 — do NOT group)
+        C. FILES TO CREATE (list every new governance doc with exact path)
+        D. FILES TO MODIFY (should be empty — this EA creates only)
+        E. FILES TO READ (every production source file + ADR + STYLE.md + predecessor
+           Sprint 9 EA-2 docs you will read for authoring context)
+        F. NEGATIVE CONSTRAINTS YOU UNDERSTAND (enumerate NC-1..NC-8 from §5 in
+           your own words — MUST list every NC individually)
+        G. OPEN QUESTIONS (any ambiguity requiring SDO clarification)
+        H. STRUCTURAL RECITATION (§ 7 line-by-line — verbatim section-header outline
+           of the STYLE.md Doc Template, in document order)
+        I. ANCHOR VERIFICATION (for each of the three docs, list primary source
+           files and ADRs you will cite — flag any phantom substitutions)
+
+      If you cannot produce every section with substantive content, STOP and ask
+      in the comprehension gate comment rather than guessing.
+    </instruction>
+    <stop_condition>
+      After posting the comprehension gate, STOP. Do not touch any file, do not
+      branch, do not create docs. Wait for SDO to post
+      [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+      If SDO returns REVISE, address feedback and re-post the gate (same prefix).
+    </stop_condition>
+  </comprehension_gate>
+
+  <!-- ===== SECTION 3: MILESTONE ===== -->
+
+  <milestone>
+    <objective>
+      Author three governance documents — context-spotlighting.md (GOV-08),
+      session-state.md (GOV-09), and configuration-management.md (GOV-11) —
+      covering the Assistant Orchestrator's operational state surface: how
+      context is assembled and spotlighted for the model, how session state
+      persists across AO lifecycle and UI reconnects, and how runtime
+      configuration flows from TOML through validation into live service state.
+      All three docs MUST conform to STYLE.md's seven-header Doc Template,
+      clear the 150-line substantive floor, cite ≥ 1 ADR and ≥ 1 source file
+      (closest-relevant where no direct ADR governs), and address the five
+      audience personas (operator / developer / auditor / incident responder /
+      future agent). Scope held strictly to docs/governance/** plus one ledger
+      entry; zero production code modified (L-15).
+    </objective>
+
+    <sprint_context>
+      Sprint 9 governance docs rollout (Task 121, DEC-15 sprint_id=9).
+      EA-1 authored the foundation set (STYLE.md, pgov-validation.md,
+      ipc-protocol.md, streaming-output.md). EA-2 added the runtime-resilience
+      set (gpu-runtime.md, error-recovery.md, circuit-breaker.md).
+      EA-3 (this milestone) completes the operational-state triangle:
+      context → session → configuration. EA-4 then covers ops/deployment/rules,
+      and EA-5 authors the README landing page.
+
+      Per Sprint 9 SDV, GOV-11 is the widest-scope doc in EA-3 because runtime
+      configuration spans shared/runtime_config.py (schema), entrypoint.py
+      (application), launcher/guest_deploy.py (artifact flow), and the
+      13 TOML constraints enumerated authoritatively in Sprint 8 EA-2
+      test_entrypoint.py. GOV-08 is narrowest (delimiter tokens, spotlight
+      pipeline). GOV-09 sits in the middle (persistence + UI Gateway bridge).
+    </sprint_context>
+
+    <predecessor_ledger_id>20260422_181301_sprint9_ea2_runtime-resilience</predecessor_ledger_id>
+
+    <branch>feature/p5-task9-ea3-operational-state</branch>
+
+    <ledger_path>docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea3_operational-state.md</ledger_path>
+    <!-- Q1-1 per-file convention. Use `date -u +"%Y%m%d_%H%M%S"` at commit
+         time to produce the timestamp. One ledger entry for the entire EA-3. -->
+  </milestone>
+
+  <!-- ===== SECTION 4: WORK ITEMS ===== -->
+
+  <work_items>
+
+    <work_item id="WI-1" size="L" priority="high">
+      <title>docs/governance/context-spotlighting.md (GOV-08)</title>
+      <vikunja_subtask>#21</vikunja_subtask>
+      <scope>
+        New file. Authoritative governance doc for context assembly, delimiter
+        tokens, spotlight pipeline, and prompt-boundary invariants that make
+        PGOV stage-3 validation meaningful.
+      </scope>
+      <structure>
+        STYLE.md seven-header Doc Template:
+          # Context Spotlighting Governance
+          ## Audience                  (all 5 personas addressed)
+          ## Prerequisites             (cite STYLE.md + pgov-validation.md + ADR-012)
+          ## Source References         (≥ 1 ADR + ≥ 1 source file)
+          ## Governance Content        (body — see key topics below)
+          ## Recovery / Remediation Procedures
+          ## Open Questions / Deferred Items
+      </structure>
+      <key_topics>
+        - Delimiter token taxonomy (system/user/assistant + PGOV sentinels)
+        - Context assembly pipeline: prompt-builder → delimiter injection →
+          tokenizer → model input
+        - Spotlight invariants: which region is "trusted context" vs
+          "untrusted user input" from PGOV's point of view
+        - Stage-3 PGOV delimiter-integrity check as the enforcement point
+        - Token budget accounting (delimiter overhead vs usable context)
+        - Thinking-mode interaction (ADR-012 §2.4 — AO allows thinking; PA
+          forces /no_think) as it relates to spotlight boundaries
+        - Failure modes: delimiter collision, truncation mid-delimiter, nested
+          assistant echoes; link each to the existing test that protects it
+      </key_topics>
+      <source_anchors>
+        - services/assistant_orchestrator/src/context_manager.py — delimiter
+          tokens, assembly pipeline
+        - services/assistant_orchestrator/src/pgov.py — stage-3 delimiter
+          validation
+        - services/assistant_orchestrator/src/constants.py — delimiter
+          constant definitions (pinned values)
+        - ADR-012 (Qwen3-14B Model Selection + Speculative Decoding) — thinking
+          mode, tokenizer, prompt format
+      </source_anchors>
+      <line_floor>≥ 150 substantive lines (comments/blank lines excluded)</line_floor>
+      <acceptance>
+        - All seven STYLE.md headers present and populated
+        - ≥ 1 ADR cited in Source References
+        - ≥ 1 source file cited in Source References with precise symbol names
+        - All five audience personas addressed in Audience section
+        - Delimiter taxonomy enumerated (not just described)
+        - Stage-3 PGOV link explicit (cross-ref pgov-validation.md §Stage-3)
+      </acceptance>
+    </work_item>
+
+    <work_item id="WI-2" size="L" priority="high">
+      <title>docs/governance/session-state.md (GOV-09)</title>
+      <vikunja_subtask>#22</vikunja_subtask>
+      <scope>
+        New file. Authoritative governance doc for session identity lifecycle,
+        persistence surface, UI Gateway bridging, and reconnect semantics.
+      </scope>
+      <structure>
+        STYLE.md seven-header Doc Template (same as WI-1).
+      </structure>
+      <key_topics>
+        - Session identity: how session_id is minted, scoped, and retired
+        - Persistence surface: what survives across AO restart vs what is
+          process-local
+        - UI Gateway session_store bridge: session_panel.py (UI Shell) →
+          ui_gateway session_store → AO context (session_id threading)
+        - Reconnect semantics: UI reconnect on existing session_id vs fresh
+          session
+        - Session scope for PGOV / circuit breaker / context window (each
+          keyed per-session or process-wide? cite code)
+        - Failure modes: orphaned sessions, cross-session bleed-through,
+          session_id collision
+      </key_topics>
+      <source_anchors>
+        <!-- PHANTOM SUBSTITUTION NOTE:
+             Continuation XML names services/assistant_orchestrator/src/session.py
+             as a primary anchor. That file DOES NOT EXIST in the AO source tree
+             (verified by SDO at authoring time). The AO does NOT maintain its own
+             session persistence — session state lives at the UI Gateway boundary
+             in services/ui_gateway/src/session_store.py, which the AO threads as
+             an opaque session_id through context assembly. This matches EA-2's
+             anchor-substitution precedent (gpu_inference.py for model_loader.py,
+             entrypoint.py + pgov.py for error_handling.py).
+             Proceed with the substitution; document it in the ledger's
+             Notes / Substitutions section. -->
+        - services/ui_gateway/src/session_store.py — authoritative session
+          persistence (SUBSTITUTE for phantom services/assistant_orchestrator/src/session.py)
+        - services/ui_shell/src/session_panel.py — UI-side session lifecycle
+        - services/assistant_orchestrator/src/context_manager.py — session_id
+          threading through context assembly (cross-link with WI-1)
+        - ADR-009 (Assistant-Interaction-Surface) — session contract between
+          UI Shell, UI Gateway, and AO
+      </source_anchors>
+      <adr_absence_note>
+        No direct ADR governs SQLite session persistence (ADR-008 is about NPU
+        concurrent scheduling, not sessions). Cite ADR-009 (closest-relevant,
+        per STYLE.md Source-Anchoring rule) and note the ADR-absence in the
+        doc's Open Questions section as a future ADR candidate.
+      </adr_absence_note>
+      <line_floor>≥ 150 substantive lines</line_floor>
+      <acceptance>
+        - All seven STYLE.md headers present
+        - ≥ 1 ADR cited (ADR-009 expected)
+        - ≥ 1 source file cited
+        - All five audience personas addressed
+        - Phantom substitution (session_store.py for session.py) explicitly
+          noted in doc prose + ledger Notes section
+        - UI Shell ↔ UI Gateway ↔ AO bridge traced end-to-end with source refs
+      </acceptance>
+    </work_item>
+
+    <work_item id="WI-3" size="L" priority="high">
+      <title>docs/governance/configuration-management.md (GOV-11)</title>
+      <vikunja_subtask>#24</vikunja_subtask>
+      <scope>
+        New file. Authoritative governance doc for the runtime configuration
+        flow: TOML schema → validation → service application, plus the
+        13 enumerated constraints and the Task 4 DEC-01..DEC-10 production
+        decisions that they encode.
+      </scope>
+      <structure>
+        STYLE.md seven-header Doc Template.
+      </structure>
+      <key_topics>
+        - Configuration lifecycle: launcher reads TOML → validates → writes to
+          VM → AO entrypoint loads → schema enforces → service applies
+        - The 13 TOML constraints enumerated authoritatively by Sprint 8 EA-2
+          test_entrypoint.py::TestAssistantOrchestratorConfigValidation
+          (device, priority, temperature, top_k, top_p, repetition_penalty,
+          max_new_tokens, vsock_cid/port, timeout, max_message_bytes, PGOV
+          threshold, response_depth_mode)
+        - Task 4 DEC-01..DEC-10 production decisions the schema encodes
+        - Fail-closed validation: invalid TOML → service refuses to start
+          (cite entrypoint.py validation path)
+        - Secret handling in config (if any) and what is host-only vs
+          guest-facing
+        - How config changes propagate: guest_deploy.py artifact flow,
+          VM restart semantics
+      </key_topics>
+      <source_anchors>
+        - shared/runtime_config.py — schema definition
+        - services/assistant_orchestrator/src/entrypoint.py — validation and
+          application
+        - launcher/guest_deploy.py — artifact flow to VM
+        - services/assistant_orchestrator/src/constants.py — pinned defaults
+        - services/assistant_orchestrator/tests/test_entrypoint.py
+          (TestAssistantOrchestratorConfigValidation) — AUTHORITATIVE
+          enumeration of the 13 constraints (cite by test name)
+      </source_anchors>
+      <adr_absence_note>
+        No direct ADR governs runtime configuration. Per STYLE.md's
+        "closest-relevant" rule, cite the decision records that DO govern:
+        DEC-01 through DEC-10 from Task 4 (production config decisions),
+        explicitly in Prerequisites. Note ADR-absence in Open Questions as a
+        candidate for a future ADR. This precedent was set by EA-2's
+        circuit-breaker.md (which cited the circuit breaker's DEC-origin
+        rather than a nonexistent ADR).
+      </adr_absence_note>
+      <line_floor>≥ 150 substantive lines (SDV flags this as the widest-scope
+        doc in EA-3 — expect longer)</line_floor>
+      <acceptance>
+        - All seven STYLE.md headers present
+        - Task 4 DEC-01..DEC-10 enumerated with one-line summary each
+        - All 13 TOML constraints enumerated with valid-range + source-of-truth
+          (test_entrypoint.py)
+        - Fail-closed semantics explicit (service refuses to start)
+        - Config propagation flow traced end-to-end (launcher → VM → AO)
+        - ADR-absence documented in Open Questions
+        - All five audience personas addressed
+      </acceptance>
+    </work_item>
+
+    <work_item id="WI-4" size="S" priority="high">
+      <title>Ledger entry (Q1-1 per-file convention)</title>
+      <scope>
+        One new file at docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea3_operational-state.md
+        using the predecessor file (20260422_181301_sprint9_ea2_runtime-resilience.md)
+        as the format template.
+      </scope>
+      <required_sections>
+        - Frontmatter (ledger_id, date, sprint_id=9, entry_type=EA,
+          predecessor=20260422_181301_sprint9_ea2_runtime-resilience,
+          branch, merge_commit=null, disposition=COMPLETE)
+        - ## Task 121 / EA-3: Operational State (heading)
+        - ### Summary (3-5 sentence narrative)
+        - ### Deliverables (table: WI | Artifact | Lines | GOV ID)
+        - ### Files Changed (every file touched, with line counts)
+        - ### Quality Gates (LINE-FLOOR, STYLE.md conformance, SOURCE-ANCHOR,
+          L-15 / L-16 / L-17 / L-18 compliance)
+        - ### Notes / Substitutions (phantom session.py → session_store.py,
+          ADR-absence handling for GOV-09 + GOV-11)
+      </required_sections>
+      <acceptance>
+        - Frontmatter complete
+        - All three governance docs listed with line counts
+        - All L-15..L-18 compliance items explicitly addressed
+        - Phantom substitution + ADR-absence notes included
+      </acceptance>
+    </work_item>
+
+  </work_items>
+
+  <!-- ===== SECTION 5: NEGATIVE CONSTRAINTS ===== -->
+
+  <negative_constraints>
+    <nc id="NC-1">
+      DO NOT modify any file under src/, services/*/src/, launcher/, shared/,
+      tests/, or pyproject.toml. This milestone is docs-only (L-15).
+    </nc>
+    <nc id="NC-2">
+      DO NOT edit EA-1 docs (STYLE.md, pgov-validation.md, ipc-protocol.md,
+      streaming-output.md) or EA-2 docs (gpu-runtime.md, error-recovery.md,
+      circuit-breaker.md). Cross-reference them via links — do NOT modify.
+      If you discover an actual defect in an EA-1 or EA-2 doc, note it in the
+      ledger's Notes section as a follow-up for SDO to triage; do not fix it
+      inline (L-18 retroactive-edit prohibition).
+    </nc>
+    <nc id="NC-3">
+      DO NOT create or stub boot-sequence.md or any other phantom-referenced
+      doc. Cite them as "(forthcoming / GOV-NN)" if cross-reference needed
+      (L-17).
+    </nc>
+    <nc id="NC-4">
+      DO NOT duplicate content that already exists in EA-1 or EA-2 docs.
+      If a topic is already governed by, e.g., pgov-validation.md, link to it
+      instead of re-explaining. Exception: a one-paragraph recap is allowed
+      where it is load-bearing for the reader's comprehension.
+    </nc>
+    <nc id="NC-5">
+      DO NOT create multiple ledger entries for this EA. One file only,
+      following the Q1-1 per-file timestamp convention. DO NOT append to the
+      frozen docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+    </nc>
+    <nc id="NC-6">
+      DO NOT author new ADRs, decision records, or protocol specs. This EA is
+      documentation of EXISTING behavior, not proposal of new behavior.
+      If the authoring process reveals a design gap, record it in the doc's
+      Open Questions / Deferred Items section.
+    </nc>
+    <nc id="NC-7">
+      DO NOT exceed scope: the three docs listed in §4 are the full
+      deliverable set. No README tweaks, no governance/index updates, no
+      touching EA-4 or EA-5 docs. EA-5 owns the README landing page — leave
+      it untouched.
+    </nc>
+    <nc id="NC-8">
+      L-16 Sprint 8 coexistence: DO NOT touch anything under **/tests/ or
+      anywhere else outside docs/governance/ + the single ledger file.
+      Sprint 8 and Sprint 9 working sets are disjoint and must stay so.
+    </nc>
+  </negative_constraints>
+
+  <!-- ===== SECTION 6: RISKS + PRE-EMPTIVE RESOLUTIONS ===== -->
+
+  <risks>
+    <risk id="I.1" severity="high">
+      <description>
+        Phantom anchor: services/assistant_orchestrator/src/session.py named in
+        continuation XML does NOT exist. EA could waste time searching,
+        invent stubs, or worse — create the file (violating NC-1).
+      </description>
+      <resolution>
+        Pre-approved substitution: services/ui_gateway/src/session_store.py is
+        the authoritative session persistence surface. AO threads session_id
+        opaquely through context_manager.py. Use session_store.py as the
+        primary source anchor for GOV-09; note the substitution explicitly in
+        both the doc prose (in Source References section) and the ledger's
+        Notes / Substitutions section. This matches EA-2's precedent
+        (gpu_inference.py ← model_loader.py; entrypoint.py + pgov.py ←
+        error_handling.py).
+      </resolution>
+    </risk>
+
+    <risk id="I.2" severity="high">
+      <description>
+        ADR-absence: no direct ADR governs session persistence (GOV-09) or
+        runtime configuration (GOV-11). STYLE.md requires ≥ 1 ADR cited per
+        doc. EA may freeze or invent an ADR.
+      </description>
+      <resolution>
+        Per STYLE.md's "closest-relevant" rule:
+          - GOV-09 → cite ADR-009 (Assistant-Interaction-Surface) which
+            governs the UI Shell / UI Gateway / AO contract that session state
+            rides on. Note ADR-absence for SQLite session persistence in the
+            doc's Open Questions section.
+          - GOV-11 → cite Task 4 DEC-01..DEC-10 as the governing decision
+            records (they predate the ADR system's current use for config
+            concerns). Note ADR-absence in Open Questions.
+        EA-2's circuit-breaker.md set the precedent for citing DECs where no
+        ADR exists. Do NOT author a new ADR (NC-6).
+      </resolution>
+    </risk>
+
+    <risk id="I.3" severity="medium">
+      <description>
+        Content duplication with EA-1 pgov-validation.md (stage-3 delimiter
+        check is shared between GOV-08 and pgov-validation.md).
+      </description>
+      <resolution>
+        GOV-08 owns the DELIMITER TAXONOMY and assembly pipeline. pgov-validation.md
+        owns the VALIDATION mechanism. Cross-link bidirectionally. In GOV-08,
+        the stage-3 mention should be one paragraph linking to pgov-validation.md §
+        Stage-3, not a re-explanation. If uncertain, prefer under-explaining
+        in GOV-08 and linking — duplication is the worse failure mode.
+      </resolution>
+    </risk>
+
+    <risk id="I.4" severity="medium">
+      <description>
+        Line-floor pressure: GOV-08 (narrowest scope) may struggle to clear
+        150 substantive lines.
+      </description>
+      <resolution>
+        Fill substantively, not with padding:
+          - Exhaustive delimiter-token enumeration (with pinned constant values)
+          - Token budget worked example (delimiter overhead math)
+          - Thinking-mode interaction (ADR-012 §2.4)
+          - Failure-mode catalog with linked tests
+          - Persona-by-persona guidance (5 audiences × short section each)
+        If after substantive authoring the doc comes in at 140-149 lines, STOP
+        and flag to SDO in the completion report — do NOT pad with filler. The
+        150-line floor targets substantive content; padding to meet it violates
+        the spirit of the rule.
+      </resolution>
+    </risk>
+
+    <risk id="I.5" severity="medium">
+      <description>
+        Ledger convention drift: the EA queue prompt could name the frozen
+        monolithic docs/POST_OPERATIONAL_MATURATION_LEDGER.md as the ledger
+        target (as it did for Sprint 9 EA-2).
+      </description>
+      <resolution>
+        This prompt explicitly pins Q1-1 per-file convention. If any instruction
+        elsewhere conflicts, follow docs/ledger/README.md (authoritative). EA-2's
+        ledger entry flagged this drift for SDO follow-up — it remains
+        unaddressed at authoring time. Do the right thing; flag again in Notes
+        if you encounter it.
+      </resolution>
+    </risk>
+
+    <risk id="I.6" severity="medium">
+      <description>
+        The 13 TOML constraints are authoritatively enumerated in Sprint 8 EA-2
+        test_entrypoint.py::TestAssistantOrchestratorConfigValidation. If GOV-11
+        lists them independently from code inspection, the two sources may
+        drift.
+      </description>
+      <resolution>
+        Cite test_entrypoint.py as the authoritative enumeration by test name
+        in GOV-11 Source References. Enumerate in the doc body, but mark the
+        test as the ground truth: "If this list diverges from
+        TestAssistantOrchestratorConfigValidation, the test wins — update this
+        doc." This pattern is the standard across EA-2 docs.
+      </resolution>
+    </risk>
+
+    <risk id="I.7" severity="low">
+      <description>
+        Parent-head drift: main may advance between authoring and EA pickup.
+      </description>
+      <resolution>
+        EA MUST verify `git rev-parse HEAD` matches df686b8 before branching.
+        If main has advanced, rebase onto current main. Do NOT force-checkout
+        df686b8 (L-13). Predecessor ledger_id in frontmatter does not change.
+      </resolution>
+    </risk>
+
+    <risk id="I.8" severity="low">
+      <description>
+        Audience section pro-forma: easy to write "operators should know X"
+        in a way that doesn't actually address the persona. Audit oversight
+        from a prior governance doc that's now referenced in STYLE.md.
+      </description>
+      <resolution>
+        Each persona bullet must answer: "If you are [persona] and this doc is
+        what you have, what specifically do you do / check / decide?" Not
+        "what do you know." If a persona has no actionable guidance from this
+        doc, say so explicitly rather than padding.
+      </resolution>
+    </risk>
+  </risks>
+
+  <!-- ===== SECTION 7: STRUCTURAL RECITATION (L-12) ===== -->
+
+  <structural_recitation>
+    <!-- The EA's comprehension gate MUST reproduce the below outline verbatim
+         (per STYLE.md Doc Template) as Section H of its comprehension comment.
+         Section headers are exact, in document order. -->
+
+    DOC TEMPLATE (STYLE.md — all three docs MUST match):
+
+      # {Domain} Governance
+      ## Audience
+      ## Prerequisites
+      ## Source References
+      ## Governance Content
+      ## Recovery / Remediation Procedures
+      ## Open Questions / Deferred Items
+
+    RECOVERY HEADER FLEX (per STYLE.md): Recovery / Remediation Procedures
+    may be standalone OR internalized within Governance Content if the doc's
+    subject matter IS recovery (not applicable to any EA-3 doc — keep
+    standalone for all three).
+
+    AUDIENCE PERSONAS (STYLE.md §Audience Taxonomy):
+      - Operator
+      - Developer
+      - Auditor
+      - Incident Responder
+      - Future Agent (Claude or successor)
+  </structural_recitation>
+
+  <!-- ===== SECTION 8: QUALITY GATES ===== -->
+
+  <quality_gates>
+    <gate id="LINE-FLOOR">
+      <command>wc -l docs/governance/context-spotlighting.md docs/governance/session-state.md docs/governance/configuration-management.md</command>
+      <pass_criteria>
+        Each doc ≥ 150 substantive lines (comment/blank lines subtracted).
+        SDV expectation: GOV-11 largest, GOV-08 smallest but still ≥ 150.
+      </pass_criteria>
+    </gate>
+
+    <gate id="STYLE-CONFORMANCE">
+      <command>grep -c "^## " docs/governance/context-spotlighting.md docs/governance/session-state.md docs/governance/configuration-management.md</command>
+      <pass_criteria>
+        Each file reports ≥ 6 level-2 headers (Audience, Prerequisites, Source
+        References, Governance Content, Recovery / Remediation, Open Questions).
+        Title (# ...) is level-1 and not counted here.
+      </pass_criteria>
+    </gate>
+
+    <gate id="SOURCE-ANCHOR">
+      <command>
+        grep -n "ADR-" docs/governance/context-spotlighting.md docs/governance/session-state.md docs/governance/configuration-management.md
+        grep -n "\.py" docs/governance/context-spotlighting.md docs/governance/session-state.md docs/governance/configuration-management.md
+      </command>
+      <pass_criteria>
+        Each doc has ≥ 1 ADR citation (or documented ADR-absence) and
+        ≥ 1 source file citation.
+      </pass_criteria>
+    </gate>
+
+    <gate id="ORACLE">
+      <command>git diff main...HEAD --name-only</command>
+      <pass_criteria>
+        Output contains ONLY:
+          - docs/governance/context-spotlighting.md
+          - docs/governance/session-state.md
+          - docs/governance/configuration-management.md
+          - docs/ledger/&lt;timestamp&gt;_sprint9_ea3_operational-state.md
+        No src/, tests/, shared/, launcher/, services/ paths. No .py files.
+        L-15 compliance is MACHINE-VERIFIED by this gate.
+      </pass_criteria>
+    </gate>
+
+    <gate id="L16-DISJOINT">
+      <command>git diff main...HEAD --name-only | grep -E "(tests/|conftest)" | wc -l</command>
+      <pass_criteria>
+        Output: 0. Zero test-file overlap with Sprint 8's working set.
+      </pass_criteria>
+    </gate>
+  </quality_gates>
+
+  <!-- ===== SECTION 9: VERIFICATION ===== -->
+
+  <verification>
+    <step>1. Run all quality gates (§8). Paste output verbatim into completion report.</step>
+    <step>2. For each doc, perform STYLE.md cross-check: open STYLE.md and walk
+      each Doc Template bullet against your doc. Any mismatch = RED.</step>
+    <step>3. Anchor verification: for each source file cited, open the file and
+      confirm every symbol name referenced exists. Phantom citations = RED.</step>
+    <step>4. Audience persona check: for each of the five personas, find the
+      sentence in each doc that addresses that persona. Missing = RED.</step>
+    <step>5. ADR-absence handling audit: for GOV-09 and GOV-11, confirm the
+      ADR-absence is documented in BOTH Source References (citing closest-
+      relevant instead) AND Open Questions (flagging the gap as a deferred
+      item).</step>
+    <step>6. Cross-link audit: for each cross-reference to an EA-1 or EA-2 doc,
+      confirm the target section header exists in the target file.</step>
+  </verification>
+
+  <!-- ===== SECTION 10: COMMIT + COMPLETION REPORT ===== -->
+
+  <commit_template>
+    <branch_create>git checkout -b feature/p5-task9-ea3-operational-state df686b8</branch_create>
+    <staged_files>
+      git add docs/governance/context-spotlighting.md
+      git add docs/governance/session-state.md
+      git add docs/governance/configuration-management.md
+      git add docs/ledger/&lt;timestamp&gt;_sprint9_ea3_operational-state.md
+    </staged_files>
+    <commit_message>[agent:ea_code] Sprint 9 EA-3: governance docs for operational state (GOV-08/09/11)</commit_message>
+  </commit_template>
+
+  <completion_report>
+    <location>docs/sprints/sprint_9/reports/&lt;YYYYMMDD_HHMMSS&gt;_ea_code_completion_v1.md</location>
+    <required_sections>
+      - Summary (3-5 sentences)
+      - Deliverables table (WI | Artifact | Lines | GOV ID | Vikunja subtask)
+      - Gate results (each of the five quality gates with command + output)
+      - Phantom / ADR-absence handling (session.py → session_store.py;
+        GOV-09 and GOV-11 ADR-absence citations)
+      - Cross-references (predecessor ledger, SDV, continuation XML, this prompt)
+      - Follow-ups (any discovered defects in EA-1/EA-2 docs; any gap flagged
+        for future EAs)
+    </required_sections>
+  </completion_report>
+
+  <!-- ===== SECTION 11: MATURE-NOT-MINIMAL ===== -->
+
+  <mature_not_minimal>
+    These docs are long-term governance artifacts that operators, auditors, and
+    future agents will rely on for years. The 150-line floor is the minimum,
+    not the target. Where the subject matter warrants depth — e.g., GOV-11's
+    13 constraints or GOV-09's lifecycle — author to the depth the subject
+    deserves, not to the floor. The user's documented preference (memory:
+    "mature Claude dev environment") is for polished, advanced, cohesive
+    work — not minimum-viable wiring.
+
+    What polish looks like here:
+      - Concrete worked examples (a config example, a delimiter layout
+        illustration, a session-reconnect sequence diagram in prose)
+      - Cross-links that actually resolve to sections that exist
+      - Persona guidance that is actionable, not performative
+      - Failure-mode catalogs linked to the tests that protect each mode
+      - Explicit acknowledgement of what is NOT covered (deferred items)
+
+    What polish is NOT:
+      - Padding to clear the line floor
+      - Speculative future-feature discussion
+      - Architectural opinion / proposal dressed as documentation
+      - Re-explaining content from EA-1/EA-2 docs
+  </mature_not_minimal>
+
+  <!-- ===== SECTION 12: REQUIRED ATTACHMENTS ===== -->
+
+  <required_attachments>
+    <!-- The EA MUST read every file in this list BEFORE posting its
+         comprehension gate. Reading order is not prescribed, but all must be
+         read. -->
+
+    <!-- STYLE + predecessor docs -->
+    <file>docs/governance/STYLE.md</file>
+    <file>docs/governance/pgov-validation.md</file>
+    <file>docs/governance/ipc-protocol.md</file>
+    <file>docs/governance/streaming-output.md</file>
+    <file>docs/governance/gpu-runtime.md</file>
+    <file>docs/governance/error-recovery.md</file>
+    <file>docs/governance/circuit-breaker.md</file>
+
+    <!-- Source anchors -->
+    <file>services/assistant_orchestrator/src/context_manager.py</file>
+    <file>services/assistant_orchestrator/src/pgov.py</file>
+    <file>services/assistant_orchestrator/src/constants.py</file>
+    <file>services/assistant_orchestrator/src/entrypoint.py</file>
+    <file>services/ui_gateway/src/session_store.py</file>
+    <file>services/ui_shell/src/session_panel.py</file>
+    <file>shared/runtime_config.py</file>
+    <file>launcher/guest_deploy.py</file>
+
+    <!-- Authoritative enumeration -->
+    <file>services/assistant_orchestrator/tests/test_entrypoint.py</file>
+
+    <!-- ADRs -->
+    <file>docs/adrs/ADR-009-Assistant-Interaction-Surface.md</file>
+    <file>docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md</file>
+
+    <!-- Predecessor ledger -->
+    <file>docs/ledger/20260422_181301_sprint9_ea2_runtime-resilience.md</file>
+
+    <!-- Ledger convention -->
+    <file>docs/ledger/README.md</file>
+
+    <!-- SDV -->
+    <file>docs/sprints/sprint_9/strategic_design_vision.md</file>
+
+    <!-- Continuation -->
+    <file>docs/P5_TASK9_SDO_CONTINUATION_v1.0.xml</file>
+  </required_attachments>
+
+</ea_prompt>

@@ -1,0 +1,921 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_prompt version="1.0" task="8" ea_number="2" authored_by="sdo" authored_at="2026-04-22">
+
+  <!--
+    BlarAI — EA Code Execution Prompt
+    Task 8: Test Quality Remediation — EA-2: Assistant Orchestrator + Semantic Router Test Hardening
+    Sprint 8 | Branch: feature/p5-task8-ea2-ao-sr-hardening
+    Ledger entry reserved: 52 (verify at commit time; see note below)
+
+    IMPORTANT (L-12): Before ANY work begins, the EA MUST post a comprehension gate
+    comment on Vikunja Task 82 prefixed [agent:ea_code][phase:comprehension] and STOP.
+    Do not start implementation until SDO explicitly approves with
+    [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+
+    IMPORTANT (L-15): This is a PURE TEST-AUTHORING milestone.
+    DO NOT modify any file outside tests/, conftest.py, docs/, or pyproject.toml.
+    If a production code change is required to unblock a test, STOP, document the
+    blocker in your completion report, and wait for SDO direction. Do not make the
+    change unilaterally.
+  -->
+
+  <!-- ===== SECTION 1: PARENT HEAD (L-13) ===== -->
+
+  <parent_head>29cea32</parent_head>
+  <!-- Verified by SDO via `git rev-parse HEAD` immediately before authoring.
+       Full HEAD at authoring: 29cea3260e7041e8dd239bc81f7ef8699fac7359.
+       EA MUST verify this matches the current main HEAD before branching. If HEAD has
+       advanced (EA-1 merged already or other SDO activity), use the current main HEAD —
+       do not force-checkout 29cea32. -->
+
+  <!-- ===== SECTION 2: COMPREHENSION GATE (L-12) ===== -->
+
+  <comprehension_gate>
+    <instruction>
+      READ THIS ENTIRE PROMPT before posting your comprehension gate.
+      Then READ every file listed in required_attachments.
+      Then POST a comprehension gate comment on Vikunja Task 82, prefixed:
+
+        [agent:ea_code][phase:comprehension]
+
+      Your comprehension comment MUST contain ALL of the following sections (verbatim
+      section headers required, in this exact order, no numbered prefixes):
+
+        A. MILESTONE OBJECTIVE (in your own words, 3-5 sentences)
+        B. WORK ITEMS (one sentence each for ALL 10 WIs — do NOT summarize, do NOT group)
+        C. FILES TO CREATE (list every new test file exactly as specified in deliverable)
+        D. FILES TO MODIFY (list every existing file you will add tests to)
+        E. FILES TO READ (all production source files you will read for context)
+        F. DELIVERABLE STRUCTURE (recite VERBATIM: branch name, every test file with its
+           test class/function names and naming conventions, ledger entry)
+        G. ORACLE EXPECTATION (recite VERBATIM the exact git diff --name-only grep command
+           and the expected EMPTY output)
+        H. MATURE-NOT-MINIMAL 1-HOUR CAP ACKNOWLEDGMENT (one sentence)
+        I. RISKS AND AMBIGUITIES (list any; at minimum address: mock-controlled centroids
+           and embeddings strategy for SR dual-gate, AO config-validation floor of 6/13,
+           pgov_display.hide() test lives in ui_shell/tests not AO tests)
+        J. PRODUCTION FILE PROHIBITION ACKNOWLEDGMENT (quote the prohibition verbatim)
+
+      After posting, STOP. Do NOT proceed to implementation.
+      You cannot begin code work until you have posted your
+      [agent:ea_code][phase:comprehension] comment AND received
+      [agent:sdo][phase:comprehension-review] VERDICT: APPROVED from the SDO.
+
+      If SDO issues VERDICT: REVISE, update your comprehension gate and wait again.
+    </instruction>
+  </comprehension_gate>
+
+  <!-- ===== SECTION 3: MILESTONE ===== -->
+
+  <milestone>
+    <objective>
+      Close all test coverage, assertion-quality, and boundary-verification gaps in the
+      assistant_orchestrator (AO) and semantic_router (SR) service clusters identified
+      by the Sprint 7 audit in docs/TEST_AUDIT_FINDINGS.md. This EA addresses:
+      the AO PGOV leakage threshold exact-point boundary (cosine_similarity == 0.85);
+      the SR dual-gate exact-point boundaries (similarity == 0.50, margin == 0.04,
+      margin == 0.03) via mock-controlled centroids and embeddings; AO entrypoint.py
+      config-validation coverage (≥ 6 of the ~13 uncovered TOML constraints, all 13
+      preferred under mature-not-minimal); AO entrypoint.py HEARTBEAT message handling;
+      AO entrypoint.py stop() isolation; circuit_breaker.py over-limit-token,
+      simultaneous-trip, and new_request() reset paths; pgov.py CREDIT_CARD and
+      HEX_SECRET PII pattern tests; direct constants assertion test files for both
+      AO and SR; and the pgov_display.py hide() assignment-posing-as-assertion bug fix.
+      No production code is modified. All work is pure test-authoring.
+    </objective>
+    <sprint>8</sprint>
+    <ea_number>2</ea_number>
+    <branch>feature/p5-task8-ea2-ao-sr-hardening</branch>
+    <ledger_entry_reserved>52</ledger_entry_reserved>
+    <ledger_entry_note>
+      SDO reserved entry 52 at authoring time. Sprint 9 EA-1 consumed entry 51 in a
+      parallel merge window; EA-2 should therefore verify the next free entry at
+      commit time and use whichever is free (target 52; adjust upward if advanced).
+      Record the actual entry number in the commit message and completion report.
+    </ledger_entry_note>
+    <sizing>M</sizing>
+    <depends_on>
+      EA-1 merged to main. Branch feature/p5-task8-ea1-policy-agent-hardening must be
+      present in main history. If EA-1 is not yet merged at EA pickup, STOP and post a
+      blocker comment — sequential execution is mandatory per SDV §5.2 and Sprint 8
+      out-of-scope policy.
+    </depends_on>
+  </milestone>
+
+  <!-- ===== SECTION 4: WORK ITEMS ===== -->
+
+  <work_items>
+
+    <!-- HIGH PRIORITY — address before MEDIUM and LOW -->
+
+    <item id="WI-1" priority="HIGH" source="TEST_AUDIT_FINDINGS.md §Boundary Violations — AO pgov.py — Exact PGOV Leakage Threshold (0.85) Untested">
+      <title>Add AO PGOV leakage threshold exact-point boundary test (cosine_similarity == 0.85)</title>
+      <detail>
+        File: services/assistant_orchestrator/tests/test_pgov_boundaries.py  (CREATE NEW)
+        Class: TestPGOVLeakageThresholdBoundary
+
+        Add test: test_leakage_cosine_similarity_at_threshold_rejects
+          Construct PGOVPipeline with PGOV_COSINE_THRESHOLD=0.85 (the production constant).
+          Inject a mocked leakage detector whose check_leakage.return_value == 0.85 exactly.
+          Feed a minimal chunk set (one chunk is sufficient; read test_pgov.py
+          TestPGOVPipeline::test_leakage_with_injected_detector for the existing pattern).
+          Run the PGOV pipeline.
+          Assert: result.approved is False.
+          Assert: the leakage-reason code matches the production denial path (read
+            services/assistant_orchestrator/src/pgov.py to identify the exact reason
+            string; do NOT invent a code).
+
+        Rationale: services/assistant_orchestrator/src/pgov.py uses a comparison operator
+        on cosine_similarity against PGOV_COSINE_THRESHOLD. Existing tests cover 0.92
+        (above) and 0.50 (below) but NOT the exact boundary at 0.85. A typo changing
+        `>=` to `>` (or vice versa) at the threshold comparison would pass all existing
+        tests while silently flipping the boundary classification.
+
+        Read before writing:
+          services/assistant_orchestrator/src/pgov.py (PGOVPipeline, leakage path)
+          services/assistant_orchestrator/src/constants.py (PGOV_COSINE_THRESHOLD == 0.85)
+          services/assistant_orchestrator/tests/test_pgov.py
+            (TestPGOVPipeline::test_leakage_with_injected_detector pattern)
+          services/assistant_orchestrator/tests/test_pgov.py
+            (TestPGOVPipeline::test_leakage_below_threshold_passes pattern)
+
+        Mocking strategy: inject a detector via the same seam already used by
+        test_leakage_with_injected_detector. Do not add new production hooks.
+      </detail>
+    </item>
+
+    <item id="WI-2" priority="HIGH" source="TEST_AUDIT_FINDINGS.md §Boundary Violations — semantic_router — Dual-Gate Thresholds">
+      <title>Add SR dual-gate exact-point boundary tests (similarity == 0.50, margin == 0.04, margin == 0.03)</title>
+      <detail>
+        File: services/semantic_router/tests/test_dual_gate_thresholds.py  (CREATE NEW)
+        Class: TestSemanticRouterDualGateThresholds
+
+        Add three tests targeting the exact boundary points of the SR dual-gate:
+
+        test_similarity_at_confidence_threshold_passes_or_escalates:
+          Mock-control the router's centroids so the top similarity equals 0.50 exactly
+          (CONFIDENCE_THRESHOLD from services/semantic_router/src/constants.py).
+          Provide an embedding that yields cosine similarity == 0.50 to the top centroid
+          and a second centroid that preserves the margin gate (e.g., similarity &lt;= 0.46).
+          Classify and assert the behavior at the exact threshold matches the production
+          comparison operator (read router.py to determine whether 0.50 is inclusive; the
+          test asserts the CURRENT production behavior, not an assumed one).
+
+        test_margin_at_exact_gate_classifies:
+          Mock-control centroids so top-1 similarity minus top-2 similarity == 0.04 exactly
+          (CONFIDENCE_MARGIN from constants.py). Assert the classifier's behavior at the
+          exact margin (inclusive vs. exclusive — read router.py to determine).
+
+        test_margin_just_below_gate_escalates_or_rejects:
+          Same setup as above but with margin == 0.03 (one hundredth below the gate).
+          Assert the classifier does NOT return a confident classification — i.e. it
+          escalates, returns a None/ambiguous label, or matches whatever the production
+          under-margin path does (read router.py).
+
+        Read before writing:
+          services/semantic_router/src/router.py (classify() or equivalent; dual-gate logic)
+          services/semantic_router/src/constants.py
+            (CONFIDENCE_THRESHOLD == 0.50, CONFIDENCE_MARGIN == 0.04)
+          services/semantic_router/src/intents.py (centroid structures, if relevant)
+          services/semantic_router/tests/test_router.py (existing mocking patterns)
+
+        Mocking strategy: monkeypatch or construct the router with injected centroids and
+        an injected embedding function so the similarity values are deterministic. The
+        audit explicitly flagged that dual-gate boundary behavior cannot be tested at exact
+        values without controlled centroids and embeddings; use whatever seam the existing
+        router.py exposes. If no clean seam exists and patching requires touching
+        production code, STOP and report the blocker — do NOT add a production hook.
+      </detail>
+    </item>
+
+    <item id="WI-3" priority="HIGH" source="TEST_AUDIT_FINDINGS.md §Coverage Map — AO entrypoint.py — Config Validation Floor">
+      <title>Add AO entrypoint.py config-validation coverage (≥ 6 of ~13 uncovered constraints; all 13 preferred)</title>
+      <detail>
+        File: services/assistant_orchestrator/tests/test_entrypoint.py  (MODIFY)
+        Class: TestAssistantOrchestratorConfigValidation  (CREATE NEW CLASS in existing file)
+
+        Add parametrized or per-constraint tests for the TOML config-validation constraints
+        currently uncovered. Only `deployment_mode` and `response_depth_mode` are covered at
+        HEAD 29cea32. The full list of uncovered constraints (per audit §Coverage Map):
+
+          1. device MUST equal "GPU"                         (ADR-011 hardening)
+          2. priority RANGE validity                         (integer or enum bounds)
+          3. model_dir MUST exist on filesystem
+          4. max_new_tokens bounds
+          5. temperature bounds
+          6. top_k bounds
+          7. top_p bounds
+          8. repetition_penalty bounds
+          9. vsock_cid validity
+          10. vsock_port validity
+          11. max_message_bytes bounds
+          12. pgov.cosine_similarity_threshold bounds
+          13. (any additional constraint surfaced in entrypoint.py validate_runtime_config)
+
+        FLOOR: ≥ 6 of 13. CEILING: 13 (preferred under mature-not-minimal).
+
+        For each constraint covered, add one test that:
+          - Writes a TOML file to tmp_path with the targeted field set to an invalid value.
+          - Calls the AO's validate_runtime_config() equivalent (read entrypoint.py for
+            the exact method name and signature).
+          - Asserts: (ok is False) AND (fingerprint["code"] starts with a recognizable
+            AO error prefix) AND (the error code matches the constraint being tested).
+
+        Each test MUST assert the specific error code string — not merely that validation
+        failed. Failing-closed with the wrong code is still a bug.
+
+        Read before writing:
+          services/assistant_orchestrator/src/entrypoint.py
+            (validate_runtime_config method OR equivalent config-validation path;
+             read in full to enumerate the exact constraint checks)
+          services/assistant_orchestrator/src/constants.py
+            (to verify expected value ranges)
+          services/policy_agent/tests/test_entrypoint.py
+            (for an equivalent config-validation test pattern, if one exists post-EA-1)
+
+        COMPLETION REPORT REQUIREMENT: State exactly how many of the 13 were covered,
+        list by name the constraints covered, list by name any constraints NOT covered
+        with a one-sentence rationale (e.g., "covered indirectly by existing test X",
+        "requires production change to make testable — deferred"). The residual count
+        MUST appear in the commit message as well.
+      </detail>
+    </item>
+
+    <item id="WI-4" priority="MEDIUM" source="TEST_AUDIT_FINDINGS.md §Coverage Map — AO entrypoint.py — HEARTBEAT handling">
+      <title>Add AO entrypoint.py HEARTBEAT message handling test</title>
+      <detail>
+        File: services/assistant_orchestrator/tests/test_entrypoint.py  (MODIFY)
+        Class: TestAssistantOrchestratorHeartbeat  (CREATE NEW CLASS)
+
+        Add test: test_handle_connection_dispatches_heartbeat
+          Construct or mock the AO _handle_connection path to receive a framed HEARTBEAT
+          message (read entrypoint.py _handle_connection to identify the exact message
+          dispatch — HANDSHAKE and PROMPT are already covered; HEARTBEAT is not).
+          Feed the HEARTBEAT message through the handler.
+          Assert: the expected HEARTBEAT response payload is emitted (read the production
+          code to determine what the response shape is; do not invent it).
+          Assert: no exception is raised.
+          Assert: the connection remains open after HEARTBEAT (HEARTBEAT is a liveness
+          probe, not a terminator).
+
+        Read before writing:
+          services/assistant_orchestrator/src/entrypoint.py (_handle_connection)
+          shared/ipc/protocol.py (MessageType.HEARTBEAT if defined; HEARTBEAT encoder
+            if one exists — the audit notes encode_handshake_request,
+            encode_handshake_response, encode_prompt_request, encode_stream_token,
+            encode_pgov_result, encode_generation_complete exist)
+          services/assistant_orchestrator/tests/test_entrypoint.py
+            (existing HANDSHAKE and PROMPT test patterns — mirror exactly)
+
+        Mocking strategy: follow the existing handshake-dispatch test fixture pattern
+        in test_entrypoint.py. Do not open a real socket.
+      </detail>
+    </item>
+
+    <item id="WI-5" priority="LOW" source="TEST_AUDIT_FINDINGS.md §Coverage Map — AO entrypoint.py — stop() not isolated">
+      <title>Add AO entrypoint.py stop() isolation test</title>
+      <detail>
+        File: services/assistant_orchestrator/tests/test_entrypoint.py  (MODIFY)
+        Class: TestAssistantOrchestratorStopIsolation  (CREATE NEW CLASS, or add to an
+          existing non-start-path class)
+
+        Add test: test_stop_when_not_running_does_not_raise
+          Construct an AO service instance with a minimal valid config (use the
+          existing _write_minimal_config test helper, or author one if missing).
+          Do NOT call start().
+          Call service.stop().
+          Assert: no exception is raised.
+          Assert: service.running is False (or service._running if that is the attribute).
+
+        Add test: test_stop_after_start_completes_cleanly
+          If a full start()-then-stop() flow is feasible with existing test mocks
+          (gpu_inference, pgov detector, and listener all mocked), add a second test
+          that starts the service, then stops it, and asserts clean shutdown signal
+          (running flag is False, no lingering listener state).
+          If the start() path cannot be exercised without real GPU/model load, skip
+          this second test and note in the completion report.
+
+        Read before writing:
+          services/assistant_orchestrator/src/entrypoint.py (stop() method)
+          services/policy_agent/tests/test_entrypoint.py
+            (test_stop_when_not_running_does_not_raise from EA-1, if merged —
+             mirror the pattern)
+      </detail>
+    </item>
+
+    <item id="WI-6" priority="MEDIUM" source="TEST_AUDIT_FINDINGS.md §Coverage Map — AO circuit_breaker.py — ADEQUATE (with gaps)">
+      <title>Add circuit_breaker.py over-limit-token, simultaneous-trip, and new_request() reset tests</title>
+      <detail>
+        File: services/assistant_orchestrator/tests/test_circuit_breaker.py  (MODIFY)
+
+        Add three tests:
+
+        test_token_breaker_over_limit_trips:
+          At HEAD, tests cover at-limit and under-limit cases but not strictly OVER the
+          limit (e.g., current_tokens == OUTPUT_TOKEN_CAP + 1). Construct a TokenBreaker
+          with OUTPUT_TOKEN_CAP and feed an over-cap value. Assert it trips. Assert the
+          tripped state exposes the expected preemption reason (read the production
+          class for the exact enum / string).
+
+        test_simultaneous_token_and_depth_cap_trip:
+          Construct both the token breaker and the tool-call depth breaker in a single
+          circuit-breaker context (read circuit_breaker.py for the exact orchestration
+          class — it may be CircuitBreaker, BreakerSet, or similar). Feed values that
+          trip BOTH caps in the same request. Assert that BOTH trip flags are set and
+          that the reported preemption reason is either the combined reason, the first-
+          tripped reason, or whichever the production code specifies. Test documents the
+          current behavior — do NOT assume priority.
+
+        test_new_request_resets_breaker_state:
+          Construct a circuit breaker, trip it (either via the token cap or depth cap),
+          verify the tripped state, call new_request() (or the equivalent reset method —
+          read the production class), and assert that all breaker counters and tripped
+          flags are reset to their initial values.
+
+        Read before writing:
+          services/assistant_orchestrator/src/circuit_breaker.py (in full)
+          services/assistant_orchestrator/src/constants.py
+            (OUTPUT_TOKEN_CAP, TOOL_CALL_DEPTH_CAP)
+          services/assistant_orchestrator/tests/test_circuit_breaker.py
+            (existing 7 tests in 3 classes — mirror the setup style)
+      </detail>
+    </item>
+
+    <item id="WI-7" priority="LOW" source="TEST_AUDIT_FINDINGS.md §Coverage Map — AO pgov.py — Untested PII Patterns (CREDIT_CARD, HEX_SECRET)">
+      <title>Add pgov.py CREDIT_CARD and HEX_SECRET PII pattern tests</title>
+      <detail>
+        File: services/assistant_orchestrator/tests/test_pgov.py  (MODIFY)
+        Class: TestPGOVPIIPatterns (existing class — read test_pgov.py to confirm exact
+          class name; if different, add to whichever class covers the other 7 PII patterns)
+
+        Add test: test_pii_pattern_credit_card_detected
+          Feed an output string containing a representative credit-card-like number
+          (e.g., "4111 1111 1111 1111" or "4111-1111-1111-1111"; use a Luhn-valid test
+          card number or a clearly-synthetic 16-digit sequence — do NOT use a real
+          cardholder number).
+          Run the PII detection stage of PGOV.
+          Assert: the CREDIT_CARD pattern matches and triggers the denial path.
+          Assert: result.approved is False.
+          Assert: the denial reason code references CREDIT_CARD (or the production
+            equivalent; read pgov.py _PII_PATTERNS to identify the exact label).
+
+        Add test: test_pii_pattern_hex_secret_detected
+          Feed an output string containing a 32+ character hex string (e.g.,
+          "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4").
+          Run PII detection.
+          Assert: the HEX_SECRET pattern matches and triggers the denial path.
+          Assert: result.approved is False.
+          Assert: the denial reason code references HEX_SECRET.
+
+        Read before writing:
+          services/assistant_orchestrator/src/pgov.py (_PII_PATTERNS list —
+            confirm CREDIT_CARD and HEX_SECRET regexes; author test inputs that match)
+          services/assistant_orchestrator/tests/test_pgov.py
+            (existing 7 PII pattern tests — mirror exactly)
+      </detail>
+    </item>
+
+    <item id="WI-8" priority="MEDIUM" source="TEST_AUDIT_FINDINGS.md §Coverage Map — AO constants.py UNCOVERED">
+      <title>Create test_constants_ao.py with direct assertion tests for all AO behavioral constants</title>
+      <detail>
+        File to CREATE: services/assistant_orchestrator/tests/test_constants_ao.py
+        Class: TestAssistantOrchestratorConstants
+
+        Author one test per constant value (or a single parametrized test). Required
+        coverage — read services/assistant_orchestrator/src/constants.py for the exact
+        value of each:
+
+          test_pgov_cosine_threshold:
+            from services.assistant_orchestrator.src.constants import PGOV_COSINE_THRESHOLD
+            assert PGOV_COSINE_THRESHOLD == 0.85
+
+          test_output_token_cap:
+            assert OUTPUT_TOKEN_CAP == &lt;value in constants.py&gt;
+
+          test_tool_call_depth_cap:
+            assert TOOL_CALL_DEPTH_CAP == &lt;value in constants.py&gt;
+
+          test_default_generation_params:
+            assert DEFAULT_TEMPERATURE == &lt;value&gt;
+            assert DEFAULT_TOP_K == &lt;value&gt;
+            (include DEFAULT_TOP_P, DEFAULT_REPETITION_PENALTY if present)
+
+          test_ao_device_constant:
+            assert AO_DEVICE == "GPU"  (post-ADR-011 value; re-exported from shared)
+
+          test_stale_reexports_mapping:
+            Note: the audit flags NPU_PRIORITY and NPU_KV_CACHE_PERSISTS as stale re-exports
+            retained for schema compatibility. Assert their CURRENT values to pin the
+            mapping to the GPU-era equivalents. Do NOT rename — stale renaming is EA-5 scope.
+
+          Any additional behavioral constant present in constants.py that gates
+          operational behavior. Read the file end-to-end; constants-test coverage is
+          comprehensive per mature-not-minimal.
+
+        Rationale: A regression changing PGOV_COSINE_THRESHOLD from 0.85 to 0.80 or
+        flipping AO_DEVICE back to "NPU" would not be caught by any existing unit test.
+        Direct constant-value assertions provide a diagnostic signal with the first
+        regression change.
+      </detail>
+    </item>
+
+    <item id="WI-9" priority="MEDIUM" source="TEST_AUDIT_FINDINGS.md §Coverage Map — semantic_router constants.py UNCOVERED">
+      <title>Create test_constants_sr.py with direct assertion tests for all SR behavioral constants</title>
+      <detail>
+        File to CREATE: services/semantic_router/tests/test_constants_sr.py
+        Class: TestSemanticRouterConstants
+
+        Author one test per constant value. Required coverage — read
+        services/semantic_router/src/constants.py for the exact value of each:
+
+          test_confidence_threshold:
+            from services.semantic_router.src.constants import CONFIDENCE_THRESHOLD
+            assert CONFIDENCE_THRESHOLD == 0.50
+
+          test_confidence_margin:
+            from services.semantic_router.src.constants import CONFIDENCE_MARGIN
+            assert CONFIDENCE_MARGIN == 0.04
+
+          test_any_other_behavioral_constants:
+            Read constants.py end-to-end. Anchor every value present (intent labels,
+            embedding model identifier, default fallback intent, etc.) with an explicit
+            assertion. Mature-not-minimal: full coverage preferred.
+
+        Rationale: CONFIDENCE_THRESHOLD and CONFIDENCE_MARGIN are the dual-gate production
+        defaults. A value regression (e.g., 0.50 → 0.05) would only be detected when
+        classification behavior visibly changes — too indirect for fleet-era ops.
+      </detail>
+    </item>
+
+    <item id="WI-10" priority="MEDIUM" source="TEST_AUDIT_FINDINGS.md §Assertion Quality — ui_shell — Assignment Posing As Assertion in test_hide_sets_display_none">
+      <title>Fix pgov_display.py hide() assignment-posing-as-assertion bug</title>
+      <detail>
+        File: services/ui_shell/tests/test_pgov_display.py  (MODIFY)
+        Test: TestPGOVPanelLogic::test_hide_sets_display_none (lines 118-121 at HEAD 29cea32)
+
+        Current state (buggy):
+          def test_hide_sets_display_none(self, panel: PGOVPanel) -&gt; None:
+              panel.display_denial(_make_denial())
+              panel.hide()
+              panel.styles.display = "none"  # Verify the assignment happened
+
+        The final line is an ASSIGNMENT, not an assertion. The test passes regardless
+        of whether hide() actually resets styles.display. A regression in which hide()
+        fails to set styles.display = "none" is not caught.
+
+        Required fix:
+          Replace the assignment with a real assertion:
+          assert panel.styles.display == "none"
+
+        The sibling test test_display_denial_sets_block_display already uses this
+        correct idiom. Mirror it.
+
+        NOTE ON SCOPE: This fix touches services/ui_shell/tests/test_pgov_display.py —
+        not an AO test file. The continuation XML §5 EA-2 scope labels this item as
+        "AO pgov_display.py" but the actual production module services/ui_shell/src/pgov_display.py
+        lives in ui_shell, and its test is in services/ui_shell/tests/test_pgov_display.py.
+        EA-2 owns the fix per SDV §5.1 item 2. This is a one-line assertion correction,
+        not a structural move — scope-appropriate for EA-2.
+
+        Read before writing:
+          services/ui_shell/tests/test_pgov_display.py (lines 118-121, and the sibling
+            test test_display_denial_sets_block_display for the correct assertion idiom)
+          services/ui_shell/src/pgov_display.py (PGOVPanel.hide() method — confirm the
+            assertion target is correct)
+
+        No new tests are required for WI-10 — this is a bug fix to an existing test.
+        The net test count may not change from this WI, but the assertion quality does.
+      </detail>
+    </item>
+
+  </work_items>
+
+  <!-- ===== SECTION 5: DELIVERABLE ===== -->
+
+  <deliverable>
+    <branch_name>feature/p5-task8-ea2-ao-sr-hardening</branch_name>
+
+    <new_files>
+      <file>
+        <path>services/assistant_orchestrator/tests/test_pgov_boundaries.py</path>
+        <classes>
+          <class>TestPGOVLeakageThresholdBoundary</class>
+        </classes>
+        <test_functions>
+          test_leakage_cosine_similarity_at_threshold_rejects
+        </test_functions>
+        <source_wi>WI-1</source_wi>
+      </file>
+
+      <file>
+        <path>services/semantic_router/tests/test_dual_gate_thresholds.py</path>
+        <classes>
+          <class>TestSemanticRouterDualGateThresholds</class>
+        </classes>
+        <test_functions>
+          test_similarity_at_confidence_threshold_passes_or_escalates,
+          test_margin_at_exact_gate_classifies,
+          test_margin_just_below_gate_escalates_or_rejects
+        </test_functions>
+        <source_wi>WI-2</source_wi>
+      </file>
+
+      <file>
+        <path>services/assistant_orchestrator/tests/test_constants_ao.py</path>
+        <classes>
+          <class>TestAssistantOrchestratorConstants</class>
+        </classes>
+        <test_functions>
+          test_pgov_cosine_threshold,
+          test_output_token_cap,
+          test_tool_call_depth_cap,
+          test_default_generation_params,
+          test_ao_device_constant,
+          test_stale_reexports_mapping
+          (plus any additional behavioral constants discovered while reading constants.py)
+        </test_functions>
+        <source_wi>WI-8</source_wi>
+      </file>
+
+      <file>
+        <path>services/semantic_router/tests/test_constants_sr.py</path>
+        <classes>
+          <class>TestSemanticRouterConstants</class>
+        </classes>
+        <test_functions>
+          test_confidence_threshold,
+          test_confidence_margin,
+          test_any_other_behavioral_constants (catch-all; split as constants.py warrants)
+        </test_functions>
+        <source_wi>WI-9</source_wi>
+      </file>
+    </new_files>
+
+    <modified_files>
+      <file>
+        <path>services/assistant_orchestrator/tests/test_entrypoint.py</path>
+        <changes>
+          WI-3: new class TestAssistantOrchestratorConfigValidation with ≥ 6 (all 13 preferred)
+            parametrized or per-constraint tests asserting (ok is False) AND specific error_code.
+          WI-4: new class TestAssistantOrchestratorHeartbeat with test_handle_connection_dispatches_heartbeat.
+          WI-5: new class TestAssistantOrchestratorStopIsolation with
+            test_stop_when_not_running_does_not_raise and optional
+            test_stop_after_start_completes_cleanly.
+        </changes>
+      </file>
+
+      <file>
+        <path>services/assistant_orchestrator/tests/test_circuit_breaker.py</path>
+        <changes>
+          WI-6: three new tests — test_token_breaker_over_limit_trips,
+            test_simultaneous_token_and_depth_cap_trip,
+            test_new_request_resets_breaker_state (placed in the existing class
+            whose pattern most closely matches, or a new class if none fits).
+        </changes>
+      </file>
+
+      <file>
+        <path>services/assistant_orchestrator/tests/test_pgov.py</path>
+        <changes>
+          WI-7: two new tests — test_pii_pattern_credit_card_detected,
+            test_pii_pattern_hex_secret_detected (added to the existing class covering
+            the other 7 PII patterns).
+        </changes>
+      </file>
+
+      <file>
+        <path>services/ui_shell/tests/test_pgov_display.py</path>
+        <changes>
+          WI-10: fix test_hide_sets_display_none — replace
+            `panel.styles.display = "none"` assignment on the final line with
+            `assert panel.styles.display == "none"` real assertion.
+          No other changes to this file.
+        </changes>
+      </file>
+
+      <file>
+        <path>docs/POST_OPERATIONAL_MATURATION_LEDGER.md</path>
+        <changes>
+          Add Entry 52 (or next free entry — verify at commit time): Task 8 / EA-2:
+            Assistant Orchestrator + Semantic Router Test Hardening — COMPLETE.
+          Format: follow the existing entry format exactly (see Entry 50, Entry 51 for
+            reference if EA-1's entry has merged). Include: branch name, commit hash,
+            net new test count, baseline before/after, date, WI disposition summary,
+            residual AO config-validation constraint count (WI-3).
+        </changes>
+      </file>
+    </modified_files>
+
+    <naming_conventions>
+      Test class names: PascalCase, descriptive (TestPGOVLeakageThresholdBoundary,
+        TestAssistantOrchestratorConfigValidation, etc.).
+      Test function names: snake_case, starts with test_, describes the behavior being tested.
+      No numbered prefixes on section headers in any test file or comprehension gate (L-12).
+      No extra sections or test classes beyond what is listed in this deliverable (L-12).
+      Do NOT rename any existing class, function, or file — stale naming cleanup is EA-5 scope.
+    </naming_conventions>
+
+    <ledger_entry_reserved>52 (verify next free entry at commit time; may advance to 53+ if
+      other sprint activity has consumed it)</ledger_entry_reserved>
+  </deliverable>
+
+  <!-- ===== SECTION 6: NEGATIVE CONSTRAINTS (L-15) ===== -->
+
+  <negative_constraints>
+    <constraint id="NC-1" severity="HARD">
+      DO NOT modify any file outside tests/, conftest.py, docs/, or pyproject.toml.
+      If a production code change is required to unblock a test, STOP, document the
+      blocker in your completion report, and wait for SDO direction. Do not make the
+      change unilaterally.
+    </constraint>
+
+    <constraint id="NC-2" severity="HARD">
+      DO NOT rename stale NPU identifiers in AO, SR, or any cross-service test file
+      (e.g., NPU_PRIORITY, NPU_KV_CACHE_PERSISTS re-exports, _make_npu_stub helpers,
+      TestPipelineWithNPUStub class names). Your tests may reference these identifiers
+      (to add coverage) but must not rename them. Renaming is EA-5 scope.
+    </constraint>
+
+    <constraint id="NC-3" severity="HARD">
+      DO NOT author EA-1, EA-3, EA-4, or EA-5 work. Only assistant_orchestrator and
+      semantic_router tests (plus the one ui_shell test-file bug-fix in WI-10) are
+      in scope for this EA.
+    </constraint>
+
+    <constraint id="NC-4" severity="HARD">
+      DO NOT add ISS-1 (AO speculative decoding), ISS-2 (think tags in TUI), or
+      ISS-3 (PA stop-token mismatch) tests. These are tracked issues requiring
+      production code changes and are explicitly deferred per SDV §13.1 and
+      Sprint 8 out-of-scope policy.
+    </constraint>
+
+    <constraint id="NC-5" severity="HARD">
+      DO NOT add integration tests requiring a live Hyper-V VM, real vsock socket,
+      real GPU inference, or real Qwen3 model load. All new tests must be unit-scoped
+      and runnable under the REGRESSION pytest scope (no slow marker, no integration
+      marker).
+    </constraint>
+
+    <constraint id="NC-6" severity="HARD">
+      DO NOT author tests for USE-CASE-002, USE-CASE-003, or USE-CASE-005 features.
+      Only USE-CASE-004 (AO) and the semantic router cluster that feeds it are in scope.
+    </constraint>
+
+    <constraint id="NC-7" severity="HARD">
+      DO NOT use parallel EA execution. EA-3 cannot begin until EA-2 has merged.
+      SDO enforces sequential ordering per SDV §5.2.
+    </constraint>
+
+    <constraint id="NC-8" severity="HARD">
+      DO NOT add sections, headers, or content that is not part of the deliverable
+      contract in Section 5 (L-12 compliance). Do not rename required sections.
+      Do not add numbered prefixes to section headers in your comprehension gate response.
+    </constraint>
+
+    <constraint id="NC-9" severity="HARD">
+      DO NOT author a retroactive Sprint 7 SCR or SWAGR. Sprint 7 closed under
+      pre-DEC-15 rules; its audit output is the input to Sprint 8 and does not need
+      retroactive reporting.
+    </constraint>
+
+    <constraint id="NC-10" severity="MEDIUM">
+      DO NOT create a root-level conftest.py. If fixture sharing is required, create
+      services/assistant_orchestrator/tests/conftest.py or
+      services/semantic_router/tests/conftest.py only.
+    </constraint>
+
+    <constraint id="NC-11" severity="MEDIUM">
+      DO NOT invent error codes, response shapes, or reason strings. Every assertion
+      against a production value must match the actual production code at HEAD 29cea32
+      (or current main at pickup). Read the production file; do not guess.
+    </constraint>
+  </negative_constraints>
+
+  <!-- ===== SECTION 7: QUALITY GATE ===== -->
+
+  <quality_gate>
+    <gate id="COMPILE">
+      After authoring all tests, verify no import errors:
+        cd C:\Users\mrbla\BlarAI
+        .venv\Scripts\python -c "import services.assistant_orchestrator.tests.test_pgov_boundaries"
+        .venv\Scripts\python -c "import services.assistant_orchestrator.tests.test_constants_ao"
+        .venv\Scripts\python -c "import services.semantic_router.tests.test_dual_gate_thresholds"
+        .venv\Scripts\python -c "import services.semantic_router.tests.test_constants_sr"
+      No ImportError or ModuleNotFoundError is acceptable. Any import failure indicates
+      a stale reference or missing __init__.py and must be resolved before TEST gate.
+    </gate>
+
+    <gate id="TEST">
+      Run the REGRESSION test suite:
+        cd C:\Users\mrbla\BlarAI
+        .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+      PASS criteria: test count MUST NOT decrease below the preceding branch's count.
+      At authoring time the post-EA-1 baseline is approximately 813 passed, 2 skipped
+      (EA-1 added ~18 tests to the 755 Sprint 8 start baseline). EA MUST re-check the
+      exact baseline at pickup by running the suite on main BEFORE creating the EA-2
+      branch. The acceptance rule is: post-EA-2 count ≥ post-EA-1 count. Record both
+      numbers in the commit message.
+      Any new test must appear in the count (count should increase by ≥ 15).
+      No pre-existing tests may regress.
+    </gate>
+
+    <gate id="ORACLE">
+      Verify no production files were modified:
+        git diff main...feature/p5-task8-ea2-ao-sr-hardening --name-only | grep -vE "tests|conftest|docs|pyproject"
+      Expected output: EMPTY (zero lines).
+      If ANY production file appears in the filtered diff, the EA has violated Sprint 8's
+      mandate. STOP and report the violation in the completion report before doing
+      anything else. Do NOT attempt to "undo" the change without SDO direction — the
+      branch is evidence.
+    </gate>
+  </quality_gate>
+
+  <!-- ===== SECTION 8: VERIFICATION (for Lead Architect) ===== -->
+
+  <verification>
+    <description>
+      These are verbatim terminal commands the Lead Architect (non-developer) can run
+      to confirm success. Run from C:\Users\mrbla\BlarAI in PowerShell.
+    </description>
+
+    <step id="V-1">
+      <command>cd C:\Users\mrbla\BlarAI</command>
+      <expected>Working directory set to the BlarAI repo root. No output expected.</expected>
+    </step>
+
+    <step id="V-2">
+      <command>git log --oneline -1</command>
+      <expected>
+        Most recent commit on main should be the EA-2 merge commit (Co-Lead auto-merges
+        after EA-2 completes). Commit subject should begin:
+          test(task8/ea2): AO + semantic_router boundary + isolation + constants hardening —
+        followed by "N new tests, baseline X → Y".
+      </expected>
+    </step>
+
+    <step id="V-3">
+      <command>git diff main --name-only</command>
+      <expected>
+        After merge: empty (the branch is merged; working tree is clean).
+        Before merge (on the feature branch): only test files under
+          services/assistant_orchestrator/tests/,
+          services/semantic_router/tests/,
+          services/ui_shell/tests/test_pgov_display.py (the WI-10 fix), and
+          docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+        NO production source files under services/*/src/ or shared/.
+      </expected>
+    </step>
+
+    <step id="V-4">
+      <command>.venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q</command>
+      <expected>
+        At least (post-EA-1 baseline) passed, 2 skipped. The exact count should be higher
+        than the post-EA-1 count by at least 15 tests. The exact numbers appear in the
+        EA-2 commit message (X → Y).
+      </expected>
+    </step>
+
+    <step id="V-5">
+      <command>git diff main...feature/p5-task8-ea2-ao-sr-hardening --name-only | findstr /v /R "tests conftest docs pyproject"</command>
+      <expected>
+        Empty output (no production files in the diff). This is the ORACLE gate
+        verification. If any line appears, it is a Sprint 8 mandate violation.
+      </expected>
+    </step>
+
+    <step id="V-6">
+      <command>.venv\Scripts\pytest services/assistant_orchestrator/ services/semantic_router/ --tb=short -q</command>
+      <expected>
+        All AO and SR tests pass, including all new WI-1 through WI-9 tests. The
+        WI-10 fix is under ui_shell, verified by V-4 above.
+      </expected>
+    </step>
+  </verification>
+
+  <!-- ===== SECTION 9: COMMIT TEMPLATE ===== -->
+
+  <commit_template>
+    <format>test(task8/ea2): AO + semantic_router boundary + isolation + constants hardening — {N} new tests, baseline {X} → {Y}</format>
+    <example>test(task8/ea2): AO + semantic_router boundary + isolation + constants hardening — 21 new tests, baseline 813 → 834</example>
+    <rules>
+      - N = exact count of new tests added by this EA (verify with `pytest --co -q` diff
+        between main@pre-branch and feature/p5-task8-ea2-ao-sr-hardening).
+      - X = total passed count on main BEFORE this EA's branch was created (run the
+        regression suite on main at pickup time and record the number).
+      - Y = total passed count AFTER this EA's changes merge (run the regression suite
+        on the feature branch after all commits).
+      - Commit only files under services/assistant_orchestrator/tests/,
+        services/semantic_router/tests/, services/ui_shell/tests/test_pgov_display.py,
+        and docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+      - Do NOT commit any production source files.
+      - Do NOT squash into a single commit if multiple logical commits are clearer —
+        Co-Lead accepts multi-commit feature branches.
+    </rules>
+  </commit_template>
+
+  <!-- ===== SECTION 10: MATURE NOT MINIMAL ===== -->
+
+  <mature_not_minimal>
+    <directive>
+      EA-2 is authorized to address directly adjacent findings discovered during work —
+      even if not pre-listed in docs/TEST_AUDIT_FINDINGS.md — provided each new item
+      adds ≤ 1 hour of additional work (per SDV §5.3).
+
+      Examples of in-scope adjacent work:
+      - While adding WI-3 config-validation tests, you discover a fourteenth constraint
+        that the audit missed. Add it and cover it.
+      - While reading circuit_breaker.py for WI-6, you notice a reset-while-running edge
+        case that has no test. Add it if ≤ 1 hour.
+      - While adding WI-8 AO constants tests, you realize a cross-referenced shared
+        constant (e.g. from shared/constants.py) should also be value-anchored in the
+        AO constants test. Add it.
+      - While fixing WI-10, you notice a sibling test in the same class has a similar
+        assignment-posing-as-assertion bug. Fix it.
+
+      Items EXCEEDING the 1-hour cap per new adjacent item:
+      - Document in your completion report as a new finding with its estimated effort.
+      - Co-Lead will open a new Vikunja task for the next sprint (per SDV §5.3).
+      - Do NOT absorb them silently into this EA.
+
+      The AO config-validation coverage target specifically (WI-3): the floor is ≥ 6 of
+      13; the mature-not-minimal preference is ALL 13. Residual uncovered constraints
+      (if any) MUST be named and justified in the completion report.
+
+      This is NOT a license for unbounded scope. EA-2 addresses AO and SR ONLY. PA
+      tests are EA-1 scope; UI gateway and UI shell app.py / session_panel.py are
+      EA-3 scope (the one WI-10 ui_shell test-file line-level fix is specifically
+      called out in SDV §5.1 item 2 as EA-2 scope); shared/launcher is EA-4 scope;
+      structural cleanup is EA-5 scope.
+    </directive>
+  </mature_not_minimal>
+
+  <!-- ===== SECTION 11: REQUIRED ATTACHMENTS ===== -->
+
+  <required_attachments>
+    <!-- Read ALL of these files before posting the comprehension gate. -->
+
+    <file path="docs/P5_TASK8_SDO_CONTINUATION_v1.0.xml"
+          sections="§5 task8_context ea_decomposition EA-2 block (lines ~227-253), §6 lessons_learned L-12 L-13 L-15, §7 ea_prompt_guidelines"
+          reason="Authoritative SDO continuation; EA-2 scope contract and L-rule requirements"/>
+
+    <file path="docs/sprints/sprint_8/strategic_design_vision.md"
+          sections="§5.1 item 2 (EA-2 scope), §5.2 Out-of-scope, §5.3 Edge cases and mature-not-minimal 1-hour cap, §4 Success Criteria, §13.1 Deferred issues"
+          reason="Strategic alignment baseline — EA-2 scope must align with SDV §5.1 item 2"/>
+
+    <file path="docs/TEST_AUDIT_FINDINGS.md"
+          sections="§Coverage Map assistant_orchestrator, §Coverage Map semantic_router, §Boundary Violations AO (0.85), §Boundary Violations SR (0.50 / 0.04 / 0.03), §Assertion Quality ui_shell (hide assignment bug), §Stale Test Inventory AO and SR"
+          reason="Complete input specification for EA-2 scope — read the AO and SR sections in full"/>
+
+    <file path="docs/TEST_GOVERNANCE.md"
+          sections="marker taxonomy (unit / integration / slow), pre-existing skip list, baseline reporting rules"
+          reason="Authoritative marker taxonomy and test placement rules"/>
+
+    <file path="docs/POST_OPERATIONAL_MATURATION_LEDGER.md"
+          sections="Entry 50, Entry 51 (EA-1) if merged, latest entries for format reference"
+          reason="Required for Entry 52 (or next free entry) — follow the existing entry format exactly"/>
+
+    <file path="services/assistant_orchestrator/src/pgov.py"
+          reason="Required for WI-1 (PGOV leakage threshold), WI-7 (CREDIT_CARD + HEX_SECRET PII patterns) — read PGOVPipeline leakage path and _PII_PATTERNS list"/>
+
+    <file path="services/assistant_orchestrator/src/circuit_breaker.py"
+          reason="Required for WI-6 — read CircuitBreaker / BreakerSet orchestration, TokenBreaker over-limit path, new_request() reset method in full"/>
+
+    <file path="services/assistant_orchestrator/src/entrypoint.py"
+          reason="Required for WI-3 (validate_runtime_config constraint enumeration), WI-4 (_handle_connection HEARTBEAT dispatch), WI-5 (stop() method)"/>
+
+    <file path="services/assistant_orchestrator/src/constants.py"
+          reason="Required for WI-1, WI-6, WI-8 — verify PGOV_COSINE_THRESHOLD=0.85, OUTPUT_TOKEN_CAP, TOOL_CALL_DEPTH_CAP, DEFAULT_* generation params, AO_DEVICE, stale NPU re-exports"/>
+
+    <file path="services/semantic_router/src/router.py"
+          reason="Required for WI-2 — read classify() or equivalent dual-gate logic to identify centroid/embedding injection seams"/>
+
+    <file path="services/semantic_router/src/constants.py"
+          reason="Required for WI-2, WI-9 — verify CONFIDENCE_THRESHOLD=0.50, CONFIDENCE_MARGIN=0.04, and enumerate any other behavioral constants"/>
+
+    <file path="services/semantic_router/src/intents.py"
+          reason="Required for WI-2 — centroid structures and intent taxonomy if relevant to the dual-gate boundary tests"/>
+
+    <file path="services/ui_shell/src/pgov_display.py"
+          reason="Required for WI-10 — confirm PGOVPanel.hide() sets styles.display = 'none' so the corrected assertion target is valid"/>
+
+    <file path="services/assistant_orchestrator/tests/test_pgov.py"
+          reason="Required for WI-1 (mirror test_leakage_with_injected_detector pattern), WI-7 (mirror existing 7 PII pattern tests)"/>
+
+    <file path="services/assistant_orchestrator/tests/test_circuit_breaker.py"
+          reason="Required for WI-6 — understand existing 7 tests in 3 classes and mirror setup style"/>
+
+    <file path="services/assistant_orchestrator/tests/test_entrypoint.py"
+          reason="Required for WI-3, WI-4, WI-5 — understand existing HANDSHAKE + PROMPT dispatch tests and config-validation patterns"/>
+
+    <file path="services/semantic_router/tests/test_router.py"
+          reason="Required for WI-2 — understand existing router test patterns and mocking style"/>
+
+    <file path="services/ui_shell/tests/test_pgov_display.py"
+          sections="TestPGOVPanelLogic::test_hide_sets_display_none (lines 118-121) and sibling test_display_denial_sets_block_display"
+          reason="Required for WI-10 — the target of the one-line assertion-correction fix, and the correct idiom to mirror"/>
+
+    <file path="docs/IMPLEMENTATION_PLAN.md"
+          reason="Reference only — full milestone tracking; EA does not edit"/>
+  </required_attachments>
+
+</ea_prompt>

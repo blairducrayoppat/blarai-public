@@ -1,0 +1,947 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_response
+  guide_instance="8"
+  procedure="platform_separation_v2"
+  stage="4"
+  item="4.0.v2"
+  classification="comprehensive_preflight_audit_amendments_bound"
+  date="2026-04-28"
+  ea_global_number="8"
+  trigger="la_directive_mature_not_minimal_pre_flight_pattern_inheritance_from_stage_3_0_v2">
+
+  <verdict>
+    APPROVED_WITH_AMENDMENTS_BOUND -- Stage 4.0.v2 comprehensive pre-flight audit checkpoint binds 14 spec corrections (Items 4.0 through 4.13.5) under one new acknowledgment g8-ea8_n1 with sub-clauses (a) through (n). Sub-clause (c) carries an LA-architectural decision (DB stays at %LOCALAPPDATA%; devplatform/tools/vikunja/config.yml absolutized) that supersedes the audit subagent's move-DB recommendation. EA-8 may begin Stage 4 execution at Item 4.0 after restating g8-ea8_n1 verbatim with all sub-clauses + the LA pre-prep checklist (in §required_acknowledgments). 5 items pass without amendment (4.0.5, 4.6.5, 4.7.6, 4.8.v2, 4.10, 4.13). 8 cross-item cascades (CC-1..CC-8) documented; mitigations cross-referenced.
+  </verdict>
+
+  <summary>
+
+    <trigger_context>
+      Stage 3 closed at devplatform 95884a0 + BlarAI c894ebd via three-subagent convergence (verdict 3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml). Stage 4 (HIGH-risk, single-session, continuous-block cutover) is the next stage. EA-1 (Stage 3 EA, globally EA-7) had three compound spec drifts mid-Stage-3 that triggered the Stage 3.0.v2 comprehensive audit checkpoint pattern; the pattern worked, Stage 3 closed cleanly. Lead Architect explicitly directed pattern inheritance for Stage 4: "I absolutely want to do the pre-flight audit. We want to do that process as best we can. It is extremely important. The motto is mature not minimal."
+
+      Guide-#8 spawned ONE general-purpose audit subagent (read-only mandate, ~80% drift coverage estimate, ~24 minutes execution, 41 tool uses, 211k tokens). Audit evidence committed alongside this verdict at:
+      `docs/platform_separation/temp_for_responses/4.0.v2-AUDIT_SUBAGENT_OUTPUT_STAGE4_PREFLIGHT_DRIFT_INVENTORY.md`
+    </trigger_context>
+
+    <approach>
+      Audit-subagent inventoried all 22 Stage 4 sub-items (4.0, 4.0.5, 4.0.6, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.6.5, 4.7, 4.7.5, 4.7.6, 4.7.7, 4.8, 4.8.v2, 4.9, 4.10, 4.11, 4.12, 4.13, 4.13.5) against actual disk state. Per-item drift classification (NONE / STRUCTURE_MISMATCH / NEW_PATTERN / FILE_NOT_FOUND / CASCADE_FROM_PRIOR_DRIFT / KNOWN_AND_DISPOSITIONED) + severity (Class A/B/C/D) + concrete recommended disposition. Cross-item cascade analysis identified 8 chains. Output bound under cumulative-ack inheritance (same vehicle as Stage 3's g7-ea1_n13).
+
+      Guide-#8 conducted a follow-up 5-10 minute investigation of the Vikunja DB-at-LocalAppData mechanism (LA's request) to strengthen the architectural disposition for Item 4.1. See §db_location_mechanism_investigation below.
+    </approach>
+
+    <db_location_decision authority="lead_architect_2026_04_28">
+      The audit subagent's g8-ea8_n1(c) recommended fixing Item 4.1 by correcting the source path (LocalAppData not BlarAI) and moving the DB to devplatform/tools/vikunja/. The Lead Architect SUPERSEDES this recommendation with an alternative architectural decision: **DB stays at %LOCALAPPDATA%\Vikunja\; devplatform/tools/vikunja/config.yml is updated at cutover to use ABSOLUTE path so the DB location is explicit and not CWD-dependent.** Three reasons (LA-stated):
+      1. Reflects current reality + zero migration risk (no Move-Item, no WAL/SHM coordination, no integrity-check during write window).
+      2. "Platform separation" goal is binary independence not data isolation.
+      3. Stage 5 deletes BlarAI/tools/vikunja/ so post-procedure only devplatform's binary exists; the DB location at LocalAppData is unaffected.
+
+      Item 4.1 therefore becomes "DB location verification + config absolutization" instead of "DB migration". The 6-step flow LA-prescribed:
+      (a) Stop BlarAI Vikunja (pre-condition; LA already executed; verify via Get-Process)
+      (b) Capture sha256 of vikunja.db at %LOCALAPPDATA% for forensic record
+      (c) Best-effort SQLite integrity check (sqlite3 PRAGMA integrity_check if sqlite3.exe on PATH; non-fatal if absent)
+      (d) Edit devplatform/tools/vikunja/config.yml: database.path absolute
+      (e) Start devplatform Vikunja; verify reachable via /api/v1/info
+      (f) Verify DB sha256 unchanged (should be — Vikunja initially opens read-only)
+
+      This decision is bound under g8-ea8_n1(c) below in full text.
+
+      Cascade implications (all bound):
+      - Item 4.2 amendment in (d) collapses to a verification-only role since (e) above absorbs the start step. Bound under g8-ea8_n1(d).
+      - Item 4.12 git-add concern in (m) becomes lower-urgency for vikunja.db (the DB never lands in devplatform/tools/vikunja/) but the gitignore augmentation remains as defense-in-depth + the config.yml edit must be explicitly staged. Bound under g8-ea8_n1(m).
+      - Item 4.9 (.vbs/.lnk handling) becomes MORE important — the .vbs's shell.Run path must be rewritten to point at devplatform's binary, even though it doesn't influence DB resolution. Bound under g8-ea8_n1(k).
+    </db_location_decision>
+
+    <findings_overview>
+      14 amendments bound under g8-ea8_n1 sub-clauses (a) through (n). Class breakdown:
+      - Class A (data-loss / irreversible): 2 sub-clauses ((c) DB-handling + (m) over-broad git-add → secret-leak)
+      - Class B (duplication / functional regression): 1 sub-clause ((n) Item 4.13.5 wrong state.json path)
+      - Class C (functional regression / EA STOP risk): 8 sub-clauses ((a) self-termination; (d) DB-resolution diagnostic; (e) VIKUNJA_TOKEN; (f) Claude Desktop multi-field; (g) VS Code/Claude Code multi-field; (h) Item 4.7 arg-injection nesting + S4U; (i) wake-template forward-slash patterns; (k) Item 4.9 .lnk gate-condition + .vbs content)
+      - Class D (cosmetic / audit-trail; non-optional per LA mature-not-minimal): 3 sub-clauses ((b) absolute path on state.json check; (j) Export-ScheduledTask noise suppression; (l) Item 4.11 EA-vs-LA smoke split)
+
+      6 items pass without amendment: 4.0.5 (worktrees-empty already true), 4.6.5 (bridge daemon command correct), 4.7.6 (PS1 line-by-line scan correct), 4.8.v2 (task count = 13), 4.10 (bridge re-verify correct), 4.13 (STATUS append per established pattern).
+
+      All amendments REQUIRED. No sub-clause is optional. Per LA mature-not-minimal motto + memory feedback: hardening followups are non-optional, both documentation AND architectural cleanup. The same standard applies to Class D items in this verdict — "cosmetic" does not mean "skippable".
+    </findings_overview>
+
+    <new_acknowledgment_summary>
+      g8-ea8_n1 sub-clauses bind the following amendments (full text in §new_acknowledgment below):
+      - n1(a) Item 4.0: EA-8-context preamble + self-termination preflight gate (CC-1).
+      - n1(b) Item 4.0.6: absolute path on state.json gate command.
+      - n1(c) Item 4.1: LA-DECIDED REWRITE — 6-step DB location verification + config absolutization (supersedes audit's move-DB recommendation; closes CC-2, CC-3).
+      - n1(d) Item 4.2: post-startup absolute-path verification + REST project-count cross-check + DB sha256 stability check.
+      - n1(e) Item 4.3: VIKUNJA_TOKEN LA pre-flight checklist + REST user/pass auth fallback (CC-7).
+      - n1(f) Item 4.4: enumerate all 3 Claude Desktop BlarAI-coupled fields (command + PYTHONPATH + VIKUNJA_PASS); drop dangling §F.
+      - n1(g) Items 4.5 + 4.6: explicit absolute-path + PYTHONPATH rewrites; remove "fallback" phrase.
+      - n1(h) Item 4.7: shape-aware arg-injection (inner-quoted, not outer-quoted); absolute python path; S4U elevation guard for `Agents Cadence Monitor` (rr5; CC-4).
+      - n1(i) Item 4.7.5: forward-slash sibling patterns + preserve target-project refs (CC-6 partial).
+      - n1(j) Item 4.7.7: `-ErrorAction SilentlyContinue` to suppress Export-ScheduledTask noise; tighten match regex.
+      - n1(k) Item 4.9: widen gate condition to Arguments/WorkingDirectory; rewrite `start_vikunja_hidden.vbs` content (CC-6 main).
+      - n1(l) Item 4.11: split into EA-8 scriptable smoke (4.11a) + LA manual smoke (4.11b deferred to post-Stage-4 close).
+      - n1(m) Item 4.12: gitignore augmentation + explicit allow-list staging (defense-in-depth even with DB at LocalAppData; closes CC-8); explicit staging of devplatform config.yml edit from n1(c).
+      - n1(n) Item 4.13.5: two-step reset+resume on devplatform state.json path (rr3 disposition + path correction; closes CC-5).
+    </new_acknowledgment_summary>
+
+    <forward_carry>
+      Three in-execution items forwarded to Stage 4 EA-8 (cannot be resolved at Stage 4.0.v2 timing):
+      EX-1 Vikunja DB-path runtime verification mid-cutover; EX-2 VIKUNJA_TOKEN fallback documentation; EX-3 S4U elevation handling.
+
+      Two NEW Stage 5 forward-items: f5_5 (gitignore vikunja.db pattern preservation through Stage 5 cleanup) + f5_6 (LocalAppData backup retention decision for `.cutover_bak` siblings).
+
+      Three NEW Stage 6.7.5 hardening tickets: TICKET F (LocalAppData doctrine documentation; NOW PARTIALLY PRE-RESOLVED by LA's config-absolutization decision — remaining work is .vbs/runbook updates), TICKET G (python.exe absolute-path migration in scheduled-task XMLs as long-term doctrine), TICKET E expansion sub-item (iv) (co_lead_architect.md line 175 stale state.json path).
+    </forward_carry>
+
+    <residual_risk_acknowledgment>
+      Audit subagent estimated ~80% drift coverage (lower than Stage 3.0.v2's 85-90% because Stage 4 mutates non-repo state — Vikunja DB, scheduled tasks, %APPDATA%, %LOCALAPPDATA%, Startup .lnk — that read-only inspection cannot dry-run). Five drift classes flagged as likely-to-surface during execution (§7 of audit MD): Vikunja first-startup DB-path behavior, Task Scheduler XML encoding edge cases, stale Claude Desktop MCP cache, la_merge_approve ad-hoc invocation post-cutover, %APPDATA%\Claude\bridge-state.json staleness.
+
+      Defense-in-depth posture: the LA's config-absolutization decision in g8-ea8_n1(c) materially de-risks the highest-coverage gap (Vikunja first-startup DB path) by making path resolution explicit-not-implicit. Stage 4's per-item fail-fast gates + the 4-level rollback ladder remain the architectural backstop against any drift this checkpoint missed.
+    </residual_risk_acknowledgment>
+
+  </summary>
+
+  <independent_disk_verification>
+
+    <audit_provenance>
+      Audit performed by general-purpose subagent (agentId a91965773a9fafc3e) spawned by Guide-#8 at 2026-04-28. Read-only mandate; zero file mutations; no commits. Subagent observed:
+      - BlarAI HEAD `b9a173d` on `chore/platform-extraction` (clean working tree)
+      - devplatform HEAD `95884a0` on `main` (working tree: ` M .gitignore` per rr8 KNOWN-AND-DISPOSITIONED)
+      - state.json sha256 `71fc1a2f21177f2461a750d0239244e709cf1e228778c46a6e188cc50d2d5d19` byte-identical to expected baseline
+      - 13/13 scheduled tasks at TaskPath `\BlarAI\` Disabled
+      - Vikunja host process STOPPED (LA pre-stopped; verified via Get-Process)
+      - Vikunja DB live location: `C:\Users\mrbla\AppData\Local\Vikunja\vikunja.db` (3.2 MB) + `vikunja.db-shm` (32 KB) + `vikunja.db-wal` (4.3 MB), last write 2026-04-27 22:03
+      - All 13 backup task XMLs structurally inspected for Command/Arguments/WorkingDirectory/LogonType
+      - All 6 wake_templates grepped for BlarAI references (per-line classification)
+      - All MCP configs (BlarAI .mcp.json, BlarAI .vscode/mcp.json, %APPDATA%\Claude\claude_desktop_config.json, devplatform .mcp.json, devplatform .vscode/mcp.json, devplatform .vscode/tasks.json) read in full
+      - Vikunja config.yml + config.yml.sample inspected on both repo sides
+
+      Full subagent output preserved in evidence artifact. Per-item findings (lines 64-792 of evidence MD) cited verbatim/paraphrased in §per_item_findings_table below.
+    </audit_provenance>
+
+    <db_location_mechanism_investigation conducted_by="guide_8" timestamp="2026-04-28" budget="5_to_10_minutes">
+
+      <vikunja_v2_3_0_doctrine source="C:\Users\mrbla\BlarAI\tools\vikunja\config.yml.sample">
+        Vikunja v2.3.0's own configuration sample documents the relative-path resolution rule explicitly:
+        "When using sqlite, this is the path where to store the database file. Can be an absolute path or relative path. Relative paths are resolved as follows:
+        - If `service.rootpath` is explicitly configured (differs from the binary location), the database path is resolved relative to that directory.
+        - Otherwise, relative paths are resolved to a platform-specific user data directory to prevent database files from being created in system directories (like `C:\Windows\System32` on Windows when running as a service):
+          - **Windows**: `%LOCALAPPDATA%\Vikunja` (e.g., `C:\Users\username\AppData\Local\Vikunja`)
+          - **macOS**: `~/Library/Application Support/Vikunja`
+          - **Linux**: `$XDG_DATA_HOME/vikunja` or `~/.local/share/vikunja`
+        **Recommendation**: Use an absolute path for production deployments, especially when running Vikunja as a Windows service, to have full control over the database location."
+
+        BlarAI/tools/vikunja/config.yml line 14: `path: "./vikunja.db"` (relative). devplatform/tools/vikunja/config.yml line 14: `path: "./vikunja.db"` (byte-identical, copied at Stage 3). Neither sets `service.rootpath`. Therefore Vikunja resolves the relative path to `%LOCALAPPDATA%\Vikunja\vikunja.db` per the documented Windows rule. This is by-design behavior, not a bug.
+      </vikunja_v2_3_0_doctrine>
+
+      <startup_lnk_inspection>
+        `Vikunja (BlarAI).lnk` at `$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\Vikunja (BlarAI).lnk` properties (via WScript.Shell):
+        - TargetPath: `C:\Windows\System32\wscript.exe`
+        - Arguments: `"C:\Users\mrbla\BlarAI\tools\vikunja\start_vikunja_hidden.vbs"`
+        - WorkingDirectory: `C:\Users\mrbla\BlarAI\tools\vikunja`
+        - Description: `BlarAI Vikunja (auto-start on login, truly hidden via wscript)`
+        The .lnk launches wscript on start_vikunja_hidden.vbs. The .vbs's `shell.CurrentDirectory = "C:\Users\mrbla\BlarAI\tools\vikunja"` sets cwd before `shell.Run "...vikunja-v2.3.0...exe web"`. But Vikunja's path resolution does NOT consult cwd — it consults `service.rootpath` (unset) then falls back to LocalAppData per the doctrine quoted above.
+      </startup_lnk_inspection>
+
+      <vbs_launcher_findings>
+        Both `start_vikunja_hidden.vbs` (BlarAI) and the byte-identical Stage 3 copy (devplatform) currently set CurrentDirectory to `C:\Users\mrbla\BlarAI\tools\vikunja\`. The cwd is irrelevant for SQLite resolution but RELEVANT for finding the binary itself (the .vbs invokes `shell.Run """C:\Users\mrbla\BlarAI\tools\vikunja\vikunja-v2.3.0...exe"" web"` — both the cwd AND the explicit binary path will need rewriting to devplatform at Stage 4.9 per g8-ea8_n1(k)).
+      </vbs_launcher_findings>
+
+      <conclusion>
+        The DB-at-LocalAppData behavior is Vikunja v2.3.0 design, not an artifact of BlarAI's launcher choices. Vikunja's own documentation recommends absolute paths for production deployments. The LA's architectural decision (absolutize devplatform's `database.path` to `C:/Users/mrbla/AppData/Local/Vikunja/vikunja.db`) is exactly the documented recommended pattern AND removes any future foot-gun if the launcher mechanism, cwd, or service-vs-interactive invocation changes. Future audits will not re-derive this; the absolute path is self-documenting in the config.
+
+        Investigation budget: ~7 minutes (within LA's 5-10 min cap).
+      </conclusion>
+
+    </db_location_mechanism_investigation>
+
+    <per_item_findings_table>
+      Per-item findings cited from audit evidence MD with line ranges. Class column reflects audit-subagent severity; Disposition column reflects what's bound in g8-ea8_n1.
+
+      | Item | Drift class | Severity | Audit MD lines | Bound in |
+      |---|---|---|---|---|
+      | 4.0 | NEW_PATTERN (self-term hazard) | Class C | 64-79 | n1(a) |
+      | 4.0.5 | NONE | N/A | 81-93 | (no bind) |
+      | 4.0.6 | STRUCTURE_MISMATCH (cwd ambiguity) + KNOWN | Class D | 95-108 | n1(b) |
+      | 4.1 | FILE_NOT_FOUND + STRUCTURE_MISMATCH + NEW_PATTERN | Class A | 110-225 | n1(c) [LA-decided architectural override] |
+      | 4.2 | CASCADE + NEW_PATTERN | Class C | 227-260 | n1(d) |
+      | 4.3 | NEW_PATTERN (token-creation timing) | Class C | 262-278 | n1(e) |
+      | 4.4 | STRUCTURE_MISMATCH + NEW_PATTERN + spec ambiguity | Class C | 280-338 | n1(f) |
+      | 4.5 | STRUCTURE_MISMATCH + NEW_PATTERN | Class C | 340-385 | n1(g) |
+      | 4.6 | STRUCTURE_MISMATCH | Class C | 387-415 | n1(g) |
+      | 4.6.5 | NONE | N/A | 417-429 | (no bind) |
+      | 4.7 | STRUCTURE_MISMATCH + KNOWN_AND_DISPOSITIONED | Class C | 431-477 | n1(h) |
+      | 4.7.5 | STRUCTURE_MISMATCH | Class C | 479-520 | n1(i) |
+      | 4.7.6 | NONE | N/A | 522-538 | (no bind) |
+      | 4.7.7 | STRUCTURE_MISMATCH + cosmetic noise | Class D | 540-563 | n1(j) |
+      | 4.8 | CASCADE_FROM_PRIOR_DRIFT | Class C | 565-580 | (covered by n1(h)) |
+      | 4.8.v2 | NONE | N/A | 582-594 | (no bind) |
+      | 4.9 | STRUCTURE_MISMATCH | Class C | 596-645 | n1(k) |
+      | 4.10 | NONE | N/A | 647-659 | (no bind) |
+      | 4.11 | NEW_PATTERN (manual gate) | Class D | 661-678 | n1(l) |
+      | 4.12 | STRUCTURE_MISMATCH | Class A | 680-722 | n1(m) [adjusted for LA-decided n1(c)] |
+      | 4.13 | NONE | N/A | 724-737 | (no bind) |
+      | 4.13.5 | STRUCTURE_MISMATCH + KNOWN_AND_DISPOSITIONED | Class C | 739-792 | n1(n) |
+
+      Cross-item cascades CC-1 through CC-8 documented at audit MD lines 798-849.
+    </per_item_findings_table>
+
+  </independent_disk_verification>
+
+  <required_corrections>
+    NONE for EA-8 retroactively. EA-8 has not begun Stage 4 execution; nothing to correct in committed work. All amendments below apply to EA-8's first-action execution starting at Item 4.0.
+  </required_corrections>
+
+  <new_acknowledgment id="g8-ea8_n1"
+                       title="Stage 4.0.v2 comprehensive pre-flight audit checkpoint amendments — Items 4.0 through 4.13.5 spec-correction binding"
+                       binding_vehicle="cumulative_ack_inheritance"
+                       sub_clause_count="14"
+                       naming_convention="corrected_global_per_la_directive_2026_04_27">
+
+    <preamble>
+      g8-ea8_n1 is the first ack emitted by Guide-#8 (reviewing EA-8). It binds 14 sub-clauses (a-n) covering all spec corrections surfaced by the Stage 4.0.v2 comprehensive audit. EA-8 must restate g8-ea8_n1 verbatim with all 14 sub-clauses in its iter-1 comprehension gate response BEFORE Item 4.0 execution.
+
+      Sub-clause class summary: A=2, B=1, C=8, D=3 (totals = 14; some items overlap classes, e.g., n1(c) is Class A as the audit subagent classified, with the LA-architectural-override making it functionally a Class A+architectural-bind).
+
+      Sub-clause (c) carries an LEAD-ARCHITECT ARCHITECTURAL DECISION that supersedes the audit subagent's recommendation. The audit subagent recommended moving the Vikunja DB from LocalAppData to devplatform/tools/vikunja/. The LA decided instead to keep the DB at LocalAppData and absolutize devplatform's database.path config. Rationale (LA-stated): (1) zero migration risk; (2) platform separation goal is binary independence not data isolation; (3) Stage 5 deletion of BlarAI/tools/vikunja/ leaves only devplatform's binary which already points at LocalAppData. The architectural decision is vetted by Guide-#8's mechanism investigation (§db_location_mechanism_investigation): Vikunja v2.3.0's own docs recommend absolute paths for production; the LocalAppData behavior is documented design, not coincidence; the absolute path eliminates dependence on cwd, launcher mechanism, and service-vs-interactive invocation.
+
+      All sub-clauses are REQUIRED. No sub-clause is optional. Per LA mature-not-minimal motto + memory feedback ("Hardening followups are NON-OPTIONAL — both documentation AND architectural cleanup. LA may triage priority at execution time; existence is non-optional."), the same standard applies to Class D items in this verdict.
+    </preamble>
+
+    <subclause id="n1(a)" item="4.0" class="C" title="EA-8-context preamble + self-termination preflight gate (CC-1)">
+
+      Spec at Item 4.0 commands `Get-Process -Name "Claude","Code" -ErrorAction SilentlyContinue | Stop-Process -Force`. If EA-8 itself runs inside a Claude Desktop or VS Code Copilot session (likely default-LA behavior), this command terminates EA-8's own process mid-execution. Stage 4 single-continuous-block invariant breaks immediately.
+
+      AMENDMENT: prepend a self-termination preflight gate to Item 4.0:
+
+      ```powershell
+      # EA-8 self-termination preflight (g8-ea8_n1(a))
+      # EA-8 MUST execute Stage 4 from a STANDALONE PowerShell console — NOT from inside a Claude Desktop or VS Code session.
+      # The Stop-Process command below will otherwise terminate EA-8's own session mid-cutover.
+      $ownPid = $PID
+      $ownName = (Get-Process -Id $ownPid).ProcessName
+      $parentName = ''
+      try {
+        $parentPid = (Get-CimInstance Win32_Process -Filter "ProcessId=$ownPid").ParentProcessId
+        if ($parentPid) { $parentName = (Get-Process -Id $parentPid -ErrorAction SilentlyContinue).ProcessName }
+      } catch {}
+      if ($ownName -match 'Claude|Code' -or $parentName -match 'Claude|Code') {
+        throw "EA-8 is running inside an AI development surface (own=$ownName parent=$parentName). The Stop-Process step would kill EA-8. Relaunch in a standalone PowerShell console (Win+X → Windows PowerShell or Terminal) and re-attach the Stage 4 init pointer + Guide-#8 verdict before retrying Item 4.0."
+      }
+      Write-Host "Self-termination preflight: PASS (own=$ownName parent=$parentName)"
+      ```
+
+      Then proceed with the original Item 4.0 commands as written.
+    </subclause>
+
+    <subclause id="n1(b)" item="4.0.6" class="D" title="Absolute path on state.json fleet-pause gate command">
+
+      Spec at Item 4.0.6: `python -c "import json; print('PAUSED' if json.load(open('tools/autonomy_budget/state.json'))['fleet_paused'] else 'RUNNING -- HALT')"`. The relative `tools/autonomy_budget/state.json` resolves against EA-8's cwd. If EA-8 cwd is BlarAI, reads BlarAI's state.json (PAUSED → exits OK). If cwd is devplatform, reads devplatform's state.json (also PAUSED at audit time per rr3 contamination, but the wrong gate file).
+
+      AMENDMENT: substitute with absolute path to BlarAI's state.json (the authoritative pre-cutover gate; devplatform's contaminated copy is reset by n1(n) at Item 4.13.5):
+
+      ```powershell
+      python -c "import json; print('PAUSED' if json.load(open(r'C:\Users\mrbla\BlarAI\tools\autonomy_budget\state.json'))['fleet_paused'] else 'RUNNING -- HALT')"
+      ```
+
+      Expected: `PAUSED`. If `RUNNING -- HALT` returned, EA-8 STOPs and reports — fleet was unexpectedly resumed since handoff.
+    </subclause>
+
+    <subclause id="n1(c)" item="4.1" class="A" title="LA-DECIDED REWRITE — DB location verification + config absolutization (supersedes audit's move-DB recommendation)">
+
+      Spec at Item 4.1 (lines 215-265 of 05_STAGE4_CUTOVER.xml) prescribes a Move-Item flow from `BlarAI\tools\vikunja\vikunja.db` to `devplatform\tools\vikunja\vikunja.db` with hash check, attachments-dir migration, and SQLite integrity check. Three compounding defects per audit:
+      1. Source path is wrong — actual Vikunja DB lives at `%LOCALAPPDATA%\Vikunja\vikunja.db` (3.2 MB + WAL + SHM) per Vikunja v2.3.0 documented design (relative `path: "./vikunja.db"` + no `service.rootpath` → LocalAppData fallback).
+      2. Destination attachments-dir clobber-guard would throw — devplatform/tools/vikunja/files/ already exists empty from Stage 3 copy.
+      3. WAL/SHM siblings unhandled — orphaned WAL = potential data loss for tasks/comments created in the last few minutes before stop. The `-wal` file at audit was 4.3 MB.
+
+      LEAD ARCHITECT ARCHITECTURAL DECISION (2026-04-28): supersede the audit subagent's move-DB recommendation. **DB stays at %LOCALAPPDATA%\Vikunja\\.** devplatform/tools/vikunja/config.yml is updated at cutover to use ABSOLUTE database.path so the location is explicit and not CWD-dependent. Three reasons (LA): (1) zero migration risk; (2) platform separation goal is binary independence not data isolation; (3) Stage 5 deletion of BlarAI/tools/vikunja/ leaves only devplatform's binary; the DB at LocalAppData is unaffected.
+
+      AMENDMENT: replace Item 4.1 entirely with the following 6-step "DB location verification + config absolutization" flow:
+
+      ```powershell
+      # Step (a) — Confirm Vikunja stopped (LA pre-stopped this session; verify defense-in-depth)
+      $running = Get-Process -Name "vikunja*" -ErrorAction SilentlyContinue
+      if ($running) { throw "Vikunja is still running (PIDs: $($running.Id -join ',')). Stop it before continuing." }
+      Write-Host "Step (a): Vikunja stopped — verified."
+
+      # Step (b) — Capture sha256 of vikunja.db at %LOCALAPPDATA% for forensic record
+      $dbPath = "$env:LOCALAPPDATA\Vikunja\vikunja.db"
+      $walPath = "$env:LOCALAPPDATA\Vikunja\vikunja.db-wal"
+      $shmPath = "$env:LOCALAPPDATA\Vikunja\vikunja.db-shm"
+      if (-not (Test-Path $dbPath)) { throw "Vikunja DB not found at $dbPath. Verify Vikunja installation before continuing." }
+      $preHash = (Get-FileHash $dbPath -Algorithm SHA256).Hash
+      $preDbSize = (Get-Item $dbPath).Length
+      $preWalSize = if (Test-Path $walPath) { (Get-Item $walPath).Length } else { 0 }
+      $preShmSize = if (Test-Path $shmPath) { (Get-Item $shmPath).Length } else { 0 }
+      Write-Host "Step (b): Pre-cutover DB sha256 = $preHash"
+      Write-Host "          DB=$preDbSize bytes; WAL=$preWalSize bytes; SHM=$preShmSize bytes"
+
+      # Step (c) — Best-effort SQLite integrity check
+      $sqlite = Get-Command sqlite3.exe -ErrorAction SilentlyContinue
+      if ($sqlite) {
+        $check = & sqlite3.exe $dbPath "PRAGMA integrity_check;"
+        if ($check -ne "ok") { throw "SQLite integrity_check returned: $check. ABORT." }
+        Write-Host "Step (c): SQLite integrity_check = ok"
+      } else {
+        Write-Host "Step (c): sqlite3.exe not on PATH — integrity check skipped (non-fatal)."
+      }
+
+      # Step (d) — Edit devplatform/tools/vikunja/config.yml: database.path absolute
+      $configPath = "C:\Users\mrbla\devplatform\tools\vikunja\config.yml"
+      Copy-Item $configPath "$configPath.pre_stage4_bak" -Force
+      $cfg = Get-Content $configPath -Raw
+      # Vikunja config.yml YAML accepts forward slashes on Windows
+      $cfg = $cfg -replace 'path:\s*"\./vikunja\.db"', 'path: "C:/Users/mrbla/AppData/Local/Vikunja/vikunja.db"'
+      Set-Content -Path $configPath -Value $cfg -NoNewline
+      # Verify the edit landed
+      $verifyCfg = Get-Content $configPath -Raw
+      if ($verifyCfg -notmatch 'path:\s*"C:/Users/mrbla/AppData/Local/Vikunja/vikunja\.db"') {
+        throw "Step (d) edit did not land in $configPath. ABORT."
+      }
+      Write-Host "Step (d): devplatform config.yml database.path absolutized."
+
+      # Step (e) — Start devplatform Vikunja; verify reachable via /api/v1/info
+      Push-Location "C:\Users\mrbla\devplatform\tools\vikunja"
+      Start-Process .\vikunja-v2.3.0-windows-4.0-amd64.exe -ArgumentList 'web' -WindowStyle Hidden
+      Pop-Location
+      $deadline = (Get-Date).AddSeconds(30)
+      $ok = $false
+      while ((Get-Date) -lt $deadline) {
+        try {
+          $info = Invoke-RestMethod -Uri "http://localhost:3456/api/v1/info" -TimeoutSec 2 -ErrorAction Stop
+          $ok = $true; break
+        } catch { Start-Sleep -Milliseconds 500 }
+      }
+      if (-not $ok) { throw "Vikunja did not become reachable within 30s after startup from devplatform. Check vikunja logs in $env:LOCALAPPDATA\Vikunja\." }
+      Write-Host "Step (e): Vikunja reachable from devplatform binary. Version: $($info.version)"
+
+      # Step (f) — Verify DB sha256 unchanged (Vikunja initially opens read-only)
+      # NOTE: Vikunja MAY immediately tick a background write (e.g., session refresh, log entry) on startup,
+      # which would advance the WAL but typically not the .db file itself for the first few seconds.
+      # Capture post-startup hash; if it differs from pre, document but do NOT throw — Vikunja is permitted
+      # to write. The forensic record is what matters: pre-hash vs post-hash, both logged.
+      Start-Sleep -Seconds 2  # allow Vikunja first-write to settle
+      $postHash = (Get-FileHash $dbPath -Algorithm SHA256).Hash
+      $postDbSize = (Get-Item $dbPath).Length
+      $postWalSize = if (Test-Path $walPath) { (Get-Item $walPath).Length } else { 0 }
+      Write-Host "Step (f): Post-startup DB sha256 = $postHash (pre = $preHash)"
+      Write-Host "          DB=$postDbSize bytes; WAL=$postWalSize bytes (pre WAL=$preWalSize)"
+      if ($postHash -ne $preHash) {
+        Write-Host "          DB hash CHANGED (Vikunja wrote on startup) — non-fatal; record both hashes in Stage 4 STATUS append."
+      } else {
+        Write-Host "          DB hash UNCHANGED — Vikunja opened read-only as expected."
+      }
+      ```
+
+      AMENDMENT to Item 4.1's `<verify>` clause: substitute with:
+      ```powershell
+      # Confirm absolutized config landed AND Vikunja is reachable
+      Test-Path "C:\Users\mrbla\devplatform\tools\vikunja\config.yml"
+      (Get-Content "C:\Users\mrbla\devplatform\tools\vikunja\config.yml" -Raw) -match 'path:\s*"C:/Users/mrbla/AppData/Local/Vikunja/vikunja\.db"'
+      Test-Path "$env:LOCALAPPDATA\Vikunja\vikunja.db"
+      (Invoke-RestMethod http://localhost:3456/api/v1/info).version
+      ```
+
+      AMENDMENT to Item 4.1's `<rollback_one_liner>` clause: substitute with:
+      ```powershell
+      # Stop devplatform-launched Vikunja; restore config.yml from .pre_stage4_bak; restart from BlarAI binary.
+      Get-Process vikunja* | Stop-Process -Force
+      Move-Item "C:\Users\mrbla\devplatform\tools\vikunja\config.yml.pre_stage4_bak" "C:\Users\mrbla\devplatform\tools\vikunja\config.yml" -Force
+      Push-Location "C:\Users\mrbla\BlarAI\tools\vikunja"; Start-Process .\vikunja-v2.3.0-windows-4.0-amd64.exe -ArgumentList 'web' -WindowStyle Hidden; Pop-Location
+      ```
+
+      AMENDMENT to RECOVERY.md / VERIFICATION_COMMANDS.md / STATUS.md: any reference to the "DB moved BlarAI→devplatform" pattern must be re-cast as "DB stays at LocalAppData; devplatform config.yml absolutized at cutover". Defer this doc-update to Stage 6.7.5 TICKET F (which now becomes scope-narrowed and partially pre-resolved by this LA decision).
+    </subclause>
+
+    <subclause id="n1(d)" item="4.2" class="C" title="Item 4.2 reduced to post-startup verification (since Item 4.1(e) absorbs the start step)">
+
+      Spec at Item 4.2 (lines 268-286): `cd C:\Users\mrbla\devplatform\tools\vikunja; Start-Process .\vikunja-v2.3.0-windows-4.0-amd64.exe` + 30-second polling for `/api/v1/info`. With g8-ea8_n1(c) Step (e) above already starting Vikunja and verifying reachability, Item 4.2 becomes redundant for the start step.
+
+      AMENDMENT: replace Item 4.2's command/verify with a POST-STARTUP verification triad that confirms (i) Vikunja resolved the DB at the absolute path; (ii) project count matches pre-cutover snapshot; (iii) DB sha256 stability across the first few seconds.
+
+      ```powershell
+      # (i) Confirm Vikunja read the absolutized DB (and not a fresh empty fallback)
+      $expectedDb = "$env:LOCALAPPDATA\Vikunja\vikunja.db"
+      $accidentalDb = "C:\Users\mrbla\devplatform\tools\vikunja\vikunja.db"
+      if (Test-Path $accidentalDb) {
+        $accLwt = (Get-Item $accidentalDb).LastWriteTime
+        Write-Host "WARNING: $accidentalDb exists (LastWriteTime $accLwt). Verify this is the .pre_stage4_bak from rollback testing OR a Vikunja fresh-start fallback."
+      }
+      if (-not (Test-Path $expectedDb)) { throw "Expected DB at $expectedDb not found post-startup. ABORT." }
+
+      # (ii) REST cross-check: project count should match pre-cutover (>=10 per Stage 1 Vikunja Project IDs section)
+      # If $env:VIKUNJA_TOKEN not set, fall back to user/pass auth per <vikunja_access_protocol> (see n1(e))
+      if (-not $env:VIKUNJA_TOKEN) {
+        $cred = Get-Content C:\Users\mrbla\BlarAI\.vscode\mcp.json -Raw | ConvertFrom-Json
+        $pass = $cred.servers.vikunja.env.VIKUNJA_PASS
+        $body = @{ username='blarai'; password=$pass } | ConvertTo-Json
+        $login = Invoke-RestMethod -Uri 'http://localhost:3456/api/v1/login' -Method POST -Body $body -ContentType 'application/json'
+        $env:VIKUNJA_TOKEN = $login.token
+      }
+      $projects = Invoke-RestMethod -Uri "http://localhost:3456/api/v1/projects" -Headers @{ Authorization = "Bearer $env:VIKUNJA_TOKEN" }
+      Write-Host "REST project count: $($projects.Count) (expected >= 10 per Stage 1 ledger)"
+      if ($projects.Count -lt 10) { throw "Project count below expected baseline ($($projects.Count) < 10). Vikunja may be reading a fresh empty DB. ABORT." }
+
+      # (iii) DB sha256 stability check (post-startup wait + re-hash)
+      Start-Sleep -Seconds 3
+      $stableHash = (Get-FileHash $expectedDb -Algorithm SHA256).Hash
+      Write-Host "DB sha256 at +5s post-startup: $stableHash"
+      ```
+
+      Mark Items 4.1 and 4.2 as a logical pair: 4.1 establishes the absolutized config + start; 4.2 cross-validates the result. EA-8 may execute them as one continuous block.
+    </subclause>
+
+    <subclause id="n1(e)" item="4.3" class="C" title="VIKUNJA_TOKEN LA pre-flight checklist + REST user/pass auth fallback (CC-7)">
+
+      Spec at Item 4.3 stops with Write-Error if `$env:VIKUNJA_TOKEN` is empty. EA-8's shell will be fresh; LA must create the token via Vikunja UI BEFORE Stage 4 spawn (Item 4.0 will have killed Claude Desktop / VS Code surfaces, and re-launching mid-stage to obtain a token violates single-continuous-block invariant).
+
+      AMENDMENT (two parts):
+
+      Part 1 — LA pre-prep checklist callout. Add to Item 4.3 description and to the EA-8 init pointer's pre-spawn LA checklist:
+
+      ```
+      LEAD ARCHITECT PRE-FLIGHT (must complete BEFORE EA-8 spawn):
+      1. Open Vikunja UI at http://localhost:3456
+      2. User Settings → API Tokens → Create token with scope: read on Projects+Tasks
+      3. Persist as User-scope env var:
+         [Environment]::SetEnvironmentVariable('VIKUNJA_TOKEN', '<token>', 'User')
+      4. Verify in a fresh shell:
+         [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')
+      5. Confirm completion in EA-8 spawn instructions.
+      ```
+
+      Part 2 — Auth fallback in case token wasn't pre-created. Amend Item 4.3 command:
+
+      ```powershell
+      # Auth fallback: if VIKUNJA_TOKEN unset in env, derive a session token via REST login (per <vikunja_access_protocol>).
+      if (-not $env:VIKUNJA_TOKEN) {
+        $userToken = [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')
+        if ($userToken) {
+          $env:VIKUNJA_TOKEN = $userToken
+          Write-Host "VIKUNJA_TOKEN loaded from User-scope env (fresh-shell fallback)."
+        } else {
+          $cred = Get-Content C:\Users\mrbla\BlarAI\.vscode\mcp.json -Raw | ConvertFrom-Json
+          $pass = $cred.servers.vikunja.env.VIKUNJA_PASS
+          $body = @{ username='blarai'; password=$pass } | ConvertTo-Json
+          $login = Invoke-RestMethod -Uri 'http://localhost:3456/api/v1/login' -Method POST -Body $body -ContentType 'application/json'
+          $env:VIKUNJA_TOKEN = $login.token
+          Write-Host "VIKUNJA_TOKEN derived via user/pass REST login fallback (LA did not pre-create token; this is acceptable but log in Stage 4 STATUS append per EX-2)."
+        }
+      }
+      Invoke-RestMethod -Uri "http://localhost:3456/api/v1/projects" -Headers @{ Authorization = "Bearer $env:VIKUNJA_TOKEN" } | Select-Object id, title
+      ```
+
+      Expected: shows BlarAI project (id=3), DevPlatform-Meta (id=10), Fleet Reports (id=8), and the auxiliaries (4, 5, 6, 7, 9) per STATUS Vikunja Project IDs table.
+    </subclause>
+
+    <subclause id="n1(f)" item="4.4" class="C" title="Claude Desktop MCP config — enumerate all 3 BlarAI-coupled fields + drop dangling §F">
+
+      Spec at Item 4.4 says "Update path from BlarAI/tools/vikunja_mcp to devplatform/tools/vikunja_mcp" and "F-1 fix: replace VIKUNJA_PASS literal with `${env:VIKUNJA_PASS}`". The actual `%APPDATA%\Claude\claude_desktop_config.json` vikunja entry has THREE BlarAI-coupled fields (not one). Spec also references "§F" (Master Plan §F) which is a forward-reference that doesn't define a clear action.
+
+      AMENDMENT: enumerate all three rewrites + drop ambiguous §F clause:
+
+      Final desired state for the `vikunja` block in `%APPDATA%\Claude\claude_desktop_config.json`:
+
+      ```jsonc
+      "vikunja": {
+        "command": "C:\\Users\\mrbla\\devplatform\\.venv\\Scripts\\python.exe",   // was BlarAI .venv
+        "args": ["-m", "tools.vikunja_mcp.server"],
+        "env": {
+          "VIKUNJA_URL": "http://localhost:3456",
+          "VIKUNJA_USER": "blarai",
+          "VIKUNJA_PASS": "${env:VIKUNJA_PASS}",                                   // F-1 fix: was literal
+          "PYTHONPATH": "C:\\Users\\mrbla\\devplatform"                            // was BlarAI
+        }
+      }
+      ```
+
+      Other entries in `mcpServers` (`git`, `memory`, `time`, `sequentialthinking`, `fetch`, `filesystem`) should be left UNCHANGED — `filesystem`'s BlarAI argument is a target-project reference (Claude Desktop should still be allowed to read/edit BlarAI source). `preferences.localAgentModeTrustedFolders` similarly unchanged.
+
+      Re: spec's "Add a second workspace entry per §F" — the §F reference is to Master Plan locked decision §F ("Both registered alongside in Claude Desktop config — `claude_desktop_config.json` gains a second workspace entry; doesn't replace BlarAI"). EA-8 may add a parallel `vikunja_devplatform` entry for dual-workspace operation if LA confirms; otherwise omit. Default: omit (per Stage 4 minimum-viable scope).
+
+      Add `<verify_no_residual_blarai>` step: assert no `C:\\Users\\mrbla\\BlarAI\\` substring inside the `vikunja` block specifically:
+      ```powershell
+      $cfg = Get-Content "$env:APPDATA\Claude\claude_desktop_config.json" -Raw | ConvertFrom-Json
+      $vik = $cfg.mcpServers.vikunja | ConvertTo-Json -Depth 10
+      if ($vik -match 'C:\\\\Users\\\\mrbla\\\\BlarAI\\\\') { throw "vikunja MCP entry still contains BlarAI path." }
+      Write-Host "Claude Desktop vikunja MCP entry: clean of BlarAI paths."
+      ```
+    </subclause>
+
+    <subclause id="n1(g)" item="4.5_and_4.6" class="C" title="VS Code Copilot + Claude Code MCP configs — explicit absolute-path + PYTHONPATH rewrites">
+
+      Spec at Items 4.5 and 4.6 has the same scope as 4.4: repoint vikunja MCP entry to devplatform + F-1 fix. Same multi-field issue. Both files (BlarAI `.vscode/mcp.json` and BlarAI `.mcp.json`) need:
+      - command: rewrite to absolute devplatform .venv python path
+      - env.PYTHONPATH: add (BlarAI files don't currently set this)
+      - env.VIKUNJA_PASS: replace literal with `${env:VIKUNJA_PASS}`
+
+      AMENDMENT for Item 4.5 — final BlarAI `.vscode/mcp.json` `vikunja` block:
+
+      ```jsonc
+      {
+        "servers": {
+          "vikunja": {
+            "type": "stdio",
+            "command": "C:\\Users\\mrbla\\devplatform\\.venv\\Scripts\\python.exe",
+            "args": ["-m", "tools.vikunja_mcp.server"],
+            "env": {
+              "VIKUNJA_URL": "http://localhost:3456",
+              "VIKUNJA_USER": "blarai",
+              "VIKUNJA_PASS": "${env:VIKUNJA_PASS}",
+              "PYTHONPATH": "C:\\Users\\mrbla\\devplatform"
+            }
+          },
+          "time": { ... preserve ... }
+        }
+      }
+      ```
+
+      Note: top-level key remains `servers` (NOT `mcpServers`). Per Stage 0 Anomaly A1 + Stage 3 g7-ea1_n13(c)(i)(ii) — schema must be preserved per file.
+
+      AMENDMENT for Item 4.6 — final BlarAI `.mcp.json` `vikunja` block: same content as 4.5 above EXCEPT top-level key is `mcpServers`. Other entries (`time`, etc.) unchanged.
+
+      Drop the spec phrase "BUT keep BlarAI's copy working as a fallback during the soak period" from Item 4.5 — per WORKFLOW_INTEGRITY A.4, all three MCP configs are repointed to devplatform; there is no "fallback BlarAI MCP" pattern post-cutover. devplatform's own .vscode/mcp.json (already correct from Stage 3.6) authoritatively serves the devplatform workspace; BlarAI's repointed configs serve the BlarAI workspace (which still uses devplatform's MCP server post-cutover).
+
+      Add same `<verify_no_literal>` check as n1(f) for both files. Item 4.6's smoke_test step ("restart any one client") should be deferred to Item 4.11 per n1(l) — relaunching VS Code mid-Stage-4 is in tension with Item 4.0's closed-surfaces invariant.
+    </subclause>
+
+    <subclause id="n1(h)" item="4.7" class="C" title="Shape-aware arg-injection + absolute python path + S4U elevation guard (CC-4)">
+
+      Spec at Item 4.7 has THREE compounding defects:
+      1. Arg-injection regex `'(</Arguments>)' " --project-root ... `$1"` appends args AFTER outer wscript closing quote → args go to wscript not inner python/powershell.
+      2. The 8 python-module tasks invoke `python.exe -m tools.X.Y` with unqualified python.exe (PATH-dependent, not devplatform's `.venv\Scripts\python.exe`).
+      3. `Agents Cadence Monitor` has LogonType=S4U; Unregister/Register requires elevated PowerShell (rr5 / Anomaly A3).
+
+      AMENDMENT to the substitution loop (apply in order, per task XML):
+
+      Step 1 — UTF-16 BOM strip + path substitutions (existing spec correct, retain).
+
+      Step 2 — bare `<WorkingDirectory>` rewrite (G-2 fix in spec, retain).
+
+      Step 3 — REPLACE the spec's outer-quote arg-injection with shape-aware injection. Two patterns based on the inner-quoted command:
+
+      ```powershell
+      # Pattern A: python-module tasks (8 tasks: Daily Digest, Welcome Back Poll, Weekly Summary,
+      # Dashboard Maintainer, Credentials Rotation Reminder, Gate Stale Cleaner, Sprint Auditor,
+      # plus any wake-* python-mode variant). Inner shape: "python.exe -m tools.X.Y"
+      $xml = $xml -replace '(runhidden\.vbs"\s*")python\.exe\s+(-m\s+tools\.[^"]*?)"',
+        ('$1C:\Users\mrbla\devplatform\.venv\Scripts\python.exe $2 --project-root C:\Users\mrbla\BlarAI --project-id ' + $BLARAI_PID + '"')
+
+      # Pattern B: powershell-script tasks (5 tasks: Wake SDO, Wake Co-Lead, Wake EA Code,
+      # Agents Cadence Monitor, Toast Watchdog, Escalation Watchdog).
+      # Inner shape: "powershell.exe ... -File <path>\<script>.ps1 -Role <role>"
+      # Append -BlarAIRoot inside the inner-quoted string (per WORKFLOW_INTEGRITY G-1 fix, the .ps1 scripts now accept this param).
+      $xml = $xml -replace '(runhidden\.vbs"\s*"powershell\.exe[^"]*?\.ps1)([^"]*?)"',
+        '$1$2 -BlarAIRoot C:\Users\mrbla\BlarAI"'
+      ```
+
+      Step 4 — S4U elevation guard for `Agents Cadence Monitor`. Wrap the per-task Unregister/Register in:
+
+      ```powershell
+      if ($name -eq 'Agents Cadence Monitor') {
+        $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        if (-not $isAdmin) {
+          Write-Host "SKIP (S4U requires elevation): $name. Will resume in elevated subshell or defer post-stage." -ForegroundColor Yellow
+          $errors += [PSCustomObject]@{ Task = $name; Error = 'S4U elevation required (rr5 / Anomaly A3); deferred.' }
+          continue
+        }
+      }
+      ```
+
+      Step 5 — post-rewrite verify. Before re-registering each task, confirm both `devplatform\.venv\Scripts\python.exe` (or `-BlarAIRoot`) AND `--project-root` (or `-BlarAIRoot`) appear in the rewritten XML's Arguments. Fail the per-task loop if either is missing.
+
+      Step 6 — at end of loop, if `Agents Cadence Monitor` is in $errors with the S4U deferral message, instruct LA: "Open elevated PowerShell, re-run the per-task block for `Agents Cadence Monitor` only, then proceed to Item 4.8". Stage 4 single-continuous-block invariant briefly relaxed for this one task per EX-3 below.
+
+      RECOMMENDED LA pre-prep: launch EA-8's PowerShell elevated from the outset (LA pre-prep checklist item) so Step 4's guard never trips. The init pointer should make this explicit.
+    </subclause>
+
+    <subclause id="n1(i)" item="4.7.5" class="C" title="Wake-template path-rewrite — forward-slash sibling patterns + preserve target-project refs (CC-6 partial)">
+
+      Spec at Item 4.7.5 has 7 backslash-style patterns (`BlarAI\\tools\\X`). Audit found `co_lead_architect.md` line 175 uses forward-slash in a Python string (`path='C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json'`). This forward-slash variant doesn't match the backslash regex, so the path stays stale post-rewrite. Result: LA's HALT motion (which the wake_launcher path emits) writes to BlarAI's dormant state.json, not devplatform's live one.
+
+      AMENDMENT: extend the patterns array with forward-slash siblings and execute both passes:
+
+      ```powershell
+      $patterns_backslash = @(
+        'BlarAI\\tools\\vikunja_mcp', 'BlarAI\\tools\\autonomy_budget',
+        'BlarAI\\tools\\scheduled-tasks', 'BlarAI\\tools\\fleet_observability',
+        'BlarAI\\tools\\fleet_ops', 'BlarAI\\tools\\agents.ps1',
+        'BlarAI\\.venv'
+      )
+      $patterns_forwardslash = @(
+        'BlarAI/tools/vikunja_mcp', 'BlarAI/tools/autonomy_budget',
+        'BlarAI/tools/scheduled-tasks', 'BlarAI/tools/fleet_observability',
+        'BlarAI/tools/fleet_ops', 'BlarAI/tools/agents.ps1',
+        'BlarAI/.venv'
+      )
+      $files = Get-ChildItem -Recurse C:\Users\mrbla\devplatform\docs\scheduled\wake_templates -File
+      foreach ($f in $files) {
+        $c = Get-Content -Raw $f.FullName
+        foreach ($p in ($patterns_backslash + $patterns_forwardslash)) {
+          $newP = $p -replace 'BlarAI', 'devplatform'
+          $c = $c -replace [regex]::Escape($p), $newP
+        }
+        Set-Content -Path $f.FullName -Value $c -Encoding UTF8 -NoNewline
+      }
+      ```
+
+      Update `<verify>`:
+      ```powershell
+      Select-String -Path C:\Users\mrbla\devplatform\docs\scheduled\wake_templates\*.md -Pattern 'BlarAI[\\/](tools|\\.venv)' -AllMatches
+      ```
+      Expected: NO matches.
+
+      Preserve clause unchanged: target-project references (`cd 'C:\Users\mrbla\BlarAI'` for REJECT; `repo_root="C:/Users/mrbla/BlarAI"` for build_diff_descriptor) are NOT rewritten — they correctly point at the BlarAI work-target post-cutover.
+
+      Note: the `co_lead_architect.md` line 175 stale state.json path is forward-bound to Stage 6.7.5 TICKET E expansion sub-item (iv) for documentation polish; the pattern fix here resolves the runtime hazard immediately.
+    </subclause>
+
+    <subclause id="n1(j)" item="4.7.7" class="D" title="Vikunja autostart enumeration — suppress Export-ScheduledTask noise + tighten match regex">
+
+      Spec at Item 4.7.7 uses `Get-ScheduledTask | Where-Object { ($_ | Export-ScheduledTask) -match 'vikunja' }`. `Export-ScheduledTask` raises `The parameter is incorrect.` for ~40-50 protected/system tasks (current user can't export); the pipeline still completes but stderr is flooded with non-fatal exceptions. The match also yields false positives on the 6 BlarAI fleet tasks whose Description references `vikunja_mcp`.
+
+      AMENDMENT: suppress per-element Export-ScheduledTask exceptions + tighten regex to actual vikunja-autostart-shaped tasks only:
+
+      ```powershell
+      $tasks = Get-ScheduledTask | Where-Object {
+        try { ($_ | Export-ScheduledTask -ErrorAction Stop) -match 'vikunja-(autostart|web)' } catch { $false }
+      }
+      ```
+
+      Behavior: enumerates only tasks that mention `vikunja-autostart` or `vikunja web` in their exported XML — i.e., tasks that actually launch Vikunja. The 6 fleet tasks whose Description contains `vikunja_mcp` are NOT autostart tasks and are correctly excluded.
+
+      Rest of Item 4.7.7 (BlarAI-substring throw + .lnk fallback warning) unchanged.
+    </subclause>
+
+    <subclause id="n1(k)" item="4.9" class="C" title="Vikunja Startup .lnk — widen gate to Arguments/WorkingDirectory + rewrite start_vikunja_hidden.vbs content (CC-6 main)">
+
+      Spec at Item 4.9 gate condition `if ($sc.TargetPath -match "BlarAI\\tools\\vikunja")` is FALSE for `Vikunja (BlarAI).lnk` because `TargetPath = C:\Windows\System32\wscript.exe` (the launcher), not the Vikunja binary. The if-block never enters; Arguments + WorkingDirectory (which DO contain BlarAI paths) never get rewritten. Stage 4.9 reports "no shortcuts updated" green; next reboot post-Stage-5 silently breaks Vikunja autostart.
+
+      AMENDMENT (two parts):
+
+      Part 1 — widen the gate condition + rewrite all three .lnk fields:
+
+      ```powershell
+      $startup = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+      $candidates = Get-ChildItem $startup -Filter "*.lnk" -ErrorAction SilentlyContinue
+      $sh = New-Object -ComObject WScript.Shell
+      foreach ($lnk in $candidates) {
+        $sc = $sh.CreateShortcut($lnk.FullName)
+        $matchesBlarAI = ($sc.TargetPath       -match "BlarAI\\tools") -or
+                         ($sc.Arguments        -match "BlarAI\\tools") -or
+                         ($sc.WorkingDirectory -match "BlarAI\\tools")
+        if ($matchesBlarAI) {
+          $oldTarget = $sc.TargetPath; $oldWd = $sc.WorkingDirectory; $oldArgs = $sc.Arguments
+          Copy-Item $lnk.FullName "$($lnk.FullName).pre_stage4_bak" -Force
+          $sc.TargetPath       = $sc.TargetPath       -replace [regex]::Escape("C:\Users\mrbla\BlarAI"), "C:\Users\mrbla\devplatform"
+          $sc.WorkingDirectory = $sc.WorkingDirectory -replace [regex]::Escape("C:\Users\mrbla\BlarAI"), "C:\Users\mrbla\devplatform"
+          $sc.Arguments        = $sc.Arguments        -replace [regex]::Escape("C:\Users\mrbla\BlarAI"), "C:\Users\mrbla\devplatform"
+          $sc.Save()
+          Write-Host "Updated $($lnk.Name):"
+          Write-Host "  Target:  $oldTarget -> $($sc.TargetPath)"
+          Write-Host "  WorkDir: $oldWd -> $($sc.WorkingDirectory)"
+          Write-Host "  Args:    $oldArgs -> $($sc.Arguments)"
+        }
+      }
+      ```
+
+      Part 2 — rewrite `start_vikunja_hidden.vbs` content. The .vbs at devplatform side (byte-identical Stage 3 copy) hardcodes BlarAI paths in `shell.CurrentDirectory` and `shell.Run`. Even though the LA-decided absolute config in n1(c) means cwd doesn't influence DB resolution, the .vbs's `shell.Run "...BlarAI\tools\vikunja\vikunja-v2.3.0...exe"` MUST point at devplatform's binary post-Stage-5 (after BlarAI's binary is deleted). Defense-in-depth even if Stage 5 hasn't run yet:
+
+      ```powershell
+      $vbsPath = "C:\Users\mrbla\devplatform\tools\vikunja\start_vikunja_hidden.vbs"
+      if (Test-Path $vbsPath) {
+        $vbs = Get-Content $vbsPath -Raw
+        if ($vbs -match 'C:\\Users\\mrbla\\BlarAI') {
+          Copy-Item $vbsPath "$vbsPath.pre_stage4_bak" -Force
+          $vbs = $vbs -replace [regex]::Escape('C:\Users\mrbla\BlarAI'), 'C:\Users\mrbla\devplatform'
+          Set-Content -Path $vbsPath -Value $vbs -Encoding ASCII -NoNewline
+          Write-Host "start_vikunja_hidden.vbs rewritten to point at devplatform paths."
+        } else {
+          Write-Host "start_vikunja_hidden.vbs already clean of BlarAI paths."
+        }
+      }
+      ```
+
+      Add `<verify>` at end of Item 4.9:
+      ```powershell
+      $sc = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\Vikunja (BlarAI).lnk")
+      [PSCustomObject]@{ Target = $sc.TargetPath; WorkDir = $sc.WorkingDirectory; Args = $sc.Arguments } | Format-List
+      ```
+      Expected: WorkingDirectory and Arguments contain `devplatform`, NOT `BlarAI`.
+    </subclause>
+
+    <subclause id="n1(l)" item="4.11" class="D" title="End-to-end smoke — split into EA-8 scriptable (4.11a) + LA manual (4.11b deferred)">
+
+      Spec at Item 4.11 says "open a fresh Claude Desktop session. Ask it to list Vikunja projects via MCP." This is a manual UI step that EA-8's PowerShell session cannot itself perform; Item 4.0 also killed Claude Desktop, so re-launching mid-stage is in tension with the closed-surfaces invariant.
+
+      AMENDMENT: split Item 4.11 into two sub-items:
+
+      Item 4.11a — EA-8 scriptable smoke (gates Stage 4 close):
+      ```powershell
+      cd C:\Users\mrbla\devplatform
+      .\.venv\Scripts\python.exe -c @"
+      import asyncio, sys
+      sys.path.insert(0, r'C:\Users\mrbla\devplatform')
+      from tools.vikunja_mcp.cli import main as cli_main
+      # Use the CLI's list-projects subcommand which exercises the same client surface as MCP server
+      sys.argv = ['cli', 'list-projects']
+      asyncio.run(cli_main())
+      "@
+      ```
+      Or equivalently invoke `python -m tools.vikunja_mcp.cli list-projects` via Start-Process and capture exit code. Expected: exits 0 with project list including BlarAI Core Development (id 3), DevPlatform-Meta (id 10), Fleet Reports (id 8). This validates the full Python-side path: devplatform venv → tools.vikunja_mcp module → REST API to localhost Vikunja → JSON parse → output.
+
+      Item 4.11b — LA manual smoke (deferred to post-Stage-4 close, analogous to Stage 3 stop_condition (v)):
+      LA re-launches Claude Desktop AFTER Stage 4 close commit, then types "list my Vikunja projects" in a chat. Confirms Claude Desktop ↔ updated config ↔ devplatform MCP server ↔ Vikunja end-to-end. Result is logged in Stage 4 STATUS append as a deferred verification (NOT a Stage 4 close blocker).
+
+      Item 4.11a is the EA-8 exit criterion for Stage 4 close. 4.11b is recorded as forward-deferred (LA at LA's convenience).
+    </subclause>
+
+    <subclause id="n1(m)" item="4.12" class="A" title="Commit hygiene — gitignore augmentation + explicit allow-list staging (CC-8) + adjusted for LA-decided n1(c)">
+
+      Spec at Item 4.12 uses bare `git add .` on devplatform. Two original concerns + one LA-decision-induced adjustment:
+
+      Original concerns:
+      1. Pre-existing rr8 `.gitignore` duplication (cleaned by EA-8 first preflight per n14(a) — must NOT re-stage that file accidentally).
+      2. SQLite DB and runtime artifacts (state.json contamination, log files) would be swept up by `git add .` — credential leak risk for vikunja.db (Class A).
+
+      LA-decision-induced adjustment per n1(c):
+      3. Vikunja DB stays at LocalAppData (NOT moved to devplatform/tools/vikunja/). The risk of accidentally committing `tools/vikunja/vikunja.db` is therefore much lower (file shouldn't exist at devplatform side post-cutover unless Vikunja somehow falls back to relative-path mode). BUT: defense-in-depth gitignore is still warranted in case (a) the absolutized config edit fails, (b) Vikunja v2.3.0 has any code path that creates a fresh DB at the binary's cwd, (c) future Vikunja version changes the resolution rules.
+
+      AMENDMENT (three steps):
+
+      Step 1 — verify devplatform working tree clean per rr8 (this should already be the case from EA-8's first preflight):
+      ```powershell
+      cd C:\Users\mrbla\devplatform
+      $status = git status --porcelain
+      if ($status) { throw "devplatform working tree not clean: `n$status`nResolve before Stage 4.12 commit." }
+      ```
+
+      Step 2 — augment devplatform `.gitignore` BEFORE staging:
+      ```
+      # Vikunja runtime artifacts (defense-in-depth; DB lives at LocalAppData per LA decision 2026-04-28)
+      tools/vikunja/vikunja.db
+      tools/vikunja/vikunja.db-wal
+      tools/vikunja/vikunja.db-shm
+      tools/vikunja/files/
+      ```
+
+      Step 3 — explicit allow-list staging on devplatform side:
+      ```powershell
+      cd C:\Users\mrbla\devplatform
+      git add .gitignore
+      git add tools/vikunja/config.yml             # the n1(c) absolutization edit
+      # Add any other Stage-4-specific tracked-file changes here if applicable.
+      git status --porcelain                       # inspect — must show only the explicitly-added files
+      git commit -m "Stage 4: cutover -- devplatform now authoritative" -m "config.yml absolutized per g8-ea8_n1(c) LA decision; runtime artifact gitignore augmented per g8-ea8_n1(m). Vikunja DB stays at %LOCALAPPDATA%\Vikunja\\."
+      ```
+
+      BlarAI side commit (per spec, modified for explicit two-config staging):
+      ```powershell
+      cd C:\Users\mrbla\BlarAI
+      git add .vscode/mcp.json .mcp.json           # the n1(g) MCP repointing edits
+      git status --porcelain                       # confirm only these two files staged
+      git commit -m "Stage 4: repoint MCP configs to devplatform"
+      ```
+
+      Note: `%APPDATA%\Claude\claude_desktop_config.json` is NOT in any repo (lives at AppData). The .pre_stage4_bak files for the three configs (Claude Desktop + .vscode/mcp.json + .mcp.json) similarly are not in either repo OR are gitignored.
+    </subclause>
+
+    <subclause id="n1(n)" item="4.13.5" class="B" title="Resume fleet — two-step reset+resume on devplatform path (rr3 disposition + path correction; CC-5)">
+
+      Spec at Item 4.13.5 invokes `state.resume_fleet(updated_by='copilot_agent', path='C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json')`. Per state.py architecture (auto-follows the script via `Path(__file__).resolve().parents[2]`) + Stage 4 cutover making devplatform's wake_launcher authoritative + rr3 (devplatform's state.json carries the contaminated BlarAI snapshot), the AUTHORITATIVE state.json post-cutover is at devplatform. Spec's BlarAI-path resume is a no-op for the live fleet — devplatform's state.json stays `fleet_paused=true` and the fleet silently doesn't run.
+
+      AMENDMENT: replace Item 4.13.5 with a two-step reset+resume that handles rr3 contamination AND the path correction:
+
+      ```powershell
+      # Step 1 — rr3 disposition: reset devplatform state.json to a clean fleet_paused=false baseline
+      # (per Stage 3 close rr3 forward-carry Decision A: explicit reset, with provenance note in Stage 4 STATUS append)
+      cd C:\Users\mrbla\devplatform
+      python -c @"
+      import json
+      from datetime import datetime, timezone
+      p = r'C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json'
+      clean = {
+        'schema_version': 1,
+        'fleet_paused': False,
+        'fleet_paused_reason': None,
+        'last_digest_utc': None,
+        'last_la_action_utc': None,
+        'last_updated_by': 'copilot_agent',
+        'last_updated_utc': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'last_welcome_back_utc': None,
+        'role_paused': {'co_lead_architect': False, 'configuration_agent': False, 'ea_code': False, 'ea_cowork': False, 'sdo': False}
+      }
+      with open(p, 'w', encoding='utf-8') as f:
+        json.dump(clean, f, indent=2, sort_keys=True)
+      print('devplatform state.json reset to clean fleet_paused=false baseline')
+      "@
+
+      # Step 2 — re-pause-then-resume via the canonical helper to ensure last_updated_by/last_updated_utc
+      # are set via the official path. (state.resume_fleet refreshes those fields atomically.)
+      python -c "from tools.autonomy_budget import state; state.resume_fleet(updated_by='copilot_agent', path=r'C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+
+      # Step 3 — verify
+      python -c "import json; s=json.load(open(r'C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json')); print('paused:', s['fleet_paused'], '| by:', s['last_updated_by'], '| utc:', s['last_updated_utc'])"
+      # Expected: paused: False | by: copilot_agent | utc: <today>
+
+      # Step 4 — commit on devplatform (the path that matters)
+      git add tools/autonomy_budget/state.json
+      git commit -m "chore(ops): unpause devplatform fleet -- platform separation v2 cutover done" -m "Per g8-ea8_n1(n): reset devplatform state.json to clean baseline (rr3 disposition Decision A) then resume_fleet via canonical helper. BlarAI's state.json is no longer the authoritative gate post-cutover; the live wake_launcher reads devplatform's per state.py auto-follow architecture."
+      ```
+
+      Function-name reminder (per V7 risk + memory): the function is `state.resume_fleet`, NEVER `state.unpause_fleet` (raises AttributeError).
+
+      `<api_gotcha>` from spec retained.
+
+      `<on_failure>`: if Item 4.11a smoke test failed earlier, do NOT execute n1(n). Rollback per Item 4.1 amended rollback (revert config.yml from .pre_stage4_bak; restart from BlarAI binary). Fleet stays paused until rollback complete or fix-forward.
+    </subclause>
+
+  </new_acknowledgment>
+
+  <forward_carry_to_stage_4_ea_in_execution>
+
+    <preamble>
+      Three items the Stage 4 EA-8 must monitor/disposition during execution that this Stage 4.0.v2 audit cannot resolve at pre-flight timing:
+    </preamble>
+
+    <ex_item id="EX-1" priority="HIGH" status="OPEN">
+      Vikunja DB-path runtime verification mid-cutover. Item 4.1(f) + Item 4.2 verification triad covers the immediate post-startup case, but EA-8 should retain awareness throughout: if at any point during Items 4.7-4.13.5 a `tools/vikunja/vikunja.db` appears in the devplatform working tree (e.g., from Vikunja accidentally writing to cwd), STOP and disposition before commit. Track via `Test-Path C:\Users\mrbla\devplatform\tools\vikunja\vikunja.db` periodically.
+    </ex_item>
+
+    <ex_item id="EX-2" priority="MEDIUM" status="OPEN">
+      VIKUNJA_TOKEN auth fallback documentation. If LA did not pre-create the token (per n1(e) LA pre-flight checklist) and EA-8 fell back to user/pass REST login, EA-8 documents this in Stage 4 STATUS append: "VIKUNJA_TOKEN auto-derived via REST login fallback per g8-ea8_n1(e); LA may retroactively create persistent User-scope token at any time."
+    </ex_item>
+
+    <ex_item id="EX-3" priority="HIGH" status="OPEN">
+      S4U elevation handling for `Agents Cadence Monitor`. If EA-8's PowerShell isn't elevated when Item 4.7 reaches that one task, the n1(h) Step 4 guard suspends (not kills) the per-task loop; EA-8 reports to LA, LA spawns elevated shell to re-run JUST that one task's Unregister/Register block, returns control to EA-8. Stage 4 single-continuous-block invariant briefly relaxed for that one task. RECOMMENDED LA pre-prep: launch EA-8's PowerShell elevated from the outset (per LA pre-prep checklist) so the guard never trips.
+    </ex_item>
+
+  </forward_carry_to_stage_4_ea_in_execution>
+
+  <forward_carry_to_stage_5_ea>
+
+    <preamble>
+      Two NEW Stage 5 forward-items joining the existing f5_1-f5_4 set:
+    </preamble>
+
+    <forward_item id="f5_5" status_at_handoff="OPEN" priority="LOW" source="g8-ea8_n1(m)">
+      Per g8-ea8_n1(m), devplatform `.gitignore` will gain `tools/vikunja/vikunja.db*` and `tools/vikunja/files/` patterns at Stage 4. Stage 5 EA must verify these patterns are PRESERVED through any Stage 5 .gitignore consolidation/cleanup work. Without these patterns, future Vikunja DB writes (e.g., from a hypothetical config regression) could leak into git.
+    </forward_item>
+
+    <forward_item id="f5_6" status_at_handoff="OPEN" priority="LOW" source="g8-ea8_n1(c)">
+      Per g8-ea8_n1(c), Stage 4.1 leaves `.pre_stage4_bak` files at LocalAppData (`vikunja.db.cutover_bak` etc., if rollback testing was performed) and at devplatform (`config.yml.pre_stage4_bak`). Stage 5 EA decision: retain backup files for an explicit retention period (recommend 14 days from Stage 4 close per Master Plan §5 90-day overall window) or delete with explicit LA approval at Stage 5 close. Document decision in Stage 5 STATUS append.
+    </forward_item>
+
+  </forward_carry_to_stage_5_ea>
+
+  <forward_carry_to_stage_6_7_5_hardening_tickets_updated>
+
+    <preamble>
+      Three NEW Stage 6.7.5 tickets joining the existing TICKET A-E set (now A-G + TICKET E sub-item expansion). Per LA mature-not-minimal motto: all REQUIRED, LA may triage priority at Stage 6 execution time, existence non-optional.
+    </preamble>
+
+    <ticket id="F" priority="LOW" source="g8-ea8_n1(c) LA-decision documentation" status="OPEN_PARTIALLY_PRE_RESOLVED">
+      Vikunja DB-path doctrine documentation. Originally scoped at full LocalAppData investigation; PARTIALLY PRE-RESOLVED by LA's 2026-04-28 architectural decision in g8-ea8_n1(c) (DB stays at LocalAppData; config absolutized). Remaining work for Stage 6.7.5 EA: (i) update `start_vikunja_hidden.vbs` and `start_vikunja.bat` documentation comments to note the absolute-path config + LocalAppData reality; (ii) update RECOVERY.md Stage 4 rollback section to reference the absolutized config + LocalAppData DB location instead of the original move-DB pattern; (iii) update VERIFICATION_COMMANDS.md Stage 4 section to test for absolute config presence + DB at LocalAppData; (iv) add an ADR (Architecture Decision Record) capturing the LA's decision and rationale for posterity.
+    </ticket>
+
+    <ticket id="G" priority="LOW" source="g8-ea8_n1(h)" status="OPEN">
+      Scheduled-task XML `python.exe` is unqualified (relies on PATH). Stage 4.7 amendment (n1(h)) makes it absolute (`devplatform\.venv\Scripts\python.exe`) for the 8 python-module tasks during cutover, but the underlying smell is that the original task XMLs depended on PATH — fragile. Consider migrating to a deployment-script pattern where every task XML uses absolute python via a templating mechanism. Lower priority because n1(h) closes the immediate risk.
+    </ticket>
+
+    <ticket id="E_expansion_iv" priority="LOW" source="g8-ea8_n1(i)" status="OPEN">
+      `co_lead_architect.md` line 175 has a forward-slash state.json path that the wake-template path-rewrite (n1(i)) covers at runtime BUT documentation polish: the line currently embeds `'C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json'` as part of a Python `state.pause_fleet(...)` call shown to the LA. Per WORKFLOW_INTEGRITY A.3, state.json moves with state.py (devplatform post-cutover); the line conceptually targets the live state.json. Stage 6.7.5 EA reviews this and other doctrine snippets in wake templates for any remaining stale path references and updates documentation language to be path-agnostic where possible (e.g., "the canonical state.json path resolved by state.py").
+    </ticket>
+
+  </forward_carry_to_stage_6_7_5_hardening_tickets_updated>
+
+  <required_acknowledgments>
+
+    <preamble>
+      EA-8 must acknowledge in its iter-1 comprehension gate response BEFORE Item 4.0 work begins:
+    </preamble>
+
+    <ack_to_emit_at_start_of_ea_8_iter_1_gate>
+      EA-8 acknowledges:
+      (a) g8-ea8_n1 sub-clauses (a) through (n) verbatim per text above.
+      (b) Cumulative-ack chain inheritance from prior verdicts (per no-amend doctrine on committed labels):
+          - g7-ea1_n10..n13(a-h) [legacy `ea1` labels documentation defects deferred to Stage 6.7.5 TICKET A; verbatim per no-amend]
+          - g7-ea7_n14(a-d) [Stage 3.10 closure verdict; corrected `ea7` global naming]
+          - g8-ea8_n1(a-n) NEW [this verdict].
+      (c) Forward-carry items rr1-rr8 (Stage 4 residual-risk inheritance from Stage 3.10) and f5_1-f5_6 (Stage 5 forward-items including new f5_5 + f5_6 from this verdict). EA-8 enumerates these verbatim in iter-1 gate (per g7-ea7_n14(c) requirement).
+      (d) Stage 6.7.5 hardening tickets A-G (5 from prior + 2 new from this verdict) and TICKET E expansion sub-items (i)-(iv).
+      (e) LA-architectural decision in n1(c): DB stays at %LOCALAPPDATA%; devplatform config.yml absolutized at cutover. EA-8 will NOT propose moving the DB.
+      (f) EA numbering: EA-8 emits new acks under `g8-ea8_n*` namespace (EA-8 = Stage 4 EA, globally EA-8 per global EA-numbering convention from feedback memory). Do NOT propagate the legacy `ea1` defect.
+      (g) Stage 4 hard invariants:
+          - Single-continuous-session execution (one EA-8 chat session covers Items 4.0 through 4.13.5).
+          - No merge to main during Stage 4 (gated to Stage 5.10 per R10).
+          - Fleet stays paused until Item 4.13.5 Step 2 (then resumed on devplatform path only).
+          - 13/13 fleet tasks remain Disabled until Item 4.8 enables them one at a time.
+          - All MCP repointing happens before bridge daemon start (4.6.5) before scheduled task enable (4.7-4.8).
+      (h) Stop-conditions during Stage 4 execution:
+          - Any Item-N command throws → STOP and report to LA before next item.
+          - Item 4.1 Step (e) Vikunja unreachable within 30s → STOP; rollback per amended Item 4.1 rollback.
+          - Item 4.2 (i) `tools/vikunja/vikunja.db` accidentally created at devplatform post-startup → STOP; investigate Vikunja resolution behavior with LA.
+          - Item 4.2 (ii) project count below 10 → STOP; Vikunja may be reading wrong DB; investigate with LA.
+          - Item 4.7 per-task verify fails (missing devplatform python OR missing project args) → STOP per-task; do NOT proceed to Item 4.8 with partial fleet.
+          - Item 4.8 LastTaskResult ≠ 0 for any task → auto-disable that task (per spec); STOP if 2+ tasks fail.
+          - Item 4.11a smoke test fails → STOP; do NOT execute Item 4.13.5 (fleet stays paused until rollback or fix).
+          - Any unexpected drift class surfacing → STOP and report; new acks under g8-ea8_n* namespace as needed.
+      (i) Standing reminders (inheriting from Stage 3 r1-r5 where applicable):
+          - r1 [adapted]: do NOT rename variables or restructure code beyond what amendments specify.
+          - r2 [adapted]: STOP and report on any pre-edit audit finding outside the documented Stage 4 scope.
+          - r3 [adapted]: target-project references (BlarAI as work-target post-cutover) preserved per Stage 4.7 preserve clause.
+          - r4 [adapted]: forward-stage Stage 4 STATUS append content as cumulative footnote items in EA-8 working notes.
+          - r5 [adapted]: Stage 4 is single-continuous-session; mid-stage handoff is NOT permitted (per Master Plan §10 + Stage 4 XML continuous_block=true). If context budget tightens dangerously, EA-8 must STOP and request LA disposition rather than self-handoff.
+    </ack_to_emit_at_start_of_ea_8_iter_1_gate>
+
+  </required_acknowledgments>
+
+  <proceed_authorization>
+
+    PROCEED — pending two prerequisites:
+
+    1. Guide-#8 authors the Stage 4 EA-8 init pointer at `docs/platform_separation/temp_for_responses/4.0-EA_INITIALIZATION_INSTANCE_8_STAGE4_CUTOVER.xml`. Init pointer must encode:
+       - LA pre-prep checklist (verbatim, with completion attestation lines)
+       - 75-ack chain VERBATIM (g7-ea1_n10..n13 + g7-ea7_n14(a-d) + g8-ea8_n1(a-n))
+       - rr1-rr8 + f5_1-f5_6 enumerated VERBATIM (per g7-ea7_n14(c) requirement)
+       - 7 Stage 6.7.5 hardening tickets (A-G) + TICKET E expansion sub-items
+       - EA-8 surface-specific directives (VS Code Copilot Opus 4.7; tool surface notes; Item 4.0 pragmatic interpretation; subagent capability NOT required)
+       - Item 4.0.0 NEW first-action: `git checkout -- .gitignore` on devplatform per rr8
+       - Stage 4 hard invariants + stop-conditions + standing reminders
+
+    2. LA pre-prep checklist completed (from g8-ea8_n1(e) + (h) + recommended elevation from outset):
+       - VIKUNJA_TOKEN created via Vikunja UI + persisted as User-scope env var
+       - All OTHER AI surfaces closed (Claude Desktop, other VS Code workspaces, other Claude Code terminals; preserve EA-8's own VS Code window per pragmatic Item 4.0 interpretation)
+       - Elevated PowerShell ready (or EA-8's PowerShell launched elevated from outset)
+       - Vikunja STOPPED (already done; verified via Get-Process at audit)
+       - Block 4-12 hours continuous time once Item 4.1 starts (push-through-or-rollback)
+
+    Stage 4 EA-8 spawn happens AFTER both prerequisites complete + LA-explicit "go" signal. EA-8 runs comprehension gate against the init pointer + this verdict + the audit MD, restates g8-ea8_n1 verbatim, then begins Item 4.0.
+
+  </proceed_authorization>
+
+  <next_action_for_la>
+
+    <step_1>
+      Review this verdict file at `docs/platform_separation/temp_for_responses/4.0.v2-GUIDE_RESPONSE_INSTANCE_8_STAGE4_PREFLIGHT_AUDIT_CHECKPOINT.xml` and the audit evidence MD at `docs/platform_separation/temp_for_responses/4.0.v2-AUDIT_SUBAGENT_OUTPUT_STAGE4_PREFLIGHT_DRIFT_INVENTORY.md`. Pay particular attention to:
+      - g8-ea8_n1(c) — the LA-decided 6-step Item 4.1 flow with config absolutization. This is the only sub-clause that overrides an audit-subagent recommendation.
+      - g8-ea8_n1(h) — Item 4.7 shape-aware arg-injection. This is the most-load-bearing fix for fleet correctness post-cutover.
+      - g8-ea8_n1(n) — Item 4.13.5 two-step reset+resume. This is the most-load-bearing fix for fleet livening at Stage 4 close.
+      - Cross-item cascades CC-1 through CC-8 in audit MD §4.
+    </step_1>
+
+    <step_2>
+      If LA agrees with the verdict as authored, signal "approve init pointer authoring" or equivalent. Per LA's stop-and-wait directive, Guide-#8 will NOT begin init pointer authoring until LA explicit signal.
+
+      If LA wants to amend any sub-clause before binding (e.g., expand g8-ea8_n1(l) Item 4.11 split, or revise g8-ea8_n1(m) gitignore patterns), signal "revise verdict" with the specific change request; Guide-#8 will re-author and re-commit before init pointer.
+
+      If LA wants additional investigation on any item (e.g., test Vikunja's actual fresh-startup behavior with absolute config in a dry-run), signal "investigate <item>"; Guide-#8 will defer init pointer until investigation closes.
+    </step_2>
+
+    <step_3>
+      After verdict approval, Guide-#8 authors the EA-8 init pointer (separately, in a follow-up turn). Init pointer + verdict + audit MD together form the Stage 4 EA-8 spawn package; LA pastes them into a fresh VS Code Copilot Opus 4.7 session and tells EA-8 "Execute this stage prompt."
+    </step_3>
+
+    <pause_state_note>
+      Fleet remains paused (`fleet_paused=true`, `last_updated_utc=2026-04-24T20:46:12Z`, `last_updated_by=copilot_agent`) throughout this verdict review and through Stage 4 EA-8 spawn. Guide-#8 will not auto-unpause. Per memory feedback: fleet pause is LA-coordinated across sessions; Guide-#8 will not intervene.
+    </pause_state_note>
+
+  </next_action_for_la>
+
+</guide_response>

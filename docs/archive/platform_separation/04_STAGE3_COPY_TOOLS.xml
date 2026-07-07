@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<stage_prompt stage="3" name="Copy Platform Tools to devplatform (Parallel Run)" risk="MEDIUM" single_session="true">
+
+  <comprehension_gate>
+    <rule>MANDATORY FIRST ACTION. Present structured summary. STOP and WAIT for Lead Architect approval.</rule>
+  </comprehension_gate>
+
+  <vikunja_access_protocol added_on="2026-04-24" rationale="Stage 1 Anomaly A5 -- Executor surfaces vary in MCP-tool exposure; REST is documented as functionally equivalent fallback">
+    <intro>
+      Stage operations that read or write Vikunja MAY use either Model Context Protocol (MCP)
+      tools OR direct Representational State Transfer (REST) against the Vikunja API. Both
+      paths are byte-equivalent at the Vikunja server. Preference: MCP when the Executor
+      surface exposes mcp__vikunja__* tools; REST is the documented fallback when MCP is not
+      surfaced.
+    </intro>
+    <preferred path="MCP">
+      Tool prefixes: mcp__vikunja__list_projects, mcp__vikunja__create_project,
+      mcp__vikunja__list_tasks, mcp__vikunja__create_task, mcp__vikunja__update_task,
+      mcp__vikunja__add_task_comment, mcp__vikunja__list_labels, mcp__vikunja__add_label_to_task.
+      Precondition: Vikunja v2.3.0 server running on http://localhost:3456 (start via
+      Start-Process C:\Users\mrbla\BlarAI\tools\vikunja\vikunja-v2.3.0-windows-4.0-amd64.exe;
+      poll /api/v1/info before first call).
+    </preferred>
+    <fallback path="REST">
+      Direct REST via Invoke-RestMethod. Authentication flow:
+        $cred = Get-Content C:\Users\mrbla\BlarAI\.vscode\mcp.json -Raw | ConvertFrom-Json
+        $pass = $cred.mcpServers.vikunja.env.VIKUNJA_PASS   # read-only; do NOT write back
+        $body = @{ username='blarai'; password=$pass } | ConvertTo-Json
+        $token = (Invoke-RestMethod -Uri 'http://localhost:3456/api/v1/login' -Method POST `
+                    -Body $body -ContentType 'application/json').token
+        $headers = @{ Authorization = "Bearer $token" }
+        # Subsequent calls: GET/PUT/POST against /api/v1/projects, /api/v1/tasks,
+        # /api/v1/labels, etc.
+    </fallback>
+    <credential_source>
+      Single canonical source for Vikunja credentials: C:\Users\mrbla\BlarAI\.vscode\mcp.json
+      key path mcpServers.vikunja.env.VIKUNJA_PASS. Both MCP path and REST path read this
+      same value. The User-scoped VIKUNJA_PASS env var (persisted at Stage 0.0.5) is used
+      by the MCP server process itself; for direct PowerShell scripts, read from the
+      .vscode/mcp.json file as shown above.
+    </credential_source>
+    <safety>
+      Neither path satisfies Master Plan section D.1 enforcement -- D.1 is enforced by
+      tools/_vikunja_client.py (created in Stage 2.1) for fleet RUNTIME tools, not for
+      stage-execution operations. Stage operations using either path must still pass
+      explicit project_id when the operation is project-scoped.
+    </safety>
+  </vikunja_access_protocol>
+
+  <v2_updates source="../INFRA_DELTA_v2.md" added_on="2026-04-24">
+    <note>Additive to v1 work_items 3.1–3.10. Apply alongside.</note>
+
+    <item id="3.1.v2" name="Expand tool-copy list with v2 additions">
+      <description>v1 item 3.1 copies 7 directories. v2 baseline adds these specific files to the same destination tree (devplatform/tools/...). Recursive directory copy already covers them — verify explicitly.</description>
+      <additional_copies>
+        <copy from="tools/fleet_ops/blarai_next_task_resolver.py" to="devplatform/tools/fleet_ops/"/>
+        <copy from="tools/fleet_ops/diff_builder.py" to="devplatform/tools/fleet_ops/"/>
+        <copy from="tools/fleet_observability/escalation_notify.ps1" to="devplatform/tools/fleet_observability/"/>
+        <copy from="tools/scheduled-tasks/escalation-watchdog.xml" to="devplatform/tools/scheduled-tasks/"/>
+        <copy from="tools/scheduled-tasks/escalation-watchdog.ps1" to="devplatform/tools/scheduled-tasks/"/>
+        <copy from="tools/scheduled-tasks/test_async_post_gate.ps1" to="devplatform/tools/scheduled-tasks/"/>
+        <copy_tests>Any test_blarai_next_task_resolver*.py, test_diff_builder*.py, test_active_tasks*.py under tools/tests/ — copy to devplatform/tools/tests/.</copy_tests>
+      </additional_copies>
+      <verify>Compare LOC totals: BlarAI source vs devplatform copy must match within 0 lines (no truncation).</verify>
+    </item>
+
+    <item id="3.2.v2" name="Expand doc-copy patterns with governance and wake templates">
+      <description>v1 item 3.2 misses governance docs (~2377 LOC across 7 files) and wake templates (6 cron-fired wake prompts).</description>
+      <additional_doc_patterns>
+        <pattern src="docs/governance/" dest="devplatform/docs/governance/"/>
+        <pattern src="docs/scheduled/wake_templates/" dest="devplatform/docs/scheduled/wake_templates/"/>
+      </additional_doc_patterns>
+      <verify>Test-Path devplatform/docs/governance/fleet-hygiene.md — expected True.</verify>
+    </item>
+
+    <item id="3.10.v2" name="Capture v2 LOC totals in copy manifest">
+      <description>For audit, record LOC counts of every v2-added file in `devplatform/.copy_manifest_v2.yaml` so Stage 5 cleanup can verify nothing was orphaned.</description>
+    </item>
+  </v2_updates>
+
+  <objective>
+    COPY (not move) all platform tools from `C:\Users\mrbla\BlarAI\tools\` to `C:\Users\mrbla\devplatform\tools\`.
+    Install dependencies in devplatform's .venv. Verify the devplatform copy runs independently.
+    Do NOT delete originals yet. Do NOT switch any external surfaces (MCP configs, scheduled tasks) — those are Stage 4.
+
+    After this stage, both BlarAI/tools/ and devplatform/tools/ contain full working copies of the platform.
+    BlarAI copy remains the active one (MCP configs still point to it; scheduled tasks still disabled).
+  </objective>
+
+  <preconditions>
+    <check>Stage 2 complete — multi-project seam merged into BlarAI tools.</check>
+    <check>devplatform scaffold exists from Stage 1.</check>
+    <check>Fleet scheduled tasks remain Disabled.</check>
+  </preconditions>
+
+  <work_items>
+
+    <item id="3.1" name="Copy platform tool directories">
+      <command>
+        $dirs_to_copy = @(
+          "vikunja", "vikunja_mcp", "fleet_ops", "fleet_observability",
+          "autonomy_budget", "gate_stale_cleaner", "scheduled-tasks"
+        );
+        foreach ($d in $dirs_to_copy) {
+          Copy-Item -Recurse -Force "C:\Users\mrbla\BlarAI\tools\$d" "C:\Users\mrbla\devplatform\tools\$d"
+        }
+        # Also copy the shared helpers created in Stage 2
+        Copy-Item "C:\Users\mrbla\BlarAI\tools\_vikunja_client.py" "C:\Users\mrbla\devplatform\tools\_vikunja_client.py"
+        Copy-Item "C:\Users\mrbla\BlarAI\tools\_project_context.py" "C:\Users\mrbla\devplatform\tools\_project_context.py"
+      </command>
+      <verify>Get-ChildItem C:\Users\mrbla\devplatform\tools -Directory</verify>
+      <do_not_copy>
+        <item>tools/openvino_contrib_agent/ — BlarAI-only, stays in BlarAI.</item>
+        <item>tools/tests/ — copy ONLY the vikunja/fleet/autonomy tests; skip BlarAI-specific tests.</item>
+      </do_not_copy>
+    </item>
+
+    <item id="3.2" name="Copy platform doctrine docs to devplatform">
+      <description>Copy (not move) the platform-layer documentation files.</description>
+      <copy_patterns>
+        <pattern>docs/CLAUDE_*.md</pattern>
+        <pattern>docs/CLAUDE_*.xml</pattern>
+        <pattern>docs/CO_LEAD_*.xml</pattern>
+        <pattern>docs/DEC*.xml</pattern>
+        <pattern>docs/DOMAIN*.xml</pattern>
+        <pattern>docs/CONTINUATION_PROMPT.md (archived reference)</pattern>
+      </copy_patterns>
+      <command>
+        $patterns = @("CLAUDE_*.md","CLAUDE_*.xml","CO_LEAD_*.xml","DEC*.xml","DOMAIN*.xml");
+        foreach ($p in $patterns) {
+          Get-ChildItem C:\Users\mrbla\BlarAI\docs\$p -File -ErrorAction SilentlyContinue |
+            Copy-Item -Destination C:\Users\mrbla\devplatform\docs\
+        }
+      </command>
+    </item>
+
+    <item id="3.3" name="Copy claude_cowork and claude_projects (if populated)">
+      <command>
+        if ((Get-ChildItem C:\Users\mrbla\BlarAI\claude_cowork -ErrorAction SilentlyContinue).Count -gt 0) {
+          Copy-Item -Recurse C:\Users\mrbla\BlarAI\claude_cowork C:\Users\mrbla\devplatform\
+        }
+        if ((Get-ChildItem C:\Users\mrbla\BlarAI\claude_projects -ErrorAction SilentlyContinue).Count -gt 0) {
+          Copy-Item -Recurse C:\Users\mrbla\BlarAI\claude_projects C:\Users\mrbla\devplatform\
+        }
+      </command>
+    </item>
+
+    <item id="3.4" name="Populate devplatform pyproject.toml with platform dependencies">
+      <description>Expand the placeholder from Stage 1.7 with real dependencies (read from current BlarAI pyproject.toml, keep only platform-tool deps).</description>
+      <pattern>
+        Copy the relevant `[project.dependencies]` and `[tool.pytest.ini_options]` entries from
+        BlarAI/pyproject.toml, filtering to only what platform tools need (requests, pyyaml, pytest, etc.).
+        BlarAI-runtime deps (openvino, transformers, etc.) stay out.
+      </pattern>
+    </item>
+
+    <item id="3.5" name="Install devplatform dependencies">
+      <command>cd C:\Users\mrbla\devplatform; .\.venv\Scripts\Activate.ps1; pip install -e .</command>
+      <verify>cd C:\Users\mrbla\devplatform; .\.venv\Scripts\python.exe -c "import yaml, requests; print('OK')"</verify>
+    </item>
+
+    <item id="3.6" name="Copy MCP config templates">
+      <description>Copy `.mcp.json` and `.vscode/mcp.json` to devplatform AND update paths inside them to reference devplatform locations. Critically, the devplatform copies pick up `tools/vikunja_mcp/` from `C:\Users\mrbla\devplatform\tools\` not from BlarAI.</description>
+      <files_touched>
+        <file>C:\Users\mrbla\devplatform\.mcp.json (new, paths point to devplatform)</file>
+        <file>C:\Users\mrbla\devplatform\.vscode\mcp.json (new, paths point to devplatform)</file>
+      </files_touched>
+      <secret_handling>
+        <warning>VIKUNJA_PASS is currently plaintext in both MCP configs (F-1 finding).
+          For the devplatform copies, reference an env var instead: `"VIKUNJA_PASS": "${env:VIKUNJA_PASS}"`.
+          Lead Architect sets the env var in the new devplatform workspace before Stage 4.</warning>
+      </secret_handling>
+    </item>
+
+    <item id="3.7" name="Smoke test devplatform fleet tool (parallel with BlarAI copy still active)">
+      <preflight>
+        $BLARAI_PID = (Get-Content C:\Users\mrbla\BlarAI\.platform\vikunja_project_ids.yaml | Select-String 'blarai_project_id:\s*(\d+)').Matches.Groups[1].Value
+        if (-not $BLARAI_PID) { throw 'BLARAI_PID not found in registry; complete Stage 1.4 first.' }
+      </preflight>
+      <command>
+        cd C:\Users\mrbla\devplatform; .\.venv\Scripts\Activate.ps1;
+        python -m tools.fleet_observability.daily_digest `
+          --project-root C:\Users\mrbla\BlarAI `
+          --project-id $BLARAI_PID `
+          --dry-run
+      </command>
+      <expected>Runs to completion from devplatform. Same output as running from BlarAI copy.</expected>
+      <important>Do NOT let it write any state (use --dry-run or equivalent). Both copies can't write simultaneously yet.</important>
+    </item>
+
+    <item id="3.8" name="Copy BlarAI docs that are BlarAI-only to ensure they stay">
+      <description>Verification check — no action needed, but confirm we did NOT copy BlarAI-only docs (ADRs, Task4.*, P5_*, ledgers, IMPLEMENTATION_PLAN.md, TEST_GOVERNANCE.md) to devplatform.</description>
+      <verify>Get-ChildItem C:\Users\mrbla\devplatform\docs | Select-String -Pattern "Task4|P5_|ADR|LEDGER|IMPLEMENTATION_PLAN|TEST_GOVERNANCE"</verify>
+      <expected>Empty (none of those should be in devplatform).</expected>
+    </item>
+
+    <item id="3.9" name="Commit devplatform state">
+      <command>cd C:\Users\mrbla\devplatform; git add .; git commit -m "Stage 3: copy platform tools and doctrine from BlarAI"</command>
+    </item>
+
+    <item id="3.10" name="Update STATUS.md">
+      <description>Mark Stage 3 COMPLETE. Record: devplatform commit hash, list of directories copied, smoke test result.</description>
+    </item>
+
+  </work_items>
+
+  <rollback>
+    <trigger>Dependencies fail to install, or devplatform smoke test fails.</trigger>
+    <steps>
+      <step>cd C:\Users\mrbla\devplatform; git reset --hard HEAD~1 (first commit from Stage 1 stays)</step>
+      <step>Delete devplatform/tools and devplatform/docs contents, recreate empty skeleton.</step>
+      <step>BlarAI is unchanged — rollback here has zero BlarAI impact.</step>
+    </steps>
+  </rollback>
+
+  <verification_commands_for_lead_architect>
+    <cmd label="devplatform tools present">Get-ChildItem C:\Users\mrbla\devplatform\tools -Directory</cmd>
+    <cmd label="devplatform .venv has deps">cd C:\Users\mrbla\devplatform; .\.venv\Scripts\python.exe -c "import yaml, requests; print('OK')"</cmd>
+    <cmd label="devplatform smoke test">cd C:\Users\mrbla\devplatform; .\.venv\Scripts\python.exe -m tools.fleet_observability.daily_digest --help</cmd>
+    <cmd label="BlarAI tools still intact">Get-ChildItem C:\Users\mrbla\BlarAI\tools -Directory</cmd>
+    <cmd label="devplatform commit recorded">cd C:\Users\mrbla\devplatform; git log --oneline</cmd>
+  </verification_commands_for_lead_architect>
+
+  <exit_criteria>
+    <criterion>All 7 platform tool directories copied to devplatform/tools/.</criterion>
+    <criterion>_vikunja_client.py and _project_context.py copied.</criterion>
+    <criterion>devplatform .venv has all platform dependencies installed.</criterion>
+    <criterion>Platform doctrine docs copied to devplatform/docs/.</criterion>
+    <criterion>Smoke test passes from devplatform copy.</criterion>
+    <criterion>BlarAI tools/ and docs/ unchanged (BlarAI copy still authoritative).</criterion>
+    <criterion>Scheduled tasks remain Disabled.</criterion>
+    <criterion>MCP configs (system-wide) still point to BlarAI paths — not yet repointed.</criterion>
+    <criterion>STATUS.md updated.</criterion>
+  </exit_criteria>
+
+</stage_prompt>

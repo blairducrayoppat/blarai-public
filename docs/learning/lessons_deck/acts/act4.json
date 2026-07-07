@@ -1,0 +1,601 @@
+{
+  "act": 4,
+  "title": "Governance and decisions — the escalation boundary",
+  "subtitle": "Accountable decisions, documented trade-offs, and what is yours to fix versus the operator's to call",
+  "aigp_intro": "This act trains the governance spine of the deck: who is accountable for which decision, how decisions are recorded for later examination, and where the builder's ownership ends and the operator's call begins. Its home is Domain I — Understanding the Foundations of AI Governance: organizational expectations, decision rights, and policies across the AI life cycle. The recurring anchor is the GOVERN function of the NIST AI Risk Management Framework (AI RMF) — accountability structures, roles, and risk culture — beside the EU AI Act's human-oversight concept: the accountable human gets the genuine decisions, with the information and timing to decide them well. Several lessons reach into Domain III (governing design) and Domain IV (the decision to deploy).",
+  "aigp_domains": [
+    "Domain I — Understanding the Foundations of AI Governance"
+  ],
+  "lessons": [
+    {
+      "number": 1,
+      "prologue": true,
+      "fragment": null,
+      "title": "Process is not progress.",
+      "failure": "The operator spent months — and real money — on an \"autonomous fleet\": AI agents that would wake on a schedule and build BlarAI on their own. The fleet was busy. It produced design documents, reports, audits of the reports — an enormous paper trail that felt like work. Then, working with an AI coding agent, he counted what it had actually done: of around 259 automated sessions that committed anything, only 15 had committed real code. The other 244 committed only markdown — documents about work. The \"factory\" was, in effect, a machine for producing the appearance of work, while the product underneath barely moved. So he stopped, and flipped the approach: build the smallest thing that genuinely runs, verify it live, grow from there. The first session working that way shipped four real fixes, each confirmed live before commit (commits aacb127, b751147, 9baa2d8, 13c235e).",
+      "evidence": [
+        "2026-05-21 — The pivot, and the first real shipping",
+        "commits aacb127, b751147, 9baa2d8, 13c235e"
+      ],
+      "lesson": "Process is not progress. Documentation, reports, and audits of reports can accumulate indefinitely while the thing being governed does not advance one step — and from the inside, the activity feels identical to work. The only honest measure of progress is the product itself: what runs, what changed, what a user can now do that they could not do before.",
+      "growth": "Understand the mechanism, because it will recur in any project you run. Producing working software is hard and slow to verify; producing documents about software is easy and instantly satisfying. When nobody measures the outcome — what the product can now do — every actor in the system, human or AI, drifts toward the output that is easiest to generate and easiest to show. The 259-session fleet was not lazy; it was optimizing for the only things being counted: sessions completed, artifacts produced. The defense is a brutal outcome metric checked on a schedule: what runs this week that could not run last week? If the answer is \"nothing, but we wrote a lot,\" you are watching this failure in progress. Count code-touching commits against paper-only commits — that ratio, fifteen against two hundred forty-four, was the diagnosis here, and it took one honest hour to compute.",
+      "growth_question": "The fleet completed roughly 259 sessions and felt productive the whole time — what single question, asked monthly, would have exposed that almost nothing was being built?",
+      "diagram": "flowchart TD\n  A[\"autonomous fleet wakes<br/>on a schedule\"] --> B[\"documents describing work\"]\n  B --> C[\"audits of the documents\"]\n  C --> D[\"reports on the audits\"]\n  D -->|\"feels like work\"| A\n  A --> E[\"honest count: 259 sessions<br/>committed, only 15<br/>touched real code\"]\n  E --> F[\"stop the factory\"]\n  F --> G[\"build the smallest thing<br/>that genuinely runs\"]\n  G --> H[\"verify it live on the<br/>real system\"]\n  H --> I[\"commit only if it survives\"]\n  I --> J[\"first session: four real<br/>fixes shipped\"]",
+      "stat": [
+        {
+          "before": "259",
+          "after": "15",
+          "label": "sessions committing vs touching real code"
+        },
+        {
+          "value": "four fixes",
+          "label": "the first session after the pivot"
+        }
+      ],
+      "aigp_text": "This is a Domain I story — Understanding the Foundations of AI Governance — because it shows what governance is for: an autonomous AI system ran for months with no accountability structure tying its activity to outcomes. The GOVERN function of the NIST AI Risk Management Framework names the missing piece — roles, accountability, and a risk culture that asks what the system is actually doing. ISO/IEC 42001's plan-do-check-act pattern names it too: plan and do in abundance, no check. Measuring outcomes is the founding governance act.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "ISO/IEC 42001 — plan-do-check-act (AIMS)"
+      ],
+      "aigp_takeaway": "Govern to outcomes: activity metrics reward the appearance of work; only outcome measures prove progress."
+    },
+    {
+      "number": 17,
+      "prologue": false,
+      "fragment": null,
+      "title": "A decision can be right for a reason that is false — re-test the rationale, not just the result.",
+      "failure": "BlarAI's governance doc disabled the GPU compile cache \"for guaranteed identical compiled state,\" and because the setting looked right, nobody had ever questioned the reason. A handoff brief then billed re-enabling that cache as \"the single highest-value startup fix.\" Instead of arguing the documentation, the agent measured it: five fresh-process loads of the production pipeline, varying only the cache setting, with outputs hashed. Every run — fresh compile or cache read — produced byte-identical output, the same SHA-256 to the last character. The documented rationale was guarding a risk that does not exist. The \"fix\" dissolved too: a fresh compile takes about eleven seconds, the first cache write cost fifty-three seconds writing a nine-gigabyte blob, and reading it back cold took just under twelve seconds — slower than recompiling. The thirteen-percent \"win\" was only the second warm run riding the operating system's file cache. Right setting, false rationale, worthless fix.",
+      "evidence": [
+        "2026-06-03 — Measuring the reason, not just the setting: the GPU cache that saved nothing",
+        "2026-05-22 — Boot time: the optimisation I measured to nothing",
+        "commit 383f445 (the 2026-05-22 first pass)"
+      ],
+      "lesson": "A decision can be right for a reason that is false. A documented rationale is a claim, and an unverified claim sitting under a correct decision is still a liability — it misleads the next person who builds on the reason rather than the result. When you revisit a decision, price its premise on the running system, and write the corrected reason down even when the decision itself does not move.",
+      "growth": "Notice the mechanism: a wrong decision gets corrected because its consequences hurt, but a right decision shields its own rationale from scrutiny forever — nothing ever goes wrong, so nobody ever looks. The danger is not the decision; it is the false reason being reused. The next engineer who reads \"cache disabled to guarantee identical compiled state\" learns a fact about the system that is not true, and may design around a reproducibility risk that does not exist. When you write or inherit a decision record, treat every \"because\" clause as a claim with a shelf life: was it measured, by whom, on what system, when? And when you re-validate a decision, test the premise separately from the conclusion — the cheapest finding in this story was that the stated reason and the proposed fix were both false while the setting stayed correct.",
+      "growth_question": "The cache setting was correct and never caused a problem — so what, exactly, was at risk while its written justification stayed false?",
+      "diagram": "flowchart TD\n  DOC[\"gpu-runtime.md: cache off for<br/>guaranteed identical<br/>compiled state\"]\n  BRIEF[\"handoff brief: re-enable it -<br/>the highest-value startup fix\"]\n  DOC --> PROBE[\"probe: five fresh-process<br/>loads, only CACHE_DIR varies,<br/>outputs SHA-256 hashed\"]\n  BRIEF --> PROBE\n  PROBE --> HASH[\"all five runs byte-identical:<br/>the same three hashes\"]\n  HASH --> RAT[\"rationale empty: the cache IS<br/>the same compiled state\"]\n  PROBE --> TIME[\"fresh compile ~11 s; cold<br/>cache read ~12 s; first<br/>write 53 s for a 9 GB blob\"]\n  TIME --> WIN[\"the 13% win was the second<br/>warm run riding the OS<br/>file cache\"]\n  RAT --> OUT[\"CACHE_DIR stays empty; the<br/>written reason is corrected\"]\n  WIN --> OUT",
+      "stat": [
+        {
+          "before": "about eleven seconds",
+          "after": "just under twelve seconds",
+          "label": "fresh compile vs cold cache read"
+        },
+        {
+          "value": "fifty-three seconds",
+          "label": "first boot cache-write cost"
+        },
+        {
+          "value": "byte-identical",
+          "label": "output with cache on or off"
+        }
+      ],
+      "aigp_text": "Decision records are a core Domain I practice — Understanding the Foundations of AI Governance — and this lesson shows their failure mode: a record whose rationale never matched reality. The probe that settled it is what the MEASURE function of the NIST AI Risk Management Framework asks for — assess claims with quantitative methods rather than argument. And the EU AI Act's high-risk obligations make technical documentation a named duty precisely because documentation others rely on must describe the system as it is, including corrected reasons and recorded supersessions.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE",
+        "EU AI Act — technical documentation (high-risk obligation)"
+      ],
+      "aigp_takeaway": "Re-test the rationale, not just the result; record the corrected reason even when the decision stands."
+    },
+    {
+      "number": 29,
+      "prologue": false,
+      "fragment": null,
+      "title": "Escalate what the user experiences; own how it is wired — a quality or capability tradeoff is the operator's call, never an implementation detail you slip in.",
+      "failure": "A vision feature was freezing the operator's machine: a fifty-megapixel photo (8160×6144) hung a describe request for four minutes, while a 2.4-megapixel photo answered in fifty seconds. The agent had the obvious fix — downscale images to about 1.5 megapixels before the vision model — and wrote it up as a \"low-risk, standard, reversible\" recommended option. The operator stopped it: shrinking that photo would gut the answer for exactly the question it carried — read the text on the wall — and reducing what the product can do is his decision, not something to bury in a recommendation. His correction is now the rule: \"Design and technical decisions that have large impacts on the quality of the response is the kind of hard escalation we should be having to me, not stuff asking me about Git which I know nothing about.\" Only observation shipped; the capability call was his.",
+      "evidence": [
+        "2026-06-04 — The fix that logged a lie, and the capability cut I almost made without asking"
+      ],
+      "lesson": "Escalate what the user experiences; own how it is wired. A quality or capability trade-off is the operator's call — surfaced explicitly, with alternatives, before implementation — never an implementation detail slipped into a \"recommended option.\" Pure mechanics (commit structure, which thread a call runs on) are the builder's to decide; whether the assistant can still read the sign in the photo is exactly the call to hand up.",
+      "growth": "The trap is one of perspective: from inside the fix, downscaling an image is a parameter — small, standard, reversible. The capability it destroys is only visible from the user's side of the glass, and the person at that layer was never asked. You will miscalibrate escalation the same way if you sort decisions by technical difficulty: hard-looking things get escalated, easy-looking things get folded in — but difficulty is the wrong axis. The right axis is user impact. Before shipping any fix, ask what the user gains or loses that they could notice; if the answer is anything but \"nothing,\" the accountable owner decides, with the alternatives laid out, before you build. The same axis works in reverse: do not push mechanics — branch strategy, thread placement — onto an owner who cannot evaluate them. You own the wiring; they own the experience.",
+      "growth_question": "The downscale really was low-risk, standard, and reversible — so what made it the operator's decision rather than the engineer's?",
+      "diagram": "flowchart TD\n  P[\"50 MP photo (8160×6144)<br/>handed to the vision model\"]\n  P --> G[\"enormous encoder patch grid:<br/>RAM spikes past the ceiling\"]\n  G --> T[\"swap-thrash: a describe takes<br/>four minutes, IPC times out\"]\n  T --> FIX[\"obvious fix: downscale to<br/>about 1.5 megapixels\"]\n  FIX --> Q{\"does the user gain or lose<br/>anything they could notice?\"}\n  Q -->|\"yes: can no longer read<br/>the text on the wall\"| ESC[\"escalate: the operator owns<br/>quality and capability\"]\n  Q -->|\"no: pure wiring\"| OWN[\"builder decides and ships\"]\n  ESC --> SHIP[\"only observation shipped;<br/>the capability call was his\"]",
+      "stat": [
+        {
+          "before": "four minutes",
+          "after": "fifty seconds",
+          "label": "describe time, 50 MP vs 2.4"
+        },
+        {
+          "before": "50 MP",
+          "after": "1.5 MP",
+          "label": "the downscale almost shipped silently"
+        }
+      ],
+      "aigp_text": "This is the escalation boundary as governance: Domain I asks organizations to establish clear expectations and accountability for AI decisions, and the boundary drawn here — capability and quality calls go to the accountable human, wiring stays with the builder — is an accountability structure in the sense of the GOVERN function of the NIST AI Risk Management Framework. It also exemplifies the EU AI Act's human-oversight concept: oversight only works when consequential trade-offs reach the human before implementation, not afterward in a degraded answer.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "EU AI Act — human oversight (high-risk obligation)"
+      ],
+      "aigp_takeaway": "Capability and quality trade-offs escalate to the accountable owner before implementation; implementation mechanics never do."
+    },
+    {
+      "number": 38,
+      "prologue": false,
+      "fragment": null,
+      "title": "When the operator's gut says a design is wrong, that is a design-review trigger — re-derive from best practice, do not defend the as-built.",
+      "failure": "The provenance sprint shipped a security lock and watched it verify live: paste untrusted content into a session, and every tool switches off until the user types /trust. Every test passed; the screen confirmed it. Then the operator — a self-described non-developer — watched the clock get locked behind a /trust prompt and asked the question the builder stopped asking: \"is this locking mechanism really best practice? this whole trusting process seems bad.\" He was right twice. Locking a clock or calculator adds friction with zero security benefit — they cannot exfiltrate, mutate, or egress anything. And /trust asked the least-equipped person in the system to \"accept that the untrusted content could influence the tool\" — the un-evaluable are-you-sure the literature calls click-through theatre. The redesign (ADR-023 Amendment 1) gave tools risk tiers: SAFE tools are never locked, and DANGEROUS actions are denied absolutely, with no /trust to override.",
+      "evidence": [
+        "2026-06-04 — The operator looked at the lock and said it felt wrong, and he was right"
+      ],
+      "lesson": "When the operator's gut says a design is wrong, that is a design-review trigger. A non-expert's \"this feels wrong\" about a security experience is rarely noise — it is the smell test the experts stopped running. Re-derive the design from first principles and the external state of practice; the as-built is evidence of what was tried, never proof that it was right.",
+      "growth": "The pull you must resist is structural: the design had passed every test and verified live, so explaining why it was fine felt like the competent response. But tests and live verification measure a design against its own specification — and the flaw was in the specification. A fresh, non-expert user evaluates the thing experts no longer see: what the experience actually demands of the person using it. Security design fails there constantly — consent prompts nobody can evaluate, friction with no risk reduction — and those failures are invisible to the people who wrote the threat model. When someone's gut objects, especially someone unlike you, do not adjudicate the objection against the as-built; open a real review and re-derive the design from first principles and the published state of practice. If the design survives, you have learned why it is right. This one did not survive.",
+      "growth_question": "Every test passed and the lock verified live — what was the operator measuring that the test suite and the builder were not?",
+      "diagram": "flowchart TD\n  U[\"untrusted content pasted<br/>into the session\"]\n  U --> L[\"blunt session lock: every<br/>tool switches off\"]\n  L --> C[\"even the clock is locked:<br/>friction, zero security gain\"]\n  L --> T[\"/trust asks the least-equipped<br/>person to accept influence\"]\n  C --> GUT[\"operator: is this really best<br/>practice? this seems bad\"]\n  T --> GUT\n  GUT --> R[\"re-derive from best practice:<br/>ADR-023 Amendment 1 risk tiers\"]\n  R --> S[\"SAFE tools (clock, calculator)<br/>never locked\"]\n  R --> D[\"DANGEROUS actions denied<br/>absolutely - no /trust override\"]",
+      "aigp_text": "Effective human oversight — a named EU AI Act high-risk obligation — requires that the human can actually evaluate what they are asked to approve; a /trust prompt the user cannot assess is oversight in form only. The redesign restored substance: no human override exists for dangerous actions, and safe ones demand no ritual. The deeper exemplar is the GOVERN function of the NIST AI Risk Management Framework: a risk culture in which a non-expert's challenge triggers review rather than defense is an accountability structure working as designed.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "EU AI Act — human oversight (high-risk obligation)",
+        "NIST AI RMF — GOVERN"
+      ],
+      "aigp_takeaway": "A non-expert's \"this feels wrong\" is a design-review trigger: re-derive from best practice, never defend the as-built."
+    },
+    {
+      "number": 39,
+      "prologue": false,
+      "fragment": null,
+      "title": "A locked decision can stay right while the evidence under it quietly rots — re-measure a premise when the stack beneath it moves, not just when you revisit the decision.",
+      "failure": "The operator asked: is 16K the right context window — how much conversation the model holds at once — and did we choose it properly? It had been: decision record DEC-03 locked it on a 42-configuration sweep. But one supporting finding — that speculative decoding (a speed-up using a small helper model) goes inert at large context, so the big window costs no speed — was measured 2026-03-03, before two stack changes: the fix that made speculative decoding engage, and a helper-model swap. The agent nearly quoted the stale finding as current; a date caught it, not a re-run. A targeted re-measurement settled it: acceptance at 16K was 46%, not zero, throughput about 2.3 times the recorded number — the decision reaffirmed. The same run found a second premise rotted the other way: the memory footprint nearly quadrupled, 3,562 MB to 12,715 MB, making \"20K is safe\" the suspect claim.",
+      "evidence": [
+        "2026-06-05 — The benchmark that aged out from under a locked decision"
+      ],
+      "lesson": "A locked decision can stay right while the evidence under it quietly rots. A decision's premises have their own shelf life, independent of the decision itself; when the stack beneath a locked call moves — a model swap, a runtime upgrade — re-measure its premises on the running system before you quote them. A right decision resting on a rotted reason is still a liability.",
+      "growth": "Premises rot silently because nothing triggers their review: the decision works, the record looks settled, and every component change happens somewhere else, on someone else's timeline. You catch it with dates — the cheapest instrument there is. Date every measurement inside a decision record, and when you are about to cite one, compare its date against what has changed underneath it: a model swap, a runtime upgrade, or a re-tuned component invalidates measurements that predate it, whatever the document says. Be equally careful with the comforting answer \"we already have that data\": check what the data actually covered. Here, recent benchmarks did prove the new decoding worked — but every one ran at short context, so the 16K corner was genuinely unmeasured, and \"we have it\" would have been a true answer to the wrong question. One decision, two premises, each on its own clock.",
+      "growth_question": "DEC-03 was still the right call — so what, concretely, had gone stale, and what is the cheapest signal that would have caught it?",
+      "diagram": "flowchart TD\n  DEC[\"DEC-03: 16K context locked<br/>on a 42-config sweep\"]\n  DEC --> PREM[\"premise: spec-decode inert at<br/>16K, so the window costs<br/>no speed (measured 2026-03-03)\"]\n  MOVE[\"stack moves twice: ISS-1 fix<br/>engages spec-decode; draft<br/>model swapped\"]\n  PREM --> STALE[\"finding now describes a<br/>system that no longer exists\"]\n  MOVE --> STALE\n  STALE --> DATE[\"a date catches it, not a<br/>re-run: finding predates fix\"]\n  DATE --> RERUN[\"targeted re-measure: 16K band<br/>plus 2K and 8K controls\"]\n  RERUN --> OK[\"acceptance 46%, throughput<br/>2.3x: DEC-03 reaffirmed\"]\n  RERUN --> ROT[\"second premise rotted: footprint<br/>3,562 MB to 12,715 MB\"]",
+      "stat": [
+        {
+          "before": "0",
+          "after": "46%",
+          "label": "spec-decode acceptance at 16K"
+        },
+        {
+          "value": "2.3×",
+          "label": "throughput vs the recorded number"
+        },
+        {
+          "before": "3,562 MB",
+          "after": "12,715 MB",
+          "label": "the 16K footprint on re-measure"
+        }
+      ],
+      "aigp_text": "The AI life cycle is the organizing idea of Domain I's policies-and-procedures competency, and this lesson is life-cycle thinking applied to decision records: evidence has a maintenance phase, just as systems do. The MEASURE function of the NIST AI Risk Management Framework asks for risks to be tracked over time, not assessed once — re-measuring a premise after the stack moves is exactly that. ISO/IEC 42001's continual-improvement loop, the plan-do-check-act pattern, exemplifies the same posture: a locked decision still gets a check when its inputs change.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE",
+        "ISO/IEC 42001 — continual improvement (plan-do-check-act)"
+      ],
+      "aigp_takeaway": "Decision premises have their own shelf life; re-measure them when the stack moves, not only when the decision is revisited."
+    },
+    {
+      "number": 45,
+      "prologue": false,
+      "fragment": null,
+      "title": "When a mess keeps reappearing, find the doctrine producing it before you clean it up again.",
+      "failure": "Eleven session handoff briefs had piled up in the repository root, and the operator wanted them gone — reasonably; the root is no place for transient continuity notes. The quick fix was mechanical: move them to docs/handoffs/ and add a gitignore line so they stop cluttering the status view. But the briefs had not landed in root by accident. The project's own context-exhaustion doctrine — the standing instruction every agent session inherits — literally told each session to write its handoff brief at the repository root. Hiding the directory would have buried the symptom while the cause kept manufacturing new instances: the very next session to hit its context limit would have dutifully dropped a fresh brief back in root. So the real fix was the doctrine, amended in both of its copies. The relocation and the rule changed together (commits e0fd0d0, fe809b9) — or neither would have held.",
+      "evidence": [
+        "2026-06-05 — The briefs piled up in root because the doctrine told them to",
+        "commits e0fd0d0, fe809b9"
+      ],
+      "lesson": "When a mess keeps reappearing, find the doctrine producing it before you clean it up again. A recurring-clutter symptom usually has a policy default standing behind it; cleaning the instances without amending the policy guarantees the next instance. The durable fix changes the rule and the residue in the same motion.",
+      "growth": "Recurrence is the diagnostic. A one-off mess is an accident; a mess that re-forms after every cleanup is being produced, and something is doing the producing — an instruction, a default, an incentive. Cleanup feels productive because it is visible and bounded, while the policy behind the mess is invisible and feels out of scope, so most people sweep the same floor indefinitely. In systems run by AI agents this is sharper still: written doctrine is effectively executable code, followed literally by every session that inherits it, so a bad default replicates with perfect fidelity — eleven briefs is not eleven mistakes, it is one instruction executed eleven times. When you find yourself tidying the same thing twice, stop and trace the instance back to the rule that generated it, and change both together. The mess is data about your policy layer.",
+      "growth_question": "The directory move was quick and it worked — why was it guaranteed to fail anyway, and what was the eleventh brief telling you that the first one was not?",
+      "diagram": "flowchart TD\n  DOC[\"context-exhaustion doctrine:<br/>write your handoff brief at<br/>repo-root/topic-brief.md\"]\n  DOC --> S[\"every session hitting its<br/>context limit obeys, literally\"]\n  S --> PILE[\"eleven briefs accumulate<br/>in the repository root\"]\n  PILE --> QUICK{\"quick fix only: move files<br/>plus gitignore the directory?\"}\n  QUICK -->|\"yes: symptom hidden\"| NEXT[\"next session reads the same<br/>doctrine, drops a fresh<br/>brief back in root\"]\n  NEXT --> PILE\n  QUICK -->|\"no: amend the rule too\"| BOTH[\"doctrine now points briefs at<br/>docs/handoffs/ - both copies\"]\n  BOTH --> HOLD[\"relocation and rule change<br/>together, so the fix holds\"]",
+      "stat": [
+        {
+          "value": "Eleven",
+          "label": "handoff briefs piled in root"
+        }
+      ],
+      "aigp_text": "Domain I's competencies center on establishing policies and procedures across the AI life cycle — and this lesson is about maintaining them: when outcomes go wrong repeatedly, the policy layer is the suspect, and amending doctrine is the corrective act. That is the GOVERN function of the NIST AI Risk Management Framework in miniature — governance as the cross-cutting layer that shapes every downstream behavior. It also exemplifies ISO/IEC 42001's plan-do-check-act management-system pattern: the act step corrects the system that produced the problem, not merely the artifact it produced.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "ISO/IEC 42001 — plan-do-check-act (AIMS)"
+      ],
+      "aigp_takeaway": "Recurring messes are produced by policy; amend the doctrine and clean the residue in the same change."
+    },
+    {
+      "number": 49,
+      "prologue": false,
+      "fragment": null,
+      "title": "A design gate — the ADR written and reviewed before a line of cipher code — turns the hard seam-choices into translation work, and moves the review surface from the code to the ADR.",
+      "failure": "The task was a cryptographic envelope — the dual-wrapped key machinery under BlarAI's at-rest encryption — the kind of code where unit tests feel deceptively reassuring. Round-trips pass, tamper tests raise, and none of it proves the design is right: the real failures are quiet wrong-shapes at the seam between components — a version byte the inner blob doesn't expect, a recovery wrap that encodes the raw key by accident — each a passing test over a silently broken security property. So the three hard choices were pinned in ADR-025, an Architecture Decision Record reviewed before any cipher code existed: a fresh single-use random nonce per encryption, a random 256-bit recovery key rather than a passphrase, and every ciphertext bound to its table, column, and row identity. Implementation then arrived as translation (commit c824f6a, 55 tests), and the merge review read the ADR rather than reverse-engineering intent from code comments.",
+      "evidence": [
+        "2026-06-05 — The key that wraps the key: shipping the DEK envelope before any real data lands",
+        "commit c824f6a (merged 18bafe7)"
+      ],
+      "lesson": "A design gate — the decision record written and reviewed before the first line of high-stakes code — turns hard seam-choices into translation work and moves the review surface from the code to the document. The path-not-taken lands on the record at the design layer, where it is legible, instead of being implied by an implementation.",
+      "growth": "Why a gate works: in most code, a wrong choice announces itself — something crashes. In cryptographic and security code, the wrong choice passes its tests and simply fails to protect, so the only moment a choice is genuinely inspectable is before it dissolves into implementation. A reviewer reading finished cipher code must reverse-engineer which behaviors are decisions and which are accidents; a reviewer reading a three-choice decision record sees exactly what was decided, why, and what was rejected. Use the gate wherever failure is silent — encryption, privacy handling, anything touching money or safety: write the few load-bearing choices down, get them reviewed, and only then build. Expect a bonus: the document also exposes its own gaps. Here, the one seam the record was silent on became the one place the merge review knew to look hardest.",
+      "growth_question": "If a security property can fail while every test passes, at what point in the work is a wrong choice still visible enough to catch — and to whom?",
+      "diagram": "flowchart TD\n  RISK[\"crypto envelope: wrong choices<br/>pass their tests and silently<br/>fail to protect\"]\n  RISK --> GATE[\"design gate: ADR-025 written<br/>and reviewed before any<br/>cipher code exists\"]\n  GATE --> C1[\"fresh single-use random<br/>nonce per encryption\"]\n  GATE --> C2[\"random 256-bit recovery key,<br/>not a passphrase\"]\n  GATE --> C3[\"every ciphertext bound to<br/>table, column, row identity\"]\n  C1 --> IMPL[\"implementation arrives as<br/>translation: commit c824f6a,<br/>55 tests\"]\n  C2 --> IMPL\n  C3 --> IMPL\n  IMPL --> REV[\"merge review reads the ADR,<br/>not reverse-engineered intent\"]\n  GATE --> SEAM[\"bonus: the one seam the ADR<br/>was silent on is where the<br/>review looks hardest\"]",
+      "stat": [
+        {
+          "value": "55 tests",
+          "label": "the envelope suite at merge"
+        }
+      ],
+      "aigp_text": "This is Domain III.A in practice — governing the designing and building of the AI model and system: the governance act happens before construction, where it can still shape it. ISO/IEC 42001's Annex A controls on the AI system life cycle take the same posture — documented design decisions as management-system artifacts, reviewed and justified. And a design record that names the path-not-taken is what the EU AI Act's technical-documentation obligation is for at concept level: documentation that lets a reviewer assess the system without excavating its source.",
+      "aigp_domains": [
+        "Domain III — Understanding How to Govern AI Development"
+      ],
+      "aigp_frameworks": [
+        "ISO/IEC 42001 — Annex A controls on the AI system life cycle",
+        "EU AI Act — technical documentation (high-risk obligation)"
+      ],
+      "aigp_takeaway": "Where failure is silent, gate the design: review the decision record before code exists, with rejected alternatives on the record."
+    },
+    {
+      "number": 66,
+      "prologue": false,
+      "fragment": null,
+      "title": "A test can lock a defect, not just a feature — so \"it's test-locked\" is not proof \"it's a decision to escalate.\"",
+      "failure": "The night of BlarAI's first production boot, the encrypted session store bricked the entire app: practice-era rows written under the old development key would not decrypt under the production key, and one undecryptable row aborted the whole session list — an app-wide \"backend not running\" from one bad record. A green Sprint-14 regression test (a test that pins existing behaviour) asserted exactly that brick-everything behaviour. Twice in one night, the agent reached to escalate the fix as a security-posture decision, handing the operator an A/B — reset the data, or change the store's behaviour — as though the passing test proved the behaviour was intended. The operator collapsed it each time: \"Fix this so it doesn't keep happening — is there really more than one correct answer?\" There was not. The fix quarantines bad rows in bulk reads; single-record paths still fail hard; confidentiality and integrity untouched (commits 4af2033, 6fe1fcc).",
+      "evidence": [
+        "2026-06-06 — The night BlarAI first answered a prompt in production",
+        "2026-06-06 — When \"fail closed\" becomes a door that locks you out of your own house",
+        "commits 4af2033, 6fe1fcc (#618)"
+      ],
+      "lesson": "A test can lock a defect, not just a feature — so \"it's test-locked\" is not proof \"it's a decision to escalate.\" Before escalating a change as a decision, ask whether the behaviour it reverses was ever correct or merely locked in; a defect with one nameable fix is yours to fix even when a passing test guards it. The test is then part of the defect, and correcting it is part of the fix.",
+      "growth": "Tests carry borrowed authority. A green assertion reads like ratified intent — somebody decided this, the suite enforces it — but a test only proves that an expectation was once written down, and it inherits every misjudgment of the person who wrote it. Here the Sprint-14 author had encoded a sensible instinct, \"authentication failure is unrecoverable,\" at the wrong granularity, and the test then defended the defect like a feature. When you find yourself escalating because a test guards the current behaviour, interrogate the test's pedigree: was this behaviour ever correct, for a reason someone could state — or merely locked in? Then apply the boundary test: a defect has one correct fix you can name; a decision has trade-offs only the accountable owner should weigh. One correct answer means fix it — and rewriting the test is part of the fix, not tampering with the record.",
+      "growth_question": "A passing regression test guarded the exact behaviour that bricked the app — what does a green test actually prove about whether the behaviour was ever a decision?",
+      "diagram": "flowchart TD\n  ROWS[\"practice-era rows written<br/>under the old dev key\"]\n  ROWS --> KEY[\"production TPM key refuses<br/>them: AES-GCM InvalidTag\"]\n  KEY --> LOOP[\"bulk readers raise on the<br/>first bad row in the loop\"]\n  LOOP --> BRICK[\"one bad row: app-wide<br/>backend not running\"]\n  TEST[\"green Sprint-14 regression test<br/>asserts the brick behaviour\"]\n  TEST --> ESC[\"agent escalates an A/B as if<br/>green proved intent\"]\n  BRICK --> ESC\n  ESC --> OP[\"operator: is there really more<br/>than one correct answer?\"]\n  OP --> FIX[\"bulk reads quarantine bad rows;<br/>single-record stays fail-closed\"]\n  FIX --> TFIX[\"rewriting the test is part<br/>of the fix\"]",
+      "stat": [
+        {
+          "value": "one bad row",
+          "label": "enough to brick the whole app"
+        },
+        {
+          "value": "2,163",
+          "label": "green tests while production bricked"
+        }
+      ],
+      "aigp_text": "The escalation boundary is an accountability structure — the GOVERN function of the NIST AI Risk Management Framework asks exactly this: who is authorized to decide what, and on what evidence. Mis-classifying a defect as a decision stalls the risk response the MANAGE function calls for — the fix existed, was nameable, and waited on a round-trip the operator did not need. Domain I frames the same discipline: governance gets the consequential trade-offs to the accountable human and keeps routine correction moving without manufactured ceremony.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "NIST AI RMF — MANAGE"
+      ],
+      "aigp_takeaway": "A green test is not a decision record; a defect with one correct fix is yours to fix, test included."
+    },
+    {
+      "number": 69,
+      "prologue": false,
+      "fragment": null,
+      "title": "A gate checklist never re-verified against the code drifts in both directions.",
+      "failure": "Preparing the air-gap-removal gate, an audit walked every criterion of the security roadmap's §5 tracker against the code on disk — and found the checklist wrong in both directions. Two controls listed as still-remaining had shipped sprints earlier: the tamper-evident audit stream (hash-chained, signed by the machine's TPM security chip) and the runtime guard that blocks outbound network connections, armed at the launcher's entry point at a verifiable file and line. Meanwhile the item the document implied was nearly done — model weight integrity — was only half built: the primary model binary was hash-checked at load; every other manifest entry was not. The walk also surfaced an open question the checklist had smoothed over: the boot code's docstring promised \"attestation\" while the implementation performed key-and-manifest validation — two different controls. The rewrite (commit 2800d53) replaced checkboxes with file:line evidence, explicit DONE/PARTIAL/REMAINING labels, and the open decisions named as decisions.",
+      "evidence": [
+        "2026-06-07 — The checklist that had never been verified",
+        "commit 2800d53"
+      ],
+      "lesson": "A gate checklist never re-verified against the code drifts in both directions — into understatement (shipped work still listed as remaining) and overstatement (half-built work implied done). The only authoritative tracker is one walked against the code on disk, carrying file:line evidence, distinguishing done from partial from remaining, and naming the open decisions it finds rather than smoothing them into uniform progress.",
+      "growth": "Status trackers decay by design: they are written once at planning time, read many times at decision time, and nothing in between forces them to notice the work shipping around them. Expect both failure directions, because they cost differently. Understatement wastes effort — a builder re-plans work that already exists. Overstatement is the dangerous one: a go/no-go gate that consumes the tracker passes on controls that are not actually there. The repair is not diligence; it is format. A tracker whose every claim carries evidence — a file and line you can open, a status that distinguishes done from partial — is falsifiable, and falsifiable documents get corrected. Before any decision that consumes a status document, walk the document against the thing it describes; and when the walk surfaces an ambiguity — here, two different meanings of \"attestation\" — record it as an open decision, not a smoothed-over checkbox.",
+      "growth_question": "The checklist was wrong in both directions at once — which direction is merely expensive, which one is dangerous, and why do they accumulate differently?",
+      "diagram": "flowchart TD\n  TRACK[\"roadmap §5 gate tracker:<br/>flat checkboxes, written at<br/>planning time\"]\n  TRACK --> WALK[\"audit: walk every criterion<br/>against the code on disk\"]\n  WALK --> UNDER[\"understated: audit stream and<br/>egress guard shipped sprints<br/>ago, still listed remaining\"]\n  WALK --> OVER[\"overstated: weight integrity<br/>half built - one .bin checked,<br/>other entries not\"]\n  WALK --> AMBIG[\"docstring says attestation;<br/>code does key-and-manifest<br/>validation\"]\n  UNDER --> COST1[\"understatement wastes effort:<br/>work re-planned\"]\n  OVER --> COST2[\"overstatement passes a gate<br/>on absent controls\"]\n  AMBIG --> DECIDE[\"named as an open decision,<br/>not a smoothed checkbox\"]\n  COST1 --> FIX[\"rewrite 2800d53: file:line<br/>evidence; DONE, PARTIAL,<br/>REMAINING labels\"]\n  COST2 --> FIX\n  DECIDE --> FIX",
+      "aigp_text": "A control-status tracker is the working ancestor of ISO/IEC 42001's Statement of Applicability — the document recording which controls apply, with justification — and this lesson is its maintenance discipline: such a record is only authoritative when verified against the system it describes. The walk — claims checked against evidence, gaps tracked — is what the MEASURE function of the NIST AI Risk Management Framework asks of assurance work. Domain I frames the stake: gate decisions are governance acts, and they are only as sound as the records they consume.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "ISO/IEC 42001 — Statement of Applicability",
+        "NIST AI RMF — MEASURE"
+      ],
+      "aigp_takeaway": "Status checklists drift both directions; only a tracker walked against the code, with file:line evidence, is authoritative at a gate."
+    },
+    {
+      "number": 72,
+      "prologue": false,
+      "fragment": null,
+      "title": "Closing the debt a sprint exists to close is act-not-ask — escalate trade-offs, not the obvious completion of the stated goal.",
+      "failure": "Sprint 16 existed for one purpose: regression locks that actually fire. The agent found the just-built production-parity test lane sitting in a directory the standing gate command never ran — a green gate said nothing about whether those locks passed — and even wrote the structural insight up as lesson 70. Then, instead of folding the lane into the gate, it escalated the fix to the operator as a \"governance/baseline-scope decision.\" His reply cut through it: \"why are you even considering not closing the debt fully? obviously that is the goal here; the goal is to have these actually working.\" Closing it widened the standing gate from 2187 to 2212 green tests — and surfaced the same gap one layer worse: the security posture guards, the most consequential locks in the repository, sat in neither the gate nor the configured test paths. Orphaned. They were folded in the same day.",
+      "evidence": [
+        "2026-06-07 — Closing the debt the sprint existed to close"
+      ],
+      "lesson": "Closing the debt a sprint exists to close is act-not-ask — escalate trade-offs, not the obvious completion of the stated goal. A scope change with a genuine downside is the operator's call; folding a just-built lock into the gate so it does its job has no trade-off to weigh. It is the work. Before escalating, ask whether the choice has a real downside the owner must weigh, or whether you are deferring the obvious.",
+      "growth": "The misclassification has a precise shape: the fix touched a governance-flavored object — the official test-gate scope — and anything governance-flavored triggered the escalation reflex, regardless of whether a genuine trade-off existed. That is sorting by the object touched instead of by the content of the choice. The test that works: try to name the downside of the obvious action, concretely, as something the owner would weigh. \"The gate takes slightly longer to run\" is not a trade-off against \"the locks we just built actually fire\"; if you cannot state a real downside, there is no decision — act, and report what you did. False escalations are not free caution: each one spends the owner's attention, stalls finished work behind a round-trip, and trains the owner to rubber-stamp — which corrodes the escalation channel you need for the calls that are genuinely theirs.",
+      "growth_question": "The gate's scope sounds like governance — what one question separates a genuine governance decision from the obvious completion of the sprint's stated goal?",
+      "diagram": "flowchart TD\n  LANE[\"production-parity lane built<br/>in tests/integration/\"]\n  GATE[\"standing gate command<br/>never runs that directory\"]\n  LANE --> GREEN[\"a green gate says nothing<br/>about whether the lock passes\"]\n  GATE --> GREEN\n  GREEN --> ESC{\"escalate as a baseline-scope<br/>governance decision?\"}\n  ESC -->|\"asked anyway\"| OP[\"operator: why consider not<br/>closing the debt fully?\"]\n  OP --> TEST[\"name a real downside the<br/>owner must weigh - none exists\"]\n  TEST --> FOLD[\"fold the lane into the gate:<br/>2187 to 2212 green\"]\n  FOLD --> WORSE[\"same gap one layer worse:<br/>tests/security/ in neither gate<br/>nor testpaths\"]\n  WORSE --> FOLD2[\"the orphaned posture guards<br/>folded in the same day\"]",
+      "stat": [
+        {
+          "before": "2187",
+          "after": "2212",
+          "label": "standing gate after folding the lane"
+        }
+      ],
+      "aigp_text": "The MANAGE function of the NIST AI Risk Management Framework is about implementing risk responses, not merely selecting them — and a regression lock outside the gate that runs is a risk treatment selected but never implemented. Completing it is execution, not policy. The GOVERN function carries the other half: well-designed accountability structures route genuine trade-offs to the accountable human and keep completion work moving without ceremony. Domain I names this calibration — oversight spent on real decisions is oversight that stays meaningful.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MANAGE",
+        "NIST AI RMF — GOVERN"
+      ],
+      "aigp_takeaway": "If you cannot name a real downside the owner must weigh, it is not a decision — finish the work."
+    },
+    {
+      "number": 84,
+      "prologue": false,
+      "fragment": null,
+      "title": "A sequencing or packing choice that changes nothing built is the orchestrator's to own, not a fork to hand the operator — and offering \"or we defer half\" reads as proposing they stop short.",
+      "failure": "Preparing Sprint 17, the agent put two \"decisions\" in front of the operator. One was genuinely his: whether the air-gap gate requires true measured-boot attestation — hardware-backed proof of what software booted — a control that guards physical tampering, is orthogonal to the gate's network threat, and fail-closes on every legitimate firmware update until re-baselined. He decided it, informed, and it became Architecture Decision Record ADR-028 (commit cd86442). The other \"decision\" — build the outbound-network machinery this sprint or hold half for the next — changed nothing about what gets built and nothing about answer quality. It was packing: how disjoint work distributes across waves. Dressed as \"…or we could defer half to Sprint 18,\" it read to the operator exactly as it should have — as the agent proposing he stop short of finishing. Taken back and owned: Sprint 17 builds the whole cluster, in parallel, and finishes.",
+      "evidence": [
+        "2026-06-07 — The control that guards a different door",
+        "commit cd86442"
+      ],
+      "lesson": "A sequencing or packing choice that changes nothing built is the orchestrator's to own, not a fork to hand the operator. The honest tell: if the alternative you are offering is \"do less of the agreed work later,\" you are not surfacing a decision — you are proposing to stop short. Decide it yourself and keep moving.",
+      "growth": "Both questions looked alike — sprint-scope items, side by side — and that is the trap: classification by surface. They differ on the only axis that matters: does any answer change an outcome the owner carries? The attestation choice changed the security posture and bound him to a decades-long maintenance cost; whichever way it went, he would live with it, so it was his. The packing choice had identical end states: the same work built either way, differing only in which week. Before you surface a fork, write the difference between its branches in outcome terms — capability, quality, risk, cost the owner bears. If that diff is empty, the fork is yours; surfacing it anyway is not humility, it is offloading. And watch the framing of deferral: \"or we could do half later\" does not read as an option — it reads as your appetite to finish.",
+      "growth_question": "Two questions sat side by side — attestation scope and sprint packing — and only one was the operator's. What is the single test that separates them?",
+      "diagram": "flowchart TD\n  TWO[\"two sprint-prep questions put<br/>to the operator, side by side\"]\n  TWO --> A[\"measured-boot attestation<br/>scope for the gate\"]\n  TWO --> B[\"build egress machinery now,<br/>or defer half to Sprint 18?\"]\n  A --> T{\"does any answer change an<br/>outcome the owner carries?\"}\n  B --> T\n  T -->|\"yes: posture, decades of<br/>re-baseline cost\"| OPDEC[\"operator decides, informed:<br/>ADR-028 - PCR work post-gate\"]\n  T -->|\"no: same work built either<br/>way, only the week differs\"| OWN[\"packing is the orchestrator's:<br/>build the whole cluster\"]\n  B --> READ[\"the defer framing read as<br/>proposing to stop short\"]\n  READ --> OWN",
+      "aigp_text": "Allocating decisions to roles is the heart of the GOVERN function of the NIST AI Risk Management Framework — accountability structures that say which calls belong to the accountable human and which to the delegate. The EU AI Act's human-oversight concept presumes the same calibration: oversight is effective only when the human's attention is spent on forks with real stakes — an attestation posture with decades of cost — rather than on packing choices with identical outcomes. Domain I frames decision-rights design as a foundational governance expectation.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "EU AI Act — human oversight (high-risk obligation)"
+      ],
+      "aigp_takeaway": "If no branch of the fork changes what is built or its quality, the choice is the orchestrator's — own it."
+    },
+    {
+      "number": 85,
+      "prologue": false,
+      "fragment": null,
+      "title": "Schedule the human's understanding pass BEFORE the irreversible decision, not after — with a remediation loop so what they learn can still change the outcome.",
+      "failure": "The capstone security presentation (ticket #612) — the full review of what risks remain once BlarAI's air-gap, its total disconnection from the network, comes off — was sequenced after the air-gap-removal sign-off, as its ticket read: an after-the-fact \"verified posture\" bookend. The operator moved it. That presentation is his real deep-dive into the residual risks of facing the network — the single biggest threat-model shift in the project, the one irreversible-feeling door — and it belongs before he signs, not after: he wants the thorough briefing, the chance to ask questions, and any work the questions surface tasked and resolved before the gap closes behind the decision. A briefing scheduled after a gate can only justify a decision already taken; before it, with a remediation loop, it can still stop or reshape the outcome. The sequence was rewritten into the gate itself as a sign-off precondition (commits 452ac98, 021ffda).",
+      "evidence": [
+        "2026-06-07 — The briefing before the irreversible door",
+        "commits 452ac98, 021ffda"
+      ],
+      "lesson": "Schedule the human's understanding pass before the irreversible decision, not after — with a remediation loop so what they learn can still change the outcome. A briefing after the gate can only explain a decision already made; before it, it makes the sign-off an informed act rather than a ceremony. Signed is not safe until understood.",
+      "growth": "Briefings drift to the wrong side of decisions for a mundane reason: from the builder's seat, the presentation is a deliverable — a summary of finished work — so it gets scheduled where deliverables go, at the end. But an approval is only worth the information and authority the approver held at the moment of signing; everything they learn afterward improves nothing about the decision. So sort your reviews by what they can still change. Before the gate, with a loop that lets surfaced questions become tasked work, a briefing has power: it can reshape or stop the outcome. After the gate it is a ceremony, and the signer's questions become regrets. Reserve this ordering especially for the irreversible calls — the doors that do not reopen — and check who the presentation is for: if it exists so the decision-maker understands, it must precede the decision by definition.",
+      "growth_question": "The same presentation, the same content, the same audience — what changes about its governance value when it moves from after the sign-off to before it?",
+      "diagram": "flowchart TD\n  CAP[\"#612 capstone: the operator's<br/>deep-dive into residual risks<br/>of removing the air-gap\"]\n  CAP --> WRONG[\"as ticketed: scheduled after<br/>the sign-off - a verified-<br/>posture bookend\"]\n  WRONG --> CEREMONY[\"after the gate it can only<br/>justify a decision already<br/>taken\"]\n  CEREMONY --> REGRET[\"the signer's questions<br/>become regrets\"]\n  CAP --> RIGHT[\"operator moves it before<br/>the sign-off\"]\n  RIGHT --> QA[\"thorough briefing, then his<br/>questions become tasked work\"]\n  QA --> LOOP[\"remediation loop: surfaced<br/>work resolved before the<br/>air-gap comes down\"]\n  LOOP --> SIGN[\"sign-off becomes an informed<br/>act - it can still stop or<br/>reshape the outcome\"]",
+      "aigp_text": "Domain IV.A is the competency this lesson trains: evaluating the key factors and risks relevant to the decision to deploy — here, the decision to let a hardened local system face the network. The EU AI Act's human-oversight concept is sharpest at such gates: oversight means the accountable human understands the residual risks before the irreversible act, not after. Sequencing the briefing ahead of the sign-off — the NIST AI Risk Management Framework's MAP function, establishing context — makes the approval an exercise of oversight rather than its record.",
+      "aigp_domains": [
+        "Domain IV — Understanding How to Govern AI Deployment and Use"
+      ],
+      "aigp_frameworks": [
+        "EU AI Act — human oversight (high-risk obligation)",
+        "NIST AI RMF — MAP"
+      ],
+      "aigp_takeaway": "Signed is not safe until understood: the understanding pass precedes the irreversible decision, with remediation in the loop."
+    },
+    {
+      "number": 86,
+      "prologue": false,
+      "fragment": null,
+      "title": "Automate by default; a human step must be proven necessary, not inherited from a runbook's wording.",
+      "failure": "Sprint 17's hardware tiers needed the real chip; the verification plan scripted them as an operator-driven session — one command at a time, the human pasting outputs back. That framing went verbatim to the execution agent — running on the dev box with full shell access — and the operator got a \"give me the first command\" kickoff draft. He stopped it: \"It's having me do testing! Why would it do that? All testing should be automated. My time is being wasted, again.\" Root cause: the script fits exactly one situation — a guiding session with no path to the hardware. The \"operator runs X, pastes Y\" phrasing carried through four layers — runbooks, the verification plan, the execution brief, the kickoff message — and no layer asked whether the executing agent could simply do the work. It could — and ran the entire on-chip session itself, surfacing only results.",
+      "evidence": [
+        "2026-06-08 — The on-chip session I told the agent to make the operator run"
+      ],
+      "lesson": "Automate by default; a human step must be proven necessary, not inherited from a runbook's wording. An agent on hardware it can reach runs every step itself; a step routes to the human only when proven to need human hands — an elevation the shell cannot obtain, a physical action, a presence assertion. The burden of proof sits on routing a step out to the human, never on automating it.",
+      "growth": "Runbooks smuggle their author's constraints into your present as if they were the task's requirements. \"The operator runs X\" was a fact about whoever first wrote the procedure — someone with no path to the hardware — not a property of X; and because each layer copied the phrasing instead of asking what it was for, the assumption survived four hand-offs into a context where it was false. The durable repair is to flip the burden of proof. If human-in-the-loop is the default, automation must be argued step by step, and it never is; if automation is the default, every human step must carry its proof — a privilege the agent genuinely cannot obtain, a physical act, a required presence. Treat one-time blockers as one-time: solve access once rather than routing every command through a person. The human's real contribution is judgment; every rote step removed protects it.",
+      "growth_question": "The runbook said \"the operator runs each command\" — what was that sentence actually evidence of, and what question should each layer that copied it have asked?",
+      "diagram": "flowchart TD\n  RB[\"runbook: the operator runs X,<br/>pastes Y back\"]\n  RB --> SDV[\"verification plan SDV §7:<br/>LA on-chip session\"]\n  SDV --> BRIEF[\"execution brief inherits<br/>the phrasing verbatim\"]\n  BRIEF --> KICK[\"kickoff draft: give me the<br/>first command\"]\n  KICK --> OP[\"operator: it is having me do<br/>testing! my time is being<br/>wasted, again\"]\n  OP --> ASK{\"can the executing agent<br/>reach the hardware itself?\"}\n  ASK -->|\"yes - dev box, full<br/>shell access\"| SELF[\"agent runs the entire on-chip<br/>session itself, surfacing<br/>only results\"]\n  ASK -->|\"only with proof: elevation,<br/>physical act, presence\"| HUMAN[\"a step routes to the human\"]",
+      "stat": [
+        {
+          "value": "four layers",
+          "label": "carried the operator-runs-it phrasing"
+        }
+      ],
+      "aigp_text": "Role design is GOVERN-function territory in the NIST AI Risk Management Framework — accountability structures and workforce: deciding what genuinely needs the human. The verification work itself belongs to MEASURE, the home of TEVV (test, evaluation, verification, and validation) — and TEVV done by hand at human speed is TEVV that gets skipped; automating it is what makes assurance sustainable for decades. Domain I carries the principle: human attention is the scarcest governance resource, and a mature system spends it on oversight and judgment, not on pasting commands.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "NIST AI RMF — MEASURE (TEVV)"
+      ],
+      "aigp_takeaway": "Automate by default; route a step to the human only with proof it needs human hands."
+    },
+    {
+      "number": 99,
+      "prologue": false,
+      "fragment": null,
+      "title": "A decision is only a decision if the options differ on security, capability, or quality — otherwise it is mechanics the builder owns.",
+      "failure": "The #639 decision record always named the destination: inline operator confirmation, with escalations approved by fingerprint via Windows Hello, Windows' built-in biometric sign-in. Scoping that follow-on (#649), the builder asked the operator to choose the implementation route — a small C# helper subprocess versus an in-process Python binding. He pushed back: 'Why are you asking me this? I am a novice. Does this impact security, capability, or performance such that I need to make a decision?' It didn't. The only fork with a real posture delta — adding a new Python dependency to the runtime — had an obvious answer under the project's supply-chain posture: don't. Mechanics had been dressed as governance, costing the operator exactly the involvement he is trying to minimize. The builder made the call, said so, and built; the operator's own live-verify ran both directions — three real fingerprint matches APPROVED, three cancels DENIED (merge c1f51e9).",
+      "evidence": [
+        "2026-06-10 — The fingerprint, and the decision I tried to hand back",
+        "commit b65f1c5",
+        "commit c1f51e9"
+      ],
+      "lesson": "Handing a novice operator an implementation choice with no governance delta inverts the responsibility the builder is paid to carry, and costs the operator exactly the involvement he is trying to minimize. The check is cheap: name what each option changes for the operator; if the answer is 'nothing he governs,' decide, state the call, and keep moving.",
+      "growth": "Asking feels safe because it transfers accountability — so escalation drifts upward until the decision-maker is adjudicating wiring he cannot evaluate, which is itself a governance failure: oversight bandwidth is finite, and spending it on mechanics starves the calls only the human can make. Run a two-column test before every ask: what does each option change for the person you are asking (security, capability, quality), versus only for the builder (effort, structure, style)? An empty first column means it is your call — make it, state it with the named trade-off (here: a few hundred milliseconds of subprocess spawn accepted over a forever-pinned supply-chain dependency). The inverse duty stands: a real posture delta, like the new-dependency fork, still gets surfaced even inside a 'mechanics' decision. Sharpens lessons 29, 37 and 84 — and this is the project's cleanest statement of the boundary, articulated by the operator himself.",
+      "growth_question": "Before handing the decision-maker a choice between two implementation routes, what must differ between the routes for the question to be legitimate at all?",
+      "diagram": "flowchart TD\n  ASK[\"builder asks the operator:<br/>C# helper subprocess or<br/>in-process Python binding?\"]\n  ASK --> PUSH[\"operator: why are you asking<br/>me this? I am a novice\"]\n  PUSH --> TEST{\"do the options differ on<br/>security, capability,<br/>or quality?\"}\n  TEST -->|\"yes\"| OPDEC[\"genuine decision: surface it<br/>with the alternatives named\"]\n  TEST -->|\"no: these didn't\"| MINE[\"mechanics: the builder<br/>decides, states the call,<br/>keeps moving\"]\n  MINE --> TRADE[\"named trade-off: subprocess<br/>spawn accepted over a forever-<br/>pinned supply-chain wheel\"]\n  TRADE --> VERIFY[\"operator's own live-verify:<br/>3 fingerprint APPROVED,<br/>3 cancels DENIED\"]",
+      "stat": [
+        {
+          "value": "~145-line",
+          "label": "C# helper, zero new dependencies"
+        },
+        {
+          "value": "3 APPROVED",
+          "label": "real fingerprint matches, live-verified"
+        },
+        {
+          "value": "3 DENIED",
+          "label": "cancels through the same dialog"
+        }
+      ],
+      "aigp_text": "NIST AI RMF's GOVERN function establishes roles and accountability structures — who decides what — and calibrated escalation is that structure working: forks with governance weight (a new supply-chain dependency) surface; mechanics do not. The EU AI Act's human-oversight concept is meaningful oversight, which over-asking dilutes as surely as under-asking evades. Fittingly, the artifact built here makes the operator's fingerprint the consent ceremony itself — Domain I.B: establishing and communicating expectations for who approves what, enforced fail-closed.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "EU AI Act — human oversight (concept level)"
+      ],
+      "aigp_takeaway": "Escalate only forks that change what the overseer governs; deciding mechanics yourself is part of keeping human oversight meaningful."
+    },
+    {
+      "number": 100,
+      "prologue": false,
+      "fragment": null,
+      "title": "An \"unbounded by default\" comment is often an unclosed gap wearing a decision's clothes.",
+      "failure": "The audit log — the system's tamper-evident record of its own governance decisions — carried a docstring (code's own explanatory note) that read like a settled decision: append-only, unbounded by default, forensic completeness for a decades-use system. Half the claim was sound: the records are metadata only (decisions and hashes, no content), a decades-long history is a rounding error on disk, and that history is the governance evidence. The literal half was deferred work in a decision's clothes: every record loaded into RAM at construction, the active file re-read whole every boot, memory growing with total history forever. #607 made the decision actually open — rotate-and-retain: the active audit.jsonl seals into a compressed segment at 64 MiB or 100k records, and a signed segment index pins each file's SHA-256 fingerprint so tamper-evidence spans files. ADR-029, an architecture decision record, names the rejected paths: time-based purge, first-in-first-out size cap, the status-quo single file.",
+      "evidence": [
+        "2026-06-10 — Keeping everything without keeping it all in RAM"
+      ],
+      "lesson": "When a comment asserts a design choice that is also the path of least resistance, check whether the valuable part of the claim and the convenient part are the same claim. Here they were not: keep-everything was sound policy; keep-everything-in-one-file-in-RAM was just work nobody had done. Separate the two, make the real decision, and put the rejected alternatives on the record.",
+      "growth": "The mechanism is that deferral likes to dress itself as intent. Writing \"unbounded by default\" is cheaper than building rotation, and once written it reads as a settled stance to every later reader — including you. The trick is that the claim bundles two things: a value judgment (keep all the evidence) and an implementation accident (one file, everything in memory), and the second rides in on the credibility of the first. The tell is coincidence: whenever the documented \"choice\" is exactly the zero-work option, suspect a gap in costume. The test is cheap: split the claim, ask whether the valuable half actually requires the convenient half, and look for named rejected alternatives — a real decision leaves them behind; a default leaves none. When you find none, the decision is still open, and it is yours to make explicitly and record.",
+      "growth_question": "When a comment says a behavior was chosen on purpose, what evidence would tell you a decision was actually made — rather than work never done?",
+      "aigp_text": "An audit trail is the record-keeping function the EU AI Act names among high-risk obligations, at concept level — and retention is part of that obligation: decided, not defaulted. The move #607 exemplifies is the NIST AI Risk Management Framework's GOVERN function — converting an implicit default into explicit policy, with the trade-off and the rejected alternatives documented in ADR-029. AIGP Domain I.C — establish policies and procedures throughout the AI life cycle — is precisely this: a retention stance that exists because someone weighed it, on the record.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — GOVERN",
+        "EU AI Act — record-keeping and logging (high-risk obligation, concept level)"
+      ],
+      "aigp_takeaway": "Record-keeping obligations include retention; a documented retention policy with rejected alternatives on the record is governance — an inherited default is not.",
+      "diagram": "flowchart TD\n  A[\"docstring claims a stance:<br/>append-only, unbounded,<br/>keep everything\"] --> B[\"as-built reality\"]\n  B --> C[\"boot re-reads the whole<br/>audit.jsonl every time\"]\n  C --> D[\"every record held in RAM;<br/>working set grows with<br/>total history\"]\n  D -->|\"the decision actually open\"| E[\"#607 rotate-and-retain\"]\n  E --> F[\"active file seals at<br/>64 MiB or 100k records\"]\n  F --> G[\"gzip segment + signed<br/>index row: boundary hashes,<br/>file SHA-256\"]\n  G --> H[\"RAM holds only the active<br/>segment; tamper-evidence<br/>spans files\"]",
+      "stat": [
+        {
+          "before": "38",
+          "after": "62",
+          "label": "audit-log tests after #607 rotate-and-retain"
+        },
+        {
+          "value": "64 MiB or 100k records",
+          "label": "threshold at which the active segment seals"
+        }
+      ]
+    },
+    {
+      "number": 103,
+      "prologue": false,
+      "fragment": null,
+      "title": "Verify the vocabulary you teach against the current source before you teach it.",
+      "failure": "Building the lessons-teaching deck (#650) — 103 study units drafted from this very journal — the agent building it \"knew\" the IAPP AIGP (Artificial Intelligence Governance Professional) exam as seven domains. Live-source verification, run before a single mapping was drafted, showed the Body of Knowledge had been restructured to four domains in v2.0.1 (February 2025), with v2.1 effective 2026-02-02 adding ISO/IEC 42005 and agentic architectures. Every framework claim in the deck would have taught a one-restructure-stale exam, at the level the certification actually tests. The catch happened only because verification was made a gate, not a courtesy: a pinned aigp_vocabulary.md became the only vocabulary the content may use, and validate_acts.py enforces it mechanically — beside an anti-hallucination check that every cited journal entry and commit SHA (the unique fingerprint of a saved change) must exist verbatim in BUILD_JOURNAL.md. Eight drafting agents wrote in parallel against that contract; the validator came back 103 units, zero failures.",
+      "evidence": [
+        "2026-06-10 — Teaching the journal its own lessons, and the vocabulary that had rotted under me"
+      ],
+      "lesson": "Domain knowledge in your head — or an agent's — has a shelf life: a certification syllabus, a framework, or an API can restructure under you between the day you learned it and the day you use it. Teaching from memory propagates the rot to a student. The staleness gets caught only when verification is a gate the content must pass, not a courtesy someone may remember to extend.",
+      "growth": "Knowledge is a cache with no expiry tag. The day you learned a fact it was true, and nothing about how your head — or a model's training — stores it marks the date or watches the source; fluency even works against you, because the facts you can recite most confidently are usually the oldest. Anything versioned is the high-risk class: syllabi, standards, APIs, laws all restructure on their own schedule, silently invalidating whoever memorized the previous shape. The defence is structural, because \"remember to double-check\" is exactly what fluency defeats. When your output will teach — documentation, training material, a curriculum, a compliance mapping — pin the vocabulary first: one sheet of claims verified against named, current sources on a stated date, and a mechanical validator that gates publication on using only that sheet. Then point the same suspicion at yourself that you point at any stale document: you are one.",
+      "growth_question": "Before teaching a framework's structure from memory, what tells you the structure has not changed since you learned it?",
+      "aigp_text": "AIGP Domain II — understanding how laws, standards and frameworks apply to AI — presumes that knowledge of the frameworks is current, and this failure shows the competency decaying in place: the Body of Knowledge itself moved from seven domains to four (v2.0.1, February 2025), and v2.1, effective 2026-02-02, added ISO/IEC 42005 and agentic architectures. Re-verifying framework claims against live sources before relying on them exemplifies the plan-do-check-act continual-improvement pattern at the heart of ISO/IEC 42001's AI management system — the check applied to the governing knowledge, not only the governed system.",
+      "aigp_domains": [
+        "Domain II — Understanding How Laws, Standards and Frameworks Apply to AI"
+      ],
+      "aigp_frameworks": [
+        "ISO/IEC 42001 — plan-do-check-act continual improvement"
+      ],
+      "aigp_takeaway": "Framework knowledge expires without notice — verify the current structure against live sources before mapping or teaching anything to it.",
+      "diagram": "flowchart TD\n  A[\"agent memory: AIGP exam<br/>has seven domains\"] -->|\"if taught unverified\"| C[\"every framework claim<br/>one-restructure-stale\"]\n  A -->|\"gate: verify first\"| D[\"live-source check before<br/>any mapping is drafted\"]\n  D --> E[\"BoK v2.0.1 (Feb 2025):<br/>four domains; v2.1 adds<br/>ISO/IEC 42005, agentic\"]\n  E --> F[\"pinned aigp_vocabulary.md<br/>= only allowed vocabulary\"]\n  F --> G[\"validate_acts.py: vocab +<br/>entries and SHAs verbatim\"]\n  G --> H[\"8 agents draft to contract;<br/>103 units, zero failures\"]",
+      "stat": [
+        {
+          "before": "seven domains, as remembered",
+          "after": "four domains — BoK v2.0.1, February 2025",
+          "label": "the AIGP exam structure on live-source check"
+        },
+        {
+          "value": "103 units, zero failures",
+          "label": "validator verdict across eight parallel drafting agents"
+        }
+      ]
+    },
+    {
+      "number": 105,
+      "prologue": false,
+      "fragment": null,
+      "title": "Demonstrating a capability is not deciding to deploy it — a proof-of-concept that ends in a deliberate \"no\" is a success, not a waste.",
+      "failure": "A proof-of-concept on 2026-06-09 closed a long-standing 'feasible but unproven' caveat: it sealed a secret under a TPM PolicyPCR (the TPM is the Trusted Platform Module, a dedicated security chip; PCRs are Platform Configuration Registers recording the machine's boot state) and watched the silicon refuse to unseal when the bound PCR value differed — measured-boot key-binding enforces on this exact chip, it does not merely decorate. The natural reflex on a green capability proof is to reach for it. The operator did the opposite: on 2026-06-10 he declined to PCR-bind the production trust-root keys. PCR values move on every legitimate firmware and OS update, so a PCR-bound trust root would brick itself after a routine BIOS or Windows update until a recovery ceremony re-sealed it — and the threat bought down is physical, boot-local, and already mitigated in depth by non-exportable, chip-bound keys on an air-gapped, physically held box.",
+      "evidence": [
+        "2026-06-10 — The lock I proved, then declined to fit"
+      ],
+      "lesson": "Demonstrating a capability is not deciding to deploy it. Feasibility and desirability are separate questions, and a proof-of-concept's highest governance value is often the informed negative it enables: 'we proved it works and chose not to use it' is a stronger position than either 'we couldn't' or 'we did it because we could.' Record the decline with the path-not-taken visible — here as ADR-028 Amendment 1.",
+      "growth": "Proofs convert themselves into deployments through momentum: effort was spent, the demo is green, and 'it works' quietly answers a question nobody asked — should we run it here? Those are different questions with different inputs. The proof answers capability; the deployment decision needs the threat model (what attack does this buy down, and is it already mitigated?), the operational cost (what does this break in normal life — here, every routine firmware update), and the fit with your recovery posture (the strongest lock is poison if you must survive losing the key). When one of your experiments succeeds, treat the green result as the start of the deployment question, not its answer: write down what the capability would cost on an ordinary Tuesday across years of operation, and let a recorded 'no' stand as a finished, successful outcome.",
+      "growth_question": "Your proof-of-concept just went green — which question has that actually answered, and what would deploying it cost on an ordinary day, repeated across years?",
+      "aigp_text": "AIGP Domain IV opens with exactly this competency: evaluating the key factors and risks relevant to the decision to deploy — a capability proof is one input to that evaluation, never its verdict. The decline exemplifies NIST AI RMF's MANAGE function, prioritizing and responding to risk: marginal reduction of an already-mitigated, boot-local physical threat was weighed against bricking the trust root on routine updates, and the documented treatment was 'do not deploy.' The EU AI Act's human-oversight concept shows in who decided: the accountable human, with the evidence in hand.",
+      "aigp_domains": [
+        "Domain IV — Understanding How to Govern AI Deployment and Use"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MANAGE",
+        "EU AI Act — human oversight (high-risk obligation concept)"
+      ],
+      "aigp_takeaway": "Feasibility and desirability are separate questions; a capability proof's highest value can be the informed, recorded decision not to deploy it.",
+      "diagram": "flowchart TD\n  POC[\"2026-06-09 PoC: secret sealed<br/>under PolicyPCR on the<br/>production TPM\"]\n  POC --> GREEN[\"chip refuses the mismatched<br/>unseal: the binding enforces\"]\n  GREEN --> Q[\"deployment question:<br/>PCR-bind the trust root?\"]\n  Q -->|\"reflex: it works, ship it\"| BIND[\"production keys sealed<br/>to the measured boot state\"]\n  BIND --> UPD[\"routine firmware or OS<br/>update moves PCR values\"]\n  UPD --> BRICK[\"trust root bricks until a<br/>recovery ceremony re-seals\"]\n  Q -->|\"operator: informed no,<br/>ADR-028 Amendment 1\"| KEEP[\"keys stay non-exportable,<br/>chip-bound, DACL-locked\"]"
+    },
+    {
+      "number": 107,
+      "prologue": false,
+      "fragment": null,
+      "title": "A \"gate-blocking residual\" must be reconciled against disk before it drives the plan.",
+      "failure": "The #612 deep-dive's residual register named one item as the gate's last technical blocker: A.3, the controlled sandboxed egress exercise (egress: outbound network traffic) — prove the armed egress stack denies by default, auto-trips off its allowlist, and blocks a planted secret, against real non-loopback traffic. The register graded it 'BUILT-DORMANT, gate-blocking, the one remaining proof.' Told to complete it, the agent went to build it and found it already built: tests/security/test_egress_sandbox_proving.py — the #643 work, merged the day before — does exactly that, sits in the standing gate, and passes. Run deliberately as the formal exercise anyway, it produced 11 proofs, 11 passed: real same-host, non-loopback round-trips on the box's own LAN IP, air-gap-safe by construction. The register had drifted — and it had folded a genuinely unfinished item into A.3: the full tool-driven egress chain, un-exercisable until an egress tool exists at all.",
+      "evidence": [
+        "2026-06-10 — The gate-blocker that was already green"
+      ],
+      "lesson": "Decision-support inventories — a residual register, a finish-list, a deep-dive's 'one remaining proof' — drift from the code the moment work lands faster than the document is reconciled. Reconcile the claim against disk before it drives the plan: here that turned 'the gate's last blocker' into 'already done, plus a genuine residual the register had folded into it.' And when document and tree disagree, the drift is itself gate-relevant.",
+      "growth": "Registers drift because they are snapshots dressed as current truth: each item was accurate when graded, the codebase kept moving, and nothing forces the document to notice a merge. The more momentum a project has, the faster its decision documents rot — and the more authority they carry, because everyone is too busy shipping to re-derive them. Before any inventory item drives your plan, reconcile first: check the system of record — the tree, the test suite, the gate run — for what the item claims is missing. Unbundle composite items while you are there; a stale register often hides a real residual inside an already-met one. And watch for circular prerequisites: a proof that can only run after the decision it supposedly blocks is mis-sequenced, and naming that beats forcing it. When document and disk disagree, the disagreement is a finding in its own right.",
+      "growth_question": "The register says one proof remains before the gate — when was that claim last checked against what the tests on disk actually prove?",
+      "aigp_text": "Gate evidence is assessment, and NIST AI RMF's MEASURE function with TEVV (test, evaluation, verification, and validation) assumes assessments describe the system as it currently is — a residual register that lags the tree feeds the deployment decision stale risk information. Running the existing proof as a formal, recorded exercise re-grounded the evidence, and routing the unsettled scope question — component-level bar versus full chain — to the accountable human rather than self-certifying exemplifies the EU AI Act's human-oversight concept: the overseer decides with reconciled facts.",
+      "aigp_domains": [
+        "Domain IV — Understanding How to Govern AI Deployment and Use"
+      ],
+      "aigp_frameworks": [
+        "NIST AI RMF — MEASURE (TEVV)",
+        "EU AI Act — human oversight (high-risk obligation concept)"
+      ],
+      "aigp_takeaway": "Reconcile decision inventories against the actual system before acting on them; stale registers rebuild green proofs and misdirect gates.",
+      "diagram": "flowchart TD\n  REG[\"deep-dive residual register:<br/>A.3 BUILT-DORMANT, the<br/>one remaining gate proof\"]\n  MERGE[\"next day: egress proving<br/>tests merge, green in<br/>the standing gate\"]\n  DRIFT[\"register never reconciled:<br/>document and disk disagree\"]\n  REG --> DRIFT\n  MERGE --> DRIFT\n  DRIFT -->|\"acted on as written\"| WASTE[\"rebuild a proof<br/>that already passes\"]\n  DRIFT -->|\"reconciled to disk first\"| RUN[\"run the existing tests as<br/>the formal gate exercise\"]\n  RUN --> OUT[\"11 of 11 pass; the genuine<br/>residual unbundled; scope<br/>call routed to the operator\"]",
+      "stat": [
+        {
+          "value": "11/11",
+          "label": "egress proofs passed when the register's 'one remaining blocker' was run as the formal exercise"
+        }
+      ]
+    },
+    {
+      "number": 115,
+      "prologue": false,
+      "fragment": null,
+      "title": "When an ADR rejects an alternative that might come back, *hold* it explicitly",
+      "failure": "BlarAI's egress policy — egress meaning outbound network traffic — was ratified as ADR-027, an Architecture Decision Record: the dated document that fixes a design decision with its rejected alternatives on the record. Rule 1: named endpoints, one vetted at a time. But ADR-027 had explicitly held its hybrid per-action-consent refinement 'if a feature warrants it (e.g. fetching arbitrary user-directed URLs).' Three days later the exact feature the parenthetical predicted showed up: the UC-002/003 ingest program needed an arbitrary pasted news URL to clear an egress door built for named endpoints, and a re-litigation of the whole posture loomed. Instead, adopting the held option took one amendment — ADR-027 Amendment 1: the paste is the consent for that ONE URL, the Policy Agent adjudicates a new INGEST_FETCH action class per fetch and logs it, GET-only with no user-content echo outbound, kill-switch and exfil screen untouched.",
+      "evidence": [
+        "2026-06-10 — The option we held three days ago found its feature",
+        "commits 63f3736, df51b8d"
+      ],
+      "lesson": "When an Architecture Decision Record rejects an alternative that might come back, hold it explicitly — name the option and the condition that would warrant it. The held option carried its reasoning pre-built, so when the predicted feature arrived the posture change cost one amendment instead of a fresh debate over a policy that looked closed. A held option is a designed seam in the decision record, the way a private method is a designed seam in code.",
+      "growth": "Decision records ossify by design: once ratified, reopening one reads as relitigating, so teams either avoid the reopening — and the policy quietly blocks a legitimate feature — or bypass the record, and the policy silently stops describing reality. A held option is a pre-authorized hinge. Naming the condition at ratification time separates 'is this change legitimate?' (answered in advance) from 'has the condition arrived?' (cheap to check on the day). When you write any decision — an ADR, a policy, a contract — sort the rejected alternatives into dead, rejected on principle, and dormant, rejected on current facts; for each dormant one, write the condition that would revive it. Future-you inherits an amendment path instead of a credibility fight. One caution from the same arc: held options drift like everything else when sessions draft in parallel — a reconciliation pass must update the preconditions ratified under the old mechanism, not just the mechanism.",
+      "growth_question": "Of the alternatives your decision record rejects, which are dead on principle and which are merely dormant on current facts — and where did you write the condition that would revive the dormant ones?",
+      "aigp_text": "ISO/IEC 42001 builds AI governance as a management system on the plan-do-check-act pattern — policies that are expected to be revisited and improved, not carved once. A held option with a named reviving condition is that pattern designed into a single decision record: the check is cheap because the criteria were written at ratification. NIST AI RMF's GOVERN function, which owns policies and accountability structures, is exercised here as Domain I.C describes — establishing policies and procedures throughout the AI life cycle that can evolve without losing their authority.",
+      "aigp_domains": [
+        "Domain I — Understanding the Foundations of AI Governance"
+      ],
+      "aigp_frameworks": [
+        "ISO/IEC 42001 — AIMS plan-do-check-act",
+        "NIST AI RMF — GOVERN"
+      ],
+      "aigp_takeaway": "Hold revivable alternatives in the record with their reviving condition; policy then evolves by amendment, not re-litigation.",
+      "diagram": "flowchart TD\n  A[\"ADR-027 egress policy<br/>(2026-06-07): rule 1 =<br/>named endpoints only\"] --> B[\"option HELD, not killed:<br/>per-action consent 'if a<br/>feature warrants it'\"]\n  C[\"2026-06-10: paste-a-URL<br/>ingest is that feature\"] --> D[\"named condition<br/>has arrived\"]\n  B --> D\n  D --> E[\"ADR-027 Amendment 1:<br/>the paste is the consent<br/>for that ONE URL\"]\n  D -.-> F[\"avoided: re-litigating a<br/>policy that looked closed\"]",
+      "stat": [
+        {
+          "value": "3 days",
+          "label": "from the option held in ADR-027 to the predicted feature arriving"
+        },
+        {
+          "value": "1 amendment",
+          "label": "total cost of the posture change, reasoning pre-built"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,796 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_initiation schema="stage_4_bootstrap_pointer" revision="2_supplement_2_amendments_folded_in">
+
+  <metadata>
+    <ea_instance>8 (global EA-numbering convention per LA directive 2026-04-27 + feedback memory: Stage 1 = EA-1, Stage 2 = EA-2..EA-6, Stage 3 = EA-7, Stage 4 = EA-8)</ea_instance>
+    <stage_ea_chain_position>1 (FIRST EA of the Stage 4 chain; chain re-numbers per stage but global EA-number persists)</stage_ea_chain_position>
+    <predecessor_ea>Stage 3 EA instance 7 (retired correctly at Stage 3 close per Guide-#7 closure verdict via three-subagent convergence at devplatform 95884a0 + BlarAI c894ebd)</predecessor_ea>
+    <stage_id>STAGE_4</stage_id>
+    <stage_xml authoritative_for_procedure_scope="true">05_STAGE4_CUTOVER.xml</stage_xml>
+    <stage_risk>HIGH per Master Plan §6 (matched only by Stage 2). Single-session continuous-block cutover; rollback ladder is 4 levels per RECOVERY.md.</stage_risk>
+    <work_item_resume_at>4.0.0 (NEW first-action sequence per g8-ea8_n1(e-part-0) + LA directive: VIKUNJA_TOKEN process-scope load → verify → git checkout -- .gitignore on devplatform → verify clean tree → proceed with Item 4.0). Then Item 4.0 (NARROWED per g8-ea8_n2(a): vikunja_mcp-only kill; verify LA prep-2 honored; preserve EA-8's own VS Code Copilot session), 4.0.5 (worktree gate), 4.0.6 (fleet-paused re-verify on absolute path), 4.1 (LA-decided 6-step DB location verification + config absolutization per g8-ea8_n1(c)), 4.2 (post-startup verification triad per g8-ea8_n1(d)), 4.3 (Vikunja project enumerate REST per g8-ea8_n1(e)), 4.4 (Claude Desktop MCP repointing + filesystem expansion + trustedFolders expansion per g8-ea8_n1(f)+(o)+(p)), 4.5 + 4.6 (VS Code + Claude Code MCP repointing per g8-ea8_n1(g)), 4.6.5 (bridge daemon start), 4.7 (scheduled-task XML rewrite with shape-aware arg-injection + S4U paste-relay carve-out per g8-ea8_n1(h) Steps 1/2/3/5/6 + g8-ea8_n2(c) Step 4 refinement), 4.7.5 (wake-template rewrite with forward-slash siblings per g8-ea8_n1(i)), 4.7.6 (PS1 line-by-line scan), 4.7.7 (Vikunja autostart enumerate with noise suppression per g8-ea8_n1(j)), 4.8 (per-task enable verify), 4.8.v2 (task count = 13 verify), 4.9 (Startup .lnk + .vbs rewrite per g8-ea8_n1(k)), 4.10 (bridge re-verify), 4.11a (EA-8 scriptable smoke per g8-ea8_n1(l)) [4.11b deferred LA manual smoke], 4.12 (commits with allow-list staging per g8-ea8_n1(m)), 4.13 (STATUS.md append), 4.13.5 (devplatform-path resume_fleet per g8-ea8_n1(n)).</work_item_resume_at>
+    <prepared_by>Guide instance 8 (successor to Guide instance 7 per Guide-#7 closing handoff at 2026-04-28T01:30:00Z; instance 8 Variant B comprehension gate completed before authoring this pointer; Guide-#8 also authored the Stage 4.0.v2 pre-flight audit checkpoint base verdict + supplement-1 + supplement-2 before this pointer revision)</prepared_by>
+    <prepared_at_utc>2026-04-28T00:00:00Z (revision: same-day amendment-fold-in per LA workflow-simplification directive)</prepared_at_utc>
+    <branch>chore/platform-extraction (BlarAI side); main (devplatform side)</branch>
+    <head_at_initiation>BlarAI HEAD chain: 9d5fcd8 (original init pointer) → 13231f0 (supplement-2 + revised init pointer; 9 commit-hash placeholder tokens unfilled at commit-time per chicken-and-egg) → backfill commit (this commit; the 9 placeholder tokens replaced with `13231f0` literal; spawn-time HEAD; recover actual hash via `git log --oneline -1`). Prior init pointer commit at 9d5fcd8 SUPERSEDED by the supplement-2 same-commit revision per LA workflow-simplification directive. devplatform 95884a0 (Stage 3 single-commit close; UNCHANGED through pre-flight audit + verdict commits + revisions per docs-only discipline).</head_at_initiation>
+    <last_la_commit>none post-init-pointer-revision (LA's last commit was b9a173d the Guide-#7→Guide-#8 handoff; subsequent commits 2c6be78, 134e17a, 9d5fcd8, 13231f0 were Guide-#8 docs-only commits with LA explicit approval gate per stop-and-wait pattern)</last_la_commit>
+    <last_ea_commit>None for EA-8 (this is EA-8's spawn pointer; no EA-8 commits exist yet). Last EA-7 commit: c894ebd (Stage 3.10 closure verified via three-subagent convergence; STATUS.md append). Stage 3 substantive commit on devplatform: 95884a0 (single Stage-3 commit; 189 files / +39592 -2; parent 3894221).</last_ea_commit>
+
+    <stage_3_close_anchors>
+      <anchor>devplatform 95884a0 — Stage 3 single substantive commit (189 files / +39592 -2 / parent 3894221).</anchor>
+      <anchor>BlarAI 76f6050 — Stage 3 close STATUS append (+59/-5; 6-item Stage 3 Closure Footnotes section + Anomalies A12/A13/A14 + Stage Ledger Stage 3 PENDING → COMPLETE).</anchor>
+      <anchor>BlarAI c894ebd — Stage 3.10 close VERIFIED via three-subagent convergence.</anchor>
+      <anchor>BlarAI b9a173d — LA's commit of GUIDE_HANDOFF_LATEST.xml (Guide-#7 to Guide-#8 handoff brief).</anchor>
+      <anchor>BlarAI 2c6be78 — Stage 4.0.v2 pre-flight audit checkpoint base verdict (Guide-#8 commit; 14 amendments bound under g8-ea8_n1(a-n)).</anchor>
+      <anchor>BlarAI 134e17a — Stage 4.0.v2 supplement-1 (Guide-#8 commit; 3 LA-relayed findings bound; g8-ea8_n1 expanded to 16 sub-clauses (a-p)).</anchor>
+      <anchor>BlarAI 9d5fcd8 — Stage 4 EA-8 init pointer ORIGINAL (Guide-#8 commit; 907 lines; SUPERSEDED by this revision).</anchor>
+      <anchor>BlarAI 13231f0 — Stage 4.0.v2 supplement-2 (Guide-#8 commit; 6 amendments bound under g8-ea8_n2(a-f); LA workflow simplification: narrowed Item 4.0 kill + paste-relay carve-out at 4.7) + this revised init pointer (folds in n2 amendments).</anchor>
+    </stage_3_close_anchors>
+
+    <resume_at_action>
+      Item 4.0.0 (NEW; LA-prescribed 5-step first-action sequence per Guide-#8 supplement-1 §init_pointer_first_action_directive). Then Item 4.0 of the Stage 4 XML (NARROWED per g8-ea8_n2(a): vikunja_mcp-only kill + verify LA prep-2 honored). Stage 4 is HIGH risk; single-session continuous-block; rollback at 4 levels per RECOVERY.md.
+    </resume_at_action>
+
+    <nature_of_this_file>
+      Bootstrap pointer prepared by Guide instance 8 for the Lead Architect (LA) to attach when spawning a fresh EA chat for Stage 4 EA-8. This file does NOT introduce new procedural instructions — it points at:
+        - The locked Stage 4 XML (`05_STAGE4_CUTOVER.xml`)
+        - The Stage 4.0.v2 audit chain: base verdict at commit 2c6be78 + supplement-1 at commit 134e17a + supplement-2 at commit 13231f0 + audit-subagent evidence MD
+        - The Stage 3 audit chain (Guide-#7 verdicts at temp_for_responses/3.* + Stage 3 init pointer)
+        - The Stage 2 audit chain (5 EA mid-stage handoff XMLs at ea_outputs/, 9 Guide-#5 + 16 Guide-#6 disposition files at temp_for_responses/, EA initialization pointers EA-3/4/5/6)
+        - The cumulative-ack inheritance chain (77 ack labels total; 70 prior + g7-ea7_n14 + g8-ea8_n1 + g8-ea8_n2)
+
+      All actual procedural authority lives in those source files; this pointer enumerates IDs + status flags + source citations + the new bindings (g7-ea7_n14 + g8-ea8_n1 + g8-ea8_n2 inline verbatim since Guide-#8 authored them).
+
+      Per LA workflow-simplification directive (2026-04-28): the standalone-PowerShell + paste-relay-for-hours workflow originally encoded in g8-ea8_n1(a) and the original init pointer at 9d5fcd8 was REJECTED as over-engineered. Replaced with: (1) Item 4.0 NARROWED to vikunja_mcp-only kill per g8-ea8_n2(a); (2) EA-8 runs in VS Code Copilot Opus 4.7 agent mode natively per g8-ea8_n2(b)+(e); (3) Item 4.7 S4U paste-relay carve-out only at `Agents Cadence Monitor` per g8-ea8_n2(c) — one paste-relay total, not hours. This revised init pointer folds in those n2 amendments.
+
+      Cumulative-ack chain summary post-supplement-2: 77 ack labels (was 76); 104 binding atoms (was 98). Sub-clause additions: g8-ea8_n2(a-f) added since supplement-1.
+
+      EA-numbering naming-convention reminder (per Anomaly A12 + LA directive 2026-04-27): legacy `g7-ea1_n*` labels in committed Stage 3 verdicts preserved verbatim per no-amend doctrine. First verdict to use corrected `ea7` global naming: g7-ea7_n14. EA-8 emits new acks under `g8-ea8_n*` namespace.
+    </nature_of_this_file>
+  </metadata>
+
+  <identity>
+    You are Stage 4 Executor Agent (EA) instance 8 — globally EA-8 per the global EA-numbering convention; locally the FIRST EA of the Stage 4 chain. Stage 4 is HIGH risk per Master Plan §6 — matched only by Stage 2. The comprehension-gate block at the top of `05_STAGE4_CUTOVER.xml` is mandatory: present a structured comprehension summary AND restate every binding acknowledgment verbatim (per `required_acknowledgments` block below), then STOP and WAIT for Guide instance 8 review before any edits, branches, file copies, or commands.
+
+    Stage 4 hard invariants (LA-locked; non-negotiable):
+      - **Single-session continuous-block execution.** One EA-8 chat session covers Items 4.0.0 through 4.13.5. No mid-stage handoff; no resume across sessions. If context budget threatens mid-Stage-4, STOP and request LA disposition.
+      - **Push-through-or-rollback semantics.** Once Item 4.1 begins (DB integrity + config absolutization), the path is forward to 4.13.5 success OR back via the 4-level rollback ladder. No "pause and continue tomorrow".
+      - **No merge to main during Stage 4** (gated to Stage 5.10 with explicit LA approval per R10).
+      - **Fleet stays paused until Item 4.13.5 Step 2** (then resumed on devplatform path only per g8-ea8_n1(n)).
+      - **13/13 fleet tasks remain Disabled until Item 4.8 enables them one at a time.**
+      - **All MCP repointing happens before bridge daemon start (4.6.5) before scheduled task enable (4.7-4.8)** — ordering is load-bearing per R7.
+      - **DB stays at %LOCALAPPDATA%\Vikunja\\.** No DB migration to devplatform/tools/vikunja/. devplatform's config.yml is absolutized at Item 4.1 to make path explicit (per LA architectural decision 2026-04-28 bound in g8-ea8_n1(c)).
+      - **Item 4.0 NARROWED kill** (per g8-ea8_n2(a)): only vikunja_mcp python processes. Claude Desktop + other VS Code workspaces are LA-closed pre-spawn (prep-2). EA-8's own VS Code Copilot session is preserved.
+
+    The LA's "mature not minimal" mandate (per feedback memory + Guide-#7/#8 inheritance) applies throughout Stage 4: thoroughness wins over speed. Every Class D ("cosmetic") finding bound in g8-ea8_n1 + g8-ea8_n2 is REQUIRED, not optional.
+
+    EA-7's procedural track record across Stage 3 (selective tools/+docs/ scope per g7-ea1_n11; selective governance per g7-ea1_n12; 8 sub-clause Stage 3.X audit checkpoint per g7-ea1_n13; Stage 3.10 closure verified via three-subagent convergence) is the discipline standard you inherit.
+  </identity>
+
+  <surface_specific_directives_for_ea_8 revision="2_per_g8_ea8_n2_e">
+
+    <intro>
+      EA-8 runs in VS Code Copilot Chat with Claude Opus 4.7, AGENT MODE. The integrated terminal is the canonical execution surface for all Stage 4 commands. EA-8 invokes PowerShell commands directly through the integrated terminal (no paste-relay to a separate shell except for the n2(c) Item 4.7 S4U carve-out where on-demand elevated PowerShell is required for that one task).
+    </intro>
+
+    <tool_surface>
+      <available>
+        - Read tool (file inspection)
+        - Edit tool (in-place file modification)
+        - Write tool (new file creation)
+        - Terminal: PowerShell (Windows; canonical for Stage 4) AND Bash (Unix-style; available)
+        - Git via terminal (status, log, diff, add, commit, checkout, branch)
+        - REST via Invoke-RestMethod (PowerShell) — REQUIRED for Item 4.3 Vikunja query post-Item-4.0 vikunja_mcp kill (MCP server processes terminated; REST is the only path)
+        - mcp__vikunja__* tools — AVAILABLE before Item 4.0; UNAVAILABLE between Item 4.0 (vikunja_mcp kill) and Item 4.11a (smoke). EA-8 must NOT assume MCP availability post-Item-4.0.
+      </available>
+      <not_available>
+        - Agent tool / subagent spawning. Guide-#8 (in Claude Code) handles subagents (e.g., Stage 4 close three-subagent verification triad). EA-8 does NOT spawn subagents during Stage 4.
+        - Guide-style multi-file orchestration. EA-8 executes the Stage 4 work plan directly + reports back; Guide-#8 reviews + dispositions.
+      </not_available>
+    </tool_surface>
+
+    <item_4_0_narrowed_kill_per_n2_a>
+      **Per g8-ea8_n2(a) (supersedes the original Stage 4 XML Item 4.0 spec command + the original init pointer's pragmatic interpretation):**
+      - Verifies LA prep-2 attestation (Get-Process Claude empty)
+      - Kills only vikunja_mcp python processes via Get-CimInstance Win32_Process (releases file locks for Items 4.4-4.6 MCP repointing)
+      - Does NOT touch Claude/Code processes (LA pre-closed those per prep-2)
+      - EA-8's own VS Code Copilot session stays alive throughout — that's the entire point of n2
+
+      The Stage 4 XML's literal Item 4.0 `Get-Process -Name "Claude","Code" -ErrorAction SilentlyContinue | Stop-Process -Force` is REPLACED by the n2(a) narrowed kill block. EA-8 runs the n2(a) version, NOT the spec's literal version.
+    </item_4_0_narrowed_kill_per_n2_a>
+
+    <item_4_7_s4u_paste_relay_carve_out_per_n2_c>
+      **Per g8-ea8_n2(c) (refines g8-ea8_n1(h) Step 4):**
+      - For `Agents Cadence Monitor` only (the one S4U LogonType task in the 13-task fleet)
+      - EA-8 detects non-elevated shell, emits the EXACT Unregister+Register block to LA chat, asks LA to run from on-demand elevated PowerShell, awaits LA paste-back of verify output, verifies, resumes per-task loop
+      - One paste-relay total. All other 12 tasks at Item 4.7 + all of Items 4.8/4.9/4.10/4.11a/4.12/4.13/4.13.5 run in-process via VS Code Copilot integrated terminal
+      - If EA-8 IS running elevated (LA optionally launched VS Code as Admin), the n2(c) guard's `if (-not $isAdmin)` doesn't trigger; Unregister/Register runs in-process. Paste-relay is the FALLBACK, not the default.
+    </item_4_7_s4u_paste_relay_carve_out_per_n2_c>
+
+    <implication_summary>
+      EA-8 surface = VS Code Copilot Opus 4.7 agent mode + integrated terminal. No standalone PowerShell. No paste-relay-for-hours. Stage 4 work runs natively through Copilot. Single tactical paste-relay at Item 4.7 for the S4U Agents Cadence Monitor task (and only if EA-8's shell is non-elevated).
+    </implication_summary>
+
+  </surface_specific_directives_for_ea_8>
+
+  <required_reading_order>
+
+    <intro>
+      EA-8 reads in this order. Files 1-5 are LOAD-BEARING for first-action work; files 6-13 are reference material for ack-chain restatement and Stage 4 risk awareness.
+    </intro>
+
+    <doc order="1" priority="LOAD_BEARING">docs/platform_separation/05_STAGE4_CUTOVER.xml — the locked Stage 4 spec. Read cover-to-cover including `<v2_updates>`, `<vikunja_access_protocol>`, every `<work_items>` entry, `<rollback>`, `<verification_commands_for_lead_architect>`, `<exit_criteria>`. The spec is the procedural baseline; all g8-ea8_n1 + n2 sub-clauses are AMENDMENTS layered on top.</doc>
+
+    <doc order="2" priority="LOAD_BEARING">docs/platform_separation/temp_for_responses/4.0.v2-GUIDE_RESPONSE_INSTANCE_8_STAGE4_PREFLIGHT_AUDIT_CHECKPOINT.xml — base Guide-#8 verdict at commit 2c6be78. 14 amendments bound under g8-ea8_n1(a-n). EA-8 restates verbatim in iter-1 gate.</doc>
+
+    <doc order="3" priority="LOAD_BEARING">docs/platform_separation/temp_for_responses/4.0.v2-GUIDE_RESPONSE_INSTANCE_8_SUPPLEMENT_TO_PREFLIGHT_AUDIT_CHECKPOINT.xml — Guide-#8 supplement-1 at commit 134e17a. Adds 3 sub-clauses: g8-ea8_n1(e-part-0), n1(o), n1(p). Plus LA-relayed init-pointer first-action ordering directive. Plus DB-mechanism LA disposition affirming KEEP n1(c) absolutization. EA-8 restates verbatim.</doc>
+
+    <doc order="4" priority="LOAD_BEARING">docs/platform_separation/temp_for_responses/4.0.v2-GUIDE_RESPONSE_INSTANCE_8_SUPPLEMENT_2_TO_PREFLIGHT_AUDIT_CHECKPOINT.xml — Guide-#8 supplement-2 at commit 13231f0. Adds NEW ack g8-ea8_n2 with 6 sub-clauses (a-f): Item 4.0 NARROWING; n1(a) supersession; Item 4.7 S4U paste-relay carve-out; LA prep-3 reframing; surface directives update; iter-1 gate emit update. EA-8 restates verbatim.</doc>
+
+    <doc order="5" priority="LOAD_BEARING">docs/platform_separation/temp_for_responses/4.0.v2-AUDIT_SUBAGENT_OUTPUT_STAGE4_PREFLIGHT_DRIFT_INVENTORY.md — audit-subagent evidence MD (943 lines). Per-item findings, cross-cascades CC-1 through CC-8, residual risk acknowledgment. EA-8 reads for context (the `<recommended_disposition>` blocks in this file are SUPERSEDED by g8-ea8_n1 + g8-ea8_n2 sub-clause text where they conflict; trust the verdicts, not the audit recommendations, for binding text).</doc>
+
+    <doc order="6" priority="REFERENCE">docs/platform_separation/STATUS.md — current state through commit c894ebd (Stage 3 close). Stage Ledger rows 0/1/2/3, Anomalies A1-A14, Stage 2 + Stage 3 Closure Footnotes, Vikunja Project IDs.</doc>
+
+    <doc order="7" priority="REFERENCE">docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml — Stage 3 init pointer (1618 lines). Authoritative source for the 61 predecessor acks (38 v4-era + 4 g6-ea5 + 10 g6-ea6 + 9 g7-ea1).</doc>
+
+    <doc order="8" priority="REFERENCE">docs/platform_separation/temp_for_responses/3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml — Stage 3.10 closure verdict. Authoritative for g7-ea7_n14(a-d) verbatim text + rr1-rr7 forward-carry + f5_1-f5_4 forward-carry.</doc>
+
+    <doc order="9" priority="REFERENCE">docs/platform_separation/temp_for_responses/3.10-GUIDE_HANDOFF_INSTANCE_7_TO_8.xml — Guide-#7 to Guide-#8 handoff brief. Procedural inheritance + LA preferences encoded.</doc>
+
+    <doc order="10" priority="REFERENCE">docs/platform_separation/00_MASTER_PLAN.md — locked decisions §A-§F + §10 execution model + §11 v2 scope expansion.</doc>
+
+    <doc order="11" priority="REFERENCE">docs/platform_separation/INFRA_DELTA_v2.md — v1→v2 delta. §1.4-1.7 (new tools), §2.1 (wake_launcher growth), §2.5 (13-task list), §3.1 (fleet-pause SOP), §3.3 (Vikunja label IDs).</doc>
+
+    <doc order="12" priority="REFERENCE">docs/platform_separation/AUDIT_RISK_REVIEW.md — V1-V8 + R1-R12 + C1-C10 + M1-M10. Stage 4 §4 Cutover Atomicity Verdict.</doc>
+
+    <doc order="13" priority="REFERENCE">docs/platform_separation/WORKFLOW_INTEGRITY_REVIEW.md — including Appendix A post-patch verification at commit 6a042ea. G-1 through G-4 + S-1, S-2.</doc>
+
+    <doc order="14" priority="REFERENCE">docs/platform_separation/RECOVERY.md — 4-level rollback ladder. Stage 4 has its own 4-level rollback specifically.</doc>
+
+    <doc order="15" priority="REFERENCE">docs/platform_separation/VERIFICATION_COMMANDS.md — LA-runnable verification commands per stage.</doc>
+
+    <doc order="16" priority="REFERENCE">docs/platform_separation/ROLLBACK_NOVICE_GUIDE.md — non-developer rollback guide. LA's "panic card" if Stage 4 fails catastrophically.</doc>
+
+    <doc order="17" priority="REFERENCE">CLAUDE.md (BlarAI root) — §Vikunja Conventions + §Active State + §Fleet-Pause SOP.</doc>
+
+    <doc order="18" priority="REFERENCE">.github/copilot-instructions.md — §fleet_pause_sop + §Execution_Agent.</doc>
+
+  </required_reading_order>
+
+  <la_pre_prep_checklist priority="MANDATORY_BEFORE_EA_8_FIRST_ACTION" revision="2_prep_3_reframed_per_g8_ea8_n2_d">
+
+    <intro>
+      Per Guide-#8 supplement-1 §init_pointer_first_action_directive + supplement-2 §subclause id="g8-ea8_n2(d)" + dn29 (do NOT spawn EA-8 until LA pre-prep verification complete). Each item below has an attestation line; LA confirms completion in their EA-8 spawn message before EA-8 begins Item 4.0.0. EA-8's iter-1 comprehension gate INCLUDES a section confirming each LA attestation was provided.
+    </intro>
+
+    <attestation_item id="prep-1" name="VIKUNJA_TOKEN_user_scope_persisted">
+      LA action: open Vikunja UI at http://localhost:3456 (Vikunja must be running for this; LA can briefly start it then stop again). User Settings → API Tokens → Create token with scope: read on Projects+Tasks. Copy token. Persist as User-scope env var:
+      ```powershell
+      [Environment]::SetEnvironmentVariable('VIKUNJA_TOKEN', '&lt;the-token-value&gt;', 'User')
+      ```
+      Verify in a fresh shell:
+      ```powershell
+      [Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')
+      # Expected: the token string (length should be ~43 per Guide-#8 Finding A relay)
+      ```
+      Stop Vikunja again before EA-8 spawn so Stage 4 starts from a clean stopped state.
+
+      LA attestation line: "[ATTESTATION prep-1] VIKUNJA_TOKEN created via Vikunja UI + persisted as User-scope env var; verified via fresh-shell GetEnvironmentVariable returns the token string."
+    </attestation_item>
+
+    <attestation_item id="prep-2" name="other_ai_surfaces_closed">
+      LA action: close all OTHER AI development surfaces:
+      - Claude Desktop application (right-click tray icon → Quit)
+      - All OTHER VS Code workspaces (any window not running EA-8's chat)
+      - All Claude Code terminals (close by typing `exit` or Ctrl+D)
+
+      PRESERVE: EA-8's own VS Code Copilot chat window stays open (EA-8 needs it to receive LA messages and emit its work).
+
+      Verify other surfaces closed:
+      ```powershell
+      Get-Process -Name "Claude" -ErrorAction SilentlyContinue
+      # Expected: empty
+      ```
+
+      LA attestation line: "[ATTESTATION prep-2] Other AI surfaces closed. Only EA-8's VS Code Copilot session remains open. Get-Process Claude returned empty."
+
+      Note: per g8-ea8_n2(a), Item 4.0 verifies this attestation by Get-Process Claude empty check at execution time. If LA reopens Claude Desktop after spawn (e.g., for unrelated chat), Item 4.0 throws; LA must close Claude Desktop again before re-running Item 4.0.
+    </attestation_item>
+
+    <attestation_item id="prep-3" name="elevated_powershell_on_demand_for_item_4_7" revision="per_g8_ea8_n2_d">
+      LA action: confirm capability to launch an elevated PowerShell ON-DEMAND when EA-8 requests it at Item 4.7 paste-relay carve-out. LA does NOT need to keep an elevated shell open during the rest of Stage 4.
+
+      The on-demand action (when triggered at Item 4.7):
+      1. Press Win+X → "Windows PowerShell (Admin)" or "Terminal (Admin)" (or right-click Start Menu → same options)
+      2. Paste the EA-8-emitted Unregister+Register block (EA-8 will produce it explicitly)
+      3. Paste the result back to EA-8 chat
+      4. Close the elevated PowerShell
+
+      Verify capability (one-time, before EA-8 spawn):
+      - Press Win+X. Confirm "Windows PowerShell (Admin)" or "Terminal (Admin)" option visible.
+      - Right-click Start Menu. Confirm same options visible.
+      - User account is part of Administrators group (verify via Control Panel → User Accounts).
+
+      LA attestation line: "[ATTESTATION prep-3 REVISED] Elevated PowerShell on-demand capability confirmed. Win+X → Admin shell available. User in Administrators group."
+
+      EA-8 surface remains VS Code Copilot Opus 4.7 agent mode throughout Stage 4. Elevation is a paste-relay-tactical action only at Item 4.7 (one task: Agents Cadence Monitor).
+    </attestation_item>
+
+    <attestation_item id="prep-4" name="vikunja_stopped">
+      LA action: confirm Vikunja host process is stopped.
+      ```powershell
+      Get-Process -Name "vikunja*" -ErrorAction SilentlyContinue
+      # Expected: empty (no rows)
+      ```
+
+      LA attestation line: "[ATTESTATION prep-4] Vikunja host process stopped. Get-Process vikunja* returned empty."
+    </attestation_item>
+
+    <attestation_item id="prep-5" name="continuous_block_time_blocked">
+      LA action: block 4-12 hours of continuous availability. Once EA-8 begins Item 4.1, the path is push-through-or-rollback. Estimated execution time: 4-6 hours best case (clean run); 6-10 hours most likely (1-3 in-stage STOP cycles for compound drifts); 12-20 hours worst case if mid-stage rollback + retry.
+
+      LA attestation line: "[ATTESTATION prep-5] Calendar blocked for the continuous block. No hard commitments in next 4-12 hours."
+    </attestation_item>
+
+    <attestation_item id="prep-6" name="recovery_documents_ready">
+      LA action: have RECOVERY.md (Stage 4 4-level rollback) + ROLLBACK_NOVICE_GUIDE.md (panic card) open in a separate window.
+
+      LA attestation line: "[ATTESTATION prep-6] RECOVERY.md and ROLLBACK_NOVICE_GUIDE.md open in separate windows for emergency reference."
+    </attestation_item>
+
+    <attestation_item id="prep-7" name="backup_anchors_intact">
+      LA action: verify Stage 0 recovery anchors still intact:
+      ```powershell
+      Test-Path "C:\Users\mrbla\backups\BlarAI_pre_extract.bundle"
+      Test-Path "C:\Users\mrbla\backups\blarai_oog_*.zip"
+      (Get-ChildItem "C:\Users\mrbla\backups\scheduled_tasks_export\*.xml" | Measure-Object).Count
+      # Expected: True; True; 13
+      ```
+
+      LA attestation line: "[ATTESTATION prep-7] Backup anchors intact (bundle + OOG zip + 13 scheduled task XMLs)."
+    </attestation_item>
+
+    <combined_attestation_template>
+      The LA includes a single combined attestation block in the EA-8 spawn message:
+      ```
+      LA pre-prep verified. Attestations:
+      [ATTESTATION prep-1] VIKUNJA_TOKEN created + persisted; fresh-shell verify PASS.
+      [ATTESTATION prep-2] Other AI surfaces closed; Claude.exe count = 0.
+      [ATTESTATION prep-3 REVISED] Elevated PowerShell on-demand capability confirmed (Win+X Admin available; user in Administrators group).
+      [ATTESTATION prep-4] Vikunja stopped; Get-Process vikunja* empty.
+      [ATTESTATION prep-5] Calendar blocked 4-12h continuous.
+      [ATTESTATION prep-6] RECOVERY.md + ROLLBACK_NOVICE_GUIDE.md open.
+      [ATTESTATION prep-7] Backup anchors intact (bundle + OOG zip + 13 XMLs).
+      Spawn EA-8.
+      ```
+      EA-8's iter-1 comprehension gate confirms each `[ATTESTATION prep-N]` line was present in the spawn message.
+    </combined_attestation_template>
+
+  </la_pre_prep_checklist>
+
+  <ack_chain_carried_forward>
+
+    <intro>
+      All 77 unique-ID binding ack labels (61 from Stage 3 init pointer's chain + g7-ea7_n14 from Stage 3.10 closure verdict + g8-ea8_n1 from Stage 4.0.v2 audit base verdict + supplement-1 + g8-ea8_n2 from supplement-2) carry forward as audit chain inheritance. Sub-clause atomic count: 70 items + 8 (n13 a-h) + 4 (n14 a-d) + 16 (n1 a-p) + 6 (n2 a-f) = 104 binding atoms.
+
+      EA-8's iteration-1 comprehension gate restates each ack VERBATIM. For the 61 prior acks (Stage 3 init pointer chain): EA-8 reads `3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml` `<ack_chain_carried_forward>` block (lines ~268-1199 approximately) and restates verbatim. For g7-ea7_n14(a-d), g8-ea8_n1(a-p), g8-ea8_n2(a-f): EA-8 restates verbatim from this file (inline below).
+
+      Status flags (extended for supplement-2):
+        FORWARD-ACTIVE        = enforce ongoing through Stage 4 close
+        SATISFIED             = closed at named item
+        SATISFIED-AUDIT-HISTORY = SATISFIED with explicit audit-history retention
+        FORWARD-ACTIVE-FIRST-ACTION = priority CRITICAL
+        SUPERSEDED-BY-&lt;ack_id&gt;  = the original ack is restated verbatim (no-amend doctrine) but EA-8 executes per the superseding ack
+        REFINED-BY-&lt;ack_id&gt;     = the original ack's specific portion is replaced; EA-8 executes per the refining ack at that portion
+
+      Naming-convention reminder (per Anomaly A12 + LA directive + memory feedback): legacy `g7-ea1_n*` labels in committed verdicts preserved verbatim. First verdict to use corrected `g7-ea7_n*` global naming: g7-ea7_n14. EA-8 emits g8-ea8_n*.
+    </intro>
+
+    <prior_61_ack_chain_reference>
+      <source_file>docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml</source_file>
+      <source_section>&lt;ack_chain_carried_forward&gt; block (lines ~268 through ~1199)</source_section>
+      <ack_count>61 (38 v4-era + 4 g6-ea5 + 10 g6-ea6 + 9 g7-ea1)</ack_count>
+      <restate_verbatim_in_ea_8_iter_1_gate>Required. EA-8 reads the source file's `<ack_chain_carried_forward>` block and restates each ack verbatim, preserving status flags + source citations.</restate_verbatim_in_ea_8_iter_1_gate>
+      <high_priority_subset_for_stage_4>
+        Of the 61 prior acks, the following are FORWARD-ACTIVE for Stage 4 specifics:
+        - n=2 (fleet stays paused; NEVER state.resume_fleet) — extends through Item 4.13.5 Step 2 where state.resume_fleet IS called on devplatform path
+        - n=3 (no merge to main) — gated to Stage 5.10
+        - n=4 (stash@{0} not popped/applied/dropped)
+        - n=5 (no edits to CLAUDE.md / AGENTS.md / copilot-instructions.md / governance docs) — V8 / Stage 6.1.v2 deferred
+        - n=6 (Vikunja access through tools/_vikunja_client.py chokepoint; bool rejection)
+        - n=8 (V8 defaults preservation: cwd-inside-BlarAI + no flags + no env → ctx.vikunja_project_id == 3)
+        - g4-5 ($BLARAI_PID drift = STOP and report) — relevant at Item 4.7 preflight
+        - g6-ea6_n8 (V4=1 Vikunja-running per Option B) — RESOLVED at Stage 4.0/4.1 preflight per rr6 (LA pre-stopped Vikunja per prep-4)
+        - g7-ea1_n1 (VIKUNJA_PASS env-var pattern in MCP configs) — relevant at Items 4.4, 4.5, 4.6
+        - g7-ea1_n7 (no BlarAI-only docs in devplatform) — extends through Stage 5
+      </high_priority_subset_for_stage_4>
+    </prior_61_ack_chain_reference>
+
+    <new_g7_ea7_n14_from_stage_3_10_closure_verdict status="STANDING_FROM_STAGE_3_CLOSURE">
+
+      <ack id="g7-ea7_n14(a)" priority="MODERATE" status="FORWARD-ACTIVE-AT-4.0.0">
+        Source: `3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml` §subclause id="n14(a)".
+        Title: Stage 4 EA-8 NEW forward-carry rr8 — gitignore working-tree cleanup preflight.
+        EA-8 disposition: encoded in Item 4.0.0 first-action sequence Step 3 (devplatform .gitignore cleanup) + Step 4 (verify clean tree).
+      </ack>
+
+      <ack id="g7-ea7_n14(b)" priority="MEDIUM" status="FORWARD-ACTIVE-AT-STAGE-6-7-5">
+        Source: `3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml` §subclause id="n14(b)".
+        Title: Stage 6.7.5 TICKET E scope expansion — 3 new sub-items.
+        EA-8 disposition: enumerated in `<stage_6_7_5_hardening_tickets>` block; not actioned at Stage 4.
+      </ack>
+
+      <ack id="g7-ea7_n14(c)" priority="LOW" status="FORWARD-ACTIVE-AT-EA-8-INIT-POINTER">
+        Source: `3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml` §subclause id="n14(c)".
+        Title: Stage 4 init pointer requirement — rr1-rr8 + f5_1-f5_4 verbatim enumeration.
+        EA-8 disposition: SATISFIED in this init pointer's `<forward_carry_residual_risks_verbatim>` and `<forward_items_for_stage_5_verbatim>` blocks.
+      </ack>
+
+      <ack id="g7-ea7_n14(d)" priority="COSMETIC" status="FORWARD-ACTIVE-AT-STAGE-6-7-5">
+        Source: `3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml` §subclause id="n14(d)".
+        Title: Stage 6.7.5 TICKET A enrichment.
+        EA-8 disposition: enumerated in `<stage_6_7_5_hardening_tickets>` TICKET A.
+      </ack>
+
+    </new_g7_ea7_n14_from_stage_3_10_closure_verdict>
+
+    <new_g8_ea8_n1_acks_for_stage_4 status="FORWARD-ACTIVE-FIRST-ACTION_FOR_STAGE_4">
+
+      <intro>
+        16 sub-clauses bound by Guide-#8's Stage 4.0.v2 base verdict (commit 2c6be78) + supplement-1 (commit 134e17a). EA-8 restates each VERBATIM in iter-1 gate.
+      </intro>
+
+      <ack id="g8-ea8_n1(a)" item="4.0" class="C" priority="HIGH_ORIGINAL_NOW_LOW" status="SUPERSEDED-BY-g8-ea8_n2(b)" restate_verbatim="true">
+        Title: Item 4.0 EA-8-context preamble + self-termination preflight gate (CC-1).
+        Source: base verdict §subclause id="n1(a)".
+        STATUS NOTE: g8-ea8_n2(b) SUPERSEDES n1(a). EA-8 restates n1(a) verbatim in iter-1 gate per no-amend doctrine on committed verdicts (n1(a) lives in base verdict at 2c6be78, not retroactively rewritten). EA-8 does NOT execute n1(a) self-termination preflight gate.
+        EA-8 execution: SKIPPED. Item 4.0 runs the n2(a) NARROWED kill block instead (verifies LA prep-2 + kills only vikunja_mcp pythons). EA-8 stays in VS Code Copilot agent mode; no standalone PowerShell required.
+      </ack>
+
+      <ack id="g8-ea8_n1(b)" item="4.0.6" class="D" priority="MEDIUM" status="FORWARD-ACTIVE-AT-4.0.6">
+        Title: Item 4.0.6 absolute path on state.json fleet-pause gate command.
+        Source: base verdict §subclause id="n1(b)". Verbatim:
+        "AMENDMENT: substitute with absolute path to BlarAI's state.json (the authoritative pre-cutover gate; devplatform's contaminated copy is reset by n1(n) at Item 4.13.5):
+        ```powershell
+        python -c &quot;import json; print('PAUSED' if json.load(open(r'C:\Users\mrbla\BlarAI\tools\autonomy_budget\state.json'))['fleet_paused'] else 'RUNNING -- HALT')&quot;
+        ```
+        Expected: `PAUSED`. If `RUNNING -- HALT` returned, EA-8 STOPs and reports."
+      </ack>
+
+      <ack id="g8-ea8_n1(c)" item="4.1" class="A" priority="LOAD-BEARING" status="FORWARD-ACTIVE-AT-4.1" la_architectural_decision="2026-04-28">
+        Title: Item 4.1 LA-DECIDED REWRITE — DB location verification + config absolutization.
+        Source: base verdict §subclause id="n1(c)" (full 6-step PowerShell flow).
+        EA-8 execution: replaces ENTIRE Item 4.1 spec flow with 6 steps (a-f): Stop verify; DB sha256 capture; SQLite integrity; Edit devplatform/tools/vikunja/config.yml database.path absolute; Start devplatform Vikunja + reachability; DB sha256 stability check.
+      </ack>
+
+      <ack id="g8-ea8_n1(d)" item="4.2" class="C" priority="HIGH" status="FORWARD-ACTIVE-AT-4.2">
+        Title: Item 4.2 reduced to post-startup verification triad.
+        Source: base verdict §subclause id="n1(d)".
+        EA-8 execution: (i) Confirm absolute-path DB; (ii) REST project count ≥ 10; (iii) DB sha256 stability at +5s.
+      </ack>
+
+      <ack id="g8-ea8_n1(e)" item="4.3" class="C" priority="HIGH" status="FORWARD-ACTIVE-MULTI-PART" parts="0,1,2,3">
+        Title: VIKUNJA_TOKEN handling — process-scope load (Part 0) + LA pre-flight checklist (Part 1) + Item 4.3 fresh-shell fallback (Part 2) + REST user/pass fallback (Part 3).
+        Source: base verdict §subclause id="n1(e)" (Parts 1, 2, 3) + supplement-1 §subclause id="g8-ea8_n1(e-part-0)" (Part 0).
+        EA-8 execution: Part 0 runs as Step 1 of Item 4.0.0 first-action sequence. Part 2 + Part 3 run inside Item 4.3 if needed.
+      </ack>
+
+      <ack id="g8-ea8_n1(f)" item="4.4" class="C" priority="HIGH" status="FORWARD-ACTIVE-AT-4.4">
+        Title: Claude Desktop MCP config — enumerate all 3 BlarAI-coupled fields.
+        Source: base verdict §subclause id="n1(f)".
+        EA-8 execution: rewrite mcpServers.vikunja block (command + PYTHONPATH + VIKUNJA_PASS env-var); backup .pre_stage4_bak; verify no residual BlarAI inside vikunja block.
+      </ack>
+
+      <ack id="g8-ea8_n1(g)" item="4.5_and_4.6" class="C" priority="HIGH" status="FORWARD-ACTIVE-AT-4.5-AND-4.6">
+        Title: VS Code + Claude Code MCP configs — explicit absolute-path + PYTHONPATH rewrites.
+        Source: base verdict §subclause id="n1(g)".
+        EA-8 execution: rewrite BlarAI .vscode/mcp.json (top-level `servers`) + BlarAI .mcp.json (top-level `mcpServers`); preserve top-level keys per file; backup .pre_stage4_bak.
+      </ack>
+
+      <ack id="g8-ea8_n1(h)" item="4.7" class="C" priority="LOAD-BEARING" status="FORWARD-ACTIVE-AT-4.7" step_4_status="REFINED-BY-g8-ea8_n2(c)" restate_verbatim="true">
+        Title: Item 4.7 shape-aware arg-injection + absolute python path + S4U handling (CC-4).
+        Source: base verdict §subclause id="n1(h)".
+        STATUS NOTE: Steps 1, 2, 3, 5, 6 of n1(h) UNCHANGED. Step 4 (S4U guard hard-throw) REFINED-BY-g8-ea8_n2(c) (paste-relay carve-out). EA-8 restates n1(h) verbatim in iter-1 gate per no-amend doctrine.
+        EA-8 execution: Steps 1, 2, 3 (BOM strip + path substitutions + bare-WorkingDirectory rewrite + shape-aware arg-injection per Pattern A python-module / Pattern B powershell-script) per n1(h). Step 4 (S4U handling) per n2(c) paste-relay carve-out (NOT the original n1(h) Step 4 hard-throw). Steps 5, 6 (post-rewrite verify; LA elevated-shell carve-out) per n1(h).
+      </ack>
+
+      <ack id="g8-ea8_n1(i)" item="4.7.5" class="C" priority="MED" status="FORWARD-ACTIVE-AT-4.7.5">
+        Title: Wake-template path-rewrite — forward-slash sibling patterns.
+        Source: base verdict §subclause id="n1(i)".
+      </ack>
+
+      <ack id="g8-ea8_n1(j)" item="4.7.7" class="D" priority="LOW" status="FORWARD-ACTIVE-AT-4.7.7">
+        Title: Vikunja autostart enumeration — suppress noise + tighten regex.
+        Source: base verdict §subclause id="n1(j)".
+      </ack>
+
+      <ack id="g8-ea8_n1(k)" item="4.9" class="C" priority="HIGH" status="FORWARD-ACTIVE-AT-4.9">
+        Title: Vikunja Startup .lnk — widen gate + rewrite .vbs content.
+        Source: base verdict §subclause id="n1(k)".
+      </ack>
+
+      <ack id="g8-ea8_n1(l)" item="4.11" class="D" priority="MED" status="FORWARD-ACTIVE-AT-4.11">
+        Title: End-to-end smoke split into EA-8 scriptable + LA manual.
+        Source: base verdict §subclause id="n1(l)".
+      </ack>
+
+      <ack id="g8-ea8_n1(m)" item="4.12" class="A" priority="LOAD-BEARING" status="FORWARD-ACTIVE-AT-4.12">
+        Title: Commit hygiene — gitignore augmentation + allow-list staging.
+        Source: base verdict §subclause id="n1(m)".
+      </ack>
+
+      <ack id="g8-ea8_n1(n)" item="4.13.5" class="B" priority="LOAD-BEARING" status="FORWARD-ACTIVE-AT-4.13.5">
+        Title: Resume fleet — two-step reset+resume on devplatform path.
+        Source: base verdict §subclause id="n1(n)".
+        Function-name reminder: `state.resume_fleet`, NEVER `state.unpause_fleet`.
+      </ack>
+
+      <ack id="g8-ea8_n1(o)" item="4.4_extension" class="MED" priority="MED" status="FORWARD-ACTIVE-AT-4.4">
+        Title: Claude Desktop filesystem MCP server — extend args to include devplatform.
+        Source: supplement-1 §subclause id="g8-ea8_n1(o)".
+      </ack>
+
+      <ack id="g8-ea8_n1(p)" item="4.4_extension" class="MED" priority="MED" status="FORWARD-ACTIVE-AT-4.4">
+        Title: Claude Desktop trustedFolders — extend to include devplatform.
+        Source: supplement-1 §subclause id="g8-ea8_n1(p)".
+      </ack>
+
+    </new_g8_ea8_n1_acks_for_stage_4>
+
+    <new_g8_ea8_n2_acks_for_stage_4 status="FORWARD-ACTIVE-FIRST-ACTION_FOR_STAGE_4" source_commit="13231f0">
+
+      <intro>
+        6 sub-clauses bound by Guide-#8's Stage 4.0.v2 supplement-2 (commit 13231f0). LA workflow-simplification: rejected the standalone-PowerShell + paste-relay-for-hours workflow encoded in n1(a) and the original init pointer at 9d5fcd8. EA-8 restates each VERBATIM in iter-1 gate.
+      </intro>
+
+      <ack id="g8-ea8_n2(a)" item="4.0" class="C" priority="HIGH" status="FORWARD-ACTIVE-AT-4.0">
+        Title: Item 4.0 NARROWING — vikunja_mcp-only kill; drop Claude/Code Stop-Process sweep.
+        Source: supplement-2 §subclause id="g8-ea8_n2(a)" (full 3-step PowerShell block).
+        EA-8 execution: Step 1 verify LA prep-2 attestation honored (Get-Process Claude empty; throw if not); Step 2 kill only vikunja_mcp python processes via Get-CimInstance + Stop-Process per-PID; Step 3 verify post-kill (no vikunja_mcp pythons remain). DROPPED: spec's `Get-Process -Name "Claude","Code" | Stop-Process -Force` (CC-1 self-termination cascade source).
+      </ack>
+
+      <ack id="g8-ea8_n2(b)" item="supersedes_n1_a" class="C" priority="HIGH" status="FORWARD-ACTIVE">
+        Title: Supersede g8-ea8_n1(a) — drop standalone-PowerShell requirement + descended-from-Claude/Code preflight gate.
+        Source: supplement-2 §subclause id="g8-ea8_n2(b)".
+        EA-8 execution: SUPERSESSION authority. EA-8 does NOT run the n1(a) self-termination preflight gate. EA-8 runs Stage 4 entirely from VS Code Copilot Opus 4.7 agent mode using integrated terminal. CC-1 cascade closed at kill-source per n2(a) instead of via shell isolation.
+      </ack>
+
+      <ack id="g8-ea8_n2(c)" item="4.7" class="C" priority="HIGH" status="FORWARD-ACTIVE-AT-4.7">
+        Title: Item 4.7 S4U paste-relay carve-out — refines g8-ea8_n1(h) Step 4.
+        Source: supplement-2 §subclause id="g8-ea8_n2(c)" (full PowerShell block + verify).
+        EA-8 execution at Item 4.7 reaching `Agents Cadence Monitor`: detect non-elevated shell via WindowsPrincipal/IsInRole check; if non-elevated, emit explicit Unregister+Register+Disable+verify block to LA chat as paste-template; record PASTE_RELAY_PENDING state; pause per-task loop; chat returns to LA awaiting paste-back; on LA paste-back, verify pattern `'Agents Cadence Monitor.*Disabled.*S4U'` matches; if matched, mark SATISFIED and resume per-task loop with next task; if not matched, throw paste-relay verify FAIL. If EA-8 IS elevated, n2(c) Step 4 doesn't trigger — Unregister/Register runs in-process. One paste-relay total (only if non-elevated).
+      </ack>
+
+      <ack id="g8-ea8_n2(d)" item="la_pre_prep_checklist_prep_3" class="MED" priority="MED" status="SATISFIED-AT-INIT-POINTER-REVISION">
+        Title: Reframe LA pre-prep prep-3 — elevated PowerShell on-demand at Item 4.7, not throughout Stage 4.
+        Source: supplement-2 §subclause id="g8-ea8_n2(d)" (revised attestation language).
+        EA-8 execution: SATISFIED in this revised init pointer's `<la_pre_prep_checklist>` prep-3 attestation_item (revision="per_g8_ea8_n2_d"). EA-8's iter-1 gate `la_pre_prep_attestation_recap` confirms the REVISED prep-3 line.
+      </ack>
+
+      <ack id="g8-ea8_n2(e)" item="surface_specific_directives_for_ea_8" class="MED" priority="MED" status="SATISFIED-AT-INIT-POINTER-REVISION">
+        Title: Update init pointer surface directives — VS Code Copilot agent mode is canonical execution surface.
+        Source: supplement-2 §subclause id="g8-ea8_n2(e)" (replacement directives content).
+        EA-8 execution: SATISFIED in this revised init pointer's `<surface_specific_directives_for_ea_8>` block (revision="2_per_g8_ea8_n2_e"). EA-8 uses VS Code Copilot agent mode + integrated terminal as canonical execution surface.
+      </ack>
+
+      <ack id="g8-ea8_n2(f)" item="required_first_actions_action_4_emit_iter_1_gate" class="MED" priority="MED" status="SATISFIED-AT-INIT-POINTER-REVISION">
+        Title: Update init pointer iter-1 gate emission — drop standalone-PowerShell check; confirm VS Code Copilot agent mode + narrowed kill.
+        Source: supplement-2 §subclause id="g8-ea8_n2(f)".
+        EA-8 execution: SATISFIED in this revised init pointer's `<required_first_actions>` action 4 (`emit_iteration_1_comprehension_gate`). Iter-1 gate `comprehension_summary` block ADDS `part_g_surface_confirmation` field. V0m elevation check REMOVED from V0a-V0o block; renumbered to V0a-V0n (14 total checks; was 15).
+      </ack>
+
+    </new_g8_ea8_n2_acks_for_stage_4>
+
+    <ack_chain_summary>
+      Total ack labels: 77 (was 76 pre-supplement-2). Total binding atoms (sub-clauses expanded): 104 (was 98).
+        - 38 v4-era (Stage 2 chain; per Stage 3 init pointer)
+        - 4 g6-ea5 (Stage 2 Guide-#5 dispositions)
+        - 10 g6-ea6 (Stage 2 Guide-#6 dispositions)
+        - 9 g7-ea1 (Stage 3 Guide-#7 dispositions n1-n9)
+        - 4 g7-ea1 (Stage 3.X amendments n10-n13; n13 has 8 sub-clauses)
+        - 1 g7-ea7 (Stage 3.10 closure n14; 4 sub-clauses; FIRST corrected `ea7` naming)
+        - 1 g8-ea8 (Stage 4.0.v2 base + supplement-1; n1; 16 sub-clauses)
+        - 1 g8-ea8 (Stage 4.0.v2 supplement-2; n2; 6 sub-clauses; NEW)
+
+      EA-8 iter-1 gate restates: 61 prior acks verbatim from Stage 3 init pointer + 4 g7-ea7_n14(a-d) verbatim + 16 g8-ea8_n1(a-p) verbatim + 6 g8-ea8_n2(a-f) verbatim.
+    </ack_chain_summary>
+
+  </ack_chain_carried_forward>
+
+  <forward_carry_residual_risks_verbatim>
+
+    <intro>
+      Per g7-ea7_n14(c) requirement: rr1-rr8 enumerated VERBATIM. Source: `3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml`.
+    </intro>
+
+    <residual_risk_item id="rr1" priority="HIGH" status="OPEN">
+      Runtime behavior of platform tools post-MCP-repointing. Stage 4 EA-8 SHALL run an end-to-end MCP smoke test from devplatform context post-repointing. Item 4.11a satisfies.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr2" priority="HIGH" status="OPEN">
+      Cross-file consistency of path rewrites. Stage 4 EA-8 preflight SHALL grep `C:\\Users\\mrbla\\BlarAI\\` across `devplatform/.mcp.json` and `devplatform/.vscode/mcp.json` and assert zero matches. Items 4.4/4.5/4.6 verify-no-residual-blarai checks satisfy.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr3" priority="MEDIUM" status="OPEN">
+      State.json contamination at devplatform. Stage 4 EA-8 disposition: Decision A (reset to clean baseline) per g8-ea8_n1(n) Step 1.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr4" priority="LOW" status="OPEN" stage="5">
+      __pycache__ pollution. Stage 5 EA SHALL run `Remove-Item -Recurse devplatform/tools/**/__pycache__` before final verification.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr5" priority="MEDIUM" status="OPEN">
+      Anomaly A3 — `Agents Cadence Monitor` S4U elevation requirement. Per g8-ea8_n2(c) paste-relay carve-out: if EA-8's shell is non-elevated, single paste-relay to LA's on-demand elevated PowerShell. If EA-8's shell IS elevated, in-process Unregister/Register.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr6" priority="HIGH" status="PARTIALLY_PRE_RESOLVED">
+      Vikunja shutdown gate. PRE-RESOLVED — LA stopped Vikunja before Guide-#8 spawn. LA prep-4 attestation re-verifies. Item 4.1 Step (a) re-verifies defense-in-depth.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr7" priority="HIGH" status="OPEN">
+      Worktrees-empty precondition. EA-8 disposition: Item 4.0.5 verifies.
+    </residual_risk_item>
+
+    <residual_risk_item id="rr8" priority="MODERATE" status="OPEN" source="g7-ea7_n14(a)" new_at_stage_3_close="true">
+      devplatform working-tree drift (`M .gitignore` 7-line tail-block duplication). EA-8 disposition: Item 4.0.0 first-action sequence Steps 3+4.
+    </residual_risk_item>
+
+  </forward_carry_residual_risks_verbatim>
+
+  <forward_items_for_stage_5_verbatim>
+
+    <intro>
+      Per g7-ea7_n14(c) requirement: f5_1-f5_6 enumerated VERBATIM.
+    </intro>
+
+    <forward_item id="f5_1" status="OPEN">F-N5/F-N6/F-N7 path drifts deferred to Stage 5 EA fresh-eyes.</forward_item>
+    <forward_item id="f5_2" status="OPEN">F-N8 BlarAI/.vscode/tasks.json bridge entry cleanup.</forward_item>
+    <forward_item id="f5_3" status="OPEN" priority="HIGH">F-N10 Stage 5.6 testpaths-removal must include `tools/gate_stale_cleaner/tests`.</forward_item>
+    <forward_item id="f5_4" status="OPEN">Stage 5.1 chokepoint deletion requires concomitant test deletion (test_vikunja_client_scope.py, test_project_context.py).</forward_item>
+    <forward_item id="f5_5" status="OPEN" priority="LOW" source="g8-ea8_n1(m)" new_at_stage_4_audit="true">Devplatform .gitignore vikunja.db patterns preservation through Stage 5 cleanup.</forward_item>
+    <forward_item id="f5_6" status="OPEN" priority="LOW" source="g8-ea8_n1(c)" new_at_stage_4_audit="true">.pre_stage4_bak retention decision (recommend 14 days) at Stage 5 close.</forward_item>
+
+  </forward_items_for_stage_5_verbatim>
+
+  <stage_6_7_5_hardening_tickets>
+
+    <intro>
+      7 Stage 6.7.5 hardening tickets (A through G) currently OPEN. All REQUIRED per LA mature-not-minimal motto.
+    </intro>
+
+    <ticket id="A" priority="HIGH" status="OPEN">Consolidated locked-artifact amendments: typos + spec drifts; EA-numbering rewrite (`g7-ea1_n*` → `g7-ea7_n*`); audit-evidence MD cross-references in STATUS Closure Footnotes (incl. 4.0.v2 audit MDs).</ticket>
+    <ticket id="B" priority="LOW" status="OPEN">BlarAI README orphan cleanup post-Stage-5.</ticket>
+    <ticket id="C" priority="LOW" status="OPEN">devplatform fleet-hygiene refs cleanup.</ticket>
+    <ticket id="D" priority="LOW" status="OPEN">devplatform parallel-sprints ledger refs.</ticket>
+    <ticket id="E" priority="MED" status="OPEN">Stage 3.X audit-checkpoint posterity fold + 4 sub-items: (i) orphan VS Code task in devplatform/.vscode/tasks.json; (ii) copy_manifest_v2.yaml totals divergence notes; (iii) daily_digest --help text BlarAI staleness; (iv) co_lead_architect.md line 175 forward-slash state.json path.</ticket>
+    <ticket id="F" priority="LOW" status="OPEN_PARTIALLY_PRE_RESOLVED">Vikunja DB-path doctrine documentation. Partially pre-resolved by g8-ea8_n1(c) LA decision. Remaining: .vbs/.bat comments; RECOVERY.md Stage 4 rollback section; VERIFICATION_COMMANDS.md Stage 4 section; ADR.</ticket>
+    <ticket id="G" priority="LOW" status="OPEN">Scheduled-task XML python.exe absolute-path migration as long-term doctrine (n1(h) closes immediate risk).</ticket>
+
+  </stage_6_7_5_hardening_tickets>
+
+  <required_first_actions order_matters="true">
+
+    <action n="1" name="copilot_instructions_pre_flight">
+      Per `.github/copilot-instructions.md` §fleet_pause_sop: verify the fleet remains paused via the absolute-path command per g8-ea8_n1(b):
+      ```powershell
+      python -c "import json; print('PAUSED' if json.load(open(r'C:\Users\mrbla\BlarAI\tools\autonomy_budget\state.json'))['fleet_paused'] else 'RUNNING -- HALT')"
+      ```
+      Expected: `PAUSED`. Do NOT call `state.resume_fleet()` or `state.pause_fleet()` until Item 4.13.5 Step 2 (devplatform path per g8-ea8_n1(n)). Function-name reminder: `state.resume_fleet()` — NEVER `state.unpause_fleet()`.
+    </action>
+
+    <action n="2" name="confirm_la_pre_prep_attestations">
+      Confirm each `[ATTESTATION prep-N]` line was present in the LA's EA-8 spawn message:
+        - prep-1: VIKUNJA_TOKEN persisted User-scope
+        - prep-2: Other AI surfaces closed
+        - prep-3 REVISED: Elevated PowerShell on-demand capability confirmed (Win+X Admin available; Administrators group)
+        - prep-4: Vikunja stopped
+        - prep-5: Calendar blocked 4-12h
+        - prep-6: RECOVERY.md + ROLLBACK_NOVICE_GUIDE.md open
+        - prep-7: Backup anchors intact
+
+      If ANY attestation missing: STOP and request LA confirmation before proceeding.
+    </action>
+
+    <action n="3" name="v0_pickup_verification" revision="2_per_g8_ea8_n2_f_dropped_v0m_elevation">
+      Run V0a-V0n pickup verification block (14 checks; was 15 before n2(f) dropped V0m elevation since elevation is no longer required throughout Stage 4). Report all outputs in iter-1 gate.
+      ON ANY V0 FAILURE: STOP. Report which V0 check failed with actual observed value vs expected.
+
+      <V0a name="branch">`git rev-parse --abbrev-ref HEAD` → expected `chore/platform-extraction`</V0a>
+      <V0b name="head">`git log --oneline -5` → expected HEAD = the backfill commit (most recent commit on chore/platform-extraction at EA-8 spawn time; subsequent to 13231f0; recover actual hash via `git log --oneline -1`); parents 13231f0 (supplement-2 + revised init pointer) → 9d5fcd8 (original init pointer) → 134e17a (supplement-1) → 2c6be78 (base verdict) → b9a173d (Guide-#7→Guide-#8 handoff)</V0b>
+      <V0c name="status_count">`git status --porcelain` → expected empty (BlarAI clean)</V0c>
+      <V0d name="worktree">`git worktree list` → expected only main worktree</V0d>
+      <V0e name="stash">`git stash list` → expected stash@{0}: "On main: wake_launcher auto-stash sdo 20260424_013002" — 13+-cycle preservation. DO NOT POP / APPLY / DROP.</V0e>
+      <V0f name="state_json">`python -c "import json; s=json.load(open(r'C:\Users\mrbla\BlarAI\tools\autonomy_budget\state.json')); print(s['fleet_paused'], s['fleet_paused_reason'], s['last_updated_by'], s['last_updated_utc'])"` → expected `True "platform separation v2 in progress" copilot_agent 2026-04-24T20:46:12Z`. sha256 expected `71fc1a2f21177f2461a750d0239244e709cf1e228778c46a6e188cc50d2d5d19`.</V0f>
+      <V0g name="devplatform_branch_head">`cd C:\Users\mrbla\devplatform; git branch --show-current; git log --oneline -1` → expected `main`; HEAD `95884a0`</V0g>
+      <V0h name="devplatform_worktree_pre_cleanup">`cd C:\Users\mrbla\devplatform; git status --porcelain` → expected ` M .gitignore` (rr8 known-and-dispositioned; cleaned at Item 4.0.0 Step 3)</V0h>
+      <V0i name="vikunja_project_ids_yaml">`Test-Path C:\Users\mrbla\BlarAI\.platform\vikunja_project_ids.yaml; Get-Content C:\Users\mrbla\BlarAI\.platform\vikunja_project_ids.yaml` → expected True; contents include `blarai_project_id: 3`</V0i>
+      <V0j name="vikunja_token_user_scope">`[Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')` → expected token string ~43 chars (per LA prep-1). If empty: STOP and request LA re-do prep-1.</V0j>
+      <V0k name="vikunja_stopped">`Get-Process -Name "vikunja*" -ErrorAction SilentlyContinue` → expected empty (per LA prep-4)</V0k>
+      <V0l name="other_ai_surfaces_closed">`Get-Process -Name "Claude" -ErrorAction SilentlyContinue` → expected empty (per LA prep-2)</V0l>
+      <V0m name="schedule_tasks_count_disabled">`(Get-ScheduledTask -TaskPath '\BlarAI\').Count; Get-ScheduledTask -TaskPath '\BlarAI\' | Where-Object {$_.State -ne 'Disabled'}` → expected 13; second command empty</V0m>
+      <V0n name="backup_anchors">`Test-Path "C:\Users\mrbla\backups\BlarAI_pre_extract.bundle"; (Get-ChildItem "C:\Users\mrbla\backups\blarai_oog_*.zip").Count; (Get-ChildItem "C:\Users\mrbla\backups\scheduled_tasks_export\*.xml").Count` → expected True; 1; 13 (per LA prep-7)</V0n>
+    </action>
+
+    <action n="4" name="emit_iteration_1_comprehension_gate" revision="2_per_g8_ea8_n2_f">
+      Per the mandatory comprehension_gate at the top of `05_STAGE4_CUTOVER.xml`, emit iteration-1 comprehension gate as XML. Structure:
+
+        - meta block (stage_id=STAGE_4, ea_global_number=8, ea_stage_chain_position=1, iteration=1, branch=chore/platform-extraction, blarai_head=&lt;backfill commit; the latest commit on chore/platform-extraction at iter-1 gate emission time; recover via `git log --oneline -1`&gt;, devplatform_head=95884a0, predecessor_ea=stage_3_ea_7_retired, prepared_by_guide=Guide instance 8)
+
+        - la_pre_prep_attestation_recap (each `[ATTESTATION prep-N]` line confirmed; restate verbatim — note prep-3 is REVISED)
+
+        - pickup_verification_recap (V0a-V0n outputs from action 3)
+
+        - required_acknowledgments_carryforward_verbatim:
+            * 61 prior acks restated VERBATIM from Stage 3 init pointer
+            * 4 g7-ea7_n14(a-d) restated VERBATIM
+            * 16 g8-ea8_n1(a-p) restated VERBATIM (n1(a) annotated SUPERSEDED-BY-g8-ea8_n2(b); n1(h) Step 4 annotated REFINED-BY-g8-ea8_n2(c))
+            * 6 g8-ea8_n2(a-f) restated VERBATIM
+            Total: 77 ack labels (104 binding atoms with sub-clauses expanded). Each with status flag + source_file attribute.
+
+        - residual_risks_recap:
+            * rr1-rr8 restated VERBATIM
+            * f5_1-f5_6 restated VERBATIM
+            * 7 Stage 6.7.5 hardening tickets (A-G) enumerated
+
+        - comprehension_summary:
+            part_a_objective: complete Stage 4 cutover by repointing all MCP configs to devplatform; absolutizing devplatform Vikunja config; rewriting + re-enabling 13 scheduled tasks with shape-aware arg-injection + S4U paste-relay carve-out; rewriting Vikunja Startup .lnk + .vbs; smoke-testing devplatform-side MCP path; resetting devplatform state.json + resume_fleet; appending STATUS.md. Risk: HIGH. Single-session continuous-block.
+            part_b_work_plan: enumerate Items 4.0.0, 4.0 (NARROWED per n2(a)), 4.0.5, 4.0.6, 4.1, 4.2, 4.3, 4.4 (per n1(f)+(o)+(p)), 4.5/4.6, 4.6.5, 4.7 (per n1(h) + n2(c) Step 4), 4.7.5, 4.7.6, 4.7.7, 4.8, 4.8.v2, 4.9, 4.10, 4.11a [4.11b deferred], 4.12, 4.13, 4.13.5.
+            part_c_files_to_modify_or_create: enumerate per work_plan_pointer below.
+            part_d_verification_strategy: V0a-V0n COMPLETE; per-step verify per amended Item commands.
+            part_e_risks: HIGH stage. Active risks: rr1, rr5 (now via paste-relay carve-out), CC-4 (closed by n1(h)+n2(c)), CC-5 (closed by n1(n)), CC-1 (closed by n2(a) narrowed kill).
+            part_f_rollback_acknowledgment: verbatim "Stage 4 has 4-level rollback ladder per RECOVERY.md. I will NOT improvise rollback. If Item 4.11a smoke fails, do NOT execute Item 4.13.5 — fleet stays paused until rollback complete or fix-forward."
+            part_g_surface_confirmation (NEW per g8-ea8_n2(f)): "Confirming EA-8 runs in VS Code Copilot Opus 4.7 agent mode. Integrated terminal is the canonical execution surface for Stage 4 commands. Item 4.0 will use the g8-ea8_n2(a) NARROWED kill (verify LA prep-2 via Get-Process Claude empty + kill vikunja_mcp pythons via Get-CimInstance), NOT the spec's broader Stop-Process Claude,Code command. g8-ea8_n1(a) self-termination preflight gate is SUPERSEDED-BY-g8-ea8_n2(b) — EA-8 does NOT run that gate. Standalone PowerShell is NOT required for Stage 4 work; on-demand elevated PowerShell is required only at Item 4.7 paste-relay for Agents Cadence Monitor (S4U LogonType) per g8-ea8_n2(c)."
+
+        - stop_discipline: STOPPING. Awaiting Guide instance 8 review. No file edits, MCP repointing, scheduled task changes, .lnk/.vbs rewrites, commits, or fleet resume until explicit PROCEED authorization from Guide-#8.
+
+      Then STOP. Do not proceed to Item 4.0.0 work until Guide instance 8 reviews and approves iteration-1 gate.
+    </action>
+
+  </required_first_actions>
+
+  <work_plan_pointer authoritative_source="05_STAGE4_CUTOVER.xml + g8-ea8_n1 + g8-ea8_n2 amendments">
+
+    The Stage 4 XML is the procedural baseline; g8-ea8_n1(a-p) + g8-ea8_n2(a-f) sub-clauses are AMENDMENTS layered on top. Where spec text and amendment conflict, AMENDMENT WINS. Where spec text is unaffected, spec text governs.
+
+    Execution order (post-iter-1-APPROVAL):
+
+      Item 4.0.0 (NEW; per Guide-#8 supplement-1 §init_pointer_first_action_directive):
+        Step 1 — Load VIKUNJA_TOKEN process-scope (per n1(e) Part 0).
+        Step 2 — Verify the load.
+        Step 3 — devplatform .gitignore cleanup (per rr8 / g7-ea7_n14(a)).
+        Step 4 — Verify devplatform working tree clean.
+        Step 5 — proceed with Item 4.0 of Stage 4 XML (NARROWED per n2(a)).
+
+      Item 4.0 (NARROWED per g8-ea8_n2(a)):
+        Step 1 — verify LA prep-2 attestation honored: `Get-Process -Name "Claude"` → expected empty; throw if Claude.exe processes found.
+        Step 2 — kill vikunja_mcp python processes via Get-CimInstance Win32_Process (filter Name='python.exe'; Where CommandLine match 'vikunja_mcp'); Stop-Process -Id per-PID.
+        Step 3 — verify post-kill (no vikunja_mcp pythons remain).
+        DROPPED from spec: `Get-Process -Name "Claude","Code" | Stop-Process -Force` (CC-1 cascade source).
+        EA-8's own VS Code Copilot session preserved.
+
+      Item 4.0.5: re-verify worktrees-empty gate (BlarAI side). Spec command unchanged.
+
+      Item 4.0.6 (per g8-ea8_n1(b)): re-confirm fleet paused via absolute-path command.
+
+      Item 4.1 (LA-decided REWRITE per g8-ea8_n1(c)): execute the 6-step (a-f) flow verbatim from base verdict.
+
+      Item 4.2 (per g8-ea8_n1(d)): post-startup verification triad.
+
+      Item 4.3 (per g8-ea8_n1(e) Parts 0-3): Vikunja project enumerate REST. Token already loaded at Item 4.0.0 Step 1.
+
+      Item 4.4 (per g8-ea8_n1(f) + n1(o) + n1(p)): Claude Desktop MCP rewrite + filesystem expansion + trustedFolders expansion.
+
+      Item 4.5 (per g8-ea8_n1(g)): VS Code Copilot MCP config rewrite.
+
+      Item 4.6 (per g8-ea8_n1(g)): Claude Code MCP config rewrite.
+
+      Item 4.6.5: bridge daemon start. Spec command unchanged.
+
+      Item 4.7 (per g8-ea8_n1(h) Steps 1, 2, 3, 5, 6 + g8-ea8_n2(c) Step 4 refinement):
+        Steps 1-3 per n1(h): UTF-16 BOM strip, path substitutions, bare-WorkingDirectory rewrite, shape-aware arg-injection (Pattern A python-module / Pattern B powershell-script).
+        Step 4 per n2(c): for `Agents Cadence Monitor`, detect non-elevated; if non-elevated, emit paste-template to LA chat + record PASTE_RELAY_PENDING + pause per-task loop + await LA paste-back + verify pattern match + resume; if elevated, in-process Unregister/Register.
+        Steps 5-6 per n1(h): post-rewrite verify + LA elevated-shell carve-out (now operationally satisfied via n2(c) paste-relay).
+
+      Item 4.7.5 (per g8-ea8_n1(i)): wake-template path rewrite with both backslash + forward-slash patterns.
+
+      Item 4.7.6 (no amendment): PS1 line-by-line scan over 5 scripts.
+
+      Item 4.7.7 (per g8-ea8_n1(j)): Vikunja autostart enumerate with -ErrorAction SilentlyContinue + tightened regex.
+
+      Item 4.8: per-task enable + verify (LastTaskResult=0). If `Agents Cadence Monitor` was paste-relayed at Item 4.7 (PASTE_RELAY_PENDING marked SATISFIED), it's already registered; Enable-AndVerify-Task can fire from in-process.
+
+      Item 4.8.v2: confirm task count = 13.
+
+      Item 4.9 (per g8-ea8_n1(k)): widened gate condition + 3 .lnk properties rewrite + start_vikunja_hidden.vbs content rewrite.
+
+      Item 4.10: bridge re-verify.
+
+      Item 4.11 (per g8-ea8_n1(l)): split into 4.11a (EA-8 scriptable smoke; STAGE 4 EXIT CRITERION) + 4.11b (LA manual smoke; deferred).
+
+      Item 4.12 (per g8-ea8_n1(m)): commits with explicit allow-list staging.
+
+      Item 4.13: STATUS.md append on BlarAI side.
+
+      Item 4.13.5 (per g8-ea8_n1(n)): two-step reset+resume on devplatform path.
+
+      Closing handoff to LA: emit per `<closing_handoff_to_la_at_stage_4_close>` block.
+
+  </work_plan_pointer>
+
+  <stop_conditions inherited_from="Stage_3_Guide_7 + Stage_4_Guide_8_specifics + supplement_2">
+    <condition>If V0a-V0n pickup verification surfaces drift beyond the expected, STOP. Report which V0 check failed with actual vs expected.</condition>
+    <condition>If any LA pre-prep `[ATTESTATION prep-N]` line is missing, STOP and request LA confirmation. Do NOT proceed without all 7 attestations (note prep-3 is REVISED).</condition>
+    <condition>If Item 4.0.0 Step 1 VIKUNJA_TOKEN load returns empty AND `[Environment]::GetEnvironmentVariable('VIKUNJA_TOKEN', 'User')` also returns empty, STOP. LA prep-1 was incomplete.</condition>
+    <condition>If Item 4.0.0 Step 4 verify clean tree FAILS, STOP. Investigate further drift before proceeding.</condition>
+    <condition>If Item 4.0 Step 1 (per n2(a)) finds Claude.exe processes still running (LA prep-2 not honored), STOP. Request LA close Claude Desktop before re-running Item 4.0.</condition>
+    <condition>If Item 4.0 Step 3 (per n2(a)) finds vikunja_mcp pythons still running post-kill, STOP. Investigate before continuing (file locks not released).</condition>
+    <condition>If Item 4.1 Step (e) Vikunja unreachable within 30s, STOP. Rollback per amended Item 4.1 rollback. Fleet stays paused.</condition>
+    <condition>If Item 4.2 (i) `tools/vikunja/vikunja.db` accidentally created at devplatform post-startup, STOP. Investigate Vikunja resolution behavior with LA.</condition>
+    <condition>If Item 4.2 (ii) project count below 10, STOP.</condition>
+    <condition>If Item 4.3 returns empty project list OR auth fails (Parts 0/1/2/3 fallbacks exhausted), STOP.</condition>
+    <condition>If Items 4.4/4.5/4.6 verify-no-residual-blarai check returns ANY match, STOP.</condition>
+    <condition>If Item 4.7 per-task verify FAILS (missing devplatform python OR missing project args/BlarAIRoot), STOP per-task. Do NOT proceed to Item 4.8 with partial fleet.</condition>
+    <condition>If Item 4.7 reaches `Agents Cadence Monitor` and EA-8 shell is non-elevated (per n2(c)), pause per-task loop + emit paste-template to LA. NOT a stop-condition; this is the n2(c) paste-relay carve-out — EA-8 awaits LA paste-back, verifies, resumes.</condition>
+    <condition>If Item 4.7 paste-relay verify FAILS (LA-pasted output does not match expected pattern `'Agents Cadence Monitor.*Disabled.*S4U'`), STOP. Request LA re-execution OR escalation to direct registration.</condition>
+    <condition>If Item 4.8 LastTaskResult ≠ 0 for any task, auto-disable that task. STOP if 2+ tasks fail.</condition>
+    <condition>If Item 4.9 widened gate finds NO candidate .lnk matching BlarAI references, STOP. Vikunja autostart .lnk SHOULD exist.</condition>
+    <condition>If Item 4.11a smoke test FAILS, STOP. Do NOT execute Item 4.13.5 — fleet stays paused.</condition>
+    <condition>If Item 4.12 git status post-stage shows unexpected files, STOP and selectively `git reset HEAD <file>` before commit.</condition>
+    <condition>If Item 4.13.5 verify Step 3 returns `True` (fleet still paused after resume), STOP.</condition>
+    <condition>If context budget tightens DANGEROUSLY mid-Stage-4, STOP and request LA disposition. Do NOT self-handoff.</condition>
+    <condition>If you discover any procedural defect mid-execution, STOP and report. NO inline-fix.</condition>
+    <condition>If any unexpected drift class surfaces beyond the 22 g8-ea8_n1 + n2 sub-clauses, STOP and report.</condition>
+  </stop_conditions>
+
+  <forbidden inherited_from="Stage_3_do_not_lists + Stage_4_specifics + supplement_2">
+    <prohibition>Do NOT merge chore/platform-extraction (BlarAI) to main during Stage 4. Merge gate is Stage 5.10 with explicit LA approval per R10.</prohibition>
+    <prohibition>Do NOT git stash pop / git stash apply / git stash drop on BlarAI's stash@{0}.</prohibition>
+    <prohibition>Do NOT edit CLAUDE.md, AGENTS.md, .github/copilot-instructions.md (BlarAI side) or any A1-A14 governance doc. V8 / Stage 6.1.v2 deferred.</prohibition>
+    <prohibition>Do NOT call state.pause_fleet() or state.resume_fleet() at any point during Items 4.0.0 through 4.13.4. The ONLY authorized resume invocation is Item 4.13.5 Step 2 against the devplatform path per g8-ea8_n1(n). Function-name: `state.resume_fleet`, NEVER `state.unpause_fleet`.</prohibition>
+    <prohibition>Do NOT MOVE the Vikunja DB. Per LA architectural decision g8-ea8_n1(c): DB stays at %LOCALAPPDATA%\Vikunja\.</prohibition>
+    <prohibition>Do NOT spawn subagents. Stage 4 is single-session continuous-block; subagent capability is not part of the EA-8 surface. Guide-#8 handles subagents at Stage 4 close.</prohibition>
+    <prohibition>Do NOT mid-stage handoff. Stage 4 is single-session per Master Plan §10. If context tightens, STOP and request LA disposition.</prohibition>
+    <prohibition>Do NOT skip the LA pre-prep attestation verification (action 2). All 7 [ATTESTATION prep-N] lines must be present (note prep-3 is REVISED per n2(d)).</prohibition>
+    <prohibition>Do NOT skip Item 4.0.0 Steps 1-4 first-action sequence.</prohibition>
+    <prohibition>Do NOT run the spec's Item 4.0 `Get-Process -Name "Claude","Code" | Stop-Process -Force` command. Per g8-ea8_n2(a), this is NARROWED to vikunja_mcp-only kill. Running the spec's broader command would trigger CC-1 self-termination cascade for EA-8's own VS Code Copilot session.</prohibition>
+    <prohibition>Do NOT execute g8-ea8_n1(a) self-termination preflight gate. Per g8-ea8_n2(b): n1(a) is SUPERSEDED. EA-8 runs in VS Code Copilot agent mode natively; no descended-from-Claude/Code parent check needed.</prohibition>
+    <prohibition>Do NOT inline-fix any spec defect or amendment defect mid-execution. Locked artifacts. Report to LA + Guide-#8 for verdict-cycle disposition.</prohibition>
+    <prohibition>Do NOT delete or modify the .pre_stage4_bak files created during Stage 4. Stage 4 rollback anchors. Stage 5 EA decides retention per f5_6.</prohibition>
+    <prohibition>Do NOT commit the Vikunja DB. Per g8-ea8_n1(m) gitignore augmentation.</prohibition>
+    <prohibition>Do NOT commit unauthorized files via bare `git add .`. Use explicit allow-list staging per g8-ea8_n1(m).</prohibition>
+    <prohibition>Do NOT use the audit-subagent's RECOMMENDED_DISPOSITION text directly where g8-ea8_n1 + n2 sub-clause text differs. Verdicts win.</prohibition>
+    <prohibition>Do NOT relabel binding acks with new IDs or reuse SATISFIED ack labels for new work. The 77-ack predecessor chain is fixed; only NEW g8-ea8_n3+ acks may be introduced via Guide-#8 verdict cycle if new drift classes surface.</prohibition>
+    <prohibition>Do NOT confuse legacy `g7-ea1_n*` labels with corrected `g7-ea7_n*` convention. Per no-amend doctrine.</prohibition>
+    <prohibition>Do NOT trust your own paraphrase. Independent disk verification on every claim; verbatim restatement from source files.</prohibition>
+    <prohibition>Do NOT treat Class D ("cosmetic") amendments as skippable. Per LA mature-not-minimal motto.</prohibition>
+    <prohibition>Do NOT begin Item 4.13.5 if Item 4.11a smoke test failed.</prohibition>
+    <prohibition>Do NOT execute n2(c) paste-relay carve-out at any task other than `Agents Cadence Monitor`. The paste-relay is scoped to that one S4U LogonType task only. All other 12 tasks at Item 4.7 run in-process.</prohibition>
+  </forbidden>
+
+  <closing_handoff_to_la_at_stage_4_close>
+
+    On Stage 4 completion (Item 4.13.5 done), final closing handoff to LA must include (NOTE: produce as XML file at `docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE4_CLOSING.xml` OR as concise chat report, at LA discretion):
+
+      - Stage 4 commit hashes (BlarAI + devplatform + STATUS append)
+      - Vikunja DB sha256 (pre-cutover, post-startup, +5s post-startup)
+      - Vikunja project count post-cutover
+      - Per-task LastTaskResult table for all 13 tasks
+      - Bridge daemon PID + CommandLine
+      - Item 4.11a smoke test result
+      - Item 4.11b deferred LA manual smoke (noted for post-Stage-4 LA action)
+      - LA pre-prep attestation summary (each prep-N reaffirmed; note prep-3 REVISED)
+      - g8-ea8_n1 + n2 sub-clauses status (each marked SATISFIED at Item N)
+      - Item 4.7 S4U paste-relay outcome: in-process (if elevated) OR paste-relay-completed (if non-elevated; LA pasted Unregister+Register output back; verify PASS)
+      - rr1-rr8 status updates
+      - f5_5 + f5_6 reaffirmed for Stage 5
+      - Any new A15+ anomalies recorded in BlarAI STATUS.md
+      - Any new drift classes that surfaced beyond g8-ea8_n1 + n2
+      - Confirmation: 13 BlarAI scheduled tasks ENABLED + LastTaskResult=0; Vikunja running from devplatform binary; bridge daemon running from devplatform; all 3 MCP configs repointed; .vbs + .lnk rewritten; fleet UNPAUSED at devplatform state.json
+      - Backup files created (.pre_stage4_bak): list paths for Stage 5 EA reference
+      - Recommendation to LA: Stage 4 close triple-subagent verification (Guide-#8 spawns S1 + S2 + S3 mirroring Stage 3.10 pattern)
+
+    EA-8 STOPs after emitting closing handoff. Guide-#8 reviews + spawns triple-subagent verification + synthesizes Stage 4 close verdict. LA confirms COMPLETE. Then Stage 5 EA spawn (separate fresh-EA spawn).
+
+  </closing_handoff_to_la_at_stage_4_close>
+
+</ea_initiation>

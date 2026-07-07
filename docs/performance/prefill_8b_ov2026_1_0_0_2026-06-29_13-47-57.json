@@ -1,0 +1,47 @@
+{
+  "harness": "benchmark_prefill",
+  "model_name": "8b",
+  "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-8b\\openvino-int4-gpu",
+  "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+  "openvino_version": "2026.1.0-21367-63e31528c62-releases/2026/1",
+  "config": {
+    "lengths": [
+      512,
+      2048,
+      8192
+    ],
+    "repeats": 5,
+    "prefix_caching": false,
+    "draft": null,
+    "do_sample": false
+  },
+  "results": {
+    "512": {
+      "target_len": 512,
+      "actual_tokens_mean": 512,
+      "prefill_ms_median": 471.5,
+      "pp_mean": 1023.5,
+      "pp_median": 1085.9,
+      "pp_std": 156.8,
+      "n": 5
+    },
+    "2048": {
+      "target_len": 2048,
+      "actual_tokens_mean": 2048,
+      "prefill_ms_median": 2859.2,
+      "pp_mean": 782.3,
+      "pp_median": 716.3,
+      "pp_std": 108.7,
+      "n": 5
+    },
+    "8192": {
+      "target_len": 8192,
+      "actual_tokens_mean": 8192,
+      "prefill_ms_median": 13837.8,
+      "pp_mean": 580.0,
+      "pp_median": 592.0,
+      "pp_std": 32.0,
+      "n": 5
+    }
+  }
+}

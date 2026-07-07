@@ -1,0 +1,690 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_prompt version="1.0" task="121" ea_number="4" authored_by="sdo" authored_at="2026-04-22">
+
+  <!--
+    BlarAI — EA Code Execution Prompt
+    Sprint 9 / Task 121: Governance Documentation Sprint — EA-4: Ops, Deployment, Rule Engine
+    Branch: feature/p5-task9-ea4-ops-deployment-rules
+    Ledger path (Q1-1 per-file convention — 2026-04-22):
+      docs/ledger/<YYYYMMDD_HHMMSS>_sprint9_ea4_ops-deployment-rules.md
+    Predecessor ledger_id: 20260422_203647_sprint9_ea3_operational-state
+
+    IMPORTANT (L-12): Before ANY work begins, the EA MUST post a comprehension gate
+    comment on Vikunja Task 121 prefixed [agent:ea_code][phase:comprehension] and STOP.
+    Do not start implementation until SDO explicitly approves with
+    [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+
+    IMPORTANT (L-15): This is a PURE DOCUMENTATION milestone.
+    DO NOT modify any file outside docs/. If a code defect is discovered during
+    research, record it in the completion report and open a Vikunja ticket. Do NOT
+    modify services/, shared/, launcher/, tests/, or pyproject.toml.
+  -->
+
+  <!-- ===== SECTION 1: PARENT HEAD (L-13) ===== -->
+
+  <parent_head>ad311ac</parent_head>
+  <!-- Verified by SDO via `git rev-parse HEAD` immediately before authoring this prompt.
+       Full HEAD: ad311ac ([agent:co_lead] report: completion Phase 2 auto-merge for Task 82
+       EA-3 and Task 121 EA-3). Sprint 9 EA-3 governance docs (GOV-08/09/11) are merged to
+       main. EA MUST verify this matches the current main HEAD before branching. If HEAD has
+       advanced, use the current main HEAD. -->
+
+  <!-- ===== SECTION 2: COMPREHENSION GATE (L-12) ===== -->
+
+  <comprehension_gate>
+    <instruction>
+      READ THIS ENTIRE PROMPT before posting your comprehension gate.
+      Then READ every file listed in required_attachments.
+      Then POST a comprehension gate comment on Vikunja Task 121, prefixed:
+
+        [agent:ea_code][phase:comprehension]
+
+      Your comprehension comment MUST contain ALL of the following sections (verbatim
+      section headers required, in this exact order):
+
+        A. MILESTONE OBJECTIVE (in your own words, 3-5 sentences)
+        B. WORK ITEMS (one sentence each for ALL 4 WIs)
+        C. FILES TO CREATE (list all 3 governance docs + ledger entry with exact paths)
+        D. FILES TO READ (all source files you will research for each doc)
+        E. DELIVERABLE STRUCTURE (recite VERBATIM: branch name; each doc filename and
+           its six STYLE.md section headers; ledger path + frontmatter)
+        F. ORACLE EXPECTATION (recite the exact git diff command and expected output
+           showing ONLY docs/ paths)
+        G. SOURCE ANCHORING PLAN (for each doc: the ADR(s) and at least 2 source files
+           you will anchor against — cite exact repo-relative paths)
+        H. MATURE-NOT-MINIMAL ACKNOWLEDGMENT (one sentence, 150-line floor cited)
+        I. RISKS AND AMBIGUITIES (address each risk I.1–I.6 from this prompt)
+        J. PRODUCTION CODE PROHIBITION ACKNOWLEDGMENT (quote the L-15 prohibition verbatim)
+
+      After posting, STOP. Do NOT proceed to implementation until you receive
+      [agent:sdo][phase:comprehension-review] VERDICT: APPROVED.
+    </instruction>
+  </comprehension_gate>
+
+  <!-- ===== SECTION 3: MILESTONE ===== -->
+
+  <milestone>
+    <objective>
+      Author three governance documents completing the Sprint 9 operations/deployment/rule-engine
+      triad: docs/governance/observability.md (GOV-12: logging strategy, event classification,
+      audit trail, error-fingerprinting), docs/governance/deployment-verification.md (GOV-13:
+      pre-deployment checks, evidence artifacts, rollback procedures), and
+      docs/governance/rule-engine.md (GOV-14: deterministic rule set, CAR schema enforcement,
+      semantic-distance threshold, fail-closed semantics). Each doc conforms to the STYLE.md
+      seven-header Doc Template, clears the 150-line substantive floor, cites at least one
+      ADR and at least one source file, and addresses all five audience personas. Plus one
+      per-file ledger entry per Q1-1 convention. No production code is modified.
+    </objective>
+    <sprint>9</sprint>
+    <ea_number>4</ea_number>
+    <branch>feature/p5-task9-ea4-ops-deployment-rules</branch>
+    <ledger_path>docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea4_ops-deployment-rules.md</ledger_path>
+    <ledger_frontmatter>
+      <![CDATA[
+---
+ledger_id: <YYYYMMDD_HHMMSS>_sprint9_ea4_ops-deployment-rules
+date: <YYYY-MM-DD>
+sprint_id: 9
+entry_type: EA
+predecessor: 20260422_203647_sprint9_ea3_operational-state
+branch: feature/p5-task9-ea4-ops-deployment-rules
+merge_commit: null
+disposition: COMPLETE
+---
+      ]]>
+    </ledger_frontmatter>
+    <sizing>M</sizing>
+    <depends_on>
+      EA-3 merged to main. Verified: merge commit d26a111 (feature/p5-task9-ea3-operational-state),
+      auto-merged by Co-Lead. Three governance docs on main: context-spotlighting.md,
+      session-state.md, configuration-management.md. If main has advanced further,
+      use the current main HEAD.
+    </depends_on>
+  </milestone>
+
+  <!-- ===== SECTION 4: WORK ITEMS ===== -->
+
+  <work_items>
+
+    <item id="WI-1" priority="HIGH" source="continuation_xml §5 EA-4 + SDV §5.1 item 10 + Vikunja GOV-12 (#25)">
+      <title>Author docs/governance/observability.md — Observability &amp; Logging Strategy Governance</title>
+      <detail>
+        File: docs/governance/observability.md (CREATE NEW)
+        Vikunja ticket: #25 (GOV-12)
+        Expected length: ~400+ lines per SDV §9.2 note. This is the broadest-scope doc
+        in the triad; do not truncate it.
+
+        STYLE.md seven-header structure (VERBATIM headers required):
+          # Observability &amp; Logging Strategy Governance
+          ## Audience
+          ## Prerequisites
+          ## Source References
+          ## Governance Content
+          ## Recovery / Remediation Procedures
+          ## Open Questions / Deferred Items
+
+        Per STYLE.md §line-count floor: Recovery / Remediation Procedures MAY be merged
+        into Governance Content if no externally triggered failure mode exists for this
+        domain (observability tooling has no recovery ceremony). Omit the section if
+        merging is cleaner; do not leave a stub.
+
+        Required content (derive from source files; never invent):
+          1. Log level taxonomy: what constitutes DEBUG / INFO / WARNING / ERROR / CRITICAL
+             in BlarAI service components. Map each level to event examples from source.
+          2. Log destinations: stdout (current runtime); file sinks if configured;
+             any structured vs plain text format decisions.
+          3. Sensitive-data filtering: what is redacted from logs (PII, secrets, tokens,
+             prompts). Cite pgov.py and transport.py source for what is and is not logged.
+          4. Per-subsystem event classification:
+             - PA adjudication logging: what events, fields, codes appear in logs
+               (cite deterministic_policy_checker.py and car.py).
+             - AO generation logging: what events appear during model inference,
+               circuit-breaker trips, PGOV evaluation (cite ao/entrypoint.py and pgov.py).
+             - IPC logging: what is logged at send/receive boundaries in transport.py;
+               what is omitted for privacy.
+             - Service lifecycle: startup/shutdown events, fail-closed logs
+               (cite runtime_config.build_failure_fingerprint — this is the canonical
+               error-fingerprinting taxonomy: stage, code, message, disposition="FAIL",
+               fail_closed="true").
+          5. Error fingerprinting classification: the build_failure_fingerprint() dict
+             structure as the authoritative audit trail format. List all known error codes
+             across services (P5_*, P6_*, UAT2_*, CFG_* prefixes from source).
+          6. Performance instrumentation: any timing or throughput logging present in source
+             (tokens per second logs in model inference, latency logs at IPC boundary).
+          7. Health-check metrics: what check_pa_status() and equivalent calls produce in logs.
+          8. Audit trail: who produces the audit trail (Policy Agent adjudication log),
+             what it contains (car_hash, decision, confidence, request_id), where it goes.
+          9. Operator guidance: how to read logs in practice, what patterns indicate
+             healthy vs degraded operation.
+
+        Source files to anchor against (read all before writing):
+          services/policy_agent/src/deterministic_policy_checker.py (PA decision logging)
+          services/policy_agent/src/entrypoint.py (service lifecycle logs)
+          services/assistant_orchestrator/src/entrypoint.py (AO lifecycle logs)
+          services/assistant_orchestrator/src/pgov.py (PGOV evaluation log events)
+          services/ui_gateway/src/transport.py (IPC boundary logging; privacy omissions)
+          shared/src/runtime_config.py (build_failure_fingerprint structure + codes)
+          launcher/__main__.py (activation evidence, prompt-flow evidence logging)
+          launcher/guest_deploy.py (deployment evidence logging, error codes)
+
+        ADRs to cite:
+          ADR-011 (GPU inference on Arc 140V) — governs what model-inference events exist
+          ADR-010 (PA classification on GPU) — governs PA audit trail events
+          If no ADR directly governs logging format, cite ADR-010/ADR-011 as the
+          load-bearing ADRs and document the ADR-absence in Open Questions.
+
+        Phantom reference warning: docs/governance/boot-sequence.md does NOT exist.
+        Per STYLE.md §Cross-Doc References, do NOT reference it. If source files
+        cite a boot-sequence governance doc, note the phantom gap in Open Questions.
+      </detail>
+    </item>
+
+    <item id="WI-2" priority="HIGH" source="continuation_xml §5 EA-4 + SDV §5.1 item 11 + Vikunja GOV-13 (#26)">
+      <title>Author docs/governance/deployment-verification.md — Deployment Verification &amp; Rollback Governance</title>
+      <detail>
+        File: docs/governance/deployment-verification.md (CREATE NEW)
+        Vikunja ticket: #26 (GOV-13)
+        Expected length: ~200-300 lines (rollback procedure complexity; may run longer).
+
+        STYLE.md seven-header structure:
+          # Deployment Verification &amp; Rollback Governance
+          ## Audience
+          ## Prerequisites
+          ## Source References
+          ## Governance Content
+          ## Recovery / Remediation Procedures
+          ## Open Questions / Deferred Items
+
+        IMPORTANT: This doc HAS externally triggered failure modes and rollback procedures.
+        The Recovery section is REQUIRED and substantive — do not merge it into Governance Content.
+
+        Required content (derive from source files; never invent):
+          1. Pre-deployment checks: what deploy_guest_runtime() validates before starting —
+             vsock topology check, guest runtime config validation for both services
+             (cite guest_deploy.py _validate_vsock_topology, _validate_guest_runtime_configs;
+             list all 8 vsock failure branches + 2 config failure codes).
+          2. Runtime-artifact deployment: how the deployment bundle is built
+             (build_bundle()), what files it includes, how they are copied to the VM
+             (cite guest_deploy.py build/copy steps; error codes P5_BUNDLE_BUILD_FAILED,
+             P5_COPY_BUNDLE_FAILED, P5_COPY_BOOTSTRAP_FAILED).
+          3. Model-artifact deployment: where Qwen3-14B files are expected; the fallback
+             model (Qwen2.5-1.5B retained per ADR-012 §5) and when it activates.
+          4. Deployment-evidence artifacts: the evidence.json file written by
+             _record_activation_evidence(); structure (disposition, stage, code, timestamp);
+             where it is written; how Co-Lead and LA verify it.
+          5. Smoke-test execution: _run_uat2_prompt_flow_preflight() as the deployment
+             smoke test; what it validates (gateway handshake, session creation, token
+             streaming, pgov evaluation); success/failure reporting.
+          6. Deployment timeout: any timeouts in the deployment flow (read __main__.py
+             and guest_deploy.py for timeout constants).
+          7. Automatic rollback: what happens on deployment failure (fail-closed: process
+             exits with code 1 via the error-code return; _cleanup() atexit stops services
+             and VM if started).
+          8. Manual emergency rollback: operator steps to return to known-good state:
+             (a) kill any running BlarAI process; (b) verify VM state via Hyper-V manager
+             or PowerShell; (c) if VM is corrupt, stop VM and re-run deployment from scratch.
+          9. Model rollback per ADR-012 §5: how to switch from Qwen3-14B to Qwen2.5-1.5B
+             if the primary model fails. Document the config change required.
+          10. Deployment-audit trail: evidence.json + activation evidence file; location;
+              retention policy (if any from source).
+
+        Source files to anchor against:
+          launcher/guest_deploy.py (full deployment flow; all error codes; evidence writing)
+          launcher/__main__.py (_run_uat2_prompt_flow_preflight; _cleanup; main flow)
+          launcher/vm_manager.py (VM start/stop; is_admin check; request_elevation)
+          shared/src/constants.py (VSOCK constants used in vsock validation)
+
+        ADRs to cite:
+          ADR-012 §5 — model rollback procedure (Qwen2.5-1.5B fallback)
+          ADR-011 — GPU inference mandate (motivates why deployment must verify GPU path)
+          If ADR-012 does not explicitly cover deployment verification, note in Open Questions.
+
+        Cross-reference: link to [observability.md](observability.md) for the
+        deployment evidence logging format. Link to [gpu-runtime.md](gpu-runtime.md)
+        for model rollback procedure context.
+      </detail>
+    </item>
+
+    <item id="WI-3" priority="HIGH" source="continuation_xml §5 EA-4 + SDV §5.1 item 12 + Vikunja GOV-14 (#27)">
+      <title>Author docs/governance/rule-engine.md — Rule Engine &amp; CAR Validation Governance</title>
+      <detail>
+        File: docs/governance/rule-engine.md (CREATE NEW)
+        Vikunja ticket: #27 (GOV-14)
+        Expected length: ~200 lines (narrowest-scope doc per SDV; GOV-14 is rated LOW→MEDIUM
+        severity in the sprint plan). Substantive content must clear 150-line floor.
+
+        STYLE.md seven-header structure:
+          # Rule Engine &amp; CAR Validation Governance
+          ## Audience
+          ## Prerequisites
+          ## Source References
+          ## Governance Content
+          ## Recovery / Remediation Procedures
+          ## Open Questions / Deferred Items
+
+        Recovery / Remediation Procedures may be merged into Governance Content if no
+        externally triggered failure mode exists beyond the standard fail-closed DENY
+        (which is already governance behavior, not a recovery procedure). Use judgement;
+        do not stub.
+
+        Required content (derive from source; never invent):
+          1. Deterministic rule set: the complete set of rules implemented in
+             deterministic_policy_checker.py. Read source to enumerate all rules
+             (regex patterns, action-verb restrictions, ESCALATE triggers). List them
+             in a table with: rule type, pattern/condition, verdict on match (DENY/ESCALATE).
+          2. Deterministic-before-LLM ordering: per ADR-010, deterministic checks run
+             BEFORE the probabilistic LLM classifier. Document why (latency, explainability,
+             fail-closed guarantee). Cite ADR-010 explicitly.
+          3. Fail-closed semantics: a DENY from any single rule terminates adjudication
+             immediately; ESCALATE routes to probabilistic classifier. Document the exact
+             flow (cite deterministic_policy_checker.py and car.py check call).
+          4. CAR schema enforcement: the is_complete() check that rejects incomplete CARs
+             before rule evaluation. Document what "complete" means (source_agent,
+             destination_service, resource, request_id populated). Cite car.py.
+          5. Semantic-distance metric and threshold: the cosine-similarity threshold for
+             the probabilistic classifier (0.85 from pgov.py / test fixtures — verify in
+             source). Document what it measures and what happens at/near the boundary.
+          6. Example CARs: construct 2-3 synthetic examples (one ALLOW, one DENY, one
+             ESCALATE) in a code block illustrating rule evaluation. Use realistic fields
+             from the ActionVerb and Sensitivity enums in car.py.
+          7. Per-action-verb rules: document any verb-specific rule behavior visible in
+             deterministic_policy_checker.py (e.g., EGRESS always triggers a stricter path,
+             if present in source).
+          8. Rule authoring and versioning: how new rules are added (code change in
+             deterministic_policy_checker.py); no runtime hot-reload; rule changes require
+             service restart; version tracked via git commit.
+          9. Performance budget: latency of the deterministic checker (pure Python, no GPU;
+             expected sub-millisecond; cite any test timing if present in source).
+          10. Rule-debugging procedures: how an operator or developer diagnoses an unexpected
+              DENY or ESCALATE (read adjudication logs; check car_hash in DecisionArtifact;
+              re-run with known-good CAR).
+
+        Source files to anchor against:
+          services/policy_agent/src/deterministic_policy_checker.py (REQUIRED — full read;
+            all rules enumerated; fail-closed flow)
+          services/policy_agent/src/car.py (is_complete(); CAR validation call site)
+          shared/schemas/car.py (CAR schema definition; ActionVerb enum; Sensitivity enum;
+            canonical_hash semantics)
+          services/assistant_orchestrator/src/pgov.py (cosine threshold; retrieval leakage
+            semantic distance check — cross-reference to pgov-validation.md)
+
+        ADRs to cite:
+          ADR-010 — PA classification on GPU; deterministic-before-LLM mandate
+          If no other ADR directly governs the rule engine, cite ADR-010 exclusively
+          and document completeness in Prerequisites.
+
+        Cross-reference: link to [pgov-validation.md](pgov-validation.md) for the
+        full PGOV pipeline context. Link to [ipc-protocol.md](ipc-protocol.md) for
+        CAR wire format. Do NOT reference boot-sequence.md (phantom per STYLE.md).
+      </detail>
+    </item>
+
+    <item id="WI-4" priority="MEDIUM" source="Q1-1 ledger convention (2026-04-22)">
+      <title>Author per-file ledger entry for EA-4</title>
+      <detail>
+        File: docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea4_ops-deployment-rules.md (CREATE NEW)
+        Timestamp: UTC, second-resolution, at EA execution time.
+        Predecessor: 20260422_203647_sprint9_ea3_operational-state
+
+        Required frontmatter (VERBATIM — from milestone section above):
+          ledger_id, date, sprint_id=9, entry_type=EA, predecessor, branch,
+          merge_commit=null, disposition=COMPLETE.
+
+        Body structure (mirror the final entries in docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+        and the Sprint 9 EA-3 ledger entry for format reference):
+          ## Summary
+          ## Deliverables
+          ## Files Changed
+          ## Quality Gate
+          ## Notes (if any)
+
+        Minimum 50 substantive lines in the body. Document doc titles, line counts,
+        ADRs cited, source files anchored, any non-blocking findings or scope deviations.
+
+        Read before writing:
+          docs/ledger/20260422_203647_sprint9_ea3_operational-state.md (predecessor — exact format)
+          docs/ledger/README.md (per-file convention requirements)
+      </detail>
+    </item>
+
+  </work_items>
+
+  <!-- ===== SECTION 5: NEGATIVE CONSTRAINTS ===== -->
+
+  <negative_constraints>
+
+    <constraint id="NC-1">
+      <rule>L-15 PURE DOCUMENTATION MANDATE</rule>
+      <detail>
+        Zero production source files may be modified. Specifically: NO edits to
+        services/**, shared/**, launcher/**, tests/**, or pyproject.toml. If source
+        research reveals a code defect, record it in the completion report and open
+        a Vikunja ticket. Do NOT fix it in this EA.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-2">
+      <rule>No retroactive edits to EA-1/EA-2/EA-3 docs</rule>
+      <detail>
+        Do NOT modify docs/governance/pgov-validation.md, ipc-protocol.md,
+        streaming-output.md (EA-1), gpu-runtime.md, error-recovery.md, circuit-breaker.md
+        (EA-2), or context-spotlighting.md, session-state.md, configuration-management.md
+        (EA-3). Forward-references and cross-links from EA-4 docs INTO prior docs are
+        ALLOWED; retroactive edits are NOT.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-3">
+      <rule>Per-file ledger convention (Q1-1, 2026-04-22)</rule>
+      <detail>
+        Do NOT append to docs/POST_OPERATIONAL_MATURATION_LEDGER.md (frozen at Entry 52).
+        Write a NEW per-file entry at docs/ledger/&lt;YYYYMMDD_HHMMSS&gt;_sprint9_ea4_ops-deployment-rules.md.
+        Predecessor: 20260422_203647_sprint9_ea3_operational-state.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-4">
+      <rule>No phantom reference creation</rule>
+      <detail>
+        docs/governance/boot-sequence.md does NOT exist and must NOT be created in this EA
+        (deferred to GOV-15 per SDV §5.2 item 4). If source files reference it, cite the
+        phantom gap in Open Questions. Do NOT backfill the phantom.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-5">
+      <rule>No migration of docs/TEST_GOVERNANCE.md</rule>
+      <detail>
+        Do NOT move, modify, or reference docs/TEST_GOVERNANCE.md as a migration target.
+        That migration is deferred to GOV-MIGRATE (post-Sprint 8 close) per SDV §5.2 item 3.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-6">
+      <rule>No new ADRs</rule>
+      <detail>
+        Governance docs cite existing ADRs. Do NOT create new ADR files in docs/adrs/.
+        If a governance decision discovered during research lacks an ADR, document the gap
+        in Open Questions and open a Vikunja ticket.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-7">
+      <rule>L-16 Sprint 8 coexistence</rule>
+      <detail>
+        Sprint 8 writes services/*/tests/** and shared/tests/**. Sprint 9 writes
+        docs/governance/**. Working sets are disjoint. Do NOT touch any test file
+        in this EA.
+      </detail>
+    </constraint>
+
+    <constraint id="NC-8">
+      <rule>Scope-limited to three named docs + ledger</rule>
+      <detail>
+        Write ONLY: docs/governance/observability.md, docs/governance/deployment-verification.md,
+        docs/governance/rule-engine.md, and the per-file ledger entry. Do not author
+        additional governance docs outside this EA's scope (GOV-15 and GOV-MIGRATE are
+        post-sprint-close items).
+      </detail>
+    </constraint>
+
+  </negative_constraints>
+
+  <!-- ===== SECTION 6: RISKS AND AMBIGUITIES ===== -->
+
+  <risks>
+
+    <risk id="I.1">
+      <topic>boot-sequence.md phantom reference in GOV-12/GOV-13 source</topic>
+      <resolution>
+        GOV-12 and GOV-13 ticket bodies may reference boot-sequence.md as if it exists.
+        Per STYLE.md §Cross-Doc References: do NOT create it; do NOT link to it. If a
+        source file you are anchoring against references a boot-sequence governance doc,
+        cite the source file and add a note to Open Questions: "boot-sequence.md is a
+        phantom reference deferred to GOV-15 (Vikunja #124)." This is the correct
+        handling established in STYLE.md by EA-1.
+      </resolution>
+    </risk>
+
+    <risk id="I.2">
+      <topic>GOV-12 ADR absence for logging format</topic>
+      <resolution>
+        No ADR directly governs BlarAI's logging format or observability strategy.
+        Per STYLE.md §Source Anchoring: cite the closest-relevant ADRs (ADR-010 and
+        ADR-011 produce the most logging events) and document the ADR-absence explicitly
+        in the Prerequisites section and in Open Questions. Do NOT skip the ADR citation.
+        This matches EA-2's precedent for GOV-06 (error handling) and GOV-11 (config
+        management) ADR-absence handling.
+      </resolution>
+    </risk>
+
+    <risk id="I.3">
+      <topic>GOV-13 deployment timeout constant discovery</topic>
+      <resolution>
+        If no explicit deployment timeout constant is found in launcher/__main__.py or
+        guest_deploy.py, document the observation: "No explicit deployment timeout
+        constant is present in source; the deployment flow will run until success or
+        process error. This is a governance gap: a timeout should be added in a
+        future sprint." Open a Vikunja ticket for the gap. Do NOT invent a timeout value.
+      </resolution>
+    </risk>
+
+    <risk id="I.4">
+      <topic>GOV-14 rule enumeration — source-authoritative rule count</topic>
+      <resolution>
+        Enumerate ALL rules in deterministic_policy_checker.py at pickup; do NOT
+        trust any prior summary or audit finding for the exact rule count or pattern text.
+        Source is authoritative. If the count differs from what was described in a prior
+        EA completion report, trust source and note the discrepancy in Open Questions.
+      </resolution>
+    </risk>
+
+    <risk id="I.5">
+      <topic>GOV-12 sensitive-data logging — what is currently redacted vs logged</topic>
+      <resolution>
+        If source does NOT implement explicit PII redaction in logging (i.e., prompt text
+        or token content appears in logs), document this as a governance gap in Open
+        Questions and open a Vikunja ticket. Do NOT assume redaction exists that does not.
+        The governance doc describes ACTUAL behavior, not aspirational behavior. A gap
+        finding is valuable; fiction is not.
+      </resolution>
+    </risk>
+
+    <risk id="I.6">
+      <topic>Audience persona applicability</topic>
+      <resolution>
+        GOV-12 (observability) primarily serves: developer, operator, incident responder.
+        GOV-13 (deployment) primarily serves: operator, incident responder.
+        GOV-14 (rule engine) primarily serves: developer, auditor.
+        Claim at most 2-3 personas per doc per STYLE.md §Audience Taxonomy. A doc claiming
+        all 5 is too broad. Each doc's Audience section names its 2-3 primary personas.
+      </resolution>
+    </risk>
+
+  </risks>
+
+  <!-- ===== SECTION 7: QUALITY GATES ===== -->
+
+  <quality_gate>
+
+    <gate id="LINE-FLOOR">
+      Each governance doc must be &gt;= 150 lines:
+        cd C:\Users\mrbla\BlarAI
+        Get-Content docs/governance/observability.md | Measure-Object -Line
+        Get-Content docs/governance/deployment-verification.md | Measure-Object -Line
+        Get-Content docs/governance/rule-engine.md | Measure-Object -Line
+      Minimum: 150 lines per doc. If under, justify in the completion report.
+    </gate>
+
+    <gate id="STYLE-CONFORMANCE">
+      Each doc must have the six STYLE.md headers (or five if Recovery is merged):
+        grep "^##" docs/governance/observability.md
+        grep "^##" docs/governance/deployment-verification.md
+        grep "^##" docs/governance/rule-engine.md
+      Expected headers per doc: Audience, Prerequisites, Source References,
+      Governance Content, [Recovery / Remediation Procedures], Open Questions / Deferred Items.
+    </gate>
+
+    <gate id="SOURCE-ANCHOR">
+      Each doc must cite at least 1 ADR and 1 source file:
+        grep -l "docs/adrs" docs/governance/observability.md
+        grep -l "services\|shared\|launcher" docs/governance/observability.md
+      (Repeat for the other two docs.) Absence of either citation is a gate failure.
+    </gate>
+
+    <gate id="ORACLE">
+      Verify no production files were modified:
+        git diff main...feature/p5-task9-ea4-ops-deployment-rules --name-only | grep -vE "^docs/"
+      Expected output: EMPTY. Any services/, shared/, launcher/, tests/ path in the
+      filtered diff is an L-15 violation. STOP and report.
+    </gate>
+
+    <gate id="REGRESSION">
+      Sprint 8 test baseline must be unaffected:
+        cd C:\Users\mrbla\BlarAI
+        .venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q
+      Expected: &gt;= 962 passed, 2 skipped (Sprint 8 EA-3 baseline). Sprint 9 commits
+      MUST NOT cause a regression per SDV §4 success criterion 5.
+    </gate>
+
+  </quality_gate>
+
+  <!-- ===== SECTION 8: VERIFICATION (for Lead Architect) ===== -->
+
+  <verification>
+    <description>
+      Verbatim terminal commands the Lead Architect can run to confirm success.
+      Run from C:\Users\mrbla\BlarAI in PowerShell.
+    </description>
+
+    <step id="V-1">
+      <command>ls docs/governance/*.md</command>
+      <expected>
+        All 10 EA-1/EA-2/EA-3 docs present (pgov-validation.md, ipc-protocol.md,
+        streaming-output.md, gpu-runtime.md, error-recovery.md, circuit-breaker.md,
+        context-spotlighting.md, session-state.md, configuration-management.md, STYLE.md)
+        PLUS new: observability.md, deployment-verification.md, rule-engine.md.
+        Total: 13 files.
+      </expected>
+    </step>
+
+    <step id="V-2">
+      <command>Get-Content docs/governance/observability.md | Measure-Object -Line</command>
+      <expected>Lines >= 150 (SDV §9.2 suggests ~400+).</expected>
+    </step>
+
+    <step id="V-3">
+      <command>git diff main...feature/p5-task9-ea4-ops-deployment-rules --name-only | Select-String -NotMatch "^docs/"</command>
+      <expected>Empty output. ORACLE gate verification.</expected>
+    </step>
+
+    <step id="V-4">
+      <command>.venv\Scripts\pytest shared/ services/ launcher/ --tb=short -q</command>
+      <expected>At least 962 passed, 2 skipped. Sprint 8 baseline unaffected.</expected>
+    </step>
+
+  </verification>
+
+  <!-- ===== SECTION 9: COMMIT TEMPLATE ===== -->
+
+  <commit_template>
+    <format>docs(task121/ea4): Sprint 9 governance docs — observability, deployment-verification, rule-engine (GOV-12/13/14)</format>
+    <rules>
+      - Commit ONLY files under docs/governance/ and docs/ledger/.
+      - Do NOT commit production source files, test files, or pyproject.toml.
+      - Single commit covering all 3 docs + ledger entry.
+    </rules>
+  </commit_template>
+
+  <!-- ===== SECTION 10: MATURE NOT MINIMAL ===== -->
+
+  <mature_not_minimal>
+    <directive>
+      Each governance doc must be substantively complete — not just a bullet-list
+      expansion of the GOV ticket. Substance means: source-anchored behavior description,
+      operator-actionable procedures, concrete examples where applicable.
+
+      Within-scope adjacent work (authorized without additional SDO approval, &lt;= 1h):
+      - While writing GOV-14, you discover a rule in deterministic_policy_checker.py
+        not mentioned in the GOV ticket. Include it in the rule table.
+      - While writing GOV-12, you discover a log event pattern in transport.py not
+        covered by the ticket description. Document it.
+      - Correcting a minor factual inaccuracy in a cross-reference to a prior EA doc
+        (a forward-reference you add in GOV-12 that links to a section header that
+        needs to exist in observability.md) — create the target section.
+
+      Out of scope (requires SDO sign-off):
+      - Creating docs outside the three named WI files.
+      - Retroactively editing EA-1/EA-2/EA-3 docs.
+
+      Per SDV §5.3: 150-line floor is a minimum, not a ceiling. If substantive
+      coverage of a domain naturally runs to 300+ lines, write the 300 lines.
+    </directive>
+  </mature_not_minimal>
+
+  <!-- ===== SECTION 11: REQUIRED ATTACHMENTS ===== -->
+
+  <required_attachments>
+
+    <file path="docs/P5_TASK9_SDO_CONTINUATION_v1.0.xml"
+          sections="§5 ea_decomposition EA-4 block (lines 352-376), §6 lessons_learned, §7 ea_prompt_guidelines"
+          reason="Authoritative SDO continuation; EA-4 scope contract"/>
+
+    <file path="docs/sprints/sprint_9/strategic_design_vision.md"
+          sections="§5.1 items 10-12 (EA-4 scope), §5.2 Out-of-scope, §5.3 mature-not-minimal, §4 Success Criteria"
+          reason="Strategic alignment baseline"/>
+
+    <file path="docs/governance/STYLE.md"
+          reason="REQUIRED — seven-header Doc Template, line-count floor, source-anchoring rules, audience taxonomy, phantom-reference policy"/>
+
+    <file path="docs/ledger/20260422_203647_sprint9_ea3_operational-state.md"
+          reason="Predecessor ledger — format reference; content precedent"/>
+
+    <file path="docs/ledger/README.md"
+          reason="Per-file ledger convention (Q1-1, 2026-04-22)"/>
+
+    <file path="docs/governance/configuration-management.md"
+          reason="EA-3 style reference — closest precedent for a medium-scope doc with ADR-absence handling"/>
+
+    <file path="docs/governance/circuit-breaker.md"
+          reason="EA-2 style reference — ADR-absence handling precedent (GOV-07)"/>
+
+    <file path="services/policy_agent/src/deterministic_policy_checker.py"
+          reason="REQUIRED for WI-3 (GOV-14) — full rule set enumeration; fail-closed flow; ESCALATE triggers"/>
+
+    <file path="services/policy_agent/src/car.py"
+          reason="Required for WI-3 (GOV-14) — is_complete() call site; CAR validation at rule-engine entry"/>
+
+    <file path="shared/schemas/car.py"
+          reason="Required for WI-3 (GOV-14) — CAR schema definition; ActionVerb, Sensitivity, AdjudicationDecision enums"/>
+
+    <file path="services/assistant_orchestrator/src/pgov.py"
+          reason="Required for WI-3 (GOV-14) — cosine threshold; retrieval leakage semantic-distance check"/>
+
+    <file path="services/policy_agent/src/entrypoint.py"
+          reason="Required for WI-1 (GOV-12) — PA service lifecycle logging events"/>
+
+    <file path="services/assistant_orchestrator/src/entrypoint.py"
+          reason="Required for WI-1 (GOV-12) — AO service lifecycle logging events"/>
+
+    <file path="services/ui_gateway/src/transport.py"
+          reason="Required for WI-1 (GOV-12) — IPC boundary logging; privacy omissions"/>
+
+    <file path="shared/src/runtime_config.py"
+          reason="Required for WI-1 (GOV-12) — build_failure_fingerprint structure; error-fingerprinting taxonomy"/>
+
+    <file path="launcher/__main__.py"
+          reason="Required for WI-1 (GOV-12) and WI-2 (GOV-13) — activation evidence; deployment flow; _cleanup; preflight"/>
+
+    <file path="launcher/guest_deploy.py"
+          reason="Required for WI-2 (GOV-13) — full deployment flow; evidence writing; error codes; rollback semantics"/>
+
+    <file path="launcher/vm_manager.py"
+          reason="Required for WI-2 (GOV-13) — VM lifecycle (start, stop, state); request_elevation for rollback"/>
+
+    <file path="shared/src/constants.py"
+          reason="Required for WI-2 (GOV-13) — vsock constants used in topology verification"/>
+
+  </required_attachments>
+
+</ea_prompt>

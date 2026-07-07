@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response>
+  <verdict>APPROVED</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <stage_xml>03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+  <reviewed_at_utc>2026-04-26T00:30:00Z</reviewed_at_utc>
+  <guide_instance>6</guide_instance>
+  <iteration>1</iteration>
+  <responding_to>
+    <ea_artifact>docs/platform_separation/temp_for_responses/2.6-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE2.xml</ea_artifact>
+    <ea_instance>5</ea_instance>
+  </responding_to>
+
+  <summary>
+    Iteration 1 of Stage 2 Executor Agent (EA) instance 5 comprehension-gate review. Verdict:
+    APPROVED on iteration 1 -- rare for HIGH-risk stage and warranted here. Pickup verification
+    (V0a-V0k) all 11/11 PASS with the canonical pre-flight n=1 PASS (fleet still paused with
+    original metadata preserved). Independent re-verification by Guide instance 6 against
+    current disk state matches EA-5's claims exactly: HEAD = 9277d61 with parents d0c6df1 +
+    9d17e7f; git status --porcelain reports 32 entries (21 M + 2 D + 9 ??) -- byte-identical
+    breakdown to EA-5's V0c output; stash@{0} timestamp 20260424_013002 byte-identical;
+    state.json shows fleet_paused=true with last_updated_by="copilot_agent" and
+    last_updated_utc="2026-04-24T20:46:12Z" preserved (no resume_fleet/pause_fleet cycle this
+    session). The 5 v4 documentation corrections (D1-D5) from Guide-#5's v4 quality review are
+    all restated VERBATIM with explicit EA-5 acknowledgment per defect. The 33 binding acks
+    are restated VERBATIM from chain-of-custody source files with proper file path + block
+    reference citations on every group; the math (9 + 3 + 4 + 7 + 4 + 2 + 4 = 33) is correct;
+    f1 disposition is correctly enumerated as g5-5 not as a separate ack. Status flags are
+    applied per init pointer ack_status_at_v4_emission table. Comprehension summary parts
+    a/b/d/e/f are comprehensive: part_a_objective restates Items 2.6 → 2.10 with full
+    sub-deliverable detail and invariants; part_b_work_plan enumerates Item 2.6's 4
+    deliverables with execution-order rationale (4→2→3→1) and proceeds through 2.7, 2.7.v2,
+    2.8, 2.9, 2.10; part_e_risks lists 11 descriptive risk labels with reference anchors per
+    g4-6 (compound labels with reference prefixes are correctly used per Guide-#5 standing
+    reminder); part_f_rollback_acknowledgment is verbatim from EA-3 iter-2 / EA-4 iter-1
+    template per Stage 2 XML &lt;rollback&gt; mandate. Stop discipline is correct (no Item 2.6
+    work, no branch creation, no commits, no state.json mutation, no resume/pause cycles).
+    The two open questions to Guide-#6 are well-framed -- the o1 evidence-artifact-form question
+    correctly recognizes the "treat-as-hypothesis" framing per LA + init pointer guidance, and
+    the 2.6-deliverable-order question correctly surfaces a tactical confirm-or-override
+    decision. All 8 axes from GUIDE_PROMPT.xml v2.1 ea_comprehension_gate_review pass:
+    objective_match, work_item_coverage, file_scope, verification_strategy, risk_awareness,
+    rollback_awareness, pre_flight_discipline, hard_rules. Zero substantive corrections
+    required. EA-5 may proceed to Item 2.6 deliverable 4 (observation o1 routing decision)
+    immediately after acknowledging the answers to its two open questions below.
+  </summary>
+
+  <required_corrections>
+    <!-- Empty: zero corrections. EA-5 iteration-1 is APPROVED as-is. -->
+  </required_corrections>
+
+  <independent_disk_verification_of_ea5_claims>
+    <intro>
+      Per LA's "mature not minimal" mandate (p3 + p16) and dn14 (do NOT trust EA reports
+      without disk verification), Guide instance 6 independently re-ran the V0 pickup commands
+      at review time to confirm no drift between EA-5's observed state and live disk state.
+    </intro>
+    <check id="git_log_3" verdict="MATCH">
+      Guide-6 observed: 9277d61 (HEAD), d0c6df1, 9d17e7f.
+      EA-5 V0b observed: 9277d61, d0c6df1, 9d17e7f.
+      EXACT MATCH.
+    </check>
+    <check id="git_status_porcelain_count_and_breakdown" verdict="MATCH">
+      Guide-6 observed via `git status --porcelain | awk '{print $1}' | sort | uniq -c`:
+        9 ??
+        2 D
+       21 M
+      Total 32 entries. EA-5 V0c observed: 32 entries (21 M + 2 D + 9 ??). EXACT MATCH on
+      count, type tally, and full file enumeration in EA-5's breakdown block.
+    </check>
+    <check id="git_stash_list" verdict="MATCH">
+      Guide-6 observed: stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002.
+      EA-5 V0g observed: identical timestamp 20260424_013002.
+      EXACT MATCH. Stash byte-identical to v4 emission and predecessor instances.
+    </check>
+    <check id="state_json_invariants" verdict="MATCH">
+      Guide-6 observed: fleet_paused=true; fleet_paused_reason="platform separation v2 in progress";
+      last_updated_by="copilot_agent"; last_updated_utc="2026-04-24T20:46:12Z".
+      EA-5 V0f observed: identical. EXACT MATCH. No resume_fleet/pause_fleet cycle this
+      session per ack n=2 + i1-2.
+    </check>
+    <check id="ack_chain_arithmetic" verdict="VERIFIED">
+      EA-5 D2 acknowledgment + total block claims 9 + 3 + 4 + 7 + 4 + 2 + 4 = 33. Arithmetic:
+      9+3=12; 12+4=16; 16+7=23; 23+4=27; 27+2=29; 29+4=33. CORRECT. f1 = g5-5 (not separately
+      enumerated) is consistent with Guide-#5 disposition file
+      2.4-GUIDE_RESPONSE_INSTANCE_5_F1_DISPOSITION_OPTION_A.xml
+      required_acknowledgments_for_ea_4_to_emit_pre_fix block (which lists g5-5 as the f1
+      disposition ack).
+    </check>
+    <check id="d1_d5_corrections_restated_verbatim" verdict="VERIFIED">
+      Cross-checked D1, D2, D3, D4, D5 in EA-5 gate against the corresponding entries in the
+      init pointer's &lt;v4_documentation_corrections_required&gt; block. Verbatim match on
+      v4_claimed text, correct_per_actual / actual text, and ea_5_acknowledgment text reflects
+      the correction without paraphrase or omission. The fictitious "PS1 alias attribute order"
+      g5-8 is explicitly rejected in EA-5's D1 ack (line 79 of EA-5 gate). Cleaner.py is
+      correctly characterized as the substantive g5-3 Option (b) ~44 LOC implementation in
+      EA-5's D3 ack. f1 is correctly characterized as body-rejection-condition extension +
+      tests, not signature/routing, in EA-5's D4 ack.
+    </check>
+    <check id="ack_source_citations" verdict="VERIFIED">
+      Each ack group in EA-5's required_acknowledgments_carryforward_verbatim_33_total block
+      cites a source_file attribute pointing to the correct chain-of-custody file (per init
+      pointer D2 correction). 9 critical_carryovers + 3 g3 + 4 i1 cite
+      2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml. 7 g4 cite both that file plus
+      2.4-GUIDE_RESPONSE_TO_EA_INITIALIZATION_03_STAGE2_REFACTOR_MULTIPROJECT.xml. 4 g5-1..g5-4
+      cite 2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_2.4_PARTIAL.xml. 2 g5-5/g5-6 cite
+      2.4-GUIDE_RESPONSE_INSTANCE_5_F1_DISPOSITION_OPTION_A.xml. 4 g5-7..g5-10 cite
+      2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_F1_AND_2.5_WITH_ADJUSTMENTS.xml. ALL
+      sources match the init pointer's documented chain-of-custody.
+    </check>
+  </independent_disk_verification_of_ea5_claims>
+
+  <axis_assessment>
+    <axis name="objective_match" verdict="PASS">
+      EA-5 part_a_objective restates Stage 2 Items 2.6 → 2.7 → 2.7.v2 → 2.8 → 2.9 → 2.10 with
+      full sub-deliverable detail. Branch chore/platform-extraction, single-commit-at-2.9 head
+      discipline, fleet pause invariance, stash byte-identity, Vikunja stopped, scheduled
+      tasks Disabled, no merge to main, no governance edits all explicitly captured. Aligns
+      with Stage 2 XML &lt;objective&gt; + &lt;scope&gt; + the v4 work_remaining block.
+    </axis>
+    <axis name="work_item_coverage" verdict="PASS">
+      All Stage 2 work items remaining enumerated: 2.6 (4 deliverables: extended grep + o1
+      routing + g5-4 legacy disposition + D3 closure), 2.7 (pytest gate + V1-V7 + V8), 2.7.v2
+      (V matrix V4-V7 NEW tests authoring), 2.8 ($BLARAI_PID hard gate), 2.9 (single Stage-2
+      commit; pyproject.toml MUST be in commit), 2.10 (append-only STATUS with all required
+      inclusions per g5-10 + the v4 documentation correction footnote per D2 of v4 quality
+      review). No items dropped or merged.
+    </axis>
+    <axis name="file_scope" verdict="PASS">
+      All file paths correct (cross-checked against v4 + init pointer + Guide-#5 dispositions):
+        - file 13 (file refactored at 2.4 closure, §D.1 hardened) = tools/vikunja_mcp/server.py ✓
+        - new chokepoint = tools/_vikunja_client.py ✓
+        - legacy (2.6 deliverable 2 disposition target) = tools/fleet_observability/_vikunja_client.py ✓
+        - D3 closure target = tools/fleet_observability/dashboard_maintainer.py:113 ✓
+        - 6 modified PS1 files all enumerated correctly with inverted-alias note for test_async_post_gate ✓
+        - 9 ?? entries enumerated correctly ✓
+      EA-5 honors dn18 path-confusion prohibition by citing full paths whenever discussing
+      tools/_vikunja_client.py vs tools/fleet_observability/_vikunja_client.py (e.g., D1
+      ack restatement, g5-6 ack restatement, part_e_risks dn18 risk label).
+    </axis>
+    <axis name="verification_strategy" verdict="PASS">
+      V0a-V0k pickup verification COMPLETE this session, all 11/11 PASS (recap is comprehensive).
+      Per-deliverable verification at 2.6 explicit (grep tabulation pre/post, before/after diffs,
+      o1 documented rationale, pytest re-runs after each substantive edit). V1-V7 closure
+      committed at 2.7 per i1-3. Per-item V8 defaults-preservation committed for 2.6-touched
+      files. V matrix V4-V7 NEW tests authoring at 2.7.v2 with AST-driven probe pattern at
+      scripts/verify_25_v2.ps1 cited as precedent reference for V5.
+    </axis>
+    <axis name="risk_awareness" verdict="PASS">
+      11 descriptive risk labels surfaced in part_e_risks with reference anchors (compound
+      label pattern per Guide-#5 standing reminder). All Item-2.6-relevant risks named:
+      w15-legacy-file-disposition, w17-D3-closure, w16-o1-structural-decision,
+      w12-multi-file-disk-verification, w13-single-commit-discipline, C6-extended-grep-coverage,
+      C2-stage-6-deferral, i1-4-mid-stage-handoff, w3-blarai-pid-preflight-watch + g4-5,
+      dn18-path-confusion, dn19-defect-vs-scope-expansion. Compound labels disambiguate from
+      the source IDs they reference. No bare-numeric labels.
+    </axis>
+    <axis name="rollback_awareness" verdict="PASS">
+      part_f_rollback_acknowledgment restates per Stage 2 XML &lt;rollback&gt; mandate:
+      "git reset --hard HEAD~1 on chore/platform-extraction (level-1 per RECOVERY.md;
+      branch is local, not pushed). Fleet stays disabled -- no runtime impact from rollback."
+      Mandatory acknowledgment for HIGH-risk Stage 2 per GUIDE_PROMPT.xml ea_comprehension_gate_review
+      axis="rollback_awareness".
+    </axis>
+    <axis name="pre_flight_discipline" verdict="PASS">
+      pre_flight_action_n1 verified fleet_paused=True. EA-5 explicitly committed in
+      &lt;fleet_state_invariants_preserved&gt; meta line + &lt;stop_discipline&gt; closing block
+      that no state.resume_fleet() / pause_fleet() calls this session. Original
+      last_updated_by="copilot_agent" + last_updated_utc="2026-04-24T20:46:12Z" preserved
+      (verified by Guide-#6 disk re-check). Function-name reminder embedded in D4 + ack n=2 +
+      stop_discipline references.
+    </axis>
+    <axis name="hard_rules" verdict="PASS">
+      Master Plan §D.1 (Vikunja project_id HARD RULE) explicitly anchored throughout the
+      ack restatement (n=6: list_tasks/search_tasks MUST receive int project_id; bool rejected;
+      g5-5: chokepoint helper rejection condition extended for &lt;= 0). Single-commit at 2.9
+      with pyproject.toml MUST be in commit (i1-3). No-merge-to-main during Stage 2 (n=3).
+      stash@{0} untouched (n=4). No governance doc edits (n=5). All 33 binding acks restated
+      VERBATIM with explicit source_file attributes per ack group. dn18 path-confusion
+      prohibition honored throughout. The 5 v4 documentation corrections (D1-D5) restated
+      VERBATIM with explicit ea_5_acknowledgment per defect.
+    </axis>
+  </axis_assessment>
+
+  <answer_to_ea_open_question id="o1_evidence_artifact_form">
+    <ea_question_recap>
+      Init pointer + Lead Architect surface o1 as "treat-as-hypothesis; surface evidence and
+      decide on its merits" rather than rubber-stamp Guide-#6's chokepoint-alone recommendation.
+      EA-5 default = lightweight (a) code comment at top of tools/vikunja_mcp/server.py + (b)
+      closing handoff narrative. Heavier alternative = dedicated evidence XML in
+      temp_for_responses/ before code change. Confirm lightweight or override to heavy.
+    </ea_question_recap>
+    <answer>
+      APPROVE EA-5's default lightweight choice (a) + (b). Reasons:
+      (1) Single-source-of-truth principle: the artifact that affects code is the code comment;
+          the handoff narrative is the human-readable summary the LA reads at Stage 2 close.
+          A separate XML adds a third copy of the same rationale with no incremental analytical
+          depth.
+      (2) Procedural-overhead minimization: a dedicated evidence XML would itself be a
+          mid-procedure docs-only artifact, sitting between EA-5's iteration-1 gate and the
+          actual code change. Per i1-4 + dn15, the only docs-only commits permitted between
+          ack-emission and Item 2.9 are v(N+1) mid-stage handoff XMLs at context-exhaustion
+          threat. A pre-decision evidence XML would not be a mid-stage handoff but a
+          procedural deliverable -- close enough to violate the spirit of i1-4 and add review
+          overhead.
+      (3) "Mature not minimal" applies to depth of analysis, not artifact volume. The LA's
+          mandate (p3 + p16) is satisfied by independent disk verification of server.py +
+          chokepoint + 5 defensive guards + tests, not by emitting a separate XML.
+      (4) Pattern reference: Guide-#5 disposition 4 (`2.4-GUIDE_RESPONSE_INSTANCE_5_VERIFICATION_OF_EA_4_2.4_COMPLETE.xml`)
+          already documents the o1 framework. Guide-#6's chokepoint-only recommendation lives
+          in the init pointer (`<work_plan_pointer>` deliverable 4 block). EA-5's code comment
+          + closing handoff narrative completes the audit chain at the appropriate level
+          (decision attached to code; rationale summary attached to closing handoff).
+
+      Required content for the lightweight artifacts:
+        Code comment at top of tools/vikunja_mcp/server.py:
+          - Cite this Guide-#6 review file (2.6-GUIDE_RESPONSE_INSTANCE_6_ITERATION_1_APPROVED_EA_5.xml)
+            and the init pointer (2.6-EA_INITIALIZATION_INSTANCE_5_STAGE2_RESUME_AT_ITEM_2.6.xml)
+            as source for the o1 decision.
+          - State the decision: chokepoint-only (B) OR handler-guards-defense-in-depth (A).
+          - State the evidence basis (3-5 sentences): which files were read, what the existing
+            5 defensive guards look like, whether removing them would weaken any test, whether
+            keeping them would produce duplicated error messages or deferred validation.
+          - State the disposition: which guards retained / which removed / why.
+        Closing handoff narrative section "o1 routing decision":
+          - One paragraph repeating the decision + rationale at LA-readable level (no code
+            references; outcome-focused).
+
+      Override condition: if EA-5's deliverable-4 reading surfaces evidence that DIVERGES from
+      Guide-#6's chokepoint-only recommendation (e.g., a test would break, or removing a
+      guard would defer validation past the MCP-handler-invocation boundary), document the
+      DIVERGE in both artifacts (a) and (b) -- still no separate XML required. EA-5 may
+      proceed to write the comment + narrative based on the actual evidence, whichever
+      direction it points.
+    </answer>
+    <next_action>EA-5 may proceed with default lightweight (a) + (b) artifact set. No separate evidence XML required.</next_action>
+  </answer_to_ea_open_question>
+
+  <answer_to_ea_open_question id="2_6_deliverable_order">
+    <ea_question_recap>
+      EA-5 proposes 2.6 deliverable execution order 4 → 2 → 3 → 1 (D4 structural decision
+      first; D2 g5-4 disposition second; D3 D3-closure third routed through whichever method
+      D4 selected; D1 extended grep last as a verification net catching anything D2/D3 missed).
+      Init pointer's recommended order was D1 → D4 → D2 → D3 (extended grep first as
+      pre-change inventory; then D4; then D2; then D3). Confirm 4-then-2-then-3-then-1 or
+      override to 1-then-4-then-2-then-3.
+    </ea_question_recap>
+    <answer>
+      APPROVE EA-5's proposed 4 → 2 → 3 → 1 order with one tactical recommendation. Reasons:
+      (1) Both orderings are defensible. Init pointer's 1-then-4-then-2-then-3 prioritizes
+          the audit-pass-before-decisions framing (you know the violation landscape before
+          deciding D2/D3 disposition specifics). EA-5's 4-then-2-then-3-then-1 prioritizes
+          the structural decision first (D4 affects D2/D3 design choices) and uses D1 as a
+          verification net.
+      (2) EA-5's natural workflow during D4 execution requires re-reading tools/vikunja_mcp/server.py
+          end-to-end + tools/_vikunja_client.py + the 5 defensive guards + tests. That reading
+          IMPLICITLY surfaces the same chokepoint-violation patterns the explicit grep would
+          catch. Same for D2's reading of legacy fleet_observability/_vikunja_client.py + 6
+          callers. Same for D3's reading of dashboard_maintainer.py:113 + related private-method
+          patterns. The implicit-grep-during-reading inventory is largely complete BEFORE D1
+          fires explicitly.
+      (3) D1 as final verification net is a STRONG defense -- it ensures D2/D3 didn't introduce
+          new violations AND catches anything the natural-reading pass missed.
+      (4) Per LA p11 (guided expertise): EA-5 has thought through the ordering and presented
+          a defensible rationale. Accepting EA-5's choice respects the EA's analytical
+          discipline rather than imposing tactical micromanagement.
+
+      Tactical recommendation (NOT required, advisory only): when reading server.py +
+      chokepoint + 5 defensive guards during D4 prep, run a quick mental tabulation of any
+      patterns that look chokepoint-violation-adjacent (e.g., direct httpx imports, raw
+      requests calls, api/v1/ path fragments outside the chokepoint). If any surface during
+      this pass, note them so D2/D3 dispositions can address them inline rather than waiting
+      for D1's explicit pass to catch them. This isn't a re-ordering of D1 -- it's a
+      "implicit-grep-while-you-read" optimization that doesn't add a discrete deliverable.
+    </answer>
+    <next_action>EA-5 may proceed with 4 → 2 → 3 → 1 order. Optional: implicit-grep-while-reading during D4 prep.</next_action>
+  </answer_to_ea_open_question>
+
+  <observations_for_audit>
+    <observation id="o5" topic="EA-5 risk-label hygiene shows mature pattern adoption">
+      EA-5's part_e_risks uses compound labels like "w15-legacy-file-disposition",
+      "dn18-path-confusion", "i1-4-mid-stage-handoff" -- exactly the descriptive-label-with-
+      reference-prefix pattern Guide-#5 standing reminder approved. No bare numeric labels;
+      no V1/V8/R5 collisions with AUDIT_RISK_REVIEW source IDs. This is the mature pattern
+      the procedure has been converging on for 4 iterations.
+    </observation>
+    <observation id="o6" topic="EA-5 correctly preserved upstream verbatim text in i1-2 ack">
+      EA-5's i1-2 ack restates "10 acknowledgments above (9 from predecessor + 3 from Guide
+      instance 3, deduped)" -- which is the verbatim text from the EA-3 iter-2 gate
+      (2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml line 58). The arithmetic
+      reading "10 vs 9+3=12" is a pre-existing nuance from the EA-3 iter-2 gate (likely
+      reflecting some EA-3-side dedup logic at that time). EA-5 correctly preserved verbatim
+      and did NOT try to "fix" the upstream text, honoring i1-2 dedup discipline + dn9
+      (do NOT modify predecessor handoff briefs in git history).
+    </observation>
+    <observation id="o7" topic="EA-5 D5 acknowledgment is appropriately measured">
+      EA-5's D5 acknowledgment says "I will re-read the actual on-disk PS1 scripts directly
+      if I need the canonical pattern (e.g., for any 2.7.v2 V matrix V5 test authoring)" --
+      this is the right discipline for a cosmetic-only correction. EA-5 doesn't over-correct
+      by demanding a separate evidence artifact for the phantom-decorator finding, just commits
+      to disk-verification-on-demand. Mature.
+    </observation>
+  </observations_for_audit>
+
+  <required_acknowledgments>
+    <!--
+      EA-5 has already restated all 33 binding acks verbatim + acknowledged D1-D5 corrections
+      in iteration-1. The two "answer_to_ea_open_question" answers above are for the LA to
+      relay; no further EA-5 acknowledgment block is required before EA-5 begins Item 2.6
+      deliverable 4 work. EA-5 may emit a brief "I acknowledge Guide-#6 answers to o1
+      evidence-artifact-form (lightweight) and 2.6 deliverable order (4-then-2-then-3-then-1
+      with implicit-grep-while-reading optional)" in the EA chat as procedural courtesy, but
+      this is not a binding gate -- EA-5 may proceed directly to deliverable 4 work.
+    -->
+  </required_acknowledgments>
+
+  <standing_reminders_for_ea_5_during_execution>
+    <reminder>Single Stage-2 commit at item 2.9 only; pyproject.toml MUST be in that commit;
+      no partial commits before 2.9.</reminder>
+    <reminder>Fleet stays paused throughout (verify state.json on each substantive edit; NEVER
+      call state.resume_fleet -- function name reminder, AttributeError otherwise). Original
+      last_updated_by + last_updated_utc must remain "copilot_agent" + "2026-04-24T20:46:12Z".</reminder>
+    <reminder>No merge to main during Stage 2; chore/platform-extraction is the only working surface.</reminder>
+    <reminder>stash@{0} (wake_launcher auto-stash sdo 20260424_013002) is UNTOUCHED -- never
+      git stash pop / git stash apply / git stash drop.</reminder>
+    <reminder>STATUS.md updates at item 2.10 are append-only; do not edit prior Stage entries.
+      Required inclusions per g5-10 + the v4 documentation correction footnote per D2 of v4
+      quality review.</reminder>
+    <reminder>If context exhaustion threatens before item 2.9, emit a v5 mid-stage handoff
+      XML following v1/v2/v3/v4 schema (docs-only commit), then stop -- no partial-commit
+      refactor and no emergency single-commit attempts that omit pending items.</reminder>
+    <reminder>$BLARAI_PID preflight at item 2.8 MUST resolve to exactly 3; empty or non-3 =
+      STOP and report (no silent regex/yaml adaptation, per ack g4-5).</reminder>
+    <reminder>Per ack g5-4 + stop_condition: if 2.6 deliverable 2 disposition leaves the
+      legacy fleet_observability/_vikunja_client.py:28 load_config callsite OPEN before Item
+      2.9, ESCALATE to Guide-#6 before proceeding. The line-28 callsite MUST close at 2.6.</reminder>
+    <reminder>D3 dashboard_maintainer.py:113 closure: NO more private-method `live._request`
+      calls allowed after 2.6. Add a public method on VikunjaClient (named-method or
+      raw_post per D4 outcome) and route the line-113 call through it.</reminder>
+    <reminder>Risk label hygiene: compound labels with reference prefixes acceptable when the
+      anchor field disambiguates them; bare numeric labels ("V1", "R12", "C3") without
+      descriptive suffix are the violation pattern.</reminder>
+    <reminder>The 5 v4 documentation corrections (D1-D5) propagate forward through this gate;
+      the v4 handoff XML on disk is preserved unmodified per the no-amend-commit doctrine.</reminder>
+    <reminder>Per LA's "mature not minimal" + dn14 + dn20: independent disk verification on
+      every substantive read. Re-read the relevant files (server.py, _vikunja_client.py,
+      legacy fleet_observability/_vikunja_client.py, dashboard_maintainer.py, the 6 callers)
+      end-to-end before any 2.6 edit. EA-4's reports were largely accurate but missed 3 issues
+      at Item 2.5 + 5 documentation defects in v4 -- never trust report alone.</reminder>
+  </standing_reminders_for_ea_5_during_execution>
+
+  <proceed_authorization>
+    PROCEED -- you may begin Item 2.6 deliverable 4 (observation o1 routing decision) work
+    immediately after acknowledging the answers to your two open questions in the EA chat
+    (procedural courtesy, not a binding gate). Per your committed execution-order plan: D4
+    (structural decision; chokepoint-only vs handler-guards-defense-in-depth; treat Guide-#6
+    recommendation as testable hypothesis; surface evidence; align or diverge with documented
+    rationale via lightweight code comment + closing handoff narrative) → D2 (g5-4 legacy
+    fold-vs-shim disposition; line-28 load_config callsite MUST close; ESCALATE to Guide-#6
+    if it would remain open at Item 2.9) → D3 (dashboard_maintainer.py:113 private-method
+    closure routed through new public method on VikunjaClient per D4 outcome) → D1 (extended
+    grep with 12 patterns as verification net; tabulate hits; ALL hits MUST be inside
+    chokepoint or LegacyVikunjaClient with shim disposition).
+
+    After Item 2.6 closes (all 4 deliverables complete + g5-4 callsite closed + D3 private-method
+    removed + o1 decision documented in code comment + closing narrative ready), proceed to
+    Item 2.7 (pytest tools/ ≥282 passed + V1-V7 closure + per-item V8) and Item 2.7.v2 (V
+    matrix V4-V7 NEW tests authoring; AST-driven probe pattern at scripts/verify_25_v2.ps1 is
+    precedent for V5). Re-evaluate context budget honestly at the 2.7.v2 → 2.8 boundary -- if
+    healthy, push through 2.8 ($BLARAI_PID==3 hard gate; STOP+report on drift) → 2.9 (single
+    Stage-2 commit; pyproject.toml MUST be in commit) → 2.10 (append-only STATUS with all
+    required inclusions per g5-10 + v4 correction footnote per D2). If context tightens at
+    any clean breakpoint before 2.9, emit v5 mid-stage handoff XML following v1/v2/v3/v4
+    schema (docs-only commit), then stop -- no partial-commit refactor, no emergency
+    single-commit attempts.
+
+    Standing reminders (above) apply throughout. On Stage 2 closure (item 2.10 done), emit
+    your final closing handoff to the LA per the closing_handoff_to_la_at_stage_2_close
+    block in your initiation pointer.
+  </proceed_authorization>
+
+</guide_review_response>

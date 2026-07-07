@@ -1,0 +1,23 @@
+# Driver currency snapshot
+# Run date: 2026-05-01
+# Purpose: confirm whether installed GPU and NPU drivers are current
+
+## Arc 140V GPU driver
+
+Installed:  32.0.101.6987  (DriverDate: 2025-07-29, from Win32_VideoController WMI)
+Latest:     32.0.101.8735  (Intel Arc Graphics Windows download page, searched 2026-05-01)
+Delta:      BEHIND — newer driver 32.0.101.8735 is available
+Source:     https://www.intel.com/content/www/us/en/download/785597/intel-arc-graphics-windows.html
+
+## AI Boost NPU driver
+
+Installed:  32.0.100.4724  (2026-03-19, Intel IDSA)
+Latest:     32.0.100.4724  — UP TO DATE per Intel Driver & Support Assistant (checked 2026-05-01)
+Delta:      Current — no newer version available
+Source:     Intel Driver & Support Assistant (intel.com/content/www/us/en/support/intel-driver-support-assistant.html)
+
+## Notes
+
+- The Arc GPU driver delta (32.0.101.6987 installed vs 32.0.101.8735 latest) has not been
+  tested against this bug. The crash is in openvino.dll (NPU path), not the GPU driver.
+- NPU driver currency will be filled in before the issue is posted.

@@ -1,0 +1,4 @@
+# Reverse lookup so BlarAI-scoped scripts can find their Vikunja project ID.
+# Authoritative source is devplatform/projects/registry.yaml.
+blarai_project_id: 3
+devplatform_meta_project_id: 10

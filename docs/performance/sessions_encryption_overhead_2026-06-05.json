@@ -1,0 +1,90 @@
+{
+  "benchmark": "sessions_db_field_encryption_overhead",
+  "config_stamp": {
+    "timestamp": "2026-06-05",
+    "sprint": "Sprint 14 EA-4",
+    "feature": "sessions.db at-rest encryption (ADR-025)",
+    "hardware_cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "hardware_gpu": "Intel Arc 140V (16 GB, integrated, not used for this benchmark)",
+    "hardware_ram_gb": 31.3,
+    "os": "Windows 11 Pro 10.0.26200",
+    "python_version": "3.11.9",
+    "cryptography_backend": "PyCA cryptography (AES-256-GCM via AESGCM, Intel AES-NI path)",
+    "cipher": "AES-256-GCM, 96-bit random nonce per operation, 128-bit auth tag",
+    "dek_sealing": "SoftwareSealer (same CPU path as TpmSealer-unsealed cipher; sealer does not affect per-field crypto latency)",
+    "methodology": "time.perf_counter() wrapping individual cipher calls; 1000 iterations per cell; no co-resident GPU load; SQLite on local NTFS (temp dir)"
+  },
+  "results": {
+    "single_field_overhead_us": {
+      "description": "Per-call AES-GCM encrypt/decrypt latency by content size",
+      "turns_content_short": {
+        "plaintext_bytes": 25,
+        "encrypt_median_us": 0.8,
+        "encrypt_p95_us": 0.9,
+        "decrypt_median_us": 0.7,
+        "decrypt_p95_us": 0.8
+      },
+      "turns_content_medium": {
+        "plaintext_bytes": 137,
+        "encrypt_median_us": 0.8,
+        "encrypt_p95_us": 0.9,
+        "decrypt_median_us": 0.7,
+        "decrypt_p95_us": 0.8
+      },
+      "turns_content_long": {
+        "plaintext_bytes": 963,
+        "encrypt_median_us": 1.0,
+        "encrypt_p95_us": 1.2,
+        "decrypt_median_us": 0.9,
+        "decrypt_p95_us": 1.0
+      },
+      "sessions_title": {
+        "plaintext_bytes": 55,
+        "encrypt_median_us": 0.8,
+        "encrypt_p95_us": 0.9,
+        "decrypt_median_us": 0.7,
+        "decrypt_p95_us": 0.8
+      }
+    },
+    "store_operation_overhead_ms": {
+      "description": "End-to-end SQLite read + decrypt latency for store API calls",
+      "iterations": {
+        "list_sessions": 200,
+        "get_session_turns": 500
+      },
+      "list_sessions_50_sessions": {
+        "store": "EncryptedSessionStore",
+        "session_count": 50,
+        "median_ms": 0.19,
+        "p95_ms": 0.20,
+        "note": "Decrypts 50 AES-GCM title blobs per call"
+      },
+      "list_sessions_50_sessions_plaintext_baseline": {
+        "store": "SessionStore (plaintext, no encryption)",
+        "session_count": 50,
+        "median_ms": 0.09,
+        "p95_ms": 0.10,
+        "note": "Baseline for comparison"
+      },
+      "get_session_turns_10_turns": {
+        "store": "EncryptedSessionStore",
+        "turn_count": 10,
+        "median_ms": 0.048,
+        "p95_ms": 0.053,
+        "note": "Decrypts 10 AES-GCM content blobs per call"
+      }
+    }
+  },
+  "not_measured": [
+    "GPU inference co-residence cost",
+    "Disk I/O (SQLite page cache fully warm for all measurements)",
+    "DEK unsealing latency at process start (single-call cost, not per-operation)",
+    "plaintext get_session_turns baseline (measured separately as needed)"
+  ],
+  "interpretation": {
+    "overhead_verdict": "negligible",
+    "absolute_overhead": "0.10 ms additional for list_sessions over 50 sessions",
+    "ratio_vs_llm_inference": "GPU inference latency ~1000-8000 ms per turn; encryption overhead is 3-5 orders of magnitude smaller",
+    "aes_ni_note": "Intel AES-NI hardware acceleration is used transparently by cryptography package on Core Ultra 7 258V"
+  }
+}

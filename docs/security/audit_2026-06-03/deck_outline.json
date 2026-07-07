@@ -1,0 +1,357 @@
+{
+  "title": "BlarAI Security Posture: What Protects You Today, and What Must Change Before You Go Online",
+  "subtitle": "A plain-language security review across 7 domains \u2014 verified against the actual code on disk \u2014 for the decision to remove the air-gap",
+  "system_diagrams": [
+    {
+      "title": "Architecture overview: what actually runs today vs. what the design describes",
+      "mermaid": "flowchart TD\n  USER[\"You: prompts + documents\"] --> WINUI[\"WinUI window<br/>Medium integrity (ADR-019)\"]\n  WINUI -->|\"named pipe (local only)\"| BACKEND[\"UI backend / dispatcher\"]\n  BACKEND --> GW[\"Transport Gateway\"]\n  GW -->|\"HOST default: loopback TCP, NO mTLS\"| AO[\"Assistant Orchestrator\"]\n  AO --> MODEL[\"Qwen3-14B on Arc 140V GPU\"]\n  AO --> PGOV[\"PGOV output validator (6 stages)\"]\n  AO --> SUB[(\"substrate.db<br/>full docs + every turn<br/>PLAINTEXT\")]\n  BACKEND --> SESS[(\"sessions.db<br/>PLAINTEXT\")]\n  AO -->|\"adjudication (HOST default: NO mTLS)\"| PA[\"Policy Agent<br/>authorization choke-point\"]\n  PA -->|\"signs with\"| PEM[\"pa_private.pem<br/>CLEARTEXT, IN GIT\"]\n  PA --> MAN[\"manifest.json<br/>UNSIGNED, 342 bytes\"]\n  subgraph VM[\"Hyper-V Alpine VM (started but EMPTY)\"]\n    EMPTY[\"no PA / AO runs here today\"]\n  end\n  LAUNCH[\"Launcher (UAC-elevated)\"] -.->|\"Start-VM only\"| VM\n  subgraph UNWIRED[\"Built but wired into nothing\"]\n    TPM[\"TPM 2.0 non-exportable key<br/>0 production callers\"]\n  end\n  TPM -.->|\"should seal key + sign manifest\"| PEM\n  AIRGAP[\"AIR-GAP: the real defense today\"] --- LAUNCH"
+    },
+    {
+      "title": "Trust boundaries: where the air-gap is the only real wall today",
+      "mermaid": "flowchart LR\n  subgraph OUTSIDE[\"Outside world (today: empty, air-gapped)\"]\n    WEB[\"Future: web pages, retrieval, internet\"]\n  end\n  subgraph MACHINE[\"The single Lunar Lake machine\"]\n    subgraph TRUSTED[\"Same-user trust zone (one elevated process)\"]\n      AO2[\"Assistant Orchestrator\"]\n      PA2[\"Policy Agent\"]\n      DBS[(\"Plaintext DBs + cleartext key + deletable logs\")]\n    end\n    DEVSESS[\"Claude DEV session<br/>full internet + arbitrary exec<br/>same disk, same key, same DBs\"]\n  end\n  WEB -.->|\"air-gap removed = this becomes live\"| TRUSTED\n  DEVSESS --- TRUSTED\n  OUTSIDE -.->|\"blocked only by absence of network, not by code\"| MACHINE"
+    },
+    {
+      "title": "Authorization & data flow: the Policy Agent gate and where it is inert",
+      "mermaid": "flowchart TD\n  REQ[\"Agent action request\"] --> CN{\"Caller identity bound to request?\"}\n  CN -->|\"HOST / guest dev_mode: SKIPPED\"| RULES[\"Deterministic rule engine<br/>structural / sensitivity / ACL / rate / resource\"]\n  CN -->|\"production mTLS: CN must match\"| RULES\n  RULES -->|\"any DENY = final\"| DENY[\"DENY (no token)\"]\n  RULES -->|\"pass\"| REHASH[\"Re-hash full multi-GB model every request\"]\n  REHASH -->|\"mismatch\"| DENY\n  REHASH -->|\"ok\"| PREFILT[\"Deterministic deny-list pre-filter\"]\n  PREFILT -->|\"DENY rule\"| DENY\n  PREFILT -->|\"ESCALATE rule\"| ESC[\"ESCALATE (no consumer = silent DENY)\"]\n  PREFILT -->|\"clear\"| LLM[\"LLM classifier\"]\n  LLM --> CONF{\"confidence at least 0.75?\"}\n  CONF -->|\"model never emits confidence; ALLOW defaults to 0.0\"| ESC\n  CONF -->|\"effectively unreachable\"| ALLOW[\"ALLOW\"]\n  ALLOW --> MINT[\"Mint ES256 token (nonce, jti, epoch, 30s TTL)\"]\n  MINT -->|\"signs with cleartext key in git\"| KEY[\"pa_private.pem\"]\n  MINT --> TOKEN[\"Authorization token to caller\"]"
+    }
+  ],
+  "slides": [
+    {
+      "title": "What BlarAI Is \u2014 and Why It's Safe Today",
+      "type": "section",
+      "bullets": [
+        "BlarAI is your personal, locally-run AI: a Policy Agent (UC-001) that authorizes every action, and an Assistant Orchestrator (UC-004) that holds the conversation and your memory.",
+        "It runs entirely on one machine (Intel Lunar Lake + Arc GPU). Today it is air-gapped \u2014 there is no network connection at all.",
+        "The honest headline: the air-gap is doing almost all of the security work today. Most of the deeper controls are either built-but-not-switched-on, or built-but-not-wired-in.",
+        "This deck walks each of the 7 security areas in plain language, then shows the easiest ways someone could break in, then a prioritized to-do list before you ever go online.",
+        "Every claim here was checked against the actual code on disk, not the design documents. Where the docs over-promise, this deck says so plainly."
+      ],
+      "speaker_notes": "Set the frame: this is a security-first system but its current safety is environmental (no network), not yet structural (enforced by code). The verified findings repeatedly distinguish 'safe by environment' from 'safe by construction'. The user is a non-developer making a go/no-go call on internet exposure, so the whole arc is built to support that one decision."
+    },
+    {
+      "title": "The Coming Shift: Going Internet-Facing Raises the Stakes on Everything",
+      "type": "content",
+      "bullets": [
+        "The plan is eventually to give BlarAI web access (navigate/retrieve). The day that happens, the single control protecting you today \u2014 the lack of a network \u2014 disappears.",
+        "Removing the air-gap inverts the risk profile: every 'soft' control (a convention, a docstring, a system-prompt instruction) suddenly becomes load-bearing, and every gap becomes remotely reachable.",
+        "Two compounding effects: (1) hostile web pages become a high-volume attacker-controlled input channel, and (2) any single foothold (a bug in a web tool) can reach your cleartext private data and the signing key.",
+        "The verified findings agree across all 7 domains: 'safe by environment, not yet safe by construction.' The design has the right seams; the enforcement is not yet built or not yet enabled.",
+        "Bottom line for the decision: a specific set of fixes must land BEFORE the air-gap is removed. Those fixes are the roadmap at the end of this deck."
+      ],
+      "speaker_notes": "This is the thesis slide. Each domain's network_facing_impact field repeats the same structure: today low-consequence because air-gapped, tomorrow first-order because remotely reachable. The privacy domain says it most sharply: there is no code-level egress enforcement point to even turn on \u2014 it must be BUILT, not enabled."
+    },
+    {
+      "title": "Architecture Overview: What Actually Runs vs. What the Design Describes",
+      "type": "diagram",
+      "bullets": [
+        "The design describes isolated components talking over mutually-authenticated channels inside a locked-down Hyper-V VM. The code for that exists and is well-written.",
+        "What actually runs: one elevated host process. The Policy Agent, Assistant Orchestrator, the model, and your memory all run together, co-resident, on the host.",
+        "The Hyper-V VM is started and stopped on every boot \u2014 but it holds none of the security-critical code. The isolation boundary the design leans on is started-and-ignored.",
+        "The mutual-TLS channels exist in source but are inactive in the default (HOST) mode, which forces a development bypass (plain loopback, no certificate checks).",
+        "See the architecture diagram: the air-gap (bottom) is what actually separates this whole box from the world; the VM and mTLS (built-but-inactive) do not.",
+        "Evidence: launcher/__main__.py constructs PA/AO in-process; ADR-019 itself states they are 'in-process'; VM merely started at launcher/__main__.py:497-519.",
+        "The Hyper-V VM is a REAL, working isolation + file-transfer boundary \u2014 it is simply started EMPTY today (the security-critical code runs in the host process, not inside it). It is not vestigial: it could later hold the network-facing services so untrusted web content is contained, once its isolation is enforced."
+      ],
+      "mermaid": "",
+      "speaker_notes": "Anchor the audience in the gap between story and reality early, because every domain repeats it. The IPC domain verified end-to-end that dev_mode_override wins over the config files (entrypoint.py:568-570 / 422-424) and the VM is empty. This is the single most important structural fact: the elaborate isolation is present in source but not in the running system."
+    },
+    {
+      "title": "Domain 1 \u2014 Hardware Trust Root & Measured Boot: Strong Parts, Unwired",
+      "type": "content",
+      "bullets": [
+        "What's good: there IS a genuine hardware trust root \u2014 a TPM key that the chip refuses to export (proven by a test that tries to export it and confirms the TPM says no). Real SHA-256 checks on the model weights do run at boot.",
+        "The catch: that TPM trust root is wired into nothing. A whole-repo search confirms the only thing importing it is its own test \u2014 zero runtime code uses it (shared/security/tpm_signer.py).",
+        "The 'measured boot' phase measures nothing: it just reloads a config file and checks files exist. It never touches the TPM, a hardware register, or any image hash (entrypoint.py:257-284). It can declare 'boot passed' on a compromised machine.",
+        "The 'known-good' list the integrity check trusts is a 342-byte plain JSON file with no signature (manifest.json). Both the boot check and the runtime check trust the same editable file \u2014 tamper it and both checks pass.",
+        "The default host launch silently runs in development mode (no mTLS, throwaway signing keys) because the launcher forces it \u2014 confirmed at launcher/__main__.py:570/636/715.",
+        "Severity: one Critical, several High. The air-gap, not the trust root, is what defends today."
+      ],
+      "speaker_notes": "Verified personally: tpm_signer has zero production callers (grep), manifest is 342 bytes with no .sig on disk, launcher forces dev_mode_override=True. The nuance the auditor corrected: weight hashing DOES still run even in dev_mode (manifest_path resolves regardless) \u2014 so this domain's integrity hashing is real, it's the SEALING and ATTESTATION that are absent. Be precise: the building blocks are real and hardware-tested; the assembly is missing."
+    },
+    {
+      "title": "Domain 1 \u2014 The Critical One: The Signing Key Is Sitting in Git",
+      "type": "content",
+      "bullets": [
+        "The Policy Agent's whole job is to authorize actions by issuing signed tokens. The private key it signs with \u2014 certs/pa_private.pem \u2014 is committed to the git repository in cleartext.",
+        "I confirmed it directly: it is a real EC private key (BEGIN PRIVATE KEY), tracked by git, and it is the configured production key path (default.toml:26). The matching public key (ca.pem) is what the Orchestrator trusts to verify tokens.",
+        "Anyone with the repository \u2014 or any future copy of its history (it was committed at 95c4f19) \u2014 can mint authorization tokens the system accepts as genuine. That defeats the entire authorization layer.",
+        "It cannot even be password-protected: the loader hardcodes 'no password,' so an encrypted key would fail to load (jwt_minter.py:146).",
+        "Why it's survivable today: the default live path runs in dev_mode with throwaway keys, and the air-gap means an attacker must already be on the box. Neither is true once you go online.",
+        "This is the #1 thing to fix: rotate the key, stop tracking it in git, and move signing into the TPM that already exists for exactly this."
+      ],
+      "speaker_notes": "Verified on disk: git ls-files shows certs/pa_private.pem tracked; head shows BEGIN PRIVATE KEY; ca.pem is BEGIN PUBLIC KEY (not an X.509 CA). This is rated Critical because it is forgeable-authorization, not merely a leaked secret. Critically, the data-at-rest auditor confirmed the validator's nonce/epoch/expiry stages do NOT stop a freshly-minted forgery \u2014 the attacker mints a fresh nonce and current epoch, so only the signature gate matters, and they hold the key."
+    },
+    {
+      "title": "Domain 2 \u2014 Policy Agent Authorization Gate: A Solid Skeleton With Inert Muscles",
+      "type": "content",
+      "bullets": [
+        "The good news is substantial: the deterministic core is genuinely fail-closed and verified. Missing config, malformed requests, integrity failures, identity mismatches \u2014 all deny. A deterministic DENY is final and skips everything downstream.",
+        "The gate has three layers: ordered rule engine, then a deny-list pre-filter, then an LLM classifier. Only an ALLOW yields a short-lived signed token. The deny direction is robust.",
+        "But the 'smart' layer is dead: the LLM is never asked to emit a confidence score, so a genuine LLM 'ALLOW' arrives at 0.0 confidence \u2014 below every threshold \u2014 and falls through to DENY. The LLM half can never actually approve anything (verified end-to-end).",
+        "The 'ask a human' safety valve (ESCALATE) has no consumer anywhere \u2014 it is silently treated as a DENY. There is no human-in-the-loop review queue built (verified by exhaustive search).",
+        "The revocation system is inert: the 'cut off a compromised agent' function is only ever called by tests, and the minter and validator track epochs as separate, never-reconciled objects.",
+        "Net: it fails safe (toward DENY) today, but the adaptive judgment, the escalation valve, and the revocation control the design relies on for online operation are all missing."
+      ],
+      "speaker_notes": "This domain is nuanced and important to get right: it is NOT a permissive hole. Every gap fails toward DENY. The risk is that for novel external actions (exactly what web navigation produces), the system can ONLY apply its static deny-lists \u2014 the layer meant to reason about unknown cases is inert, and the valve for ambiguity silently denies. Frame as 'the deny machinery is real; the judgment and recovery machinery is missing.'"
+    },
+    {
+      "title": "Domain 2 \u2014 Token Containment & A Denial-of-Service Lever",
+      "type": "content",
+      "bullets": [
+        "Authorization tokens are designed to be contained three ways: short life, revocable, single-use. In practice only one works: the short life (TTL).",
+        "Revocation is inert (above). Single-use is required but never enforced \u2014 the token ID is logged but never recorded as 'spent,' so a captured token can be replayed against a different instance or after a restart.",
+        "Worse, the short life isn't that short: both shipped configs set the token TTL to 30 seconds, not the 5 seconds the spec and code constant say \u2014 a silent 6x-wider replay window, and the config will accept up to 300 seconds.",
+        "Availability risk: before every single authorization, the system re-reads and re-hashes the entire multi-gigabyte model file. Correct, but it means an attacker who can drive traffic can stall the whole authorization choke-point.",
+        "Today none of this matters much \u2014 local trusted callers, no network. Online, the containment story degrades to 'TTL only,' and the per-request re-hash becomes a cheap way to grind the system to a halt.",
+        "Evidence: TTL 30s at both default.toml:25 and guest_runtime.toml:24; per-request full re-hash at adjudicator.py:318-325."
+      ],
+      "speaker_notes": "A genuine strength worth naming aloud: the validator pins the algorithm to ES256 on decode, which correctly blocks the classic 'alg=none' JWT downgrade attack. Balance the negatives. The DoS amplifier is reachable only by requests that pass all deterministic rules (rule-engine DENYs short-circuit before the hash), so it's a real but bounded lever \u2014 important honesty for the AIGP portfolio framing."
+    },
+    {
+      "title": "Domain 2 \u2014 The Worst Default: The Guest Profile Ships With Security Off",
+      "type": "content",
+      "bullets": [
+        "The architecture says services run inside the Hyper-V VM. The config selected for that VM (guest_runtime.toml) ships with dev_mode=true and measured_boot=false \u2014 verified on disk.",
+        "In that one profile, the entire perimeter drops at once: no mutual TLS, no caller-identity binding, no weight verification, no measured boot, and throwaway signing keys.",
+        "This is not a hypothetical stray flag \u2014 it is a committed, selectable runtime path that the code picks whenever deployment is set to 'guest' (runtime_config.py:106).",
+        "Air-gapped, a dev bypass is tolerable. Internet-facing, selecting this already-committed profile would authorize unauthenticated callers and mint forgeable-context tokens \u2014 a total perimeter collapse from one config choice.",
+        "Fix before going online: harden the guest profile to dev_mode=false (with real certs), or forbid dev_mode entirely outside an explicit local-test mode, and refuse to run dev_mode when network-facing.",
+        "This is the highest-leverage single-line risk in the authorization domain.",
+        "Why it is the worst: one config choice \u2014 deployment_mode=guest \u2014 collapses MULTIPLE controls at once (mTLS, identity binding, weight verification, measured boot). A single switch with whole-perimeter blast radius."
+      ],
+      "speaker_notes": "Verified the guest_runtime.toml contents directly: dev_mode = true (line 62), empty mtls paths (68-70), jwt_ca_cert_path empty (63). The auditor ELEVATED this from the original 'if ever true' framing to a High because it is a shipped, selectable path. This pairs with the privacy domain's identical finding \u2014 both auditors independently flagged the guest profile. Make sure the user hears: this is a posture that already exists in the repo, not a future risk."
+    },
+    {
+      "title": "Domain 3 \u2014 IPC & Process Isolation: Built, Bypassed at Runtime",
+      "type": "content",
+      "bullets": [
+        "The mutual-TLS-over-vsock stack is fully written and sound (certificate checks, TLS 1.2+, bounded message sizes). The problem is it doesn't run: the default HOST mode forces a development bypass to plain loopback with no authentication.",
+        "Deeper gap found: the UI gateway that talks to the Orchestrator does no TLS at all on its production path \u2014 it never even imports the TLS library. So the 'authenticated channel' the design assumes does not exist in either mode (transport.py:416-436).",
+        "There are no production certificates on disk and no code to generate the per-boot certificates the design calls for \u2014 only a test fixture can mint them. A real production launch would fail to start the secure channel.",
+        "The VM doesn't contain what it's meant to: the security-critical code runs on the host, co-resident with the UI-facing process, so a host compromise is not contained by the VM.",
+        "Genuine live wins worth crediting: the WinUI window is de-elevated to Medium integrity (a real least-privilege improvement, ADR-019), and the local pipe rejects remote clients and is locked to your user account.",
+        "The local pipe authenticates only by OS file permissions, in neither direction \u2014 any process running as you can drive the backend or impersonate it to the UI."
+      ],
+      "speaker_notes": "The IPC auditor made the sharpest correction in the whole review: the original audit said the gateway 'trusts any CA-signed cert'; in fact the gateway does NO TLS at all, which is worse \u2014 turning ON the Orchestrator's server mTLS would BREAK the channel, not secure it. The de-elevation (ADR-019) is the one genuine recent security win and should be credited honestly amid the gaps."
+    },
+    {
+      "title": "Domain 4 \u2014 Prompt-Injection Defense (Input Side): The Deterministic Backstop Is OFF",
+      "type": "content",
+      "bullets": [
+        "What runs and is real: every loaded document and recalled memory gets its forged delimiters stripped and every line tagged as 'data, not instructions' with a fresh random marker per load, plus an always-on system prompt telling the model to never obey embedded instructions.",
+        "The strongest guarantee \u2014 'even a fooled model still can't ACT' \u2014 is the tool-privilege gate (ADR-013). It is fully coded but DISABLED in both shipped configs (block_tools_when_documents_loaded = false), confirmed on disk.",
+        "Worse, the manual re-enable path is documented-broken: a 2026-05-26 user test found /trust didn't propagate and /unload didn't restore tool access (recorded in default.toml's own comment). So the action-side barrier is off by default AND can't currently be reliably turned on.",
+        "The spec's first sanitization layer \u2014 the 'Cleaner' service that would scrub and cryptographically sign every document \u2014 does not exist at all. Documents flow straight from disk to the model.",
+        "The spec calls the boundary markers 'cryptographic'; they are actually plain static text strings (the per-load tags ARE random, but the boundary tokens are code-visible). The governance doc honestly admits this.",
+        "Your own typed/pasted text is never scanned for injection \u2014 only loaded files are. Pasting hostile text from a web page into the chat box bypasses the warning."
+      ],
+      "speaker_notes": "This domain had the biggest audit correction: the prior audit rated the disabled tool-gate 'Low' and called it 'default-secure.' The re-check found it's OFF by default in shipped config AND the /trust re-enable was observed broken in a real UAT. That promotion to High is the single most important input-side finding. Also note the auditor REFUTED a false positive: the Layer 2.5 alignment directive IS present and always-on (it's in the model's system role, not the empty session wrapper) \u2014 credit it as a real feature."
+    },
+    {
+      "title": "Domain 4 \u2014 Why This Domain Is the Biggest Online Risk",
+      "type": "content",
+      "bullets": [
+        "Air-gapped, the only untrusted text is files you chose to load \u2014 and the controls that run (tagging + alignment prompt + warnings) are a credible defense against a passive injection.",
+        "Online, fetched web pages become a high-volume, adversarial injection channel \u2014 and the four-layer defense degrades to about two-and-a-half layers.",
+        "Missing for the online case: no Cleaner sanitization (Layer 1), the deterministic action-gate is off and its override broken, and the heuristic scanner never inspects fetched or pasted content.",
+        "What genuinely survives is the probabilistic stack: data-tagging + the alignment prompt + delimiter neutralization + an output-side check that catches the model echoing internal markers.",
+        "The three highest-value pre-internet fixes here: (1) re-enable the tool-gate AND fix the /trust path, (2) build the Cleaner with a signature gate, (3) extend the injection scan to fetched/pasted text.",
+        "Severity: two High (disabled gate, absent Cleaner), several Medium. This is the single largest spec-vs-build gap for the internet-facing future."
+      ],
+      "speaker_notes": "Tie it to the user's stated trajectory ('navigate the web'). The phrase from the findings: hostile pages become 'a high-volume, adversarial, attacker-controlled injection channel.' The defense-in-depth design is sound on paper but only partly built. This slide is the bridge into the attack-paths section because injection-to-tool-call is the marquee online threat."
+    },
+    {
+      "title": "Domain 5 \u2014 Output Validation (PGOV): The Egress Guards Are Inert",
+      "type": "content",
+      "bullets": [
+        "PGOV is a 6-stage check on every response. The module is well-written and fail-closed on its own errors. Two of three data-leakage stages are inert in the shipped config.",
+        "The retrieval-leakage detector (catches the model parroting secrets from retrieved content) is fed an EMPTY list by the only production caller \u2014 I confirmed retrieved_chunks=[] hardcoded at entrypoint.py:1194. The detector is loaded and ready, but handed nothing to compare against.",
+        "The PII/secret detector ships OFF (pii_mode='off'). SSNs, API keys, credit cards, bearer tokens in model output are not detected or redacted on the live path.",
+        "What does run: the delimiter-echo check and the tool-call allowlist. Those are real and active.",
+        "Live streaming undercuts block-mode: tokens (even tool-call text) are shown on screen and spoken aloud BEFORE validation finishes \u2014 so suppression can't retract what you've already seen or heard.",
+        "The denial messages leak which stage fired (over the wire to the UI), contradicting the design's stated 'don't tell the adversary which control tripped.'"
+      ],
+      "speaker_notes": "Verified retrieved_chunks=[] and pii_mode='off' directly. The leakage-detector nuance the auditor strengthened: the embedding model IS loaded in production (the Substrate reuses the same embedder), so this is not a fail-closed-on-unloaded situation \u2014 a fully operational detector is deliberately starved. The streaming point is worse than originally reported: the AO marks every token is_tool_call=False, so even tool-call text streams live; PGOV is post-hoc for ALL streamed text in the shipped modes."
+    },
+    {
+      "title": "Domain 5 \u2014 The Allowlist Is Broader Than the Build",
+      "type": "content",
+      "bullets": [
+        "The tool-call allowlist names 14 tools \u2014 including high-impact ones like calendar_write, smart_home_control, note_create, code_agent \u2014 but only 4 read-only tools actually exist and execute.",
+        "Because the check only flags names OUTSIDE the allowlist, a model induced to emit an in-allowlist side-effecting tool name would NOT be flagged. Today it's latent (those tools don't run), but the allowlist is pre-approving a surface that isn't built or gated.",
+        "A credit-card detector claims 'Luhn-plausible' validation but performs no checksum \u2014 it flags any long number. The governance docs also cite line numbers that no longer match the code, which causes over-claiming of the security posture.",
+        "Net for PGOV: its deterministic 'verify the LLM behaved' promise is only partially delivered on the live path today.",
+        "Before going online, this domain needs: wire the retrieved chunks into the leakage check (a near-one-line fix), choose a non-off PII posture, buffer output until validated, prune the allowlist to built tools, and re-enable the tool-gate.",
+        "Severity: one High (leakage disconnected), one High (PII off), several Medium/Low."
+      ],
+      "speaker_notes": "The allowlist-vs-registry gap (14 named, 4 executable) is the through-line connecting this domain to the privacy domain, where the same finding appears alongside the system prompt advertising 'Search' to the model. Emphasize the leakage fix is cheap (the machinery is built, loaded, tested in isolation \u2014 it's just called with an empty list) \u2014 a quick, high-value win for the roadmap."
+    },
+    {
+      "title": "Domain 6 \u2014 Privacy & Network Boundary: Real, But Enforced by Absence",
+      "type": "content",
+      "bullets": [
+        "The no-external-network mandate is real but enforced by ABSENCE and CONVENTION, not by an active guard. Verified: zero outbound network library calls in the runtime source code.",
+        "But there is no code-level kill-switch \u2014 no firewall rule, no DNS block, no egress allowlist, no socket guard. The mandate rests on (a) not importing network libraries, (b) ~20 docstrings saying 'no network,' and (c) a system-prompt instruction to the model.",
+        "The bigger picture (completeness gap): the runtime's Python environment SHIPS full network stacks (requests, httpx, aiohttp, openai, huggingface_hub, transformers) \u2014 about 270 packages. The guarantee rests entirely on source code not calling them; the capability is fully loaded in the process.",
+        "The Policy Agent's 'external network requests are always denied' rule (P-004) exists ONLY as a red-team test string \u2014 there is no code that classifies or denies a network-bearing action.",
+        "The 'search' tool is the seam internet access will arrive through \u2014 and it is BOTH pre-approved in the allowlist AND already advertised to the model in its system prompt as a live capability.",
+        "The same guest-profile dev_mode=true finding from Domain 2 reappears here independently.",
+        "Nuance (important): those ~270 network packages are PRESENT and loaded in the process, but NO runtime code CALLS them \u2014 egress is blocked by code discipline, not by a guard. There is no active network today; the boundary is one regression or one injection away, with nothing in code to stop it. That is why a code-enforced egress kill-switch is a Tier-0 fix."
+      ],
+      "speaker_notes": "This is the domain that most directly governs the go/no-go decision. The key reframing from the findings: there is no enforcement point to even flip on \u2014 an egress allowlist + default-deny guard must be BUILT, not merely enabled, BEFORE any internet feature ships. The 270-package detail is from the completeness gaps and is load-bearing: the air-gap is the ONLY thing between a fully network-capable interpreter and the internet."
+    },
+    {
+      "title": "Domain 7 \u2014 Data at Rest: Decades of Private Data, in Plaintext",
+      "type": "content",
+      "bullets": [
+        "Your entire history lives in two plaintext SQLite files: sessions.db (conversations) and substrate.db (a permanent searchable archive of every approved turn AND the full text of every document you load). No encryption at rest \u2014 confirmed: no SQLCipher, no DPAPI, no cipher anywhere.",
+        "substrate.db is the worst exposure: anyone who can read your user folder (malware, a stolen or backed-up disk, another local account, a sync tool) reads everything you've ever said or loaded.",
+        "There is no durable, tamper-evident audit log. The Policy Agent's 'complete audit record' lives only in memory and is discarded; the only on-disk trace is plaintext INFO lines in three deletable, unrotated logs (launcher.log, boot.log, crash.log).",
+        "The integrity 'known-good manifest' is unsigned JSON \u2014 an attacker with local write access can swap a model file AND edit the manifest, defeating the SHA-256 check entirely.",
+        "Diagnostic logs (including voice) are written unredacted into the same folder as your private data, one with a hardcoded developer home path.",
+        "The one strong piece \u2014 the non-exportable TPM key \u2014 is proven in hardware but connected to zero production code, so it protects nothing yet."
+      ],
+      "speaker_notes": "Verified no .sig on the manifest and that it's 342 bytes. The data-minimization angle (from completeness gaps): substrate.db has NO retention/TTL/pruning \u2014 it grows forever, retaining everything in plaintext for the 'decades of use' design lifetime. For the AIGP portfolio, the absence of a tamper-evident audit trail is a governance finding in its own right: there is no reliable after-the-fact answer to 'what was authorized, when, and why.'"
+    },
+    {
+      "title": "Cross-Cutting Completeness Gaps (Beyond the 7 Domains)",
+      "type": "content",
+      "bullets": [
+        "Supply chain: BlarAI's own dependencies are unpinned (floating '>=' with no upper bound) and there is NO lockfile and NO hash verification. A future 'pip install' pulls whatever the index serves that day \u2014 a compromise enters at build/update time, before the air-gap matters.",
+        "Model provenance: only ONE classifier weight file is ever hash-checked. The models that drive every visible feature (the 14B LLM, embeddings, Whisper, Kokoro, the vision model) are NEVER integrity-verified, and two of three tokenizer loads can fall back to fetching from the internet.",
+        "Dev/runtime co-residency: the Claude development session runs on the SAME machine with full internet and arbitrary-execution permissions, sharing the filesystem, the committed signing key, and your data DBs with the air-gapped runtime.",
+        "Error leakage: raw internal exception strings (paths, config, stack detail) are returned to the calling client \u2014 low risk on today's local pipe, but that dispatcher is exactly what a future network gateway would sit on.",
+        "Resource limits: the memory store grows unbounded (no retention), and the local pipe allows unlimited concurrent connections.",
+        "None of these are defended by the air-gap; several get worse the moment you go online."
+      ],
+      "speaker_notes": "These are from the COMPLETENESS GAPS payload \u2014 areas the 7 domains didn't fully cover. The supply-chain and model-provenance gaps are the most strategically important because they bypass the air-gap entirely (the compromise is pulled in at build/update time on a connected machine). The dev/runtime co-residency point is delicate: it's a real attack surface but also reflects the documented two-tier privacy model (dev sessions are permitted internet). Present it as a surface to be aware of, not a contradiction."
+    },
+    {
+      "title": "Top Attack Paths \u2014 The Red-Team View",
+      "type": "diagram",
+      "bullets": [
+        "The easiest realistic compromises cluster around four enablers: the cleartext signing key, the disabled injection/output guards, the absent egress enforcement, and the plaintext data store.",
+        "Today the air-gap blocks the remote starting point for most of these. The diagram shows how a single online foothold chains into bulk data theft.",
+        "The marquee online path: hostile web page -> prompt injection -> tool call (gate is off) -> action or exfiltration, with the output leakage check inert to catch it.",
+        "The catastrophic path: any foothold reads substrate.db in cleartext (your whole history) and reads the signing key to forge unlimited authorization tokens.",
+        "The next slide's table ranks each path by severity and whether it opens or worsens once internet-facing.",
+        "Every path here traces to a specific verified finding \u2014 none are speculative."
+      ],
+      "mermaid": "flowchart TD\n  WEB[\"Hostile web page / retrieved doc\"] -->|\"injection; Cleaner absent\"| INJ[\"Prompt injection reaches model\"]\n  INJ -->|\"tool-gate DISABLED, /trust broken\"| ACT[\"Model takes an action\"]\n  INJ -->|\"leakage check fed empty list\"| LEAK[\"Secrets echoed into reply, unfiltered\"]\n  FOOT[\"Any online foothold\"] --> DBREAD[\"Read substrate.db: full history, cleartext\"]\n  FOOT --> KEYREAD[\"Read pa_private.pem: forge ALLOW tokens\"]\n  KEYREAD --> BYPASS[\"Defeat the authorization choke-point\"]\n  FOOT --> ERASE[\"Erase plaintext logs: no forensic trace\"]\n  SUPPLY[\"Compromised dependency\"] --> EXFIL[\"Exfiltrate via already-loaded network libs (once air-gap off)\"]\n  AIRGAP[\"Air-gap blocks WEB + foothold start points TODAY\"] -.-> WEB\n  AIRGAP -.-> FOOT",
+      "speaker_notes": "This diagram is the synthesis of all 7 domains' network_facing_impact fields plus the completeness gaps. The chaining is the point: individual findings are bad, but the compounding (injection + off gates + inert leakage check + cleartext data + forgeable key) is what makes the online posture untenable until the roadmap lands. Keep the framing concrete and non-alarmist \u2014 these are realistic, not exotic."
+    },
+    {
+      "title": "Prioritized Hardening Roadmap \u2014 Before the Air-Gap Comes Off",
+      "type": "table",
+      "bullets": [
+        "TIER 0 (do first, blocking): Rotate the signing key + stop tracking it in git + move signing into the existing TPM. Build a code-level egress guard (default-deny + allowlist) \u2014 there is nothing to 'turn on' today.",
+        "TIER 1 (UC-001 / Policy Agent): Sign the weight manifest with the TPM; harden the guest profile to dev_mode=false and refuse dev_mode when network-facing; add a real network-egress adjudication rule (make P-004 enforced code, not a test string); stand up a tamper-evident audit log.",
+        "TIER 1 (UC-004 / Assistant Orchestrator): Re-enable the tool-privilege gate AND fix the broken /trust path (live-tested); wire retrieved chunks into the leakage check; switch PII detection to block/redact for online mode; prune the tool allowlist to the 4 built tools and stop advertising unbuilt 'Search' to the model.",
+        "TIER 2 (data + injection depth): Encrypt sessions.db and substrate.db (SQLCipher or TPM-wrapped key); build the Cleaner sanitization service with its signature gate; extend the injection scan to fetched/pasted content; add retention/pruning to the memory store.",
+        "TIER 2 (infrastructure): Actually run in GUEST/VM mode so mutual-TLS is exercised; build per-boot certificate generation; give the gateway a real mutual-TLS client path; put web-content-handling code inside the VM so it becomes a real containment boundary.",
+        "TIER 3 (supply chain + hygiene): Pin dependencies with a lockfile + hash verification; integrity-check ALL model weights; add a test that fails if a network library is imported; sanitize error strings before they leave the process."
+      ],
+      "mermaid": "",
+      "speaker_notes": "Mapped explicitly to UC-001 (Policy Agent) and UC-004 (Assistant Orchestrator) as requested. The sequencing logic: Tier 0 items are the cleartext-key (Critical) and the absent egress enforcement (High, must be BUILT) \u2014 these are non-negotiable blockers. Tier 1 splits cleanly by use case. Many fixes are cheap (leakage check is ~1 line; flipping PII/tool-gate flags is config \u2014 though the /trust path needs a real code fix and live test). Be explicit that 'go internet-facing' should be gated on Tier 0 + Tier 1 at minimum."
+    },
+    {
+      "title": "The Decision in One Slide",
+      "type": "section",
+      "bullets": [
+        "Today: BlarAI is safe primarily because it's air-gapped. The deterministic deny-machinery, fail-closed posture, de-elevated UI, and local-only pipe are genuine and worth crediting.",
+        "The deeper controls the security story promises are either built-but-off (tool-gate, PII filter, leakage check) or built-but-unwired (the TPM trust root, mutual-TLS, the VM isolation).",
+        "Going internet-facing removes the one control doing the real work and makes every gap remotely reachable \u2014 most urgently the cleartext signing key, the absent egress enforcement, and the plaintext history store.",
+        "Recommendation: do NOT remove the air-gap until at least Tier 0 and Tier 1 of the roadmap are complete and live-verified.",
+        "The encouraging part: the design has the right seams everywhere. The work is mostly connecting and enabling what's already there, plus building three genuinely-missing pieces (egress guard, Cleaner, at-rest encryption).",
+        "This whole review was disk-verified \u2014 it's an honest baseline you can hand to anyone, including the AIGP portfolio."
+      ],
+      "speaker_notes": "Close on the go/no-go. The motto throughout: 'safe by environment, not yet safe by construction.' The constructive framing matters for a non-developer owner \u2014 this is not 'the system is broken,' it's 'the system is air-gapped-safe today and has a clear, mostly-connect-what-exists path to being construction-safe online.' End by pointing at the roadmap as the gate on the decision."
+    }
+  ],
+  "top_attack_paths": [
+    {
+      "name": "Forge authorization tokens with the signing key from git",
+      "description": "The Policy Agent's private signing key (certs/pa_private.pem) is committed to git in cleartext and is the configured production key. Anyone with the repo or its history can mint ES256-signed ALLOW tokens the Orchestrator accepts as genuine, defeating the entire authorization choke-point. The validator's nonce/epoch/expiry checks do not stop a freshly-minted forgery (attacker uses a fresh nonce + current epoch), so only the signature gate matters \u2014 and the attacker holds the key.",
+      "severity": "Critical",
+      "enabled_by": "Domain 1 (Hardware trust root) + Domain 7 (Data at rest): cleartext JWT/CA signing key committed in git at commit 95c4f19; loader hardcodes password=None so it cannot be encrypted (jwt_minter.py:146)",
+      "network_facing": true
+    },
+    {
+      "name": "Hostile web page -> prompt injection -> tool action",
+      "description": "Once web navigation is live, a fetched page carries an injection that the model obeys. The deterministic action-prevention gate (ADR-013) that would stop a fooled model from acting ships DISABLED in both configs, and its /trust re-enable was observed broken in a 2026-05-26 UAT. No Cleaner sanitization layer exists. Only data-tagging and the alignment prompt sit between a hostile page and a tool call.",
+      "severity": "High",
+      "enabled_by": "Domain 4 (Prompt-injection defense): block_tools_when_documents_loaded=false in both shipped configs; /trust path documented-broken; Cleaner (UC-003) absent",
+      "network_facing": true
+    },
+    {
+      "name": "Bulk exfiltration of the entire history from one foothold",
+      "description": "sessions.db and substrate.db are plaintext with no encryption at rest. substrate.db holds the full text of every loaded document and every approved turn, building a permanent searchable archive. Any single online foothold (a bug in a web tool) \u2014 running in the same process that holds the substrate handle \u2014 reads the user's whole conversational and document history from one cleartext file.",
+      "severity": "High",
+      "enabled_by": "Domain 7 (Data at rest): no SQLCipher/DPAPI/cipher anywhere; substrate_chunks.text is plaintext TEXT NOT NULL (substrate.py:117); no retention/pruning so it accumulates indefinitely",
+      "network_facing": true
+    },
+    {
+      "name": "Silent data exfiltration through an unguarded egress path",
+      "description": "There is no code-level network kill-switch, firewall rule, DNS block, or egress allowlist \u2014 the no-network mandate rests on source code not calling network libraries. Yet the runtime interpreter ships ~270 packages including requests/httpx/aiohttp/openai/huggingface_hub, fully loaded in-process. The Policy Agent's 'deny external network' rule exists only as a test string. Injected or compromised code faces zero code-level resistance to opening a connection.",
+      "severity": "High",
+      "enabled_by": "Domain 6 (Privacy & network boundary): no NetworkGuard module exists (grep-confirmed); P-004 egress rule is a test fixture, not enforced code; network libs present in .venv",
+      "network_facing": true
+    },
+    {
+      "name": "Select the guest profile and collapse the entire perimeter",
+      "description": "The committed guest_runtime.toml ships dev_mode=true and measured_boot=false. Selecting it (deployment_mode=guest) drops mutual TLS, caller-identity binding, weight verification, measured boot, and uses throwaway signing keys \u2014 all at once. Internet-facing, this single already-committed config choice would authorize unauthenticated callers and mint forgeable-context tokens.",
+      "severity": "High",
+      "enabled_by": "Domain 2 (Policy Agent) + Domain 6 (Privacy): guest_runtime.toml dev_mode=true (line 62) with empty mTLS paths; runtime_config.py:106 selects it for guest mode; no guard refuses dev_mode when network-facing",
+      "network_facing": true
+    },
+    {
+      "name": "Swap model weights past the unsigned manifest",
+      "description": "The 'known-good' manifest the integrity check trusts is a 342-byte unsigned plain JSON file (no .sig on disk). An attacker with a write primitive swaps a model file AND edits the manifest, so both the boot check and the per-request re-hash still pass \u2014 turning the integrity gate into security theater and enabling a backdoored model.",
+      "severity": "High",
+      "enabled_by": "Domain 1 + Domain 7: manifest.json unsigned (load_manifest does plain json.load, no signature); the TPM that should sign it has zero production callers",
+      "network_facing": true
+    },
+    {
+      "name": "Steal secrets via the inert output-leakage and PII checks",
+      "description": "The retrieval-leakage detector that catches the model echoing retrieved secrets is fed an empty list by the only production caller (retrieved_chunks=[]), and PII/secret detection ships off (pii_mode='off'). With web retrieval live, an injected page that coaxes the model into echoing secrets or prior-context data into its answer sails through unfiltered \u2014 and live streaming means the text is shown/spoken before any check could suppress it.",
+      "severity": "High",
+      "enabled_by": "Domain 5 (Output validation): validate_output called with retrieved_chunks=[] (entrypoint.py:1194); pii_mode='off' in both configs; tokens stream live pre-validation",
+      "network_facing": true
+    },
+    {
+      "name": "Supply-chain compromise pulled in before the air-gap matters",
+      "description": "BlarAI's dependencies are unpinned with no lockfile and no hash verification; a future pip install pulls whatever the index serves. A malicious release of any dependency (or a transitive one whose import-time code runs) executes in-process, where network libraries are already loaded. The air-gap does not defend this because the compromise enters at build/update time on a connected machine.",
+      "severity": "Medium",
+      "enabled_by": "Completeness gaps (supply chain): floating '>=' specifiers, no lockfile, no --require-hashes anywhere in BlarAI source",
+      "network_facing": true
+    },
+    {
+      "name": "Replay or forge tokens against the weakened containment model",
+      "description": "Token containment was designed as short-TTL + revocable + single-use, but revocation is inert (never triggered, minter/validator epochs never reconciled) and single-use is required but never enforced (jti logged, never recorded as spent). The TTL \u2014 the only working control \u2014 is silently widened to 30s (vs spec 5s) in both configs. A captured token can be replayed against another instance or after a restart within that window.",
+      "severity": "Medium",
+      "enabled_by": "Domain 2 (Policy Agent): EpochManager.increment has zero production callers; jti never recorded; validity_seconds=30 in both configs",
+      "network_facing": true
+    },
+    {
+      "name": "Drive the authorization gate into denial-of-service",
+      "description": "Before every authorization that passes the deterministic rules, the system re-reads and re-hashes the entire multi-gigabyte model file. An attacker who can generate adjudication traffic forces repeated multi-GB disk reads + hashes, collapsing the throughput of the authorization choke-point for the whole system.",
+      "severity": "Medium",
+      "enabled_by": "Domain 2 (Policy Agent): full-file SHA-256 re-hash inside adjudicate_car per request (adjudicator.py:318-325)",
+      "network_facing": true
+    },
+    {
+      "name": "Same-user process hijacks the local control plane",
+      "description": "The named pipe between the UI and backend authenticates only by OS file permissions, in neither direction. Any process running as the user can open the pipe and invoke every method (list/delete sessions, load/store attachments, prompt/voice), or squat the pipe name first and impersonate the backend to the UI. The lowered Medium integrity label widens the set of processes that can reach it.",
+      "severity": "Medium",
+      "enabled_by": "Domain 3 (IPC & process isolation): no GetNamedPipeClientProcessId/ImpersonateNamedPipeClient (grep-confirmed); client does no server-identity check; PIPE_UNLIMITED_INSTANCES",
+      "network_facing": false
+    },
+    {
+      "name": "Erase the evidence after a breach",
+      "description": "There is no durable, tamper-evident audit log. The Policy Agent's 'complete audit record' lives only in memory and is discarded; the only on-disk trace of decisions is plaintext INFO lines in three deletable, unrotated logs (launcher.log, boot.log, crash.log). An intruder can rewrite or delete the record of what they did, and there is no signed proof of which authorizations were genuinely issued.",
+      "severity": "Medium",
+      "enabled_by": "Domain 7 (Data at rest) + Completeness gaps (audit-trail integrity): AdjudicationContext returned but never persisted; three plaintext deletable logs; no hash-chained/append-only sink",
+      "network_facing": true
+    }
+  ]
+}

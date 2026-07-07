@@ -1,0 +1,55 @@
+# BlarAI Root Pytest Configuration
+# Supports running tests across all P1 services with: pytest -v
+
+# ---------------------------------------------------------------------------
+# Project metadata and dependencies
+# ---------------------------------------------------------------------------
+#
+# cryptography is declared here explicitly (Sprint 14 EA-2, ADR-025 §5.1 #3).
+# It was previously a transitive-only dependency (present as 46.0.5 via other
+# packages).  Making it explicit removes the fragility for security-critical
+# code; a bound of >=46,<47 tracks the installed version and keeps the pin
+# stable until a deliberate upgrade.  No new install is required — it is
+# already present.
+#
+# httpx is the ONE external-network client the runtime depends on, and it is
+# imported by exactly ONE module: shared/security/guarded_fetch.py, the
+# Policy-Agent-gated one-door egress seam (#598 air-gap removal, ADR-027 +
+# ADR-020). The import-scan control (tests/security/test_no_external_egress.py)
+# enforces that single-door property. Already present in the venv (0.28.1); a
+# bound of >=0.28,<0.29 tracks it. No new install required.
+[project]
+name = "blarai"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=46,<47",
+    "httpx>=0.28,<0.29",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = [
+    "shared/tests",
+    "services/policy_agent/tests",
+    "services/assistant_orchestrator/tests",
+    "services/semantic_router/tests",
+    "services/ui_gateway/tests",
+    "services/ui_shell/tests",
+    "launcher/tests",
+    "tests/integration",
+    "tests/security",
+    "tests/harness",
+    "tests/pa_quality_benchmark",
+    "tests/substrate_benchmark",
+    "tools/tests",
+    "tools/perf_contrib/tests",
+]
+addopts = "--strict-markers -v --import-mode=importlib -m 'not slow and not hardware and not winui'"
+markers = [
+    "asyncio: mark a test as an asyncio coroutine",
+    "slow: real-hardware (TPM) or real-socket-timeout tests, deselected by default (run with pytest -m slow)",
+    "hardware: requires real OpenVINO models on the GPU/CPU; deselected by default (run with pytest -m hardware tests/harness)",
+    "winui: drives the real WinUI window via UI Automation (needs a free display + built exe + BlarAI closed); deselected by default (run with pytest -m winui tests/harness)",
+]
+asyncio_mode = "auto"

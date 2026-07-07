@@ -1,0 +1,42 @@
+{
+  "all_fail_closed": true,
+  "baseline_restore": {
+    "orchestrator_config_sha256_after": "674a20e467e7b1cc5cbab34c549a15ee8ebc3f61d1ad30b86d505d3bf08c2215",
+    "orchestrator_config_sha256_before": "674a20e467e7b1cc5cbab34c549a15ee8ebc3f61d1ad30b86d505d3bf08c2215",
+    "policy_config_sha256_after": "81f1e9c5f540a9110fc75a0e1e506f7ea395d152b7cbb866b9beccd5e72de3d7",
+    "policy_config_sha256_before": "81f1e9c5f540a9110fc75a0e1e506f7ea395d152b7cbb866b9beccd5e72de3d7",
+    "restored": true
+  },
+  "milestone": "Operational Exit Milestone 3",
+  "scenario_count": 2,
+  "scenarios": [
+    {
+      "activation_evidence_path": "phase2_gates\\evidence\\uat25_runs\\fi_01_pa_runtime_mode_mismatch_activation.json",
+      "disposition": "FAIL",
+      "expected_fail_closed_fingerprint_codes": [
+        "PA_CFG_RUNTIME_MODE_MISMATCH"
+      ],
+      "fail_closed": true,
+      "injected_condition": "policy_agent.default.toml runtime.deployment_mode set to guest",
+      "observed_fingerprint_codes": [
+        "PA_CFG_RUNTIME_MODE_MISMATCH"
+      ],
+      "scenario_id": "FI-01"
+    },
+    {
+      "activation_evidence_path": "phase2_gates\\evidence\\uat25_runs\\fi_02_ao_runtime_mode_mismatch_activation.json",
+      "disposition": "FAIL",
+      "expected_fail_closed_fingerprint_codes": [
+        "AO_CFG_RUNTIME_MODE_MISMATCH"
+      ],
+      "fail_closed": true,
+      "injected_condition": "assistant_orchestrator.default.toml runtime.deployment_mode set to guest",
+      "observed_fingerprint_codes": [
+        "AO_CFG_RUNTIME_MODE_MISMATCH"
+      ],
+      "scenario_id": "FI-02"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "timestamp": "2026-02-25T16:20:52.568232+00:00"
+}

@@ -1,0 +1,725 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sprint 11 EA-3 prompt -- SWAGR Template Cross-Repo Amendment
+  Authored by SDO 2026-05-12 per docs/P5_TASK11_SDO_CONTINUATION_v1.0.xml.
+  Staged for Co-Lead Phase 2 completion review before EA Code pickup.
+  Strictly serial after EA-2 (both BlarAI + devplatform sides landed).
+  BlarAI-only EA -- no devplatform writes.
+-->
+<ea_prompt sprint_id="11" ea_number="3" descriptor="swagr-cross-repo-template">
+
+  <parent_head>4fb1e7c</parent_head>
+  <devplatform_parent_head>674a0a9</devplatform_parent_head>
+
+  <parent_head_capture_note>
+    Captured at SDO authoring time. EA must re-capture at the start of
+    execution via `git rev-parse HEAD` on BlarAI (and confirm devplatform
+    HEAD via `cd C:\Users\mrbla\devplatform; git log --oneline -1`) and
+    substitute live values into the comprehension comment. EA-3 is
+    BlarAI-only writes; the devplatform HEAD is a sanity reference for
+    EA-2-landed confirmation, not an amendment target.
+  </parent_head_capture_note>
+
+  <required_attachments>
+    <attachment path="docs/sprints/sprint_11/strategic_design_vision.md" reason="Authoritative scope; SS5.1 EA-3 deliverable specification; SS5.2 non-goals (no ADR/DEC amendments, no test-file edits, no production source); SS5.3 EA-3 boundary on whether to amend the SCR template symmetrically (EA's choice within boundary); SS7 sequencing (strictly after EA-2)."/>
+    <attachment path="docs/P5_TASK11_SDO_CONTINUATION_v1.0.xml" reason="Sprint 11 continuation; lessons L-12 (verbatim comprehension recitation), L-13 (parent_head capture), L-15 (working-set declaration), L-22 (mature-not-minimal floors), L-25 (evidence-first: quote source documents verbatim, do not paraphrase)."/>
+    <attachment path="docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md" reason="Primary amendment target -- current state at lines 184-215 (SS5 Scope integrity analysis; SS5.4 Ghost commits already exists). Read end-to-end before editing to identify the precise insertion location (within SS5.4 as SS5.4.1, OR as new SS5.5, OR as expansion of SS5.4 with cross-repo applicability gate)."/>
+    <attachment path="docs/sprints/_templates/strategic_design_vision_template.md" reason="Secondary amendment target -- SS8.4 Parallel-Sprint Authorization at lines 124-175 currently references `docs/governance/parallel-sprints.md` (BlarAI-relative). That file moved to devplatform per Sprint 10 doctrine split; the relative path is now a broken pointer. Fix to absolute devplatform path."/>
+    <attachment path="docs/sprints/_templates/strategic_completion_report_template.md" reason="Tertiary amendment target -- EVALUATE whether the SCR template has a SS5.4-equivalent ghost-commit subsection that warrants symmetric cross-repo amendment. SDV SS5.1 EA-3 says optional: amend if present, skip if absent. Read end-to-end to make the call; document the choice in the comprehension comment."/>
+    <attachment path="docs/sprints/sprint_10/Strategic_Work_Analysis_and_Gap_Report_Sprint_10_*.md" reason="Sprint 10 SWAGR -- the manual cross-repo SS5.4 ghost-commit sweep at lines ~236-242 + the formal MINOR gap #6 row at line 641 that recommends template amendment. EA-3 codifies the manual style into the template. Confirm exact filename via Glob at EA start."/>
+    <attachment path="docs/sprints/sprint_9/Strategic_Work_Analysis_and_Gap_Report_Sprint_9_*.md" reason="Sprint 9 SWAGR SS9.3(d) -- the original prediction (`SWAGR template lacks cross-repo section`) that Sprint 10 confirmed. EA-3 closes the loop on this prediction; cite both SWAGRs in the new template subsection's revision-log entry."/>
+    <attachment path="docs/governance/parallel-sprints.md" reason="VERIFY THIS FILE DOES NOT EXIST IN BlarAI (it moved to devplatform per Sprint 10 EA-3). Test-Path C:\Users\mrbla\BlarAI\docs\governance\parallel-sprints.md should return False; Test-Path C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md should return True. Confirms the broken-pointer fix surface."/>
+    <attachment path="C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md" reason="The operational reference target for the SDV template SS8.4 pointer fix AND for the new SWAGR template cross-repo subsection. Read end-to-end so the new template subsection's prose grounds in what the doctrine actually says about cross-repo sweeps."/>
+  </required_attachments>
+
+  <pre_flight>
+    Sprint 11 EA-3 is the THIRD EA in Sprint 11. EA-1 (DEC bundle) and
+    EA-2 (Active State refresh procedure) are landed on both BlarAI main
+    and devplatform main. EA-3 is BlarAI-only writes: it amends three
+    BlarAI template files (SWAGR + SDV + optional SCR), updates each
+    amended template's revision log, and lands a Q1-1 ledger entry.
+
+    Working-set verification. Before any writes, Test-Path each of:
+      - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_work_analysis_and_gap_report_template.md
+        (must return True -- primary amendment target)
+      - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_design_vision_template.md
+        (must return True -- secondary amendment target)
+      - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_completion_report_template.md
+        (must return True -- tertiary, EA evaluates whether to amend)
+      - C:\Users\mrbla\BlarAI\docs\ledger\ (must return True -- ledger destination)
+      - C:\Users\mrbla\BlarAI\docs\governance\parallel-sprints.md
+        (MUST return False -- confirms Sprint 10 doctrine split landed; the
+         SDV template pointer is broken because the file no longer lives here)
+      - C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md
+        (MUST return True -- confirms target of the fixed absolute pointer)
+
+    Conflict check: no prior EA-3 staged or finalized prompt should exist
+    in docs/scheduled/ea_queue/ outside the staging directory; no prior
+    ledger entry with the EA-3 slug should exist:
+      cd C:\Users\mrbla\BlarAI
+      Test-Path docs\scheduled\ea_queue\*_ea3_*.xml
+      Get-ChildItem docs\ledger\ -Filter '*sprint11_ea3*.md'
+    Expected: False / empty. If conflicts, STOP and escalate -- do NOT
+    overwrite.
+
+    Fleet-Pause SOP (per feedback_pause_fleet_for_git_work). PAUSE the
+    fleet before any checkout or git work:
+
+      $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.pause_fleet('Sprint 11 EA-3 SWAGR cross-repo template amendment', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      cd C:\Users\mrbla\BlarAI; git commit --allow-empty -m "chore(ops): pause fleet -- Sprint 11 EA-3 SWAGR cross-repo template"
+
+    Resume LAST, just before posting the completion comment:
+      $env:PYTHONPATH = "C:\Users\mrbla\devplatform"; python -c "from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      cd C:\Users\mrbla\BlarAI; git commit --allow-empty -m "chore(ops): unpause fleet -- Sprint 11 EA-3 done"
+
+    API-NAME GOTCHA: function is `resume_fleet`, NOT `unpause_fleet`.
+
+    Serial execution context. EA-1 and EA-2 are landed -- no parallel
+    sibling. EA-4 (test-baseline drift investigation) is gated on EA-3
+    merge per SDV SS7. Do NOT touch any EA-4 or EA-5 working-set path
+    (see negative_constraints).
+  </pre_flight>
+
+  <comprehension_gate>
+    BEFORE any edits, checkouts, or branch creation, post a comprehension
+    comment to Vikunja tracking task #410 prefixed `[agent:ea_code][phase:comprehension]`
+    containing ALL of:
+
+    1. Milestone objective in your own words: what template amendments
+       you are authoring; why now (Sprint 9 SWAGR SS9.3(d) prediction +
+       Sprint 10 SWAGR gap #6 confirmation -- two-sprint signal to
+       codify the cross-repo cross-repo ghost-commit sweep into the
+       SWAGR template); who consumes the amendments downstream (the
+       Sprint Auditor authoring the first post-EA-3 SWAGR -- Sprint 11's
+       own SWAGR may exercise the new subsection, since Sprint 11 itself
+       is cross-repo).
+
+    2. Per-deliverable work-item summary. WI-1 through WI-7 -- one
+       sentence each in your own words.
+
+    3. Files to create/modify (absolute paths). EXACTLY between three
+       and five files depending on SCR-symmetric-amendment choice:
+       - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_work_analysis_and_gap_report_template.md (amend -- new cross-repo subsection + revision-log row)
+       - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_design_vision_template.md (amend -- SS8.4 broken pointer fix + revision-log row)
+       - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_completion_report_template.md (amend IFF EA-3 evaluates the SCR template has a SS5.4-equivalent ghost-commit subsection; otherwise SKIP this file -- document the skip-rationale in the comprehension comment and ledger entry)
+       - C:\Users\mrbla\BlarAI\docs\ledger\TS_sprint11_ea3_swagr-cross-repo-template.md (new; TS = UTC YYYYMMDD_HHMMSS captured at EA start)
+
+       NO other files are edited. No production source. No test code.
+       No ADR. No DEC document. No CLAUDE.md. No active_tasks.yaml.
+       No wake template. The SWAGR template insertion location is
+       SS5.4.1 OR SS5.5 (EA-3 picks within SDV SS5.3 boundary by reading
+       the existing SS5.4 "Ghost commits -- independent discovery" and
+       choosing the structurally cleaner placement; document the choice
+       in the comprehension comment).
+
+    4. Source files to read (read-only). All required_attachments above.
+
+    5. EXACT deliverable structure -- recite VERBATIM.
+
+       SWAGR template amendment
+       (docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md):
+         New subsection titled "Cross-repo ghost-commit sweep" with:
+           (a) one-paragraph applicability gate (>= 3 sentences) stating
+               "fill out this subsection only when the sprint writes to
+               more than one repo's main branch during the sprint window;
+               skip otherwise with a verbatim 'N/A -- single-repo sprint'
+               note";
+           (b) populated table template with columns: `Repo | Commit
+               window (HEAD-pre-sprint -> HEAD-post-sprint) | Sweep
+               result | Substantive findings | Requires LA attention?`
+               -- show one example row referencing the Sprint 10 sweep
+               pattern;
+           (c) prose guidance (>= 2 paragraphs) explaining the cross-repo
+               classification (TRIVIAL / MINOR_UNDOC / SCOPE_DRIFT /
+               INFRASTRUCTURE_FIX) and the cross-repo escalation surface
+               -- some commits are out-of-sprint but cross-repo-unblocking
+               (see Sprint 10 wake-template absolute-path fix pattern);
+           (d) pointer line citing the operational reference:
+               `Reference: C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md`
+               (absolute path -- BlarAI -> devplatform cross-repo pointer
+               style established by Sprint 10 EA-3).
+         Length floor: >= 25 populated lines of new content (excluding
+         insertion-context lines).
+         Insertion location: EA-3 picks SS5.4.1 (within current SS5.4)
+         OR SS5.5 (parallel to current SS5.4); the rationale is
+         documented in the comprehension comment AND in the SWAGR
+         template revision-log entry.
+
+       SDV template amendment
+       (docs/sprints/_templates/strategic_design_vision_template.md):
+         Section SS8.4 contains the broken pointer at line 138:
+         `Reference: docs/governance/parallel-sprints.md for the full
+         best-practice guide.` That relative path is BlarAI-relative;
+         post Sprint 10 doctrine split, the file lives on devplatform.
+         Replace with the absolute devplatform path:
+         `Reference: C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md`.
+         OPTIONAL (within SDV SS5.1 EA-3 scope): add a cross-repo row
+         to the SS8.4.1 shared-artifact table reflecting that a sprint
+         writing to both repos lists each repo's main as a shared
+         artifact with `serialize-at-co-lead` mitigation. EA-3 picks
+         within scope; document choice in the comprehension comment.
+         Net new lines: >= 1 (pointer fix) + >= 0-5 (optional row).
+
+       SCR template amendment
+       (docs/sprints/_templates/strategic_completion_report_template.md):
+         EVALUATE: does the SCR template carry a SS5.4-equivalent
+         ghost-commit subsection that would benefit from symmetric
+         cross-repo amendment? If YES, amend symmetrically using the
+         SWAGR template insertion pattern (>= 10 lines of new content;
+         pointer to the operational reference; revision-log entry).
+         If NO, SKIP this file and document the skip-rationale in the
+         comprehension comment + ledger entry. The SDV explicitly
+         permits skip per SS5.3 boundary.
+
+       Template revision-log entries:
+         Each amended template's revision-log table (Appendix-style at
+         end of file) gets a new row recording the v_prev -> v_new
+         transition with date + change summary. Each row cites Sprint 9
+         SWAGR SS9.3(d) (original prediction) + Sprint 10 SWAGR gap #6
+         (confirmation) + Sprint 11 EA-3 (this work) as the motivation
+         chain. Increment the template version (if a frontmatter version
+         field exists; check at EA start).
+
+       Ledger entry (docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md):
+         Q1-1 schema per docs/ledger/README.md. Frontmatter (ledger_id,
+         date, sprint_id=11, entry_type=EA, predecessor, branch=
+         feature/p5-task11-ea3-swagr-cross-repo-template, merge_commit=
+         null, disposition=COMPLETE) -> SSSummary -> SSDeliverables ->
+         SSFiles Changed (BlarAI commit) -> SSQuality Gate -> SSDEC
+         References (link to DEC-17 ledger-format if EA-1 has landed,
+         which it has; link to DEC-15 sprint-lifecycle).
+
+    6. ORACLE expectation (verbatim, executed at EA close after the
+       BlarAI commit lands):
+
+       cd C:\Users\mrbla\BlarAI
+       git diff main...feature/p5-task11-ea3-swagr-cross-repo-template --name-only
+       Expected (sorted, SCR-amended case -- 4 files):
+         docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md
+         docs/sprints/_templates/strategic_completion_report_template.md
+         docs/sprints/_templates/strategic_design_vision_template.md
+         docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md
+
+       Expected (sorted, SCR-skipped case -- 3 files):
+         docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md
+         docs/sprints/_templates/strategic_design_vision_template.md
+         docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md
+
+       Any other path -> ORACLE violation; STOP and report.
+
+    7. Working-set declaration (L-15). Verbatim: "I write to exactly
+       three or four absolute paths (three if I skip the optional SCR
+       template amendment; four if I include it). All four are
+       BlarAI-only. I read the devplatform parallel-sprints.md doctrine
+       as a content source for the new SWAGR subsection but do NOT
+       edit it -- devplatform writes are out-of-scope for EA-3 per SDV
+       SS5.1. I touch no test file, no production source, no ADR, no
+       existing DEC, no CLAUDE.md, no active_tasks.yaml, no wake
+       template. If I discover a defect in a doctrine file or a
+       contradiction between the existing template content and the
+       Sprint 10 SWAGR manual sweep style, I STOP and escalate via the
+       comprehension comment; I do NOT silently 'reconcile'."
+
+    8. Mature-not-minimal acknowledgment (L-22). Verbatim: "Mature not
+       minimal: SWAGR new subsection >= 25 populated lines with a
+       SUBSTANTIVE example row grounded in the Sprint 10 sweep pattern
+       (not a `<placeholder>` row); ledger entry >= 35 lines content;
+       template revision-log rows are descriptive (>= 1 sentence per
+       row, citing motivation chain), not one-word entries. Padding to
+       hit the floor is rejected -- a focused 28-line subsection with
+       substantive content beats a 50-line subsection padded with
+       redundant boilerplate."
+
+    9. Evidence-first discipline (L-25). Verbatim: "Every claim about
+       what the existing templates say, what the Sprint 9/10 SWAGRs
+       predicted/confirmed, or what the devplatform parallel-sprints.md
+       doctrine prescribes is grounded in an empirical file read at the
+       parent_head, with line-number citations in the comprehension
+       comment. No paraphrasing of source text in the new template
+       subsection -- direct quotes or close paraphrases with
+       attribution."
+
+    10. No-cross-repo-write acknowledgment (Sprint-11-specific).
+        Verbatim: "EA-3 is BlarAI-only writes. I do NOT touch any path
+        under C:\Users\mrbla\devplatform\ for editing. I read
+        devplatform parallel-sprints.md as a content source for prose
+        and pointer-target verification; I do not modify it. EA-2
+        amended the devplatform Co-Lead wake template -- EA-3 does not
+        amend any devplatform file."
+
+    11. ADR / DEC non-amendment acknowledgment. Verbatim: "EA-3 does
+        not author or amend any ADR or DEC document. The Sprint 11
+        DEC-16/17/18 bundle is EA-1's purview (landed). DEC-19 (cross-
+        reference style decision record) is EA-5's optional purview.
+        EA-3 ships template amendments only, with revision-log rows
+        recording the change."
+
+    12. Risks and ambiguities. State any unresolved understanding
+        before starting -- especially: (a) SWAGR insertion location
+        (SS5.4.1 vs SS5.5) -- pick and explain; (b) SCR symmetric
+        amendment ship-or-skip choice -- pick and explain; (c) optional
+        SDV SS8.4.1 cross-repo row addition ship-or-skip -- pick and
+        explain. Each choice is within SDV SS5.3 boundary; SDO does
+        NOT pre-decide these.
+
+    After posting the comprehension comment, apply label `Gate:Pending-SDO`
+    (id 9) on Vikunja task #410 and STOP. WAIT for SDO Phase 1a review
+    verdict before doing any work. Do NOT bundle downstream work with
+    the comprehension comment.
+  </comprehension_gate>
+
+  <milestone>
+    <objective>Codify the cross-repo ghost-commit sweep pattern into
+      the canonical BlarAI SWAGR template (new subsection within SS5
+      Scope integrity analysis), fix the SDV template SS8.4 broken
+      pointer to parallel-sprints.md (which moved to devplatform in
+      Sprint 10 EA-3), and optionally amend the SCR template
+      symmetrically if it carries a ghost-commit-equivalent subsection.
+      Update each amended template's revision log. Land one BlarAI
+      feature-branch commit (merged via Co-Lead trusted_scope) plus
+      Q1-1 ledger entry. Closes Sprint 9 SWAGR SS9.3(d) prediction
+      and Sprint 10 SWAGR gap #6 confirmation.</objective>
+    <ea_number>3</ea_number>
+    <branch>feature/p5-task11-ea3-swagr-cross-repo-template</branch>
+    <ledger_entry>docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md</ledger_entry>
+    <size>S</size>
+    <size_rationale>Template-surgical edits across two-or-three BlarAI template files: new SWAGR subsection (~25-35 lines) + SDV pointer fix (~1-5 lines) + optional SCR symmetric amendment (~10-15 lines) + revision-log rows (~3-9 lines) + ledger entry (~35-50 lines). Aggregate ~75-115 lines, all docs.</size_rationale>
+  </milestone>
+
+  <work_items>
+
+    <wi id="1">
+      WI-1: Pre-flight conflict + dependency check.
+
+      Verify input file presence via Test-Path:
+        - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_work_analysis_and_gap_report_template.md -- must return True
+        - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_design_vision_template.md -- must return True
+        - C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_completion_report_template.md -- must return True
+        - C:\Users\mrbla\BlarAI\docs\ledger\ -- must return True
+        - C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md -- must return True (the post-Sprint-10 destination)
+
+      Verify the SDV template's broken pointer surface:
+        - Test-Path C:\Users\mrbla\BlarAI\docs\governance\parallel-sprints.md -- MUST return False (confirms Sprint 10 EA-3 doctrine split landed; the BlarAI-relative pointer in SDV template SS8.4 is the broken pointer to fix)
+
+      Verify no prior EA-3 artifact exists:
+        - Get-ChildItem C:\Users\mrbla\BlarAI\docs\scheduled\ea_queue\ -Filter '*_ea3_*.xml' -- expected: empty (or only the EA-3 staging file at docs\scheduled\ea_queue\staging\, which is THIS prompt)
+        - Get-ChildItem C:\Users\mrbla\BlarAI\docs\ledger\ -Filter '*sprint11_ea3*.md' -- expected: empty
+
+      Verify EA-1 + EA-2 commits landed on main:
+        - cd C:\Users\mrbla\BlarAI; git log --oneline main | Select-String 'sprint:11.*EA-1|Sprint 11 EA-1|sprint:11.*EA-2|Sprint 11 EA-2' | Select-Object -First 4
+        - cd C:\Users\mrbla\devplatform; git log --oneline main | Select-String 'sprint:11' | Select-Object -First 4
+        - Expected: EA-1 + EA-2 merge/commit lines visible on BOTH repos.
+
+      Read each amended template end-to-end and identify the precise
+      insertion locations:
+        - SWAGR template: locate SS5.4 "Ghost commits -- independent
+          discovery" (line ~206 at parent_head). Decide insertion
+          location: SS5.4.1 (sub-subsection within current SS5.4) OR
+          SS5.5 (new parallel subsection after SS5.4). Document the
+          choice in the comprehension comment with the structural
+          rationale.
+        - SDV template: locate SS8.4 paragraph at line ~138 containing
+          the broken pointer `docs/governance/parallel-sprints.md`.
+          Capture verbatim the surrounding sentence for the commit-body
+          before/after diff cite.
+        - SCR template: scan the table of contents / section headers
+          end-to-end. Determine whether a SS5.4-equivalent ghost-commit
+          subsection exists. Document the YES/NO + ship-or-skip
+          rationale in the comprehension comment.
+
+      Capture all Test-Path outputs + section-locating outputs verbatim
+      for the ledger entry's SSQuality Gate section.
+    </wi>
+
+    <wi id="2">
+      WI-2: Amend the SWAGR template. File:
+        C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_work_analysis_and_gap_report_template.md
+
+      Insert a new subsection (SS5.4.1 within current SS5.4 OR SS5.5
+      parallel to SS5.4 -- WI-1 chose) titled `Cross-repo ghost-commit
+      sweep`.
+
+      Required content for the new subsection (recite verbatim in
+      comprehension):
+
+        (a) Applicability gate paragraph (>= 3 sentences):
+            - State that this subsection is filled out only when the
+              sprint writes to more than one repo's main branch during
+              the sprint window (e.g., a BlarAI + devplatform cross-repo
+              sprint per the Sprint 10 / Sprint 11 pattern).
+            - State the skip convention: write `N/A -- single-repo
+              sprint` and proceed.
+            - Cross-reference the SDV template SS8.4 Parallel-Sprint
+              Authorization + Shared-Artifact Audit (companion
+              authorization-side audit; this SWAGR subsection is the
+              post-hoc verification side).
+
+        (b) Sweep table template:
+            | Repo | Commit window (HEAD-pre-sprint -> HEAD-post-sprint) | Sweep result | Substantive findings | Requires LA attention? |
+            |---|---|---|---|---|
+            | `BlarAI` | `<hash>...<hash>` | `<N commits inspected, M ghost (non-sprint-attributable)>` | `<TRIVIAL / MINOR_UNDOC / SCOPE_DRIFT / INFRASTRUCTURE_FIX>` | `YES / NO` |
+            | `devplatform` | `<hash>...<hash>` | `<N commits inspected, M ghost>` | `<classification>` | `YES / NO` |
+
+        (c) Guidance prose (>= 2 paragraphs):
+            - Paragraph 1: classification taxonomy. TRIVIAL =
+              whitespace / typo. MINOR_UNDOC = small but undocumented
+              scope addition. SCOPE_DRIFT = material undocumented
+              addition warranting LA attention. INFRASTRUCTURE_FIX =
+              cross-repo-unblocking commit attributed to LA/Co-Lead
+              outside the sprint's EA chain (see Sprint 10 wake-template
+              absolute-path fix sequence for the canonical pattern).
+            - Paragraph 2: cross-repo escalation surface. Some commits
+              are out-of-sprint but cross-repo-unblocking and must be
+              attributed correctly -- they are not EA scope drift; they
+              are LA/Co-Lead fleet-tooling fixes that unblock the
+              cross-repo sprint. Mis-classifying such commits as
+              SCOPE_DRIFT produces false-positive audit signal.
+
+        (d) Pointer line citing the operational reference:
+            `Reference: C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md`
+            (absolute path; BlarAI -> devplatform cross-repo pointer
+            style as established by Sprint 10 EA-3.)
+
+      Length floor: >= 25 populated lines of new content (excluding
+      adjacent insertion-context lines). Mature-not-minimal: the sample
+      row in the sweep table is GROUNDED in the Sprint 10 SWAGR §5.4
+      manual-sweep pattern (real commit-window shape, real
+      classification value) -- not `<placeholder>` text.
+
+      Add a SWAGR template revision-log row (Appendix at end-of-file)
+      recording the change. The row format follows the existing log
+      style; the row text cites Sprint 9 SWAGR §9.3(d) prediction +
+      Sprint 10 SWAGR gap #6 confirmation + Sprint 11 EA-3 (this work)
+      motivation chain.
+    </wi>
+
+    <wi id="3">
+      WI-3: Amend the SDV template. File:
+        C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_design_vision_template.md
+
+      Two surgical edits within SS8.4 Parallel-Sprint Authorization &
+      Shared-Artifact Audit:
+
+        (i) Pointer fix at line ~138 (verify exact line at WI-1):
+            Replace the relative path
+              `Reference: docs/governance/parallel-sprints.md for the full best-practice guide.`
+            with the absolute devplatform path
+              `Reference: C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md for the full best-practice guide.`
+            (Adjust the exact surrounding prose only as needed for the
+            substituted path; preserve sentence flow.)
+
+        (ii) OPTIONAL within SDV §5.1 EA-3 scope: add a cross-repo row
+            to the SS8.4.1 shared-artifact table (lines ~140-150).
+            Suggested row:
+              | `devplatform main` (when cross-repo) | Y (via direct-to-main commit) | M (shared-mutable across cross-repo sprints) | Low (Co-Lead serializes; single direct-to-main commit per EA) | serialize-at-co-lead |
+            EA-3 picks ship-or-skip within scope; document choice in
+            comprehension comment + ledger entry.
+
+      Add an SDV template revision-log row (Appendix A at end-of-file)
+      recording the change, with motivation-chain citation matching
+      the SWAGR template row's structure.
+
+      If a frontmatter `sdv_version` or `template_version` field exists
+      and is incrementable, bump it; otherwise leave unchanged.
+
+      Verification: independent re-grep at completion time --
+        Select-String -Path docs/sprints/_templates/strategic_design_vision_template.md -Pattern 'docs/governance/parallel-sprints.md'
+        Expected: ZERO matches (the relative-path string no longer
+        appears). The absolute path
+        `C:\Users\mrbla\devplatform\docs\governance\parallel-sprints.md`
+        appears at least once. Capture both grep results verbatim in
+        the ledger entry SSQuality Gate.
+    </wi>
+
+    <wi id="4">
+      WI-4 (CONDITIONAL): Symmetric SCR template amendment. File:
+        C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_completion_report_template.md
+
+      Conditional on WI-1's evaluation: amend IFF the SCR template
+      carries a §5.4-equivalent ghost-commit-discovery subsection or
+      a sweep-style subsection that would benefit from symmetric
+      cross-repo amendment.
+
+      If YES, amend symmetrically: append the same `Cross-repo ghost-
+      commit sweep` content shape as WI-2 (>= 10 lines new content +
+      pointer to operational reference + revision-log row). The SCR-side
+      subsection emphasizes self-report disclosure (SCR is the
+      sprint's own claim) vs SWAGR's independent verification posture.
+
+      If NO, SKIP this file entirely. Document the skip-rationale in:
+        - the comprehension comment (under risks/ambiguities item (b))
+        - the ledger entry's §Summary (one sentence)
+
+      The SDV explicitly permits skip per §5.3 boundary.
+
+      If amended, the SCR template's revision-log gets the same
+      motivation-chain citation row.
+    </wi>
+
+    <wi id="5">
+      WI-5: Commit BlarAI side. Create feature branch and commit:
+        cd C:\Users\mrbla\BlarAI
+        git checkout -b feature/p5-task11-ea3-swagr-cross-repo-template
+        git add docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md
+        git add docs/sprints/_templates/strategic_design_vision_template.md
+        git add docs/sprints/_templates/strategic_completion_report_template.md   (IF amended -- WI-4 YES)
+        git add docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md
+        git commit -m "[sprint:11][role:ea_code][phase:completion] EA-3 SWAGR cross-repo template + SDV pointer fix + ledger"
+
+      Commit body cites: (a) the two-sprint motivation chain (Sprint 9
+      SWAGR §9.3(d) prediction + Sprint 10 SWAGR gap #6 confirmation);
+      (b) the structural choice (§5.4.1 vs §5.5 insertion +
+      SCR-amended-or-skipped); (c) the SDV §8.4 pointer-fix verbatim
+      before/after (one line each); (d) one-sentence statement that
+      EA-3 is BlarAI-only writes (no devplatform companion commit
+      this EA).
+
+      DO NOT merge to BlarAI main yourself. Leave for Co-Lead
+      trusted_scope merge at Phase 3.
+    </wi>
+
+    <wi id="6">
+      WI-6: BlarAI ledger entry on the feature branch. Path:
+        C:\Users\mrbla\BlarAI\docs\ledger\TS_sprint11_ea3_swagr-cross-repo-template.md
+      where TS = UTC YYYYMMDD_HHMMSS captured at EA start.
+
+      Frontmatter (Q1-1 schema per docs/ledger/README.md, formalized
+      by EA-1's DEC-17):
+        ---
+        ledger_id: TS_sprint11_ea3_swagr-cross-repo-template
+        date: YYYY-MM-DD
+        sprint_id: 11
+        entry_type: EA
+        predecessor: <ledger_id of most recent entry in docs/ledger/ at EA start>
+        branch: feature/p5-task11-ea3-swagr-cross-repo-template
+        merge_commit: null
+        disposition: COMPLETE
+        ---
+
+      Body sections:
+        §Summary (3-5 sentences): motivation chain (Sprint 9
+          prediction -> Sprint 10 confirmation -> Sprint 11 EA-3
+          codification); SWAGR insertion-location choice rationale;
+          SCR ship-or-skip choice rationale; SDV §8.4.1 row
+          ship-or-skip choice rationale.
+        §Deliverables (bulleted, absolute paths): SWAGR template path
+          + new-subsection line count; SDV template path + net-line
+          change; SCR template path + net-line change (or "skipped");
+          this ledger entry.
+        §Files Changed: single sub-table for the BlarAI commit hash +
+          paths.
+        §Quality Gate: verbatim WI-1 Test-Path outputs + WI-3
+          before/after grep outputs for the SDV pointer fix +
+          line-count grep outputs for the SWAGR new subsection (e.g.
+          `Select-String -Pattern '^### 5\.4\.1' OR '^### 5\.5'`).
+        §DEC References: link to DEC-17 (Q1-1 ledger format -- landed
+          in EA-1); link to DEC-15 (sprint-lifecycle, template
+          ownership context).
+
+      Length floor: >= 35 lines content (excluding frontmatter).
+    </wi>
+
+    <wi id="7">
+      WI-7: Post-commit ORACLE verification + completion comment
+      composition. Execute:
+
+        cd C:\Users\mrbla\BlarAI
+        git diff main...feature/p5-task11-ea3-swagr-cross-repo-template --name-only
+
+      Expected output is one of the two shapes documented in the
+      comprehension gate item (6). Capture the verbatim output.
+
+      Additional Co-Lead-audit verification commands (capture verbatim
+      output for the completion comment):
+        (Get-Content C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_work_analysis_and_gap_report_template.md | Measure-Object -Line).Lines
+        Select-String -Path C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_work_analysis_and_gap_report_template.md -Pattern 'Cross-repo ghost-commit sweep'
+        Select-String -Path C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_design_vision_template.md -Pattern 'C:\\Users\\mrbla\\devplatform\\docs\\governance\\parallel-sprints.md'
+        Select-String -Path C:\Users\mrbla\BlarAI\docs\sprints\_templates\strategic_design_vision_template.md -Pattern 'docs/governance/parallel-sprints.md'
+        # Expected: SWAGR new subsection title found >= 1 time;
+        # SDV absolute-path pointer found >= 1 time;
+        # SDV old relative-path pointer found ZERO times.
+
+      Verify no out-of-scope file appears in the diff. Any out-of-scope
+      file -> ORACLE violation; STOP and report.
+
+      Do NOT push or merge. Leave for Co-Lead trusted_scope merge.
+    </wi>
+
+  </work_items>
+
+  <negative_constraints>
+    DO NOT, under any circumstances:
+
+    1. Touch any path under C:\Users\mrbla\devplatform\ for editing.
+       EA-3 is BlarAI-only writes. devplatform parallel-sprints.md is
+       READ-ONLY (content source for prose + pointer-target
+       verification). EA-2 amended the devplatform Co-Lead wake
+       template; EA-3 does not amend any devplatform file.
+
+    2. Author or amend any ADR or DEC document. The Sprint 11
+       DEC-16/17/18 bundle is EA-1's purview (landed). DEC-19 (cross-
+       reference style decision record) is EA-5's optional purview.
+       EA-3 ships template amendments only.
+
+    3. Touch any test file or production source. No edits to services/,
+       shared/, launcher/, tests/, pyproject.toml, conftest.py.
+
+    4. Edit C:\Users\mrbla\BlarAI\CLAUDE.md, ACTIVE_SPRINT.md,
+       docs/active_tasks.yaml, docs/TEST_GOVERNANCE.md,
+       docs/POST_OPERATIONAL_MATURATION_LEDGER.md (frozen at Entry 52
+       per DEC-17), or any ADR.
+
+    5. Touch any EA-4 or EA-5 working-set path. No edits to
+       docs/sprints/sprint_11/test_baseline_drift_investigation.md
+       (EA-4), .github/copilot-instructions.md (EA-5),
+       tools/vikunja_mcp/README.md (EA-5),
+       C:\Users\mrbla\devplatform\docs\scheduled\wake_templates\sprint_auditor.md
+       (EA-5).
+
+    6. Touch any EA-1 or EA-2 working-set path. No edits to
+       C:\Users\mrbla\devplatform\docs\decisions\DEC-16_*.md / DEC-17_*.md /
+       DEC-18_*.md (EA-1); no edits to
+       C:\Users\mrbla\BlarAI\docs\runbooks\active_state_refresh.md (EA-2);
+       no edits to C:\Users\mrbla\BlarAI\tools\active_state_refresh.ps1
+       (EA-2); no edits to
+       C:\Users\mrbla\devplatform\docs\scheduled\wake_templates\co_lead_architect.md
+       (EA-2).
+
+    7. Touch any wake template on either repo. Sprint 11 wake-template
+       work is EA-2 (Co-Lead) + EA-5 (Sprint Auditor) exclusive.
+
+    8. Invent new gate labels, lifecycle phases, or EA roles. EA-3
+       ratifies the existing Sprint 9 / Sprint 10 cross-repo sweep
+       pattern; it does not invent.
+
+    9. Push to a remote main, force-push, or bypass Co-Lead
+       trusted_scope merge. The branch lands via the standard
+       feature-branch + Co-Lead merge flow.
+
+    10. Bundle downstream work with the comprehension comment. Post
+        comprehension; apply Gate:Pending-SDO; STOP. Wait for SDO
+        Phase 1a verdict before any edits.
+
+    11. Author the new SWAGR cross-repo subsection with placeholder
+        content (`<example>`, `<TBD>`, etc.). The mature-not-minimal
+        floor requires a grounded example row built from the Sprint 10
+        manual-sweep pattern.
+
+    12. Silently reconcile inconsistencies between existing template
+        content and the Sprint 10 SWAGR manual-sweep style. If a
+        contradiction is found, STOP and escalate via the comprehension
+        comment.
+  </negative_constraints>
+
+  <mature_not_minimal>
+    SWAGR new subsection >= 25 populated lines with a SUBSTANTIVE
+    example row in the sweep table grounded in the Sprint 10 SWAGR
+    §5.4 manual-sweep pattern (real classification value, real
+    commit-window shape -- not placeholder text). Guidance prose
+    spans >= 2 paragraphs with the cross-repo escalation surface
+    explicitly called out (infrastructure-fix vs scope-drift
+    classification distinction). SDV pointer fix preserves
+    sentence flow; the optional shared-artifact-table row is shipped
+    when it adds clarity vs noise (EA-3 judges). SCR amendment ships
+    iff the SCR template carries a parallel ghost-commit subsection;
+    skipped otherwise with a written rationale. Ledger entry >= 35
+    lines content with verbatim Quality Gate evidence (Test-Path +
+    grep before/after). Padding to hit floors is rejected -- a
+    focused 28-line SWAGR subsection with substantive content beats
+    a 50-line subsection padded with redundant cross-references.
+  </mature_not_minimal>
+
+  <cross_repo_ordering>
+    EA-3 is BlarAI-only writes. There is no cross-repo commit ordering
+    concern within EA-3 itself. EA-1 + EA-2 cross-repo commits are
+    PRE-CONDITIONS that WI-1 verifies. The new SWAGR subsection
+    REFERENCES devplatform parallel-sprints.md by absolute path; the
+    devplatform side is read-only.
+  </cross_repo_ordering>
+
+  <oracle>
+    At EA close, after the BlarAI feature-branch commit lands:
+
+      cd C:\Users\mrbla\BlarAI
+      git diff main...feature/p5-task11-ea3-swagr-cross-repo-template --name-only
+
+    Expected (sorted, SCR-amended case -- 4 files):
+      docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md
+      docs/sprints/_templates/strategic_completion_report_template.md
+      docs/sprints/_templates/strategic_design_vision_template.md
+      docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md
+
+    Expected (sorted, SCR-skipped case -- 3 files):
+      docs/ledger/TS_sprint11_ea3_swagr-cross-repo-template.md
+      docs/sprints/_templates/strategic_design_vision_template.md
+      docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md
+
+    Any other path = ORACLE violation. EA captures the diff verbatim
+    in the completion comment on Vikunja task #410.
+
+    Additional verification commands for Co-Lead audit:
+      Select-String -Path docs/sprints/_templates/strategic_work_analysis_and_gap_report_template.md -Pattern 'Cross-repo ghost-commit sweep'
+      # Expected: >= 1 match (the new subsection heading)
+      Select-String -Path docs/sprints/_templates/strategic_design_vision_template.md -Pattern 'C:\\Users\\mrbla\\devplatform\\docs\\governance\\parallel-sprints.md'
+      # Expected: >= 1 match (the fixed absolute path)
+      Select-String -Path docs/sprints/_templates/strategic_design_vision_template.md -Pattern 'docs/governance/parallel-sprints.md' -SimpleMatch
+      # Expected: ZERO matches without the C:\Users\mrbla\devplatform prefix
+      # (the old broken pointer string no longer appears)
+  </oracle>
+
+  <completion>
+    After ORACLE passes, post `[agent:ea_code][phase:completion]` comment
+    on Vikunja tracking task #410 containing:
+      1. The BlarAI feature-branch commit hash. If Co-Lead trusted_scope
+         merge has already landed, include the merge commit hash too.
+      2. The git diff --name-only output verbatim.
+      3. Line counts: SWAGR new subsection, SDV pointer-fix net change,
+         SCR amendment (or "skipped"), ledger entry.
+      4. The TS timestamp used in the ledger filename.
+      5. Three EA-3 within-scope choices + one-sentence rationale each:
+         (a) SWAGR insertion location (§5.4.1 vs §5.5);
+         (b) SCR symmetric amendment (ship vs skip);
+         (c) SDV §8.4.1 cross-repo row (ship vs skip).
+      6. Confirmation that all WI-1 Test-Path checks returned the
+         expected shape (3 templates True, ledger dir True, devplatform
+         parallel-sprints.md True, BlarAI governance dir False).
+      7. Verbatim WI-7 grep outputs verifying the SWAGR subsection
+         title appears, the SDV absolute-path pointer appears, and the
+         SDV old relative-path pointer does NOT appear.
+      8. Confirmation that no negative constraint was violated -- in
+         particular: NO devplatform writes, NO ADR/DEC writes, NO
+         test/production source writes, NO touch of EA-1/2/4/5
+         working-set paths.
+
+    Apply label Gate:Pending-SDO (id 9) on task #410. STOP. WAIT for
+    SDO Phase 1b completion-review verdict.
+
+    Resume the fleet LAST BEFORE posting the completion comment --
+    ensures the fleet is unpaused for SDO's review-wake to fire cleanly.
+  </completion>
+
+  <budget_envelope>
+    Effective session cap: 60 min (+ active Budget Lift if granted).
+    TTG: 2 h wall-clock.
+    Trusted_scope merge eligibility: yes (Sprint 11 EA-3 BlarAI-side
+    working set is 3-4 doc files, aggregate ~75-115 LOC; well under
+    DEC-18 thresholds at 3000 LOC / 100 files; all paths under
+    docs/sprints/_templates/ + docs/ledger/, which are doctrine
+    surfaces inside the trusted_scope envelope).
+  </budget_envelope>
+
+  <links>
+    - Continuation: docs/P5_TASK11_SDO_CONTINUATION_v1.0.xml
+    - Sprint 11 SDV (v3): docs/sprints/sprint_11/strategic_design_vision.md
+    - DEC-13 report format: docs/DEC13_REPORT_QUEUE_PROPOSAL_v1.xml
+    - Sprint 9 SWAGR §9.3(d): original prediction
+    - Sprint 10 SWAGR §5.4 + gap #6 (line ~641): confirmation +
+        formal MINOR recommendation
+    - Sprint 10 EA-3 (BlarAI commit `cf95e4b` -- doctrine split move
+        of parallel-sprints.md from BlarAI to devplatform; this EA
+        fixes the resulting broken SDV-template pointer)
+    - EA-1 DEC-17 (Q1-1 ledger format permanence -- this EA's ledger
+        entry follows that schema)
+  </links>
+
+</ea_prompt>

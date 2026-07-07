@@ -1,0 +1,148 @@
+{
+  "gate": "VALIDATE_MEMORY_CEILING",
+  "timestamp": "2026-02-23T05:33:08.286228+00:00",
+  "effective_ceiling_gb": 31.323,
+  "test_3_1": {
+    "test_id": "3.1",
+    "description": "Windows + Hyper-V baseline memory",
+    "total_physical_mb": 32075.2,
+    "used_mb": 18005.6,
+    "available_mb": 14069.7,
+    "used_percent": 56.1,
+    "process_count": 342,
+    "top_10_consumers": [
+      {
+        "name": "MemCompression",
+        "rss_mb": 1921.7,
+        "pid": 4428
+      },
+      {
+        "name": "Code.exe",
+        "rss_mb": 999.3,
+        "pid": 3212
+      },
+      {
+        "name": "Code.exe",
+        "rss_mb": 871.7,
+        "pid": 4068
+      },
+      {
+        "name": "Code.exe",
+        "rss_mb": 759.4,
+        "pid": 25112
+      },
+      {
+        "name": "bdservicehost.exe",
+        "rss_mb": 556.3,
+        "pid": 3172
+      },
+      {
+        "name": "WINWORD.EXE",
+        "rss_mb": 521.7,
+        "pid": 7772
+      },
+      {
+        "name": "firefox.exe",
+        "rss_mb": 516.9,
+        "pid": 15136
+      },
+      {
+        "name": "firefox.exe",
+        "rss_mb": 461.9,
+        "pid": 19208
+      },
+      {
+        "name": "firefox.exe",
+        "rss_mb": 447.9,
+        "pid": 18456
+      },
+      {
+        "name": "firefox.exe",
+        "rss_mb": 445.2,
+        "pid": 14564
+      }
+    ],
+    "host_baseline_mb": 18005.6
+  },
+  "test_3_2": {
+    "test_id": "3.2",
+    "description": "Per-VM memory overhead (Hyper-V)",
+    "status": "SKIPPED",
+    "estimated_overhead_mb": 256
+  },
+  "test_3_3": {
+    "test_id": "3.3",
+    "description": "Agent RSS under load",
+    "agents": [
+      {
+        "agent": "semantic_router",
+        "model": "BERT-mini proxy",
+        "device": "CPU",
+        "rss_delta_mb": 66.0,
+        "measured": true
+      },
+      {
+        "agent": "policy_agent",
+        "model": "1.7B INT4",
+        "device": "NPU",
+        "rss_delta_mb": 1024,
+        "measured": false,
+        "note": "spec max"
+      },
+      {
+        "agent": "orchestrator",
+        "model": "1.7B INT4 (shared mmap)",
+        "device": "NPU",
+        "rss_delta_mb": 1024,
+        "measured": false,
+        "note": "spec max, worst case no sharing"
+      },
+      {
+        "agent": "code_agent",
+        "model": "14B Q4_K_M",
+        "device": "Arc 140V iGPU",
+        "vram_mb": 9216,
+        "host_rss_overhead_mb": 512,
+        "total_system_impact_mb": 9728,
+        "measured": false,
+        "note": "iGPU uses shared system memory \u2014 full VRAM counts against ceiling"
+      }
+    ],
+    "total_agent_mb": 11842.0
+  },
+  "test_3_4": {
+    "test_id": "3.4",
+    "description": "Execution tier summation",
+    "tiers": {
+      "host_os_mb": 18005.6,
+      "hypervisor_mb": 512,
+      "vm_assigned_mb": 0,
+      "vm_overhead_mb": 256,
+      "agent_total_mb": 11842.0,
+      "total_committed_mb": 30615.6,
+      "ceiling_mb": 32074.8,
+      "headroom_mb": 1459.2,
+      "headroom_percent": 4.5,
+      "over_ceiling": false
+    },
+    "pass": true,
+    "failures": [],
+    "warnings": [
+      "Headroom critically low: 1459MB (4.5%). Consider reducing Code Agent model size or enabling dynamic memory."
+    ]
+  },
+  "gate_evaluation": {
+    "gate": "VALIDATE_MEMORY_CEILING",
+    "disposition": "PASS",
+    "pass": true,
+    "failures": [],
+    "warnings": [
+      "Headroom critically low: 1459MB (4.5%). Consider reducing Code Agent model size or enabling dynamic memory."
+    ],
+    "total_committed_mb": 30615.6,
+    "ceiling_mb": 32074.8,
+    "headroom_mb": 1459.2,
+    "headroom_percent": 4.5,
+    "recommendation": "Memory ceiling validated. 1459MB headroom (4.5%). Proceed with VM sizing."
+  }
+}

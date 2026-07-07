@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 1 dispatch for EA-17.
+  Workstream: openvino-contribution-npu-int8-guard
+  Guide: #11
+  Authored: 2026-05-12
+
+  Terminology note (per LA correction 2026-05-12):
+    - openvino#35641 is an ISSUE (not a PR). The engagement comment is posted
+      ON the issue. Any future code contribution would be a PR fixing the issue,
+      either extending PR #34651 or as a separate companion PR.
+    - openvino#34651 IS a PR (open, stalled). It is the precedent template.
+
+  EA-17 must STOP after the comprehension gate (CG1-CG10) and wait for Guide-#11
+  to issue APPROVED / APPROVED_WITH_ADJUSTMENTS / REJECTED before proceeding to
+  preflight or execution. Per BlarAI memory note "Comprehension gates: stop
+  after gate, don't bundle downstream".
+-->
+<dispatch>
+
+  <header>
+    <instance>Guide-#11 / openvino-contribution-npu-int8-guard / Phase 1 / EA-17</instance>
+    <workstream>openvino-contribution-npu-int8-guard</workstream>
+    <phase>1</phase>
+    <ea>EA-17</ea>
+    <label>Coordinate with Intel — engagement comment + CLA + AI Usage Policy compliance brief</label>
+    <authored_by>Guide-#11 (session "Intel Contribution May 12th")</authored_by>
+    <date>2026-05-12</date>
+    <repo_roots>
+      <blarai>C:\Users\mrbla\BlarAI</blarai>
+      <devplatform>C:\Users\mrbla\devplatform</devplatform>
+    </repo_roots>
+    <ack_namespace>g11-ea17_n{K}</ack_namespace>
+  </header>
+
+  <scope>
+    <summary>
+      Phase 1 is engagement-first. The EA produces text artifacts only:
+      (1) a draft GitHub comment for posting on OpenVINO **issue** #35641
+          that links the issue to **PR** #34651 (same author, same plugin
+          layer, same construct-time guard pattern) and asks Intel to
+          direct the contribution shape;
+      (2) a CLA + AI Usage Policy compliance brief for the LA;
+      (3) a state report on the LA's existing OpenVINO upstream work;
+      (4) a Phase 1 close report.
+      NO code is changed. NO PR is opened. NO GitHub comment is POSTED by
+      the EA — the LA reviews and posts.
+    </summary>
+    <acceptance>
+      <criterion id="1">Engagement comment draft (a) names openvino#35641 as the issue being commented on, (b) references openvino#34651 explicitly with URL as the precedent PR (same author, same plugin file, same construct-time layer, same guard pattern), and (c) invites Intel to choose how the team would like #35641 addressed — extend the open PR #34651 to also cover INT8 weight-only detection, open a separate companion PR following the same pattern, or defer until the team has a preferred design in place. The three options are offered, not insisted upon; Intel may propose a fourth shape.</criterion>
+      <criterion id="2">Engagement comment draft includes an AI Usage Policy disclosure block matching the precedent in `BlarAI/docs/PR_34617_DESCRIPTION_PASTE.md` §AI Assistance, adjusted for the #35641 engagement-comment specifics (this is a comment, not a PR description; disclose AI assistance accordingly).</criterion>
+      <criterion id="3">CLA mechanics brief documents the live CLA status for `blairducrayoppat` on the OpenVINO project (likely Linux Foundation EasyCLA, sign-once, persists), and any re-sign trigger conditions. If the CLA bot's last known state is not observable from preflight, the brief documents the uncertainty and defers to LA.</criterion>
+      <criterion id="4">Status report on PR #34651 (open/merged/closed + last activity), issues #34450 (closure mechanism), #34532 (last activity), #34617 (closure relationship to PR #34651), and npu_compiler PRs #265 + #266 (state). All findings verified live against GitHub at preflight time, not inherited from this dispatch's §background.</criterion>
+      <criterion id="5">All four deliverables committed to `phase1-ea17-coordinate-with-intel/`. Close report path: `phase1-ea17-coordinate-with-intel/close-report.md` per §close_report_format.</criterion>
+      <criterion id="6">No edits to BlarAI runtime code or production paths. No GitHub posts. No PR submissions. No clones of the OpenVINO repo (that's Phase 2).</criterion>
+    </acceptance>
+  </scope>
+
+  <background>
+    <!-- Background is CONTEXT, not gospel. Preflight checks 0d-0g must re-verify these claims against
+         live GitHub state. Discrepancies are reported in the close report's Anomalies section. -->
+
+    <item id="B1" name="Issue openvino#35641 — primary target (this is an ISSUE)">
+      <url>https://github.com/openvinotoolkit/openvino/issues/35641</url>
+      <type>issue</type>
+      <opened>2026-05-01</opened>
+      <reporter>blairducrayoppat (the LA)</reporter>
+      <assignees>diego-villalobos, Zulkifli-Intel, Munesh-Intel</assignees>
+      <labels>PSE, bug, support_request</labels>
+      <status_at_dispatch_time>Open. 0 comments. 0 Intel response observed as of 2026-05-12 (11 days since filed).</status_at_dispatch_time>
+      <bug_summary>
+        LLMPipeline(ir, "NPU") silently accepts an INT8 weight-only IR (constructs in 16.45s, NPU placement
+        confirmed via EXECUTION_DEVICES, no warning emitted). First generate() terminates the process with
+        Windows STATUS_ACCESS_VIOLATION (0xC0000005, exit -1073741819). Crash is in openvino.dll
+        v2026.0.0.20965 at consistent offset 0x0000000000077d86. Same IR works on GPU. INT4 (sym + group-size
+        128, AND asym + per-channel) IRs work on NPU. Failure is specific to NPU + INT8 weight-only at decode.
+      </bug_summary>
+      <suggested_fix_in_issue_body>
+        Add construct-time validation in the NPUW LLM path rejecting unsupported weight formats with a clear
+        exception. Proposed user-facing message: "Configuration not supported on NPU: weight format INT8
+        weight-only is outside the supported NPU LLM matrix. Use --sym INT4 (--group-size -1 or 128)."
+      </suggested_fix_in_issue_body>
+    </item>
+
+    <item id="B2" name="PR openvino#34651 — direct precedent, currently stalled (this is a PR)">
+      <url>https://github.com/openvinotoolkit/openvino/pull/34651</url>
+      <type>pull_request</type>
+      <author>blairducrayoppat (the LA)</author>
+      <opened>2026-03-12</opened>
+      <state_at_dispatch_time>
+        Open. Last activity: 2026-04-16 (author rebase + review request). No CI check status visible. No Intel
+        reviewers assigned. 0 review comments. 0 approvals. 0 requested changes. Labels: `category: NPU`,
+        `ExternalPR`. 2 commits on branch `blairducrayoppat:fix/npu-unbounded-dynamic-shape-guard`.
+      </state_at_dispatch_time>
+      <closes>openvino#34617 (this is an ISSUE — NPU compile_model fails with "to_shape was called on a dynamic shape" for Qwen3-0.6B INT4)</closes>
+      <pattern>
+        ~25-line early validation guard in Plugin::compile_model() (file:
+        src/plugins/intel_npu/src/plugin/src/plugin.cpp). Detects unbounded dynamic dimensions via
+        dim.get_interval().has_upper_bound() == false BEFORE invocation reaches the VPUX compiler.
+        OPENVINO_THROW with an actionable error message directing users to model.reshape(). Uses only
+        existing public OpenVINO C++ APIs already present elsewhere in plugin.cpp. Author claims zero
+        regression risk.
+      </pattern>
+      <relevance_to_issue_35641>
+        Same author. Same plugin file. Same layer (Plugin::compile_model construct-time). Same pattern
+        (detect unsupported config + throw catchable exception). Any fix for issue #35641 has the same
+        SHAPE but a different DETECTION (introspect the IR for INT8 weight-only quantization markers,
+        not unbounded dynamic shape).
+      </relevance_to_issue_35641>
+      <strategic_implication>
+        If a separate companion PR (one fixing issue #35641) is opened while PR #34651 still stalls,
+        Intel's review attention splits across two PRs in the same NPU-plugin guard space. The mature
+        engagement is to comment on issue #35641, link to PR #34651, and let Intel direct which shape
+        (extend the open PR, separate PR, or wait).
+      </strategic_implication>
+    </item>
+
+    <item id="B3" name="Issue openvino#34450 — precedent cited in #35641 body (this is an ISSUE)">
+      <url>https://github.com/openvinotoolkit/openvino/issues/34450</url>
+      <type>issue</type>
+      <reporter>blairducrayoppat (the LA)</reporter>
+      <state_at_dispatch_time>Closed. Closure reason not visible in WebFetch extraction. EA preflight 0f must verify.</state_at_dispatch_time>
+      <la_comment_drafted>
+        `BlarAI/docs/ISSUE_34450_COMMENT_EDIT.md` shows the LA's reply pattern: polite ("Thanks for looking
+        into this, @YuChern-Intel."), suggested catchable-error pattern, referenced npu_compiler PRs #265 and
+        #266, offered to adjust approach ("Happy to adjust the approach if the team has a preferred
+        pattern."). THIS IS THE ENGAGEMENT STYLE TEMPLATE for the #35641 comment.
+      </la_comment_drafted>
+    </item>
+
+    <item id="B4" name="LA's prior OpenVINO upstream artifacts in BlarAI/docs/">
+      <required_reads>
+        <file path="docs/OPENVINO_CONTRIBUTION_PLAN_MARCH_2026.md">Overall contribution strategy from 2026-03-13. Tier 1-4 opportunity scan, prioritized action queue, completed/blocked status as of March, "Session Assessment 2026-03-13" with explicit deprioritization rationales.</file>
+        <file path="docs/ISSUE_34450_COMMENT_EDIT.md">Engagement style template — the LA's reply to YuChern-Intel on issue #34450.</file>
+        <file path="docs/PR_34617_DESCRIPTION_PASTE.md">PR description for PR #34651 (which closes issue #34617). Includes the AI Assistance disclosure block — the EXACT template to mirror for the #35641 engagement comment and any future #35641-fix PR description.</file>
+        <file path="docs/PR_PACKAGE_ISSUE_34617.md">Full PR packaging for the #34617 fix — examine for contribution-process notes and any pre-submit checks the LA documented.</file>
+      </required_reads>
+      <recommended_reads>
+        <file path="docs/QWEN35_CONTRIBUTION_GUIDE.md">Broader Qwen3.5 contribution context; LA's domain depth.</file>
+        <file path="docs/LESSONS_LEARNED_QWEN3_THINKING_SUPPRESSION.md">LA's style and rigor reference for technical writeups.</file>
+      </recommended_reads>
+    </item>
+
+    <item id="B5" name="OpenVINO CONTRIBUTING.md essentials (incomplete — EA must read in full)">
+      <url>https://github.com/openvinotoolkit/openvino/blob/master/CONTRIBUTING.md</url>
+      <known_points>
+        - `.take` command applies to "Good First Issue" board. Issue #35641 is PSE-assigned, NOT a good-first
+          issue — `.take` does NOT apply.
+        - Discussion path: GitHub Discussions or Intel DevHub Discord for complex features (relevant if
+          Phase 1 engagement gets no response within the deferral window).
+        - Standard fork-and-PR (any future code work is a PR, not a comment).
+        - AI Usage Policy MUST be followed — EA must read the live policy text in full (link from
+          CONTRIBUTING.md).
+        - PR must link the issue ("Closes #X"). This applies if a PR is later opened to fix #35641.
+        - Tests required for any PR.
+        - No explicit DCO sign-off mentioned in extracted summary — EA verifies by reading CONTRIBUTING.md
+          completely (not just a summary).
+      </known_points>
+    </item>
+
+    <item id="B6" name="EA numbering convention">
+      EA-17 is the next global EA instance. Stage 6.7.5 closed with EA-16 (Phase 7 close-out, 2026-05-08).
+      Per BlarAI memory note "EA numbering is global, not stage-scoped". Ack namespace for this dispatch:
+      `g11-ea17_n{K}` (Guide-#11, EA-17, ack K).
+    </item>
+  </background>
+
+  <comprehension_gate>
+    <instructions>
+      Answer CG1-CG10 in order in a single response back to Guide-#11. STOP after answering. Do NOT proceed
+      to preflight or execution until Guide-#11 issues APPROVED / APPROVED_WITH_ADJUSTMENTS / REJECTED.
+      Bundling the gate with downstream artifacts defeats the LA's review checkpoint (per BlarAI memory note
+      "Comprehension gates: stop after gate, don't bundle downstream").
+    </instructions>
+    <CG1>What is the workstream's scope boundary? Recite both the in-scope and out-of-scope items from §2 of the charter.</CG1>
+    <CG2>What are the three contribution shapes the engagement comment offers Intel to choose from? Recite from §scope/acceptance/criterion-1. Confirm: these are SUGGESTIONS to Intel, not a demand for them to pick from a fixed menu — Intel may propose a fourth shape.</CG2>
+    <CG3>Why is "engagement-first, not PR-first" the LA's posture? Recite the rationale, including the strategic implication of PR #34651's stall.</CG3>
+    <CG4>What is the current state of PR openvino#34651 per §background §B2, and what is the EA's preflight obligation regarding that claim? Confirm: openvino#34651 is a PR, openvino#35641 is an ISSUE — do not conflate.</CG4>
+    <CG5>List the four required-tier prior-art files from §B4 and the two recommended-tier files. Confirm you will read all four required files in full (no skim).</CG5>
+    <CG6>What goes in close-report.md? Recite the required section list from §close_report_format.</CG6>
+    <CG7>Recite each acknowledgement n1-n6 verbatim and confirm understanding of each.</CG7>
+    <CG8>What is the fleet-hygiene §4 pause / resume obligation, and where do those operations sit relative to the EA's work? Name the correct method (`resume_fleet`, not `unpause_fleet`).</CG8>
+    <CG9>Where does the EA's content commit (artifacts + close report) land? Branch name? Commit message convention?</CG9>
+    <CG10>What is OUT of scope per §exclusions? Recite the exclusion list.</CG10>
+  </comprehension_gate>
+
+  <preflight>
+    <check id="0a" name="Fleet pause">
+      Run `state.pause_fleet(...)` per `devplatform/docs/governance/fleet-hygiene.md` §4. Commit the pause
+      record BEFORE any branch checkout. The canonical invocation (from `devplatform/docs/governance/fleet-hygiene.md` §R7):
+        python -c "from tools.autonomy_budget import state; state.pause_fleet('EA-17 phase1 engagement work', updated_by='ea_17', path='C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json')"
+      EXPECT: pause record commit lands cleanly on main. HARD STOP if pause fails — do not proceed; report
+      to LA via close report.
+    </check>
+    <check id="0b" name="Working tree clean">
+      Run `git status` from `C:\Users\mrbla\BlarAI`. EXPECT: only the pause commit + this Phase 1 directory
+      tree visible as recent changes. If unrelated uncommitted changes are present, HARD STOP — report to LA.
+    </check>
+    <check id="0c" name="Read LA's prior-art files (required tier)">
+      Read in full (no skim) the four §B4 required-tier files:
+        - BlarAI/docs/OPENVINO_CONTRIBUTION_PLAN_MARCH_2026.md
+        - BlarAI/docs/ISSUE_34450_COMMENT_EDIT.md
+        - BlarAI/docs/PR_34617_DESCRIPTION_PASTE.md
+        - BlarAI/docs/PR_PACKAGE_ISSUE_34617.md
+      EXPECT: all four files exist and read successfully. Take notes on engagement style, AI Usage
+      disclosure precedent, CLA references, and pre-submit checks.
+    </check>
+    <check id="0d" name="Verify PR #34651 live state">
+      Independently re-fetch https://github.com/openvinotoolkit/openvino/pull/34651. EXPECT to confirm
+      (or correct) §B2: PR open as of dispatch authoring 2026-05-12, last activity 2026-04-16, no Intel
+      reviewers, no CI status visible, no merge. If state has changed (reviewer assigned, comments posted,
+      merged), document the delta in the close report Anomalies section. Guide findings are context, not
+      gospel.
+    </check>
+    <check id="0e" name="Verify issue #35641 live state">
+      Independently re-fetch https://github.com/openvinotoolkit/openvino/issues/35641. EXPECT to confirm
+      (or correct) §B1: open, 0 comments, no Intel response as of 2026-05-12. Document any new comments or
+      labels since the dispatch was authored.
+    </check>
+    <check id="0f" name="Verify issue #34450 closure mechanism">
+      Independently re-fetch https://github.com/openvinotoolkit/openvino/issues/34450. Determine: closure
+      reason (closed by PR / expected behavior / not planned / completed), any Intel engineer response to
+      the LA's catchable-error suggestion in `docs/ISSUE_34450_COMMENT_EDIT.md`, cross-references to
+      npu_compiler PRs #265 or #266. This DIRECTLY informs how to frame the #35641 engagement: if Intel
+      endorsed the catchable-error pattern, the precedent is stronger; if not, the comment relies solely
+      on PR #34651 as the precedent.
+    </check>
+    <check id="0g" name="Verify state of issue #34532, issue #34617, npu_compiler PRs #265+#266">
+      Quick state check (open/closed/last activity) for each. These are not the primary target but inform
+      LA's overall upstream-engagement portfolio. EXPECT: one-line state line per item.
+    </check>
+    <check id="0h" name="Read OpenVINO CONTRIBUTING.md in full + AI Usage Policy in full">
+      Read the full text of https://github.com/openvinotoolkit/openvino/blob/master/CONTRIBUTING.md (not
+      a summary). Follow the link to the AI Usage Policy and read it in full. EXPECT: extract verbatim the
+      disclosure-block requirement, the human-validation requirement, and any commit-message conventions
+      (DCO sign-off, etc.). Note: PR #34651 was opened in March 2026 — verify the AI policy text is the
+      same as when PR #34651 was opened; if policy has tightened, document the delta.
+    </check>
+    <check id="0i" name="Confirm CLA status for blairducrayoppat">
+      Check whether `blairducrayoppat` has an active CLA on the OpenVINO project. Easiest signal: examine
+      PR #34651's CLA bot status — if the bot did not block PR #34651 at open time, the CLA was active in
+      March 2026 and (assuming sign-once persistence) is likely still valid in May 2026. Document the
+      check method and outcome. If unclear, defer to LA in the CLA brief.
+    </check>
+  </preflight>
+
+  <execution>
+    <branch_setup>
+      From `C:\Users\mrbla\BlarAI` on `main`, AFTER preflight 0a (fleet pause commit) lands:
+        git checkout -b feature/p-openvino-35641-phase1-engagement
+      (Note: `p-` prefix denotes "post-operational" Guide workstream branches, distinguishing them from
+       sprint feature branches like `feature/p5-task...`. The `35641` in the branch name refers to issue
+       #35641, the engagement target.)
+      Do NOT push to remote. Do NOT merge to main. The branch is read-only-from-the-fleet's-perspective.
+    </branch_setup>
+
+    <task id="T1" name="Draft engagement comment for issue #35641">
+      Produce a draft GitHub comment for posting on **issue** openvino#35641. Save to:
+        phase1-ea17-coordinate-with-intel/engagement-comment-draft.md
+
+      MUST include:
+        - Clear identification of the target as issue #35641.
+        - Direct reference to PR openvino#34651 (with URL) as same-author, same-plugin-file
+          (src/plugins/intel_npu/src/plugin/src/plugin.cpp), same-layer
+          (Plugin::compile_model construct-time), same-pattern construct-time guard precedent.
+        - Brief technical framing: issue #35641 is the INT8-weight-only variant of the same class of
+          problem PR #34651 addresses — unsupported config → silent construct → uncatchable native crash.
+        - An open three-options offer to Intel. Suggested phrasing (EA may adjust for tone, must
+          preserve substance):
+            "Would the team prefer (a) extending PR #34651 to also cover INT8 weight-only detection,
+            (b) a separate companion PR following the same pattern, or (c) deferring this until the
+            team has a preferred design in place? Happy to follow whichever direction fits your plans
+            best, or to adapt if a different approach would be more useful."
+        - AI Usage disclosure block — mirror `BlarAI/docs/PR_34617_DESCRIPTION_PASTE.md` §AI Assistance
+          structure. Adjust verbiage for the engagement-comment scenario (this is a comment, not a PR
+          description). Acknowledge the tooling honestly: Copilot used for the issue body initially,
+          Claude (this Guide + EA workflow) used for follow-up engagement-comment authoring. Human
+          validation: all evidence (reproductions, hashes, exit codes) generated locally on Intel
+          Core Ultra 7 258V / Arc 140V Lunar Lake.
+        - Polite, suggests-not-demands tone (per `BlarAI/docs/ISSUE_34450_COMMENT_EDIT.md` style).
+        - At most one @-mention in the closing line. Suggested: @Zulkifli-Intel OR @diego-villalobos.
+          Do NOT triple-ping all assignees.
+        - Length target: 150-250 words. Concise — respect reviewer time.
+
+      MUST NOT:
+        - Demand a response.
+        - Speculate about why PR #34651 has not been reviewed (no "I notice you haven't reviewed").
+        - Re-paste the full issue #35641 body content (maintainer already has it).
+        - Cite issue #34450 as a "resolution" precedent unless preflight 0f confirms a positive Intel
+          response on the catchable-error pattern. If 0f shows #34450 was closed without engagement,
+          REMOVE that citation; rely solely on PR #34651 as the precedent.
+        - Conflate "issue" and "PR" — #35641 is an issue, #34651 is a PR.
+        - Contain content beyond Phase 1 scope (e.g., do not propose code, do not link to follow-up
+          plans).
+    </task>
+
+    <task id="T2" name="Author CLA + AI Usage Policy compliance brief">
+      Produce `phase1-ea17-coordinate-with-intel/cla-and-ai-policy-brief.md` for LA review. Sections:
+        - **CLA status**: live finding from preflight 0i. "Active, no action needed" OR
+          "Action required: ${steps}" OR "Uncertain — LA to verify by ${method}".
+        - **AI Usage Policy — verbatim relevant excerpts**: the disclosure-block requirement, the
+          human-validation requirement, any commit-message conventions, the URL of the live policy
+          text and its commit SHA / last-modified date for traceability.
+        - **Disclosure template for any future #35641-fix PR**: the exact disclosure paragraph the LA
+          can paste into the eventual PR description if Intel responds positively to engagement. Mirrors
+          PR #34651's structure with #35641-specific details.
+        - **Compliance notes**: any new requirements since PR #34651 was opened (policy may have been
+          updated). Cite the diff if any.
+        - **DCO / sign-off finding**: confirmed or not? If commits need `-s`, document.
+    </task>
+
+    <task id="T3" name="State report on prior upstream work">
+      Produce `phase1-ea17-coordinate-with-intel/upstream-state-report.md` for LA. Sections:
+        - PR openvino#34651 — live state, last activity, any new Intel-side actions since 2026-04-16.
+        - Issue openvino#34617 — state and relationship to PR #34651.
+        - Issue openvino#34450 — closure mechanism (from preflight 0f).
+        - Issue openvino#34532 — last activity.
+        - npu_compiler PRs #265, #266 — state.
+        - **Recommendations for LA**: any of these need a separate engagement nudge, OR can wait, OR
+          should be folded into the #35641 engagement? Calibrate: this is information for the LA, not
+          for Intel. Do NOT bake recommendations about reviving PR #34651 into the #35641 engagement
+          comment — that is the LA's call, not the comment's content.
+    </task>
+
+    <commit>
+      Single content commit on `feature/p-openvino-35641-phase1-engagement` containing the four
+      Phase 1 artifacts:
+        - phase1-ea17-coordinate-with-intel/engagement-comment-draft.md
+        - phase1-ea17-coordinate-with-intel/cla-and-ai-policy-brief.md
+        - phase1-ea17-coordinate-with-intel/upstream-state-report.md
+        - phase1-ea17-coordinate-with-intel/close-report.md
+
+      Use `git add` with explicit file list (per C-EXPLICIT-ADD). Do NOT use `git add .` or `git add -A`.
+
+      Commit message (HEREDOC):
+        [agent:ea17] phase1: openvino-35641 engagement artifacts
+
+        Guide-#11 / Phase 1 / EA-17 of workstream openvino-contribution-npu-int8-guard.
+
+        Artifacts: engagement-comment-draft, cla-and-ai-policy-brief, upstream-state-report,
+        close-report.
+
+        Note: #35641 is the issue; PR #34651 is the precedent template. No GitHub posts.
+        No PR submissions. LA review pending.
+    </commit>
+
+    <fleet_unpause>
+      LAST ACTION: `state.resume_fleet(...)` + commit. Use `resume_fleet`, NOT `unpause_fleet` (the
+      latter raises AttributeError — documented gotcha per `guide-agent-design.md` §Coordination With
+      the Autonomous Fleet). Canonical invocation:
+        python -c "from tools.autonomy_budget import state; state.resume_fleet('EA-17 phase1 engagement work complete', updated_by='ea_17', path='C:/Users/mrbla/BlarAI/tools/autonomy_budget/state.json')"
+    </fleet_unpause>
+
+    <pf1_bifurcation>
+      If at ANY preflight check or task the EA finds Guide's claims contradicted by live state, do NOT
+      proceed silently. Stop, document the discrepancy in close report's Anomalies section, and
+      proceed only on items unaffected by the discrepancy. Out-of-scope discoveries are reported, not
+      fixed.
+
+      Specific likely bifurcations:
+        - If preflight 0d reveals PR #34651 has been merged or reviewed since 2026-04-16: the
+          engagement comment's framing changes substantially. STOP and report; LA must steer.
+        - If preflight 0e reveals new Intel comments on issue #35641: engagement may need to respond
+          to their substance rather than initiate. STOP and report.
+        - If preflight 0h reveals a tightened AI Usage Policy with new requirements: the disclosure
+          template must be regenerated. Note the delta and re-author T2.
+    </pf1_bifurcation>
+  </execution>
+
+  <close_report_format>
+    <path>./close-report.md</path>
+    <required_sections>
+      <section name="1. Verdict">PASS / PASS_WITH_NOTES / FAIL — the EA's self-verdict before Guide cross-verifies.</section>
+      <section name="2. Preflight results">Per-check outcome for 0a-0i. For each: PASS or note the deviation, citing disk evidence (commit SHAs, fetched URLs, file paths).</section>
+      <section name="3. Task results">For each of T1-T3: deliverable path, length, key authoring choices made (e.g., which assignee was @-mentioned in T1, which contribution-option ordering was used, any deviations from suggested wording and why).</section>
+      <section name="4. State findings">Concrete live-state summary for: PR openvino#34651, issues openvino#34450 / #34532 / #34617 / #35641, npu_compiler PRs #265 + #266. Cite fetch timestamps.</section>
+      <section name="5. Anomalies">Any discrepancies between Guide's §background dispatch claims and live state. Named (A-NEW1, A-NEW2 for novel; reference precedents like A33 / MCP-403-P5 for recurrence). Document even if absent ("No anomalies observed").</section>
+      <section name="6. Backlog math">Pre-Phase-1 backlog: 1 open ticket (Vikunja #443 — this workstream parent). Post-Phase-1 expectation: still 1 open + 0-3 new hardening tickets if EA discovers in-scope-defect items per ack n5.</section>
+      <section name="7. Forward-looking notes">What Phase 2 needs to be, given Phase 1 findings. Recommendations for Guide-#11 / LA to consider in Phase 2 dispatch authoring (e.g., build environment requirements surfaced by reading CONTRIBUTING.md, target subsystem identified, etc.).</section>
+      <section name="8. Commit SHAs">Pause-fleet commit, content commit, resume-fleet commit, in chronological order.</section>
+      <section name="9. AI usage in this phase">The EA agent itself is the AI assistance. This phase produced text artifacts authored by an AI agent (the EA) under Guide-#11 supervision, with LA approval gate on dispatch and verdict. State this verbatim; do not synthesize.</section>
+    </required_sections>
+  </close_report_format>
+
+  <constraints>
+    <constraint id="C-SCOPE">Phase scope is closed. No expansion mid-execution. Out-of-scope findings → close report's Anomalies section + LA disposition.</constraint>
+    <constraint id="C-EXPLICIT-ADD">Every `git add` names files explicitly. Never `git add .` or `git add -A`.</constraint>
+    <constraint id="C-VERIFY-FIRST">All preflight 0d-0i checks run independently before treating Guide's §background as fact. Document any discrepancy in close report.</constraint>
+    <constraint id="C-DOC-ONLY">Phase 1 produces text artifacts only. No edits to BlarAI runtime code, no GitHub posts, no PR submissions, no clones of OpenVINO repo.</constraint>
+    <constraint id="C-NOEDIT">
+      The following files MUST NOT be edited by the EA:
+        - this dispatch.xml (frozen at Phase 1 start)
+        - workstream charter (BlarAI/docs/guide-workstreams/openvino-contribution-npu-int8-guard/README.md)
+        - workstream STATUS.md (appended only by Guide-#11 after each phase verdict)
+        - registry README (BlarAI/docs/guide-workstreams/README.md — appended only by Guide-#11)
+    </constraint>
+    <constraint id="C-NO-POST">The engagement comment is a DRAFT. The EA does NOT post it to GitHub. The LA reviews and posts.</constraint>
+    <constraint id="C-ISSUE-VS-PR">Throughout all artifacts, openvino#35641 is an issue, openvino#34651 is a PR. Do not conflate. When the difference is ambiguous in a sentence, disambiguate explicitly ("issue #35641" / "PR #34651").</constraint>
+  </constraints>
+
+  <exclusions>
+    <exclusion>Posting any comment, opening any PR, or executing any state-changing action on github.com.</exclusion>
+    <exclusion>Modifying BlarAI runtime code or production paths.</exclusion>
+    <exclusion>Cloning the OpenVINO repository or starting a source build (that's Phase 2).</exclusion>
+    <exclusion>Authoring code patches, even draft / WIP / proof-of-concept.</exclusion>
+    <exclusion>Re-pinging PR #34651's reviewers from any account.</exclusion>
+    <exclusion>Engaging on issues other than #35641 (state checks only on related items).</exclusion>
+    <exclusion>Substituting alternative weight-format diagnostic narratives (e.g., "what about FP16?") into the engagement comment — the issue is INT8 weight-only specifically.</exclusion>
+    <exclusion>Including commendations of Intel engineers or the LA in any artifact (per BlarAI memory note "No commendations of agents" — applies to Guide artifacts as well).</exclusion>
+  </exclusions>
+
+  <acknowledgements>
+    <ack id="g11-ea17_n1">
+      I will not expand phase scope mid-execution. Out-of-scope findings go to the close report's
+      Anomalies section for LA disposition.
+    </ack>
+    <ack id="g11-ea17_n2">
+      I will independently re-verify the Guide's §background claims (PR #34651 state, issue #35641
+      state, issue #34450 closure mechanism, etc.) via preflight checks 0d-0g before treating them as
+      fact. Discrepancies go to the close report.
+    </ack>
+    <ack id="g11-ea17_n3">
+      The engagement comment is a DRAFT for LA review. I will not post anything to GitHub. The LA
+      reviews and posts.
+    </ack>
+    <ack id="g11-ea17_n4">
+      I will follow OpenVINO's AI Usage Policy disclosure pattern when drafting the comment,
+      mirroring the template in `BlarAI/docs/PR_34617_DESCRIPTION_PASTE.md` §AI Assistance and any
+      new requirements I discover in the live policy text (preflight 0h).
+    </ack>
+    <ack id="g11-ea17_n5">
+      Any hardening followups discovered (doc typos, related stale PRs, AI policy delta requiring
+      action, etc.) are NON-OPTIONAL — they get bound to Vikunja tickets at the close report, not
+      noted as "optional" or "suggested" (per BlarAI memory note "Hardening followups are
+      NON-OPTIONAL").
+    </ack>
+    <ack id="g11-ea17_n6">
+      I will pause the fleet as the FIRST action and resume it as the LAST action, using
+      `state.resume_fleet(...)` (NOT `unpause_fleet` — documented AttributeError gotcha).
+    </ack>
+    <ack id="g11-ea17_n7">
+      Issue vs. PR terminology: openvino#35641 is an issue; openvino#34651 is a PR. I will not
+      conflate the two in any artifact, comment text, or commit message. Where the noun is
+      ambiguous in a sentence, I disambiguate explicitly.
+    </ack>
+  </acknowledgements>
+
+  <guide_verification>
+    <checklist>
+      <check>Engagement comment draft correctly identifies #35641 as an issue and #34651 as a PR (terminology audit).</check>
+      <check>Engagement comment draft cites PR #34651 explicitly with URL and explains the same-author / same-plugin-file / same-layer / same-pattern relationship.</check>
+      <check>Engagement comment offers the three contribution shapes openly (Intel may also propose a fourth).</check>
+      <check>Engagement comment includes AI Usage disclosure block; structure matches the precedent template per `BlarAI/docs/PR_34617_DESCRIPTION_PASTE.md` §AI Assistance and any live-policy updates from preflight 0h.</check>
+      <check>Comment word count is in the 150-250 band.</check>
+      <check>CLA brief documents live status, not assumed status. Method of verification stated.</check>
+      <check>State report covers all six upstream items with live timestamps.</check>
+      <check>Close report's Anomalies section is present even if empty ("No anomalies observed").</check>
+      <check>Pause-fleet and resume-fleet commits bracket the content commit; all three commit SHAs recorded in close report §8.</check>
+      <check>No unintended files added to the content commit (explicit add list).</check>
+      <check>If preflight 0f shows #34450 had no positive Intel response, engagement comment does NOT cite #34450 as resolution precedent.</check>
+    </checklist>
+    <backlog_expectation>
+      Pre-Phase-1 backlog: 1 open ticket (Vikunja #443 — this workstream parent).
+      Post-Phase-1 expectation: 1 open ticket (#443 — parent does NOT close at Phase 1; it closes
+      with the whole workstream) + 0-3 new hardening tickets if EA discovers in-scope defects per
+      ack n5.
+    </backlog_expectation>
+  </guide_verification>
+
+</dispatch>

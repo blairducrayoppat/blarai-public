@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<execution_prompt version="1.0" task="4.10" date="2026-03-05"
+  predecessor="Task 4.9d (commit 40443b0)" branch="feature/p5-task4-9-pa-quality-gate">
+
+  <!-- ================================================================
+       EA Execution Prompt ==== Task 4.10: Workload Profile Lock + ADR-012 §2.2 Finalization
+       SDO v3.6 | Type: DOCS-ONLY | No production code changes
+       Harness: NO_FULL_HARNESS (no code, no tests)
+       ================================================================ -->
+
+  <mandatory_first_action>
+    Before writing ANY file, produce a structured summary with these sections:
+    1. PREDECESSOR STATE ==== Task 4.9d final metrics + 10 locked decisions
+    2. OBJECTIVE ==== What 4.10 must achieve (zero EVALUATING rows, workload profiles, closure)
+    3. DELIVERABLES ==== 7 items (D-1 through D-7) with target files
+    4. MICRO-DECISIONS ==== Q-1 LOCK_ADVISORY, Q-2 DEFER_TO_TASK5, Q-3 YES
+    5. ADR-012 §2.2 CHANGES ==== Exact row-level before/after for the 2 EVALUATING rows
+    6. CONSTRAINTS ==== All 6
+    7. VERIFICATION ==== 4 terminal commands
+    Wait for Lead Architect approval before proceeding to implementation.
+  </mandatory_first_action>
+
+  <!-- =================================================================
+       SECTION 1: PREDECESSOR STATE
+       ================================================================= -->
+
+  <predecessor_state>
+    <commit>40443b0</commit>
+    <branch>feature/p5-task4-9-pa-quality-gate</branch>
+    <task_4_9d_results>
+      <agreement rate="1.000" fraction="40/40" threshold="0.95" />
+      <adversarial_security rate="1.000" fraction="8/8" />
+      <determinism>40/40 x 3/3</determinism>
+      <unit_tests>75/75 (59 pre-existing + 16 new DeterministicPolicyChecker)</unit_tests>
+      <prefilter cases_prefiltered="25" total="40" coverage="62.5%">
+        <deny count="22" />
+        <escalate count="3" />
+      </prefilter>
+    </task_4_9d_results>
+    <decisions_locked count="10">
+      <decision id="DEC-01" value="NAT=3" source="Task 4.3" />
+      <decision id="DEC-02" value="spec_decode_collapse_accepted" source="Task 4.3" />
+      <decision id="DEC-03" value="max_context=16384" source="Task 4.3" />
+      <decision id="DEC-04" value="task_4.5_retired" source="Task 4.3" />
+      <decision id="DEC-05" value="SDPA=ON" source="Task 4.4" />
+      <decision id="DEC-06" value="prefix_caching=OFF" source="Task 4.6" />
+      <decision id="DEC-07" value="FP16_locked" source="Task 4.7" />
+      <decision id="DEC-08" value="PA_max_new_tokens=10" source="Task 4.8" />
+      <decision id="DEC-09b" value="/no_think_mandatory" source="Task 4.9b" />
+      <decision id="DEC-10" value="deterministic_prefilter_validated" source="Task 4.9c-4.9d" />
+    </decisions_locked>
+    <task4_aggregate>
+      <total_sub_sessions>11 (4.1, 4.2, 4.2b, 4.3, 4.3b, 4.4, 4.6, 4.7, 4.8, 4.9a-d)</total_sub_sessions>
+      <retired>1 (Task 4.5 subsumed by Task 4.3)</retired>
+      <total_evidence_artifacts>17</total_evidence_artifacts>
+      <ledger_entries>13-27 (15 entries)</ledger_entries>
+      <date_started>2026-03-01</date_started>
+    </task4_aggregate>
+  </predecessor_state>
+
+  <!-- =================================================================
+       SECTION 2: OBJECTIVE
+       ================================================================= -->
+
+  <objective>
+    Close out the Task 4 Production Configuration Feasibility Study by:
+    (1) resolving all remaining EVALUATING parameters in ADR-012 §2.2 to zero EVALUATING rows,
+    (2) compiling final per-component production workload profile tables,
+    (3) generating a structured decision registry evidence artifact, and
+    (4) recording the Task 4 closure milestone in all governance documents.
+
+    This is a DOCS-ONLY milestone. No production code, test files, or existing evidence
+    artifacts are modified. The only new file created is the evidence JSON (D-3).
+
+    After Task 4.10, the roadmap proceeds to Task 4.11 (Security Hardening) then Task 5
+    (Model Upgrade to Qwen3-14B).
+  </objective>
+
+  <!-- =================================================================
+       SECTION 3: LEAD ARCHITECT MICRO-DECISIONS (LOCKED)
+       ================================================================= -->
+
+  <micro_decisions>
+    <decision id="Q-1" parameter="Input/output split" disposition="LOCK_ADVISORY">
+      <rationale>
+        Preserve the ~12,288 input / ~4,096 output heuristic as an advisory guideline
+        with explicit "not empirically optimized" caveat. No component enforces this
+        split, but it is a useful reference for future USE-CASE-005 integration.
+      </rationale>
+      <adr_action>
+        Change status from **EVALUATING** to **ADVISORY**.
+        Update Notes column to: "Heuristic guideline (75/25 split of 16,384 max context).
+        Not empirically optimized. PA: irrelevant (output 3-10 tokens). AO/CODE: revisit
+        if output truncation observed in production."
+      </adr_action>
+    </decision>
+
+    <decision id="Q-2" parameter="AO/CODE max_new_tokens" disposition="DEFER_TO_TASK5">
+      <rationale>
+        Production currently runs Qwen3-1.7B. No AO/CODE empirical data on Qwen3-14B
+        exists. Task 5 upgrades both to 14B and is the correct point to tune
+        max_new_tokens for these components. Avoids locking a value predicted to change.
+      </rationale>
+      <adr_action>
+        Within the GenConfig row: mark AO/CODE max_new_tokens as DEFERRED_TO_TASK5.
+        Change composite row status from **EVALUATING** to **LOCKED** (individual sub-params
+        are all either LOCKED, specified in §2.4, or DEFERRED_TO_TASK5).
+      </adr_action>
+    </decision>
+
+    <decision id="Q-3" disposition="YES">
+      <action>Update §0 status table: Task 4.10 row to COMPLETE upon milestone execution.</action>
+    </decision>
+  </micro_decisions>
+
+  <!-- =================================================================
+       SECTION 4: DETAILED DELIVERABLES
+       ================================================================= -->
+
+  <deliverables>
+
+    <!-- ==== D-1: ADR-012 §2.2 EVALUATING Row Resolution ==== -->
+    <deliverable id="D-1" target="docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md"
+                 section="§2.2">
+      <action>Resolve both EVALUATING rows to zero EVALUATING remaining.</action>
+      <detail>
+        ROW 1 ==== Input/output split:
+        BEFORE: | Input/output split | ~12,288 input / ~4,096 output | **EVALUATING** | 70–80% input / 20–30% output guideline for USE-CASE-005 coding tasks. |
+        AFTER:  | Input/output split | ~12,288 input / ~4,096 output | **ADVISORY** | Heuristic guideline (75/25 split of 16,384 max context). Not empirically optimized. PA: irrelevant (output 3-10 tokens). AO/CODE: revisit if output truncation observed in production. |
+
+        ROW 2 ==== GenConfig fields:
+        BEFORE: Status column shows **EVALUATING**
+        AFTER:  Status column shows **LOCKED**
+        The Notes column must be updated to clarify sub-parameter resolution:
+        - PA max_new_tokens=10 LOCKED (DEC-08, Task 4.8)
+        - PA stop_token_ids=[151645, 151668] LOCKED (§2.4)
+        - AO stop_token_ids=[151645] LOCKED (§2.4)
+        - AO/CODE max_new_tokens DEFERRED_TO_TASK5 (Q-2: no 14B empirical data;
+          Task 5 is the correct tuning point)
+        - num_assistant_tokens=3 LOCKED (DEC-01, Task 4.3)
+        - do_sample=False LOCKED (project mandate)
+
+        Also append to the GenConfig notes: Task 4.9d reference ==== "PA quality gate
+        PASS (agreement 1.000, 40/40, adversarial 1.000, 8/8). DeterministicPolicyChecker:
+        6 rules (4 DENY + 2 ESCALATE), 25/40 prefiltered. Commit 40443b0. Evidence:
+        p5_task4_9d_escalate_hardening.json."
+
+        Also update the §2.2 section heading:
+        BEFORE: ### 2.2 Configuration Optimization ==== In Progress
+        AFTER:  ### 2.2 Configuration Optimization ==== Complete
+
+        VERIFICATION: After D-1, grep for **EVALUATING** in §2.2 must return zero matches.
+        VERIFICATION: The §2.2 section heading must NOT contain "In Progress".
+      </detail>
+    </deliverable>
+
+    <!-- ==== D-2: ADR-012 §2.6 Production Workload Profiles ==== -->
+    <deliverable id="D-2" target="docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md"
+                 section="new §2.6">
+      <action>Add new §2.6 ==== Production Workload Profiles (Task 4 Exit State)</action>
+      <detail>
+        Insert after current §2.5 (PA Latency Budget). Add a header note:
+        "These profiles represent the Task 4 exit state. Parameters locked during
+        Tasks 4.1-4.9d. Values marked DEFERRED_TO_TASK5 will be resolved during
+        Task 5 model upgrade."
+
+        TABLE 1 ==== USE-CASE-001 Policy Agent (PA):
+        | Parameter | Value | Source |
+        |-----------|-------|--------|
+        | Model | Qwen3-14B INT4 | ADR-012 §2.1 |
+        | Device | GPU (Arc 140V) | ADR-011 |
+        | Draft model | Qwen3-0.6B INT4 28L | DEC-01 (Task 4.2) |
+        | num_assistant_tokens | 3 | DEC-01 (Task 4.3) |
+        | max_new_tokens | 10 | DEC-08 (Task 4.8) |
+        | stop_token_ids | [151645, 151668] | §2.4 |
+        | Thinking mode | /no_think MANDATORY | DEC-09b (Task 4.9b) |
+        | INFERENCE_PRECISION_HINT | f16 | DEC-07 (Task 4.7) |
+        | GPU_ENABLE_SDPA_OPTIMIZATION | ON | DEC-05 (Task 4.4) |
+        | enable_prefix_caching | OFF | DEC-06 (Task 4.6) |
+        | use_sparse_attention | OFF | DEFERRED (Task 4.3b) |
+        | do_sample | False | Project mandate |
+        | temperature | 0.0 | Project mandate |
+        | DeterministicPolicyChecker | 6 rules (4 DENY + 2 ESCALATE), 25/40 prefiltered | DEC-10 (Tasks 4.9c-4.9d) |
+        | Quality gate | agreement 1.000 (40/40), adversarial 1.000 (8/8) | DEC-10 |
+        | Latency budget | 2,000ms P95 | ADR-012 §2.5 (Task 4.1) |
+
+        TABLE 2 ==== USE-CASE-004 Assistant Orchestrator (AO):
+        | Parameter | Value | Source |
+        |-----------|-------|--------|
+        | Model | Qwen3-14B INT4 | ADR-012 §2.1 |
+        | Device | GPU (Arc 140V) | ADR-011 |
+        | Draft model | Qwen3-0.6B INT4 28L | DEC-01 (Task 4.2) |
+        | num_assistant_tokens | 3 | DEC-01 (Task 4.3) |
+        | max_new_tokens | DEFERRED_TO_TASK5 | Q-2 (no 14B data) |
+        | stop_token_ids | [151645] | §2.4 |
+        | Thinking mode | Default (thinking allowed) | §2.4 |
+        | INFERENCE_PRECISION_HINT | f16 | DEC-07 (Task 4.7) |
+        | GPU_ENABLE_SDPA_OPTIMIZATION | ON | DEC-05 (Task 4.4) |
+        | enable_prefix_caching | OFF | DEC-06 (Task 4.6) |
+        | use_sparse_attention | OFF | DEFERRED (Task 4.3b) |
+        | do_sample | False | Project mandate |
+        | temperature | 0.0 | Project mandate |
+
+        TABLE 3 ==== USE-CASE-005 Code Agent (not yet in production):
+        Same as AO profile except:
+        | Thinking mode | Context-dependent (/think complex, /no_think simple) | §2.4 |
+        | max_new_tokens | DEFERRED_TO_TASK5 | Q-2 (no 14B data) |
+        Add note: "CODE profile inherits AO shared parameters. Component-specific
+        tuning deferred to Task 5 when Qwen3-14B is deployed for code generation."
+
+        POST-TASK-4 SECURITY CAVEATS (mandatory subsection after the 3 tables):
+        Include a note titled "Security Caveats — Pending Task 4.11" with these items:
+
+        1. **mTLS CN → source_agent validation (P0):** The PA DeterministicPolicyChecker
+           ESCALATE_CROSS_AGENT_OWNERSHIP rule depends on source_agent integrity. Currently
+           source_agent is self-asserted — no code extracts the peer cert CN to validate it.
+           A compromised agent holding a valid mTLS cert can spoof source_agent and bypass
+           ownership-based ESCALATE rules. Fix scoped to Task 4.11.
+           (AI Risk Assessment §Recommendation 3; SECURITY_ASSESSMENT.md P0-1)
+
+        2. **parameters_schema prompt injection (P0):** car.parameters_schema is serialized
+           via json.dumps() and concatenated directly into the LLM prompt with no schema
+           validation or sanitization. The DeterministicPolicyChecker's string-match rules
+           catch narrow patterns but do not defend against general prompt injection payloads
+           embedded in parameters_schema. Fix scoped to Task 4.11.
+           (AI Risk Assessment §Recommendation 1; SECURITY_ASSESSMENT.md P0-2)
+
+        3. **Authority claim regex bypass (HIGH):** Unicode homoglyphs and synonym
+           substitution bypass the 5-pattern _AUTHORITY_CLAIM_RE. Fix scoped to Task 4.11.
+           (SECURITY_ASSESSMENT.md P1-1)
+
+        Add closing note: "These caveats do not invalidate the Task 4 configuration
+        decisions. They document known security gaps that Task 4.11 (Security Hardening)
+        must resolve before Task 5 (Model Upgrade). Task 5 is blocked on Task 4.11
+        completion."
+      </detail>
+    </deliverable>
+
+    <!-- ==== D-3: Decision Registry Evidence Artifact ==== -->
+    <deliverable id="D-3" target="phase2_gates/evidence/p5_task4_10_profile_lock_summary.json">
+      <action>Create Task 4 decision registry evidence artifact (new file).</action>
+      <detail>
+        Structured JSON with these top-level keys:
+
+        "task": "P5-Task-4.10",
+        "title": "Workload Profile Lock + ADR-012 §2.2 Finalization",
+        "date": "2026-03-05",
+        "type": "DOCS_ONLY",
+        "predecessor": { "task": "4.9d", "commit": "40443b0", "agreement": 1.000 },
+
+        "decisions": [
+          {
+            "id": "DEC-01",
+            "parameter": "num_assistant_tokens",
+            "value": 3,
+            "status": "LOCKED",
+            "task_source": "Task 4.3",
+            "evidence": "p5_task4_3_nat_sweep_matrix.json",
+            "lock_date": "2026-03-03",
+            "rationale": "Wins weighted TPS across 512-8K production range (score 4.847)"
+          },
+          ... (all 10 decisions DEC-01 through DEC-10, each with same structure)
+        ],
+
+        "evaluating_resolved": [
+          {
+            "parameter": "input_output_split",
+            "before_status": "EVALUATING",
+            "after_status": "ADVISORY",
+            "disposition": "LOCK_ADVISORY",
+            "rationale": "Heuristic guideline, not empirically optimized"
+          },
+          {
+            "parameter": "genconfig_fields",
+            "before_status": "EVALUATING",
+            "after_status": "LOCKED",
+            "sub_parameters": {
+              "pa_max_new_tokens": { "value": 10, "status": "LOCKED", "source": "DEC-08" },
+              "pa_stop_token_ids": { "value": [151645, 151668], "status": "LOCKED", "source": "§2.4" },
+              "ao_stop_token_ids": { "value": [151645], "status": "LOCKED", "source": "§2.4" },
+              "ao_code_max_new_tokens": { "status": "DEFERRED_TO_TASK5", "rationale": "No 14B data" },
+              "num_assistant_tokens": { "value": 3, "status": "LOCKED", "source": "DEC-01" },
+              "do_sample": { "value": false, "status": "LOCKED", "source": "project_mandate" }
+            }
+          }
+        ],
+
+        "workload_profiles": {
+          "pa": { ... all PA parameters from D-2 table ... },
+          "ao": { ... all AO parameters from D-2 table ... },
+          "code": { ... all CODE parameters from D-2 table ... }
+        },
+
+        "task4_closure": {
+          "total_sub_sessions": 11,
+          "retired_sub_sessions": 1,
+          "total_decisions": 10,
+          "total_evidence_artifacts": 17,
+          "total_ledger_entries": 15,
+          "ledger_range": "13-27",
+          "date_started": "2026-03-01",
+          "date_closed": "2026-03-05",
+          "evaluating_rows_remaining": 0,
+          "next_task": "4.11 (Security Hardening)"
+        },
+
+        "security_caveats": {
+          "source": "docs/SECURITY_ASSESSMENT.md + AI Risk Assessment and Mitigation Strategy.md",
+          "status": "PENDING_TASK_4_11",
+          "findings": [
+            {
+              "id": "P0-1",
+              "title": "mTLS CN to source_agent validation",
+              "severity": "CRITICAL",
+              "impact": "ESCALATE_CROSS_AGENT_OWNERSHIP rule defeated if source_agent spoofed",
+              "risk_assessment_ref": "Recommendation 3 (Fortify Vsock IPC with mTLS)",
+              "remediation": "Task 4.11"
+            },
+            {
+              "id": "P0-2",
+              "title": "parameters_schema prompt injection",
+              "severity": "CRITICAL",
+              "impact": "Attacker-crafted CAR can embed prompt injection in parameters_schema",
+              "risk_assessment_ref": "Recommendation 1 (Deterministic Execution Controls)",
+              "remediation": "Task 4.11"
+            },
+            {
+              "id": "P1-1",
+              "title": "Authority claim regex bypass via Unicode homoglyphs",
+              "severity": "HIGH",
+              "impact": "DENY_AUTHORITY_CLAIM rule bypassed by homoglyph substitution",
+              "risk_assessment_ref": "Recommendation 1 (Deterministic Execution Controls)",
+              "remediation": "Task 4.11"
+            }
+          ],
+          "blocking_note": "Task 5 (Model Upgrade) blocked on Task 4.11 completion"
+        }
+
+        The "decisions" array must include ALL 10 decisions with complete metadata.
+        Here is the full registry for EA reference:
+
+        DEC-01: NAT=3, Task 4.3, p5_task4_3_nat_sweep_matrix.json, 2026-03-03, rationale: "Wins weighted TPS across 512–8K production range (score 4.847)"
+        DEC-02: spec_decode_collapse_accepted, Task 4.3, p5_task4_3_nat_sweep_matrix.json, 2026-03-03, rationale: "AR=0.000 at ≥16K accepted; system degrades gracefully to autoregressive; no code change"
+        DEC-03: max_context=16384, Task 4.3, p5_task4_3_nat_sweep_matrix.json, 2026-03-03, rationale: "Proven safe at RSS 3,562 MB; speculative decoding inert above ~12K but system functional"
+        DEC-04: task_4.5_retired, Task 4.3, N/A (scope decision), 2026-03-03, rationale: "Fully subsumed by Task 4.3 7-band × 6-NAT matrix"
+        DEC-05: SDPA=ON, Task 4.4, p5_task4_4_xattention_sweep.json, 2026-03-04, rationale: "ON wins or ties at every band (4K–16K); dominant TTFT improvement (+5–26%)"
+        DEC-06: prefix_caching=OFF, Task 4.6, p5_task4_6_prefix_cache_study.json, 2026-03-04, rationale: "Prefix caching destroys speculative decoding AR on warm calls at ≥12K context"
+        DEC-07: FP16_locked, Task 4.7, p5_task4_7_precision_study.json, 2026-03-04, rationale: "BF16 not supported on Arc 140V; FP16 is optimal supported precision"
+        DEC-08: PA_max_new_tokens=10, Task 4.8, p5_task4_8_pa_max_tokens_study.json, 2026-03-04, rationale: "Lowest ceiling with 100% label extraction; think block overhead = 3 tokens, effective label budget = 7"
+        DEC-09b: /no_think_mandatory, Task 4.9b, p5_task4_9b_no_think_measurement.json, 2026-03-05, rationale: "Removing /no_think causes unbounded CoT, 0.025 agreement, 111/120 multi-label rejection"
+        DEC-10: deterministic_prefilter_validated, Task 4.9c-4.9d, p5_task4_9d_escalate_hardening.json, 2026-03-05, rationale: "PA quality gate PASS: 1.000 agreement (40/40), adversarial 1.000, 25/40 prefiltered by 6-rule DeterministicPolicyChecker"
+      </detail>
+    </deliverable>
+
+    <!-- ==== D-4: LEDGER Entry 28 ==== -->
+    <deliverable id="D-4" target="docs/POST_OPERATIONAL_MATURATION_LEDGER.md">
+      <action>New Entry 28 ==== Task 4.10: Workload Profile Lock + ADR-012 §2.2 Finalization</action>
+      <detail>
+        Format: same structure as existing entries (27 is the predecessor).
+
+        | Field | Value |
+        |---|---|
+        | **Date** | 2026-03-05 |
+        | **Branch** | feature/p5-task4-9-pa-quality-gate |
+        | **Predecessor** | Task 4.9d (commit 40443b0) |
+        | **Commit** | (fill after commit) |
+        | **Disposition** | DOCS-ONLY |
+
+        ### Context
+        Task 4 Production Configuration Feasibility Study closure. All 10 sub-sessions
+        complete (4.1-4.9d, 4.5 retired). 10 decisions locked (DEC-01 through DEC-10).
+        2 remaining EVALUATING rows in ADR-012 §2.2 resolved: input/output split to
+        ADVISORY (Q-1), GenConfig composite to LOCKED with AO/CODE max_new_tokens
+        DEFERRED_TO_TASK5 (Q-2).
+
+        ### Changes
+        - D-1: ADR-012 §2.2 updated ==== zero EVALUATING rows
+        - D-2: ADR-012 §2.6 added ==== 3 workload profile tables (PA, AO, CODE)
+        - D-3: Evidence artifact created ==== decision registry JSON
+        - D-5: IMPLEMENTATION_PLAN §1.23 added
+        - D-6: P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md §0 table updated
+        - D-7: ADR-012 header status changed to "Configuration Locked (Task 4 Complete)"
+
+        ### Artifacts
+        - docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md (D-1, D-2, D-7)
+        - phase2_gates/evidence/p5_task4_10_profile_lock_summary.json (D-3)
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md (D-4, this entry)
+        - docs/IMPLEMENTATION_PLAN.md (D-5)
+        - docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md (D-6)
+      </detail>
+    </deliverable>
+
+    <!-- ==== D-5: IMPLEMENTATION_PLAN §1.23 ==== -->
+    <deliverable id="D-5" target="docs/IMPLEMENTATION_PLAN.md" section="new §1.23">
+      <action>Add §1.23 ==== Phase 5 Task 4.10 Workload Profile Lock</action>
+      <detail>
+        Insert AFTER §1.22 (Task 4.11 placeholder ==== note this is a PENDING placeholder
+        that was added in an earlier session, so §1.23 goes after §1.22 even though Task 4.10
+        executes before Task 4.11 chronologically).
+
+        Content:
+        ### 1.23 Phase 5 ==== Task 4.10: Workload Profile Lock + ADR-012 §2.2 Finalization
+
+        DOCS-ONLY milestone. Task 4 Production Configuration Feasibility Study closure.
+        All remaining EVALUATING parameters in ADR-012 §2.2 resolved: input/output split
+        to ADVISORY (per Q-1), GenConfig composite to LOCKED with AO/CODE max_new_tokens
+        DEFERRED_TO_TASK5 (per Q-2). Zero EVALUATING rows remain.
+
+        Three production workload profiles compiled (PA, AO, CODE) in ADR-012 §2.6.
+        Decision registry evidence artifact generated with all 10 locked decisions
+        (DEC-01 through DEC-10).
+
+        - **Type:** DOCS-ONLY
+        - **Branch:** feature/p5-task4-9-pa-quality-gate
+        - **Commit:** (fill after commit)
+        - **Date:** 2026-03-05
+        - **LEDGER Entry:** 28
+        - **Disposition:** COMPLETE
+        - **Deliverables:**
+          - D-1: ADR-012 §2.2 zero EVALUATING rows
+          - D-2: ADR-012 §2.6 production workload profiles
+          - D-3: phase2_gates/evidence/p5_task4_10_profile_lock_summary.json
+          - D-4: LEDGER Entry 28
+          - D-5: This section (IMPLEMENTATION_PLAN §1.23)
+          - D-6: P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md §0 update
+          - D-7: ADR-012 header status change
+        - **Evidence:** phase2_gates/evidence/p5_task4_10_profile_lock_summary.json
+      </detail>
+    </deliverable>
+
+    <!-- ==== D-6: Feasibility Doc §0 Table Update ==== -->
+    <deliverable id="D-6" target="docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md" section="§0">
+      <action>Update Task 4.10 row in §0 table to COMPLETE. Update document header.</action>
+      <detail>
+        In the §0 Task 4 Execution Status table:
+
+        BEFORE:
+        | 4.10 | Workload Profile Lock + ADR-012 §2.2 Finalization | PENDING | ==== | ==== | ==== |
+
+        AFTER:
+        | 4.10 | Workload Profile Lock + ADR-012 §2.2 Finalization | **COMPLETE** | (commit) | Entry 28 | p5_task4_10_profile_lock_summary.json |
+
+        Update document header:
+        BEFORE: **Status:** ACTIVE ==== Tasks 4.1-4.9 COMPLETE (4.5 RETIRED). Task 4.10 NEXT.
+        AFTER:  **Status:** ACTIVE ==== Tasks 4.1-4.10 COMPLETE (4.5 RETIRED). Task 4.11 (Security Hardening) NEXT.
+        Update **Updated:** date to 2026-03-05.
+        Update HEAD commit.
+      </detail>
+    </deliverable>
+
+    <!-- ==== D-7: ADR-012 Header Status Change ==== -->
+    <deliverable id="D-7" target="docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md"
+                 section="header">
+      <action>Change ADR-012 status line.</action>
+      <detail>
+        BEFORE: **Status:** ACCEPTED ==== Configuration Optimization In Progress
+        AFTER:  **Status:** ACCEPTED ==== Configuration Locked (Task 4 Complete)
+      </detail>
+    </deliverable>
+
+  </deliverables>
+
+  <!-- =================================================================
+       SECTION 5: CONSTRAINTS
+       ================================================================= -->
+
+  <constraints>
+    <constraint id="K-1">ZERO production code changes. No .py files modified. No test files modified. No existing .json evidence files modified.</constraint>
+    <constraint id="K-2">After D-1 completes, ADR-012 §2.2 must contain ZERO rows with status **EVALUATING**.</constraint>
+    <constraint id="K-3">All 10 locked decisions (DEC-01 through DEC-10) must appear in D-3 with evidence citations, task sources, and lock dates.</constraint>
+    <constraint id="K-4">Workload profile tables in D-2 must cover all three components: PA, AO, CODE.</constraint>
+    <constraint id="K-5">DEFERRED_TO_TASK5 entries must include explicit justification (no 14B empirical data exists for AO/CODE).</constraint>
+    <constraint id="K-6">After D-1 completes, the §2.2 section heading must NOT contain "In Progress".</constraint>
+  </constraints>
+
+  <!-- =================================================================
+       SECTION 6: EXECUTION ORDER
+       ================================================================= -->
+
+  <execution_order>
+    <step number="1" action="Structured summary (mandatory_first_action). STOP and wait for approval." />
+    <step number="2" action="D-7: Update ADR-012 header status line." />
+    <step number="3" action="D-1: Resolve ADR-012 §2.2 EVALUATING rows (input/output split + GenConfig) + update §2.2 section heading to Complete." />
+    <step number="4" action="Verify: §2.2 heading no longer contains 'In Progress' (K-6)." />
+    <step number="5" action="D-2: Add ADR-012 §2.6 Production Workload Profiles (3 tables)." />
+    <step number="6" action="D-3: Create p5_task4_10_profile_lock_summary.json evidence artifact." />
+    <step number="7" action="D-4: Add LEDGER Entry 28." />
+    <step number="8" action="D-5: Add IMPLEMENTATION_PLAN §1.23." />
+    <step number="9" action="D-6: Update P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md §0 table + header." />
+    <step number="10" action="Verify: grep ADR-012 for EVALUATING ==== expect zero matches." />
+    <step number="11" action="Commit all changes." />
+  </execution_order>
+
+  <!-- =================================================================
+       SECTION 7: COMMIT TEMPLATE
+       ================================================================= -->
+
+  <commit_template>
+    <message>Task 4.10: Workload Profile Lock + ADR-012 §2.2 Finalization [DOCS-ONLY]
+
+- ADR-012 §2.2: zero EVALUATING rows (input/output split ADVISORY, GenConfig LOCKED)
+- ADR-012 §2.6: production workload profiles (PA, AO, CODE)
+- ADR-012 header: "Configuration Locked (Task 4 Complete)"
+- Evidence: p5_task4_10_profile_lock_summary.json (decision registry)
+- LEDGER Entry 28, IMPLEMENTATION_PLAN §1.23
+- Task 4 closed: 11 sub-sessions, 10 decisions, 17 evidence artifacts</message>
+  </commit_template>
+
+  <!-- =================================================================
+       SECTION 8: VERIFICATION COMMANDS (Lead Architect non-dev confirmation)
+       ================================================================= -->
+
+  <verification>
+    <command purpose="Confirm commit">git log --oneline -1</command>
+    <command purpose="Confirm zero EVALUATING rows in ADR-012">Select-String -Path "docs\adrs\ADR-012*.md" -Pattern "**EVALUATING**" -SimpleMatch</command>
+    <command purpose="Confirm evidence artifact exists">Test-Path "phase2_gates\evidence\p5_task4_10_profile_lock_summary.json"</command>
+    <command purpose="Confirm files changed">git diff HEAD~1 --name-only</command>
+  </verification>
+
+  <!-- =================================================================
+       SECTION 9: ATTACHMENT LIST
+       ================================================================= -->
+
+  <attachment_list count="8">
+    <attachment index="1" path="docs/Task4.10_SCOPE_OUTLINE.md" reason="SDO scope outline with Q-1/Q-2/Q-3 analysis and workload profile table templates" />
+    <attachment index="2" path="docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md" reason="Target document for D-1, D-2, D-7. Current §2.2 EVALUATING rows to resolve." />
+    <attachment index="3" path="docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md" reason="Target for D-6. §0 table update." />
+    <attachment index="4" path="docs/POST_OPERATIONAL_MATURATION_LEDGER.md" reason="Target for D-4 (Entry 28). Contains Entries 13-27." />
+    <attachment index="5" path="docs/IMPLEMENTATION_PLAN.md" reason="Target for D-5 (§1.23). Contains §1.21-§1.22." />
+    <attachment index="6" path=".github/copilot-instructions.md" reason="Project governance, phase directives, coding standards." />
+    <attachment index="7" path="docs/SECURITY_ASSESSMENT.md" reason="P0/P1 findings for D-2 security caveats and D-3 security_caveats JSON section." />
+    <attachment index="8" path="docs/Task4.10_v1.xml" reason="This execution prompt (self-reference for EA context)." />
+  </attachment_list>
+
+</execution_prompt>

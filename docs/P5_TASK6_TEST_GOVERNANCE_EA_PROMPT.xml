@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BlarAI Phase 5 — Task 6: Test Governance Framework
+  Generated: 2026-04-18
+  Author: SDO (Strategic Development Orchestrator)
+  Target: Execution Agent (single-session)
+  Scope: DOCS-ONLY + one baseline update in copilot-instructions.md
+-->
+
+<execution_prompt version="1.0" task="P5-Task-6" milestone="Test Governance Framework">
+
+  <comprehension_gate>
+    <instruction>
+      MANDATORY FIRST ACTION: Before any implementation work, read this entire prompt.
+      Then present a structured summary to the Lead Architect:
+        (a) Milestone objective in your own words
+        (b) List of work items with 1-sentence descriptions
+        (c) Files you will create or modify
+        (d) Test strategy (if applicable — this is primarily a DOCS milestone)
+        (e) Any risks or ambiguities you see
+      Then STOP and WAIT for Lead Architect approval.
+      Do NOT write code, create branches, or run commands until explicit approval is received.
+    </instruction>
+  </comprehension_gate>
+
+  <milestone>
+    <id>P5-TASK6-TEST-GOVERNANCE</id>
+    <title>Test Governance Framework</title>
+    <type>DOCS-ONLY (one minor config baseline update)</type>
+    <branch>feature/p5-task6-test-governance</branch>
+    <parent_branch>main</parent_branch>
+    <parent_head>103dfe6</parent_head>
+
+    <objective>
+      Create a single authoritative test governance document (docs/TEST_GOVERNANCE.md) that
+      defines named test scopes with exact commands, scope-selection guidance, the canonical
+      baseline with update policy, marker policy, gate-checking order with pass/fail
+      criteria, and test development policy (when/where/how to write tests). Update the
+      stale test baseline in .github/copilot-instructions.md. Record the milestone in the
+      Post-Operational Maturation Ledger (Entry 38). This single document governs both
+      test execution and test development — no additional documents needed.
+    </objective>
+
+    <background>
+      Testing governance is currently fragmented across 10+ touchpoints with no single
+      authoritative document. Phase_2_Test_Plan.md is archived (Phase 2 only).
+      copilot-instructions.md declares a stale baseline of 749/751. Two implicit test scopes
+      coexist (focused vs. full) with no documentation. The slow marker was introduced in
+      M5.5 but no marker policy exists. Different EAs have used different pytest commands
+      with no standard. Root snapshots pytest_baseline.txt (Phase 3, 670 passed) and
+      pytest_output.txt (Task 4, 786 collected) are stale.
+
+      The Lead Architect wants:
+      1. Modular "plug-and-play" test scopes — pick the right scope for the job
+      2. Consistent governance across all development — every EA uses the same commands
+      3. No over-engineering — lean document, not a bureaucratic framework
+      4. Proper baseline management — single source of truth that stays current
+      5. Test development policy — codify when tests are required, where they go, and
+         how they are structured so the doc governs both execution AND development
+    </background>
+  </milestone>
+
+  <work_items>
+    <item id="WI-1" title="Create docs/TEST_GOVERNANCE.md">
+      <description>
+        Create a new governance document at docs/TEST_GOVERNANCE.md that contains ALL of the
+        following sections. Keep it lean — use tables and exact commands, not prose.
+      </description>
+      <deliverables>
+
+        <section id="S1" title="Named Test Scopes">
+          <instruction>
+            Define the following named scopes in a table. Each scope MUST include:
+            - Scope name (uppercase identifier)
+            - Exact pytest command (copy-pasteable)
+            - What it covers (directories/markers)
+            - Expected baseline count (current numbers)
+
+            Required scopes:
+
+            1. UNIT — Unit tests only for shared library and all services, excluding
+               launcher and integration tests. Fastest feedback loop.
+               Command: pytest shared/ services/ --tb=short -q
+               Current baseline: Derive by running the command (expected ~670-680 based
+               on 755 total minus launcher/ tests).
+               NOTE: The EA MUST run this command to capture the exact count.
+
+            2. FOCUSED — Unit tests plus launcher tests, excluding integration.
+               Command: pytest shared/ services/ launcher/ --tb=short -q
+               Current baseline: Derive by running the command.
+               NOTE: The EA MUST run this command to capture the exact count.
+
+            3. REGRESSION — Full test suite with default marker filtering (slow excluded).
+               This is the standard regression gate for code-change milestones.
+               Command: pytest shared/ services/ tests/ --tb=short -q
+               Current baseline: 755 passed, 2 skipped, 80 deselected
+
+            4. FULL — Complete test suite including slow-marked tests. Overrides the
+               default -m 'not slow' filter. Used for task/phase closure gates only.
+               Command: pytest -m "slow or not slow" shared/ services/ tests/ --tb=short -q
+               Current baseline: 835 passed, 2 skipped
+               NOTE: The EA MUST verify this command correctly overrides the addopts
+               marker filter and produces 835 passed. If the -m override syntax does not
+               work, try: pytest -o "addopts=--strict-markers -v --import-mode=importlib"
+               shared/ services/ tests/ --tb=short -q
+               Document whichever syntax works.
+
+            5. SERVICE (parameterized) — Single-service test run for targeted development.
+               Command pattern: pytest services/{service_name}/tests/ --tb=short -q
+               List the 5 valid service_name values: policy_agent, assistant_orchestrator,
+               semantic_router, ui_gateway, ui_shell
+
+            6. SLOW — Only the slow-marked integration tests. Used for runtime validation.
+               Command: pytest -m slow tests/integration/ --tb=short -q
+               Current baseline: 80 tests (from test_p110_end_to_end.py and
+               test_p114_ui_end_to_end.py)
+               NOTE: The EA MUST verify this command runs exactly 80 tests.
+          </instruction>
+        </section>
+
+        <section id="S2" title="Scope Selection Guide">
+          <instruction>
+            Create a decision table mapping development activity → required test scope.
+            Required mappings:
+
+            | Activity | Required Scope | Notes |
+            |----------|---------------|-------|
+            | Single-service code change | SERVICE + REGRESSION | Run targeted first, then regression |
+            | Shared library change | REGRESSION | Shared code impacts all consumers |
+            | Cross-service change | REGRESSION | Any change touching 2+ services |
+            | Code-change milestone gate | REGRESSION | Standard EA quality gate |
+            | Runtime/E2E validation | SLOW or FULL | When testing against live services |
+            | Task closure gate | FULL | All tests including slow must pass |
+            | Phase closure gate | FULL | All tests including slow must pass |
+            | Quick smoke check during dev | UNIT | Fastest feedback loop |
+
+            Add a note: "The REGRESSION scope is the default for SDO-generated EA prompts
+            unless the milestone explicitly requires FULL."
+          </instruction>
+        </section>
+
+        <section id="S3" title="Canonical Baseline">
+          <instruction>
+            Define the canonical baseline section with:
+
+            1. Current baseline table (one row per scope with pass/skip/deselect counts)
+            2. Baseline provenance: branch, commit hash, date, ledger entry that established it
+            3. Update policy:
+               - Baseline MUST be updated when tests are added, removed, or reclassified
+               - The EA that changes test counts MUST update this section as part of their
+                 milestone
+               - copilot-instructions.md baseline MUST be kept in sync (reference this doc
+                 as source of truth)
+               - Stale baselines are a governance violation
+               - Re-baselining scope rule: When an EA adds, removes, or reclassifies tests,
+                 they MUST re-run ALL scopes that could be affected — not just the scope
+                 used during development. For example, adding a unit test affects UNIT,
+                 FOCUSED, REGRESSION, and FULL baselines. The EA must run each affected
+                 scope, capture the summary line, and update EVERY baseline row that changed.
+                 This prevents drift where an EA adds tests but only updates one row.
+            4. Known pre-existing failures:
+               - test_build_prompt_does_not_contain_no_think (2 skipped — pre-existing)
+               - test_stop_token_ids_constants_defined (2 skipped — pre-existing)
+               Document their status and why they are accepted.
+          </instruction>
+        </section>
+
+        <section id="S4" title="Marker Policy">
+          <instruction>
+            Define marker governance:
+
+            1. Current markers table:
+               | Marker | Registered In | Purpose | Default Behavior |
+               |--------|--------------|---------|-----------------|
+               | asyncio | pyproject.toml | Async coroutine tests | Auto-applied (asyncio_mode=auto) |
+               | slow | pyproject.toml | Socket-timeout integration tests | Deselected by default |
+
+            2. Qualification criteria for `slow` marker:
+               - Tests that require real socket connections with timeout waits
+               - Tests that take >30 seconds individually
+               - Tests that require running services (integration/E2E)
+               - MUST be applied at module level via pytestmark, not per-test
+
+            3. Future marker guidelines:
+               - New markers MUST be registered in root pyproject.toml with description
+               - New markers MUST have documented default behavior (selected/deselected)
+               - Adding a marker that changes default selection MUST update the baseline
+               - Marker names: lowercase, single word, descriptive
+               - Any new marker requires a governance doc update
+
+            4. Where markers are applied currently:
+               - tests/integration/test_p110_end_to_end.py — pytestmark = pytest.mark.slow
+               - tests/integration/test_p114_ui_end_to_end.py — pytestmark = pytest.mark.slow
+          </instruction>
+        </section>
+
+        <section id="S5" title="Gate-Checking Order and Pass/Fail Criteria">
+          <instruction>
+            Document the mandatory gate-checking order for EA milestones:
+
+            1. COMPILE gate:
+               - Command: python -m py_compile {changed_files} OR general import check
+               - Pass criteria: Zero compilation errors
+               - Fail action: STOP — do not proceed to TEST gate
+
+            2. TEST gate:
+               - Command: Use the scope defined in the EA prompt (default: REGRESSION)
+               - Pass criteria:
+                 a. Zero NEW failures (pre-existing skips are accepted)
+                 b. Pass count matches or exceeds baseline for the scope used
+                 c. No new skips without documented justification
+               - Fail action: STOP — diagnose and fix before proceeding
+               - Evidence: Capture the pytest summary line in the commit message or
+                 ledger entry
+
+            3. REGRESSION gate (for milestones that change test infrastructure):
+               - Required when: test files are added/removed/renamed, markers changed,
+                 pyproject.toml test config modified
+               - Command: FULL scope (all tests including slow)
+               - Pass criteria: Total pass count matches FULL baseline
+               - Fail action: STOP — the test infrastructure change broke something
+
+            Include a note on the relationship to copilot-instructions.md gate-checking
+            order (Compile → Test → Oracle) — this document provides the detailed
+            implementation of that rule.
+
+            Add SDO prompt integration guidance:
+            - Every SDO-generated EA prompt MUST specify which test scope to use in its
+              quality_gate section
+            - Default is REGRESSION unless the milestone involves runtime validation or
+              task/phase closure
+            - The EA MUST capture and report the exact pytest summary line
+          </instruction>
+        </section>
+
+        <section id="S6" title="Test Development Policy">
+          <instruction>
+            Define when and how tests are written. This section makes EAs self-service for
+            test development, just as the scope selection guide makes them self-service for
+            test execution. Keep it lean — codify existing patterns, don't invent new ones.
+
+            1. When tests are required:
+               - Every code-change milestone that modifies production Python files MUST
+                 include tests for new/changed behavior.
+               - DOCS-ONLY milestones and runtime-validation milestones are exempt.
+               - "Production Python files" = any .py file under services/, shared/,
+                 or launcher/ that is NOT in a tests/ directory.
+
+            2. Where tests go — mirror existing directory convention:
+               - Service tests: services/{service_name}/tests/
+               - Shared library tests: shared/tests/
+               - Launcher tests: launcher/tests/
+               - Cross-service integration tests: tests/integration/ (get the slow marker)
+               - New service → new tests/ directory → update testpaths in root pyproject.toml
+
+            3. Naming convention — codify the existing codebase pattern:
+               - File naming: test_{module_name}.py
+                 (e.g., test_car.py tests the car module, test_pgov.py tests pgov)
+               - Function naming: test_{descriptive_snake_case}
+                 Styles observed in the codebase:
+                   * Verb-noun: test_build_car_minimal, test_ssn_detected
+                   * State-behavior: test_frozen_immutable, test_construction_defaults
+                   * Condition-result: test_elevation_denied_returns_1,
+                     test_encode_size_limit_exceeded_raises
+                 All names are fully descriptive (no abbreviations), self-documenting,
+                 and use snake_case throughout.
+               - Do NOT invent new conventions. Follow the established patterns above.
+
+            4. Test boundary rule:
+               - Unit tests (services/*/tests/, shared/tests/, launcher/tests/) MUST mock
+                 external dependencies: IPC sockets, file I/O, network calls, hardware
+                 interfaces. They run without any running services.
+               - Integration tests (tests/integration/) test real cross-service interaction
+                 and MUST receive the slow marker (module-level pytestmark).
+               - No test should require manual setup or external state beyond what pytest
+                 fixtures provide.
+
+            5. Coverage expectation:
+               - No numeric coverage target (avoids over-engineering).
+               - Gate rule: Every public function or class added or modified MUST have at
+                 least one test exercising its primary (happy) path AND at least one test
+                 exercising its error/edge path.
+               - This is enforced by code review (SDO or Lead Architect), not by tooling.
+          </instruction>
+        </section>
+
+      </deliverables>
+    </item>
+
+    <item id="WI-2" title="Update copilot-instructions.md baseline">
+      <description>
+        In .github/copilot-instructions.md, update the test baseline declaration from the
+        stale "749/751 passed" to reflect the current state. The updated text should
+        reference docs/TEST_GOVERNANCE.md as the canonical source and state the REGRESSION
+        scope baseline: 755 passed, 2 skipped, 80 deselected (FULL: 835 passed, 2 skipped).
+        Also update the HEAD commit reference from 4cdb780 to the current main HEAD (103dfe6)
+        and ledger entry count from 33 to 37.
+      </description>
+      <location>
+        .github/copilot-instructions.md, Phase 5 directive block, approximately line 137.
+        Search for "Test baseline: 749/751" to find the exact location.
+        Also search for "HEAD: 4cdb780" and "LEDGER: 33 entries" in the same block.
+      </location>
+    </item>
+
+    <item id="WI-3" title="Record in Post-Operational Maturation Ledger">
+      <description>
+        Add Entry 38 to docs/POST_OPERATIONAL_MATURATION_LEDGER.md documenting this milestone.
+        Follow the existing entry format. Key fields:
+        - Title: Task 6 / Test Governance Framework (COMPLETE)
+        - Date: today's date
+        - Branch: feature/p5-task6-test-governance
+        - Predecessor: Entry 37 (M5.5 E2E Validation, commit 2801db4)
+        - Disposition: PASS
+        - Summary: Created canonical test governance document. Updated stale baseline in
+          copilot-instructions.md. Defined 6 named test scopes, scope selection guide,
+          canonical baseline with re-baselining policy, marker policy, gate-checking order,
+          and test development policy (when/where/how to write tests).
+        - Files: List docs/TEST_GOVERNANCE.md (created), .github/copilot-instructions.md
+          (modified), docs/POST_OPERATIONAL_MATURATION_LEDGER.md (modified)
+      </description>
+    </item>
+
+    <item id="WI-4" title="Note stale root artifacts">
+      <description>
+        In the TEST_GOVERNANCE.md document, add a brief "Stale Artifacts" section at the
+        bottom noting that the following root-level files are historical snapshots and are
+        NOT authoritative:
+        - pytest_baseline.txt (Phase 3 closure, 670 passed — STALE)
+        - pytest_output.txt (Task 4 era, 786 collected — STALE)
+        - pytest_m53_gate.txt (Task 5 M5.3, 835 passed — superseded by this doc)
+        - pytest_m54_gate.txt (Task 5 M5.4, 835 passed — superseded by this doc)
+        Do NOT delete these files. Just document that they are not the source of truth.
+      </description>
+    </item>
+  </work_items>
+
+  <context_notes>
+    <note id="CN-1" title="Current pytest config">
+      Root pyproject.toml [tool.pytest.ini_options]:
+      - pythonpath = ["."]
+      - testpaths covers: shared/tests, 5 service test dirs, launcher/tests, tests/integration
+      - addopts = "--strict-markers -v --import-mode=importlib -m 'not slow'"
+      - markers: asyncio, slow
+      - asyncio_mode = "auto"
+    </note>
+
+    <note id="CN-2" title="Service-level pyproject.toml files">
+      5 service-level configs exist (policy_agent, assistant_orchestrator, semantic_router,
+      ui_gateway, ui_shell). They supplement root config for per-service runs. Content is
+      minimal — mostly testpaths and addopts with strict-markers, or just asyncio_mode.
+    </note>
+
+    <note id="CN-3" title="No conftest.py files exist">
+      The workspace has zero conftest.py files. All test configuration is in pyproject.toml.
+      Do NOT create conftest.py files — this is not in scope.
+    </note>
+
+    <note id="CN-4" title="Test directory layout">
+      shared/tests/ — IPC protocol, transport, JWT, weight integrity, runtime config (5 files)
+      services/policy_agent/tests/ — adjudicator, boot, car, config_loader, entrypoint,
+        gpu_inference, hybrid_adjudicator + 6 more (13 files)
+      services/assistant_orchestrator/tests/ — circuit_breaker, context_manager, entrypoint,
+        gpu_inference, pgov (5 files)
+      services/semantic_router/tests/ — router (1 file)
+      services/ui_gateway/tests/ — session_store, transport (2 files)
+      services/ui_shell/tests/ — app, pgov_display, streaming (3 files)
+      launcher/tests/ — guest_deploy, launcher, vm_manager (3 files)
+      tests/integration/ — test_p110_end_to_end, test_p114_ui_end_to_end (2 files, both slow-marked)
+    </note>
+
+    <note id="CN-8" title="Existing test naming conventions (for S6)">
+      File pattern: test_{module_name}.py — no exceptions across 32 test files.
+      Function pattern: test_{descriptive_snake_case} — all fully descriptive, no
+      abbreviations, snake_case throughout. Styles: verb-noun (test_build_car_minimal),
+      state-behavior (test_frozen_immutable), condition-result (test_elevation_denied_returns_1).
+      The EA should codify these observed patterns, NOT invent new conventions.
+    </note>
+
+    <note id="CN-5" title="Baseline numbers to verify">
+      REGRESSION scope (default): 755 passed, 2 skipped, 80 deselected (confirmed 2026-04-18)
+      FULL scope: 835 passed, 2 skipped (from M5.5 pre-streamlining gate)
+      The EA must empirically verify all scope baselines by running the exact commands.
+    </note>
+
+    <note id="CN-6" title="Pre-existing skipped tests">
+      2 tests are skipped (pre-existing since Task 4):
+      - test_build_prompt_does_not_contain_no_think
+      - test_stop_token_ids_constants_defined
+      These are known and accepted. They relate to Qwen3 thinking mode suppression constants
+      that were intentionally deferred.
+    </note>
+
+    <note id="CN-7" title="Stale baseline in copilot-instructions.md">
+      Line ~137 of .github/copilot-instructions.md declares:
+      "Test baseline: 749/751 passed (2 pre-existing: ...)"
+      "HEAD: 4cdb780. LEDGER: 33 entries (latest: Entry 33 Task 4.11 Security Hardening)."
+      Both are stale after Task 5 completion. Update to reflect current state.
+    </note>
+  </context_notes>
+
+  <quality_gate>
+    <gate id="COMPILE" order="1">
+      <command>python -c "import py_compile; py_compile.compile('.github/copilot-instructions.md', doraise=False)"</command>
+      <criteria>N/A — DOCS-ONLY milestone. No Python source files are created or modified.
+        Verify that all markdown files are well-formed (no broken tables, no unclosed fences).</criteria>
+    </gate>
+    <gate id="REGRESSION" order="2">
+      <command>python -m pytest shared/ services/ tests/ --tb=short -q</command>
+      <criteria>755 passed, 2 skipped, 80 deselected. This is a DOCS-ONLY milestone —
+        the regression gate confirms no accidental test infrastructure changes.
+        Zero new failures. Zero new skips.</criteria>
+    </gate>
+    <gate id="BASELINE_VERIFIED" order="3">
+      <command>Run each of the 6 named scope commands defined in WI-1 and verify counts match.</command>
+      <criteria>All 6 scope commands execute successfully. Captured counts are recorded
+        in the TEST_GOVERNANCE.md baseline table. REGRESSION and FULL baselines match
+        known values (755/2/80 and 835/2 respectively).</criteria>
+    </gate>
+    <gate id="DOC_CONSISTENCY" order="4">
+      <command>grep -n "Test baseline" .github/copilot-instructions.md</command>
+      <criteria>The baseline in copilot-instructions.md matches the REGRESSION baseline
+        in TEST_GOVERNANCE.md. No stale numbers remain.</criteria>
+    </gate>
+  </quality_gate>
+
+  <verification>
+    <instruction>
+      The Lead Architect will run these commands to verify milestone success.
+      These are the ONLY confirmation mechanism — the Lead Architect cannot read code.
+    </instruction>
+    <commands>
+      <!-- Verify commit exists -->
+      <command>git log --oneline -1</command>
+      <expected>Single commit on feature/p5-task6-test-governance branch</expected>
+
+      <!-- Verify files changed -->
+      <command>git diff main --name-only</command>
+      <expected>
+        docs/TEST_GOVERNANCE.md (new)
+        .github/copilot-instructions.md (modified)
+        docs/POST_OPERATIONAL_MATURATION_LEDGER.md (modified)
+      </expected>
+
+      <!-- Verify governance doc exists and has all sections -->
+      <command>Select-String -Path docs/TEST_GOVERNANCE.md -Pattern "^## " | ForEach-Object { $_.Line }</command>
+      <expected>
+        Sections for: Named Test Scopes, Scope Selection Guide, Canonical Baseline,
+        Marker Policy, Gate-Checking Order, Test Development Policy, Stale Artifacts
+        (or similar headings)
+      </expected>
+
+      <!-- Verify baseline updated in copilot-instructions.md -->
+      <command>Select-String -Path .github/copilot-instructions.md -Pattern "Test baseline"</command>
+      <expected>Shows updated baseline (755 passed or 835 passed — not 749/751)</expected>
+
+      <!-- Regression gate (DOCS-ONLY confirmation) -->
+      <command>python -m pytest shared/ services/ tests/ --tb=short -q --no-header 2>&amp;1 | Select-Object -Last 3</command>
+      <expected>755 passed, 2 skipped, 80 deselected</expected>
+    </commands>
+  </verification>
+
+  <commit_template>
+    <message>
+Task 6: Test Governance Framework
+
+- Created docs/TEST_GOVERNANCE.md with 6 named test scopes, scope selection
+  guide, canonical baseline with re-baselining policy, marker policy,
+  gate-checking order, and test development policy
+- Updated .github/copilot-instructions.md baseline from 749/751 to current
+- Recorded Entry 38 in Post-Operational Maturation Ledger
+
+REGRESSION gate: {EA_FILLS_IN: e.g., 755 passed, 2 skipped, 80 deselected}
+All 6 scope baselines empirically verified.
+    </message>
+  </commit_template>
+
+  <attachments>
+    <instruction>
+      Attach the following files when creating the EA session:
+    </instruction>
+    <required>
+      <file reason="Project governance, coding standards, gate-checking rules">.github/copilot-instructions.md</file>
+      <file reason="Current pytest config — scopes derive from this">pyproject.toml</file>
+      <file reason="This execution prompt">docs/P5_TASK6_TEST_GOVERNANCE_EA_PROMPT.xml</file>
+    </required>
+    <recommended>
+      <file reason="Latest ledger entries for format reference">docs/POST_OPERATIONAL_MATURATION_LEDGER.md</file>
+    </recommended>
+  </attachments>
+
+</execution_prompt>

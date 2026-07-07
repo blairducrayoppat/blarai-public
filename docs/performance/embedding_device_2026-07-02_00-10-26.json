@@ -1,0 +1,224 @@
+{
+  "benchmark": "embedding_device_offload_720",
+  "timestamp": "2026-07-02T00:10:26",
+  "model": "BAAI/bge-small-en-v1.5 ONNX fp16 (127.8 MB, 384-dim)",
+  "surface": "services.assistant_orchestrator.src.pgov.LeakageDetector",
+  "methodology": {
+    "warmup_runs": 3,
+    "timed_runs": 20,
+    "cases": {
+      "single_short_128": "1 short sentence, 128-token leakage window",
+      "single_long_512": "1 ~420-word text, 512-token document window",
+      "batch8_128": "8 sentences, 128-token window",
+      "batch32_128": "32 sentences, 128-token window",
+      "batch8_512": "8 sentences, 512-token window"
+    },
+    "npu_note": "NPU plugin is static-shape only: two static compiles (128 + 512 windows), inputs padded to the window, batch processed one text per infer request."
+  },
+  "environment": {
+    "python": "3.11.9",
+    "os": "Windows 10.26200",
+    "onnxruntime": "1.24.2",
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "devices": {
+      "CPU": {
+        "name": "Intel(R) Core(TM) Ultra 7 258V"
+      },
+      "GPU": {
+        "name": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)"
+      },
+      "NPU": {
+        "name": "Intel(R) AI Boost",
+        "driver": "1004778"
+      }
+    },
+    "drivers": {
+      "gpu_arc140v": "32.0.101.8826",
+      "npu_ai_boost": "32.0.100.4778",
+      "source": "Win32_VideoController / Win32_PnPSignedDriver, verified 2026-07-02"
+    },
+    "hardware": "Intel Core Ultra 7 258V (Lunar Lake), Arc 140V iGPU, Intel AI Boost NPU, 32 GB LPDDR5X"
+  },
+  "results": [
+    {
+      "requested_device": "CPU",
+      "load_ok": true,
+      "backend": "ort-cpu",
+      "active_device": "CPU",
+      "load_s": 8.53,
+      "load_rss_delta_mb": 522.3,
+      "cases": {
+        "single_short_128": {
+          "n": 20,
+          "mean_ms": 7.0,
+          "median_ms": 6.23,
+          "p95_ms": 9.04,
+          "stdev_ms": 1.44,
+          "min_ms": 5.55,
+          "max_ms": 9.14
+        },
+        "single_long_512": {
+          "n": 20,
+          "mean_ms": 168.92,
+          "median_ms": 160.67,
+          "p95_ms": 210.7,
+          "stdev_ms": 23.7,
+          "min_ms": 147.96,
+          "max_ms": 239.08
+        },
+        "batch8_128": {
+          "n": 20,
+          "mean_ms": 49.42,
+          "median_ms": 51.07,
+          "p95_ms": 54.53,
+          "stdev_ms": 5.45,
+          "min_ms": 35.23,
+          "max_ms": 55.63
+        },
+        "batch32_128": {
+          "n": 20,
+          "mean_ms": 186.01,
+          "median_ms": 189.5,
+          "p95_ms": 206.26,
+          "stdev_ms": 17.32,
+          "min_ms": 151.27,
+          "max_ms": 209.03
+        },
+        "batch8_512": {
+          "n": 20,
+          "mean_ms": 52.0,
+          "median_ms": 54.22,
+          "p95_ms": 56.36,
+          "stdev_ms": 4.94,
+          "min_ms": 41.25,
+          "max_ms": 57.09
+        }
+      }
+    },
+    {
+      "requested_device": "GPU",
+      "load_ok": true,
+      "backend": "openvino",
+      "active_device": "GPU",
+      "load_s": 2.2,
+      "load_rss_delta_mb": 408.2,
+      "cases": {
+        "single_short_128": {
+          "n": 20,
+          "mean_ms": 1.47,
+          "median_ms": 1.44,
+          "p95_ms": 1.56,
+          "stdev_ms": 0.13,
+          "min_ms": 1.4,
+          "max_ms": 2.03
+        },
+        "single_long_512": {
+          "n": 20,
+          "mean_ms": 7.45,
+          "median_ms": 7.45,
+          "p95_ms": 7.68,
+          "stdev_ms": 0.16,
+          "min_ms": 7.14,
+          "max_ms": 7.76
+        },
+        "batch8_128": {
+          "n": 20,
+          "mean_ms": 3.19,
+          "median_ms": 2.95,
+          "p95_ms": 4.28,
+          "stdev_ms": 0.6,
+          "min_ms": 2.66,
+          "max_ms": 5.08
+        },
+        "batch32_128": {
+          "n": 20,
+          "mean_ms": 6.94,
+          "median_ms": 6.91,
+          "p95_ms": 7.32,
+          "stdev_ms": 0.2,
+          "min_ms": 6.59,
+          "max_ms": 7.33
+        },
+        "batch8_512": {
+          "n": 20,
+          "mean_ms": 2.87,
+          "median_ms": 2.77,
+          "p95_ms": 3.27,
+          "stdev_ms": 0.4,
+          "min_ms": 2.54,
+          "max_ms": 4.34
+        }
+      },
+      "parity_vs_cpu": {
+        "min_cosine_128": 1.0,
+        "min_cosine_512": 1.0
+      }
+    },
+    {
+      "requested_device": "NPU",
+      "load_ok": true,
+      "backend": "openvino",
+      "active_device": "NPU",
+      "load_s": 12.11,
+      "load_rss_delta_mb": 227.5,
+      "cases": {
+        "single_short_128": {
+          "n": 20,
+          "mean_ms": 5.56,
+          "median_ms": 5.52,
+          "p95_ms": 5.93,
+          "stdev_ms": 0.26,
+          "min_ms": 5.17,
+          "max_ms": 5.96
+        },
+        "single_long_512": {
+          "n": 20,
+          "mean_ms": 12.39,
+          "median_ms": 12.16,
+          "p95_ms": 13.44,
+          "stdev_ms": 0.55,
+          "min_ms": 11.82,
+          "max_ms": 13.89
+        },
+        "batch8_128": {
+          "n": 20,
+          "mean_ms": 23.05,
+          "median_ms": 22.88,
+          "p95_ms": 24.69,
+          "stdev_ms": 0.97,
+          "min_ms": 21.84,
+          "max_ms": 24.73
+        },
+        "batch32_128": {
+          "n": 20,
+          "mean_ms": 85.58,
+          "median_ms": 85.21,
+          "p95_ms": 87.74,
+          "stdev_ms": 1.36,
+          "min_ms": 84.07,
+          "max_ms": 89.85
+        },
+        "batch8_512": {
+          "n": 20,
+          "mean_ms": 78.18,
+          "median_ms": 77.96,
+          "p95_ms": 79.5,
+          "stdev_ms": 1.16,
+          "min_ms": 77.1,
+          "max_ms": 82.01
+        }
+      },
+      "parity_vs_cpu": {
+        "min_cosine_128": 0.999997,
+        "min_cosine_512": 0.999996
+      }
+    }
+  ],
+  "not_measured": [
+    "co-resident Qwen3-14B contention (harness runs in isolation; the production win case \u2014 embedding while the 14B generates on the GPU \u2014 needs a separate resident-14B run)",
+    "semantic router ORT session (separate consumer, CPU-targeted, not in the live turn path)",
+    "openvino-int8 IR precision variant (knob is device-only)",
+    "OpenVINO-on-CPU executor (not reachable via the production knob)",
+    "sustained/thermal behaviour"
+  ]
+}

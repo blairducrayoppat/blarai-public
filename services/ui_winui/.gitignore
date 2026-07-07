@@ -1,0 +1,13 @@
+# Build output
+bin/
+obj/
+# VS / Rider cruft
+.vs/
+*.user
+*.suo
+# Publish output
+publish/
+AppPackages/
+BundleArtifacts/
+*.appx
+*.msix

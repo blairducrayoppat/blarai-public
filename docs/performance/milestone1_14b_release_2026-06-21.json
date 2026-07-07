@@ -1,0 +1,86 @@
+{
+  "title": "Qwen3-14B INT4 (OpenVINO GenAI) in-process release/reload memory behavior on Intel Arc 140V (Lunar Lake)",
+  "date": "2026-06-21",
+  "question": "Does an in-process OpenVINO GenAI LLMPipeline release (drop all refs + one gc.collect) return the integrated-GPU shared-memory carve-out WITHOUT a process restart, on Lunar Lake? (ref: openvinotoolkit/openvino #33896 — iGPU memory not auto-released on idle)",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2 integrated)",
+    "memory": "32 GB LPDDR5X-8533, 31.323 GB effective",
+    "unified_memory": true,
+    "shared_gpu_memory_override": "~87% (window ~27 GB), reboot applied"
+  },
+  "software": {
+    "openvino": "2026.1.0",
+    "openvino_genai": "2026.1.0.0",
+    "gpu_driver": "32.0.101.8826 (2026-05-28)",
+    "os": "Windows 11 Pro build 26200"
+  },
+  "model": {
+    "target": "Qwen3-14B, INT4 OpenVINO IR",
+    "draft": "Qwen3-0.6B pruned-6L, INT8 (speculative decoding)",
+    "prefix_caching": true,
+    "device": "GPU",
+    "performance_hint": "LATENCY",
+    "inference_precision_hint": "f16"
+  },
+  "method": {
+    "build": "build one LLMPipeline (target + draft) on GPU, warm with one generation",
+    "cycle": "measure -> unload (del refs + 1x gc.collect) -> 60s stability-gated settle (stop when 3 consecutive per-PID GPU reads within 100 MB) -> measure -> reload (fresh LLMPipeline build) -> coherence generation",
+    "cycles": 3,
+    "configs": ["B1 standalone throwaway process", "B2 same unload inside a long-lived process with full warmed allocator state (authoritative for #33896)"],
+    "counters": {
+      "gpu_per_process": "\\GPU Process Memory(*)\\{Local Usage, Shared Usage, Total Committed} filtered by pid_<PID>_",
+      "ram_authoritative": "\\Memory\\Available MBytes",
+      "ram_genuineness_crosscheck": "\\Memory\\Committed Bytes and \\Memory\\Free & Zero Page List Bytes (rules out standby-cache inflation)"
+    }
+  },
+  "result": {
+    "carve_out_returns_on_in_process_release": true,
+    "issue_33896_observed": false,
+    "gpu_local_usage_before_mb": 10774,
+    "gpu_local_usage_after_mb": 677,
+    "gpu_returned_mb": 10097,
+    "unload_return_seconds": 1.0,
+    "settle_to_stable_seconds": 1,
+    "second_gc_collect_frees_additional": false,
+    "reload_fresh_build_seconds": 18.5,
+    "reload_coherent": true,
+    "creeping_residue_across_cycles": "none (per-PID GPU after = 682/677/677 MB)",
+    "ram_committed_drop_mb": 11300,
+    "ram_available_rise_mb": 10400,
+    "free_and_zero_list_rise_mb": 11000,
+    "iGPU_local_equals_shared": "On this integrated GPU the per-process Local Usage and Shared Usage counters report the same value (unified memory); the model weights also appear in the process Working Set.",
+    "model_gpu_footprint_state_dependent_mb": {"idle": 8700, "reloaded": 10800, "kv_warmed": 11800}
+  },
+  "step2_30b_load_certification": {
+    "model": "Qwen3-Coder-30B INT4 (OVMS, --target_device GPU)",
+    "load_seconds": 30,
+    "decode_tok_s": 37.4,
+    "override_effective_ge_35_tok_s": true,
+    "gpu_per_process_local_mb": 15672,
+    "steady_available_after_load_gb": 9.8,
+    "steady_committed_gb": 28.2,
+    "stops_clean_ram_returns": true,
+    "load_peak_measured_blarai_down": {
+      "pre_load_available_gb": 25.4,
+      "min_available_mb_during_load": 67,
+      "committed_peak_mb": 29765,
+      "max_pages_input_per_sec": 206265,
+      "av_heavy_features_off_retest": "Re-ran with Bitdefender heavy real-time features disabled: min Available 19 MB, Committed peak 29.1 GB (UNCHANGED), max pages-in 179k — essentially identical. The thrash is inherent to the dual CPU+GPU weight allocation, NOT antivirus file-scanning.",
+      "note": "Available dips transiently to ~67 MB (19 MB AV-off), Committed peaks 29.1 GB, pages-in ~180-206k/s for ~6s; the load COMPLETES (~32-36s to READY) and runs at 37.4 tok/s but is MARGINAL. It exhausts PHYSICAL RAM headroom (Available -> ~0): the 31.3 GB figure is PHYSICAL RAM, the commit LIMIT is higher (pagefile). No OOM (commit limit not hit), but physical exhaustion IS the page-storm. Correction of an earlier note: 'Committed 29.1 < 31.3 so RAM never exhausted' conflated commit-limit with physical headroom — physical WAS exhausted."
+    },
+    "verdict_three_cases": {
+      "1_14b_release": "SOUND — #33896 doesn't bite; ~10 GB iGPU back in ~1s, genuine (committed-corroborated), reversible, coherent reload. Directly measured (B2 live process).",
+      "2_30b_standalone_load_leaned_box": "WORKS BUT MARGINAL — the operator's daily case; loads + runs 37.4 t/s from a leaned ~25 GB box, but barely (Available -> 67/19 MB, 29.1 GB committed, ~6s page-storm = physical exhaustion).",
+      "3_the_actual_swap": "MEASURED end-to-end (live BlarAI -> release the 14B in-process -> measure the resulting headroom, from a real un-leaned ~19.9 GB cold ambient): the BARE swap (BlarAI stays alive) lands at 20.1 GB Available (releasing the 14B freed +11.3 GB; backend GPU 8.7 -> 0.65 GB; unload 1.4s). 20.1 < 23.1 GB (lowest measured successful 30B load) -> SUB-THRESHOLD: the 30B load was correctly NOT attempted (it would death-spiral) and the gate aborts. Swap-BACK proven: the 14B reloads fresh in the live process in ~21s, coherent (GPU back to 11 GB). So the bare swap (release only the 14B) is NOT viable — BlarAI staying resident keeps it ~2 GB below even the cold baseline. From this ambient even a FULL BlarAI teardown (~19.9 GB cold) is still sub-threshold unless non-BlarAI apps are also trimmed.",
+      "conditional_verdict": "Release proven; standalone load proven-but-marginal; the BARE swap is NOT viable (measured 20.1 GB, sub-threshold). The swap is viable ONLY IF it ACTIVELY reaches >=~23-25 GB before the 30B load (full BlarAI step-aside AND ambient trim) and VERIFIES it. The pre-load headroom check is the LOAD-BEARING gate: from a real ambient it ABORTS (as it correctly did here), which is the whole point.",
+      "surfaced_facts": ["start-llm's 21 GB gate is TOO LOW (measured load peak 29.1 GB committed) AND lets the bare swap through (20.1 >= 21? no — 20.1 < 21, but a leaner-ambient bare swap ~22 passes the 21 gate yet is still < the 23.1 it needs)", "start-llm's -Force SKIPS its own gate", "the 14B is HOST-side on the Arc 140V iGPU, not in the VM"],
+      "milestone_2_gate": "Dispatch wiring (milestone 2) gating is now satisfiable-but-conditional: the bare swap is measured-not-viable; a viable swap requires the active step-aside + ambient-trim path, whose 30B LOAD has not been run from a >=23 GB swap-achieved ambient (deferred — would just reproduce the marginal standalone case)."
+    }
+  },
+  "not_measured": [
+    "The full live-release-then-30B co-state in one process tree (the swap-state load was inferred from the BlarAI-down peak vs B2's measured ~22 GB post-release Available, not run directly).",
+    "A genuinely lean production ambient (~27-28 GB free) where the load might avoid thrashing."
+  ],
+  "takeaway": "On this Arc 140V / driver 32.0.101.8826 / OpenVINO 2026.1.0 stack, dropping all references to an OpenVINO GenAI LLMPipeline plus a single gc.collect() returns the full iGPU shared-memory carve-out (~10 GB) within ~1 second, stably and reversibly, with no process restart and no driver-held residue — i.e. #33896 does not manifest here. The freed memory is genuine (Committed Bytes drops in lockstep). A second gc.collect() is unnecessary."
+}

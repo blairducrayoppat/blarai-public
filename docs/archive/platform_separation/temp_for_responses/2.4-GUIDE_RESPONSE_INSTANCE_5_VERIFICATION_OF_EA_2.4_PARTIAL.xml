@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response schema="midstage_completion_report_review">
+  <verdict>APPROVED</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <stage_xml>03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+  <work_item>2.4_partial</work_item>
+  <reviewed_at_utc>2026-04-25T05:30:00Z</reviewed_at_utc>
+  <guide_instance>5</guide_instance>
+  <reviewing>
+    <ea_instance>3</ea_instance>
+    <ea_artifact>docs/platform_separation/ea_outputs/EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_GUIDE.xml</ea_artifact>
+    <companion_handoff>docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v3.xml</companion_handoff>
+    <work_completion>6 of 13 entrypoint files refactored to canonical pattern; remaining 7 deferred to successor EA-4</work_completion>
+  </reviewing>
+
+  <summary>
+    Independent multi-file verification of EA-instance-3's claimed 2.4 partial work product (6 of 13
+    entrypoint files refactored). Per the LA's "mature not minimal" mandate and the GUIDE_HANDOFF_LATEST
+    w12-w15 protocol, this Guide instance ran every claim through disk-level verification rather than
+    trusting the EA's narrative. Result: every substantive claim in the EA completion report
+    reproduces on disk. The single-commit discipline at ccdd82b holds (1 file changed, +291/-0,
+    docs-only). The 6 refactored Python files match the canonical pattern by both direct read AND
+    grep verification. Defaults preserve byte-equivalent BlarAI behavior:
+    `_project_context.resolve(None, None)` returns `ProjectContext(root=C:/Users/mrbla/BlarAI,
+    vikunja_project_id=3, name='BlarAI')` and the overlay path resolves to the existing
+    `tools/autonomy_budget/projects/blarai.yaml`. Helper-handling is consistent and correctly
+    described: `REPO_ROOT` preserved in both daily_digest and weekly_summary; `build_digest` /
+    `build_summary` accept `*, ctx: ProjectContext | None = None` with auto-resolve fallback;
+    `_git_log_oneline_since` and `_git_log_stats` accept `repo_root: Path = REPO_ROOT` kwarg;
+    `main()` threads `ctx=ctx` into the builders. Pytest tools/ baseline holds at 280 passed
+    (matches v0e baseline from EA-iter-2 gate; zero regression). Fleet pause invariant holds
+    (state.json `fleet_paused=true`, reason "platform separation v2 in progress", schema_version=1)
+    and stash@{0} (`wake_launcher auto-stash sdo 20260424_013002`) is byte-identical to its
+    pre-session state. All four decisions D1-D4 are RATIFIED. Four minor heads-up items are
+    surfaced for the next EA (EA-4) below; none rise to a blocking-correction level for EA-3,
+    which has already emitted and is closing this session.
+  </summary>
+
+  <verification_evidence>
+
+    <recipe id="V1" purpose="single-commit discipline + working-tree refactor delta" verdict="PASS">
+      <command_run>git log --oneline -3 ; git show --stat ccdd82b ; git status --porcelain ; git diff --stat</command_run>
+      <observed>
+        git log -3 confirms ccdd82b is the EA-3 commit. Current HEAD has advanced to 9d17e7f
+        (LA's between-instance Guide-instance-4-to-5 handoff brief, also docs-only) -- this is
+        an EXPECTED LA-side commit between EA emission and Guide spawn, not an EA violation.
+
+        git show --stat ccdd82b output:
+          docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v3.xml | 291 +++++++++
+          1 file changed, 291 insertions(+)
+
+        git diff --stat for the 6 refactored files (line counts vs EA prediction):
+          tools/fleet_observability/credential_rotation_reminder.py | 34 (predicted 34) MATCH
+          tools/fleet_observability/welcome_back_digest.py          | 34 (predicted 34) MATCH
+          tools/fleet_observability/daily_digest.py                 | 65 (predicted 65) MATCH
+          tools/fleet_observability/weekly_summary.py               | 63 (predicted 63) MATCH
+          tools/fleet_observability/dashboard_maintainer.py         | 34 (predicted 34) MATCH
+          tools/gate_stale_cleaner/run_live.py                      | 34 (predicted 34) MATCH
+
+        Plus the 4 inherited Stage-2 paths from v2 (pyproject.toml, config.yaml,
+        config_loader.py, test_config_loader.py) all present as expected.
+      </observed>
+      <unexpected_extras_observed_and_classified>
+        FOUR additional working-tree entries NOT predicted by EA-3 in v3 handoff -- ALL classified
+        as LA-side housekeeping post-emission, NOT EA violations:
+          (a) M docs/platform_separation/GUIDE_PROMPT.xml (+19 lines) -- LA's update to v2.1 with
+              file-output-discipline carve-out. Predates the EA but not committed when EA emitted;
+              now visible because EA's v3 handoff captured working tree before LA's later edits.
+          (b) D "docs/platform_separation/Temp for responses/0.10 blocked on two corrections - 01_STAGE0_PREFLIGHT.xml"
+          (c) D "docs/platform_separation/Temp for responses/0.7 re-verify - 01_STAGE0_PREFLIGHT.xml"
+              (b)+(c) are LA's directory-rename housekeeping (capital "Temp for responses" -> lowercase
+              "temp_for_responses" per GUIDE_PROMPT v2.1 file-output convention).
+          (d) ?? docs/platform_separation/temp_for_responses/ -- the new lowercase directory holding
+              the iteration-1/iteration-2 review files (which EA-3 v3-ground-truth listed under the
+              old "Temp for responses" path).
+        These are NOT EA-3 commits. They are LA-side workspace state that the next EA's pickup
+        verification must expect.
+      </unexpected_extras_observed_and_classified>
+    </recipe>
+
+    <recipe id="V2" purpose="compile every refactored file" verdict="PASS">
+      <command_run>foreach file in 6 refactored files: python -m py_compile $file</command_run>
+      <observed>OK x6 -- all 6 refactored files compile cleanly. Reproducible.</observed>
+    </recipe>
+
+    <recipe id="V3" purpose="pattern-compliance grep across 6 files" verdict="PASS">
+      <observed>
+        Direct read of all 6 files confirms the canonical pattern: `import argparse`,
+        `from tools import _project_context`, `parser.add_argument("--project-root", type=str, ...)`,
+        `parser.add_argument("--project-id", type=int, ...)`, `def main(argv: list[str] | None = None) -> int:`,
+        `_project_context.resolve(args.project_root, args.project_id)`, and
+        `config_loader.load_config(path=ctx.root/..., project_overlay_path=ctx.root/.../f"{ctx.name.lower()}.yaml")`.
+
+        Grep for `_project_context.resolve(` returned 8 hits across the 6 entrypoints (exactly the
+        expected 6 main() invocations + 2 auto-resolve fallbacks in build_digest/build_summary
+        helpers, by design).
+
+        Grep for `f"{ctx.name.lower()}.yaml"` returned 7 files -- the 6 entrypoints + config_loader.py
+        (the latter is the inherited Stage 2.3 _resolve_project_overlay_path helper). Correct.
+      </observed>
+    </recipe>
+
+    <recipe id="V4" purpose="defaults preservation under no-flag invocation" verdict="PASS">
+      <command_run>python -c "from tools import _project_context; ctx = _project_context.resolve(None, None); print(repr(ctx))"</command_run>
+      <observed>ProjectContext(root=WindowsPath('C:/Users/mrbla/BlarAI'), vikunja_project_id=3, name='BlarAI')</observed>
+      <command_run_2>overlay path resolution check</command_run_2>
+      <observed_2>
+        overlay = C:\Users\mrbla\BlarAI\tools\autonomy_budget\projects\blarai.yaml
+        exists = True
+      </observed_2>
+      <interpretation>
+        Confirms EA's defaults_preservation attestation: ctx.name="BlarAI" -> ctx.name.lower()="blarai"
+        -> blarai.yaml overlay file exists -> load_config() under no-flag invocation produces the
+        same merged config as pre-2.3 (per the test_load_config_default_overlay_restores_blarai_path
+        Stage 2.3 test, also passing in the 280-baseline run).
+      </interpretation>
+    </recipe>
+
+    <recipe id="V5" purpose="helper-handling integrity (REPO_ROOT preservation + ctx kwarg)" verdict="PASS">
+      <observed>
+        daily_digest:
+          REPO_ROOT exists: True
+          build_digest sig: (client: 'LiveVikunjaClient', *, ctx: '_project_context.ProjectContext | None' = None) -> 'str'
+          _git_log_oneline_since sig: (since_iso: 'str', repo_root: 'Path' = WindowsPath('C:/Users/mrbla/BlarAI')) -> 'list[str]'
+
+        weekly_summary:
+          REPO_ROOT exists: True
+          build_summary sig: (client: 'LiveVikunjaClient', *, ctx: '_project_context.ProjectContext | None' = None) -> 'tuple[str, str]'
+          _git_log_stats sig: (since: 'datetime', until: 'datetime', repo_root: 'Path' = WindowsPath('C:/Users/mrbla/BlarAI')) -> 'dict[str, int]'
+      </observed>
+      <interpretation>
+        D1 (REPO_ROOT preservation) and D2 (helper ctx kwarg discipline) both verified on disk:
+        signatures exactly match the EA's claims. dashboard_maintainer.py imports
+        _git_log_oneline_since from daily_digest (line 53-56) and calls it without args, confirming
+        the in-process caller D1 was protecting against -- removing REPO_ROOT would break that
+        import-side caller. EA's design is sound.
+      </interpretation>
+    </recipe>
+
+    <recipe id="V6" purpose="fleet-pause + stash invariants" verdict="PASS">
+      <observed>
+        git stash list:
+          stash@{0}: On main: wake_launcher auto-stash sdo 20260424_013002
+
+        tools/autonomy_budget/state.json:
+          {
+            "fleet_paused": true,
+            "fleet_paused_reason": "platform separation v2 in progress",
+            "last_updated_by": "copilot_agent",
+            "last_updated_utc": "2026-04-24T20:46:12Z",
+            "schema_version": 1,
+            ...
+          }
+      </observed>
+      <interpretation>
+        Both invariants hold: stash byte-identical to pre-session state (per its 20260424_013002
+        timestamp); fleet_paused remains true with the original reason and the original
+        last_updated_by="copilot_agent" timestamp. NO state.resume_fleet() was called this session.
+        Acks n=2 and n=4 from the iteration-2 EA gate verbatim_carryforward both honored.
+      </interpretation>
+    </recipe>
+
+  </verification_evidence>
+
+  <multi_file_cross_check_w12_w15>
+
+    <check id="w12_multi_file_entrypoint_verification" verdict="PASS">
+      <ea_claim>6 of 13 entrypoint files refactored to canonical pattern.</ea_claim>
+      <independent_verification>
+        Read all 6 files end-to-end. Each contains:
+          - `import argparse` and `from tools import _project_context` at module top.
+          - `_build_parser()` returning ArgumentParser with `--project-root` (type=str, default=None)
+            and `--project-id` (type=int, default=None) flags.
+          - `main(argv: list[str] | None = None) -> int:` signature.
+          - `ctx = _project_context.resolve(args.project_root, args.project_id)` call.
+          - `config_loader.load_config(path=ctx.root / "tools" / "autonomy_budget" / "config.yaml",
+             project_overlay_path=ctx.root / "tools" / "autonomy_budget" / "projects" /
+             f"{ctx.name.lower()}.yaml")` invocation.
+        Argparse declarations are NECESSARY-AND-SUFFICIENT-COMBINED-WITH-resolve()-call (per dn14
+        sufficiency rule). Both verified for all 6 files.
+      </independent_verification>
+    </check>
+
+    <check id="w13_single_commit_discipline" verdict="PASS">
+      <ea_claim>Only ONE commit this session (ccdd82b), docs-only, +291/-0, file = v3 handoff XML.</ea_claim>
+      <independent_verification>
+        git show --stat ccdd82b output:
+          docs/platform_separation/ea_outputs/EA_HANDOFF_STAGE2_MIDSTAGE_v3.xml | 291 +++++++++
+          1 file changed, 291 insertions(+)
+        EXACTLY ONE file, EXACTLY 291 insertions, EXACTLY 0 deletions, EXACTLY the v3 handoff XML
+        path. Refactor work is intentionally UNCOMMITTED in working tree (10 M + new untracked
+        artifacts visible per V1 above). i1-4 and dn15 binding both honored. NOT a violation.
+      </independent_verification>
+    </check>
+
+    <check id="w14_critical_notify_inspection" verdict="DEFERRED_AS_EXPECTED">
+      <ea_claim>EA-3 has not yet reached item 2.5 (PS1 work).</ea_claim>
+      <independent_verification>
+        Confirmed EA-3 stopped after Item 2.4 partial (6 of 13 files); Item 2.5 PS1 work is in
+        the v3 handoff &lt;work_remaining&gt; for the successor. critical_notify.ps1 inspection rule
+        from Guide-#4 iteration-2 approval (acks for the EA after iteration-2) carries forward to
+        the successor EA-4 unchanged. No w14 violation by EA-3; this watchpoint properly recurs
+        for EA-4.
+      </independent_verification>
+    </check>
+
+    <check id="w15_legacy_vikunja_client_dual_touch" verdict="DEFERRED_WITH_NOTE">
+      <ea_claim>v3 handoff defers tools/fleet_observability/_vikunja_client.py ctx-thread to Item 2.6: "For Item 2.4, NO ctx-related change (HTTP client has no project knowledge). Re-confirm at Item 2.6 whether the legacy client gets folded entirely or kept as a thin shim."</ea_claim>
+      <independent_verification>
+        Grep confirmed tools/fleet_observability/_vikunja_client.py:28 contains
+        `cfg = config_loader.load_config()` (zero-arg). Today this works because load_config()
+        with zero args invokes the auto-resolve fallback in _resolve_project_overlay_path
+        (Stage 2.3), which walks up cwd and produces the BlarAI overlay when the cwd is BlarAI.
+        Defaults preserved for Item 2.4 scope.
+
+        Soft inconsistency observed: iteration-2 part_b_work_plan part_b_work_plan ent n=7
+        (the legacy file) is enumerated in the canonical 12, with note "ALSO touched by item 2.6 --
+        consistent treatment per Guide-#4". The v3 handoff defers the load_config call to 2.6
+        treatment. Defensible interpretation: "consistent treatment" = joint disposition at 2.6
+        (folded chokepoint absorbs the load_config call site), not separate refactor at 2.4.
+        This reading is acceptable BUT successor EA-4 must ensure the 2.6 work actually disposes
+        of the load_config call (either by folding the file entirely or by threading ctx through
+        the surviving call site). Failing to do so leaves a defaults-preservation hazard
+        post-Stage-4 cutover when the script is invoked from devplatform cwd.
+      </independent_verification>
+      <successor_action_required>EA-4 must verify the 2.6 disposition closes the legacy file's load_config call site before Item 2.9 single-commit.</successor_action_required>
+    </check>
+
+    <check id="pytest_baseline_s2w8" verdict="PASS">
+      <ea_claim>Test baseline must hold at &gt;= 280 passed (no regression).</ea_claim>
+      <independent_verification>
+        `.venv/Scripts/python.exe -m pytest tools/ --tb=short -q` -> "280 passed in 2.56s"
+        EXACT match to v0e baseline (280) from EA-iter-2 pickup verification. Zero regression.
+      </independent_verification>
+    </check>
+
+  </multi_file_cross_check_w12_w15>
+
+  <decision_ratifications>
+
+    <decision id="D1" topic="REPO_ROOT preservation in daily_digest + weekly_summary" verdict="RATIFIED">
+      <ea_choice>Keep module-level REPO_ROOT constant AND add repo_root kwarg defaulting to REPO_ROOT.</ea_choice>
+      <guide_assessment>
+        Approved. Verified on disk that dashboard_maintainer.py:53-56 imports
+        _git_log_oneline_since from daily_digest and invokes it without args -- this is the
+        in-process caller D1 was protecting against. Removing REPO_ROOT would break that import
+        and is a strictly larger semantic change than 2.4's scope authorizes. The kwarg-default
+        pattern is risk-free, additive, and forward-compat for ctx-based per-call override.
+      </guide_assessment>
+      <forward_direction>
+        EA-4 should use the same pattern uniformly for any remaining files (7-13) that have
+        analogous module-level REPO_ROOT constants AND import-side callers. Files without such
+        callers may use ctx-only signatures (cleaner.py is a candidate per the v3 handoff).
+      </forward_direction>
+    </decision>
+
+    <decision id="D2" topic="Helper ctx-kwarg vs repo_root-kwarg discipline" verdict="RATIFIED">
+      <ea_choice>Helpers calling load_config receive `*, ctx: ProjectContext | None = None`; helpers using only REPO_ROOT receive `repo_root: Path = REPO_ROOT`.</ea_choice>
+      <guide_assessment>
+        Approved as the canonical helper-handling rule for files 7-13. Two distinct concerns
+        (config loading vs filesystem path) deserve two distinct kwargs. Forcing single-kwarg
+        uniformity would either over-load ctx into git-only helpers (un-needed coupling) or
+        leak repo_root into config-only helpers (un-needed plumbing). The two-kwarg discipline
+        is minimal-at-each-call-site.
+      </forward_direction>
+    </decision>
+
+    <decision id="D3" topic="dashboard_maintainer.py private-method abuse left in-place" verdict="RATIFIED">
+      <ea_choice>NOT addressed in 2.4 -- flagged for item 2.6 disposition (live._request("POST",...) on private API at line 113).</ea_choice>
+      <guide_assessment>
+        Approved. Verified the abuse exists at dashboard_maintainer.py:113-117. 2.4 scope is
+        config-resolution refactor (argparse + ProjectContext threading); client-API cleanup is
+        the chokepoint-routing concern owned by 2.6. Doing it in 2.4 would expand scope without
+        completing the chokepoint design. Deferral is correct.
+      </guide_assessment>
+      <forward_direction>
+        EA-4's 2.6 disposition list MUST include dashboard_maintainer.py:113 in addition to the
+        legacy fleet_observability/_vikunja_client.py disposition. Surface as a 2.6 work item.
+      </forward_direction>
+    </decision>
+
+    <decision id="D4" topic="Mid-stage handoff at 6 of 13 vs pushing into MCP server" verdict="RATIFIED">
+      <ea_choice>Emitted v3 handoff at 6 of 13 rather than pushing into self_check + blarai_next_task_resolver + cleaner.</ea_choice>
+      <guide_assessment>
+        Approved. Per i1-4 binding the safety valve is mid-stage handoff with docs-only commit.
+        File 13 (vikunja_mcp/server.py, 19 handlers + project_id required-kwarg discipline) is
+        the largest single-file lift in 2.4 and the v3 handoff explicitly warns "may consume
+        an entire successor session by itself." Pushing further with EA-3 risked emergency-stop
+        mid-MCP-refactor with either partial-commit damage or context-loss damage. The handoff
+        was emitted with canonical pattern PROVEN across 6 files of varying complexity (trivial
+        through complex/REPO_ROOT/helper-ctx) which is exactly what the successor needs as a
+        working template.
+      </guide_assessment>
+      <forward_direction>
+        EA-4 should plan to take MCP server (file 13) in its own focused session, possibly
+        emitting v4 handoff before items 2.7-2.10 if context tightens. The same i1-4 discipline
+        applies.
+      </forward_direction>
+    </decision>
+
+  </decision_ratifications>
+
+  <required_acknowledgments_for_next_ea>
+
+    <intro>
+      EA-3 has emitted and is closing this session. The acknowledgments below are addressed to
+      the successor EA-4 (or whoever picks up the v3 handoff). They are NOT corrections to EA-3
+      and require no further action by EA-3. EA-4 will restate them verbatim in its iteration-1
+      comprehension gate.
+    </intro>
+
+    <ack id="g5-1" severity="MED" topic="Pickup verification expectations updated for LA-side housekeeping">
+      The v3 handoff's predicted ground state (10 M + 4 ?? Temp + 4 ?? new tools artifacts) does
+      NOT include the LA-side housekeeping that landed AFTER EA-3 emitted: (a) modified
+      docs/platform_separation/GUIDE_PROMPT.xml (+19 lines, v2.1 file-output-discipline carve-out);
+      (b) deleted "docs/platform_separation/Temp for responses/0.10 blocked..." and
+      "docs/platform_separation/Temp for responses/0.7 re-verify..." (LA's old-XML housekeeping);
+      (c) renamed directory "Temp for responses" -> "temp_for_responses" (lowercase, underscores
+      per v2.1 convention) -- visible in git as one new untracked entry "?? temp_for_responses/";
+      (d) two new ?? entries for EA-3's own report files
+      (EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_GUIDE.xml +
+      EA_COMPLETION_REPORT_STAGE2_ITEM_2.4_PARTIAL_FOR_LA.md). All FOUR additions are EXPECTED
+      and not violations. EA-4's iteration-1 V0 pickup MUST account for these or it will report
+      false drift.
+    </ack>
+
+    <ack id="g5-2" severity="LOW" topic="File 12 path-label mismatch in EA reports vs v3 handoff">
+      The EA's Guide-facing completion report (.xml) and LA-facing report (.md) both label
+      file 12 as `tools/_vikunja_client.py` (the new chokepoint, Stage 2.1). The CORRECT path
+      for the legacy load_config caller is `tools/fleet_observability/_vikunja_client.py`. The
+      v3 handoff XML &lt;files_pending&gt; correctly uses
+      `tools/fleet_observability/_vikunja_client.py`, so EA-4 (which reads the v3 handoff, not
+      the LA/Guide reports) is not impacted -- the path is correct in the source-of-truth
+      document. Cosmetic only, but EA-4 should note the discrepancy if cross-referencing the
+      reports.
+    </ack>
+
+    <ack id="g5-3" severity="LOW" topic="cleaner.py file 9 disposition adjustment">
+      v3 handoff plan for `tools/gate_stale_cleaner/cleaner.py` says "VERIFY by reading the file:
+      confirm no module-level REPO_ROOT, no hardcoded BlarAI paths, no direct load_config calls."
+      Independent grep shows line 180 contains
+      `cfg = config if config is not None else config_loader.load_config()` -- a fallback
+      load_config call. EA-4 must disposition this fallback (either remove if config is always
+      injected by callers, or thread ctx through to make the fallback project-aware). Today's
+      production caller (run_live.py:58) always passes config so the fallback is dead path, but
+      it is a load_config-callsite that should be addressed in 2.4 scope.
+    </ack>
+
+    <ack id="g5-4" severity="LOW" topic="Legacy fleet_observability/_vikunja_client.py disposition to 2.6 must close load_config callsite">
+      v3 handoff defers `tools/fleet_observability/_vikunja_client.py` to Item 2.6 ("HTTP client
+      has no project knowledge"). Independent grep confirms line 28 contains
+      `cfg = config_loader.load_config()` (zero-arg). The defaults-preservation chain holds today
+      via _resolve_project_overlay_path auto-resolve from BlarAI cwd. POST-Stage-4 cutover risk:
+      if the script is invoked from devplatform cwd, the auto-resolve resolves to a non-BlarAI
+      ctx and the overlay merge produces wrong allowlist. EA-4 MUST ensure the Item 2.6
+      disposition (whether "fold entirely" or "thin shim through new chokepoint") explicitly
+      closes the line-28 load_config callsite before Item 2.9 single-commit. If 2.6 ends up
+      leaving the load_config call in place without ctx threading, that is a w15 hazard and
+      requires escalation back to Guide.
+    </ack>
+
+  </required_acknowledgments_for_next_ea>
+
+  <standing_reminders_for_next_ea_session>
+    <reminder>Single Stage-2 commit at item 2.9 only; pyproject.toml MUST be in that commit; no partial commits before 2.9.</reminder>
+    <reminder>Fleet stays paused throughout (verify state.json on each substantive edit; NEVER call state.resume_fleet -- function name reminder, AttributeError otherwise).</reminder>
+    <reminder>No merge to main during Stage 2; chore/platform-extraction is the only working surface.</reminder>
+    <reminder>stash@{0} (wake_launcher auto-stash sdo 20260424_013002) is UNTOUCHED -- never git stash pop / git stash apply / git stash drop.</reminder>
+    <reminder>STATUS.md updates at item 2.10 are append-only; do not edit prior Stage entries.</reminder>
+    <reminder>If context exhaustion threatens before item 2.9, emit a v4 mid-stage handoff XML following v1/v2/v3 schema (docs-only commit), then stop -- no partial-commit refactor and no emergency single-commit attempts that omit pending items.</reminder>
+    <reminder>$BLARAI_PID preflight at item 2.8 MUST resolve to exactly 3; empty or non-3 = STOP and report (no silent regex/yaml adaptation, per ack g4-5).</reminder>
+    <reminder>critical_notify.ps1 inspection rule (per Guide-#4 ack g4-1): default disposition is no-action with WORKFLOW_INTEGRITY_REVIEW.md Appendix A.1 citation; runtime-path discovery = STOP and report. Same rule for any other PS1 the expanded 3-directory audit scope (tools/scheduled-tasks/, tools/fleet_ops/, tools/fleet_observability/) surfaces beyond the canonical 7.</reminder>
+    <reminder>Risk label hygiene: compound labels with reference prefixes (e.g., "R12-PS1-coverage-watch", "w3-blarai-pid-preflight-watch") are acceptable when the anchor field disambiguates them; bare numeric labels ("V1", "R12", "C3") without descriptive suffix are the violation pattern.</reminder>
+    <reminder>All 23 binding acknowledgments from EA-3's iteration-2 gate (16 pre-existing + 7 Guide-#4) plus the 4 g5-N acknowledgments above remain in force through Stage 4 cutover (per i1-2 dedup rule).</reminder>
+  </standing_reminders_for_next_ea_session>
+
+  <closing_handoff_recommendations_for_next_ea>
+    <step n="1">Run the V0a-V0g pickup verification block at session start, expecting the additional LA-side housekeeping entries per ack g5-1.</step>
+    <step n="2">Read the three artifacts EA-3 left on disk: v3 handoff XML, Guide-facing completion report, LA-facing completion report (the latter two for context only -- v3 handoff is the authoritative work plan).</step>
+    <step n="3">Read the 6 already-refactored files end-to-end to internalize the proven pattern before applying to files 7-13.</step>
+    <step n="4">Refactor the 7 remaining Item-2.4 files in v3-handoff order: self_check.py -> blarai_next_task_resolver.py -> cleaner.py -> diff_builder.py -> active_tasks.py -> fleet_observability/_vikunja_client.py -> vikunja_mcp/server.py. Note the file-9 + file-12 dispositions per acks g5-3 + g5-4.</step>
+    <step n="5">If MCP server (file 13) approaches context exhaustion, emit v4 handoff per i1-4. Same single-commit discipline.</step>
+    <step n="6">After all 13 entrypoint-side files complete + compile clean: proceed to 2.4.v2 verification, then items 2.5 through 2.10.</step>
+  </closing_handoff_recommendations_for_next_ea>
+
+  <proceed_authorization>
+    APPROVED -- EA-3's 6-of-13 partial work and v3 mid-stage handoff are RATIFIED. Single-commit
+    discipline holds. Decisions D1-D4 RATIFIED. The 4 g5-N acknowledgments are MED/LOW heads-up
+    items addressed to the successor EA-4 (NOT corrections requiring EA-3 to re-emit). EA-3 may
+    close this session. The Lead Architect may forward this file to the next EA chat at the
+    next session bootstrap, alongside the standard attachment set (v1+v2+v3 handoffs,
+    iteration-1+iteration-2 Guide reviews, EA iteration-2 gate, completion reports, Stage 2 XML,
+    EA_HANDOFF_STAGE2.xml, STATUS.md). No further Guide re-review required for the 4 g5-N acks;
+    they are for audit-trail purposes and EA-4 will restate them in its iteration-1 gate.
+  </proceed_authorization>
+
+</guide_review_response>

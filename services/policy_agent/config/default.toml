@@ -1,0 +1,70 @@
+# Policy Agent Configuration — Default Profile
+# USE-CASE-001: Action Authorization Boundary
+
+[runtime]
+deployment_mode = "host"
+
+[service]
+name = "policy_agent"
+version = "0.1.0"
+log_level = "INFO"
+
+[inference]
+device = "GPU"                     # ADR-010: PA classification on Intel Arc 140V
+model_dir = "models/qwen3-14b/openvino-int4-gpu"           # ADR-012: Qwen3-14B INT4
+weight_manifest = "models/qwen3-14b/openvino-int4-gpu/manifest.json"  # ADR-012
+draft_model_dir = "models/qwen3-0.6b/openvino-int4-gpu"    # ADR-012 §2.6
+speculative_decoding_enabled = true                         # ADR-012 §2.6
+
+[security]
+fail_closed = true
+dev_mode = false  # Set to true ONLY for local development without hardware attestation
+# FUT-04 / ADR-018: TPM-signed manifest verification.  Off by default — the capability
+# is built but the LA must run the provisioning ceremony first, then flip this to true.
+# With false: missing .sig is permitted (WARNING emitted); present-but-invalid .sig
+# is still FAIL-CLOSED.  With true: missing OR invalid .sig blocks boot entirely.
+require_signed_manifest = true
+
+# --- Audit-log segmented retention (ISS-607 / ADR-029) ---------------------
+# "Segmented keep-everything with a bounded working set": the full forensic
+# history is kept FOREVER, but in sealed, individually-verifiable, gzip-
+# compressed segments rotated at a size/count cap, so the active file and the
+# in-RAM working set stay bounded.  Defaults shown; uncomment to override.
+#   audit_max_active_bytes   = 67108864   # 64 MiB — rotate when the active file grows past this
+#   audit_max_active_records = 100000     # rotate when the active file holds this many records
+# Whichever cap trips first rotates.  The archive ceilings below default OFF
+# (keep everything — the chosen policy).  If an operator EVER sets one, whole
+# sealed segments are pruned oldest-first and each prune is itself audited (a
+# signed RETENTION_PRUNE record), so verify(full=True) still passes with a
+# documented, attributable gap (distinct from a tail-deletion attack).
+#   audit_archive_max_bytes    = 0        # 0/unset = unlimited; set >0 to cap total sealed bytes
+#   audit_archive_max_age_days = 0        # 0/unset = unlimited; set >0 to cap sealed-segment age
+
+[jwt]
+issuer = "policy_agent"
+validity_seconds = 5                        # #638: 5s hard TTL per Use Cases_FINAL.md §3 (was 30 — fail-open)
+tpm_key_name = "BlarAI-PA-JWT-Signing"     # ADR-021: non-exportable TPM signing key (run provisioning ceremony)
+ca_cert_path = "certs/pa_public.pem"       # ADR-021: PA JWT public key (ceremony-generated, per-chip, gitignored)
+algorithm = "ES256"
+
+[ipc]
+vsock_cid = 2
+vsock_port = 5000
+mtls_cert_path = "certs/pa_server.pem"
+mtls_key_path = "certs/pa_server_key.pem"
+ca_cert_path = "certs/ca.pem"
+timeout_ms = 5000
+max_message_bytes = 65536
+
+[rules]
+version = "1.0.0"
+acl_path = "config/acl_matrix.toml"
+deny_list_path = "config/deny_list.toml"
+
+[rate]
+max_requests_per_window = 100
+window_seconds = 60.0
+
+[boot]
+measured_boot = true
+attestation_timeout_ms = 10000

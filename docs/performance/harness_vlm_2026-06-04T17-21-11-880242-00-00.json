@@ -1,0 +1,32 @@
+{
+  "name": "vlm",
+  "timestamp": "2026-06-04T17:21:11.880242+00:00",
+  "model": "Qwen3-VL-8B-Instruct",
+  "precision": "INT4",
+  "methodology": "vlm.describe_image() on a synthetic 512x384 PNG; window = lazy model load + inference (the user-facing wait); model evicted after. Cold load (no resident VLM) \u2014 co-resident-with-14B cost NOT measured here.",
+  "environment": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2)",
+    "memory_ceiling_gb": 31.323,
+    "openvino_version": "2026.1.0-21367-63e31528c62-releases/2026/1",
+    "openvino_genai_version": "2026.1.0.0-2957-1dabb8c2255",
+    "not_measured": [
+      "GPU driver version (read from dxdiag / Device Manager; not introspectable here)",
+      "co-resident memory cost when other models are loaded alongside",
+      "subjective voice naturalness / visual answer quality"
+    ]
+  },
+  "measurements": {
+    "available": true,
+    "model": "Qwen3-VL-8B-Instruct",
+    "precision": "INT4",
+    "device": "GPU",
+    "load_plus_describe_ms": 21745.8,
+    "max_new_tokens": 128,
+    "description_chars": 659,
+    "description_preview": "This image depicts a minimalist, abstract representation of a landscape, likely a conceptual or schematic design rather than a photograph of a real garden or yard.\n\nFrom the perspective of a landscaping professional, the scene contains the ",
+    "methodology": "vlm.describe_image() on a synthetic 512x384 PNG; window = lazy model load + inference (the user-facing wait); model evicted after. Cold load (no resident VLM) \u2014 co-resident-with-14B cost NOT measured here."
+  },
+  "notes": "",
+  "source": "tests/harness (Vikunja #563)"
+}

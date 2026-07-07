@@ -1,0 +1,140 @@
+{
+  "gate_evaluation": {
+    "recommendation": "ESCALATE: DVMT budget verification failed. Review hardware_snapshot and registry values. Do NOT delete this branch.",
+    "gate": "VALIDATE_DVMT_BUDGET",
+    "failures": [
+      {
+        "test_id": "2.3a",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\dvmt_validation.json",
+        "disposition": "FAIL",
+        "escalation": "Lead Architect decision required",
+        "timestamp": "2026-02-23T05:12:54.2729003Z",
+        "expected": "512MB (±64MB)",
+        "gate": "VALIDATE_DVMT_BUDGET",
+        "actual": "692.799999999999MB",
+        "branch_preserved": "feature/phase2-scaffolding",
+        "metric": "inferred_dvmt_mb"
+      },
+      {
+        "test_id": "2.3b",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\dvmt_validation.json",
+        "disposition": "FAIL",
+        "escalation": "Lead Architect decision required",
+        "timestamp": "2026-02-23T05:12:54.2729003Z",
+        "expected": "31.5GB (±64MB)",
+        "gate": "VALIDATE_DVMT_BUDGET",
+        "actual": "31.323GB",
+        "branch_preserved": "feature/phase2-scaffolding",
+        "metric": "effective_ceiling_gb"
+      }
+    ],
+    "effective_ceiling_gb": 31.323,
+    "pass": false,
+    "disposition": "FAIL",
+    "warnings": [],
+    "inferred_dvmt_mb": 692.7999999999993
+  },
+  "test_2_3": {
+    "test_id": "2.3",
+    "dvmt_match": false,
+    "description": "Runtime memory visibility — effective ceiling verification",
+    "ceiling_pass": false,
+    "hardware_snapshot": {
+      "cpu_cores": 8,
+      "os_name": "Microsoft Windows 11 Pro",
+      "board_vendor": "ASUSTeK COMPUTER INC.",
+      "os_build": "26200",
+      "cpu_max_mhz": 2200,
+      "os_version": "10.0.26200",
+      "board_product": "P5405CSA",
+      "bios_version": "P5405CSA.328",
+      "processor": "Intel(R) Core(TM) Ultra 7 258V",
+      "bios_vendor": "ASUSTeK COMPUTER INC. (Licensed by AMI, LLC.)",
+      "cpu_threads": 8
+    },
+    "effective_ceiling_gb": 31.323,
+    "os_visible_mb": 32075.2,
+    "ceiling_delta_mb": 180.79999999999927,
+    "ceiling_target_gb": 31.5,
+    "inferred_dvmt_mb": 692.7999999999993,
+    "failures": [
+      {
+        "test_id": "2.3a",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\dvmt_validation.json",
+        "disposition": "FAIL",
+        "escalation": "Lead Architect decision required",
+        "timestamp": "2026-02-23T05:12:54.2729003Z",
+        "expected": "512MB (±64MB)",
+        "gate": "VALIDATE_DVMT_BUDGET",
+        "actual": "692.799999999999MB",
+        "branch_preserved": "feature/phase2-scaffolding",
+        "metric": "inferred_dvmt_mb"
+      },
+      {
+        "test_id": "2.3b",
+        "evidence_path": "C:\\Users\\mrbla\\BlarAI\\phase2_gates\\evidence\\dvmt_validation.json",
+        "disposition": "FAIL",
+        "escalation": "Lead Architect decision required",
+        "timestamp": "2026-02-23T05:12:54.2729003Z",
+        "expected": "31.5GB (±64MB)",
+        "gate": "VALIDATE_DVMT_BUDGET",
+        "actual": "31.323GB",
+        "branch_preserved": "feature/phase2-scaffolding",
+        "metric": "effective_ceiling_gb"
+      }
+    ],
+    "os_visible_gb": 31.323,
+    "raw_physical_gb": 32,
+    "effective_ceiling_mb": 32075.2
+  },
+  "gate": "VALIDATE_DVMT_BUDGET",
+  "test_2_2": {
+    "test_id": "2.2",
+    "registry": [
+      {
+        "path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000",
+        "driver_desc": null,
+        "dvmt_size": null,
+        "dvmt_max_size": null
+      },
+      {
+        "path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0001",
+        "driver_desc": "Intel(R) Arc(TM) 140V GPU (16GB)",
+        "dvmt_size": null,
+        "dvmt_max_size": null
+      }
+    ],
+    "video_controllers": [
+      {
+        "status": "OK",
+        "adapter_ram_mb": 2048.0,
+        "pnp_device_id": "PCI\\VEN_8086&DEV_64A0&SUBSYS_1F631043&REV_04\\3&11583659&0&10",
+        "driver_version": "32.0.101.6874",
+        "name": "Intel(R) Arc(TM) 140V GPU (16GB)"
+      }
+    ],
+    "failures": [],
+    "dxdiag_summary": {
+      "dac_type": "Internal",
+      "video_mode": "3840 x 2160 x 4294967296 colors",
+      "adapter_ram": 2147479552,
+      "name": "Intel(R) Arc(TM) 140V GPU (16GB)"
+    },
+    "description": "OS-level DVMT verification"
+  },
+  "effective_ceiling_gb": 31.323,
+  "test_2_1": {
+    "test_id": "2.1",
+    "status": "SKIPPED",
+    "description": "BIOS DVMT readout (manual verification)",
+    "instructions": [
+      "1. Reboot and enter BIOS/UEFI (F2 or DEL during POST)",
+      "2. Navigate to: Advanced > System Agent > Graphics Configuration",
+      "3. Locate 'DVMT Pre-Allocated' setting",
+      "4. Record the value (expected: 512MB)",
+      "5. If the value differs, note it for the evidence record"
+    ]
+  },
+  "expected_dvmt_mb": 512,
+  "timestamp": "2026-02-23T05:12:54.2729003Z"
+}

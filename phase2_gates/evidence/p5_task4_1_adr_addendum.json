@@ -1,0 +1,69 @@
+{
+  "milestone": "P5-Task-4.1",
+  "title": "AO /no_think Default System Prompt + ADR-012 §2.5 PA Latency Budget Addendum",
+  "date": "2026-03-01",
+  "branch": "feature/p5-task4-1-adr-addendum",
+  "scope": "DOCS_ONLY",
+  "harness_availability": "NO_FULL_HARNESS",
+  "disposition": "COMPLETE",
+  "decisions_locked": [
+    {
+      "id": "D-T4-01",
+      "decision": "PA inference latency budget: 2,000ms P95 flat",
+      "replaces": "ADR-010 §3.2 — 125ms P95 (Qwen2.5-1.5B/NPU — invalidated)",
+      "adr_section": "ADR-012 §2.5",
+      "derivation_basis": "10.72 tps empirical (P5-005b D-01) + TTFT 408ms at 4K + overhead + P95 variance",
+      "worst_case_at_max32": "2987ms (exceeds budget — Task 4.8 must reduce max_new_tokens)",
+      "realistic_e2e": "875ms (5-token output, 4K input)",
+      "gates": ["Task 4.8 (max_new_tokens lock)", "Task 4.9 (quality gate)", "UAT-4b (live TUI)"]
+    }
+  ],
+  "implementation_items_completed": [
+    {
+      "id": "M-AO-no-think",
+      "description": "AO /no_think directive added to _DEFAULT_SYSTEM_PROMPT Block 6",
+      "file": "services/assistant_orchestrator/src/npu_inference.py",
+      "adr_ref": "ADR-012 §2.4"
+    },
+    {
+      "id": "M-AO-no-think-test",
+      "description": "test_system_prompt_no_think_default: assertion inverted, /no_think presence confirmed",
+      "file": "services/assistant_orchestrator/tests/test_npu_inference.py",
+      "adr_ref": "ADR-012 §2.4"
+    }
+  ],
+  "governance_artifacts_committed": [
+    "docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md",
+    "docs/P5_TASK4_SDO_HANDOFF.xml",
+    ".github/copilot-instructions.md (v3.2)"
+  ],
+  "adr_012_section_24_status": {
+    "M1_PA_no_think": "DONE",
+    "M2_AO_thinking_stripping": "DONE",
+    "M3_StreamToken_is_thinking": "DONE",
+    "M_AO_no_think_default": "DONE",
+    "UAT_4a_AO_think_toggle": "OPEN — requires Task 5 (Qwen3-14B/GPU AO) before execution"
+  },
+  "uat_gates_introduced": [
+    {
+      "id": "UAT-4a",
+      "title": "AO /think per-turn toggle",
+      "prerequisite": "Task 5 complete (AO on Qwen3-14B/GPU)",
+      "status": "OPEN"
+    },
+    {
+      "id": "UAT-4b",
+      "title": "PA classification ≤ 2,000ms P95 in live TUI",
+      "prerequisite": "Task 5 complete (PA on Qwen3-14B/GPU) + Task 4.8 max_new_tokens lock",
+      "status": "OPEN"
+    }
+  ],
+  "test_baseline": {
+    "collected": 786,
+    "passed": 755,
+    "deferred": 31,
+    "deferred_reason": "test_p114_ui_end_to_end.py asyncio teardown hang — pre-existing Windows environment issue, not a regression"
+  },
+  "do_not_commit": "phase2_gates/evidence/uat2_real_runtime_activation.json — known FAIL live artifact; Phase 4 PASS baseline on main must be preserved",
+  "next_milestone": "Task 4.2 — Draft model comparison (Draft-A 0.6B 28L INT4 vs Draft-B 0.6B pruned 22L INT8_ASYM)"
+}

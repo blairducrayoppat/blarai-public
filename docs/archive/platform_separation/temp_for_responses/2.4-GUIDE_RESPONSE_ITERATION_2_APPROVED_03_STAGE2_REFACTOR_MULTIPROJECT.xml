@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response>
+  <verdict>APPROVED</verdict>
+  <stage_id>STAGE_2</stage_id>
+  <stage_xml>03_STAGE2_REFACTOR_MULTIPROJECT.xml</stage_xml>
+  <reviewed_at_utc>2026-04-25T23:30:00Z</reviewed_at_utc>
+  <guide_instance>4</guide_instance>
+  <iteration>2</iteration>
+  <responding_to>
+    <ea_artifact>2.4-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_2_STAGE2.xml</ea_artifact>
+    <ea_instance>3</ea_instance>
+  </responding_to>
+
+  <summary>
+    Iteration 2 of Stage 2 Executor Agent (EA) instance 3 comprehension-gate review. All 8 corrections
+    from iteration 1 are fully addressed. Pickup verification (V0a-V0g) re-confirmed PASS. The 12
+    Python entrypoints and 7 PowerShell (PS1) scripts are now explicitly enumerated, with on-disk
+    Get-ChildItem evidence confirming la_merge_approve.ps1 lives at tools/scheduled-tasks/ (not
+    tools/fleet_ops/) and that escalation_notify.ps1 + test_async_post_gate.ps1 exist at the cited
+    paths. Parameter-name standardization on -BlarAIRoot is applied uniformly across all 7 PS1.
+    Code-Risk-4 (vikunja_mcp/server.py inclusion) and Code-Risk-6 (extended grep patterns) commitments
+    are concrete and testable. Risk labels are descriptive (compound labels that include reference
+    prefixes such as "R12-PS1-coverage-watch" or "w3-blarai-pid-preflight-watch" are acceptable
+    because the anchor field disambiguates them from the source IDs they reference -- they are not
+    bare-numeric relabelings of the kind iteration 1 flagged). Rollback explicitly acknowledged.
+    The w3 preflight stop-and-report discipline is committed in both the ack list and item 2.8's
+    on_drift block. The legacy_consistency_rule for tools/fleet_observability/_vikunja_client.py
+    correctly surfaces the dual-touch hazard across items 2.4 and 2.6. The single open question
+    (critical_notify.ps1) is healthy escalation rather than silent decision-making and is answered
+    in the answer_to_ea_open_question block below. Twenty-three acknowledgments restated verbatim
+    (7 Guide-#4 + 9 critical_carryovers + 3 plus_guide_3 + 4 plus_iteration_1_acks) -- ack discipline
+    is solid. EA may proceed to item 2.4 work after emitting the two small acknowledgments below;
+    no further Guide re-review required for those acks.
+  </summary>
+
+  <required_corrections>
+    <!-- Empty: all eight iteration-1 corrections are addressed. -->
+  </required_corrections>
+
+  <answer_to_ea_open_question>
+    <question_recap>
+      tools/fleet_observability/critical_notify.ps1 surfaced via the expanded 3-directory PS1 audit
+      scope. Not enumerated in 2.4.v2 additional_tools or G-1/G-4. Should it be added to canonical 7
+      (becoming 8), or surfaced as defer-decision in closing handoff?
+    </question_recap>
+    <answer>
+      Default disposition: NOT added to canonical 7. critical_notify.ps1 was already audited in
+      WORKFLOW_INTEGRITY_REVIEW.md Appendix A.1, which classified it as "NO ACTION" because its only
+      BlarAI path reference is a comment-example (line 11), not runtime code. It was intentionally
+      excluded from 2.4.v2 additional_tools and from G-1/G-4 for that reason. The expanded 3-directory
+      audit scope correctly surfaces it as a side effect, but the prior audit answer stands.
+
+      Inspection rule at item 2.5 (mandatory; not optional):
+      1. Physically inspect tools/fleet_observability/critical_notify.ps1 to confirm Appendix A.1
+         still holds: no runtime $RepoRoot or hardcoded BlarAI path; only comment-example references.
+      2. If confirmed (expected outcome): document the no-action disposition in the closing handoff
+         with explicit citation to WORKFLOW_INTEGRITY_REVIEW.md Appendix A.1, and proceed with the
+         canonical 7 unchanged.
+      3. If a runtime BlarAI path is discovered (unexpected; would invalidate Appendix A.1's audit):
+         STOP and report to Lead Architect. Do NOT silently expand the canonical 7 to 8 mid-stage.
+         The Lead Architect will decide whether to add critical_notify.ps1 to scope (with -BlarAIRoot
+         refactor) or defer to a follow-up ticket.
+
+      Same inspection rule applies generically to any other PS1 the expanded 3-directory audit scope
+      surfaces beyond the canonical 7: default = no-action with documented citation to Appendix A.1
+      (or other prior audit); runtime-path discovery = STOP and report; never silent scope expansion.
+    </answer>
+  </answer_to_ea_open_question>
+
+  <required_acknowledgments>
+    <acknowledge>I will inspect tools/fleet_observability/critical_notify.ps1 at item 2.5 and confirm the WORKFLOW_INTEGRITY_REVIEW.md Appendix A.1 audit finding (BlarAI reference in comment only, no runtime path). If confirmed: document the no-action disposition with explicit Appendix A.1 citation in the closing handoff. If a runtime BlarAI path is discovered: STOP and report to Lead Architect before any refactor or scope expansion.</acknowledge>
+    <acknowledge>The same inspection rule applies to any other PS1 the expanded 3-directory audit scope (tools/scheduled-tasks/, tools/fleet_ops/, tools/fleet_observability/) surfaces beyond the canonical 7: default = no-action with documented citation; runtime-path discovery = STOP and report. Never silent scope expansion mid-stage.</acknowledge>
+    <acknowledge>I will begin item 2.4 (Python entrypoints argparse refactor) work after emitting the two acknowledgments above in the EA chat. The 16 pre-existing binding acknowledgments + 7 Guide-#4 acknowledgments + these 2 critical_notify-watchpoint acknowledgments remain in force through Stage 4 cutover (per i1-2 dedup rule).</acknowledge>
+  </required_acknowledgments>
+
+  <proceed_authorization>
+    PROCEED — you may begin item 2.4 (Python entrypoints argparse refactor) immediately after
+    emitting the three acknowledgments above. No separate Guide re-review is required for those
+    acknowledgments; they are for audit-trail purposes. All other work-plan items (2.4.v2 through
+    2.10) flow as enumerated in your iteration-2 comprehension gate. Standing reminders applicable
+    throughout: single Stage-2 commit at item 2.9; fleet stays paused (verify state.json on each
+    substantive edit; never call state.resume_fleet); no merge to main; stash@{0} untouched;
+    append-only STATUS.md edit at item 2.10. If context exhaustion threatens before item 2.9,
+    emit a v3 mid-stage handoff XML following the v1/v2 schema (docs-only commit), then stop —
+    no partial-commit refactor and no emergency single-commit attempts that omit pending items.
+    On completion, emit the closing handoff including V0a-V0g + V1-V7 + per-item V8 outputs plus
+    your decision on the legacy tools/fleet_observability/_vikunja_client.py treatment (route
+    through new chokepoint OR fold in entirely) and your critical_notify.ps1 inspection result.
+  </proceed_authorization>
+
+</guide_review_response>

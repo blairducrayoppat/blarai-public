@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "_stub_notice": "STUB-DIGEST PLACEHOLDER (Sprint 15 EA-3). Digests below are NOT the real Qwen3-14B SHA-256 values — they are dummy values that satisfy the cascade-structure validation (64-hex format, keyed by filename) without a real model on disk. The real Qwen3-14B digest manifest is EA-4 ceremony-prep (requires the LA's on-chip session with real weights). NOT full FUT-04 (require_signed_manifest stays false). See docs/sprints/sprint_15/ea_prompts/EA-3.md.",
+  "digests": {
+    "openvino_model.bin": "fdd8b6eb6d6ee7d4fce9723d7f5adfdd6e07c1a53b07324df8ec03e825ff53fd",
+    "openvino_tokenizer.bin": "6031d99f0c7245d7571981778b9323a6a88544afe8e787dc901d68371f16fda9",
+    "openvino_detokenizer.bin": "d73093f72c80ebcaffb76a192727170ecd3c6a06c4df52df0e76b3f70ad9d7f7"
+  }
+}

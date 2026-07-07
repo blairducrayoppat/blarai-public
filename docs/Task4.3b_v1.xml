@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<execution_prompt version="1.0" task="4.3b" date="2026-03-03" model_hint="claude-sonnet-4.6">
+
+  <!-- ================================================================
+       BlarAI — Task 4.3b: Dynamic Sparse Attention Discovery + A/B Test
+       SDO-generated single-session execution prompt.
+       Pre-condition: Task 4.3 COMPLETE, NAT=3 LOCKED.
+       Baseline (Test A) imported from Task 4.3 evidence JSON.
+       Tests B (TRISHAPE) and C (XATTENTION) run new pipeline compilations.
+       Estimated runtime: ~45-75 minutes. Single session.
+       ================================================================ -->
+
+  <pre_execution_gate>
+    <instruction>Before writing ANY code, read all attached files, then produce
+      a summary of your understanding in the chat. The summary MUST include:
+      1. Task scope (what you will benchmark and why)
+      2. Test matrix dimensions (modes × bands × runs)
+      3. Baseline import strategy (Task 4.3 NAT=3 data)
+      4. PA security constraint (why sparse attention is AO/Code Agent only)
+      5. Evidence artifact path
+      6. Quality gate criteria (delta-based comparisons)
+      7. Governance updates required
+      8. Pre-condition verification checklist
+      Wait for Lead Architect approval before proceeding.</instruction>
+
+    <pre_conditions>
+      <check id="PC-01">Branch: `feature/p5-task4-3b-sparse-attention` created from
+        merged main HEAD (after merge of `feature/p5-task4-3-nat-sweep`).
+        Verify HEAD contains Task 4.3 evidence artifact and SDO governance updates.</check>
+      <check id="PC-02">Task 4.3 evidence artifact exists:
+        `phase2_gates/evidence/p5_task4_3_nat_sweep_matrix.json`
+        Parse it, extract NAT=3 entries for bands [4096, 8192, 12288, 16384, 20480].
+        These are the Test A baselines — DO NOT re-run them.</check>
+      <check id="PC-03">Model paths exist:
+        - Target: `models/qwen3-14b/openvino-int4-gpu/openvino_model.xml` (+ .bin)
+        - Draft-A: `models/qwen3-0.6b/openvino-int4-gpu/openvino_model.xml` (+ .bin)</check>
+      <check id="PC-04">Sparse attention API available: verify that
+        `ov_genai.SchedulerConfig()` exposes `use_sparse_attention` (bool attribute)
+        and `sparse_attention_config` (with `.mode`, `.num_retained_start_tokens_in_cache`,
+        `.num_retained_recent_tokens_in_cache` sub-fields). If any attribute is missing,
+        ABORT with `API_NOT_AVAILABLE` — do NOT attempt workarounds.</check>
+      <check id="PC-05">Verify `ov_genai.SparseAttentionMode.TRISHAPE` and
+        `ov_genai.SparseAttentionMode.XATTENTION` exist as enum values.
+        If either is missing, ABORT that specific test (B or C) and proceed with
+        the available mode only.</check>
+      <check id="PC-06">AC power connected (battery-only = fail-closed abort).</check>
+      <check id="PC-07">Python .venv active with openvino_genai, psutil, transformers.</check>
+      <check id="PC-08">Test suite baseline: run `python -m pytest --tb=short -q --no-header`
+        and record pass count. No test failures expected. Task 4.3b adds NO unit tests
+        (benchmark harness only).</check>
+    </pre_conditions>
+  </pre_execution_gate>
+
+  <scope>
+    <summary>A/B test dynamic sparse attention (TRISHAPE and XATTENTION modes) against
+      the Task 4.3 dense baseline at AO/Code Agent context bands. Determine whether
+      sparse attention improves TTFT at long context, whether it interacts with speculative
+      decoding acceptance rate, and whether it shifts the AR=0.000 collapse boundary
+      discovered at ≥16K in Task 4.3. The PA is EXCLUDED — sparse attention must NEVER
+      be enabled on the Policy Agent (security constraint).</summary>
+
+    <rationale>Task 4.3 discovered that speculative decoding acceptance rate collapses
+      to exactly 0.000 at ≥16K for ALL NAT values. This is the most consequential finding
+      in the Task 4 series. Sparse attention changes KV cache contents by evicting
+      intermediate tokens — this may shift the collapse boundary. Intel's technical article
+      (2026-05-06) demonstrates 2.6× TTFT improvement at 32K on identical hardware
+      (Core Ultra 7 258V / Arc 140V). If sparse attention significantly improves TTFT
+      or shifts AR collapse, it becomes a mandatory AO/Code Agent configuration.
+      Running this before Task 4.4 (XAttention sweep) provides data for potential
+      sparse+XAttention cross-interaction testing.</rationale>
+
+    <pa_security_constraint severity="IMMUTABLE">
+      NEVER enable sparse attention on the Policy Agent. The PA system prompt is ~600 tokens.
+      With `num_retained_start_tokens_in_cache = 128`, only the first 128 tokens are guaranteed
+      as attention sinks. Tokens 129–600 of the system prompt (the critical policy rules) may
+      be evicted from the KV cache at long context. A policy rule that is evicted cannot
+      influence the classification decision — this is an UNACCEPTABLE security regression.
+      Sparse attention is AO + Code Agent ONLY. This constraint is not negotiable.
+    </pa_security_constraint>
+
+    <files_changed>
+      <file action="CREATE">phase2_gates/scripts/run_p5_task4_3b_sparse_attention.py</file>
+      <file action="CREATE">phase2_gates/evidence/p5_task4_3b_sparse_attention_ab_test.json</file>
+      <file action="UPDATE">docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md</file>
+      <file action="UPDATE">docs/POST_OPERATIONAL_MATURATION_LEDGER.md</file>
+    </files_changed>
+
+    <harness_declaration>NO_FULL_HARNESS — new script, no prior sparse attention benchmark.
+      Pattern derived from run_p5_task4_3_nat_sweep.py (list-input generate, RSS sampler,
+      acceptance rate extraction, atomic JSON writes, AC power enforcement).</harness_declaration>
+
+    <no_production_code_changes>Task 4.3b touches phase2_gates/ and docs/ ONLY.
+      No modifications to services/, shared/, launcher/, or tests/.</no_production_code_changes>
+  </scope>
+
+  <test_matrix>
+    <dimensions>
+      <dimension name="sparse_mode" values="[DENSE, TRISHAPE, XATTENTION]" count="3">
+        <note>DENSE (Test A): imported from Task 4.3 NAT=3 baseline — NOT re-run.
+          TRISHAPE (Test B): tri-shape pattern (dense start sinks + dense recent + sparse middle).
+          XATTENTION (Test C): sparse XAttention blocks only (no tri-shape wrapper).
+          NAMING DISAMBIGUATION: SparseAttentionMode enum values are SCHEDULER-LEVEL KV cache
+          eviction patterns — completely separate from GPU_ENABLE_SDPA_OPTIMIZATION (GPU plugin
+          SDPA kernel, tested in P5-005b as OFF=better). These are NOT the same feature.</note>
+      </dimension>
+      <dimension name="prompt_band" values="[4096, 8192, 12288, 16384, 20480]" count="5">
+        <note>PA bands (512, 2048) EXCLUDED — sparse attention must never touch PA workloads.
+          4096: AO baseline reference band, cross-validates with Task 4.3.
+          8192: AO/Code Agent primary production band.
+          12288: regime change boundary (NAT=3 shows 38% TPS penalty in Task 4.3).
+          16384: AR=0.000 collapse boundary — key test for sparse attention impact.
+          20480: ceiling validation (OPTIONAL — graceful OOM handling).</note>
+      </dimension>
+    </dimensions>
+
+    <total_new_configs>10 (2 sparse modes × 5 bands)</total_new_configs>
+    <total_baseline_configs>5 (imported from Task 4.3, not re-run)</total_baseline_configs>
+    <runs_per_config>7 (2 warmup discarded + 5 measured)</runs_per_config>
+    <total_new_generate_calls>70 (10 configs × 7 runs)</total_new_generate_calls>
+
+    <calibration_check>
+      <instruction>Before running Tests B and C, compile a DENSE pipeline (identical to
+        Task 4.3 construction — no sparse attention) and run 1 generate() call at band
+        4096 with NAT=3. Compare the TPS to the Task 4.3 baseline (8.065 tps).
+        If within ±15%: proceed (thermal/session variance is acceptable).
+        If outside ±15%: flag as CALIBRATION_WARNING in the evidence but proceed anyway.
+        This is a defensive sanity check, NOT a quality gate blocker.</instruction>
+    </calibration_check>
+
+    <execution_order>
+      1. Load Task 4.3 baseline (Test A import from evidence JSON)
+      2. Run calibration check (1 dense generate at 4K)
+      3. Compile TRISHAPE pipeline
+      4. Run Test B: TRISHAPE at [4096, 8192, 12288, 16384, 20480] (band-ascending)
+      5. Delete TRISHAPE pipeline, gc.collect()
+      6. Compile XATTENTION pipeline
+      7. Run Test C: XATTENTION at [4096, 8192, 12288, 16384, 20480] (band-ascending)
+      8. Compute deltas and quality gates
+
+      Pipeline compilations: 3 total (1 dense calibration + 1 TRISHAPE + 1 XATTENTION).
+      The dense calibration pipeline is discarded after the single check — it does NOT
+      serve as the Test A data source (Task 4.3 evidence JSON is the Test A source).
+    </execution_order>
+
+    <pipeline_configs>
+      <config id="calibration_dense" purpose="One-shot calibration check">
+        scheduler = SchedulerConfig()
+        scheduler.cache_size = 3
+        # No sparse attention — identical to Task 4.3 construction
+        pipeline = LLMPipeline(
+            str(target_path), "GPU",
+            scheduler_config=scheduler,
+            draft_model=ov_genai.draft_model(str(draft_path), "GPU"),
+        )
+      </config>
+
+      <config id="test_b_trishape" purpose="Sparse attention — TRISHAPE mode">
+        scheduler = SchedulerConfig()
+        scheduler.cache_size = 3
+        scheduler.use_sparse_attention = True
+        scheduler.sparse_attention_config.mode = ov_genai.SparseAttentionMode.TRISHAPE
+        # All other sparse_attention_config fields use defaults:
+        #   num_retained_start_tokens_in_cache = 128  (attention sinks)
+        #   num_retained_recent_tokens_in_cache = 1920  (working window)
+        #   num_last_dense_tokens_in_prefill = 100
+        #   xattention_block_size = 64
+        #   xattention_stride = 8
+        #   xattention_threshold = 0.80
+        pipeline = LLMPipeline(
+            str(target_path), "GPU",
+            scheduler_config=scheduler,
+            draft_model=ov_genai.draft_model(str(draft_path), "GPU"),
+        )
+      </config>
+
+      <config id="test_c_xattention" purpose="Sparse attention — XATTENTION mode">
+        scheduler = SchedulerConfig()
+        scheduler.cache_size = 3
+        scheduler.use_sparse_attention = True
+        scheduler.sparse_attention_config.mode = ov_genai.SparseAttentionMode.XATTENTION
+        # Same defaults as TRISHAPE for xattention_* fields.
+        # Difference: no tri-shape wrapper (no dense-start/dense-recent guarantee).
+        pipeline = LLMPipeline(
+            str(target_path), "GPU",
+            scheduler_config=scheduler,
+            draft_model=ov_genai.draft_model(str(draft_path), "GPU"),
+        )
+      </config>
+    </pipeline_configs>
+
+    <generation_config>
+      # Fixed for ALL configs (NAT=3 LOCKED from Task 4.3):
+      cfg = ov_genai.GenerationConfig()
+      cfg.max_new_tokens = 128
+      cfg.do_sample = False
+      cfg.temperature = 0.0
+      cfg.top_k = 1
+      cfg.top_p = 1.0
+      cfg.num_assistant_tokens = 3       # NAT=3 — LOCKED
+      cfg.assistant_confidence_threshold = 0.0
+    </generation_config>
+
+    <prompt_construction>
+      Use IDENTICAL prompt construction to Task 4.3:
+      - Tokenizer: AutoTokenizer from Qwen3-14B model directory.
+      - System prompt: "You are a helpful assistant."
+      - User content: padded to target token count per band.
+      - Chat template: apply_chat_template with add_generation_prompt=True.
+      - Build prompt ONCE per band, reuse across sparse modes.
+      Prompts MUST be byte-identical to Task 4.3 prompts at matching bands to ensure
+      the ONLY variable is the sparse attention configuration.
+    </prompt_construction>
+
+    <band_20k_oom_handling>
+      The 20,480 band is OPTIONAL. Apply the same defensive handling as Task 4.3:
+      1. Save intermediate results after EACH band (bands 4096-16384 preserved).
+      2. Wrap 20K in try/except (RuntimeError, MemoryError, Exception).
+      3. If OOM at 20K for a sparse mode: mark as "OOM_SKIPPED", continue.
+      4. If RSS exceeds 26,000 MB: abort 20K immediately.
+      5. Session is NOT a failure if 20K OOMs.
+      Note: Task 4.3 completed 20K without OOM (peak RSS 1,835 MB). Sparse attention
+      SHOULD reduce RSS at long context (evicts old KV entries). OOM at 20K with sparse
+      enabled would be UNEXPECTED and must be prominently flagged.
+    </band_20k_oom_handling>
+  </test_matrix>
+
+  <mandatory_measurements>
+    <!-- Same 7 fields as Task 4.3, applied to each sparse mode config -->
+    <per_run count="7">
+      <field id="1" name="combined_tps">Wall-clock tokens/second for full target+draft pipeline.
+        Source: extended_perf_metrics.get_throughput().mean</field>
+      <field id="2" name="draft_forward_ms_per_step">Mean draft model forward pass time.
+        Source: extended_perf_metrics.draft_model_metrics.get_inference_duration().mean</field>
+      <field id="3" name="tokens_drafted_total">NAT × total_speculative_episodes.
+        Source: raw_metrics.m_batch_sizes count × 3 (NAT=3 fixed)</field>
+      <field id="4" name="tokens_accepted_total">sum(b - 1 for b in m_batch_sizes).
+        Source: raw_metrics.m_batch_sizes</field>
+      <field id="5" name="acceptance_rate_by_step">Per-step array [step_1_rate, step_2_rate, step_3_rate].
+        Source: m_batch_sizes analysis (3 steps since NAT=3)</field>
+      <field id="6" name="peak_rss_mb">Process RSS high-water mark.
+        Source: RssSampler thread (0.01s polling interval)</field>
+      <field id="7" name="ttft_ms">First-token wall-clock time. PRIMARY METRIC for sparse attention.
+        Source: extended_perf_metrics.get_ttft().mean</field>
+    </per_run>
+    <supplementary>
+      <field name="pipeline_compile_ms_trishape">Time to compile Test B pipeline.</field>
+      <field name="pipeline_compile_ms_xattention">Time to compile Test C pipeline.</field>
+      <field name="calibration_tps_4k">Dense calibration check TPS at 4K.</field>
+      <field name="calibration_delta_pct">Delta vs Task 4.3 baseline (8.065 tps).</field>
+    </supplementary>
+    <validation_rule>A run missing ANY of the 7 fields is INVALID and must not be counted.
+      If valid_count drops below 3 for any config, mark as INSUFFICIENT_DATA.</validation_rule>
+  </mandatory_measurements>
+
+  <api_critical_patterns>
+    <!-- MANDATORY. Violations produce silent data loss. Identical to Task 4.3. -->
+    <pattern name="list_input_generate" severity="CRITICAL">
+      pipeline.generate([prompt], gen_config, streamer_callback)
+      NEVER: pipeline.generate(prompt, gen_config, streamer_callback)
+      Bare str input returns bare str with NO perf_metrics, NO extended_perf_metrics.
+      List input returns DecodedResults with .texts[0], .perf_metrics, .extended_perf_metrics.
+    </pattern>
+    <pattern name="extended_perf_metrics" severity="CRITICAL">
+      output = pipeline.generate([prompt], gc, cb)
+      epm = output.extended_perf_metrics
+      epm.get_throughput().mean            # native combined TPS
+      epm.get_ttft().mean                  # native TTFT (ms) — PRIMARY METRIC
+      epm.draft_model_metrics.get_inference_duration().mean  # draft forward ms
+      epm.get_num_accepted_tokens()        # integer accepted count
+    </pattern>
+    <pattern name="acceptance_rate_from_m_batch_sizes" severity="CRITICAL">
+      raw = output.perf_metrics.raw_metrics
+      batch_sizes = list(raw.m_batch_sizes)
+      # batch_sizes[i] = accepted_tokens + 1 for speculative episode i
+      # Aggregate: sum(b-1 for b in batch_sizes) / (3 × len(batch_sizes))
+    </pattern>
+  </api_critical_patterns>
+
+  <baseline_import>
+    <instruction>Load `phase2_gates/evidence/p5_task4_3_nat_sweep_matrix.json` at script
+      startup. Parse the `results` array and extract all entries where `nat == 3` for
+      bands [4096, 8192, 12288, 16384, 20480]. These become the Test A (DENSE) baselines.
+      For each baseline entry, extract:
+      - combined_tps (summary.combined_tps.mean)
+      - ttft_ms (summary.ttft_ms.mean)
+      - acceptance_rate_aggregate (summary.acceptance_rate_aggregate)
+      - peak_rss_mb (summary.peak_rss_mb — or from per-band peak)
+      Store these in the evidence artifact under test_a_baseline.</instruction>
+
+    <reference_data note="Task 4.3 execution report — NAT=3 per-band (informational only; use JSON)">
+      <!-- Use the JSON values, not these — these are from the execution report for quick reference -->
+      <band tokens="4096"  tps="8.065" ar="0.457" peak_rss_mb="6372"/>
+      <band tokens="8192"  tps="5.543" ar="0.378" peak_rss_mb="5707"/>
+      <band tokens="12288" tps="2.482" ar="0.378" peak_rss_mb="3569"/>
+      <band tokens="16384" tps="2.886" ar="0.000" peak_rss_mb="3562"/>
+      <band tokens="20480" tps="3.207" ar="0.000" peak_rss_mb="1835"/>
+    </reference_data>
+
+    <ar_collapse_context>At bands 16384 and 20480, acceptance_rate is EXACTLY 0.000 for
+      ALL NAT values in Task 4.3 — speculative decoding has completely failed. The Qwen3-0.6B
+      draft model generates tokens that the Qwen3-14B target 100% rejects beyond ~12K context.
+      SPARSE ATTENTION MAY SHIFT THIS BOUNDARY because it changes which KV cache entries are
+      retained. If AR > 0 at 16K with sparse attention enabled, that is a significant finding.</ar_collapse_context>
+  </baseline_import>
+
+  <quality_gate>
+    <!-- All gates are DELTA-BASED: comparing Test B/C measurements against Test A baseline -->
+
+    <gate id="G-01" name="measurement_completeness">
+      All 7 mandatory fields present for all measured runs at bands [4096..16384].
+      20K band exempt (OOM acceptable). Threshold: zero invalid runs at bands 4096-16384.
+    </gate>
+
+    <gate id="G-02" name="valid_run_count">
+      valid_count >= 5 for all non-OOM configurations at bands [4096..16384].
+      If any config has valid_count &lt; 5, disposition = INSUFFICIENT_EVIDENCE.
+    </gate>
+
+    <gate id="G-03" name="ttft_improvement" primary="true">
+      For each band ≥8192, compute: ttft_delta_pct = (ttft_dense - ttft_sparse) / ttft_dense × 100
+      If ttft_delta_pct ≥ 10% at ANY band ≥8192 for EITHER mode (TRISHAPE or XATTENTION):
+        → Flag that (mode, band) as SPARSE_CANDIDATE
+      If ttft_delta_pct ≥ 10% at TWO OR MORE bands ≥8192:
+        → Flag mode as STRONG_SPARSE_CANDIDATE
+      If ttft_delta_pct &lt; 10% at ALL bands:
+        → TTFT improvement is marginal; sparse attention benefit is primarily RSS, not latency.
+    </gate>
+
+    <gate id="G-04" name="tps_compatibility">
+      For each band, compute: tps_ratio = tps_sparse / tps_dense
+      If tps_ratio ≥ 0.95 (within 5% of baseline): SPARSE_COMPATIBLE — no throughput cost.
+      If tps_ratio &lt; 0.95 but ≥ 0.85: SPARSE_MINOR_COST — acceptable for TTFT trade.
+      If tps_ratio &lt; 0.85: SPARSE_TPS_DEGRADATION — significant throughput cost.
+    </gate>
+
+    <gate id="G-05" name="spec_decode_interaction" critical="true">
+      For each band, compute: ar_delta = ar_sparse - ar_dense
+      If ar_delta &lt; -0.10 (>10% AR degradation) at ANY band ≤12288 (where AR > 0 in baseline):
+        → Flag as SPEC_DECODE_INTERACTION — sparse attention is harming draft acceptance.
+      SPECIAL CASE for bands 16384+: if ar_sparse > 0.0 (vs ar_dense = 0.000):
+        → Flag as AR_COLLAPSE_BOUNDARY_SHIFT — sparse attention has RECOVERED speculative
+          decoding at long context. This is a MAJOR finding. Report prominently.
+      If ar_sparse == 0.0 and ar_dense == 0.0 at 16K/20K: no interaction, as expected.
+    </gate>
+
+    <gate id="G-06" name="rss_validation">
+      For each band, compare: rss_delta = rss_sparse - rss_dense
+      Expected: rss_delta ≤ 0 (sparse should reduce RSS by evicting old KV entries).
+      If rss_delta > 0 at ANY band: flag as UNEXPECTED_RSS_INCREASE.
+      If rss_delta &lt; 0 by >10% at ANY band ≥8192: flag as RSS_IMPROVEMENT.
+      RSS improvement at 16K+ is particularly significant (Task 4.3 showed 3,562 MB dense).
+    </gate>
+
+    <gate id="G-07" name="memory_budget">
+      peak_rss_mb at the highest successful band must be &lt; 15,507 MB.
+      If exceeded: MEMORY_BUDGET_EXCEEDED.
+    </gate>
+
+    <gate id="G-08" name="mode_comparison">
+      Compare TRISHAPE vs XATTENTION on all metrics at each band.
+      Identify which mode is superior (or if they are equivalent within noise).
+      Record the winning mode per band and overall.
+      TRISHAPE is expected to be safer (preserves attention sinks); XATTENTION may be
+      faster but risks degrading quality at position-sensitive tasks.
+    </gate>
+
+    <disposition_rules>
+      G-01/G-02 FAIL → INSUFFICIENT_EVIDENCE (cannot draw conclusions)
+
+      G-03 STRONG_SPARSE_CANDIDATE + G-04 COMPATIBLE + G-05 no SPEC_DECODE_INTERACTION:
+        → disposition = SPARSE_ENABLED_AO_CODE
+        → Update AO + Code Agent workload profiles to enable sparse attention.
+        → Record winning mode (TRISHAPE or XATTENTION) in ADR-012 §2.2.
+        → Confirm 4K band uses same mode (or if 4096 shows no benefit, sparse OFF at 4K).
+
+      G-03 marginal/FAIL OR G-05 SPEC_DECODE_INTERACTION OR G-04 TPS_DEGRADATION:
+        → disposition = SPARSE_DEFERRED
+        → Insufficient benefit or negative interaction detected.
+        → Close, proceed to Task 4.4. Note findings in ADR-012 for future reference.
+
+      G-05 AR_COLLAPSE_BOUNDARY_SHIFT detected:
+        → This overrides other gates as a MAJOR finding regardless of disposition.
+        → Must be documented prominently in the execution report.
+        → SDO will decide whether to add a follow-up task for detailed AR boundary mapping.
+
+      ANY run failure that prevents ≥3 valid runs at bands 4096-16384:
+        → disposition = INSUFFICIENT_EVIDENCE
+    </disposition_rules>
+  </quality_gate>
+
+  <evidence_artifact>
+    <path>phase2_gates/evidence/p5_task4_3b_sparse_attention_ab_test.json</path>
+    <schema>
+      {
+        "milestone": "P5-TASK-4.3b",
+        "timestamp_utc": "ISO-8601",
+        "metadata": {
+          "commit_hash": "git HEAD",
+          "python_version": "...",
+          "platform": "...",
+          "openvino_version": "...",
+          "openvino_genai_version": "...",
+          "power_envelope": { ... },
+          "memory_limits": { "warning_rss_mb": 26000.0, "budget_rss_mb": 15507.0 }
+        },
+        "benchmark_policy": {
+          "sparse_modes": ["DENSE_IMPORTED", "TRISHAPE", "XATTENTION"],
+          "prompt_bands": [4096, 8192, 12288, 16384, 20480],
+          "nat": 3,
+          "warmup_runs": 2,
+          "measured_runs": 5,
+          "max_new_tokens": 128,
+          "scheduler_cache_gb": 3,
+          "xattention_gpu_sdpa": "OFF (default, NOT the same as SparseAttentionMode)",
+          "sparse_attention_defaults": {
+            "num_retained_start_tokens_in_cache": 128,
+            "num_retained_recent_tokens_in_cache": 1920,
+            "num_last_dense_tokens_in_prefill": 100,
+            "xattention_block_size": 64,
+            "xattention_stride": 8,
+            "xattention_threshold": 0.80
+          }
+        },
+        "calibration": {
+          "dense_tps_4k": ...,
+          "baseline_tps_4k": 8.065,
+          "delta_pct": ...,
+          "status": "PASS | CALIBRATION_WARNING"
+        },
+        "pipeline_compile_ms": {
+          "calibration_dense": ...,
+          "trishape": ...,
+          "xattention": ...
+        },
+        "test_a_baseline": {
+          "source": "p5_task4_3_nat_sweep_matrix.json",
+          "nat": 3,
+          "entries": [
+            {
+              "band": 4096,
+              "combined_tps": { "mean": ... },
+              "ttft_ms": { "mean": ... },
+              "acceptance_rate_aggregate": ...,
+              "peak_rss_mb": ...
+            }
+            // ... 5 entries (one per band)
+          ]
+        },
+        "results": [
+          {
+            "band": 4096,
+            "sparse_mode": "TRISHAPE",
+            "status": "completed | OOM_SKIPPED | INSUFFICIENT_DATA | API_NOT_AVAILABLE",
+            "warmup_runs": 2,
+            "measured_runs": [ ... per-run 7-field records ... ],
+            "summary": {
+              "combined_tps": { "mean": ..., "stddev": ..., "p50": ..., "p95": ... },
+              "ttft_ms": { "mean": ..., "stddev": ... },
+              "draft_forward_ms_per_step": { "mean": ... },
+              "tokens_drafted_total": ...,
+              "tokens_accepted_total": ...,
+              "acceptance_rate_aggregate": ...,
+              "acceptance_rate_by_step": [step_1, step_2, step_3],
+              "peak_rss_mb": ...
+            },
+            "delta_vs_baseline": {
+              "ttft_delta_pct": ...,
+              "tps_ratio": ...,
+              "ar_delta": ...,
+              "rss_delta_mb": ...
+            }
+          }
+          // ... 10 entries total (2 sparse modes × 5 bands)
+        ],
+        "analysis": {
+          "ttft_improvement_bands": {
+            "TRISHAPE": { "4096": ..., "8192": ..., "12288": ..., "16384": ..., "20480": ... },
+            "XATTENTION": { ... }
+          },
+          "tps_compatibility": {
+            "TRISHAPE": { ... per-band tps_ratio ... },
+            "XATTENTION": { ... }
+          },
+          "ar_collapse_shift": {
+            "baseline_collapse_band": 16384,
+            "trishape_ar_at_16k": ...,
+            "xattention_ar_at_16k": ...,
+            "collapse_boundary_shifted": true | false
+          },
+          "rss_deltas": { ... per-band rss comparison ... },
+          "mode_comparison": {
+            "overall_winner": "TRISHAPE | XATTENTION | EQUIVALENT",
+            "per_band_winners": { ... }
+          }
+        },
+        "quality_gate": {
+          "G-01": "PASS|FAIL",
+          "G-02": "PASS|FAIL",
+          "G-03": "PASS|FAIL|SPARSE_CANDIDATE|STRONG_SPARSE_CANDIDATE",
+          "G-04": "PASS|FAIL notes...",
+          "G-05": "PASS|FAIL|SPEC_DECODE_INTERACTION|AR_COLLAPSE_BOUNDARY_SHIFT",
+          "G-06": "PASS|FAIL|RSS_IMPROVEMENT|UNEXPECTED_RSS_INCREASE",
+          "G-07": "PASS|FAIL",
+          "G-08": "TRISHAPE_WINS | XATTENTION_WINS | EQUIVALENT",
+          "disposition": "SPARSE_ENABLED_AO_CODE | SPARSE_DEFERRED | INSUFFICIENT_EVIDENCE"
+        },
+        "finished_utc": "ISO-8601"
+      }
+    </schema>
+  </evidence_artifact>
+
+  <governance_updates>
+    <update id="GOV-01" condition="disposition == SPARSE_ENABLED_AO_CODE">
+      Update ADR-012 §2.2 — add new row to configuration table:
+      | **Sparse attention** | [winning mode] AO/Code only; PA=OFF | **LOCKED** |
+        Task 4.3b: [summary]. Evidence: p5_task4_3b_sparse_attention_ab_test.json |
+      Add sparse_attention_config defaults to the row notes.
+    </update>
+    <update id="GOV-02" condition="disposition == SPARSE_DEFERRED">
+      Update ADR-012 §2.2 — add new row:
+      | **Sparse attention** | OFF (globally) | **LOCKED** |
+        Task 4.3b: DEFERRED — [reason]. Evidence: p5_task4_3b_sparse_attention_ab_test.json |
+    </update>
+    <update id="GOV-03" condition="disposition == INSUFFICIENT_EVIDENCE">
+      Update ADR-012 §2.2 — add new row:
+      | **Sparse attention** | OFF (default) | EVALUATING |
+        Task 4.3b: INSUFFICIENT_EVIDENCE — [reason]. May require retry. |
+    </update>
+    <update id="GOV-04" condition="G-05 == AR_COLLAPSE_BOUNDARY_SHIFT">
+      Add prominent note to ADR-012 §3.1 (architectural implications):
+      "Sparse attention shifts the speculative decoding AR collapse boundary beyond 16K.
+      AR at 16K with [mode]: [value]. This may warrant re-evaluation of DEC-02 (graceful
+      degradation acceptance) if AR recovery is substantial enough for the Code Agent
+      workload profile at 16K."
+    </update>
+    <update id="GOV-05" condition="always">
+      Append new LEDGER entry to docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+      Use the NEXT available entry number (count existing ### Entry N headers + 1).
+      Format:
+
+      ### Entry [N] — Task 4.3b: Dynamic Sparse Attention A/B Test
+
+      **Date:** 2026-03-0X (actual execution date)
+      **Branch:** `feature/p5-task4-3b-sparse-attention`
+      **Commit:** `[HEAD after commit]`
+      **Type:** Empirical Evidence Collection (Configuration Optimization)
+      **Scope:** Sparse attention A/B test — TRISHAPE + XATTENTION vs dense baseline
+        at bands [4096, 8192, 12288, 16384, 20480] with NAT=3 LOCKED.
+
+      Key findings:
+      - [TTFT improvement summary per mode]
+      - [TPS compatibility summary]
+      - [AR interaction / collapse boundary shift status]
+      - [RSS delta summary]
+      - [Mode comparison: TRISHAPE vs XATTENTION]
+
+      Quality gate: [G-01..G-08 results]
+      Disposition: [SPARSE_ENABLED_AO_CODE / SPARSE_DEFERRED / INSUFFICIENT_EVIDENCE]
+
+      Evidence: `phase2_gates/evidence/p5_task4_3b_sparse_attention_ab_test.json`
+    </update>
+  </governance_updates>
+
+  <intermediate_save_strategy>
+    Save partial results after EACH band completes (both TRISHAPE and XATTENTION).
+    Use `p5_task4_3b_sparse_attention_ab_test.json.partial` for intermediate saves.
+    After all bands complete (or 20K OOM), rename to final artifact path.
+    Save Test A baseline import as the first intermediate save (before any generate calls).
+  </intermediate_save_strategy>
+
+  <commit_template>
+    feat(benchmark): Task 4.3b — sparse attention A/B test (AO/Code Agent)
+
+    A/B test dynamic sparse attention (TRISHAPE + XATTENTION) against dense
+    baseline (imported from Task 4.3) at bands [4096,8192,12288,16384,20480]
+    with NAT=3 LOCKED. AO/Code Agent workload only — PA excluded (security).
+
+    - 10 new configurations (2 modes × 5 bands), 5 measured runs each
+    - Dense baseline imported from Task 4.3 evidence JSON (not re-run)
+    - TTFT primary metric; TPS, AR, RSS secondary
+    - Disposition: [SPARSE_ENABLED_AO_CODE | SPARSE_DEFERRED | INSUFFICIENT_EVIDENCE]
+    - ADR-012 §2.2 updated: sparse attention row [LOCKED|EVALUATING]
+    - LEDGER Entry [N]
+    - AR collapse at 16K: [SHIFTED | UNCHANGED]
+
+    Evidence: phase2_gates/evidence/p5_task4_3b_sparse_attention_ab_test.json
+  </commit_template>
+
+  <reference_data>
+    <baseline name="Task 4.3 NAT=3 per-band (dense, from execution report)">
+      Band  4096: tps=8.065, ar=0.457, peak_rss=6,372 MB
+      Band  8192: tps=5.543, ar=0.378, peak_rss=5,707 MB
+      Band 12288: tps=2.482, ar=0.378, peak_rss=3,569 MB
+      Band 16384: tps=2.886, ar=0.000, peak_rss=3,562 MB
+      Band 20480: tps=3.207, ar=0.000, peak_rss=1,835 MB
+    </baseline>
+    <baseline name="Task 4.3 global">
+      Pipeline compile time: 26,802 ms
+      Standalone draft TPS: 76.26 (mean 3 runs at 4K)
+      NAT=3 global weighted TPS score: 4.847 (highest of all NATs)
+    </baseline>
+    <baseline name="Intel reference (2026-05-06 article, same hardware)">
+      Dense TTFT at 32K: ~88 seconds
+      Sparse TTFT at 32K: ~34 seconds (2.6× improvement)
+      Config: OpenVINO 2025.2.0-dev, Core Ultra 7 258V, Arc 140V
+      Note: different OV version, no speculative decoding, different model. Directional only.
+    </baseline>
+    <note>Task 4.3 and Task 4.3b use different pipeline configurations (dense vs sparse).
+      The imported baseline is cross-pipeline but same-hardware and same-model. Deltas are
+      valid for architectural decisions. The calibration check (step 2) validates that
+      session-to-session variance is within tolerance.</note>
+  </reference_data>
+
+  <runtime_estimate>
+    Baseline import + calibration check: ~2 minutes (1 compile + 1 generate + JSON parse)
+    TRISHAPE pipeline compilation: ~20-30 seconds
+    XATTENTION pipeline compilation: ~20-30 seconds
+    Generate calls per mode: 35 (5 bands × 7 runs per band)
+      4096 band:  7 calls × ~12 sec = ~1.5 min
+      8192 band:  7 calls × ~18 sec = ~2 min
+      12288 band: 7 calls × ~25 sec = ~3 min
+      16384 band: 7 calls × ~32 sec = ~4 min
+      20480 band: 7 calls × ~40 sec = ~5 min (if no OOM)
+    Subtotal per mode: ~16 minutes
+    Total for both modes: ~32 minutes
+    Total with compilation + calibration + analysis: ~45-60 minutes
+    Ceiling estimate (with OV recompile overhead): ~75 minutes
+    Well within single-session ceiling.
+  </runtime_estimate>
+
+  <attachment_order>
+    1. .github/copilot-instructions.md (governance — MUST)
+    2. docs/Task4.3b_v1.xml (this prompt — PRIMARY)
+    3. docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md (spec reference — §Task 4.3b, §6 measurements)
+    4. docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md (parameter table)
+  </attachment_order>
+
+  <verification_commands>
+    <!-- Non-dev terminal commands for Lead Architect to confirm milestone succeeded -->
+    <command purpose="Confirm commit">git log --oneline -1</command>
+    <command purpose="Confirm files changed">git diff HEAD~1 --name-only</command>
+    <command purpose="Confirm evidence artifact exists">
+      python -c "import json, pathlib; d=json.loads(pathlib.Path('phase2_gates/evidence/p5_task4_3b_sparse_attention_ab_test.json').read_text()); print(f'Disposition: {d[\"quality_gate\"][\"disposition\"]}')"
+    </command>
+    <command purpose="Confirm test suite not regressed">python -m pytest --tb=short -q --no-header</command>
+    <command purpose="Confirm ADR-012 sparse row added">
+      python -c "print([l.strip() for l in open('docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md') if 'Sparse attention' in l])"
+    </command>
+  </verification_commands>
+
+</execution_prompt>

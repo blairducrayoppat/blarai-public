@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<execution_prompt version="1.0" task="4.4" date="2026-03-04" model_hint="claude-sonnet-4.6">
+
+  <!-- ================================================================
+       BlarAI — Task 4.4: XAttention (GPU SDPA Optimization) Independent Sweep
+       SDO-generated single-session execution prompt.
+       Pre-conditions: Task 4.3 COMPLETE (NAT=3 LOCKED), Task 4.3b COMPLETE
+         (sparse attention DEFERRED, no cross-test needed).
+       Sweep: GPU_ENABLE_SDPA_OPTIMIZATION {OFF, ON} × 4 context bands.
+       Both pipelines compiled and run fresh — no baseline import.
+       Estimated runtime: ~30-45 minutes. Single session.
+       ================================================================ -->
+
+  <pre_execution_gate>
+    <instruction>Before writing ANY code, read all attached files, then produce
+      a summary of your understanding in the chat. The summary MUST include:
+      1. Task scope (what you will benchmark and why)
+      2. Variable under test (GPU_ENABLE_SDPA_OPTIMIZATION — NOT the same as sparse attention)
+      3. Test matrix dimensions (2 XAttention configs × 4 bands × 7 runs)
+      4. Fixed constants (NAT=3, Draft-A, sparse_attention=OFF, do_sample=False)
+      5. Evidence artifact path
+      6. Quality gate criteria
+      7. Governance updates required
+      8. Pre-condition verification checklist
+      Wait for Lead Architect approval before proceeding.</instruction>
+
+    <pre_conditions>
+      <check id="PC-01">Branch: `feature/p5-task4-4-xattention-sweep` created from
+        merged main HEAD (after merge of `feature/p5-task4-3b-sparse-attention`).
+        Verify HEAD contains Task 4.3 and 4.3b evidence artifacts and governance updates.</check>
+      <check id="PC-02">Task 4.3 evidence artifact exists:
+        `phase2_gates/evidence/p5_task4_3_nat_sweep_matrix.json`
+        Parse it, extract NAT=3 entries for bands [4096, 8192, 12288, 16384].
+        These are REFERENCE ONLY for calibration check — NOT used as baselines.
+        Task 4.4 runs BOTH XAttention OFF and ON fresh.</check>
+      <check id="PC-03">Model paths exist:
+        - Target: `models/qwen3-14b/openvino-int4-gpu/openvino_model.xml` (+ .bin)
+        - Draft-A: `models/qwen3-0.6b/openvino-int4-gpu/openvino_model.xml` (+ .bin)</check>
+      <check id="PC-04">Verify GPU_ENABLE_SDPA_OPTIMIZATION is a valid pipeline
+        construction property. Test: create a minimal pipeline with
+        `LLMPipeline(path, "GPU", GPU_ENABLE_SDPA_OPTIMIZATION=True)` and verify
+        no exception on construction. If the property is not recognized or causes an error,
+        ABORT with `PROPERTY_NOT_AVAILABLE`.</check>
+      <check id="PC-05">AC power connected (battery-only = fail-closed abort).</check>
+      <check id="PC-06">Python .venv active with openvino_genai, psutil, transformers.</check>
+      <check id="PC-07">Test suite baseline: run `python -m pytest --tb=short -q --no-header`
+        and record pass count. No test failures expected. Task 4.4 adds NO unit tests
+        (benchmark harness only).</check>
+    </pre_conditions>
+  </pre_execution_gate>
+
+  <scope>
+    <summary>Sweep GPU_ENABLE_SDPA_OPTIMIZATION {OFF, ON} across 4 context bands
+      [4096, 8192, 12288, 16384] with all other parameters fixed (NAT=3, Draft-A,
+      sparse_attention=OFF, do_sample=False). Determine whether the P5-005b finding
+      (XAttention OFF is better at 4K) holds at longer context, or whether XAttention ON
+      becomes beneficial where speculative decoding is weak or inert.</summary>
+
+    <rationale>P5-005b found GPU_ENABLE_SDPA_OPTIMIZATION OFF produced higher TPS at 4K
+      (10.02 vs 9.74 tps — 2.9% delta). That test was conducted at a single context band.
+      Task 4.3 revealed that speculative decoding acceptance rate collapses to 0.000 at
+      ≥16K, meaning the pipeline becomes purely autoregressive at long context. The SDPA
+      optimization accelerates attention computation — its benefit may emerge precisely where
+      speculative decoding can no longer help. This sweep tests whether XAttention's effect
+      is context-length-dependent and whether the P5-005b finding is a universal constant
+      or a short-context artifact.</rationale>
+
+    <naming_disambiguation severity="CRITICAL">
+      GPU_ENABLE_SDPA_OPTIMIZATION is the **GPU plugin SDPA kernel optimization**.
+      It controls whether the OpenVINO GPU plugin uses Scaled Dot-Product Attention
+      kernel fusion. It is a pipeline construction property, NOT a SchedulerConfig field.
+
+      This is COMPLETELY SEPARATE from:
+      - `SchedulerConfig.use_sparse_attention` (scheduler KV cache eviction — tested in Task 4.3b, DEFERRED)
+      - `SparseAttentionMode.TRISHAPE` / `SparseAttentionMode.XATTENTION` (scheduler eviction patterns)
+
+      The "XAttention" name in Task 4.4 title refers to the GPU SDPA optimization feature,
+      which Intel sometimes markets as "XAttention" in their documentation. Do NOT confuse
+      this with SparseAttentionMode.XATTENTION from Task 4.3b.
+    </naming_disambiguation>
+
+    <files_changed>
+      <file action="CREATE">phase2_gates/scripts/run_p5_task4_4_xattention_sweep.py</file>
+      <file action="CREATE">phase2_gates/evidence/p5_task4_4_xattention_sweep.json</file>
+      <file action="UPDATE">docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md</file>
+      <file action="UPDATE">docs/POST_OPERATIONAL_MATURATION_LEDGER.md</file>
+    </files_changed>
+
+    <harness_declaration>NO_FULL_HARNESS — new script, no prior XAttention × multi-band benchmark.
+      Pattern derived from run_p5_task4_3b_sparse_attention.py (list-input generate, RSS sampler,
+      acceptance rate extraction, atomic JSON writes, AC power enforcement).</harness_declaration>
+
+    <no_production_code_changes>Task 4.4 touches phase2_gates/ and docs/ ONLY.
+      No modifications to services/, shared/, launcher/, or tests/.</no_production_code_changes>
+  </scope>
+
+  <test_matrix>
+    <dimensions>
+      <dimension name="xattention" values="[OFF, ON]" count="2">
+        <note>OFF: GPU_ENABLE_SDPA_OPTIMIZATION not set (or explicitly False) — default behavior.
+          ON: GPU_ENABLE_SDPA_OPTIMIZATION=True passed to LLMPipeline constructor.
+          Each value requires a SEPARATE pipeline compilation (GPU plugin config is compile-time).
+          NAMING: "XAttention" here means GPU SDPA kernel, NOT SparseAttentionMode.XATTENTION.</note>
+      </dimension>
+      <dimension name="prompt_band" values="[4096, 8192, 12288, 16384]" count="4">
+        <note>4096: AO baseline reference band. Speculative decoding effective (AR ~0.457).
+          8192: AO/Code Agent primary production band. Spec-decode fading (AR ~0.378).
+          12288: Regime change boundary. Spec-decode weak (AR ~0.378 but TPS drops 38%).
+          16384: AR=0.000 collapse. Spec-decode inert — purely autoregressive.
+          20480 excluded: locked out by DEC-03 (context cap = 16,384 tokens).</note>
+      </dimension>
+    </dimensions>
+
+    <total_configs>8 (2 XAttention settings × 4 bands)</total_configs>
+    <runs_per_config>7 (2 warmup discarded + 5 measured)</runs_per_config>
+    <total_generate_calls>56 (8 configs × 7 runs)</total_generate_calls>
+    <pipeline_compilations>2 (one per XAttention setting)</pipeline_compilations>
+
+    <execution_order>
+      1. Compile Pipeline A: XAttention OFF (no GPU_ENABLE_SDPA_OPTIMIZATION property)
+      2. Run Pipeline A at [4096, 8192, 12288, 16384] (band-ascending)
+      3. Calibration check: compare Pipeline A 4K TPS with Task 4.3 reference (8.065 tps)
+      4. Save intermediate results
+      5. Delete Pipeline A, gc.collect()
+      6. Compile Pipeline B: XAttention ON (GPU_ENABLE_SDPA_OPTIMIZATION=True)
+      7. Run Pipeline B at [4096, 8192, 12288, 16384] (band-ascending)
+      8. Save intermediate results
+      9. Compute deltas and quality gates
+      10. Write final evidence artifact
+
+      XAttention OFF runs FIRST because it is the current production default (PROVISIONAL BEST).
+      If Pipeline B compilation fails (SDPA not supported), disposition is XATTENTION_NOT_AVAILABLE
+      and Pipeline A data validates the OFF default.
+    </execution_order>
+
+    <pipeline_configs>
+      <config id="pipeline_a_off" purpose="XAttention OFF — current default">
+        scheduler = SchedulerConfig()
+        scheduler.cache_size = 3
+        # sparse_attention=OFF — fixed constant per Task 4.3b SPARSE_DEFERRED
+        pipeline = LLMPipeline(
+            str(target_path), "GPU",
+            scheduler_config=scheduler,
+            draft_model=ov_genai.draft_model(str(draft_path), "GPU"),
+        )
+        # Note: GPU_ENABLE_SDPA_OPTIMIZATION is NOT set — defaults to OFF.
+        # This is functionally identical to Task 4.3 pipeline construction.
+      </config>
+
+      <config id="pipeline_b_on" purpose="XAttention ON — SDPA kernel enabled">
+        scheduler = SchedulerConfig()
+        scheduler.cache_size = 3
+        pipeline = LLMPipeline(
+            str(target_path), "GPU",
+            scheduler_config=scheduler,
+            draft_model=ov_genai.draft_model(str(draft_path), "GPU"),
+            **{"GPU_ENABLE_SDPA_OPTIMIZATION": True},
+        )
+        # Note: if GPU_ENABLE_SDPA_OPTIMIZATION is passed as a string property,
+        # the correct syntax may be:
+        #   LLMPipeline(..., config={"GPU_ENABLE_SDPA_OPTIMIZATION": "YES"})
+        # or via ov.Core().set_property("GPU", {"GPU_ENABLE_SDPA_OPTIMIZATION": True})
+        #
+        # VERIFY THE EXACT API during PC-04. The P5-005b harness used one of these patterns.
+        # If unsure, check the OpenVINO GenAI 2026.0 LLMPipeline constructor signature.
+        # The property MUST be applied at pipeline compile time, not per-generate.
+      </config>
+
+      <config_verification>
+        After compiling Pipeline B, verify the property took effect. If OpenVINO logs
+        a warning like "Unknown property GPU_ENABLE_SDPA_OPTIMIZATION" or silently ignores
+        it, the test is invalid. Check:
+        1. Pipeline B compile time differs from Pipeline A (SDPA optimization changes
+           compilation strategy — non-trivial delta expected).
+        2. Pipeline B 4K TPS differs from Pipeline A 4K TPS by any non-zero amount
+           (even if small). Identical TPS at 4K across 5 runs strongly suggests the
+           property was ignored.
+        If both checks suggest the property was ignored: ABORT and report
+        `PROPERTY_IGNORED` disposition.
+      </config_verification>
+    </pipeline_configs>
+
+    <generation_config>
+      # Fixed for ALL configs:
+      cfg = ov_genai.GenerationConfig()
+      cfg.max_new_tokens = 128
+      cfg.do_sample = False
+      cfg.temperature = 0.0
+      cfg.top_k = 1
+      cfg.top_p = 1.0
+      cfg.num_assistant_tokens = 3       # NAT=3 — LOCKED (DEC-01)
+      cfg.assistant_confidence_threshold = 0.0
+    </generation_config>
+
+    <prompt_construction>
+      Use IDENTICAL prompt construction to Tasks 4.3 and 4.3b:
+      - Tokenizer: AutoTokenizer from Qwen3-14B model directory.
+      - System prompt: "You are a helpful assistant."
+      - User content: padded to target token count per band.
+      - Chat template: apply_chat_template with add_generation_prompt=True.
+      - Build prompt ONCE per band, reuse across XAttention settings.
+      Prompts MUST be byte-identical to Task 4.3/4.3b prompts at matching bands.
+    </prompt_construction>
+  </test_matrix>
+
+  <mandatory_measurements>
+    <!-- Same 7 fields as Tasks 4.3 and 4.3b -->
+    <per_run count="7">
+      <field id="1" name="combined_tps">Wall-clock tokens/second for full target+draft pipeline.
+        Source: extended_perf_metrics.get_throughput().mean — PRIMARY METRIC FOR THIS TASK.</field>
+      <field id="2" name="draft_forward_ms_per_step">Mean draft model forward pass time.
+        Source: extended_perf_metrics.draft_model_metrics.get_inference_duration().mean</field>
+      <field id="3" name="tokens_drafted_total">NAT × total_speculative_episodes.
+        Source: raw_metrics.m_batch_sizes count × 3 (NAT=3 fixed)</field>
+      <field id="4" name="tokens_accepted_total">sum(b - 1 for b in m_batch_sizes).
+        Source: raw_metrics.m_batch_sizes</field>
+      <field id="5" name="acceptance_rate_by_step">Per-step array [step_1_rate, step_2_rate, step_3_rate].
+        Source: m_batch_sizes analysis (3 steps since NAT=3)</field>
+      <field id="6" name="peak_rss_mb">Process RSS high-water mark.
+        Source: RssSampler thread (0.01s polling interval)</field>
+      <field id="7" name="ttft_ms">First-token wall-clock time.
+        Source: extended_perf_metrics.get_ttft().mean</field>
+    </per_run>
+    <supplementary>
+      <field name="pipeline_compile_ms_off">Time to compile Pipeline A (XAttention OFF).</field>
+      <field name="pipeline_compile_ms_on">Time to compile Pipeline B (XAttention ON).</field>
+      <field name="calibration_tps_4k">Pipeline A 4K TPS for cross-session validation.</field>
+      <field name="calibration_delta_pct">Delta vs Task 4.3 reference (8.065 tps).</field>
+    </supplementary>
+    <validation_rule>A run missing ANY of the 7 fields is INVALID and must not be counted.
+      If valid_count drops below 3 for any config, mark as INSUFFICIENT_DATA.</validation_rule>
+  </mandatory_measurements>
+
+  <api_critical_patterns>
+    <!-- MANDATORY. Violations produce silent data loss. Identical to Task 4.3/4.3b. -->
+    <pattern name="list_input_generate" severity="CRITICAL">
+      pipeline.generate([prompt], gen_config, streamer_callback)
+      NEVER: pipeline.generate(prompt, gen_config, streamer_callback)
+      Bare str input returns bare str with NO perf_metrics, NO extended_perf_metrics.
+      List input returns DecodedResults with .texts[0], .perf_metrics, .extended_perf_metrics.
+    </pattern>
+    <pattern name="extended_perf_metrics" severity="CRITICAL">
+      output = pipeline.generate([prompt], gc, cb)
+      epm = output.extended_perf_metrics
+      epm.get_throughput().mean            # native combined TPS
+      epm.get_ttft().mean                  # native TTFT (ms)
+      epm.draft_model_metrics.get_inference_duration().mean  # draft forward ms
+      epm.get_num_accepted_tokens()        # integer accepted count
+    </pattern>
+    <pattern name="acceptance_rate_from_m_batch_sizes" severity="CRITICAL">
+      raw = output.perf_metrics.raw_metrics
+      batch_sizes = list(raw.m_batch_sizes)
+      # batch_sizes[i] = accepted_tokens + 1 for speculative episode i
+      # Aggregate: sum(b-1 for b in batch_sizes) / (3 × len(batch_sizes))
+    </pattern>
+  </api_critical_patterns>
+
+  <calibration_check>
+    <instruction>After Pipeline A completes the 4K band, compare its mean TPS with the
+      Task 4.3 NAT=3 reference value (8.065 tps). This validates cross-session consistency.
+      If within ±15%: proceed (thermal/session variance is acceptable).
+      If outside ±15%: flag as CALIBRATION_WARNING in evidence but proceed anyway.
+      This is a defensive sanity check, NOT a quality gate blocker.</instruction>
+
+    <reference_data note="Task 4.3 NAT=3 per-band (informational — for calibration only)">
+      <band tokens="4096"  tps="8.065" ar="0.457" ttft_ms="11248" peak_rss_mb="6372"/>
+      <band tokens="8192"  tps="5.543" ar="0.378" ttft_ms="28869" peak_rss_mb="5707"/>
+      <band tokens="12288" tps="2.482" ar="0.378" ttft_ms="100776" peak_rss_mb="3569"/>
+      <band tokens="16384" tps="2.886" ar="0.000" ttft_ms="104875" peak_rss_mb="3562"/>
+    </reference_data>
+  </calibration_check>
+
+  <quality_gate>
+    <!-- TPS is the PRIMARY metric for Task 4.4 (not TTFT as in 4.3b) -->
+
+    <gate id="G-01" name="measurement_completeness">
+      All 7 mandatory fields present for all measured runs at all 4 bands.
+      Threshold: zero invalid runs across all 8 configs.
+    </gate>
+
+    <gate id="G-02" name="valid_run_count">
+      valid_count >= 5 for all configurations.
+      If any config has valid_count &lt; 5, disposition = INSUFFICIENT_EVIDENCE.
+    </gate>
+
+    <gate id="G-03" name="tps_comparison" primary="true">
+      For each band, compute: tps_delta_pct = (tps_on - tps_off) / tps_off × 100
+      Classification per band:
+        tps_delta_pct > +3%:  ON_WINS — XAttention improves throughput.
+        tps_delta_pct in [-3%, +3%]: EQUIVALENT — within noise floor.
+        tps_delta_pct &lt; -3%:  OFF_WINS — XAttention hurts throughput.
+      If EQUIVALENT at all bands: P5-005b finding CONFIRMED (effectively no difference
+        at production precision). Lock OFF as default (simpler, no additional GPU compilation).
+      If ON_WINS at any band: context-dependent result — requires profiling.
+      If OFF_WINS at all bands: P5-005b finding CONFIRMED emphatically. Lock OFF globally.
+    </gate>
+
+    <gate id="G-04" name="ttft_comparison">
+      For each band, compute: ttft_delta_pct = (ttft_off - ttft_on) / ttft_off × 100
+      Positive = ON is faster prefill. Report per-band but this is secondary to TPS.
+      If ttft_delta_pct > 10% at any band ≥ 8192: flag SDPA_PREFILL_BENEFIT.
+    </gate>
+
+    <gate id="G-05" name="ar_interaction">
+      For each band, compute: ar_delta = ar_on - ar_off
+      Expected: ar_delta ≈ 0 (GPU kernel optimization should not affect speculative acceptance).
+      If |ar_delta| > 0.05 at any band: flag AR_INTERACTION — unexpected behavior.
+      If ar_on > 0 at 16K (where ar_off = 0.000): flag AR_RECOVERY — highly unexpected.
+    </gate>
+
+    <gate id="G-06" name="rss_comparison">
+      For each band, compare: rss_delta = rss_on - rss_off
+      Expected: near zero (SDPA optimization changes compute kernels, not memory allocation).
+      If |rss_delta| > 500 MB at any band: flag RSS_ANOMALY.
+    </gate>
+
+    <gate id="G-07" name="memory_budget">
+      peak_rss_mb at band 16384 for BOTH settings must be &lt; 15,507 MB.
+      If exceeded: MEMORY_BUDGET_EXCEEDED.
+    </gate>
+
+    <gate id="G-08" name="compile_time_impact">
+      Compare pipeline compilation times: Pipeline B (ON) vs Pipeline A (OFF).
+      Report compile_delta_ms and compile_delta_pct.
+      If Pipeline B compile > 2× Pipeline A: flag COMPILE_OVERHEAD.
+      One pipeline compilation per system boot — this is informational, not a blocker.
+    </gate>
+
+    <disposition_rules>
+      G-01/G-02 FAIL → INSUFFICIENT_EVIDENCE (cannot draw conclusions)
+
+      G-03 ALL_EQUIVALENT or ALL_OFF_WINS:
+        → disposition = XATTENTION_OFF_LOCKED
+        → Update ADR-012 §2.2: GPU_ENABLE_SDPA_OPTIMIZATION → LOCKED (OFF).
+        → P5-005b finding confirmed across context range.
+
+      G-03 MIXED (ON wins at some bands, OFF/EQUIVALENT at others):
+        → disposition = CONTEXT_DEPENDENT
+        → Update ADR-012 §2.2: GPU_ENABLE_SDPA_OPTIMIZATION → CONTEXT_DEPENDENT.
+        → Document per-band optimal setting in workload profiles.
+        → If ON wins ONLY at 16K (where AR=0.000): note that this benefit is only
+          relevant for USE-CASE-005 Code Agent at long context.
+        → PA always uses 4K band maximum. AO uses up to 12K. Only Code Agent reaches 16K.
+
+      G-03 ALL_ON_WINS:
+        → disposition = XATTENTION_ON_LOCKED
+        → Update ADR-012 §2.2: GPU_ENABLE_SDPA_OPTIMIZATION → LOCKED (ON).
+        → Supersedes P5-005b finding.
+
+      PROPERTY_IGNORED (from pipeline_configs.config_verification):
+        → disposition = PROPERTY_IGNORED
+        → Lock OFF by default (property has no measurable effect).
+
+      PROPERTY_NOT_AVAILABLE (from PC-04):
+        → disposition = XATTENTION_NOT_AVAILABLE
+        → Lock OFF by default (property not supported in this OpenVINO version).
+    </disposition_rules>
+  </quality_gate>
+
+  <evidence_artifact>
+    <path>phase2_gates/evidence/p5_task4_4_xattention_sweep.json</path>
+    <schema>
+      {
+        "milestone": "P5-TASK-4.4",
+        "timestamp_utc": "ISO-8601",
+        "metadata": {
+          "commit_hash": "git HEAD",
+          "python_version": "...",
+          "platform": "...",
+          "openvino_version": "...",
+          "openvino_genai_version": "...",
+          "power_envelope": { "ac_connected": true, "battery_check_passed": true },
+          "memory_limits": { "warning_rss_mb": 26000.0, "budget_rss_mb": 15507.0 }
+        },
+        "benchmark_policy": {
+          "xattention_settings": ["OFF", "ON"],
+          "prompt_bands": [4096, 8192, 12288, 16384],
+          "nat": 3,
+          "warmup_runs": 2,
+          "measured_runs": 5,
+          "max_new_tokens": 128,
+          "scheduler_cache_gb": 3,
+          "sparse_attention": "OFF (fixed — DEFERRED from Task 4.3b)",
+          "do_sample": false,
+          "temperature": 0.0
+        },
+        "calibration": {
+          "pipeline_a_tps_4k": "...",
+          "task43_reference_tps_4k": 8.065,
+          "delta_pct": "...",
+          "status": "PASS | CALIBRATION_WARNING"
+        },
+        "pipeline_compile_ms": {
+          "off": "...",
+          "on": "...",
+          "delta_ms": "...",
+          "delta_pct": "..."
+        },
+        "results": [
+          {
+            "band": 4096,
+            "xattention": "OFF",
+            "status": "completed | INSUFFICIENT_DATA",
+            "warmup_runs": 2,
+            "measured_runs": [
+              {
+                "run_idx": 1,
+                "combined_tps": "...",
+                "draft_forward_ms_per_step": "...",
+                "tokens_drafted_total": "...",
+                "tokens_accepted_total": "...",
+                "acceptance_rate_by_step": ["...", "...", "..."],
+                "peak_rss_mb": "...",
+                "ttft_ms": "..."
+              }
+            ],
+            "summary": {
+              "combined_tps": { "mean": "...", "stddev": "...", "p50": "...", "p95": "..." },
+              "ttft_ms": { "mean": "...", "stddev": "..." },
+              "draft_forward_ms_per_step": { "mean": "..." },
+              "tokens_drafted_total": "...",
+              "tokens_accepted_total": "...",
+              "acceptance_rate_aggregate": "...",
+              "acceptance_rate_by_step": ["...", "...", "..."],
+              "peak_rss_mb": "..."
+            }
+          }
+          // ... 8 entries total (2 XAttention settings × 4 bands)
+        ],
+        "analysis": {
+          "tps_comparison": {
+            "4096":  { "off": "...", "on": "...", "delta_pct": "...", "verdict": "OFF_WINS|EQUIVALENT|ON_WINS" },
+            "8192":  { "off": "...", "on": "...", "delta_pct": "...", "verdict": "..." },
+            "12288": { "off": "...", "on": "...", "delta_pct": "...", "verdict": "..." },
+            "16384": { "off": "...", "on": "...", "delta_pct": "...", "verdict": "..." }
+          },
+          "ttft_comparison": {
+            "4096":  { "off_ms": "...", "on_ms": "...", "delta_pct": "..." },
+            "8192":  { "off_ms": "...", "on_ms": "...", "delta_pct": "..." },
+            "12288": { "off_ms": "...", "on_ms": "...", "delta_pct": "..." },
+            "16384": { "off_ms": "...", "on_ms": "...", "delta_pct": "..." }
+          },
+          "ar_comparison": {
+            "4096":  { "off": "...", "on": "...", "delta": "...", "flag": "NONE|AR_INTERACTION" },
+            "8192":  { "off": "...", "on": "...", "delta": "..." },
+            "12288": { "off": "...", "on": "...", "delta": "..." },
+            "16384": { "off": "...", "on": "...", "delta": "..." }
+          },
+          "rss_comparison": {
+            "4096":  { "off_mb": "...", "on_mb": "...", "delta_mb": "..." },
+            "8192":  { "off_mb": "...", "on_mb": "...", "delta_mb": "..." },
+            "12288": { "off_mb": "...", "on_mb": "...", "delta_mb": "..." },
+            "16384": { "off_mb": "...", "on_mb": "...", "delta_mb": "..." }
+          },
+          "overall_verdict": "OFF_WINS_ALL | ON_WINS_ALL | MIXED | EQUIVALENT"
+        },
+        "quality_gate": {
+          "G-01": "PASS|FAIL",
+          "G-02": "PASS|FAIL",
+          "G-03": "OFF_WINS|ON_WINS|EQUIVALENT|MIXED + per-band detail",
+          "G-04": "PASS|SDPA_PREFILL_BENEFIT + per-band detail",
+          "G-05": "PASS|AR_INTERACTION|AR_RECOVERY",
+          "G-06": "PASS|RSS_ANOMALY",
+          "G-07": "PASS|MEMORY_BUDGET_EXCEEDED",
+          "G-08": "PASS|COMPILE_OVERHEAD + compile_delta_pct",
+          "disposition": "XATTENTION_OFF_LOCKED | XATTENTION_ON_LOCKED | CONTEXT_DEPENDENT | PROPERTY_IGNORED | XATTENTION_NOT_AVAILABLE | INSUFFICIENT_EVIDENCE"
+        },
+        "finished_utc": "ISO-8601"
+      }
+    </schema>
+  </evidence_artifact>
+
+  <governance_updates>
+    <update id="GOV-01" condition="disposition == XATTENTION_OFF_LOCKED">
+      Update ADR-012 §2.2 — change GPU_ENABLE_SDPA_OPTIMIZATION row:
+      | `GPU_ENABLE_SDPA_OPTIMIZATION` | OFF | **LOCKED** |
+        Task 4.4: OFF confirmed across 4K-16K context range. P5-005b finding validated
+        at extended context bands. No throughput benefit from SDPA kernel fusion with
+        speculative decoding pipeline. Evidence: p5_task4_4_xattention_sweep.json. |
+    </update>
+    <update id="GOV-02" condition="disposition == XATTENTION_ON_LOCKED">
+      Update ADR-012 §2.2 — change GPU_ENABLE_SDPA_OPTIMIZATION row:
+      | `GPU_ENABLE_SDPA_OPTIMIZATION` | ON | **LOCKED** |
+        Task 4.4: ON wins at all bands. Supersedes P5-005b finding (which tested 4K only).
+        [summary of per-band deltas]. Evidence: p5_task4_4_xattention_sweep.json. |
+    </update>
+    <update id="GOV-03" condition="disposition == CONTEXT_DEPENDENT">
+      Update ADR-012 §2.2 — change GPU_ENABLE_SDPA_OPTIMIZATION row:
+      | `GPU_ENABLE_SDPA_OPTIMIZATION` | Context-dependent | **LOCKED** |
+        Task 4.4: [per-band summary]. PA/AO (≤12K) use OFF. Code Agent (≤16K) uses ON
+        if ON wins at 16K. Evidence: p5_task4_4_xattention_sweep.json. |
+      NOTE: Context-dependent configuration requires per-component pipeline construction —
+      this means the unified pipeline must be split. Document the architectural implication.
+    </update>
+    <update id="GOV-04" condition="disposition in [PROPERTY_IGNORED, XATTENTION_NOT_AVAILABLE]">
+      Update ADR-012 §2.2 — change GPU_ENABLE_SDPA_OPTIMIZATION row:
+      | `GPU_ENABLE_SDPA_OPTIMIZATION` | OFF (default) | **LOCKED** |
+        Task 4.4: [PROPERTY_IGNORED|NOT_AVAILABLE] — property has no measurable effect
+        or is not supported in OV GenAI 2026.0. Lock OFF as the null default.
+        Evidence: p5_task4_4_xattention_sweep.json. |
+    </update>
+    <update id="GOV-05" condition="disposition == INSUFFICIENT_EVIDENCE">
+      Update ADR-012 §2.2 — keep GPU_ENABLE_SDPA_OPTIMIZATION row as EVALUATING:
+      | `GPU_ENABLE_SDPA_OPTIMIZATION` | OFF | **EVALUATING** |
+        Task 4.4: INSUFFICIENT_EVIDENCE — [reason]. Requires retry or manual investigation. |
+    </update>
+    <update id="GOV-06" condition="always">
+      Append new LEDGER entry to docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+      Use the NEXT available entry number (count existing ### Entry N headers + 1).
+      Format:
+
+      ### Entry [N] — Task 4.4: XAttention (GPU SDPA) Independent Sweep
+
+      **Date:** 2026-03-0X (actual execution date)
+      **Branch:** `feature/p5-task4-4-xattention-sweep`
+      **Commit:** `[HEAD after commit]`
+      **Type:** Empirical Evidence Collection (Configuration Optimization)
+      **Scope:** GPU_ENABLE_SDPA_OPTIMIZATION {OFF, ON} × [4096, 8192, 12288, 16384]
+        with NAT=3 LOCKED, Draft-A, sparse_attention=OFF. 8 configs, 5 measured runs each.
+
+      Key findings:
+      - [TPS comparison per band]
+      - [TTFT comparison per band]
+      - [AR interaction status]
+      - [RSS comparison]
+      - [Compile time difference]
+
+      Quality gate: [G-01..G-08 results]
+      Disposition: [XATTENTION_OFF_LOCKED | ... ]
+
+      Evidence: `phase2_gates/evidence/p5_task4_4_xattention_sweep.json`
+    </update>
+  </governance_updates>
+
+  <intermediate_save_strategy>
+    Save partial results after EACH band completes for EACH pipeline.
+    Use `p5_task4_4_xattention_sweep.json.partial` for intermediate saves.
+    After all bands complete for both pipelines, rename to final artifact path.
+    Save Pipeline A results before starting Pipeline B (crash recovery).
+  </intermediate_save_strategy>
+
+  <commit_template>
+    feat(benchmark): Task 4.4 — XAttention (GPU SDPA) sweep across context bands
+
+    Sweep GPU_ENABLE_SDPA_OPTIMIZATION {OFF, ON} at bands [4096, 8192, 12288, 16384]
+    with NAT=3 LOCKED, Draft-A, sparse_attention=OFF. 8 configs, 5 measured runs each.
+
+    - Pipeline A (OFF): current production default
+    - Pipeline B (ON): SDPA kernel fusion enabled
+    - TPS primary metric; TTFT, AR, RSS secondary
+    - Calibration: Pipeline A 4K TPS vs Task 4.3 reference (8.065 tps)
+    - Disposition: [XATTENTION_OFF_LOCKED | XATTENTION_ON_LOCKED | CONTEXT_DEPENDENT | ...]
+    - ADR-012 §2.2 updated: GPU_ENABLE_SDPA_OPTIMIZATION → [LOCKED status]
+    - LEDGER Entry [N]
+
+    Evidence: phase2_gates/evidence/p5_task4_4_xattention_sweep.json
+  </commit_template>
+
+  <reference_data>
+    <baseline name="P5-005b XAttention comparison (4K only, prior study)">
+      XAttention OFF: 10.02 tps (4K, NAT=5 in P5-005b — different NAT than production)
+      XAttention ON:  9.74 tps (4K, NAT=5 in P5-005b — different NAT than production)
+      Delta: -2.8% (ON is slightly worse at 4K)
+      NOTE: P5-005b used NAT=5. Production uses NAT=3 (LOCKED). Task 4.4 uses NAT=3.
+      The absolute TPS values will differ — the DIRECTION of the delta is what matters.
+    </baseline>
+    <baseline name="Task 4.3 NAT=3 per-band (cross-session reference, NOT baseline)">
+      Band  4096: tps=8.065, ar=0.457, ttft=11,248ms, peak_rss=6,372 MB
+      Band  8192: tps=5.543, ar=0.378, ttft=28,869ms, peak_rss=5,707 MB
+      Band 12288: tps=2.482, ar=0.378, ttft=100,776ms, peak_rss=3,569 MB
+      Band 16384: tps=2.886, ar=0.000, ttft=104,875ms, peak_rss=3,562 MB
+    </baseline>
+    <baseline name="Task 4.3b TRISHAPE reference (informational — sparse is DEFERRED)">
+      TRISHAPE AR=0.000 at all bands including 4K. Not applicable to Task 4.4.
+      sparse_attention=OFF is a fixed constant for Task 4.4.
+    </baseline>
+    <note>Task 4.4 runs BOTH XAttention OFF and ON from scratch in the same session.
+      Cross-session variance is eliminated. The Task 4.3 data is reference-only for the
+      calibration sanity check. All deltas are computed within-session (Pipeline A vs B).</note>
+  </reference_data>
+
+  <runtime_estimate>
+    Pipeline A compilation (XAttention OFF): ~25-30 seconds
+    Pipeline B compilation (XAttention ON):  ~25-30 seconds (may differ with SDPA)
+    Generate calls per pipeline: 28 (4 bands × 7 runs per band)
+      4096 band:  7 calls × ~12 sec = ~1.5 min
+      8192 band:  7 calls × ~18 sec = ~2 min
+      12288 band: 7 calls × ~25 sec = ~3 min
+      16384 band: 7 calls × ~32 sec = ~4 min
+    Subtotal per pipeline: ~11 minutes
+    Total for both pipelines: ~22 minutes
+    Total with compilation + calibration + analysis: ~30-40 minutes
+    Ceiling estimate (with OV recompile overhead): ~45 minutes
+    Significantly shorter than Task 4.3b (no 20K band, fewer modes).
+  </runtime_estimate>
+
+  <attachment_order>
+    1. .github/copilot-instructions.md (governance — MUST)
+    2. docs/Task4.4_v1.xml (this prompt — PRIMARY)
+    3. docs/P5_TASK4_PRODUCTION_CONFIG_FEASIBILITY.md (spec reference — §Task 4.4)
+    4. docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md (parameter table)
+  </attachment_order>
+
+  <verification_commands>
+    <!-- Non-dev terminal commands for Lead Architect to confirm milestone succeeded -->
+    <command purpose="Confirm commit">git log --oneline -1</command>
+    <command purpose="Confirm files changed">git diff HEAD~1 --name-only</command>
+    <command purpose="Confirm evidence artifact exists">
+      python -c "import json, pathlib; d=json.loads(pathlib.Path('phase2_gates/evidence/p5_task4_4_xattention_sweep.json').read_text()); print(f'Disposition: {d[\"quality_gate\"][\"disposition\"]}')"
+    </command>
+    <command purpose="Confirm test suite not regressed">python -m pytest --tb=short -q --no-header</command>
+    <command purpose="Confirm ADR-012 XAttention row updated">
+      python -c "print([l.strip() for l in open('docs/adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md') if 'GPU_ENABLE_SDPA' in l])"
+    </command>
+  </verification_commands>
+
+</execution_prompt>

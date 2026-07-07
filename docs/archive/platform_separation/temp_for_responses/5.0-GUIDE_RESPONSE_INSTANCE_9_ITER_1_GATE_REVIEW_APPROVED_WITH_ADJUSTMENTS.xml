@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response
+  guide_instance="9"
+  procedure="platform_separation_v2"
+  stage="5"
+  iteration_reviewed="1"
+  ea_global_number="9"
+  reviewed_artifact="docs/platform_separation/temp_for_responses/5.0-EA_INSTANCE_9_ITER_1_COMPREHENSION_GATE.xml (784 lines)"
+  reviewed_at_utc="2026-04-30T04:48:00Z"
+  date="2026-04-30">
+
+  <verdict>APPROVED_WITH_ADJUSTMENTS</verdict>
+  <stage_id>STAGE_5</stage_id>
+  <stage_xml>06_STAGE5_CLEANUP.xml</stage_xml>
+
+  <summary>
+    EA-9's iter-1 comprehension gate is substantively complete. All 8 review axes (objective_match / work_item_coverage / file_scope / verification_strategy / risk_awareness / rollback_awareness / pre_flight_discipline / hard_rules) score PASS. Pre-Flight Steps 0-2 EXECUTED cleanly and cross-verified on disk: Step 0 5/5 PASS, Step 1 devplatform commit `1a552d9`, V0 pickup 12/14 MATCH + 2 STATUS-staleness drift items correctly classified (5b(a), document+proceed). LOAD-BEARING ack9 (n1(e) selective-vs-wholesale) and ack13 (n1(n) Step 0 HARD STOP discipline) both present, unambiguous, and EXECUTED-where-applicable. Cumulative-ack chain 130 atoms restated per init pointer convention (116 inherited by ID + structure; 14 g9-ea9_n1 sub-clauses (a)-(n) full verbatim from verdict). PROCEED THRESHOLD substantively met. HOLD pending 4 LA-confirmation items below; once LA confirms, Guide-#9 issues PROCEED for Item 5.0.5 → 5.1 execution. EA-9 is NOT required to re-emit a supplement gate; the iter-1 gate is sufficient as-is.
+  </summary>
+
+  <axes_scoring>
+
+    <axis name="objective_match" verdict="PASS">
+      EA-9's §A bullets accurately convey Stage 5's structural objective: BlarAI-side platform tool deletion + .platform/ migration of project state + selective doctrine deletion + devplatform-side path-reference audit + baseline check + F.2 mini-soak + LA HALT-gate + tag + STATUS append. Includes Class A LOAD-BEARING n1(e) selective-vs-wholesale + n1(n) Pre-Flight Step 0 explicit recognition. Defensive posture (fleet stays paused; rollback Level 2; data-preservation default; triple-subagent at close) called out in §A bullet 9.
+    </axis>
+
+    <axis name="work_item_coverage" verdict="PASS">
+      §E enumerates: Pre-Flight Step 0 + Step 1 + Step 2 + 5.0.5, 5.1, 5.1.v2, 5.2, 5.3, 5.4, 5.5, 5.5.v2, 5.5.5, 5.6, 5.7, 5.8, 5.8.v2, 5.9, 5.10, 5.11, 5.12 + Stage-5-close unpause. All 16 dispatch items + Pre-Flight steps + close unpause covered. No items dropped or merged.
+    </axis>
+
+    <axis name="file_scope" verdict="PASS">
+      Item-by-item file-touched mapping accurate: 5.1 lists 9 paths matching dispatch lines 122-133; 5.3 lists 4 moves matching dispatch lines 154-157; 5.4 lists 8 globs per n1(c) aug1 expansion; 5.5 includes n1(d) extension (3 .md peers); 5.5.v2 SELECTIVE 4-of-17 + wake_templates wholesale per n1(e); 5.6 testpaths (6 REMOVE + 9 PRESERVE) per n1(g); 5.7 .gitignore additions per n1(h); 5.10 commit on chore/platform-extraction (NOT main); 5.11 tags both repos; 5.12 STATUS.md append.
+    </axis>
+
+    <axis name="verification_strategy" verdict="PASS">
+      Per-item verification + STOP-trigger mapping in §E. EA-9 explicitly committed to (and partially executed): Step 0 5-check verification (DONE PASS), V0 pickup verification block (DONE), 5.0.5 archive completeness check + t3 STOP, 5.1 foreach Test-Path verification, 5.4 Select-String per glob with classification (per n1(c)), 5.6 post-edit Read, 5.7 post-edit `git status --short`, 5.8.v2 baseline ~981/22 with ±5 tolerance, 5.9 30-min soak observation, 5.10 4-row HALT-gate matrix with actual values, 5.11 `git tag -l`, 5.12 hash-verify pre-vs-post.
+    </axis>
+
+    <axis name="risk_awareness" verdict="PASS">
+      §F lists R1-R6 + A1-A2 + OQ1: R1 (HIGH; n1(e) LOAD-BEARING), R2 (MED; prep-1/prep-4 attestations), R3 (MED; V0 STATUS-staleness), R4 (LOW; audit MD §24 likely-to-surface items including PowerShell file-locks during 5.1, .mcp.json gitignore safety, STATUS append duplication, baseline drift, devplatform unpause), R5 (LOW; cross-verification per dn14/dn20/dn24/A18), R6 (LOW; Phase-C-pattern resurfacing per dn35/t11). Covers dominant Stage 5 risks.
+    </axis>
+
+    <axis name="rollback_awareness" verdict="PASS">
+      §A bullet 9 explicitly: "rollback escape route is Level-2 (`git reset --hard pre-platform-extract`) per RECOVERY.md — Pre-Flight Step 0 verified the parachute is intact (5/5 PASS)." Connection to Pre-Flight Step 0 verification chain established. Post-cutover MCP-config asymmetry (rollback Level 4) noted in init pointer reference.
+    </axis>
+
+    <axis name="pre_flight_discipline" verdict="PASS_AND_EXECUTED">
+      ack3 ACKNOWLEDGED_AND_EXECUTED. Step 1 ran: state.pause_fleet on devplatform path + commit `chore(ops): pause fleet -- Stage 5 cleanup`. Disk verification: devplatform HEAD = `1a552d9`; state.json paused=True, reason='Stage 5 cleanup', updated_by='ea_code_blarai_helper', utc=2026-04-30T04:27:50Z, schema_version=1. Path = devplatform/tools/autonomy_budget/state.json (NOT BlarAI/; per dn31/w21 + post-Phase-C4 SOP).
+    </axis>
+
+    <axis name="hard_rules" verdict="PASS">
+      All 13 acks present + verbatim. ack3 (fleet pause SOP) EXECUTED. ack5 (no direct touch of BlarAI's state.json) ACKNOWLEDGED + V0h confirmed file untouched. ack7 (no edits to CLAUDE.md/copilot-instructions.md/AGENTS.md) ACKNOWLEDGED. ack8 (no merge to main) ACKNOWLEDGED. ack9 (LOAD-BEARING n1(e) selective-vs-wholesale) ACKNOWLEDGED_LOAD_BEARING with verbatim text. ack10 (STATUS append hash-verify) ACKNOWLEDGED. ack13 (LOAD-BEARING n1(n) Step 0 HARD STOP) ACKNOWLEDGED_AND_EXECUTED_LOAD_BEARING.
+    </axis>
+
+  </axes_scoring>
+
+  <verbatim_restatement_check>
+    <inherited_chain_116_atoms verdict="PASS">EA-9 §C inherited_chain enumerates by ID + status + naming-defect-flag + sub-clause-count + brief description per source citation. Pattern matches init pointer §cumulative_ack_chain_restatement convention ("Inherited acks: enumerate IDs + status + source citations"). All 7 ack labels covered: g7-ea1_n10, n11, n12, n13 (8 sub-clauses), g7-ea7_n14 (4 sub-clauses), g8-ea8_n1 (16 sub-clauses), g8-ea8_n2 (6 sub-clauses), g8-ea8_n3 (12 sub-clauses).</inherited_chain_116_atoms>
+    <new_g9_ea9_n1_14_sub_clauses verdict="PASS">EA-9 §C new_g9_ea9_n1 includes full verbatim text for all 14 sub-clauses (a)-(n) including the Class A n1(e) selective-delete code block + n1(n) Step 0 5-check enumeration + ext1-ext3 mention. Per init pointer convention ("New acks: full verbatim text"). EA-9 also added <execution_status_for_this_iter_1_gate> annotation to n1(n) noting "EXECUTED at 2026-04-30T04:25Z; ALL 5 CHECKS PASS" — appropriate live-state annotation, not a binding modification.</new_g9_ea9_n1_14_sub_clauses>
+    <ack1_ack13_verbatim verdict="PASS">All 13 required_acknowledgments restated verbatim from verdict §required_acknowledgments. Status fields added per ack (ACKNOWLEDGED / ACKNOWLEDGED_AND_EXECUTED / ACKNOWLEDGED_LOAD_BEARING) — appropriate live-state annotation, not binding modification.</ack1_ack13_verbatim>
+  </verbatim_restatement_check>
+
+  <disk_cross_verification per_dn14_dn20_dn24_A18="confirmed">
+    <intro>Per rc3 + dn14/dn20/dn24/A18 cross-verification discipline: never accept EA report claim about file state without independent disk check. Guide-#9 verified all EA-9 reported state.</intro>
+    <verification rows_verified="all_critical">
+      | EA-9 claim | Disk verification | Match? |
+      |---|---|---|
+      | Step 0 5/5 PASS | `git -C devplatform log --oneline` shows `be22a15` Phase C fix; tag check + bundle check + OOG zip check + bundle SHA256 = `C051CCFB...65D7707` (Stage 0 manifest match) | ✓ ALL 5 PASS confirmed |
+      | Step 1 devplatform commit `1a552d9` on main | `git -C devplatform log --oneline -1` returns `1a552d9 chore(ops): pause fleet -- Stage 5 cleanup` | ✓ MATCH |
+      | state.json paused=True, reason='Stage 5 cleanup', updated_by='ea_code_blarai_helper' | `cat devplatform/tools/autonomy_budget/state.json` JSON parse = `paused=True reason=Stage 5 cleanup updated_by=ea_code_blarai_helper utc=2026-04-30T04:27:50Z schema=1` | ✓ MATCH |
+      | BlarAI HEAD = ff39a41 (init-pointer commit; no Step-1 BlarAI commit) | `git -C BlarAI log --oneline -1` returns `ff39a41 docs(platform_separation): Stage 5 EA-9 init pointer ...` | ✓ MATCH (confirms init pointer V0 doc-defect on BlarAI HEAD expected) |
+      | BlarAI WT = M tools/autonomy_budget/state.json + ?? .claude/scheduled_tasks.lock + ?? iter-1 gate file | `git -C BlarAI status --porcelain` returns exact 3-line output | ✓ MATCH |
+      | Worktree only main (no contamination) | `git -C BlarAI worktree list` returns single line `C:/Users/mrbla/BlarAI ff39a41 [chore/platform-extraction]` | ✓ MATCH (V1 OK) |
+      | Stash list 2 wake_launcher auto-stashes from 2026-04-29 | `git -C BlarAI stash list` returns 2 entries: co_lead_architect 20260429_004502 + sdo 20260429_004501 | ✓ MATCH (per dn10/w8/A20 don't-pop discipline) |
+    </verification>
+    <verdict>0 false claims detected. EA-9's reports are disk-faithful. EA-paraphrase-introduced-error pattern (w11/dn14) NOT manifested in this iter-1 gate.</verdict>
+  </disk_cross_verification>
+
+  <load_bearing_acks_check>
+    <ack9_n1_e_selective_vs_wholesale verdict="PRESENT_AND_UNAMBIGUOUS">"I will execute n1(e)'s selective-delete amendment at Item 5.5.v2 (preserving 13 BlarAI-internal governance docs per A14), NOT the original dispatch wholesale-delete. If at execution time the dispatch text appears unamended, I STOP and verify with LA before proceeding. Data-preservation default if LA unreachable: selective-delete." — Verbatim match with verdict §required_acknowledgments ack9. Status: ACKNOWLEDGED_LOAD_BEARING. Guide-#9 confirms ack9 PROCEED-eligible.</ack9_n1_e_selective_vs_wholesale>
+    <ack13_n1_n_step_0_hard_stop verdict="PRESENT_AND_UNAMBIGUOUS_AND_EXECUTED">"I will run Step 0 (rollback-readiness verification) BEFORE state.pause_fleet. If any of the 5 checks fail, I HARD STOP and report to LA with the failure_disposition guidance from the dispatch. I do NOT autonomously execute recovery (tag recreation, bundle regeneration, etc.) — those are LA decisions." + execution annotation "EXECUTED at 2026-04-30T04:25Z; ALL 5 CHECKS PASS; EA-9 proceeded to Step 1 per success path." — Verbatim match with verdict ack13. Status: ACKNOWLEDGED_AND_EXECUTED_LOAD_BEARING. Guide-#9 confirms ack13 PROCEED-eligible.</ack13_n1_n_step_0_hard_stop>
+  </load_bearing_acks_check>
+
+  <required_corrections>
+
+    <intro>4 LA-confirmation items required before Guide-#9 issues PROCEED for Item 5.0.5 → 5.1. Each is an LA-decision item (not an EA misunderstanding); EA-9's iter-1 gate properly surfaces each. EA-9 is NOT required to re-emit a supplement gate; the iter-1 gate is sufficient as-is. Once LA confirms, Guide-#9 issues PROCEED directly.</intro>
+
+    <correction id="1" severity="HIGH" priority="LOAD_BEARING" related_to="prep-1 + prep-4 LA pre-prep attestations">
+      <issue>EA-9's §D la_pre_prep_attestation_recap reports prep-1 and prep-4 attestation status as "REQUEST_CONFIRMATION" — EA-9 did not observe explicit `[ATTESTATION prep-1]` / `[ATTESTATION prep-4]` lines in the LA spawn message. The user prose stated "LA pre-prep attestations: provided in this message above the chat-paste line" but the explicit attestation lines were not visible to EA-9.</issue>
+      <source_citation>EA-9 iter-1 gate §D la_pre_prep_attestation_recap; init pointer §la_pre_prep_checklist; Guide-#8 → Guide-#9 handoff §prime_stage_5_init_pointer_watchpoints s9w4 + dn29.</source_citation>
+      <required_action>LA confirms in PROCEED message:
+        (a) `[ATTESTATION prep-1] Other AI surfaces closed. Only EA-9's VS Code Copilot session remains open. Get-Process Claude returned empty.` — OR explicit confirmation that prep-1 was satisfied at spawn time.
+        (b) `[ATTESTATION prep-4] Available for ~3-4 hour block. Reachable via EA-9 chat for Item 5.5.v2 selective-delete confirmation gate AND Item 5.10 pre-merge review matrix approval.` — OR explicit confirmation that LA reachability holds for the full Stage 5 window.
+        Stage 5's prep-1 risk is lower than Stage 4 (no MCP-server kill at Pre-Flight) but the discipline applies. prep-4 is critical because of the LOAD-BEARING n1(e) Item 5.5.v2 LA-confirmation gate (per ack9).</required_action>
+    </correction>
+
+    <correction id="2" severity="HIGH" priority="LOAD_BEARING" related_to="V0 5b(a) STATUS-staleness classification">
+      <issue>EA-9 §B v0_drift_summary classifies 2 V0 drift items as Operating Rule 5b(a) STATUS staleness (V0a BlarAI HEAD = ff39a41 instead of init-pointer-expected `176922c + Step 1 pause commit`; V0c BlarAI WT = M state.json instead of clean post-Step-1-commit). Both stem from a doc-defect in init pointer §v0_pickup_verification_block expected text: the V0 expected was authored against an idealized model where Step 1 commits on BOTH repos, but the canonical fleet_pause_sop §1 (consistent with §identity hard-invariant "EA-9 does NOT touch BlarAI's state.json directly" + dn31 + w21) commits ONLY on devplatform. BlarAI's M state on dead-artifact state.json is pre-existing (BUG-5 emergency-pause snapshot from Phase B) and carries forward UNCHANGED until Stage 5.1 deletes the parent directory.</issue>
+      <source_citation>EA-9 iter-1 gate §B v0_drift_summary + OQ1; init pointer §v0_pickup_verification_block + §step_1_state_pause_fleet_per_fleet_pause_sop + §identity hard invariant; verdict ack5 (no direct touch of BlarAI's state.json); CLAUDE.md + .github/copilot-instructions.md §fleet_pause_sop (post-Phase-C4 SOP); Operating Rule 5b(a) per GUIDE_PROMPT.xml.</source_citation>
+      <required_action>LA confirms EA-9's classification (5b(a) STATUS-staleness; document and proceed) is correct. Recommended LA confirmation text: "Classification confirmed: 5b(a) STATUS-staleness on init pointer V0 expected text. Init pointer is committed at ff39a41 per no-amend doctrine on committed audit artifacts; the V0 doc-defect is bound for Stage 5.12 STATUS append posterity (Anomaly A21) and folds into Ticket MM scope (dispatch + init pointer text posterity-corrections). NO additional BlarAI-side pause commit required; Stage 5.1 auto-resolves the M state via parent-directory deletion." If LA disagrees and intends BlarAI side to receive an additional pause commit (capturing the BUG-5 dead-artifact M state), please direct EA-9 explicitly in PROCEED — this would be an unusual choice (commits to a dead artifact about to be deleted).</required_action>
+    </correction>
+
+    <correction id="3" severity="MED" priority="mature_not_minimal_recalibration" related_to="ext1-ext3 Step 0 optional extensions">
+      <issue>EA-9 §F A1 reports default-skipped ext1 (OOG zip SHA256 verification), ext2 (13 scheduled task XML backups exist), ext3 (devplatform branch is main) per Guide-#8 dispatch §optional_extensions. EA-9's reasoning: "5/5 critical PASS suffices for rollback parachute confirmation". Per `feedback_recalibrate_against_mature_not_minimal.md` recalibration: re-evaluate against Stage 4's "MEDIUM"-labeled-but-5-bugs lesson. Stage 5 has 4 destructive delete clusters; the OOG zip is a separate recovery layer (covers untracked artifacts at Stage 0 baseline; per RECOVERY.md asset coverage matrix — covers Vikunja DB + MCP configs + bridge state + scheduled-task XMLs which the bundle does NOT cover).</issue>
+      <source_citation>Guide-#8 dispatch at 9e92b26 §optional_extensions; STATUS.md Recovery Anchors table (OOG zip SHA256 = `15B4B9A138974F500FFAE9682350F333DC228AC94A1DB184E26A220508A129A8`); init pointer §pre_flight_step_0_per_n1_n optional ext1-ext3; `feedback_recalibrate_against_mature_not_minimal.md`.</source_citation>
+      <required_action>LA decides one of:
+        (a) **Recommended (mature-not-minimal)**: Direct EA-9 to run ext1 (OOG zip SHA verify, ~10-20s) + ext2 (13 scheduled-task XML backup count, ~1s) at iter-1.5 mini-execution before PROCEED for 5.0.5. Skip ext3 (already covered by V0e MATCH). Total ~12-22s additional verification of OOG zip + scheduled-task backups.
+        (b) **Skip (matches EA-9 default)**: Accept EA-9's default-skip; proceed with 5/5 critical-only PASS posture. Justification: Step 0 critical 5 already validate the primary recovery layers; OOG zip + scheduled-task backups are secondary and were captured at Stage 0; 90-day retention per Master Plan §5.
+        Guide-#9 recommends (a) for the same defensive-depth reasoning that drove F.4 dual-track (mature-not-minimal posture; Stage 5's 4 destructive delete clusters justify ~12-22s additional verification of secondary recovery layers).</required_action>
+    </correction>
+
+    <correction id="4" severity="HIGH" priority="LOAD_BEARING" related_to="PROCEED authorization for 5.0.5 → 5.1 execution">
+      <issue>EA-9 §stop_and_wait awaits Guide-#9 PROCEED for Item 5.0.5 (audit archive) → 5.1 (platform tool dir deletion). PROCEED THRESHOLD per verdict §proceed_authorization: all 13 acknowledgments + 14 sub-clauses verbatim + 116-atom inherited chain restated + ack9/ack13 LOAD-BEARING unambiguous. Threshold substantively MET. PROCEED is contingent on corrections #1, #2, #3 above being addressed by LA confirmations.</issue>
+      <source_citation>EA-9 iter-1 gate §stop_and_wait; verdict §proceed_authorization; init pointer §required_first_actions Step 3.</source_citation>
+      <required_action>After LA confirms corrections #1 + #2 + #3 (or directs alternatives), Guide-#9 issues PROCEED in chat. EA-9 begins Item 5.0.5 audit archive immediately upon receiving PROCEED. EA-9 is NOT required to re-emit a supplement comprehension gate; the iter-1 gate at `temp_for_responses/5.0-EA_INSTANCE_9_ITER_1_COMPREHENSION_GATE.xml` (784 lines) is authoritative as-is.</required_action>
+    </correction>
+
+  </required_corrections>
+
+  <required_acknowledgments>
+    <intro>No additional acknowledgments required from EA-9. The 13 ack1-ack13 in iter-1 gate §D suffice. Once LA confirms corrections #1-#3 in chat, Guide-#9 PROCEED authorization is implicit; EA-9 does NOT need to re-acknowledge.</intro>
+  </required_acknowledgments>
+
+  <new_finding_for_stage_5_close>
+
+    <finding id="A21_provisional" anomaly_status="bound_for_stage_5_12_status_append" severity="LOW">
+      <name>Stage 5 init pointer V0 expected text doc-defect (BlarAI HEAD + working tree fields)</name>
+      <description>Init pointer at commit ff39a41 §v0_pickup_verification_block declares BlarAI_HEAD expected = "176922c + Step 1 pause commit (so HEAD = 176922c + 1 commit ahead at EA-9 spawn time post-Step-1)" AND BlarAI_working_tree expected = "clean post-Step-1-commit (only the Step 1 pause commit changed; no untracked except .claude/scheduled_tasks.lock per w20)". Both fields presume Step 1 advances BlarAI HEAD, which is incorrect per the canonical fleet_pause_sop §1 (commits only on devplatform path) + §identity hard-invariant "EA-9 does NOT touch BlarAI's state.json directly" + dn31 + w21. EA-9 correctly identified the doc-defect and classified as 5b(a) STATUS-staleness (document and proceed). Init pointer is committed at ff39a41 per no-amend doctrine; doc-defect bound for posterity-correction.</description>
+      <disposition>Document in Stage 5.12 STATUS append (alongside A20 wake_launcher stash narrative correction). Fold into Ticket MM scope (dispatch + init pointer text posterity-corrections). NO retroactive amendment to ff39a41 commit per no-amend doctrine on committed audit artifacts. Class D documentation drift; non-blocking.</disposition>
+      <citation>EA-9 iter-1 gate §B v0_drift_summary + OQ1 + correction #2 above.</citation>
+    </finding>
+
+  </new_finding_for_stage_5_close>
+
+  <stage_6_7_5_backlog_update>
+    <intro>Ticket MM scope expanded to include init pointer V0 doc-defect alongside the BlarAI_daily_digest dispatch task-name correction. Backlog count UNCHANGED (26 tickets total; MM scope grows but no new ticket).</intro>
+    <ticket_mm_extended>
+      <title>06_STAGE5_CLEANUP.xml + 5.0-EA_INITIALIZATION_INSTANCE_9_STAGE5_CLEANUP.xml posterity corrections</title>
+      <items_in_scope>
+        - Item 5.9 task name `BlarAI_daily_digest` (underscore form) → `Daily Digest` (Title Case Spaces) per CLAUDE.md (original iter-1 MM scope; Stage 5 dispatch text)
+        - Init pointer V0 expected text on BlarAI_HEAD field + BlarAI_working_tree field — both presume Step 1 commits on BlarAI; canonical SOP commits only on devplatform (NEW per A21_provisional; init pointer text)
+        Both moot at Stage 5 execution (per n1(j) replacement + EA-9's correct 5b(a) classification respectively); optional posterity-edit post-procedure for traceability.
+      </items_in_scope>
+    </ticket_mm_extended>
+    <backlog_count_unchanged>26 tickets total (MM/OO/PP/QQ/RR + 21 inherited; NN skipped). MM scope expansion is in-place; no new ticket.</backlog_count_unchanged>
+  </stage_6_7_5_backlog_update>
+
+  <proceed_authorization>
+    HOLD — pending LA confirmation of corrections #1 + #2 + #3 in chat. Once LA confirms (in any format; explicit attestation lines or paraphrased confirmation suffices), Guide-#9 issues PROCEED for Item 5.0.5 → 5.1 execution. EA-9 is NOT required to re-emit a supplement comprehension gate.
+
+    PROCEED THRESHOLD substantively MET at iter-1 gate emission:
+      - All 13 acknowledgments present + verbatim ✓
+      - 14 g9-ea9_n1 sub-clauses (a)-(n) restated verbatim ✓
+      - 116-atom inherited chain restated per init pointer convention (IDs + structure) ✓
+      - ack9 (n1(e) Class A LOAD-BEARING; selective-vs-wholesale disposition) PRESENT and UNAMBIGUOUS ✓
+      - ack13 (n1(n) Step 0 HARD STOP discipline) PRESENT, UNAMBIGUOUS, and EXECUTED-with-PASS ✓
+      - Pre-Flight Steps 0-2 EXECUTED cleanly (Step 0 5/5 PASS; Step 1 commit `1a552d9`; V0 pickup 12/14 MATCH + 2 doc-defect drifts correctly classified)
+      - Disk cross-verification: 0 false claims; EA-paraphrase-error pattern NOT manifested
+
+    EXTERNAL PRECONDITIONS (LA-confirmable, not EA-actionable):
+      - prep-1 + prep-4 attestations (correction #1)
+      - V0 5b(a) classification confirmation (correction #2)
+      - ext1-ext3 decision (correction #3)
+  </proceed_authorization>
+
+  <iteration_count>1 of EA-9 comprehension-gate review for Stage 5. Guide-#9 has not exhausted iteration budget (per GUIDE_PROMPT.xml ea_comprehension_gate_review re_review_loop: "if you reach iteration 3 without APPROVED, recommend the LA pause the procedure and reconsider whether the stage XML itself needs clarification before any EA can execute it"). Iter-1 gate substantive completeness suggests no re-emission needed; LA confirmations in chat sufficient.</iteration_count>
+
+</guide_review_response>

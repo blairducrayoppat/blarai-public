@@ -1,0 +1,169 @@
+{
+  "entry_type": "cross_runtime_comparison_analysis",
+  "date": "2026-06-27",
+  "refreshed": "2026-06-28",
+  "note": "ANALYSIS entry synthesizing BlarAI's OpenVINO measurements on the Arc 140V against community llama.cpp/SYCL figures for the same silicon (pulled 2026-06-27, primary sources + 3-vote adversarial verification). REFRESHED 2026-06-28 with the (a) on-hardware re-benchmark: Qwen3-14B + Qwen3-8B + Qwen3-Coder-30B-A3B re-measured (5+2 runs each) on the current stack WITH the new pp (prompt-processing throughput) metric, so prefill is now comparable too (with the prompt-length caveat below). The blarai_measured numbers below are the 2026-06-28 figures; the May-2026 figures live in PERFORMANCE_LOG.md history.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2, 8 Xe2 cores), integrated, shares system RAM (no dedicated VRAM)",
+    "npu": "Intel AI Boost (~47 TOPS)",
+    "memory": "32 GB LPDDR5X-8533 (31.323 GB effective ceiling)",
+    "device": "Asus ExpertBook P5 (5405CSA)",
+    "os": "Windows 11 Pro (build 26200)",
+    "gpu_driver": "32.0.101.8826"
+  },
+  "runtime_versions_2026_06_28": {
+    "in_process_14b_8b": "OpenVINO GenAI 2026.1.0 (BlarAI venv: openvino 2026.1.0-21367, genai 2026.1.0.0-2957)",
+    "ovms_30b": "OVMS 2026.2 (OV backend 2026.2.0-21902, GenAI backend 2026.2.0.0-3121) — a separately installed, NEWER OpenVINO than the venv",
+    "correction": "The original 2026-06-27 caveat assumed the box had moved wholesale to OpenVINO 2026.2. It had not: the in-process assistant path is 2026.1.0; only OVMS (the coder 30B server) is 2026.2."
+  },
+  "methodology_note": {
+    "blarai_metrics": "generation throughput = output_tokens / total_latency (tok/s); TTFT = time-to-first-token (ms, a LATENCY); pp = prompt-processing throughput (tok/s, ADDED 2026-06-28) = input_tokens / prefill_time via a max_new_tokens=1 probe. 5 measured + 2 warmup + 30s thermal cooldown (benchmark_gpu_inference.py + benchmark_ovms_http.py, prompt-set v1).",
+    "community_metrics": "llama-bench reports pp512 = prompt-processing THROUGHPUT (tok/s) and tg128 = generation THROUGHPUT (tok/s). Mostly single-run blog/forum figures.",
+    "comparability": "Generation (BlarAI gen tok/s <-> community tg) is directly comparable. Prefill is NOW comparable too (BlarAI pp <-> community pp512), RESOLVED 2026-06-28 — with one caveat: BlarAI's in-process pp is measured over ~970 chat-template-formatted tokens (incl. system prompt), the OVMS pp over ~421 bare-message tokens, so cross-model pp is directional, not a controlled A/B.",
+    "cross_runtime": "BlarAI numbers are OpenVINO (GenAI 2026.1.0 in-process; OVMS 2026.2 for the 30B); community numbers are llama.cpp/SYCL/Vulkan/IPEX-LLM. Same Arc 140V silicon, DIFFERENT runtime + different models/quants — a triangulation, not an A/B."
+  },
+  "blarai_measured": [
+    {
+      "model": "Qwen3-14B",
+      "role": "assistant",
+      "precision": "INT4",
+      "runtime": "OpenVINO GenAI 2026.1.0",
+      "device": "GPU",
+      "config": "standard decoding (spec-off)",
+      "generation_tok_s": {"median": 11.1, "mean": 10.1, "p95": 11.9},
+      "prefill_pp_tok_s": {"median": 1960, "mean": 1877, "p95": 2005, "over_input_tokens": 970},
+      "ttft_ms": {"median": 466},
+      "source_entry": "2026-06-28 (OV GenAI 2026.1.0, driver 32.0.101.8826)",
+      "runs": "5 measured + 2 warmup, 30s run-cooldown"
+    },
+    {
+      "model": "Qwen3-14B",
+      "role": "assistant",
+      "precision": "INT4",
+      "runtime": "OpenVINO GenAI 2026.1.0",
+      "device": "GPU",
+      "config": "speculative decoding ON (+ Qwen3-0.6B-pruned-6L INT8 draft)",
+      "generation_tok_s": {"median": 17.1, "mean": 16.1, "p95": 21.5, "best_on_252tok_prompt": 21.5},
+      "prefill_pp_tok_s": "use spec-off pp ~1960 — the spec-on probe (1308) is a ContinuousBatching single-token artifact, not the true prefill rate",
+      "ttft_ms": {"median": 471},
+      "speedup_vs_spec_off": "~1.54x",
+      "note": "UP from the stale 2026-05-22 figure of 13.6 tok/s median — the tuned pruned-6L draft on the current stack. speculative_decoding_active=True confirmed.",
+      "source_entry": "2026-06-28",
+      "runs": "5 measured + 2 warmup, 30s run-cooldown"
+    },
+    {
+      "model": "Qwen3-8B",
+      "role": "assistant (smaller variant)",
+      "precision": "INT4",
+      "runtime": "OpenVINO GenAI 2026.1.0",
+      "device": "GPU",
+      "config": "spec-off / spec-on (+ same 0.6B draft; shared Qwen3 vocab)",
+      "generation_tok_s": {"spec_off": {"median": 19.8, "mean": 16.2, "p95": 21.1}, "spec_on": {"median": 27.4, "mean": 21.9, "p95": 29.7}},
+      "prefill_pp_tok_s": {"median": 1968, "mean": 1978, "p95": 2028, "over_input_tokens": 970, "config": "spec-off"},
+      "ttft_ms": {"spec_off_median": 264, "spec_on_median": 313},
+      "speedup_spec_on": "~1.38x",
+      "note": "First spec-on number on record for the 8B; the 0.6B draft accelerates it too.",
+      "source_entry": "2026-06-28 (NEW model in this comparison)",
+      "runs": "5 measured + 2 warmup, 30s run-cooldown"
+    },
+    {
+      "model": "Qwen3-Coder-30B-A3B",
+      "role": "coder (headless dispatch)",
+      "precision": "INT4",
+      "architecture": "qwen3_moe (128 experts, 8 active/token, 48 layers; ~30B total / ~3B active)",
+      "runtime": "OpenVINO Model Server (OVMS 2026.2, continuous batching)",
+      "device": "GPU",
+      "generation_tok_s": {"median": 38.1, "mean": 34.9, "p95": 38.8},
+      "prefill_pp_tok_s": {"median": 480, "mean": 458, "p95": 495, "over_input_tokens": 421},
+      "ttft_ms": {"median": 214, "mean": 226},
+      "moe_profile": "FASTEST decode (38 tok/s, ~2x dense 14B) + FASTEST TTFT (214 ms), but SLOWEST prefill (pp ~480, ~1/4 the dense ~1960) — decode touches ~3B active params, prefill routes every token across all 128 experts (~30B compute).",
+      "source_entry": "2026-06-28 (driver 32.0.101.8826); confirms the 2026-06-21/06-27 ~37-39 single-stream baseline",
+      "runs": "5 measured + 2 warmup, 30s run-cooldown"
+    },
+    {
+      "model": "Qwen3-VL-8B-Instruct",
+      "role": "vision",
+      "precision": "INT4",
+      "runtime": "OpenVINO GenAI (VLMPipeline)",
+      "device": "GPU",
+      "generation_tok_s": {"approx_range": "8-16 (image-size dependent; conflates vision prefill + text decode)"},
+      "load_s": 13,
+      "source_entry": "2026-06-03 + 2026-06-04 (NOT re-measured in the 2026-06-28 refresh)",
+      "runs": "n=1 probes"
+    }
+  ],
+  "blarai_other_workloads": {
+    "embeddings_bge_small_en_v1.5": {"runtime": "ONNX Runtime", "device": "CPU", "classify_ms": "5-6", "source": "2026-06-04"},
+    "image_gen_sdxl_realvisxl_v5_int8": {"runtime": "OpenVINO", "device": "GPU", "gen_1024px_6step_s": 10.7, "source": "2026-06-16"},
+    "image_gen_playground_v2.5_int8": {"runtime": "OpenVINO", "device": "GPU", "gen_1024px_30step_s": 36, "source": "2026-06-24"},
+    "stt_whisper_small": {"runtime": "OpenVINO", "device": "GPU", "transcribe_s_per_2.67s_audio": 0.53, "source": "2026-06-02"},
+    "tts_kokoro_82m": {"runtime": "ONNX", "device": "CPU", "real_time_factor": 0.30, "source": "2026-06-02"}
+  },
+  "community_llamacpp_arc140v": [
+    {"model": "llama-2-7B", "size": "7B dense", "quant": "Q4_0", "runtime": "llama.cpp SYCL (FP16)", "pp512_tok_s": 536, "tg128_tok_s": 24.6, "date": "2026-06", "source": "https://github.com/ggml-org/llama.cpp/discussions/23313", "quality": "forum llama-bench (build hash + stddev)"},
+    {"model": "llama-2-7B", "size": "7B dense", "quant": "Q4_0", "runtime": "llama.cpp SYCL (FP16)", "pp512_tok_s": 526, "tg128_tok_s": 13.5, "date": "2024-11", "source": "https://llm-tracker.info/howto/Intel-GPUs", "quality": "secondary (self-measured)"},
+    {"model": "llama-2-7B", "size": "7B dense", "quant": "Q4_0", "runtime": "IPEX-LLM (ARCHIVED 2026-01-28)", "pp512_tok_s": 708, "tg128_tok_s": 24.35, "date": "2024-11", "source": "https://llm-tracker.info/howto/Intel-GPUs", "quality": "secondary"},
+    {"model": "llama-2-7B", "size": "7B dense", "quant": "Q4_0", "runtime": "llama.cpp Vulkan", "pp512_tok_s": 45, "tg128_tok_s": 5.5, "date": "2024-11", "source": "https://llm-tracker.info/howto/Intel-GPUs", "quality": "secondary (Vulkan weak on this iGPU)"},
+    {"model": "Qwen3-8B", "size": "8B dense", "quant": "Q4_K_M", "runtime": "IPEX-LLM / Ollama", "pp512_tok_s": null, "tg128_tok_s": 17.5, "date": "2026-06", "source": "https://gist.github.com/enricomgian/14542e6921dbaa19c44d7e2f67b9a688", "quality": "blog/gist, n=1"},
+    {"model": "8B", "size": "8B dense", "quant": "INT4", "runtime": "OpenVINO (community)", "pp512_tok_s": null, "tg128_tok_s": 12, "date": "2025-04", "source": "https://www.julien.org/youtube/2025/20250714_SLM_Inference_on_a_Windows_laptop_Intel_Lunar_Lake_CPU_GPU_NPU_+_OpenVINO.html", "quality": "blog"},
+    {"model": "Qwen2.5-14B", "size": "14B dense", "quant": "Q4_K_M", "runtime": "llama.cpp (backend unspecified; LIKELY CPU)", "pp512_tok_s": 9, "tg128_tok_s": 4.3, "date": "2026", "source": "https://www.localscore.ai/accelerator/720", "quality": "secondary, single-run, almost certainly CPU not iGPU"}
+  ],
+  "cross_comparison_generation_by_size": [
+    {"size": "7B dense Q4_0", "best_community_tg": 24.6, "runtime": "llama.cpp SYCL"},
+    {"size": "8B dense INT4 spec-on", "blarai_tg": 27.4, "runtime": "OpenVINO GenAI 2026.1 (BlarAI)", "note": "beats community 8B (12-17.5 tg) by ~1.6x; the 0.6B draft is the lever"},
+    {"size": "8B VLM INT4", "blarai_tg": "8-16", "runtime": "OpenVINO (BlarAI)"},
+    {"size": "14B dense INT4 spec-on", "blarai_tg": 17.1, "runtime": "OpenVINO GenAI 2026.1 (BlarAI)", "note": "community has NO clean 14B-on-GPU number; the ~4.3 figure is likely CPU. 17.1 vs the May 13.6 is a real stack/draft gain"},
+    {"size": "30B-A3B MoE INT4 (~3B active)", "blarai_tg": 38.1, "runtime": "OVMS 2026.2 (BlarAI)", "note": "fastest decode of all; beats every community dense-7B; MoE active-param advantage"}
+  ],
+  "prefill_pp_comparison": {
+    "blarai_dense_14b_8b_pp": "~1960 tok/s (over ~970 formatted tokens, OV GenAI 2026.1, spec-off)",
+    "blarai_moe_30b_pp": "~480 tok/s (over ~421 bare tokens, OVMS 2026.2) — MoE prefill pays full-expert compute",
+    "community_7b_sycl_pp512": 536,
+    "finding": "BlarAI dense prefill ~1960 is ~3.7x the community llama.cpp/SYCL 7B pp512 (~536) on the same silicon. The MoE 30B prefill (~480) lands near the community dense-7B pp512 despite 30B total params — the active-param win is a DECODE win, not a prefill win.",
+    "caveat": "Different prompt lengths (970 vs 421 vs 512) + different runtime versions — directional, not a controlled A/B."
+  },
+  "findings": [
+    "pp (prefill) is now MEASURED (2026-06-28), closing the gap the 2026-06-27 analysis flagged: BlarAI's dense prefill ~1960 tok/s is ~3.7x the community llama.cpp/SYCL 7B pp512 (~536) on the same Arc 140V. OpenVINO's prefill is the strong half of its profile on this iGPU.",
+    "The 30B-A3B MoE has the mirror-image profile of the dense models: FASTEST decode (38 tok/s) + FASTEST TTFT (214 ms) but SLOWEST prefill (pp ~480) — decode is ~3B active, prefill routes all 128 experts. This is the single most useful shape in the dataset for capacity planning.",
+    "BlarAI's 14B is competitive AND fills a real community gap: 14B spec-on 17.1 tok/s (up from May's 13.6) where the community has no trustworthy 14B-on-GPU number (the ~4.3 figure is likely CPU).",
+    "Speculative decoding is a real lever on BOTH assistant models: 14B ~1.54x (11.1->17.1), 8B ~1.38x (19.8->27.4), both with the same 0.6B-pruned-6L draft (shared Qwen3 vocab).",
+    "OpenVINO quietly beats the runtime hobbyists default to: IPEX-LLM (their fastest turnkey Arc path) is archived/security-flagged (2026-01-28); Vulkan is ~5.5 tok/s on this iGPU.",
+    "BlarAI's numbers are the MORE rigorous side: 5 runs + 2 warmup + 30s thermal cooldown, vs the community's mostly single-run blog/forum figures."
+  ],
+  "caveats": [
+    "Cross-runtime + cross-model triangulation, not an A/B (OpenVINO vs llama.cpp; different model families and quants).",
+    "Community figures are mostly n=1, single-run blog/forum.",
+    "Prefill pp is comparable as of 2026-06-28 BUT with a prompt-length confound: BlarAI in-process pp is over ~970 chat-formatted tokens, OVMS pp over ~421 bare tokens, community pp512 over 512 tokens. Each is internally valid; cross-model pp is directional.",
+    "Runtime versions differ even within BlarAI: 14B/8B on OpenVINO GenAI 2026.1.0, 30B on OVMS 2026.2. (This supersedes the original caveat that wrongly assumed a wholesale move to 2026.2.)",
+    "Co-resident cost NOT measured — each model was benchmarked alone (the 30B and the 14B cannot co-reside in 31.3 GB).",
+    "spec-on pp is reported as a ContinuousBatching single-token artifact (1308/1748); the spec-off pp (~1960) is the true prefill rate."
+  ],
+  "followup_a": {
+    "status": "DONE 2026-06-28",
+    "what": "Re-ran Qwen3-14B + Qwen3-8B + Qwen3-Coder-30B-A3B on the current stack, 5 measured + 2 warmup runs each, with the new pp (prompt-processing) tok/s metric.",
+    "result_jsons": [
+      "docs/performance/benchmark_2026-06-28_00-27-22.json (14B)",
+      "docs/performance/benchmark_2026-06-28_00-44-13.json (8B)",
+      "docs/performance/benchmark_ovms_coder-30b_2026-06-28_08-32-38.json (30B)"
+    ],
+    "prep_edits": [
+      "DONE (2026-06-27): De-hardcoded config_stamp model_name via --model-name + _derive_model_name so the 8B/30B runs label correctly.",
+      "DONE (2026-06-27): Added pp tok/s to benchmark_gpu_inference.py — a fixed probe (pp-v1) through the production generate path with max_new_tokens=1; pp = formatted_input_tokens / prefill_time; per-run unique prefix defeats prefix-caching; benchmark-only; unit-tested (test_benchmark_helpers.py, 49 passed).",
+      "DONE (2026-06-28): Wrote scripts/benchmark_ovms_http.py — the OVMS-HTTP 30B bench (loopback OpenAI-compatible, same prompt-set + pp probe, byte-identity asserted, unique prefix vs OVMS prefix-caching). Unit-tested (test_benchmark_ovms_helpers.py, 18 passed)."
+    ],
+    "run_params": "5 measured + 2 warmup, --run-cooldown 30. Recorded: in-process OpenVINO GenAI 2026.1.0; OVMS 2026.2; driver 32.0.101.8826.",
+    "on_completion": "DONE: added the 2026-06-28 PERFORMANCE_LOG.md measurement entry + a BUILD_JOURNAL entry + folded the fresh numbers into this comparison file."
+  },
+  "sources_community": [
+    "https://github.com/ggml-org/llama.cpp/discussions/23313",
+    "https://llm-tracker.info/howto/Intel-GPUs",
+    "https://gist.github.com/enricomgian/14542e6921dbaa19c44d7e2f67b9a688",
+    "https://www.localscore.ai/accelerator/720",
+    "https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/SYCL.md",
+    "https://github.com/ggml-org/llama.cpp/issues/19918",
+    "https://github.com/intel/ipex-llm",
+    "https://huggingface.co/blog/intel-qwen3-agent",
+    "https://www.julien.org/youtube/2025/20250714_SLM_Inference_on_a_Windows_laptop_Intel_Lunar_Lake_CPU_GPU_NPU_+_OpenVINO.html"
+  ]
+}

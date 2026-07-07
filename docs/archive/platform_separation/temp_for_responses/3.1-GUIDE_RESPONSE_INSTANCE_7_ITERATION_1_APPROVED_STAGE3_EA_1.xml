@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<guide_review_response>
+  <verdict>APPROVED</verdict>
+  <stage_id>STAGE_3</stage_id>
+  <stage_xml>04_STAGE3_COPY_TOOLS.xml</stage_xml>
+  <reviewed_at_utc>2026-04-27T00:00:00Z</reviewed_at_utc>
+  <guide_instance>7</guide_instance>
+  <reviewing>
+    <ea_instance>1 (Stage 3 EA chain instance 1; the LA's colloquial "EA-7" matches the Guide-#7 numbering and is interchangeable in chat narrative)</ea_instance>
+    <ea_artifact>docs/platform_separation/temp_for_responses/3.1-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE3_INSTANCE_1.xml</ea_artifact>
+    <iteration>1</iteration>
+  </reviewing>
+
+  <summary>
+    Stage 3 EA instance 1 emits a clean iteration-1 comprehension gate. All 13 V0 checks
+    PASS or PASS-WITH-NOTE; the single PASS-WITH-NOTE flagged as HIGH/blocking (OQ-1
+    devplatform HEAD drift) is demonstrably STATUS-staleness per Guide-#7 operating rule
+    5b(a), NOT procedure breakage per 5b(b). EA-1's STOP-and-report discipline is exactly
+    correct: rather than autonomously rewriting expected baselines or silently absorbing
+    the drift, EA-1 paused, framed three disposition options, and surfaced the question
+    with explicit Guide arbitration request. This is the discipline reminder w11 was
+    written to maintain across the Stage 2 to Stage 3 EA chain transition; EA-1 inherits
+    EA-6's structural-axis quality without inheriting EA-6's narrative-paraphrase pattern.
+
+    The 61-ack verbatim restatement (38 v4-era + 4 g6-ea5 + 10 g6-ea6 + 9 g7-ea1) is
+    complete. Phantom i1-5/6/7 rejection narrative is present. f1 treated as separate ID
+    per Guide-#5 v4 quality review D2 default disposition (38 v4-era count, not 37). Stage
+    3 hard invariants correctly locked at: BlarAI-untouched-except-3.10-STATUS-append;
+    single substantive devplatform commit at 3.9; fleet stays paused; stash@{0} untouched;
+    no merge to main.
+
+    Disposition of all 4 open questions:
+      - OQ-1 (V0i devplatform HEAD drift): AUTHORIZED disposition (a) per rule 5b(a). EA-1
+        acknowledges 3894221 as new Stage 3 entry baseline. STATUS.md "Active branch
+        (devplatform)" line is stale; gets corrected at Stage 3.10 STATUS append per
+        g7-ea1_n9 + new g7-ea1_n10 added below.
+      - OQ-2 (BlarAI 2 untracked files): No-action; benign. LA may commit both files
+        together as a single docs-only commit pre-PROCEED to clean working tree before
+        Item 3.1 begins. Specific commit guidance below in `pre_proceed_la_action`.
+      - OQ-3 (f1/g5-5 dedup; restated 38 by default): AFFIRM. EA-1 followed the canonical
+        Guide-#5 v4 quality review D2 disposition ("1 f1 treated as separate ack"). 38 is
+        correct.
+      - OQ-4 (v4/v5 handoff commit history): AFFIRM informational; no action.
+
+    NEW ack g7-ea1_n10 added: STATUS.md "Active branch (devplatform)" line correction at
+    Stage 3.10 (mirrors the Stage 2.10.1 N-correction pattern; small targeted edit, append
+    region).
+
+    PROCEED authorization granted for Item 3.1. Standing reminders r1-r5 apply throughout
+    Stage 3:
+      r1 = preserve assignee variable name when copying; do NOT rename variables in the
+           Copy-Item -Recurse flow.
+      r2 = STOP and report on any pre-edit audit finding outside the documented Stage 3
+           scope (e.g., unexpected hardcoded BlarAI runtime path in a PS1 not in the G-1
+           5-script set).
+      r3 = README.md examples and similar comment-only paths are out-of-scope for any Stage
+           3 verification (per Stage 2 r3 inheritance).
+      r4 = forward-stage all Stage 3.10 STATUS append content as cumulative footnote items
+           in EA-1 working notes (mirrors the Stage 2.10 cumulative-footnote pattern).
+      r5 = at any clean breakpoint with even slightly tight context budget, emit
+           Stage-3-mid-stage-handoff XML rather than push through (per dn15 + i1-4 +
+           g6-ea6_n4 + g7-ea1_n8).
+  </summary>
+
+  <independent_disk_verification_of_ea_1_findings>
+    <intro>
+      Per dn14 + dn20 + p3+p16: Guide-#7 trusts EA-1's V0a-V0M reports because EA-1 has
+      operated honestly in iter-1 gate emission; spot-checks below verify the
+      highest-stakes claims (OQ-1 + OQ-2) against disk.
+    </intro>
+
+    <check id="OQ_1_devplatform_HEAD_drift" verdict="VERIFIED-AS-STATUS-STALENESS-PER-RULE-5B-A">
+      <command>git -C C:/Users/mrbla/devplatform log --oneline -10</command>
+      <output>
+        3894221 fix(registry): promote agent_gates_bus + architecture_decisions to fleet-level; annotate remaining auxiliaries pending Stage 6 review
+        eaa005f Scaffold: initial devplatform skeleton (Stage 1)
+      </output>
+      <metadata>
+        commit 3894221a3a07c8edfc71b0cf1553bef3a508987a
+        parent  eaa005fcccf6da2884872ec7118bd03b6fc357af
+        author  Blair &lt;mr.blair.do@gmail.com&gt; [Lead Architect]
+        date    2026-04-24 21:33:12 -0400
+        diff    projects/registry.yaml | 25 +++++++++++++++++++++----  (+21 / -4)
+      </metadata>
+      <classification>
+        STATUS-staleness per rule 5b(a). Repo state is internally consistent: the registry
+        edit at 3894221 IS the agent_gates_bus + architecture_decisions promotion + auxiliary
+        annotation work documented in STATUS.md anomalies A8 (line 165-170), A9 (line 172-177),
+        and A10 (line 179-184) under the "Stage 1 close + 1" Execution Log entry (line 99).
+        STATUS.md line 35 "Active branch (devplatform) | main (HEAD eaa005f -- initial scaffold
+        commit)" is the stale piece -- the HEAD has advanced one commit since Stage 1 close,
+        and STATUS just hasn't caught up. The Stage 3 procedure is not affected: Stage 3 starts
+        from devplatform main HEAD regardless of which specific HEAD commit it is, as long as
+        the Stage 1 scaffold is present (verified by V0h Test-Path checks PASS) and the
+        registry has the correct project IDs (verified by V0k Test-Path PASS + content shape
+        consistent with STATUS Vikunja Project IDs section).
+      </classification>
+      <not_procedure_breakage_evidence>
+        The 04_STAGE3_COPY_TOOLS.xml `&lt;preconditions&gt;` block does NOT specify a particular
+        devplatform HEAD commit; it requires "devplatform scaffold exists from Stage 1" + "Fleet
+        scheduled tasks remain Disabled". Both are TRUE at 3894221 (the scaffold from eaa005f
+        is preserved in the parent chain; 3894221 only edits projects/registry.yaml). The
+        registry.yaml at 3894221 contains the same project IDs (blarai=3, devplatform_meta=10,
+        fleet_reports=8) that Stage 3 needs, plus the A8/A9/A10 promotions that are
+        forward-progress, not regression.
+      </not_procedure_breakage_evidence>
+      <ea_1_disposition_authorized>
+        EA-1's option (a) -- acknowledge 3894221 as new Stage 3 entry baseline -- is AUTHORIZED.
+        Stage 3 work proceeds from 3894221 unchanged; Stage 3 single commit at 3.9 will land
+        on 3894221 as parent. The init pointer's expected V0i value (eaa005f) was inherited
+        from STATUS.md's stale field; the init pointer is forward-correctable but does NOT
+        need amendment per dn9/dn23 no-amend doctrine on committed audit artifacts (the init
+        pointer itself is not yet committed -- per OQ-2 -- so even amendment would be
+        permitted, but it's not necessary; this verdict file documents the disposition and
+        the Stage 3.10 STATUS append per g7-ea1_n10 makes the canonical correction).
+      </ea_1_disposition_authorized>
+    </check>
+
+    <check id="OQ_2_blarai_untracked_files" verdict="VERIFIED-BENIGN">
+      <command>git -C C:/Users/mrbla/BlarAI status --porcelain</command>
+      <output>
+        ?? docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml
+        ?? docs/platform_separation/temp_for_responses/3.1-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE3_INSTANCE_1.xml
+      </output>
+      <classification>
+        Benign. Two untracked files:
+          (a) 3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml -- Guide-#7-authored Stage
+              3 EA initialization pointer; emitted via Write tool by Guide-#7 at 2026-04-27;
+              attached to the EA-1 chat by the LA at session spawn. Not yet committed because
+              Guide-#7 emitted it as a working-tree artifact for LA to attach + commit at LA's
+              cadence convenience.
+          (b) 3.1-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE3_INSTANCE_1.xml -- EA-1's
+              iter-1 gate response file emitted per the EA-1 init pointer's required_first_actions
+              §action_3 file-output discipline.
+        Plus this Guide-#7 verdict file (3.1-GUIDE_RESPONSE_INSTANCE_7_ITERATION_1_APPROVED_STAGE3_EA_1.xml)
+        is being authored at 2026-04-27 and is also a candidate for the same docs-only commit.
+      </classification>
+      <pre_proceed_la_action recommended="true">
+        Before EA-1 begins Item 3.1 work, the LA SHOULD commit all 3 docs-only files together
+        as a single chore commit on chore/platform-extraction (BlarAI side). This:
+          - cleans the BlarAI working tree before Stage 3 substantive work begins (preserves
+            the single-commit-discipline-by-default at devplatform 3.9 + g3-1 inheritance)
+          - preserves the audit chain (init pointer + iter-1 gate + Guide-#7 verdict together
+            in a coherent commit; mirrors the Stage 2 cycle pattern: Guide-#6 init pointer +
+            EA-6 iter-1 gate + Guide-#6 verdict frequently committed together)
+          - simplifies EA-1's V0c expected baseline for any subsequent V0 re-run
+        Suggested commit:
+          cd C:\Users\mrbla\BlarAI
+          git add docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml
+          git add docs/platform_separation/temp_for_responses/3.1-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE3_INSTANCE_1.xml
+          git add docs/platform_separation/temp_for_responses/3.1-GUIDE_RESPONSE_INSTANCE_7_ITERATION_1_APPROVED_STAGE3_EA_1.xml
+          git commit -m "docs(platform_separation): Stage 3 init pointer + EA-1 iter-1 gate + Guide-#7 verdict (APPROVED)"
+        Per g6-ea6_n4 + i1-4 + g7-ea1_n8: this is a docs-only commit; exempt from the Stage 3
+        single-substantive-commit-at-3.9 rule. The substantive commit at 3.9 lands on
+        devplatform main, not on BlarAI chore/platform-extraction; these are different repos.
+
+        ALTERNATIVELY: the LA may defer this commit until after EA-1 emits more Stage 3 work
+        (e.g., bundle with mid-stage handoff if any, or with closing handoff) -- low impact
+        either way. Recommendation: commit now for cleanest sequencing.
+      </pre_proceed_la_action>
+    </check>
+
+    <check id="OQ_3_f1_g5_5_dedup" verdict="AFFIRMED-DEFAULT-DISPOSITION-CORRECT">
+      EA-1 chose 38 v4-era count (treating f1 as separate from g5-5). This matches the
+      canonical Guide-#5 v4 quality review D2 disposition at line 72 verbatim: "1 f1 (treated
+      as separate ack)". The init pointer's `&lt;ack_group label="f1"&gt;` `&lt;intro&gt;`
+      explicitly stated: "Adding f1 separately here per disk reality; Stage 3 EA may treat as
+      alias of g5-5 in iter-1 gate IF the LA confirms the conceptual-collapse interpretation
+      (otherwise restate verbatim)." EA-1 correctly chose the default (separate).
+      AUTHORIZED.
+    </check>
+
+    <check id="OQ_4_v4_v5_commit_history" verdict="INFORMATIONAL-NO-ACTION">
+      EA-1 noted v4 + v5 mid-stage handoff XML commit lineage as informational context. No
+      action needed; this is audit-chain literacy that informs future mid-stage handoff
+      emission discipline (per r5 above) but does not block Item 3.1 work.
+    </check>
+
+    <check id="61_ack_verbatim_restatement_completeness" verdict="VERIFIED">
+      EA-1 restated all 61 acks verbatim:
+        - 38 v4-era (incl. the 5 Guide-#7 disk-corrected misses: g4-iter2-1, g4-iter2-2,
+          g4-iter2-3, f1, dn15)
+        - 4 g6-ea5
+        - 10 g6-ea6
+        - 9 g7-ea1
+        - 0 phantom (i1-5/6/7 explicitly rejected with reference to Guide-#5 v4 quality
+          review D2 line 67)
+      The phantom rejection narrative is present + correctly attributed. Per LA's "do not
+      hallucinate" directive at 2026-04-27, EA-1 followed exactly. AUTHORIZED.
+    </check>
+
+    <check id="V0_block_completeness" verdict="VERIFIED">
+      All 13 V0 checks (V0a through V0M) executed + reported with PASS / PASS-WITH-NOTE
+      labels. EA-1's transparency on partial-pass cases (V0c init-pointer-untracked + V0i
+      HEAD drift + V0l Vikunja running) is exemplary -- each surfaces the actual observed
+      value vs expected with proposed disposition rather than silently absorbing.
+    </check>
+
+    <check id="hard_invariants" verdict="VERIFIED">
+      EA-1 explicitly locked: BlarAI untouched (except 3.10 STATUS append); single
+      substantive commit at devplatform 3.9; fleet stays paused; stash@{0} untouched; no
+      merge to main. All match init pointer hard_invariants block + the 61-ack carry-forward
+      enforcement set.
+    </check>
+  </independent_disk_verification_of_ea_1_findings>
+
+  <required_corrections>
+    <!-- Empty: EA-1's iter-1 gate is substantively clean. The OQ-1 drift is
+         repo-side staleness (LA's between-stages registry edit), not an EA-side error.
+         No "EA must redo" obligations. -->
+  </required_corrections>
+
+  <new_acknowledgment>
+    <ack id="g7-ea1_n10" priority="LOW" status="FORWARD-ACTIVE-AT-3.10">
+      STATUS.md "Active branch (devplatform)" line correction at Stage 3.10. The line at
+      docs/platform_separation/STATUS.md line 35 currently reads:
+        "| Active branch (devplatform) | `main` (HEAD `eaa005f` -- initial scaffold commit) |"
+      This is stale: actual devplatform HEAD at Stage 3 entry is `3894221` (per Guide-#7 disk
+      verification at OQ-1 above). EA-1 corrects at Stage 3.10 STATUS append:
+        - Update line 35 to reflect: "main @ &lt;Stage-3-3.9-commit-hash&gt; (Stage 3 commit; parent
+          3894221; ancestor eaa005f Stage 1 scaffold)"
+        - Append a brief Stage 3 Closure Footnote (in the Stage Ledger row + a new "Stage 3
+          Closure Footnotes" section if structurally analogous to Stage 2's pattern)
+          documenting the corrected baseline narrative:
+            "STATUS.md 'Active branch (devplatform)' line was stale at Stage 3 entry (recorded
+            eaa005f from Stage 1.4 closure; actual HEAD at Stage 3 entry was 3894221 from LA's
+            between-stages registry edit on 2026-04-24 promoting agent_gates_bus +
+            architecture_decisions to fleet-level + annotating auxiliary projects per A8 + A9 +
+            A10 anomalies). Disposition source: Guide-#7 review file
+            docs/platform_separation/temp_for_responses/3.1-GUIDE_RESPONSE_INSTANCE_7_ITERATION_1_APPROVED_STAGE3_EA_1.xml.
+            STATUS-staleness per Guide-#7 operating rule 5b(a); not procedure breakage."
+      Status transitions to SATISFIED at 3.10 STATUS append landing.
+
+      This ack joins the cumulative Stage 3.10 STATUS append set: g7-ea1_n9 (Stage 3 closure
+      entry) + g7-ea1_n10 (devplatform HEAD line correction) + ack-count correction footnote
+      (per nature_of_this_file forward-correction at 2026-04-27).
+    </ack>
+  </new_acknowledgment>
+
+  <required_acknowledgments>
+    <ack_to_emit_at_start_of_next_chat_turn>
+      EA-1 acknowledges before Item 3.1 work begins:
+        (a) OQ-1 disposition: 3894221 is the new Stage 3 entry baseline; STATUS-staleness on
+            line 35 will be corrected at 3.10 per new ack g7-ea1_n10.
+        (b) OQ-2 disposition: pre-PROCEED docs-only commit (3 files: init pointer + iter-1
+            gate + this Guide-#7 verdict) is recommended; EA-1 awaits LA's decision on
+            commit timing (commit-now-pre-PROCEED OR defer-to-bundle-with-mid-stage). Either
+            is procedurally acceptable.
+        (c) OQ-3 disposition: 38 v4-era count CORRECT per default; no change.
+        (d) OQ-4 disposition: informational; no action.
+        (e) New ack g7-ea1_n10 added to FORWARD-ACTIVE set; binding through Stage 3.10
+            STATUS append.
+        (f) Standing reminders r1-r5 acknowledged.
+    </ack_to_emit_at_start_of_next_chat_turn>
+  </required_acknowledgments>
+
+  <proceed_authorization>
+    PROCEED -- EA-1 may begin Item 3.1 (Copy 7 platform tool directories + 2 chokepoint
+    helpers from BlarAI/tools/ to devplatform/tools/) AFTER:
+      (1) Acknowledging the OQ-1/OQ-2/OQ-3/OQ-4 dispositions + new ack g7-ea1_n10 +
+          standing reminders r1-r5 in EA-1's next chat reply.
+      (2) The LA's decision on pre-PROCEED docs-only commit (recommended; see OQ-2 disposition).
+
+    Stage 3 execution order (per init pointer + 04_STAGE3_COPY_TOOLS.xml):
+      Item 3.1: Copy-Item -Recurse for 7 dirs (vikunja, vikunja_mcp, fleet_ops,
+                fleet_observability, autonomy_budget, gate_stale_cleaner, scheduled-tasks)
+                + 2 chokepoint helpers (_vikunja_client.py + _project_context.py). Do-not-copy:
+                tools/openvino_contrib_agent/, BlarAI-specific tests.
+      Item 3.1.v2: Test-Path verify all 6 v2-baseline files present per g7-ea1_n3.
+      Item 3.2: Copy doctrine docs by pattern (CLAUDE_*, CO_LEAD_*, DEC*, DOMAIN*,
+                CONTINUATION_PROMPT.md).
+      Item 3.2.v2: Copy docs/governance/ + docs/scheduled/wake_templates/ per g7-ea1_n4.
+      Item 3.3: Copy claude_cowork/ + claude_projects/ if populated.
+      Item 3.4: Populate devplatform pyproject.toml from BlarAI minus runtime deps.
+      Item 3.5: cd devplatform; pip install -e . (sanity verify + import check).
+      Item 3.6: Copy MCP configs with `${env:VIKUNJA_PASS}` env-var pattern per g7-ea1_n1
+                (F-1 mitigation devplatform half).
+      Item 3.7: Smoke test daily_digest --dry-run from devplatform per g7-ea1_n6 (BLARAI_PID
+                preflight from BlarAI/.platform/vikunja_project_ids.yaml; expect 3).
+      Item 3.8: Verify devplatform/docs/ does NOT contain BlarAI-only doc patterns
+                per g7-ea1_n7.
+      Item 3.9: Single Stage-3 commit on devplatform main per g7-ea1_n8. Parent: 3894221
+                (the LA's between-stages registry edit). Commit template per init pointer
+                §work_plan_pointer §3.9 + g7-ea1_n8 verbatim.
+      Item 3.10: Append-only STATUS.md update on BlarAI side per g7-ea1_n9 + g7-ea1_n10 +
+                 ack-count correction footnote.
+      Item 3.10.v2: Write devplatform/.copy_manifest_v2.yaml per g7-ea1_n5.
+
+    Stop conditions during Stage 3 (unchanged from init pointer + standing reminders r1-r5):
+      - Any Item-N verify clause fails -&gt; STOP and report.
+      - Any pre-edit audit surfaces a hardcoded BlarAI runtime path in a PS1 OUTSIDE the G-1
+        5-script set (per r2 + g4-iter2-2) -&gt; STOP and report; default disposition no-action;
+        runtime-path discovery requires LA scope-expansion approval.
+      - $BLARAI_PID drift at Stage 3.7 -&gt; STOP and report per g4-5; NO silent regex/yaml
+        adaptation.
+      - VIKUNJA_PASS literal slips into devplatform .mcp.json or .vscode/mcp.json -&gt; STOP per
+        g7-ea1_n1; refactor to env-var reference; NO commit with literal.
+      - Any unexpected Stage 3.2 doctrine-doc pattern overshoot (BlarAI-only doc copied to
+        devplatform/docs/) -&gt; STOP per g7-ea1_n7; remove unintended copy; preserve BlarAI
+        original.
+      - Any Stage 3.8 BlarAI-only docs absence Select-String returns non-empty -&gt; STOP.
+      - Any Stage 3.9 commit produces more than ONE commit OR omits any expected file (manifest,
+        MCP configs, doctrine docs, pyproject.toml) -&gt; STOP per g7-ea1_n8; NO partial commits.
+      - Any Stage 3.10 STATUS append modifies pre-existing sections (A1-A11, Stage Ledger
+        Stages 0/1/2, Stage 2 Closure Footnotes, Recovery Anchors, Vikunja Project IDs, How
+        to Resume, prior Execution Log entries) -&gt; STOP and revert per g7-ea1_n9.
+      - Context exhaustion at any clean breakpoint (post-3.5 dep-install close; post-3.7
+        smoke-test close; post-3.8 docs-absence-verify close) -&gt; emit Stage-3-mid-stage-handoff
+        XML (docs-only commit; ONE file in diff) per i1-4 + g6-ea6_n4 + g7-ea1_n8 + r5. NO
+        partial-refactor commits.
+      - Any procedural defect discovered in Stage 3 XML (e.g., regex/path drift) -&gt; STOP and
+        report; do NOT inline-fix without LA authorization (per dn3-equivalent).
+
+    Standing invariants unchanged through Stage 3: single substantive Stage 3 commit on
+    devplatform main at item 3.9 only (parent 3894221); fleet stays paused (NEVER
+    state.resume_fleet -- AttributeError); no merge to main (BlarAI or otherwise during
+    Stage 3); stash@{0} untouched (12+-cycle byte-identity preservation continuing); STATUS
+    append-only at item 3.10. Standing reminders r1-r5 + 9 g7-ea1 acks (n1-n10 with new n10
+    above) apply throughout.
+
+    After Item 3.10 + 3.10.v2 land, EA-1 emits the closing handoff to LA per the
+    `closing_handoff_to_la_at_stage_3_close` block in the EA-1 init pointer. The closing
+    handoff transitions Stage 3 to CLOSED and primes Stage 4 spawn (which requires LA panic-
+    card preparation per ROLLBACK_NOVICE_GUIDE.md §8 self-test + Guide-#7-to-Guide-#8 handoff
+    or Guide-#7 continuation per p17 strategic context-budget pattern).
+  </proceed_authorization>
+
+  <next_action_for_la>
+    Forward this Guide-#7 verdict file to the EA-1 chat. Specifically:
+
+      File path: docs/platform_separation/temp_for_responses/3.1-GUIDE_RESPONSE_INSTANCE_7_ITERATION_1_APPROVED_STAGE3_EA_1.xml
+
+      Suggested chat message to EA-1:
+        "Iter-1 gate APPROVED per Guide-#7 verdict at the attached file path. OQ-1 dispositioned
+        as STATUS-staleness rule 5b(a); 3894221 is your new baseline. OQ-2 dispositioned as
+        benign untracked (I will commit init pointer + your iter-1 gate + Guide-#7 verdict
+        together as a single docs-only commit before you begin Item 3.1; standby briefly).
+        OQ-3 affirmed (38 v4-era count, default disposition correct). OQ-4 informational, no
+        action. New ack g7-ea1_n10 added: STATUS.md devplatform-HEAD line correction at 3.10.
+        Standing reminders r1-r5 apply. Acknowledge in your next chat reply, then begin Item
+        3.1 (Copy-Item -Recurse for 7 dirs + 2 chokepoint helpers) per init pointer
+        work_plan_pointer."
+
+    Optional pre-PROCEED action (recommended): commit the 3 docs-only files together. Suggested
+    command (LA runs in BlarAI workspace terminal):
+      cd C:\Users\mrbla\BlarAI
+      git add docs/platform_separation/temp_for_responses/3.0-EA_INITIALIZATION_INSTANCE_1_STAGE3_COPY_TOOLS.xml
+      git add docs/platform_separation/temp_for_responses/3.1-RESPONSE-EA_COMPREHENSION_GATE_ITERATION_1_STAGE3_INSTANCE_1.xml
+      git add docs/platform_separation/temp_for_responses/3.1-GUIDE_RESPONSE_INSTANCE_7_ITERATION_1_APPROVED_STAGE3_EA_1.xml
+      git commit -m "docs(platform_separation): Stage 3 init pointer + EA-1 iter-1 gate + Guide-#7 verdict (APPROVED)"
+
+    Then EA-1 acknowledges + begins Item 3.1.
+  </next_action_for_la>
+
+</guide_review_response>

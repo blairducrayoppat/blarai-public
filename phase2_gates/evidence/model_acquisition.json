@@ -1,0 +1,135 @@
+{
+  "timestamp": "2026-02-23T09:13:24.736778+00:00",
+  "models": {
+    "bge": "BAAI/bge-small-en-v1.5",
+    "qwen": "Qwen/Qwen3-1.7B"
+  },
+  "conversions": [
+    {
+      "step": "bge_onnx_fp16",
+      "status": "PASS",
+      "output_dir": "C:\\Users\\mrbla\\BlarAI\\models\\bge-small-en-v1.5\\onnx-fp16",
+      "elapsed_s": 0.0,
+      "note": "cached"
+    },
+    {
+      "step": "bge_openvino_int8",
+      "status": "PASS",
+      "output_dir": "C:\\Users\\mrbla\\BlarAI\\models\\bge-small-en-v1.5\\openvino-int8",
+      "elapsed_s": 0.0,
+      "note": "cached"
+    },
+    {
+      "step": "qwen3_openvino_int4",
+      "status": "PASS",
+      "output_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-1.7b\\openvino-int4",
+      "elapsed_s": 0.0,
+      "note": "cached"
+    }
+  ],
+  "validations": [
+    {
+      "dir": "C:\\Users\\mrbla\\BlarAI\\models\\bge-small-en-v1.5\\onnx-fp16",
+      "status": "PASS",
+      "files": [
+        "config.json",
+        "model.onnx",
+        "special_tokens_map.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.txt"
+      ],
+      "total_size_mb": 127.8
+    },
+    {
+      "dir": "C:\\Users\\mrbla\\BlarAI\\models\\bge-small-en-v1.5\\openvino-int8",
+      "status": "PASS",
+      "files": [
+        "config.json",
+        "openvino_config.json",
+        "openvino_model.bin",
+        "openvino_model.xml",
+        "special_tokens_map.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.txt"
+      ],
+      "total_size_mb": 33.5
+    },
+    {
+      "dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-1.7b\\openvino-int4",
+      "status": "PASS",
+      "files": [
+        "added_tokens.json",
+        "chat_template.jinja",
+        "config.json",
+        "generation_config.json",
+        "merges.txt",
+        "openvino_config.json",
+        "openvino_model.bin",
+        "openvino_model.xml",
+        "special_tokens_map.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.json"
+      ],
+      "total_size_mb": 1014.0
+    }
+  ],
+  "inference_tests": [
+    {
+      "test": "bge_onnx_inference",
+      "status": "PASS",
+      "embedding_dim": 384,
+      "embedding_norm": 1.0
+    },
+    {
+      "test": "bge_openvino_inference",
+      "status": "PASS",
+      "embedding_dim": 384,
+      "embedding_norm": 9.2745
+    },
+    {
+      "test": "qwen3_openvino_inference",
+      "status": "PASS",
+      "generation_time_s": 2.11,
+      "output_preview": "What is 2+2? How many times does 2 go into 2? What is 2+"
+    }
+  ],
+  "hashes": {
+    "bge_onnx_fp16": {
+      "config.json": "eeea25cf51621ee833225090cf4c7a9aae65d9da66e66cdb4103e4ab00c3a794",
+      "model.onnx": "f0b7728e3e9f2337fa14f7aa5b5a7d7078873e302f8217aa16e51326e60863f5",
+      "special_tokens_map.json": "5aa43c2f985a25296d5a5ce621c2f77376ca8091a47993c492fd5460b895b140",
+      "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+      "tokenizer_config.json": "a5c2e5a7b1a29a0702cd28c08a399b5ecc110c263009d17f7e3b415f25905fd8",
+      "vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+    },
+    "bge_openvino_int8": {
+      "config.json": "657111fd79935d8950ef174e9c11a9da4823ccbd40de3d7d935eaa3967b96672",
+      "openvino_config.json": "2e9247c3c812a93d7221d9e6e674b36643ad902c8b68e056fce68d8ea36eb863",
+      "openvino_model.bin": "891d8fb68080c87a379f74be4f8352543dfd63dadbcf3ffff6a6c426b9944bc9",
+      "openvino_model.xml": "027b2a320d42bf91b044bf12b5d294e778f7e4776938628e11c45f8dd51eef76",
+      "special_tokens_map.json": "5aa43c2f985a25296d5a5ce621c2f77376ca8091a47993c492fd5460b895b140",
+      "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+      "tokenizer_config.json": "a5c2e5a7b1a29a0702cd28c08a399b5ecc110c263009d17f7e3b415f25905fd8",
+      "vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+    },
+    "qwen3_openvino_int4": {
+      "added_tokens.json": "79f6ec6fcc423d3a82bfac8b9033b1daac7b7bce06a5f5f441637b480cc605de",
+      "chat_template.jinja": "51fa65c79bb57f058dc7ef8734884bd325fe9d45bb03a61bfef59785d3bc2da9",
+      "config.json": "b2feeddf031392c9404458a46570a01a64458f516217d91e51e94a914e9392c8",
+      "generation_config.json": "757981fe8a3022277be120d547c94a073701f55d94e96e921a06ae8363686951",
+      "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "openvino_config.json": "3a4b467729ac303f55968675c506943deabbaae5a3b95a144e5bcb1131a6fc12",
+      "openvino_model.bin": "3dcf2b93dd9df26b93eac89d409a31bcd8a0a9e303c776e2440a7494221ab671",
+      "openvino_model.xml": "5ccd97f70a0708b1b47d21b65f013deb3d41c68d8ea366add3f9bc4fbd5ba825",
+      "special_tokens_map.json": "57255613bbe23c9497211ca68561ff429a51e871dbaf5a59998fa4c8f7fe168a",
+      "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "tokenizer_config.json": "b2a0d89cf5c89d5d844c56d82e9c3731f862d720a6ce221c31955b628960cde7",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  },
+  "overall_status": "PASS",
+  "total_elapsed_s": 12.4
+}

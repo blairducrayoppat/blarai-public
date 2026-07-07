@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<execution_prompt version="1.0" task="P5-Task-7" milestone="EA-3">
+
+  <comprehension_gate>
+    <instruction>
+      MANDATORY FIRST ACTION: Before any branch creation, file edits, or commands, read this entire prompt and all required attachments in full.
+      Then present a structured comprehension summary to the Lead Architect covering:
+        (a) milestone objective in your own words
+        (b) work items with 1 sentence each
+        (c) files to READ and files to WRITE
+        (d) exact structural requirements for docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+        (e) ORACLE strategy for this DOCS-ONLY audit milestone
+        (f) risks or ambiguities
+        (g) EXACT deliverable structure, recited VERBATIM from this prompt:
+            - branch to create: feature/p5-task7-ea3-ui-gateway-ui-shell-audit from main at 4de08a3
+            - files to WRITE: docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md only
+            - docs/TEST_AUDIT_FINDINGS.md must retain exactly these 6 top-level sections in this order:
+              1. ## Coverage Map
+              2. ## Stale Test Inventory
+              3. ## Assertion Quality Findings
+              4. ## Boundary Violations
+              5. ## Prioritized Gap Report
+              6. ## Pre-existing Skip Analysis
+            - under sections 1-4, preserve ### policy_agent, ### assistant_orchestrator, and ### semantic_router, then append ### ui_gateway and ### ui_shell only
+            - preserve the existing header and EA Index rows from main, then append exactly one EA-3 index row for ui_gateway and ui_shell on baseline 4de08a3 / Entry 42
+            - sections 5 and 6 remain exactly: Deferred to EA-5 synthesis.
+            - append Entry 42 for this milestone
+      Then STOP and WAIT for explicit Lead Architect approval.
+      Do NOT create the branch, write files, or run commands until the Lead Architect confirms that your recitation is correct.
+    </instruction>
+  </comprehension_gate>
+
+  <milestone>
+    <id>P5-TASK7-EA3</id>
+    <title>Task 7 / EA-3: UI Gateway + UI Shell Audit</title>
+    <type>DOCS-ONLY AUDIT</type>
+    <recommended_model>claude-opus-4.6</recommended_model>
+    <model_rationale>Constraint-heavy DOCS-ONLY audit against a shared multi-EA artifact with strict structure, taxonomy, and ledger requirements.</model_rationale>
+    <branch>feature/p5-task7-ea3-ui-gateway-ui-shell-audit</branch>
+    <parent_branch>main</parent_branch>
+    <parent_head>4de08a3</parent_head>
+    <branch_command>git checkout -b feature/p5-task7-ea3-ui-gateway-ui-shell-audit 4de08a3</branch_command>
+    <predecessor>Main HEAD 4de08a3 includes the merged EA-2 correction (Entry 41) plus a later repo hygiene commit. The accepted Task 7 artifact on main already contains policy_agent, assistant_orchestrator, and semantic_router findings and must be extended without structural drift.</predecessor>
+    <harness_declaration>NO_FULL_HARNESS</harness_declaration>
+
+    <required_attachments>
+      <file>.github/copilot-instructions.md</file>
+      <file>docs/TEST_GOVERNANCE.md</file>
+      <file>docs/TEST_AUDIT_FINDINGS.md</file>
+      <file>docs/POST_OPERATIONAL_MATURATION_LEDGER.md</file>
+      <file>docs/P5_TASK7_SDO_CONTINUATION_v1.0.xml</file>
+      <file>docs/P5_TASK7_EA2_AO_SR_AUDIT_CORRECTION.xml</file>
+    </required_attachments>
+
+    <objective>
+      Audit the ui_gateway and ui_shell test suites against docs/TEST_GOVERNANCE.md and append findings to the canonical Task 7 artifact.
+      EA-3 is limited to services/ui_gateway/src, services/ui_gateway/tests, services/ui_shell/src, and services/ui_shell/tests.
+      It must answer the four Task 7 audit questions for those two services only: coverage gaps, stale/dead tests, assertion quality, and boundary correctness.
+      It must append ledger Entry 42 to docs/POST_OPERATIONAL_MATURATION_LEDGER.md.
+      No production files or test files may be changed.
+    </objective>
+
+    <artifact_state>
+      <item>The current main artifact is already populated for policy_agent, assistant_orchestrator, and semantic_router.</item>
+      <item>EA-3 must preserve all accepted prior content from main and append ui_gateway plus ui_shell findings only.</item>
+      <item>Independent oversight is now mandatory for Task 7. Keep Section 4 limited to true boundary-correctness findings, not generic edge-case or threshold coverage gaps.</item>
+      <item>Sections 5 and 6 remain reserved for EA-5 synthesis.</item>
+    </artifact_state>
+
+    <scope>
+      Re-read exactly these in-scope source and test files, excluding __init__.py from coverage counts:
+
+      ui_gateway production files:
+      - services/ui_gateway/src/constants.py
+      - services/ui_gateway/src/session_store.py
+      - services/ui_gateway/src/transport.py
+
+      ui_gateway test files:
+      - services/ui_gateway/tests/test_session_store.py
+      - services/ui_gateway/tests/test_transport.py
+
+      ui_shell production files:
+      - services/ui_shell/src/app.py
+      - services/ui_shell/src/constants.py
+      - services/ui_shell/src/pgov_display.py
+      - services/ui_shell/src/session_panel.py
+      - services/ui_shell/src/streaming.py
+
+      ui_shell test files:
+      - services/ui_shell/tests/test_app.py
+      - services/ui_shell/tests/test_pgov_display.py
+      - services/ui_shell/tests/test_streaming.py
+    </scope>
+
+    <work_items>
+      <item id="WI-1">Re-read all 8 production files and all 5 test files in scope before changing the artifact.</item>
+      <item id="WI-2">Preserve the accepted header and existing service content in docs/TEST_AUDIT_FINDINGS.md, then append exactly one EA-3 row to the EA Index.</item>
+      <item id="WI-3">Append ui_gateway findings under sections 1-4 only, after the existing semantic_router subsection in each populated section.</item>
+      <item id="WI-4">Append ui_shell findings under sections 1-4 only, after the ui_gateway subsection in each populated section.</item>
+      <item id="WI-5">Audit both services for stale or dead tests, including superseded import paths, obsolete architectural assumptions, and tests whose stated purpose no longer matches production behavior.</item>
+      <item id="WI-6">Audit both services for weak assertions and tests that prove too little.</item>
+      <item id="WI-7">Audit both services for true boundary-correctness issues only and keep non-boundary coverage gaps out of Section 4.</item>
+      <item id="WI-8">Append Entry 42 to docs/POST_OPERATIONAL_MATURATION_LEDGER.md using current main numbering.</item>
+      <item id="WI-9">Enforce strict DOCS-ONLY hygiene: stage and commit only the two allowed docs files.</item>
+      <item id="WI-10">Use Tier 3 fail-safe if the assigned scope cannot be completed without quality degradation.</item>
+    </work_items>
+  </milestone>
+
+  <deliverable>
+    <primary_artifact>
+      Modify docs/TEST_AUDIT_FINDINGS.md on main-derived state. Preserve accepted policy_agent, assistant_orchestrator, and semantic_router content from main exactly as-is unless a minimal EA Index append is required.
+    </primary_artifact>
+
+    <header_contract>
+      Preserve the current top block exactly as it exists on main:
+      - Title exactly: # Test Audit Findings
+      - Keep:
+        **Audit Type:** DOCS-ONLY qualitative audit — no production or test file modifications
+        **Task:** P5-Task-7
+        **Governance Reference:** `docs/TEST_GOVERNANCE.md`
+        ### EA Index
+
+      Preserve the existing EA Index rows exactly:
+      - | EA-1 | policy_agent | `feature/p5-task7-ea1-policy-agent-audit` | `88b330d` | Entry 39 |
+      - | EA-1 Correction | policy_agent | `feature/p5-task7-ea1-audit-correction` | `488b198` | Entry 40 |
+      - | EA-2 | assistant_orchestrator, semantic_router | `feature/p5-task7-ea2-ao-sr-audit-correction` | `6ab1ece` | Entry 41 |
+
+      Append exactly one new row:
+      - | EA-3 | ui_gateway, ui_shell | `feature/p5-task7-ea3-ui-gateway-ui-shell-audit` | `4de08a3` | Entry 42 |
+    </header_contract>
+
+    <exact_structure>
+      docs/TEST_AUDIT_FINDINGS.md must continue to contain exactly these 6 top-level sections in this exact order:
+      1. ## Coverage Map
+      2. ## Stale Test Inventory
+      3. ## Assertion Quality Findings
+      4. ## Boundary Violations
+      5. ## Prioritized Gap Report
+      6. ## Pre-existing Skip Analysis
+
+      Under sections 1-4 only, the service headings after EA-3 are:
+      - ### policy_agent
+      - ### assistant_orchestrator
+      - ### semantic_router
+      - ### ui_gateway
+      - ### ui_shell
+
+      Preserve the existing three service subsections from main exactly as they are.
+      Append new ui_gateway content after semantic_router within each populated section.
+      Append new ui_shell content after ui_gateway within each populated section.
+      Sections 5 and 6 must remain exactly:
+      - Deferred to EA-5 synthesis.
+    </exact_structure>
+
+    <coverage_contract>
+      Under ## Coverage Map:
+      - preserve the accepted policy_agent, assistant_orchestrator, and semantic_router content already on main
+      - append ui_gateway findings under ### ui_gateway
+      - append ui_shell findings under ### ui_shell
+      - map every production file in scope to its corresponding test file(s)
+      - record qualitative coverage adequacy and notable coverage gaps
+      - if a production file has only indirect or incidental coverage, say so explicitly
+    </coverage_contract>
+
+    <stale_contract>
+      Under ## Stale Test Inventory:
+      - append ui_gateway stale findings under ### ui_gateway
+      - append ui_shell stale findings under ### ui_shell
+      - if either service has no stale findings, state that explicitly
+      - include stale naming, dead imports, superseded assumptions, or tests whose stated purpose no longer matches current implementation
+    </stale_contract>
+
+    <assertion_contract>
+      Under ## Assertion Quality Findings:
+      - append ui_gateway findings under ### ui_gateway
+      - append ui_shell findings under ### ui_shell
+      - identify weak assertions, tests that only prove non-crash, overreliance on implementation details, and assertions too shallow to catch real regressions
+      - if either service has no material assertion-quality issues, state that explicitly
+    </assertion_contract>
+
+    <boundary_contract>
+      Under ## Boundary Violations:
+      - preserve ### policy_agent, ### assistant_orchestrator, and ### semantic_router exactly as they exist on main
+      - append ### ui_gateway
+      - append ### ui_shell
+
+      Boundary-correctness means only:
+      - real socket connections
+      - real filesystem writes beyond isolated scaffolding
+      - dependence on live services or hardware
+      - tests that should really be integration tests rather than service-level unit tests
+
+      The following do NOT belong in this section:
+      - exact numeric threshold coverage gaps
+      - missing state-transition branches that are really coverage findings
+      - stale nomenclature
+      - weak assertions
+
+      Borderline cases must be justified explicitly.
+      Self-contained temporary-file scaffolding or controlled test doubles do not automatically count as boundary violations.
+
+      If ui_gateway has no true boundary violations, write exactly:
+      No material boundary violations identified for ui_gateway.
+
+      If ui_shell has no true boundary violations, write exactly:
+      No material boundary violations identified for ui_shell.
+    </boundary_contract>
+
+    <ledger_contract>
+      Append Entry 42 to docs/POST_OPERATIONAL_MATURATION_LEDGER.md using the existing ledger format.
+
+      Required content:
+      - Title: Entry 42 - Task 7/EA-3: UI Gateway + UI Shell Audit (COMPLETE)
+      - Date: 2026-04-18 or actual execution date
+      - Branch: feature/p5-task7-ea3-ui-gateway-ui-shell-audit
+      - Predecessor: Entry 41 - Task 7/EA-2: Assistant Orchestrator + Semantic Router Audit
+      - Type: AUDIT / DOCS-ONLY
+      - Disposition: COMPLETE
+      - Summary: EA-3 completed against post-EA-2 corrected main; ui_gateway and ui_shell findings appended to docs/TEST_AUDIT_FINDINGS.md; existing prior-service findings preserved; sections 5-6 remain deferred to EA-5
+      - Files: docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md only
+
+      In Entry 42 summary and key findings:
+      - do not use numbered section references such as Section 4, 5.3, or 5.4
+      - do not describe generic coverage gaps as boundary tests
+    </ledger_contract>
+  </deliverable>
+
+  <negative_constraints>
+    <item>DO NOT modify any file under services/ui_gateway/src/.</item>
+    <item>DO NOT modify any file under services/ui_gateway/tests/.</item>
+    <item>DO NOT modify any file under services/ui_shell/src/.</item>
+    <item>DO NOT modify any file under services/ui_shell/tests/.</item>
+    <item>DO NOT modify docs/TEST_GOVERNANCE.md.</item>
+    <item>DO NOT modify docs/IMPLEMENTATION_PLAN.md.</item>
+    <item>DO NOT rewrite or re-litigate accepted policy_agent, assistant_orchestrator, or semantic_router findings from main.</item>
+    <item>DO NOT add top-level sections beyond the 6 required sections.</item>
+    <item>DO NOT rename any of the 6 required top-level sections.</item>
+    <item>DO NOT populate ## Prioritized Gap Report with findings. Leave it exactly: Deferred to EA-5 synthesis.</item>
+    <item>DO NOT populate ## Pre-existing Skip Analysis with findings. Leave it exactly: Deferred to EA-5 synthesis.</item>
+    <item>DO NOT place generic coverage gaps or weak assertions under ## Boundary Violations.</item>
+    <item>DO NOT use git add .</item>
+    <item>DO NOT run coverage tooling or install dependencies.</item>
+    <item>DO NOT touch unrelated pre-existing untracked files in the worktree.</item>
+  </negative_constraints>
+
+  <context_notes>
+    <note id="CN-1" title="Audit standard">
+      docs/TEST_GOVERNANCE.md is the governing standard for this audit. Use its scope definitions,
+      marker policy, boundary rules, and qualitative coverage expectations as the audit rubric.
+    </note>
+
+    <note id="CN-2" title="Qualitative audit only">
+      Numeric coverage tooling is out of scope. This audit is based on careful code-to-test mapping
+      and governance alignment, not coverage percentages.
+    </note>
+
+    <note id="CN-3" title="Current artifact is canonical">
+      docs/TEST_AUDIT_FINDINGS.md on main is now the canonical shared Task 7 artifact.
+      EA-3 must extend it in-place without disturbing accepted prior content.
+    </note>
+
+    <note id="CN-4" title="Boundary taxonomy must remain strict">
+      Oversight now includes an independent spot-check gate. Findings placed under ## Boundary Violations
+      must be true boundary-correctness issues, not mislabeled coverage or assertion gaps.
+    </note>
+
+    <note id="CN-5" title="Diagnosis only">
+      This is a diagnosis-only audit. The EA must not fix any finding, add any test, or modify any source/test file.
+    </note>
+
+    <note id="CN-6" title="Out-of-scope untracked files already present">
+      The worktree contains unrelated untracked artifacts. Do not touch, stage, rename, or delete them.
+      They are outside this milestone.
+    </note>
+  </context_notes>
+
+  <quality_gate>
+    <gate id="COMPILE" order="1">
+      <command>N/A - DOCS-ONLY audit milestone</command>
+      <criteria>No Python files may be created or modified in this milestone.</criteria>
+    </gate>
+
+    <gate id="TEST" order="2">
+      <command>N/A - DOCS-ONLY audit milestone</command>
+      <criteria>
+        Do not run pytest as a standard gate for this slice.
+        Use file inspection as the primary evidence source.
+        If you choose to run a targeted read-only command to confirm a suspected stale reference or boundary claim, report it explicitly.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_1" order="3">
+      <command>Manual audit completion against all 8 production files and all 5 test files in scope</command>
+      <criteria>
+        All 3 ui_gateway production files, all 2 ui_gateway test files,
+        all 5 ui_shell production files, and all 3 ui_shell test files are evaluated.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_2" order="4">
+      <command>Review docs/TEST_AUDIT_FINDINGS.md structure and header</command>
+      <criteria>
+        The top title remains exactly # Test Audit Findings.
+        The document still contains the same 6 required top-level sections in the same order.
+        Sections 1-4 contain only ### policy_agent, ### assistant_orchestrator, ### semantic_router, ### ui_gateway, and ### ui_shell service headings.
+        The existing three EA Index rows remain intact and one EA-3 row is appended.
+        Sections 5 and 6 remain exactly: Deferred to EA-5 synthesis.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_3" order="5">
+      <command>Review section placement and boundary taxonomy</command>
+      <criteria>
+        ui_gateway and ui_shell findings appear only under sections 1-4.
+        ui_gateway and ui_shell boundary content contains only true boundary-correctness findings.
+        If either service has no true boundary violations, its subsection contains the exact required no-violation sentence.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_4" order="6">
+      <command>Review docs/POST_OPERATIONAL_MATURATION_LEDGER.md metadata</command>
+      <criteria>
+        Entry 42 exists and matches the required title, date, predecessor, type, and disposition.
+        Entry 42 does not use numbered section references and does not mislabel generic coverage gaps as boundary tests.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_5" order="7">
+      <command>git diff --staged --name-only 4de08a3</command>
+      <criteria>
+        Output contains ONLY:
+        - docs/TEST_AUDIT_FINDINGS.md
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_6" order="8">
+      <command>Tier 3 fail-safe check</command>
+      <criteria>
+        If the audit cannot be completed without degraded quality, STOP,
+        leave a clearly labeled partial report, record partial status in Entry 42,
+        and recommend a re-scope instead of forcing a weak close-out.
+      </criteria>
+    </gate>
+  </quality_gate>
+
+  <verification>
+    <instruction>
+      The Lead Architect will verify this milestone using terminal commands only.
+      Your final EA response must report results that these commands can confirm.
+    </instruction>
+
+    <commands>
+      <command>git branch --show-current</command>
+      <expected>feature/p5-task7-ea3-ui-gateway-ui-shell-audit</expected>
+
+      <command>git log --oneline -1</command>
+      <expected>Single EA-3 audit commit on the feature branch</expected>
+
+      <command>git diff 4de08a3 --name-only</command>
+      <expected>
+        docs/TEST_AUDIT_FINDINGS.md
+        docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </expected>
+
+      <command>git diff 4de08a3 --name-only | Select-String "\.py$"</command>
+      <expected>No output</expected>
+
+      <command>Select-String -Path docs/TEST_AUDIT_FINDINGS.md -Pattern "^# Test Audit Findings$","^### EA Index$","^## ","^### policy_agent$","^### assistant_orchestrator$","^### semantic_router$","^### ui_gateway$","^### ui_shell$","Deferred to EA-5 synthesis"</command>
+      <expected>
+        Shows the preserved multi-EA header, the 6 required top-level sections, the five allowed service headings,
+        and the unchanged deferred placeholders.
+      </expected>
+
+      <command>Select-String -Path docs/POST_OPERATIONAL_MATURATION_LEDGER.md -Pattern "Entry 42","Type: AUDIT / DOCS-ONLY","Disposition: COMPLETE" | Select-Object -First 6</command>
+      <expected>Ledger contains contract-compliant Entry 42 for EA-3 on current main.</expected>
+    </commands>
+  </verification>
+
+  <commit_template>
+    <message>
+Task 7 EA-3: append UI gateway and UI shell audit
+
+- Appended ui_gateway and ui_shell findings to docs/TEST_AUDIT_FINDINGS.md
+- Preserved accepted prior-service findings and deferred sections 5-6 to EA-5
+- Added Entry 42 in Post-Operational Maturation Ledger
+    </message>
+  </commit_template>
+
+</execution_prompt>

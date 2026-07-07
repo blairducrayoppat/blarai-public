@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  EA DISPATCH — INSTANCE 12
+  Stage 6 / Phase 3 — Governance and Posterity
+  Authored: 2026-05-07 by Guide-#10
+  Authorized by LA: 2026-05-07 (verbal: "Proceed.")
+  Prerequisite: EA-11 Phase 2 APPROVED by Guide-#10 (all 8 exit criteria met;
+    commits 1e21bc5 / 20d8fc2 / 15d68d8 / 71436e7).
+-->
+<ea_dispatch
+  instance="12"
+  guide_instance="10"
+  stage="6"
+  phase="3"
+  phase_name="Stage 6 Phase 3 — Governance Documentation and Stage 3 Posterity"
+  risk="LOW"
+  authored_date="2026-05-07"
+  authored_by="Guide-#10">
+
+  <!-- ===================================================================
+       §1  MANDATORY FIRST ACTION — COMPREHENSION GATE
+       Present sections CG1–CG7 as first and ONLY output.
+       STOP. Wait for Guide-#10 APPROVED verdict before any tool call.
+       =================================================================== -->
+  <comprehension_gate mandatory="true">
+    <rule>
+      Present CG1–CG7. Do NOT begin work. Do NOT call any tool. Await APPROVED verdict.
+      If APPROVED_WITH_ADJUSTMENTS, apply adjustments verbatim before Step 0.
+    </rule>
+
+    <required_sections>
+
+      <section id="CG1" title="Phase 3 scope summary">
+        In 3–5 sentences: what Tickets A (id 282) and X (id 289) require; which ticket is
+        doc-only vs. which touches existing files; why GUIDE_HANDOFF_LATEST.xml is NOT in
+        Phase 3 EA-12 scope (Co-Lead Phase 3 responsibility, not EA); that the 24-ticket
+        hardening backlog will decrease by 2 open (A + X closed), net 38→39 total after
+        Phase 3 tracking task creation.
+      </section>
+
+      <section id="CG2" title="Pre-Flight Step 0 expected state (all 4 checks)">
+        Check 0a — .platform/ exactly 2 entries (audit_archive/, vikunja_project_ids.yaml).
+        Check 0b (CORRECTED per Phase 2 dispatch correction): Run git tag --list on BOTH repos.
+          BlarAI expected: exactly pre-platform-extract + post-platform-extract (2 tags, no third).
+          devplatform expected: platform-extracted at ae75507 present.
+          HARD STOP if BlarAI shows a third extraction tag or devplatform tag is absent.
+        Check 0c — BlarAI main HEAD 15d68d8; devplatform main HEAD 71436e7. Working tree:
+          BlarAI has 9 .claude/agents/*.md ' D' unstaged deletions (LA WIP, expected, untouched).
+          devplatform has 2 untracked stale flag files in tools/fleet_observability/ (expected, untouched).
+          HARD STOP on any HEAD mismatch or unexpected staged changes.
+        Check 0d — fleet_paused=false at boot.
+      </section>
+
+      <section id="CG3" title="Ticket A (id 282) — exact execution plan">
+        State the exact 4-step execution plan, file by file:
+
+        Step A-1: Grep for the escalation-watchdog typo.
+          Command: Select-String -Path "C:\Users\mrbla\BlarAI\docs\platform_separation\INFRA_DELTA_v2.md" -Pattern "escalation-watchdog" (hyphen variant)
+          If found: fix in-place (replace hyphen with underscore). INFRA_DELTA_v2.md is a reference
+          spec, not a frozen verdict file; amendment permitted. Stage as part of commit 2.
+          If not found: note "typo not found in INFRA_DELTA_v2.md; already corrected or never present."
+          Also grep the 4 verdict files for the same pattern (read-only — do NOT edit them if found there;
+          note any occurrences in the posterity doc for audit trail).
+
+        Step A-2: Grep all 4 frozen verdict files for g7-ea1_n instances.
+          Files (exact paths under BlarAI/docs/platform_separation/temp_for_responses/):
+            - 3.0.v2-GUIDE_RESPONSE_INSTANCE_7_STAGE3_COMPREHENSIVE_AUDIT_CHECKPOINT.xml
+            - 3.1.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_1_V2_VERIFIED_SPEC_CORRECTION_AUTHORIZED.xml
+            - 3.2.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_2_V2_RECLASSIFICATION_REQUIRED_SELECTIVE_COPY_AUTHORIZED.xml
+            - 3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml
+          Command (per file): Select-String -Path "&lt;file&gt;" -Pattern "g7-ea1_n" | Select-Object LineNumber, Line
+          These files are frozen (no-amend doctrine dn30). Do NOT edit them.
+          Collect all instances: file, line number, full ack-atom text.
+
+        Step A-3: Create posterity correction doc.
+          Path: BlarAI/docs/platform_separation/A_STAGE3_EA_NUMBERING_POSTERITY.md
+          Content (minimum):
+            - Header: "Stage 3 EA-Numbering Posterity Correction"
+            - Origin: Anomaly A12 (EA-numbering defect); per no-amend doctrine dn30, verdict files
+              3.0.v2 / 3.1.v2 / 3.2.v2 / 3.10 are not retroactively edited.
+            - Cross-reference table: for each g7-ea1_n* instance found in Step A-2, one row:
+              File | Line | ack-atom text (verbatim from verdict) | Corrected ack ID (g7-ea7_n*)
+            - Typo audit result (from Step A-1): whether escalation-watchdog was found and corrected.
+            - Any other typos/spec-drift discovered during the read-only grep passes — listed here for
+              record; corrections only in non-frozen files (INFRA_DELTA_v2.md, non-verdict XMLs).
+            - Scope note: this document is the canonical correction artifact; it does not supersede
+              the ack atoms in the frozen verdict files, which remain as originally emitted.
+
+        Step A-4: Commit the Ticket A deliverables on BlarAI main.
+          Files: docs/platform_separation/A_STAGE3_EA_NUMBERING_POSTERITY.md (NEW)
+                 docs/platform_separation/INFRA_DELTA_v2.md (ONLY IF typo found in Step A-1)
+          git add must name both files explicitly (or just the posterity doc if no INFRA_DELTA_v2.md edit).
+          Message: docs(stage6_phase3): Ticket A -- Stage 3 EA-numbering posterity correction doc
+      </section>
+
+      <section id="CG4" title="Ticket X (id 289) — exact execution plan">
+        Step X-1: Create the subagent verification protocol governance doc.
+          Path: devplatform/docs/governance/subagent_verification_protocol.md
+          Content (minimum):
+            - Title: "Subagent Verification Protocol"
+            - Origin: Anomaly A18 (Stage 4 dispatch audit; subagent verification false-negative);
+              decision d8 in GUIDE_HANDOFF_LATEST.xml.
+            - Core rule: A Guide instance MUST NOT accept an EA's claim about file state,
+              commit content, diff stats, or test results without independent verification.
+              Verification is not optional — it is part of every Guide cross-check pass.
+            - Standard verification commands for common EA claims:
+                Claimed file content → Read tool (or git show &lt;SHA&gt; -- &lt;file&gt;)
+                Claimed commit stats → git show &lt;SHA&gt; --stat
+                Claimed diff → git show &lt;SHA&gt; -- &lt;file&gt; (with + lines vs - lines)
+                Claimed Vikunja state → mcp__vikunja__get_task(task_id) independently
+                Claimed fleet state → Read devplatform/tools/autonomy_budget/state.json directly
+            - Activation scope: all Guide-supervised EA executions from Stage 4 onward.
+            - Note: GUIDE_HANDOFF_LATEST.xml update is NOT in EA-12 scope. The Co-Lead Phase 3
+              step at the next Guide transition will incorporate a reference to this document.
+              EA-12 does not edit GUIDE_HANDOFF_LATEST.xml.
+
+        Step X-2: Commit on devplatform main.
+          Files: docs/governance/subagent_verification_protocol.md (NEW)
+          Message: docs(governance): Ticket X -- subagent verification protocol (A18 resolution)
+      </section>
+
+      <section id="CG5" title="Commit plan (5 commits in order)">
+        | # | Repo | Files staged | Message | Skip condition |
+        |---|---|---|---|---|
+        | 1 | devplatform | tools/autonomy_budget/state.json | chore(ops): pause fleet -- Stage 6 Phase 3 governance+posterity -- EA-12 | None |
+        | 2 | BlarAI | docs/platform_separation/A_STAGE3_EA_NUMBERING_POSTERITY.md [+ INFRA_DELTA_v2.md if typo found] | docs(stage6_phase3): Ticket A -- Stage 3 EA-numbering posterity correction doc | None |
+        | 3 | devplatform | docs/governance/subagent_verification_protocol.md | docs(governance): Ticket X -- subagent verification protocol (A18 resolution) | None |
+        | 4 | BlarAI | docs/platform_separation/STATUS.md | docs(stage6_phase3): record Phase 3 complete in STATUS.md (E11) | Deferred to Phase 4 if HARD STOP on both tickets |
+        | 5 | devplatform | tools/autonomy_budget/state.json | chore(ops): unpause fleet -- Stage 6 Phase 3 governance+posterity -- EA-12 done | None — always runs |
+
+        Explicit-add only. git diff --staged verified before each commit.
+        Standing artifacts untouched (9 BlarAI .claude/agents/*.md ' D' deletions;
+        2 devplatform tools/fleet_observability/*.flag files).
+      </section>
+
+      <section id="CG6" title="STATUS.md E11 entry plan">
+        Commit 4 makes two edits to STATUS.md:
+
+        Edit (a) — Stage 6 table row: update devplatform and BlarAI commit columns and Key Evidence.
+          Current after Phase 2:
+            | 6 Hardening | IN-PROGRESS | | devplatform Phase 2 SHAs | BlarAI 15d68d8 | Items 6.4+6.5 complete; ... |
+          New:
+            | 6 Hardening | IN-PROGRESS | 2026-05-07 | devplatform &lt;3+5 SHAs&gt; | BlarAI &lt;2+4 SHAs&gt; | Items 6.4+6.5+TicketA+TicketX complete; 6.1-6.3/6.6 DEFERRED; 6.7-6.10 pending |
+
+        Edit (b) — §11 evolution: append E11 after E10 block.
+          Content:
+            **E11 — Stage 6 Phase 3 (Tickets A+X) complete** (devplatform commits 1+3+5-SHAs,
+            BlarAI commits 2+4-SHAs, 2026-05-07): Ticket A — Stage 3 EA-numbering posterity
+            correction published at docs/platform_separation/A_STAGE3_EA_NUMBERING_POSTERITY.md;
+            g7-ea1_n* → g7-ea7_n* cross-reference table covers N instances across 4 frozen verdict
+            files; INFRA_DELTA_v2.md [typo corrected / typo not found]. Ticket X —
+            devplatform/docs/governance/subagent_verification_protocol.md published (A18 resolution;
+            standard verification commands for Guide cross-check passes). Hardening backlog:
+            39 total / 17 done / 22 open after Phase 3 tracking task close.
+
+        Fill in actual SHAs and counts once commits land.
+      </section>
+
+      <section id="CG7" title="All 9 required acks confirmed">
+        Confirm each ack label (g10-ea12_n1 through g10-ea12_n9) with one sentence each.
+        See §5 Required Acks for the full text.
+      </section>
+
+    </required_sections>
+  </comprehension_gate>
+
+
+  <!-- ===================================================================
+       §2  CONTEXT AND INHERITED STATE
+       =================================================================== -->
+  <context>
+
+    <repo_state>
+      BlarAI main HEAD: 15d68d8
+        "docs(stage6_phase2): record Items 6.4+6.5 complete in STATUS.md (E10)"
+      devplatform main HEAD: 71436e7
+        "chore(ops): unpause fleet -- Stage 6 Phase 2 items 6.4+6.5 -- EA-11 done"
+      Fleet state: unpaused (fleet_paused=false, last_updated_utc=2026-05-07T21:10:10Z)
+    </repo_state>
+
+    <vikunja_state>
+      Project 10 (DevPlatform-Meta) at Phase 3 boot: 38 total / 14 done / 24 open
+      Tickets closed in Phase 3: A (id 282) + X (id 289) from hardening backlog
+      Phase 3 tracking task: 1 new task created + closed = net +1 total / +1 done / open unchanged
+      Expected Project 10 final state: 39 total / 17 done / 22 open
+        Breakdown: +1 tracking task created (39 total / 14 done / 25 open)
+                 → close A: 39/15/24
+                 → close X: 39/16/23
+                 → close tracking task: 39/17/22
+    </vikunja_state>
+
+    <phase2_dispatch_corrections>
+      Both corrections carry forward into Check 0b of this dispatch:
+      1. Check 0b: platform-extracted is a devplatform tag (ae75507); BlarAI has exactly 2
+         extraction tags (pre-platform-extract, post-platform-extract). Verify BOTH repos.
+      2. Item 6.5 sweep false-positive (_claude_projects_dirty.log): documented in E10, no
+         further action needed. Not relevant to Phase 3 scope.
+    </phase2_dispatch_corrections>
+
+    <anomaly_A33_standing_workaround>
+      complete_task SUSPENDED. All closes use Option B:
+        get_task(id) → capture title/description/priority
+        update_task(id, title=t, description=d, priority=p, done=True)
+      Both title and done=True explicit on every close call.
+      Fix tracked at Ticket WW (id 318, MEDIUM priority, open).
+    </anomaly_A33_standing_workaround>
+
+    <no_amend_doctrine>
+      dn30: frozen verdict files are NEVER retroactively edited.
+      Frozen in Phase 3 scope:
+        3.0.v2-GUIDE_RESPONSE_INSTANCE_7_STAGE3_COMPREHENSIVE_AUDIT_CHECKPOINT.xml
+        3.1.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_1_V2_VERIFIED_SPEC_CORRECTION_AUTHORIZED.xml
+        3.2.v2-GUIDE_RESPONSE_INSTANCE_7_ITEM_3_2_V2_RECLASSIFICATION_REQUIRED_SELECTIVE_COPY_AUTHORIZED.xml
+        3.10-GUIDE_RESPONSE_INSTANCE_7_STAGE3_CLOSE_VERIFIED.xml
+      INFRA_DELTA_v2.md is a living reference spec — amendment permitted for typo correction.
+    </no_amend_doctrine>
+
+  </context>
+
+
+  <!-- ===================================================================
+       §3  PRE-FLIGHT
+       =================================================================== -->
+  <pre_flight>
+
+    <step id="0" name="4-check verification">
+
+      <check id="0a">
+        <command>Get-ChildItem C:\Users\mrbla\BlarAI\.platform | Select-Object Name</command>
+        <expected>Exactly 2: audit_archive, vikunja_project_ids.yaml</expected>
+        <on_fail>HARD STOP. Report actual contents to Guide-#10.</on_fail>
+      </check>
+
+      <check id="0b" note="CORRECTED — checks both repos, not just BlarAI">
+        <commands>
+          <cmd>git -C "C:\Users\mrbla\BlarAI" tag --list</cmd>
+          <cmd>git -C "C:\Users\mrbla\devplatform" tag --list "platform-extracted"</cmd>
+        </commands>
+        <expected>
+          BlarAI: pre-platform-extract and post-platform-extract (exactly 2 extraction tags;
+            archive/mock-backend-uat1 also present — expected, unrelated).
+          devplatform: platform-extracted (1 line output).
+        </expected>
+        <on_fail>HARD STOP. Missing or unexpected extraction tag — report to Guide-#10.</on_fail>
+      </check>
+
+      <check id="0c">
+        <commands>
+          <cmd>git -C "C:\Users\mrbla\BlarAI" log --oneline -1</cmd>
+          <cmd>git -C "C:\Users\mrbla\devplatform" log --oneline -1</cmd>
+          <cmd>git -C "C:\Users\mrbla\BlarAI" status --short</cmd>
+          <cmd>git -C "C:\Users\mrbla\devplatform" status --short</cmd>
+        </commands>
+        <expected>
+          BlarAI HEAD: 15d68d8
+          devplatform HEAD: 71436e7
+          BlarAI working tree: 9 .claude/agents/*.md ' D' lines only.
+          devplatform working tree: 2 untracked flag files only.
+        </expected>
+        <on_fail>
+          HEAD mismatch or unexpected staged changes → HARD STOP; report to Guide-#10.
+          New untracked files not in Phase 3 commit paths → note, not auto-stop.
+        </on_fail>
+      </check>
+
+      <check id="0d">
+        <command>Get-Content C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json | ConvertFrom-Json | Select-Object fleet_paused, last_updated_utc</command>
+        <expected>fleet_paused=false</expected>
+        <on_fail>HARD STOP. Investigate who holds the pause before proceeding.</on_fail>
+      </check>
+
+    </step>
+
+    <step id="0.5" name="Create Phase 3 Vikunja tracking task" timing="After Step 0 PASS, before Step 1">
+      <task_spec>
+        title:       "Stage 6 Phase 3: Stage 3 posterity + subagent verification protocol (Tickets A+X)"
+        project_id:  10
+        priority:    2  (MEDIUM)
+        description: "EA-12 Phase 3 execution. Tickets in scope: A (id 282, Stage 3 EA-numbering posterity + INFRA_DELTA_v2.md typo) and X (id 289, subagent verification protocol governance doc). Documentation-only phase; no code or fleet-config changes. Reference: docs/platform_separation/07_STAGE6_HARDENING.xml."
+        labels:      [Active (id 1), Documentation (id 7)]
+      </task_spec>
+      <note>Capture the new task ID immediately. Reference it in all subsequent Vikunja comments.</note>
+    </step>
+
+    <step id="1" name="Pause fleet" timing="After Step 0.5">
+      <command>
+        python -c "import sys; sys.path.insert(0, r'C:\Users\mrbla\devplatform'); from tools.autonomy_budget import state; state.pause_fleet('Stage 6 Phase 3 governance+posterity -- EA-12', updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      </command>
+      <verify>fleet_paused=True, fleet_paused_reason contains "EA-12", last_updated_by=ea_code</verify>
+      <commit>
+        <repo>devplatform</repo>
+        <files>tools/autonomy_budget/state.json</files>
+        <message>chore(ops): pause fleet -- Stage 6 Phase 3 governance+posterity -- EA-12</message>
+      </commit>
+    </step>
+
+  </pre_flight>
+
+
+  <!-- ===================================================================
+       §4  WORK ITEMS
+       =================================================================== -->
+  <work_items>
+
+    <item id="A" vikunja_id="282" name="Stage 3 locked-artifact amendments + EA-numbering posterity"
+          priority="HIGH" labels="Active, Architecture, Documentation">
+
+      <step id="A-1" name="Typo audit — INFRA_DELTA_v2.md">
+        <command>Select-String -Path "C:\Users\mrbla\BlarAI\docs\platform_separation\INFRA_DELTA_v2.md" -Pattern "escalation-watchdog" -CaseSensitive</command>
+        <if_found>Fix: replace escalation-watchdog with escalation_watchdog (exact occurrences only).
+          Verify no other hyphen-vs-underscore defects in adjacent lines.
+          Note: INFRA_DELTA_v2.md is a living spec — amendment permitted per §2 no_amend_doctrine.</if_found>
+        <if_not_found>Note "escalation-watchdog hyphen pattern not found in INFRA_DELTA_v2.md" in posterity doc.</if_not_found>
+        <also_grep_frozen_files>
+          Run same pattern against the 4 verdict files (read-only):
+            Select-String -Path "C:\Users\mrbla\BlarAI\docs\platform_separation\temp_for_responses\3.0.v2-GUIDE_RESPONSE_INSTANCE_7_STAGE3_COMPREHENSIVE_AUDIT_CHECKPOINT.xml" -Pattern "escalation-watchdog"
+            [repeat for 3.1.v2, 3.2.v2, 3.10 files]
+          If found: note occurrences in posterity doc for audit trail. Do NOT edit verdict files.
+        </also_grep_frozen_files>
+      </step>
+
+      <step id="A-2" name="g7-ea1_n* grep in frozen verdict files">
+        <instruction>
+          For each of the 4 frozen verdict files, run:
+            Select-String -Path "&lt;file&gt;" -Pattern "g7-ea1_n" | Select-Object LineNumber, Line
+          Collect all results: file shortname, line number, full ack text (the line content).
+          These instances form the cross-reference table in the posterity doc.
+          Do NOT edit the verdict files.
+        </instruction>
+      </step>
+
+      <step id="A-3" name="Create posterity correction doc">
+        <path>C:\Users\mrbla\BlarAI\docs\platform_separation\A_STAGE3_EA_NUMBERING_POSTERITY.md</path>
+        <required_content>
+          1. Header: "Stage 3 EA-Numbering Posterity Correction (Ticket A)"
+          2. Origin: "Anomaly A12 — EA-numbering defect. Stage 3 verdict files used g7-ea1_n*
+             (reflecting the first EA spawned for Stage 3) but the correct global identifier
+             is g7-ea7_n* (EA-7 in the cumulative cross-session count, per feedback_ea_numbering_global.md).
+             Per no-amend doctrine (dn30), the verdict files are not retroactively edited.
+             This document is the canonical correction artifact."
+          3. Cross-reference table: one row per g7-ea1_n* instance found in Step A-2:
+               File | Line | ack-atom text (verbatim) | Corrected ID
+             Example row: 3.0.v2-GUIDE_RESPONSE... | 42 | "g7-ea1_n1: ..." | g7-ea7_n1
+          4. Typo audit results (from Step A-1): INFRA_DELTA_v2.md status + frozen file grep.
+          5. Scope note: "This document supersedes no prior artifact. The frozen verdict files
+             remain as originally emitted. Callers who encounter g7-ea1_n* in Stage 3 verdict
+             files should resolve via this table."
+          6. Reference: STATUS.md Anomaly A12; EA-numbering feedback memory.
+        </required_content>
+      </step>
+
+      <step id="A-4" name="Commit Ticket A deliverables on BlarAI">
+        <files_to_stage>
+          docs/platform_separation/A_STAGE3_EA_NUMBERING_POSTERITY.md  (always)
+          docs/platform_separation/INFRA_DELTA_v2.md  (only if typo fix was made in Step A-1)
+        </files_to_stage>
+        <message>docs(stage6_phase3): Ticket A -- Stage 3 EA-numbering posterity correction doc</message>
+        <verify>git diff --staged before commit; only the listed files staged.</verify>
+      </step>
+
+      <vikunja_close>
+        After commit from Step A-4:
+          1. add_task_comment(282, "Phase 3 execution complete. A_STAGE3_EA_NUMBERING_POSTERITY.md
+             created at docs/platform_separation/. Cross-reference table covers [N] g7-ea1_n* instances
+             across 4 verdict files. INFRA_DELTA_v2.md [typo corrected / typo not found]. BlarAI
+             commit &lt;SHA&gt;.")
+          2. get_task(282) → capture title, description, priority.
+          3. update_task(282, title=t, description=d, priority=p, done=True)  [Option B — A33 workaround]
+          4. get_task(282) → verify done=true, description preserved.
+      </vikunja_close>
+
+    </item>
+
+    <item id="X" vikunja_id="289" name="Subagent verification protocol formalization"
+          priority="HIGH" labels="Active, Architecture, Documentation">
+
+      <step id="X-1" name="Create governance doc on devplatform">
+        <path>C:\Users\mrbla\devplatform\docs\governance\subagent_verification_protocol.md</path>
+        <required_content>
+          1. Title: "Subagent Verification Protocol"
+          2. Status: Active (effective Stage 4 onward)
+          3. Origin: Anomaly A18 (Stage 4 dispatch audit, subagent verification false-negative);
+             decision d8 in GUIDE_HANDOFF_LATEST.xml.
+          4. Core rule: "A Guide instance MUST independently verify every substantive EA claim
+             before accepting it. Verification is not optional. Accepting an EA's claim about file
+             state, commit content, diff stats, or test results without cross-checking is a
+             protocol violation."
+          5. Standard verification commands by claim type:
+               EA claims file content → Read tool directly, OR git show &lt;SHA&gt; -- &lt;file&gt;
+               EA claims commit stats → git show &lt;SHA&gt; --stat
+               EA claims diff is exactly X → git show &lt;SHA&gt; -- &lt;file&gt;  (inspect + / - lines)
+               EA claims Vikunja task state → mcp__vikunja__get_task(task_id) independently
+               EA claims fleet is unpaused → Read devplatform/tools/autonomy_budget/state.json
+               EA claims working tree clean → git -C &lt;repo&gt; status --short (run on both repos)
+          6. Escalation: if cross-check contradicts EA claim, issue REJECTED verdict with evidence.
+             Do not accept EA's explanation without re-running the verification command.
+          7. Scope: applies to all Guide instances (Guide-#7 onward, retroactively; new protocol
+             in all Guide handoff briefs from this commit onward).
+          8. Note: GUIDE_HANDOFF_LATEST.xml incorporation is at the next Co-Lead Phase 3 step
+             (Guide transition), not by this EA.
+        </required_content>
+      </step>
+
+      <step id="X-2" name="Commit Ticket X deliverable on devplatform">
+        <files_to_stage>docs/governance/subagent_verification_protocol.md</files_to_stage>
+        <message>docs(governance): Ticket X -- subagent verification protocol (A18 resolution)</message>
+        <verify>git diff --staged before commit; only the governance doc staged.</verify>
+      </step>
+
+      <vikunja_close>
+        After commit from Step X-2:
+          1. add_task_comment(289, "Phase 3 execution complete. subagent_verification_protocol.md
+             created at devplatform/docs/governance/. Core rule + standard verification commands
+             documented. GUIDE_HANDOFF_LATEST.xml incorporation at next Co-Lead Phase 3 Guide
+             transition (not EA-12 scope). devplatform commit &lt;SHA&gt;.")
+          2. get_task(289) → capture title, description, priority.
+          3. update_task(289, title=t, description=d, priority=p, done=True)  [Option B — A33 workaround]
+          4. get_task(289) → verify done=true, description preserved.
+      </vikunja_close>
+
+    </item>
+
+    <item id="STATUS_UPDATE" name="STATUS.md E11 evolution entry + Stage 6 table">
+      <instruction>
+        After both Ticket A and Ticket X commits land, update STATUS.md in a single BlarAI commit.
+        Two edits:
+          (a) Stage 6 table row: update devplatform and BlarAI commit SHA columns; update Key Evidence
+              to read "Items 6.4+6.5+TicketA+TicketX complete; 6.1-6.3/6.6 DEFERRED; 6.7-6.10 pending".
+          (b) §11 evolution: append E11 entry after E10. Fill actual SHAs and counts.
+      </instruction>
+      <commit>
+        <repo>BlarAI</repo>
+        <files>docs/platform_separation/STATUS.md</files>
+        <message>docs(stage6_phase3): record Phase 3 complete in STATUS.md (E11)</message>
+      </commit>
+      <skip_condition>
+        If both Tickets A and X hit HARD STOPs (unlikely for doc-only work), defer this commit
+        and close report as PARTIAL. Fleet must still be unpaused via Post-Flight.
+      </skip_condition>
+    </item>
+
+  </work_items>
+
+
+  <!-- ===================================================================
+       §5  REQUIRED ACKS
+       =================================================================== -->
+  <required_acks>
+
+    <ack id="g10-ea12_n1">
+      BlarAI main HEAD is 15d68d8 (Phase 2 STATUS.md commit); devplatform main HEAD is 71436e7
+      (Phase 2 unpause). Any deviation → HARD STOP with actual HEADs reported to Guide-#10.
+    </ack>
+
+    <ack id="g10-ea12_n2">
+      Check 0b runs git tag --list on BOTH repos. BlarAI expected: pre-platform-extract +
+      post-platform-extract (2 extraction tags, no third). devplatform expected: platform-extracted
+      at ae75507. The dispatch error from Phase 2 (checking only BlarAI) is corrected here.
+    </ack>
+
+    <ack id="g10-ea12_n3">
+      The unpause function is resume_fleet() — NOT unpause_fleet() (raises AttributeError).
+      sys.path.insert(0, r'C:\Users\mrbla\devplatform') required before import.
+    </ack>
+
+    <ack id="g10-ea12_n4">
+      Ticket A no-amend constraint: verdict files 3.0.v2 / 3.1.v2 / 3.2.v2 / 3.10 are frozen
+      per dn30. They are grepped read-only; results go into the posterity doc. Only
+      INFRA_DELTA_v2.md (living spec) may be edited, and only if the typo is present.
+    </ack>
+
+    <ack id="g10-ea12_n5">
+      Ticket X deliverable is devplatform/docs/governance/subagent_verification_protocol.md only.
+      GUIDE_HANDOFF_LATEST.xml is NOT edited by EA-12; that is Co-Lead Phase 3 responsibility
+      at the next Guide transition.
+    </ack>
+
+    <ack id="g10-ea12_n6">
+      A33 standing workaround: complete_task suspended. All closes (Ticket A, Ticket X, Phase 3
+      tracking task) use Option B: get_task → update_task(title, description, priority, done=True).
+    </ack>
+
+    <ack id="g10-ea12_n7">
+      Explicit-add discipline: git add names exact filenames; git add . and git add -A never used;
+      git diff --staged verified before each commit.
+    </ack>
+
+    <ack id="g10-ea12_n8">
+      Standing artifacts untouched: 9 BlarAI .claude/agents/*.md ' D' deletions and 2 devplatform
+      tools/fleet_observability/ flag files. Neither set is staged or remediated in Phase 3.
+    </ack>
+
+    <ack id="g10-ea12_n9">
+      Phase 3 Vikunja tracking task created in Project 10 at Step 0.5 before fleet pause.
+      Closed via Option B at PF1 after commit 4 (STATUS.md). PF1 is PASS-path only: if Phase 3
+      is partial (HARD STOP), add comment to tracking task and leave open, per AOAM §4.
+    </ack>
+
+  </required_acks>
+
+
+  <!-- ===================================================================
+       §6  POST-FLIGHT
+       =================================================================== -->
+  <post_flight>
+
+    <step id="PF1" name="Close or comment Phase 3 tracking task">
+      <pass_path>
+        get_task(tracking_task_id) → capture fields.
+        update_task(tracking_task_id, title=t, description=d, priority=p, done=True).
+        Verify: get_task → done=true, fields preserved.
+      </pass_path>
+      <partial_path>
+        add_task_comment with "Phase 3 PARTIAL — [explanation]. Awaiting Guide-#10 disposition."
+        Leave done=false. Do NOT call update_task with done=True.
+      </partial_path>
+    </step>
+
+    <step id="PF2" name="Unpause fleet — ALWAYS RUNS">
+      <command>
+        python -c "import sys; sys.path.insert(0, r'C:\Users\mrbla\devplatform'); from tools.autonomy_budget import state; state.resume_fleet(updated_by='ea_code', path='C:/Users/mrbla/devplatform/tools/autonomy_budget/state.json')"
+      </command>
+      <verify>fleet_paused=False, fleet_paused_reason=null, last_updated_by=ea_code</verify>
+      <commit>
+        <repo>devplatform</repo>
+        <files>tools/autonomy_budget/state.json</files>
+        <message>chore(ops): unpause fleet -- Stage 6 Phase 3 governance+posterity -- EA-12 done</message>
+      </commit>
+    </step>
+
+  </post_flight>
+
+
+  <!-- ===================================================================
+       §7  EXIT CRITERIA
+       =================================================================== -->
+  <exit_criteria>
+    <criterion id="EC1">Step 0 PASS on all 4 checks (after any Guide-#10 dispositions).</criterion>
+    <criterion id="EC2">Pause commit 1 on devplatform main.</criterion>
+    <criterion id="EC3">A_STAGE3_EA_NUMBERING_POSTERITY.md exists at BlarAI/docs/platform_separation/;
+      INFRA_DELTA_v2.md amended or confirmed clean; commit 2 on BlarAI main.</criterion>
+    <criterion id="EC4">subagent_verification_protocol.md exists at devplatform/docs/governance/;
+      commit 3 on devplatform main.</criterion>
+    <criterion id="EC5">STATUS.md E11 entry appended + Stage 6 row updated; commit 4 on BlarAI main.</criterion>
+    <criterion id="EC6">Ticket A (282) and Ticket X (289) both done=true in Vikunja, fields preserved.
+      Project 10: 39 total / 17 done / 22 open.</criterion>
+    <criterion id="EC7">Phase 3 tracking task closed or commented; unpause commit 5 on devplatform main;
+      fleet_paused=false.</criterion>
+    <criterion id="EC8">EA-12 emits Phase 3 close report with all commit SHAs, Vikunja mutation log,
+      posterity doc cross-reference table summary, and EC1–EC7 checklist.</criterion>
+  </exit_criteria>
+
+
+  <!-- ===================================================================
+       §8  GUIDE-#10 VERIFICATION COMMANDS
+       =================================================================== -->
+  <guide_verification>
+    <cmd>git -C "C:\Users\mrbla\BlarAI" show HEAD --stat</cmd>
+    <cmd>git -C "C:\Users\mrbla\BlarAI" log --oneline -4</cmd>
+    <cmd>git -C "C:\Users\mrbla\devplatform" log --oneline -5</cmd>
+    <cmd>Get-Content "C:\Users\mrbla\BlarAI\docs\platform_separation\A_STAGE3_EA_NUMBERING_POSTERITY.md" | Select-Object -First 40</cmd>
+    <cmd>Get-Content "C:\Users\mrbla\devplatform\docs\governance\subagent_verification_protocol.md" | Select-Object -First 40</cmd>
+    <cmd>mcp__vikunja__get_task(282) — verify done=true, description preserved</cmd>
+    <cmd>mcp__vikunja__get_task(289) — verify done=true, description preserved</cmd>
+    <cmd>mcp__vikunja__project_summary — expect Project 10: 39/17/22</cmd>
+    <cmd>Get-Content "C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json" | ConvertFrom-Json | Select fleet_paused, last_updated_utc</cmd>
+  </guide_verification>
+
+</ea_dispatch>

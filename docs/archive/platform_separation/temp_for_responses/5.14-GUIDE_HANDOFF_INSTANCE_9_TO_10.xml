@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AUDIT COPY (instance 9 → 10).
+  Mirror of docs/platform_separation/GUIDE_HANDOFF_LATEST.xml at the moment of emission
+  (2026-04-30T17:55:00Z). The LATEST file will be overwritten by the next Guide-instance handoff;
+  this dated audit copy is the permanent record for the 9→10 transition. DO NOT MODIFY (per dn9 + dn23).
+  Pattern matches predecessor 4.13-GUIDE_HANDOFF_INSTANCE_8_TO_9.xml.
+-->
+<guide_handoff_brief schema_version="1" audience="successor_guide_only">
+
+  <metadata>
+    <predecessor_instance>9</predecessor_instance>
+    <successor_instance>10</successor_instance>
+    <handoff_timestamp_utc>2026-04-30T17:55:00Z</handoff_timestamp_utc>
+    <procedure_phase>Stage 5 (Cleanup) OPERATIONALLY CLOSED + VERIFIED at 2026-04-30T15:31:12Z (devplatform close-unpause `2637413`). EA-9 retired correctly. Triple-subagent convergence VERIFIED at 5.12 verdict; boundary gate APPROVED at 5.13 verdict (45-min post-close soak 6/6 criteria PASS). LA explicitly REJECTED 24h soak ("over-engineering"). Stage 6 (Hardening per `docs/platform_separation/07_STAGE6_HARDENING.xml` — LOW risk, multi-session) NOT YET SPAWNED. Guide-#10's first substantive task is the Variant B comprehension gate; second task is to consider whether Stage 6 needs a 6.0.v2 pre-flight audit (LOW risk; likely not needed); third task is to begin Stage 6 dispatch authoring per LA gate-review (multi-item: 6.4 / 6.5 / 6.7.5 / 6.7.v2 / 6.8 / 6.9; 6.1-6.3 + 6.6 DEFERRED per d30).</procedure_phase>
+    <branch_at_handoff_blarai>main @ pending-this-handoff-commit (chain: f3b0071 STATUS append → 9a23911 MM-scope corrections → 8f9220c gap recovery → e36e9f8 evidence pack → next: 5.14 handoff brief commit). chore/platform-extraction tip @ 3e73484 PRESERVED. Tags: post-platform-extract (object 67d0025 → annotates 4122b92 merge); pre-platform-extract (object ce2ec58 → annotates d0dc1c7 Stage 0 baseline; PRESERVED per RECOVERY.md).</branch_at_handoff_blarai>
+    <branch_at_handoff_devplatform>main @ pending-final-unpause (chain: 1a552d9 pause → c20e298 Phase E → ae75507 Phase F → 2637413 Stage 5 unpause → 535968b Guide-#9 transition pause → 19bed62 soak_monitor add → next: Guide-#9 final unpause commit). Tag: platform-extracted (object 896d591 → annotates ae75507).</branch_at_handoff_devplatform>
+    <status_md_last_commit>e36e9f8 (Stage 5 close evidence pack; STATUS.md not modified at this commit). STATUS.md at HEAD reflects: Stage Ledger row 5 = COMPLETE with disambiguated commit-stat figures; §7 35-ticket Stage 6.7.5 backlog with full letter→Vikunja-ID mapping; §8 commit-discipline footnote with Stage 5 anchors; §9 anomalies A20-A31. Last STATUS.md commit was 8f9220c (gap recovery; backlog 29 → 35).</status_md_last_commit>
+    <fleet_pause_state>PAUSED at `devplatform/tools/autonomy_budget/state.json` — fleet_paused=true, fleet_paused_reason='Guide-#9 Stage 5→6 transition work', last_updated_by='claude_code', last_updated_utc=2026-04-30T17:48:xxZ (capture exact via state.json read). Pause committed at devplatform `535968b`. Guide-#9's FINAL action before this handoff XML commit will be devplatform unpause (commit will follow). Guide-#10 boots into fleet_paused=False.</fleet_pause_state>
+    <worktree_state_blarai>Working tree CLEAN at handoff emission (after this 5.14 commit). All Guide-#9-cycle artifacts committed: 5.0.v2 audit verdict at 176922c; 5.0 init pointer at ff39a41; 5.12 close verdict + S1/S2/S3 + 5.13 boundary gate + soak_log committed at e36e9f8; 5.14 handoff brief at this commit; STATUS.md at f3b0071 + 9a23911 + 8f9220c. soak_monitor.ps1 deleted from BlarAI root (migrated to devplatform).</worktree_state_blarai>
+    <worktree_state_devplatform>Working tree CLEAN post-pause + soak_monitor commit. Pre-existing Stage-4-residue untracked items (FLEET_DASHBOARD.md + tools/vikunja/config.yml.pre_stage4_bak + tools/vikunja_mcp/bridge/inbox.json) carried forward unchanged from Guide-#8 → #9 handoff state.</worktree_state_devplatform>
+    <pytest_baseline>
+      BlarAI side (`pytest shared/ services/ launcher/`): **1001 passed, 2 skipped, 0 failed** per Item 5.8.v2 verification + soak observation (BENEFICIAL drift +20 vs CLAUDE.md 981/22 baseline; same 1003 collection total). Anomaly A30 binds as new accepted baseline.
+      devplatform side (`pytest --collect-only tools/`): 351 tests, 0 errors (unchanged through Stage 5; Stage 5 work was BlarAI deletion + devplatform PS1 path-resolution edits only).
+    </pytest_baseline>
+    <stash_zero>**Generic discipline**: don't pop or apply ANY wake_launcher auto-stash, regardless of timestamp. Pattern D 24h retention sweep (commit `7ec424f`) auto-drops stashes older than 24h. Anomaly A20 binds forensic investigation to Ticket LL (Vikunja id 302).</stash_zero>
+    <trigger_reason>LA directive 2026-04-30 post-boundary-gate-approval: "Walk me now through any remaining decisions and/or steps I need to make before I can have you begin the handoff process to Guide #10 for Stage 6 work." All 6 boundary-gate decisions resolved (commit evidence pack ✓ at e36e9f8; soak_monitor migration ✓ at 19bed62; UU Vikunja binding ✓ at id=316; doctrine split DEFERRED per 6.1.v2; late-Stage-6 archival per d29; 24h soak REJECTED per d28). Stage 6 ready to spawn.</trigger_reason>
+  </metadata>
+
+  <active_conversational_topic>
+    Stage 5 (Cleanup; MEDIUM risk; SINGLE-session execution) closed + verified. Boundary gate APPROVED. Guide-#9 retires with this handoff brief committed. Stage 6 (Hardening; LOW risk; MULTI-session execution) ready to spawn at LA discretion.
+
+    LA's IMMEDIATE next steps per Guide-#10 spawn pattern:
+      (1) LA spawns fresh Guide-#10 chat with: GUIDE_PROMPT.xml + STATUS.md + GUIDE_HANDOFF_LATEST.xml + Variant B chat-init block + Stage 6 dispatch (07_STAGE6_HARDENING.xml).
+      (2) Guide-#10 runs Variant B comprehension gate (re-reads source-doc set per GUIDE_PROMPT.xml + this handoff brief + Guide-#9 verdict files at temp_for_responses/5.X — many: 5.0.v2 preflight audit + 5.12 close verdict + S1/S2/S3 subagents + 5.13 boundary gate + soak_log).
+      (3) Guide-#10 considers Stage 6.0.v2 pre-flight audit (likely not needed; LOW risk + multi-session means per-item audits as needed rather than batch preflight).
+      (4) Guide-#10 begins Stage 6 dispatch authoring (multi-item; recommended order: 6.4 + 6.5 first as low-risk + non-blocking; then 6.7.5 batches grouped by priority; 6.7.v2 + 6.8 + 6.9 per LA gate-review).
+
+    LA expectation per established pattern: post-spawn calibration review by Guide-#9 (this current Claude Code session) of Guide-#10's initial responses to ensure calibration and understanding. Once LA is satisfied Guide-#10 is calibrated, Guide-#9 retires fully. (Guide-#9 retains advisory standby; Guide-#10 owns Stage 6 supervision.)
+  </active_conversational_topic>
+
+  <stage_5_close_anchors>
+
+    <blarai_side>
+      <commit sha="3e73484" subject="Extract platform layer to devplatform (Stages 2-5)" branch="chore/platform-extraction" stats="335/+1120/-33179 single-commit; 480/+32942/-37655 cumulative pre-merge / 42 commits" preserved_post_merge="true"/>
+      <commit sha="4122b92" subject="Merge platform extraction to main" branch="main" merge_strategy="--no-ff" parents="3e5f439 + 3e73484"/>
+      <commit sha="f3b0071" subject="Stage 5 Closure Footnotes" branch="main" stats="1 file / +126 / -6 / SHA256 305B1B77→89C30C6D"/>
+      <commit sha="9a23911" subject="MM-scope STATUS.md posterity corrections" branch="main" stats="1 file / +11 / -3"/>
+      <commit sha="8f9220c" subject="recover 6 missing Stage 6.7.5 backlog tickets B/C/D/E/F/G; backlog 29 → 35" branch="main" stats="1 file / +8 / -4"/>
+      <commit sha="e36e9f8" subject="Stage 5 close evidence pack" branch="main" stats="6 files / +2768 / -0 / 5.12 verdict + S1/S2/S3 + 5.13 boundary + soak_log"/>
+      <tag name="post-platform-extract" object="67d0025" annotates="4122b92"/>
+      <tag name="pre-platform-extract" object="ce2ec58" annotates="d0dc1c7" preserved="true" purpose="rollback parachute per RECOVERY.md"/>
+      <chore_branch_preservation>chore/platform-extraction tip at 3e73484; PRESERVED post-merge per copilot-instructions preservation rule</chore_branch_preservation>
+    </blarai_side>
+
+    <devplatform_side>
+      <commit sha="1a552d9" subject="chore(ops): pause fleet" purpose="Pre-Flight Step 1 pause for Stage 5 execution"/>
+      <commit sha="c20e298" subject="Phase E mid-execution remediation" stats="3 PS1 scripts × 6 edits"/>
+      <commit sha="ae75507" subject="Phase F mid-execution remediation" stats="wake_launcher.ps1 × 7 edits beyond Phase C be22a15; line 870 wake-template gating Item 5.5.v2 unblocked"/>
+      <commit sha="2637413" subject="chore(ops): unpause fleet" purpose="Stage 5 OPERATIONAL CLOSE timestamp 2026-04-30T15:31:12Z"/>
+      <commit sha="535968b" subject="chore(ops): pause fleet -- Guide-#9 Stage 5→6 transition work"/>
+      <commit sha="19bed62" subject="feat(fleet_observability): add soak_monitor.ps1 -- parameterized fleet observation tool"/>
+      <tag name="platform-extracted" object="896d591" annotates="ae75507"/>
+    </devplatform_side>
+
+    <cumulative_ack_chain count="132">
+      Inheritance from Guide-#8 cycle: 116 atoms (Stage 4 close per b9b213d Phase D + ecc8e7c Stage 4 closure record). + Guide-#9 cycle: 14 atoms (g9-ea9_n1 sub-clauses a-n at 5.0.v2 audit) + 2 atoms (g9-ea9_n2(a) Phase E + g9-ea9_n2(b) Phase F mid-execution remediations). NO new acks emitted at 5.12 close verdict (per dn30 no-amend doctrine). Total 132.
+    </cumulative_ack_chain>
+  </stage_5_close_anchors>
+
+  <decisions carry_forward="true">
+
+    <decision id="d1_through_d27" status="UNCHANGED">
+      All 27 prior decisions from Guide-#7→#8→#9 chain carried forward verbatim. Reference: `4.13-GUIDE_HANDOFF_INSTANCE_8_TO_9.xml` decisions section + Guide-#9 cycle inheritance.
+    </decision>
+
+    <decision id="d28" title="Stage 5 close 24h soak — REJECTED by LA" la_directive_2026_04_30="true">
+      <what>Master Plan §6.7 references a 24h soak observation period before Stage 6 work. LA explicitly rejected this for Stage 5→6 transition: "We let it soak already. We won't learn anything more from waiting 24hrs than we did from the 45 minutes we did. 24hr soak is over-engineering. Get moving on Stage 6." 45-min post-close soak observation 2026-04-30T16:55:26Z → 17:41:15Z returned CLEAN across all 6 boundary-gate criteria.</what>
+      <successor_instruction>Guide-#10: do NOT spawn a 24h soak. Stage 6 work may begin at any time. The 45-min soak evidence (soak_log.txt at e36e9f8) is the sufficient observation baseline. If Guide-#10 needs additional soak observation for any sub-item (e.g., post-EA-10 work verification), use parameterized `devplatform/tools/fleet_observability/soak_monitor.ps1 -Cycles N -IntervalSeconds M` for shorter targeted windows.</successor_instruction>
+    </decision>
+
+    <decision id="d29" title="Stage 5 artifact archival — DEFERRED to late-Stage-6" la_directive_2026_04_30="true">
+      <what>Item 6.9 archives `docs/platform_separation/` to `docs/archive/`. LA decision 2026-04-30: late-Stage-6 (Option b from boundary gate verdict) — after 6.7.5 tickets that reference Stage 5 dispatch artifacts complete (MM, SS, TT, UU all reference Stage 5 dispatch artifacts).</what>
+      <successor_instruction>Guide-#10: do NOT archive `docs/platform_separation/` early in Stage 6. Defer to after 6.7.5 tickets MM (id 303), SS (id 308), TT (id 309), UU (id 316) have either completed or explicitly cleared their artifact dependencies. Track via Stage 6 progress; trigger Item 6.9 archival when those 4 tickets are done OR explicitly de-scoped.</successor_instruction>
+    </decision>
+
+    <decision id="d30" title="Doctrine split (Items 6.1-6.3 + 6.6) — DEFERRED per V8 / 6.1.v2" la_directive_inherited="2026-04-29">
+      <what>Items 6.1 (CLAUDE.md split) + 6.2 (copilot-instructions.md split) + 6.3 (AGENTS.md split) + 6.6 (commit doctrine splits) are deferred per V8 / 6.1.v2 motion. LA already performed substantial SOP work (Fleet-Pause SOP, fleet-hygiene §4 ✓ in CLAUDE.md). Revisit post-Stage-6.</what>
+      <successor_instruction>Guide-#10: do NOT execute Items 6.1, 6.2, 6.3, or 6.6 unless LA explicitly re-authorizes. Stage 6 work proceeds with 6.4 / 6.5 / 6.7 / 6.7.5 / 6.7.v2 / 6.8 / 6.9 first. The 6.1.v2 deferred-execution motion remains the canonical record.</successor_instruction>
+    </decision>
+
+    <decision id="d31" title="Vikunja conversion approach — Project 10 (DevPlatform-Meta), full conversion in one batch" la_directive_2026_04_30="true">
+      <what>LA chose Option (b) full conversion. 35-ticket Stage 6.7.5 backlog fully bound to Vikunja Project 10 (DevPlatform-Meta) IDs 282-316 at Stage 5→6 boundary. Project 10 was previously 0-task placeholder; activated by this batch per the original Stage 3 plan (`3.0.v2-GUIDE_RESPONSE_INSTANCE_7_STAGE3_COMPREHENSIVE_AUDIT_CHECKPOINT.xml` line 643 specified DevPlatform-Meta as auto-creation home).</what>
+      <vikunja_letter_to_id_map>
+        A=282, I=283, K=284, L=285, M=286, V=287, W=288, X=289, Y=290, Z=291, AA=292, BB=293, CC=294, EE=295, FF=296, GG=297, HH=298, II=299, JJ=300, KK=301, LL=302, MM=303, OO=304, PP=305, QQ=306, RR=307, SS=308, TT=309, B=310, C=311, D=312, E=313, F=314, G=315, UU=316
+      </vikunja_letter_to_id_map>
+      <successor_instruction>Guide-#10: when EA-10 begins ticket execution at Stage 6.7.5, refer to letter→ID map above. Update each ticket via Vikunja MCP tools (`update_task` for status, `add_task_comment` for execution notes, `complete_task` for closure with comment + commit hash). 11 inherited tickets (K, L, M, V, W, Y, Z, AA, BB, CC, EE) have placeholder bodies — search `temp_for_responses/` Stages 0-3 dispatch + handoff XMLs for original binding context per their Acceptance criterion; if unrecoverable propose for retirement via LA review.</successor_instruction>
+    </decision>
+
+    <decision id="d32" title="Backlog gap recovery — B/C/D/E/F/G restored to inherited list" guide_9_decision="2026-04-30">
+      <what>LA verification 2026-04-30 ("I don't see tickets B, C, D, E, S and others") surfaced documentation defect: Stage 4 close STATUS.md enumeration silently dropped tickets B/C/D/E (Stage-3-bound per `3.10-GUIDE_HANDOFF_INSTANCE_7_TO_8.xml` lines 129-138) and F/G (Stage-4-preflight-bound per `4.0.v2-GUIDE_RESPONSE_INSTANCE_8_STAGE4_PREFLIGHT_AUDIT_CHECKPOINT.xml` line 89, 836). Stage 5 close inherited the gap. Recovery 2026-04-30: 6 tickets created in Vikunja IDs 310-315 + STATUS.md §7 corrected at commit `8f9220c` (count 29 → 35; "20 inherited" → "26 inherited"; gap-recovery footnote with full audit trail; letter→ID mapping table).</what>
+      <successor_instruction>Guide-#10: this is a documentation-defect recovery, NOT a re-binding. None of B/C/D/E/F/G were retired or completed in committed artifacts. Treat as inherited Stages 0-4 work. Single-letter convention precedent: F+G recovered (NOT skipped); H/J/N/O/P/Q/R/S/T were never bound. NN explicitly skipped per skip-the-cancelled-letter convention.</successor_instruction>
+    </decision>
+
+  </decisions>
+
+  <vikunja_backlog_mapping>
+    35 Stage 6.7.5 tickets at handoff (project 10 DevPlatform-Meta):
+
+    <high_priority count="3">
+      A (id 282) — Stage 3 locked-artifact amendments + EA-numbering posterity
+      X (id 289) — Subagent verification protocol formalization (per A18)
+      II (id 299) — Refactor 5 PS1 scripts to direct env-var credential pattern (incl. la_merge_approve.ps1:189 fold-in per LA option b2)
+    </high_priority>
+
+    <medium_priority count="22">
+      I, E, FF, GG, HH, JJ, LL, MM, OO, QQ, RR, TT, UU, F, G (15 with full descriptions); plus L, M, V, W, Y, Z, AA, BB, CC, EE (11 placeholder bodies — descriptions not captured at granular level in committed artifacts; lookup required at execution time per ticket Acceptance criterion).
+      Total medium priority: 25 (corrected — see priority field per task).
+    </medium_priority>
+
+    <low_priority count="7">
+      K (placeholder; LOW per Stage 0-3 era), KK, PP, SS, B, C, D
+    </low_priority>
+
+    <project_summary_at_handoff>
+      project 10 (DevPlatform-Meta): 35 total / 35 open / 3 high-priority / 0 done / 0% completion.
+    </project_summary_at_handoff>
+  </vikunja_backlog_mapping>
+
+  <anomalies_forward_bound>
+    A20-A31 (12 entries) bound at Stage 5 close STATUS append (commit `f3b0071` + `9a23911` + `8f9220c`). Forward-bound to Stage 6 EA-10 awareness:
+
+    - A20: wake_launcher auto-stash multi-cycle preservation narrative correction → Ticket LL (id 302)
+    - A21_provisional: Stage 5 init pointer V0 expected text BlarAI HEAD/WT → Ticket MM (id 303) sub-item
+    - A22 / A18: ext2 strict-count refinement → Ticket MM (id 303) sub-item; Ticket X (id 289) protocol formalization
+    - A23: zombie BlarAI Vikunja launch mechanism unknown → Ticket SS (id 308)
+    - A27: case-insensitive Get-ChildItem double-counting (audit archive) — bound for documentation only; non-actionable
+    - A30: pytest +20 beneficial drift (1001 vs target 981) — accepted as new baseline
+    - A31: LA boot test runtime isolation confirmation — passed; documentation only
+    - Other A24-A29: bound for documentation/forward-awareness; see `STATUS.md` §9 for full enumeration
+  </anomalies_forward_bound>
+
+  <watchpoints carry_forward="true">
+    All Guide-#7→#8→#9 watchpoints carried forward. New from Guide-#9 cycle:
+
+    <watchpoint id="w23" severity="MED" recheck_at="Stage 6.7.5 II" carry_forward_from="instance 9">
+      Phase F broader-sweep at wake_launcher.ps1 caught 7 additional dynamic-path edits beyond Phase C be22a15 (lines 69+809). Item 5.4 audit pattern `BlarAI(?!-worktrees)\\tools` static pattern misses dynamic-path-resolution `Join-Path $RepoRoot 'tools'` constructions. Ticket TT (id 309) addresses pattern enhancement; remaining devplatform PS1 scripts (especially la_merge_approve.ps1 deferred per Ticket II option b2) need re-audit with enhanced pattern.
+    </watchpoint>
+
+    <watchpoint id="w24" severity="LOW" recheck_at="Stage 6.7.5 K-EE inherited" carry_forward_from="instance 9">
+      11 placeholder-body tickets (K, L, M, V, W, Y, Z, AA, BB, CC, EE) lack original dispatch-reference granularity. If Guide-#10 EA-10 cannot recover binding context from `temp_for_responses/` Stages 0-3 search, propose retirement via LA review per ticket Acceptance criterion. This is honest gap, not silent loss.
+    </watchpoint>
+
+    <watchpoint id="w25" severity="MED" recheck_at="Stage 6 — UU resolution" carry_forward_from="instance 9">
+      UU's Vikunja-project-rationalization audit may relocate Project 10 (DevPlatform-Meta) contents elsewhere. Stage 6.7.5 tickets currently in project 10 may move during UU execution; track via Vikunja IDs not project. The 35 ticket IDs 282-316 are stable across project moves.
+    </watchpoint>
+  </watchpoints>
+
+  <stage_6_scope_summary>
+    Per Master Plan §6 + `07_STAGE6_HARDENING.xml`. Items in execution order (recommendation):
+
+    <item id="6.4">devplatform pyproject.toml finalization (post-Stage-5 dependency audit; package metadata)</item>
+    <item id="6.5">cross-repo reference rules (BlarAI ↔ devplatform pointer discipline)</item>
+    <item id="6.7">soak observation: SHORTENED per d28 LA directive (45-min already done; no 24h required)</item>
+    <item id="6.7.5">35-ticket hardening backlog execution per d31 + d32 mapping (Vikunja IDs 282-316)</item>
+    <item id="6.7.v2">monitoring additions (escalation watchdog liveness + bridge daemon liveness)</item>
+    <item id="6.8">fleet-owned platform maintenance handoff (LA discretion)</item>
+    <item id="6.9">archive `docs/platform_separation/` to `docs/archive/` per d29 (DEFERRED to late-Stage-6 after MM/SS/TT/UU complete)</item>
+
+    Items 6.1, 6.2, 6.3, 6.6: DEFERRED per d30 / V8 / 6.1.v2.
+  </stage_6_scope_summary>
+
+  <prohibitions carry_forward="true">
+    <prohibition id="dn1_through_dn30" status="UNCHANGED">All Guide-#7→#8→#9 prohibitions carried forward verbatim. Reference: `4.13-GUIDE_HANDOFF_INSTANCE_8_TO_9.xml` prohibitions section + Guide-#9 cycle additions.</prohibition>
+
+    <prohibition id="dn31" introduced_in="instance_9">**Do NOT spawn a 24h soak before Stage 6 work.** Per LA directive 2026-04-30 (d28). 45-min soak evidence is sufficient. If targeted observation needed, use parameterized `devplatform/tools/fleet_observability/soak_monitor.ps1` with appropriate -Cycles / -IntervalSeconds.</prohibition>
+
+    <prohibition id="dn32" introduced_in="instance_9">**Do NOT amend the 5.12 Stage 5 close verdict snapshot at 28 tickets.** Per no-amend doctrine. STATUS.md §7 evolves (currently 35 with UU + B/C/D/E/F/G recovery); the verdict-file count of 28 is locked. Evolution recorded in §7 footnote with audit trail.</prohibition>
+
+    <prohibition id="dn33" introduced_in="instance_9">**Do NOT archive `docs/platform_separation/` early in Stage 6.** Per d29 LA directive. Wait until MM, SS, TT, UU complete (or explicitly de-scope) before triggering Item 6.9.</prohibition>
+  </prohibitions>
+
+  <successor_instructions audience="Guide-#10">
+
+    <opening_actions>
+      1. Read this handoff brief in full (single artifact; no separate calibration response needed unless LA initiates).
+      2. Read `5.12-GUIDE_RESPONSE_INSTANCE_9_STAGE5_CLOSE_VERIFIED.xml` for Stage 5 close verdict context.
+      3. Read `5.13-GUIDE_RESPONSE_INSTANCE_9_STAGE5_TO_STAGE6_BOUNDARY_GATE.xml` for boundary gate criteria evidence.
+      4. Read `STATUS.md` §7 (35-ticket backlog) + §8 (commit-discipline footnote) + §9 (anomalies) for current operational state.
+      5. Skim `07_STAGE6_HARDENING.xml` for canonical Stage 6 spec.
+      6. Verify state at session boot: `git log --oneline -5` on both BlarAI + devplatform; `state.json` should show fleet_paused=False (Guide-#9 will unpause as last action before this handoff brief commit).
+
+      Do NOT issue a separate Stage 6 comprehension gate unless Stage 6 dispatch authoring requires LA scope decisions (none currently anticipated for items 6.4 / 6.5 / 6.7.5 / 6.7.v2 / 6.8).
+    </opening_actions>
+
+    <ea_10_spawn_guidance>
+      EA-10 spawn is at Guide-#10 discretion based on Stage 6 item readiness. Stage 6 is multi-session; EA-10 may be spawned for individual items or batched. Recommended first batch: Items 6.4 + 6.5 (low-risk; non-blocking; clean scope). Then 6.7.5 ticket batches grouped by priority (HIGH first: A + X + II).
+
+      Use the established EA init pointer pattern (Stage 5 precedent at `5.0-EA_INITIALIZATION_INSTANCE_9_STAGE5_CLEANUP.xml`). Include cumulative-ack-chain inheritance + Pre-Flight Step 0 rollback-readiness verification.
+    </ea_10_spawn_guidance>
+
+    <subagent_verification_discipline>
+      Per Ticket X (id 289) + dn14/dn20/dn24/A18: when EA-10 reports work complete, do NOT accept subagent claims about file state without `git diff` cross-check. Spawn parallel verification subagents at major boundaries (item close + stage close) per Stage 5 precedent (S1/S2/S3 triple-subagent at `5.12-S1/S2/S3-*.md`).
+    </subagent_verification_discipline>
+
+    <vikunja_workflow>
+      For each Stage 6.7.5 ticket execution:
+      1. EA-10 sets ticket status (via comment): "Doing started at &lt;UTC&gt;"
+      2. EA-10 executes scope; commits work
+      3. EA-10 sets ticket complete via `mcp__vikunja__complete_task` with comment containing commit hash + outcome summary
+      4. If blocked: comment with blocker + apply Vikunja "Blocked" label (id 3)
+
+      Per LA directive 2026-04-29 (`feedback_doc_cleanup_non_optional.md`): hardening tickets are NON-OPTIONAL; LA may triage priority but existence is not optional. Placeholder-body tickets (K-EE 11 letters) may propose retirement only via LA review, not unilaterally.
+    </vikunja_workflow>
+
+    <handoff_to_guide_11>
+      When Stage 6 OPERATIONALLY closes (all non-deferred items complete + 6.9 archival done), Guide-#10 emits handoff to Guide-#11 ONLY IF LA explicitly authorizes Stage 7+ work. The platform-separation procedure formally closes at Stage 6 OPERATIONAL CLOSE; post-procedure work moves to standard fleet/sprint cadence.
+    </handoff_to_guide_11>
+
+  </successor_instructions>
+
+  <session_state_at_handoff_emission>
+
+    <untracked_artifacts>
+      0 untracked artifacts in BlarAI working tree at handoff emission post-5.14-commit.
+    </untracked_artifacts>
+
+    <fleet_state>
+      fleet_paused=True at handoff emission moment (devplatform commit 535968b; reason: "Guide-#9 Stage 5→6 transition work"). Guide-#9 final action: devplatform unpause commit. Guide-#10 boots into fleet_paused=False.
+    </fleet_state>
+
+    <vikunja_state>
+      Project 10 DevPlatform-Meta: 35 tasks (IDs 282-316). All open. 3 high-priority. 0% completion.
+      Other projects: unchanged from Stage 5 close.
+    </vikunja_state>
+
+  </session_state_at_handoff_emission>
+
+  <closing>
+    Guide-#9 retires with this handoff brief committed. Stage 5 OPERATIONALLY CLOSED + VERIFIED 2026-04-30. Stage 6 boundary GATE APPROVED. Guide-#10 spawn at LA discretion.
+
+    Total Guide-#9 cycle deliverables (committed):
+    - 5.0-* RC1-RC4 confirmation + iter-1 gate review verdicts (committed earlier in cycle)
+    - 5.0.v2-* preflight audit checkpoint with 14 g9-ea9_n1 sub-clauses (committed at 176922c)
+    - 5.0-EA_INITIALIZATION_INSTANCE_9_STAGE5_CLEANUP.xml init pointer (~770 lines; committed at ff39a41)
+    - 5.12-* close verdict (triple-subagent convergence; committed at e36e9f8)
+    - 5.13-* boundary gate verdict (45-min soak; committed at e36e9f8)
+    - 5.14 handoff brief (this artifact; committing now)
+    - BlarAI side: 8 commits in cycle (init pointer, audit verdict, Stage 5 extract, merge, STATUS append, MM corrections, gap recovery, evidence pack, this handoff)
+    - devplatform side: 7 commits in cycle (Stage 5 pause, Phase E, Phase F, Stage 5 unpause, transition pause, soak_monitor add, transition unpause)
+    - 35 Vikunja tasks bound (Project 10 IDs 282-316)
+
+    Cumulative-ack chain at handoff: 132 binding atoms.
+    Stage 6.7.5 backlog at handoff: 35 tickets.
+    Anomalies bound: A20-A31 (12 entries).
+  </closing>
+
+</guide_handoff_brief>

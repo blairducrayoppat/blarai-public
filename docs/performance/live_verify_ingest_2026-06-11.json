@@ -1,0 +1,37 @@
+{
+  "benchmark": "uc002_003_live_verify_ingest_arc",
+  "config_stamp": {
+    "timestamp": "2026-06-11T00:03:44",
+    "hardware_cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "hardware_gpu": "Intel Arc 140V (Xe2)",
+    "gpu_driver": "32.0.101.8826",
+    "os": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "openvino": "2026.1.0-21367-63e31528c62-releases/2026/1",
+    "openvino_genai": "2026.1.0.0-2957-1dabb8c2255",
+    "model": "Qwen3-14B openvino-int4-gpu, draft Qwen3-0.6B-pruned-6L openvino-int8-gpu (spec-decode)",
+    "num_runs": 1,
+    "methodology": "Single-pass on-box live verify (NOT a benchmark): production-posture headless boot (dev_mode=False, signed manifests, mTLS CERT_REQUIRED, real data root) mirroring launcher main(); /ingest file-mode of the 92,152-byte staged UniFi article; /approve; one knowledge-grounded retrieval question; timings from the driver's perf_counter log. Repo main @ e3bb2ef. Full evidence: docs/handoffs/uc002-003-live-verify-evidence_2026-06-11.md (gitignored working artifact) + Vikunja #655."
+  },
+  "results": {
+    "shared_pipeline_build_s": 145.3,
+    "shared_pipeline_build_note": "cold recompile - the 2026-05-28 GPU driver update invalidated the 2026-05-22 ov_cache; warm-cache boot is the boot-time baseline elsewhere",
+    "pa_measured_boot_s": 10.5,
+    "ao_boot_s": 14.4,
+    "vm_start_s": 18.1,
+    "ingest_round_trip_s": 1.143,
+    "approve_round_trip_s": 1.212,
+    "approve_chunks_indexed": 3,
+    "retrieval_question_first_token_ms": 24540.7,
+    "retrieval_question_total_s": 64.331,
+    "retrieval_question_token_frames": 64,
+    "driver_total_s": 308.4
+  },
+  "not_measured": [
+    "statistical spread (n=1 single live pass - functional verify, not a benchmark)",
+    "warm-ov_cache boot time under this driver (cache was invalidated; first warm boot will differ)",
+    "retrieval latency vs knowledge-bank size (bank held exactly 1 doc / 3 chunks)",
+    "paste-mode and URL-mode ingest (URL mode is structurally absent until Stage C)",
+    "concurrent-session load"
+  ]
+}

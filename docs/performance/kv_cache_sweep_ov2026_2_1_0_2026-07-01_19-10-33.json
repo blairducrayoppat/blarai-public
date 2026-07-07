@@ -1,0 +1,340 @@
+{
+  "harness": "kv_cache_sweep",
+  "schema_version": 2,
+  "measurement_state": "steady_state_sustained",
+  "steady_state_warmup": {
+    "context": 16384,
+    "tol": 0.04,
+    "window": 3,
+    "iters": 6,
+    "reached": true,
+    "ttft_ramp_ms": [
+      131504.1,
+      130718.4,
+      50314.1,
+      46121.6,
+      46163.9,
+      46086.1
+    ]
+  },
+  "supersedes": "docs/performance/_invalid/kv_cache_sweep_2026-06-29_13-11-56.json (Vikunja #709)",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+  "geometry": {
+    "num_hidden_layers": 40,
+    "num_key_value_heads": 8,
+    "head_dim": 128
+  },
+  "methodology": {
+    "cache_size": "right-sized per (precision,context) from analytical KV x margin (NOT the production cache_size=3)",
+    "cache_margin": 1.5,
+    "cache_floor_gb": 4,
+    "pipeline": "fresh per (precision,context), del+gc+settle between combos",
+    "warmup": "one untimed generate at the FULL context length before timing",
+    "cooldown_s": 0.0,
+    "thermal": "fanless Arc 140V throttles under sustained long-context prefill; combos are cooldown-separated so each starts from a comparable baseline, and per-rep TTFT (ttft_ms_first = cool start vs the median = sustained) is retained",
+    "prefix_caching": false,
+    "draft": null,
+    "do_sample": false,
+    "memory_instruments": {
+      "analytical_kv_gib": "ground truth from geometry x precision bytes (the true precision lever)",
+      "gpu_mem_kv_pool_gib": "GPU_MEMORY_STATISTICS cl_mem \u2014 the reserved KV pool (tracks cache_size)",
+      "gpu_mem_host_gib": "GPU_MEMORY_STATISTICS usm_host \u2014 model weights + working buffers",
+      "sys_peak_used_gib": "system-RAM proxy (shared-LPDDR5X iGPU); coarse whole-footprint check",
+      "note": "usm_device stays ~0 on this iGPU; the KV pool is pre-reserved to cache_size, so the precision lever is read from analytical_kv_gib, not the reserved-pool size"
+    }
+  },
+  "config": {
+    "contexts": [
+      16384,
+      32768
+    ],
+    "precisions": [
+      "fp16_unset",
+      "u8",
+      "u4"
+    ],
+    "repeats": 3,
+    "gen_tokens": 32,
+    "cooldown_s": 0.0
+  },
+  "results": [
+    {
+      "precision": "fp16_unset",
+      "context": 16384,
+      "input_tokens": 16384,
+      "cache_size_gb": 4,
+      "analytical_kv_gib": 2.5,
+      "kv_precision_supported": true,
+      "kv_precision_applied": false,
+      "load_compile_s": 10.7,
+      "actual_tokens_mean": 16384,
+      "ttft_ms": {
+        "median": 45796.25,
+        "mean": 45814.96,
+        "std": 27.12,
+        "n": 3
+      },
+      "tpot_ms": {
+        "median": 111.58,
+        "mean": 111.66,
+        "std": 0.14,
+        "n": 3
+      },
+      "ttft_ms_per_rep": [
+        45853.3,
+        45795.3,
+        45796.3
+      ],
+      "ttft_ms_first": 45853.3,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 4293754880,
+        "unknown": 0,
+        "usm_device": 2963092,
+        "usm_host": 8476656857,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 3.999,
+        "unknown": 0.0,
+        "usm_device": 0.003,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 3.999,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 11.25
+    },
+    {
+      "precision": "fp16_unset",
+      "context": 32768,
+      "input_tokens": 32768,
+      "cache_size_gb": 8,
+      "analytical_kv_gib": 5.0,
+      "kv_precision_supported": true,
+      "kv_precision_applied": false,
+      "load_compile_s": 10.5,
+      "actual_tokens_mean": 32768,
+      "ttft_ms": {
+        "median": 368853.11,
+        "mean": 369812.68,
+        "std": 5044.37,
+        "n": 3
+      },
+      "tpot_ms": {
+        "median": 159.96,
+        "mean": 159.79,
+        "std": 0.63,
+        "n": 3
+      },
+      "ttft_ms_per_rep": [
+        364170.5,
+        368853.1,
+        376414.4
+      ],
+      "ttft_ms_first": 364170.5,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 8589004800,
+        "unknown": 0,
+        "usm_device": 4288308,
+        "usm_host": 8476660953,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 7.999,
+        "unknown": 0.0,
+        "usm_device": 0.004,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 7.999,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 15.83
+    },
+    {
+      "precision": "u8",
+      "context": 16384,
+      "input_tokens": 16384,
+      "cache_size_gb": 4,
+      "analytical_kv_gib": 1.25,
+      "kv_precision_supported": true,
+      "kv_precision_applied": true,
+      "load_compile_s": 10.4,
+      "actual_tokens_mean": 16384,
+      "ttft_ms": {
+        "median": 46813.61,
+        "mean": 56161.08,
+        "std": 13761.8,
+        "n": 3
+      },
+      "tpot_ms": {
+        "median": 112.31,
+        "mean": 112.53,
+        "std": 0.44,
+        "n": 3
+      },
+      "ttft_ms_per_rep": [
+        75618.2,
+        46051.4,
+        46813.6
+      ],
+      "ttft_ms_first": 75618.2,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 4293754880,
+        "unknown": 0,
+        "usm_device": 2963092,
+        "usm_host": 8476656857,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 3.999,
+        "unknown": 0.0,
+        "usm_device": 0.003,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 3.999,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 11.7
+    },
+    {
+      "precision": "u8",
+      "context": 32768,
+      "input_tokens": 32768,
+      "cache_size_gb": 4,
+      "analytical_kv_gib": 2.5,
+      "kv_precision_supported": true,
+      "kv_precision_applied": true,
+      "load_compile_s": 8.6,
+      "actual_tokens_mean": 32768,
+      "ttft_ms": {
+        "median": 158995.63,
+        "mean": 158648.68,
+        "std": 552.05,
+        "n": 3
+      },
+      "tpot_ms": {
+        "median": 142.94,
+        "mean": 145.42,
+        "std": 3.76,
+        "n": 3
+      },
+      "ttft_ms_per_rep": [
+        159080.9,
+        158995.6,
+        157869.5
+      ],
+      "ttft_ms_first": 159080.9,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 4293754880,
+        "unknown": 0,
+        "usm_device": 4288308,
+        "usm_host": 8476660953,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 3.999,
+        "unknown": 0.0,
+        "usm_device": 0.004,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 3.999,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 11.91
+    },
+    {
+      "precision": "u4",
+      "context": 16384,
+      "input_tokens": 16384,
+      "cache_size_gb": 4,
+      "analytical_kv_gib": 0.625,
+      "kv_precision_supported": true,
+      "kv_precision_applied": true,
+      "load_compile_s": 8.3,
+      "actual_tokens_mean": 16384,
+      "ttft_ms": {
+        "median": 51456.93,
+        "mean": 51514.88,
+        "std": 589.73,
+        "n": 3
+      },
+      "tpot_ms": {
+        "median": 120.75,
+        "mean": 159.18,
+        "std": 58.04,
+        "n": 3
+      },
+      "ttft_ms_per_rep": [
+        50823.3,
+        51456.9,
+        52264.4
+      ],
+      "ttft_ms_first": 50823.3,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 4294963200,
+        "unknown": 0,
+        "usm_device": 2963092,
+        "usm_host": 8476656857,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 4.0,
+        "unknown": 0.0,
+        "usm_device": 0.003,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 4.0,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 11.4
+    },
+    {
+      "precision": "u4",
+      "context": 32768,
+      "input_tokens": 32768,
+      "cache_size_gb": 4,
+      "analytical_kv_gib": 1.25,
+      "kv_precision_supported": true,
+      "kv_precision_applied": true,
+      "load_compile_s": 9.6,
+      "actual_tokens_mean": 32768,
+      "ttft_ms": {
+        "median": 174486.36,
+        "mean": 175733.84,
+        "std": 2009.16,
+        "n": 3
+      },
+      "tpot_ms": {
+        "median": 146.03,
+        "mean": 150.1,
+        "std": 5.94,
+        "n": 3
+      },
+      "ttft_ms_per_rep": [
+        178568.4,
+        174486.4,
+        174146.7
+      ],
+      "ttft_ms_first": 178568.4,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 4294963200,
+        "unknown": 0,
+        "usm_device": 4288308,
+        "usm_host": 8476660953,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 4.0,
+        "unknown": 0.0,
+        "usm_device": 0.004,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 4.0,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 11.93
+    }
+  ]
+}

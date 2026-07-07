@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ea_completion_report version="1.0">
+
+  <metadata>
+    <task>P5-Task-7</task>
+    <milestone>EA-2 Correction: Assistant Orchestrator + Semantic Router Audit</milestone>
+    <type>DOCS-ONLY CORRECTIVE AUDIT</type>
+    <date>2026-04-18</date>
+    <branch>feature/p5-task7-ea2-ao-sr-audit-correction</branch>
+    <base_head>6ab1ece</base_head>
+    <commit>f25e170</commit>
+    <ledger_entry>41</ledger_entry>
+    <disposition>COMPLETE</disposition>
+    <prompt_file>docs/P5_TASK7_EA2_AO_SR_AUDIT_CORRECTION.xml</prompt_file>
+  </metadata>
+
+  <scope_executed>
+    <service name="assistant_orchestrator">
+      <production_files count="6">circuit_breaker.py, constants.py, context_manager.py, entrypoint.py, gpu_inference.py, pgov.py</production_files>
+      <test_files count="5">test_circuit_breaker.py, test_context_manager.py, test_entrypoint.py, test_gpu_inference.py, test_pgov.py</test_files>
+    </service>
+    <service name="semantic_router">
+      <production_files count="3">constants.py, intents.py, router.py</production_files>
+      <test_files count="1">test_router.py</test_files>
+    </service>
+    <total_files_reviewed>15</total_files_reviewed>
+  </scope_executed>
+
+  <work_items_completed>
+    <item id="WI-1" status="DONE">Full re-read of all 15 in-scope source/test files. Key findings confirmed against old EA-2 branch content.</item>
+    <item id="WI-2" status="DONE">Header normalized from PA-only format to multi-EA format with EA index table (EA-1, EA-1 Correction, EA-2).</item>
+    <item id="WI-3" status="DONE">AO coverage findings appended: 6 modules assessed, 19 gaps documented. Critical: entrypoint.py config validation 13/15 constraints untested (HIGH).</item>
+    <item id="WI-4" status="DONE">SR coverage findings appended: 3 modules assessed, 8 gaps documented. Dual-gate boundaries untested (MEDIUM).</item>
+    <item id="WI-5" status="DONE">Reclassified PGOV 0.85 threshold (Boundary → AO Coverage Map) and SR dual-gate boundaries (Boundary → SR Coverage Map) per TEST_GOVERNANCE.md §boundary-rule.</item>
+    <item id="WI-6" status="DONE">Boundary Violations section rewritten: PA (no violations), AO (cross-service import — test_entrypoint.py line 17 imports PA jwt_minter), SR (no violations).</item>
+    <item id="WI-7" status="DONE">Obsolete §-references check: N/A — no stale cross-references found (EA-1 correction already cleaned these).</item>
+    <item id="WI-8" status="DONE">Entry 41 appended to POST_OPERATIONAL_MATURATION_LEDGER.md.</item>
+    <item id="WI-9" status="DONE">Staged exactly 2 docs files (explicit git add, no git add .). Committed as f25e170.</item>
+    <item id="WI-10" status="DONE">All 6 oracle gates PASS.</item>
+  </work_items_completed>
+
+  <files_changed>
+    <file path="docs/TEST_AUDIT_FINDINGS.md" insertions="314" deletions="6">Multi-EA header, AO+SR findings appended across all 4 populated sections, reclassifications applied</file>
+    <file path="docs/POST_OPERATIONAL_MATURATION_LEDGER.md" insertions="6" deletions="0">Entry 41 appended</file>
+  </files_changed>
+
+  <key_findings_summary>
+    <finding_category service="assistant_orchestrator" category="coverage_gaps" count="19">
+      <critical>entrypoint.py: 13 of 15 TOML config validation constraints untested (HIGH)</critical>
+      <notable>constants.py: UNCOVERED — no dedicated test file, value regressions undetectable</notable>
+      <notable>PGOV 0.85 exact threshold untested (reclassified from boundary to coverage)</notable>
+    </finding_category>
+    <finding_category service="semantic_router" category="coverage_gaps" count="8">
+      <notable>constants.py: UNCOVERED — CONFIDENCE_THRESHOLD/CONFIDENCE_MARGIN never directly asserted</notable>
+      <notable>Dual-gate exact boundary untested (reclassified from boundary to coverage)</notable>
+    </finding_category>
+    <finding_category service="assistant_orchestrator" category="stale_nomenclature" count="3">
+      <detail>3 NPU→GPU cosmetic items in test_gpu_inference.py (docstrings + mock message)</detail>
+    </finding_category>
+    <finding_category service="assistant_orchestrator" category="assertion_quality" count="3">
+      <detail>Missing error code in fail-closed test, weak circuit breaker complementary negatives, untested PII patterns (CREDIT_CARD, HEX_SECRET)</detail>
+    </finding_category>
+    <finding_category service="semantic_router" category="assertion_quality" count="1">
+      <detail>TestConfidenceThresholdBehavior uses extreme values, not production defaults</detail>
+    </finding_category>
+    <finding_category service="assistant_orchestrator" category="boundary_violations" count="1">
+      <critical>Cross-service import: test_entrypoint.py line 17 imports from services.policy_agent.src.jwt_minter — maintenance coupling between PA and AO test suites</critical>
+    </finding_category>
+  </key_findings_summary>
+
+  <oracle_gates>
+    <gate id="ORACLE_1" result="PASS">f25e170 descends from 6ab1ece (main). No divergence.</gate>
+    <gate id="ORACLE_2" result="PASS">6 h2 sections present: Coverage Map, Stale Test Inventory, Assertion Quality Findings, Boundary Violations, Prioritized Gap Report, Pre-existing Skip Analysis.</gate>
+    <gate id="ORACLE_3" result="PASS">3 service headings (policy_agent, assistant_orchestrator, semantic_router) under each of 4 populated sections (12 total h3 headings + EA Index).</gate>
+    <gate id="ORACLE_4" result="PASS">PGOV 0.85 at line 184 (Coverage Map). Dual-Gate at line 240 (Coverage Map). Neither appears under Boundary Violations.</gate>
+    <gate id="ORACLE_5" result="PASS">git diff 6ab1ece --name-only returns exactly 2 files: docs/TEST_AUDIT_FINDINGS.md + docs/POST_OPERATIONAL_MATURATION_LEDGER.md.</gate>
+    <gate id="ORACLE_6" result="PASS">Tier 3 fail-safe: zero .py files in staged diff.</gate>
+  </oracle_gates>
+
+  <abandoned_branch_cleanup>
+    <branch name="feature/p5-task7-ea2-ao-sr-audit" base="488b198" status="ABANDONED">
+      <reason>Based on pre-EA-1-correction main (488b198). Content fully ported to corrected branch. Safe to delete after merge of correction branch.</reason>
+    </branch>
+  </abandoned_branch_cleanup>
+
+  <sdo_action_items>
+    <action priority="1">Merge feature/p5-task7-ea2-ao-sr-audit-correction (f25e170) to main.</action>
+    <action priority="2">Delete abandoned branch feature/p5-task7-ea2-ao-sr-audit after merge confirmation.</action>
+    <action priority="3">Update docs/IMPLEMENTATION_PLAN.md: Task 7 EA-2 → COMPLETE.</action>
+    <action priority="4">Update Vikunja task for Task 7 EA-2 with commit f25e170 and mark complete.</action>
+    <action priority="5">Scope Task 7 EA-3 (Prioritized Gap Report synthesis) or next task per roadmap.</action>
+  </sdo_action_items>
+
+  <verification_commands>
+    <!-- Lead Architect terminal verification -->
+    <command purpose="Confirm commit">git log --oneline -1</command>
+    <command purpose="Confirm file scope">git diff 6ab1ece --name-only</command>
+    <command purpose="Confirm no .py changes">git diff 6ab1ece --name-only | Select-String "\.py$"</command>
+  </verification_commands>
+
+</ea_completion_report>

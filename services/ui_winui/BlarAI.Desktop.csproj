@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BlarAI native Windows surface (WinUI 3 / Windows App SDK) — ADR-014.
+    Unpackaged, self-contained Windows App SDK runtime so the app launches
+    without a separate runtime install. The C# front end is a thin client of
+    the Python UI backend over a named pipe (see Ipc/PipeClient.cs); it holds
+    no business logic.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>BlarAI.Desktop</RootNamespace>
+    <AssemblyName>BlarAI.Desktop</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- BlAIr gold brand mark embedded in the .exe (Explorer + alt-tab +
+         taskbar default). The same .ico is also Content-copied below so the
+         runtime AppWindow.SetIcon call can find it next to the build. -->
+    <ApplicationIcon>Assets\blair.ico</ApplicationIcon>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- AudioGraph frame buffers are read via a COM byte-access interface and a
+         raw float* pointer (Services/VoiceCapture.cs), which needs unsafe. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Unpackaged + self-contained App SDK runtime: no separate install. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableMsixTooling>true</EnableMsixTooling>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260508005" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <!-- Primary-screen screenshot capture (Phase 4). Windows-only; matches the
+         net8.0-windows TFM. Used only by ScreenCapture.cs. -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.27" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship the brand mark next to the build so AppWindow.SetIcon (the live
+         taskbar button + titlebar icon, MainWindow.xaml.cs) resolves it from
+         AppContext.BaseDirectory at runtime. -->
+    <Content Include="Assets\blair.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude the sibling test project from this app csproj's implicit
+         C# glob. The SDK auto-globs **/*.cs under the project root; without
+         this exclusion BlarAI.Desktop.csproj picks up the xUnit test files
+         and fails with CS0246 (unknown Fact/Assert types). The test project
+         has its own BlarAI.Desktop.Tests.csproj. -->
+    <Compile Remove="tests\**" />
+    <EmbeddedResource Remove="tests\**" />
+    <None Remove="tests\**" />
+    <Page Remove="tests\**" />
+  </ItemGroup>
+
+</Project>

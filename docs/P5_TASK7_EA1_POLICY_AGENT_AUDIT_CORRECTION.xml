@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<execution_prompt version="1.0" task="P5-Task-7" milestone="EA-1-CORRECTION">
+
+  <comprehension_gate>
+    <instruction>
+      MANDATORY FIRST ACTION: Before any branch creation, file edits, or commands, read this entire prompt and all required attachments in full.
+      Then present a structured comprehension summary to the Lead Architect covering:
+        (a) corrective objective in your own words
+        (b) work items with 1 sentence each
+        (c) files to READ and files to WRITE
+        (d) exact structural defects being corrected
+        (e) ORACLE strategy for this DOCS-ONLY corrective milestone
+        (f) risks or ambiguities
+        (g) EXACT deliverable structure, recited VERBATIM from this prompt:
+            - branch to create: feature/p5-task7-ea1-audit-correction from main at 488b198
+            - files to WRITE: docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md only
+            - docs/TEST_AUDIT_FINDINGS.md must retain exactly these 6 top-level sections in this order:
+              1. ## Coverage Map
+              2. ## Stale Test Inventory
+              3. ## Assertion Quality Findings
+              4. ## Boundary Violations
+              5. ## Prioritized Gap Report
+              6. ## Pre-existing Skip Analysis
+            - sections 1-4 must each contain the exact plain subsection heading: ### policy_agent
+            - the two misfiled findings must be reclassified out of ## Boundary Violations:
+              * Exact escalation floor boundary (0.50) untested
+              * RateLimiter sliding window expiry untested
+            - if no true boundary-correctness violations remain after re-review, the boundary subsection must say exactly:
+              No material boundary violations identified for policy_agent.
+            - append Entry 40 for this correction milestone
+      Then STOP and WAIT for explicit Lead Architect approval.
+      Do NOT create the branch, write files, or run commands until the Lead Architect confirms that your recitation is correct.
+    </instruction>
+  </comprehension_gate>
+
+  <milestone>
+    <id>P5-TASK7-EA1-CORRECTION</id>
+    <title>Task 7 / EA-1 Correction: Policy Agent Audit Structural and Taxonomy Fix</title>
+    <type>DOCS-ONLY CORRECTIVE AUDIT</type>
+    <recommended_model>claude-opus-4.6</recommended_model>
+    <model_rationale>Constraint-heavy DOCS-ONLY correction against a merged artifact with strict structural requirements and non-dev ORACLE checks.</model_rationale>
+    <branch>feature/p5-task7-ea1-audit-correction</branch>
+    <parent_branch>main</parent_branch>
+    <parent_head>488b198</parent_head>
+    <branch_command>git checkout -b feature/p5-task7-ea1-audit-correction 488b198</branch_command>
+    <predecessor>Main HEAD 488b198 contains Entry 39 and the merged EA-1 artifact, but does NOT include EA-2. This correction milestone reserves Entry 40 on the correction branch.</predecessor>
+    <harness_declaration>NO_FULL_HARNESS</harness_declaration>
+
+    <objective>
+      Correct the merged EA-1 policy_agent audit artifact so it complies with the original EA-1 prompt contract and passes the independent spot-check gate.
+      This is not a new full-scope audit and not a code-change milestone.
+      You must repair structural non-compliance in docs/TEST_AUDIT_FINDINGS.md, re-evaluate policy_agent boundary correctness against the actual contract, reclassify the two misfiled value-boundary findings into the coverage taxonomy, normalize Entry 39 metadata, and append a new correction record as Entry 40.
+      No production files or test files may be changed.
+    </objective>
+
+    <required_attachments>
+      <file>.github/copilot-instructions.md</file>
+      <file>docs/TEST_GOVERNANCE.md</file>
+      <file>docs/P5_TASK7_EA1_POLICY_AGENT_AUDIT.xml</file>
+      <file>docs/TEST_AUDIT_FINDINGS.md</file>
+      <file>docs/POST_OPERATIONAL_MATURATION_LEDGER.md</file>
+    </required_attachments>
+
+    <correction_basis>
+      <item>Original EA-1 prompt required the exact plain subsection heading ### policy_agent under sections 1-4; the merged artifact does not contain those headings.</item>
+      <item>The current policy_agent content under ## Boundary Violations is not boundary-correctness analysis. It contains value-boundary coverage gaps, which are misclassified under the Task 7 contract.</item>
+      <item>Independent oversight confirmed the two misclassified findings are factually real but belong in coverage analysis, not in boundary-correctness findings.</item>
+      <item>Entry 39 metadata on main is not fully contract-compliant: title differs from the original prompt contract, Type is missing, and Disposition is recorded as PASS rather than COMPLETE.</item>
+    </correction_basis>
+
+    <scope>
+      Re-read these policy_agent production files:
+      - services/policy_agent/src/adjudicator.py
+      - services/policy_agent/src/boot.py
+      - services/policy_agent/src/car.py
+      - services/policy_agent/src/config_loader.py
+      - services/policy_agent/src/constants.py
+      - services/policy_agent/src/entrypoint.py
+      - services/policy_agent/src/gpu_inference.py
+      - services/policy_agent/src/ipc.py
+      - services/policy_agent/src/jwt_minter.py
+      - services/policy_agent/src/rule_engine.py
+
+      Re-read these policy_agent test files:
+      - services/policy_agent/tests/test_adjudicator.py
+      - services/policy_agent/tests/test_boot.py
+      - services/policy_agent/tests/test_car.py
+      - services/policy_agent/tests/test_config_loader.py
+      - services/policy_agent/tests/test_entrypoint.py
+      - services/policy_agent/tests/test_gpu_inference.py
+      - services/policy_agent/tests/test_hybrid_adjudicator.py
+      - services/policy_agent/tests/test_ipc.py
+      - services/policy_agent/tests/test_jwt_minter.py
+      - services/policy_agent/tests/test_rate_and_resource_rules.py
+      - services/policy_agent/tests/test_rule_engine.py
+      - services/policy_agent/tests/test_integration_car_pipeline.py
+
+      The purpose of the re-read is narrow:
+      - verify policy_agent boundary correctness against the real contract
+      - confirm the two misfiled findings remain valid as coverage findings
+      - recalibrate any impacted coverage-level wording if the reclassification requires it
+      - avoid reopening stale, assertion, or coverage findings that are not implicated by the correction
+    </scope>
+
+    <work_items>
+      <item id="WI-1">Re-read all 10 policy_agent production files and all 12 policy_agent test files before changing the artifact.</item>
+      <item id="WI-2">Restructure docs/TEST_AUDIT_FINDINGS.md so sections 1-4 each contain the exact plain heading ### policy_agent.</item>
+      <item id="WI-3">Demote the existing numbered EA-1 subheadings beneath ### policy_agent so the document preserves detail without violating the original section contract.</item>
+      <item id="WI-4">Reclassify the two misfiled Section 4 findings into the coverage taxonomy and update impacted module coverage wording or coverage levels if evidence requires it.</item>
+      <item id="WI-5">Rewrite the policy_agent boundary subsection so it contains only true boundary-correctness findings under the Task 7 contract.</item>
+      <item id="WI-6">Replace obsolete internal numbered cross-references in the EA-1 policy_agent content with descriptive text where needed.</item>
+      <item id="WI-7">Normalize Entry 39 metadata to the original EA-1 contract.</item>
+      <item id="WI-8">Append Entry 40 documenting this correction milestone.</item>
+      <item id="WI-9">Enforce strict DOC_ONLY hygiene: stage and commit only the two allowed docs files.</item>
+      <item id="WI-10">Use Tier 3 fail-safe if the correction cannot be completed without quality degradation.</item>
+    </work_items>
+  </milestone>
+
+  <deliverable>
+    <primary_artifact>
+      Modify docs/TEST_AUDIT_FINDINGS.md in place on main-derived state. Do not introduce assistant_orchestrator or semantic_router content in this correction branch.
+    </primary_artifact>
+
+    <exact_structure>
+      docs/TEST_AUDIT_FINDINGS.md must continue to contain exactly these 6 top-level sections in this exact order:
+      1. ## Coverage Map
+      2. ## Stale Test Inventory
+      3. ## Assertion Quality Findings
+      4. ## Boundary Violations
+      5. ## Prioritized Gap Report
+      6. ## Pre-existing Skip Analysis
+
+      Sections 1-4 must each contain the exact plain subsection heading:
+      - ### policy_agent
+
+      Under each ### policy_agent subsection, you MAY retain supporting detail via lower-level headings such as #### Module Coverage Summary or #### Coverage Gaps by Module.
+      Do not leave numbered level-3 headings directly under the top-level sections without ### policy_agent above them.
+
+      Sections 5 and 6 must remain exactly:
+      - Deferred to EA-5 synthesis.
+    </exact_structure>
+
+    <coverage_contract>
+      Under ## Coverage Map / ### policy_agent:
+      - preserve the overall policy_agent coverage analysis
+      - move the two misclassified findings out of ## Boundary Violations and into the appropriate coverage area
+      - use these exact descriptive labels for verification stability:
+        * #### Exact Escalation Floor Boundary (0.50) Untested
+        * #### RateLimiter Sliding Window Expiry Untested
+      - if the reclassification means `adjudicator.py` or `rule_engine.py` should no longer be described as COMPREHENSIVE, update the table and rationale accordingly
+      - remove or update any coverage text that points readers to the old Section 4 placement
+    </coverage_contract>
+
+    <stale_contract>
+      Under ## Stale Test Inventory / ### policy_agent, preserve the accepted stale-test findings.
+      This correction should alter structure only unless a descriptive cross-reference must be updated for internal consistency.
+    </stale_contract>
+
+    <assertion_contract>
+      Under ## Assertion Quality Findings / ### policy_agent, preserve the accepted assertion-quality findings.
+      Remove obsolete numbered cross-references if they no longer read correctly after the structural correction.
+    </assertion_contract>
+
+    <boundary_contract>
+      Under ## Boundary Violations / ### policy_agent, evaluate only true boundary-correctness issues:
+      - real socket connections
+      - real filesystem writes beyond acceptable isolated scaffolding
+      - dependence on live services, hardware, or manual setup
+      - tests that should really be integration tests rather than service-level unit tests
+
+      The following do NOT belong in this section:
+      - exact numeric threshold coverage gaps
+      - untested value boundaries
+      - missing edge-case assertions that are really coverage findings
+
+      If, after re-review of the in-scope files, no material policy_agent boundary violations exist, write exactly:
+      No material boundary violations identified for policy_agent.
+
+      You may follow that exact sentence with a short evidence note, but do not reinsert the two misclassified value-boundary findings here.
+    </boundary_contract>
+
+    <ledger_contract>
+      In docs/POST_OPERATIONAL_MATURATION_LEDGER.md:
+
+      1. Normalize Entry 39 to the original EA-1 contract:
+         - Title: Entry 39 — Task 7: Test Quality Audit / EA-1 Policy Agent Audit (COMPLETE)
+         - Type: AUDIT / DOCS-ONLY
+         - Disposition: COMPLETE
+
+      2. Append Entry 40 for this correction milestone.
+
+      Required Entry 40 content:
+      - Title: Entry 40 - Task 7/EA-1 Correction: Policy Agent Audit Structural and Taxonomy Fix (COMPLETE)
+      - Date: 2026-04-18 or actual execution date
+      - Branch: feature/p5-task7-ea1-audit-correction
+      - Predecessor: Entry 39 - Task 7: Test Quality Audit / EA-1 Policy Agent Audit
+      - Type: AUDIT / DOCS-ONLY
+      - Disposition: COMPLETE
+      - Summary: corrected the merged EA-1 artifact to restore ### policy_agent subsection structure, reclassified value-boundary coverage findings out of ## Boundary Violations, normalized Entry 39 metadata, and preserved sections 5-6 as deferred to EA-5
+      - Files: docs/TEST_AUDIT_FINDINGS.md and docs/POST_OPERATIONAL_MATURATION_LEDGER.md only
+    </ledger_contract>
+  </deliverable>
+
+  <negative_constraints>
+    <item>DO NOT modify any file under services/policy_agent/src/.</item>
+    <item>DO NOT modify any file under services/policy_agent/tests/.</item>
+    <item>DO NOT modify docs/TEST_GOVERNANCE.md.</item>
+    <item>DO NOT modify docs/IMPLEMENTATION_PLAN.md.</item>
+    <item>DO NOT add assistant_orchestrator content to this correction branch.</item>
+    <item>DO NOT add semantic_router content to this correction branch.</item>
+    <item>DO NOT add top-level sections beyond the 6 required sections.</item>
+    <item>DO NOT rename any of the 6 required top-level sections.</item>
+    <item>DO NOT populate ## Prioritized Gap Report with findings. Leave it exactly: Deferred to EA-5 synthesis.</item>
+    <item>DO NOT populate ## Pre-existing Skip Analysis with findings. Leave it exactly: Deferred to EA-5 synthesis.</item>
+    <item>DO NOT leave the two misclassified value-boundary findings under ## Boundary Violations.</item>
+    <item>DO NOT leave sections 1-4 without the exact plain heading ### policy_agent.</item>
+    <item>DO NOT run coverage tooling or install dependencies.</item>
+    <item>DO NOT use git add .</item>
+    <item>DO NOT touch unrelated pre-existing untracked files in the worktree.</item>
+  </negative_constraints>
+
+  <quality_gate>
+    <gate id="COMPILE" order="1">
+      <command>N/A - DOCS-ONLY corrective milestone</command>
+      <criteria>No Python files may be created or modified in this milestone.</criteria>
+    </gate>
+
+    <gate id="TEST" order="2">
+      <command>N/A - DOCS-ONLY corrective milestone</command>
+      <criteria>
+        Do not run pytest as a standard gate for this slice.
+        Use file inspection as the primary evidence source.
+        If you run a targeted read-only command to confirm a reference or boundary claim, report it explicitly in your session close-out.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_1" order="3">
+      <command>Manual correction review against all 10 policy_agent production files and all 12 policy_agent test files in scope</command>
+      <criteria>
+        Boundary correctness is re-evaluated from source evidence, not assumed from the prior artifact.
+        The two misclassified findings are confirmed as real coverage issues before reclassification.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_2" order="4">
+      <command>Review docs/TEST_AUDIT_FINDINGS.md structure</command>
+      <criteria>
+        The document contains the same 6 required top-level sections in the same order.
+        Sections 1-4 each contain the exact plain heading ### policy_agent.
+        Sections 5 and 6 remain exactly: Deferred to EA-5 synthesis.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_3" order="5">
+      <command>Review policy_agent coverage and boundary subsection content</command>
+      <criteria>
+        The exact labels #### Exact Escalation Floor Boundary (0.50) Untested and #### RateLimiter Sliding Window Expiry Untested appear under ## Coverage Map / ### policy_agent.
+        Those findings do not remain under ## Boundary Violations.
+        If no true boundary violations exist, the boundary subsection contains the exact sentence: No material boundary violations identified for policy_agent.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_4" order="6">
+      <command>Review docs/POST_OPERATIONAL_MATURATION_LEDGER.md metadata</command>
+      <criteria>
+        Entry 39 title, Type, and Disposition match the original EA-1 contract.
+        Entry 40 exists and documents this correction milestone.
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_5" order="7">
+      <command>git diff --staged --name-only 488b198</command>
+      <criteria>
+        Output contains ONLY:
+        - docs/TEST_AUDIT_FINDINGS.md
+        - docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </criteria>
+    </gate>
+
+    <gate id="ORACLE_6" order="8">
+      <command>Tier 3 fail-safe check</command>
+      <criteria>
+        If the correction cannot be completed without degraded quality, STOP,
+        leave a clearly labeled partial correction, record partial status in Entry 40,
+        and recommend a re-scope instead of forcing a weak close-out.
+      </criteria>
+    </gate>
+  </quality_gate>
+
+  <verification>
+    <instruction>
+      The Lead Architect will verify this corrective milestone using terminal commands only.
+      Your final EA response must report results that these commands can confirm.
+    </instruction>
+
+    <commands>
+      <command>git branch --show-current</command>
+      <expected>feature/p5-task7-ea1-audit-correction</expected>
+
+      <command>git log --oneline -1</command>
+      <expected>Single EA-1 correction commit on the feature branch</expected>
+
+      <command>git diff 488b198 --name-only</command>
+      <expected>
+        docs/TEST_AUDIT_FINDINGS.md
+        docs/POST_OPERATIONAL_MATURATION_LEDGER.md
+      </expected>
+
+      <command>Select-String -Path docs/TEST_AUDIT_FINDINGS.md -Pattern "^## ","^### policy_agent","^#### Exact Escalation Floor Boundary \\(0\\.50\\) Untested$","^#### RateLimiter Sliding Window Expiry Untested$","^No material boundary violations identified for policy_agent\\.$","Deferred to EA-5 synthesis"</command>
+      <expected>
+        Shows the 6 required top-level sections, the four required ### policy_agent subsections,
+        the two reclassified coverage findings, the corrected boundary statement, and the unchanged deferred placeholders.
+      </expected>
+
+      <command>Select-String -Path docs/POST_OPERATIONAL_MATURATION_LEDGER.md -Pattern "Entry 39","Type: AUDIT / DOCS-ONLY","Disposition: COMPLETE","Entry 40" | Select-Object -First 8</command>
+      <expected>Entry 39 metadata is normalized and Entry 40 exists for the correction milestone.</expected>
+    </commands>
+  </verification>
+
+  <commit_template>
+    <message>
+Task 7 EA-1 correction: fix policy agent audit structure and taxonomy
+
+- Restored required ### policy_agent subsection structure under sections 1-4
+- Reclassified value-boundary coverage gaps out of Boundary Violations
+- Normalized Entry 39 metadata and added Entry 40 for the correction milestone
+    </message>
+  </commit_template>
+
+</execution_prompt>
