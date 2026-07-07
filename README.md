@@ -40,9 +40,9 @@ repository is real measurement on it:
 |-----------|---------------|
 | CPU | Intel Core Ultra 7 258V (Lunar Lake) |
 | GPU | Intel Arc 140V (Xe2) integrated |
-| NPU | Intel AI Boost (used for encoder offload) |
+| NPU (Neural Processing Unit) | Intel AI Boost (used for encoder offload) |
 | Memory | 32 GB LPDDR5X — **31.323 GB effective** ceiling after firmware reservation |
-| Trust root | TPM 2.0 (STMicroelectronics), Windows CNG Platform Crypto Provider |
+| Trust root | TPM 2.0 (Trusted Platform Module, STMicroelectronics); Windows Cryptography Next Generation (CNG) Platform Crypto Provider |
 | Host OS | Windows 11 Pro + Hyper-V |
 
 The 31.323 GB effective ceiling is a hard architectural constraint. Every model,
@@ -57,8 +57,8 @@ All language-model inference runs on the Arc 140V GPU via **OpenVINO GenAI**
 (2026.2.1). BlarAI does not use llama.cpp, Ollama, or any cloud runtime — it is
 an Intel/OpenVINO-native stack tuned for Lunar Lake.
 
-- **Primary model — Qwen3-14B, INT4 (GPU).** 40 layers, 5120 hidden, 8 KV heads
-  (GQA), \~9.1 GB of INT4-symmetric weights. A single shared model instance backs
+- **Primary model — Qwen3-14B, INT4 (GPU).** 40 layers, 5120 hidden, 8 key-value (KV) attention heads
+  using grouped-query attention (GQA), \~9.1 GB of INT4-symmetric weights. A single shared model instance backs
   both the Policy Agent (classification) and the Assistant Orchestrator
   (conversation) — one weight load, distinct KV-caches — so the security gate and
   the conversational agent never double the RAM cost.
@@ -73,15 +73,15 @@ an Intel/OpenVINO-native stack tuned for Lunar Lake.
   on 512-token document windows (168.9 ms → 12.4 ms) at 0.999996 cosine parity,
   while freeing both the P-cores and the GPU-contended 14B. Fail-soft: a box
   without a working NPU falls back to CPU automatically.
-- **Voice loop.** Whisper STT (GPU) + Kokoro TTS, with speak-to-submit and
+- **Voice loop.** Whisper speech-to-text (STT, on GPU) + Kokoro text-to-speech (TTS), with speak-to-submit and
   streaming synthesis. Whisper-on-NPU was measured and found *not* viable on the
   current driver — recorded honestly, STT stays on GPU.
 - **Vision.** Qwen3-VL-8B provides local image understanding, host-side, load-on-
   demand.
 - **Local image generation (UC-010).** Text→image and image+text→image on the
   Arc 140V via OpenVINO `Text2ImagePipeline` / `Image2ImagePipeline`, using an
-  uncensored SDXL INT8 finetune (RealVisXL V5.0) for photoreal plus a base SDXL +
-  runtime LoRA for illustration and cartoon styles. Because SDXL and the 14B
+  uncensored Stable Diffusion XL (SDXL) INT8 finetune (RealVisXL V5.0) for photoreal plus a base SDXL +
+  runtime Low-Rank Adaptation (LoRA) for illustration and cartoon styles. Because SDXL and the 14B
   cannot always co-reside under the 31.323 GB ceiling, generation is choreographed
   against memory: the diffusion pipeline is evicted after every generate, and a
   high-resolution refine will evict the shared 14B and lazily reload it. The
@@ -108,7 +108,7 @@ agent generates. It uses a hybrid model:
 2. Only actions the deterministic layer admits proceed; a probabilistic
    classifier backstops semantic intent.
 3. An approved action is bound to a signed **Decision Artifact** — an
-   instance-scoped, single-use JWT carrying a 128-bit nonce, a 5-second hard TTL,
+   instance-scoped, single-use JSON Web Token carrying a 128-bit nonce, a 5-second hard time-to-live,
    and a monotonic epoch for lazy revocation. Destination code validates the
    receipt before executing. No receipt, no execution.
 
@@ -126,11 +126,11 @@ state. A missing or invalid signature blocks boot. This is enforced in code
 
 ### Hardware-rooted trust and at-rest encryption
 
-- **TPM 2.0 trust root (ADR-018).** SGX, referenced in the original architecture,
+- **TPM 2.0 trust root (Architecture Decision Record ADR-018).** SGX (Software Guard Extensions), referenced in the original architecture,
   is absent from Lunar Lake; the trust root was migrated to non-exportable TPM 2.0
   keys via the Windows CNG Platform Crypto Provider. The signing primitive is
   implemented and hardware-verified.
-- **At-rest encryption (ADR-025).** Application-layer AES-GCM over the session and
+- **At-rest encryption (ADR-025).** Application-layer AES-GCM (Advanced Encryption Standard, Galois/Counter Mode) over the session and
   substrate/knowledge databases, under a TPM-sealed Data Encryption Key with an
   offline recovery-key ceremony. Stores open with `secure_delete=ON` so discarded
   content is zeroed at rest.
@@ -141,8 +141,8 @@ state. A missing or invalid signature blocks boot. This is enforced in code
 ### Isolation and egress
 
 - **Hyper-V guest isolation** with `AF_HYPERV` vsock for host↔guest communication
-  — **no TCP/IP inside the guest**. Hostile web bytes are parsed inside a NIC-less
-  guest (the launcher asserts zero NICs at start, fail-closed); only cleaned text
+  — **no TCP/IP inside the guest**. Hostile web bytes are parsed inside a guest with no network interface card
+  (the launcher asserts zero network interface cards at start, fail-closed); only cleaned text
   crosses the vsock boundary.
 - **One governed egress door (ADR-027).** By default BlarAI makes no external
   calls. When network features are enabled, all outbound traffic flows through a
@@ -180,7 +180,7 @@ controls rather than a per-item rubber-stamp.
 - **Model-quality eval harness.** A golden-set eval suite (`evals/`) covers Policy
   Agent classification, tool calling, and governance behavior, with committed
   per-case baselines and regression exit codes that have teeth. First
-  model-in-the-loop PA classification measured 26/30 (86.7%) — and, importantly,
+  model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
 - **Standing test gate.** **4919 passed / 0 skipped / 120 deselected**, plus the
@@ -210,16 +210,16 @@ controls rather than a per-item rubber-stamp.
 
 ```
 shared/              Shared libraries — security (guarded_fetch, egress guard,
-                     tpm_signer), inference, config, IPC, provenance, evals feed
+                     tpm_signer), inference, config, inter-process communication, provenance, evals feed
 services/
   policy_agent/          USE-CASE-001 — deterministic + probabilistic adjudication
   assistant_orchestrator/ USE-CASE-004 — conversation, tool loop, PGOV governance
   semantic_router/       Intent routing
-launcher/            Hyper-V VM manager, boot sequencing, deployment
+launcher/            Hyper-V virtual-machine manager, boot sequencing, deployment
 evals/               Golden-set model-quality eval suites (regression exit codes)
 docs/
   adrs/                  Architecture Decision Records (ADR-005..035)
-  DECISION_REGISTER.md   SSOT index of runtime decisions + ADRs
+  DECISION_REGISTER.md   Single-source-of-truth index of runtime decisions + ADRs
   IMPLEMENTATION_PLAN.md Milestone tracking
   TEST_GOVERNANCE.md     Test policy, marker taxonomy, baseline
   ledger/                Per-entry milestone ledger
@@ -233,14 +233,16 @@ PERFORMANCE_LOG.md   Reproducible, community-grade inference measurements
 
 ## The Use Cases
 
-BlarAI's full vision is seven Use Cases. Two are operational, one is live, and the
-rest are defined and staged.
+BlarAI's full vision spans nine original Use Cases, with a tenth — local image
+generation — added later as a deliberate, documented expansion. Two are operational,
+one is live, and the rest are defined and staged; the most developed are summarized
+below.
 
 | # | Use Case | Status |
 |---|----------|--------|
 | 001 | Policy-Driven Security & Access Orchestration (Policy Agent) | **Operational** |
 | 002 | Personal Knowledge Substrate | Knowledge bank live; layered store merged |
-| 003 | Local Data Normalization with Mobile LAN Ingress (Cleaner) | Ingest flow merged; fetch limb governed |
+| 003 | Local Data Normalization with Mobile Local Area Network Ingress (Cleaner) | Ingest flow merged; fetch limb governed |
 | 004 | Context-Aware Private Assistant with Modular Skills | **Operational** |
 | 005 | Interactive Local Software Engineer (headless) | Dispatch integration live |
 | 009 | Autonomous System Maintainer | Defined |
@@ -257,7 +259,7 @@ Canonical definitions live in `Use Cases_FINAL.md`.
 | 1 — Architectural Definition | Closed | Use Cases locked; canonical architecture defined |
 | 2 — Empirical Validation | Closed | All hardware gates passed; core backend complete |
 | 3 — UI Design & Scaffolding | Closed | Desktop shell; UI backend |
-| 4 — Operational Gap Closure | Closed | UAT sign-off; operational baseline |
+| 4 — Operational Gap Closure | Closed | User Acceptance Testing sign-off; operational baseline |
 | 5 — Post-Operational Development | **Active** | Capability program: eval harness, native tool calls, NPU offload, image generation, web search, dispatch |
 
 ---
