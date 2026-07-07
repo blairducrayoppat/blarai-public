@@ -31,7 +31,7 @@ or take the [direct download](https://github.com/blairducrayoppat/blarai-public/
 
 ## 🎬 The coder cut (2 minutes) — how it ships software
 
-[![BlarAI — the coder cut: It ships software](media/coder_cut_poster.png)](media/BlarAI_coder_cut.mp4)
+[![BlarAI — the coder cut: It ships software](media/coder_cut_poster.png)](https://blairducrayoppat.github.io/blarai-public/coder.html)
 
 One plain-English request → the resident 14B decomposes it into a dependency-ordered
 plan (*"the model proposes; a deterministic ruler disposes"*) → a dedicated 30B coder
@@ -42,7 +42,7 @@ merge on evidence, never on the model's word → a real website ships. Ends with
 run of a fleet-built Node utility suite: 28 tests, 0 failures.
 
 *Illustrated by BlarAI's own on-device image model and narrated by its own voice
-engine. Click the poster to play, or take the
+engine. Click the poster to stream in full quality, or take the
 [1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-coder-v1).*
 
 ---
