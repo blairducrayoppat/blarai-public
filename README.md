@@ -29,6 +29,22 @@ and BlarAI's own coder fleet building a real website.
 was synthesized on the same laptop it runs on. The player above is a 720p preview; [stream it in full quality](https://blairducrayoppat.github.io/blarai-public/demo.html),
 or take the [direct download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-v1).*
 
+## 🎬 The coder cut (2 minutes) — how it ships software
+
+[![BlarAI — the coder cut: It ships software](media/coder_cut_poster.png)](media/BlarAI_coder_cut.mp4)
+
+One plain-English request → the resident 14B decomposes it into a dependency-ordered
+plan (*"the model proposes; a deterministic ruler disposes"*) → a dedicated 30B coder
+swaps onto the GPU → a research substrate hands each task what its dependencies
+*actually* built (real files, AST-extracted signatures) → every candidate faces an
+acceptance gate it cannot edit — fail, and a fresh candidate is built instead → waves
+merge on evidence, never on the model's word → a real website ships. Ends with a live
+run of a fleet-built Node utility suite: 28 tests, 0 failures.
+
+*Illustrated by BlarAI's own on-device image model and narrated by its own voice
+engine. Click the poster to play, or take the
+[1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-coder-v1).*
+
 ---
 
 ## Target hardware

@@ -1,8 +1,0 @@
-{
-  "version": "1.0.0",
-  "digests": {
-    "openvino_model.bin": "25ba03e298032c73087cda35fd58eafeef0fdbe820208ac0390fdb29802f5e4a",
-    "openvino_tokenizer.bin": "7f5ad873902d49091f9698d375d992b80f988fc077014a24ba5c78336bf03573",
-    "openvino_detokenizer.bin": "d73093f72c80ebcaffb76a192727170ecd3c6a06c4df52df0e76b3f70ad9d7f7"
-  }
-}

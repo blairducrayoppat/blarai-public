@@ -1,8 +1,0 @@
-# Guest-bound files MUST check out with LF line endings: they are shipped
-# byte-for-byte into the Alpine guest (Copy-VMFile), where busybox sh /
-# OpenRC reject CRLF ("\r" reaches the interpreter as part of the line).
-# This repo runs on Windows with core.autocrlf=true, which would otherwise
-# rewrite these to CRLF on checkout — the same failure class the
-# bundle.sha256 LF fix in launcher/guest_parser.py guards at runtime.
-# (#655 Stage C; see docs/security/guest_parser_provisioning_record.md.)
-scripts/guest/** text eol=lf

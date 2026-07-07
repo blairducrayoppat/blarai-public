@@ -1,5 +1,0 @@
-# Empirical reproduction evidence for openvinotoolkit/openvino#34450.
-# Exported model artifacts are large (~1.1 GB total) and reproducible from the
-# scripts in this directory; do not commit them. Crash logs, sha256 manifests,
-# and the structured matrix report ARE committed (small, human-readable).
-exports/

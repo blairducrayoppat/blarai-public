@@ -1,4 +1,0 @@
-READY mode=llmpipeline device=GPU ir=phase2_gates\evidence\issue34450\exports\cell_i
-GENERATE_OK tokens=16 elapsed=0.33s output='<think> | Okay, the user is asking about the capital of France. Let me'
-EXECUTION_DEVICES=<llmpipeline: no compiled-model accessor exposed>
-OK elapsed=6.11s
