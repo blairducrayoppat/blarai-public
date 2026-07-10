@@ -18,9 +18,17 @@ keeps the 2342/0 baseline deterministic); this file locks the pure
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+
 import pytest
 
-from conftest import port_leak_verdict
+from conftest import (
+    _fleet_swap_fingerprint,
+    _session_descendant_pids,
+    port_leak_verdict,
+)
 
 
 class TestPortLeakVerdict:
@@ -85,3 +93,91 @@ class TestPortLeakVerdict:
         assert "skip" in result.lower() or "gate" in result.lower(), (
             "failure message should explain the downstream coverage impact"
         )
+
+
+class TestFleetSwapAwareness:
+    """The 2026-07-08 false positive: a gate spanning a live battery job's
+    teardown sees free→held because the DISPATCH CYCLE restored the AO —
+    the fleet's transition, never a test leak.  free→held must pass silently
+    when the real fleet's swap-state advanced during the session."""
+
+    def test_free_to_held_with_fleet_swap_change_is_silent_pass(self) -> None:
+        """The exact 2026-07-08 incident shape: gate started mid-dispatch
+        (AO stopped, port free), a job teardown restored the AO mid-gate,
+        teardown saw the port held.  The swap-state fingerprint differs →
+        the AO restore is attributed to the fleet → None."""
+        result = port_leak_verdict(
+            held_at_start=False, held_at_end=True, fleet_swap_changed=True
+        )
+        assert result is None, (
+            "free→held during a live fleet swap cycle must return None — "
+            "the dispatch teardown's AO restore is not a test leak"
+        )
+
+    def test_free_to_held_without_fleet_activity_still_fails(self) -> None:
+        """The detector's original teeth are unchanged when the fleet was
+        quiet: free→held with an unchanged swap-state is still a leak."""
+        result = port_leak_verdict(
+            held_at_start=False, held_at_end=True, fleet_swap_changed=False
+        )
+        assert result is not None, (
+            "free→held with no fleet activity must still fail loud"
+        )
+
+    def test_fleet_swap_change_does_not_mask_other_transitions(self) -> None:
+        """fleet_swap_changed must only ever WIDEN the silent-pass set; the
+        three already-silent transitions stay silent with it set."""
+        for start, end in ((False, False), (True, True), (True, False)):
+            assert (
+                port_leak_verdict(
+                    held_at_start=start, held_at_end=end, fleet_swap_changed=True
+                )
+                is None
+            )
+
+    def test_default_is_fleet_quiet(self) -> None:
+        """Omitting the parameter preserves the pre-2026-07-08 behavior —
+        existing callers and the truth-table above are byte-identical."""
+        assert port_leak_verdict(held_at_start=False, held_at_end=True) is not None
+
+    def test_fingerprint_is_read_only_and_fail_soft(self) -> None:
+        """The fingerprint probe must never raise (absent file, unreadable
+        state, import trouble all → a comparable value or None)."""
+        fp = _fleet_swap_fingerprint()
+        assert fp is None or isinstance(fp, tuple)
+
+
+class TestKillAttribution:
+    """The kill must only ever hit PIDs this session spawned: tree-killing an
+    unattributed port holder is how a standing gate shoots the production AO
+    (the 2026-07-08 near-miss — the battery's freshly restored AO was on the
+    kill list)."""
+
+    def test_own_child_is_attributed(self) -> None:
+        """A process this session spawned descends from us and is killable."""
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            owned = _session_descendant_pids([child.pid], os.getpid())
+            assert owned == [child.pid], (
+                "a directly spawned child must be attributed to this session"
+            )
+        finally:
+            child.kill()
+            child.wait(timeout=10)
+
+    def test_external_pid_is_never_attributed(self) -> None:
+        """A system process (PID 4 on Windows / init's kin elsewhere) does not
+        descend from the test session and must be excluded from any kill."""
+        externals = _session_descendant_pids([4], os.getpid())
+        assert externals == [], "an external PID must never be kill-attributed"
+
+    def test_dead_pid_is_skipped_not_raised(self) -> None:
+        """A PID that exited between the port probe and the kill filter must
+        be skipped silently (the detector is teardown code — it cannot raise)."""
+        child = subprocess.Popen([sys.executable, "-c", "pass"])
+        child.wait(timeout=10)
+        assert _session_descendant_pids([child.pid], os.getpid()) == []

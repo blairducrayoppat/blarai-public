@@ -78,6 +78,10 @@ class TestMessageType:
             "PLAN_RESULT",
             "EXECUTE_REQUEST",
             "EXECUTE_RESULT",
+            # Guest-certified oracle channel (#744, DORMANT) — chunked framing
+            # contract in shared/ipc/oracle_channel.py:
+            "ORACLE_EXEC_REQUEST",
+            "ORACLE_EXEC_RESPONSE",
         }
 
     def test_value_round_trip(self) -> None:

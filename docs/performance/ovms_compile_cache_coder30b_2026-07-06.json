@@ -1,0 +1,49 @@
+{
+  "measurement": "ovms_compile_cache_model_load_time",
+  "date": "2026-07-06",
+  "ticket": "#747",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V GPU (16 GB, Xe2)",
+    "gpu_driver": "32.0.101.8826"
+  },
+  "software": {
+    "ovms": "OpenVINO Model Server 2026.2 (5e9dcfc46)",
+    "openvino_backend": "2026.2.0-21902-90214e5be05",
+    "openvino_genai_backend": "2026.2.0.0-3121-adf73e80e66",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "model": {
+    "id": "coder-30b",
+    "name": "Qwen3-Coder-30B-A3B",
+    "precision": "INT4 (per project spec / ADR)",
+    "task": "text_generation (continuous batching)",
+    "target_device": "GPU"
+  },
+  "config": {
+    "cache_mechanism": "--cache_dir (OVMS folds it into the CB-LLM node plugin_config as CACHE_DIR)",
+    "cache_dir_path_format": "FORWARD-SLASH (C:/Users/mrbla/agentic-setup/state/ovms-model-cache). A Windows BACKSLASH path makes the folded plugin_config JSON invalid (\\U is not a valid JSON escape) -> 'Plugin config is in wrong format' (the #740/W7 revert cause).",
+    "cache_artifacts": ".cl_cache (compiled GPU kernels)",
+    "cache_size_approx": "~16 GB across 19 .cl_cache files",
+    "other_flags": "--cache_size 4 (KV-cache POOL, separate concern), --kv_cache_precision u8, --enable_prefix_caching true, --enable_tool_guided_generation true"
+  },
+  "measurements": {
+    "cold_load_s": 289,
+    "cold_load_note": "first load with an empty cache: compile + write the .cl_cache (log: 10:16:19 servable init -> 10:21:08 state AVAILABLE). One-time; also recurs on cache invalidation (OVMS/driver/model change).",
+    "warm_load_s": 12,
+    "warm_load_note": "cache hit: load the compiled kernels, no recompile (start-llm.ps1 wall-clock, exit 0, model served).",
+    "baseline_no_cache_s_range": "30-90 (the pre-cache load range documented in start-llm.ps1)",
+    "per_swap_saving_s_estimate": "~18-78 (warm 12s vs the 30-90s no-cache baseline)"
+  },
+  "not_measured": [
+    "inference throughput (tokens/s) — this measures MODEL LOAD time only, not generation",
+    "co-resident memory cost with the 14B (the swap unloads the 14B before loading the 30B)",
+    "a statistical distribution — n=1 per condition; load time is low-variance, not sampled",
+    "the exact no-cache baseline on THIS box (used the script's documented 30-90s range, not a fresh cache-disabled run)"
+  ],
+  "methodology": "start-llm.ps1 -Model coder-30b -Force, wall-clock timed. COLD = empty cache dir (first ever); WARM = the cache populated by the cold run. Load success = coder-30b appears in GET :8000/v3/models. Headless, no GUI.",
+  "consequence": {
+    "deadline_bump": "start-llm.ps1 load deadline 240s->480s and swap_ops.real_load_30b timeout 300s->480s, so a COLD load (289s) does not false-fail; a WARM load (12s) is unaffected.",
+    "pre_warm": "the cache was pre-populated by this test, so subsequent production swaps hit the warm 12s path."
+  }
+}

@@ -1144,6 +1144,9 @@ class PolicyAgentService:
             manifest_path=(str(resolved.manifest_path) if resolved.manifest_path else None),
             model_bin_path=str(resolved.model_bin_path),
             audit_log=audit_log,
+            # #571: thread the signed-manifest posture into the per-request
+            # Stage-2 re-verify so it matches the signature-checked boot gate.
+            require_signed_manifest=resolved.require_signed_manifest,
         )
 
     @staticmethod

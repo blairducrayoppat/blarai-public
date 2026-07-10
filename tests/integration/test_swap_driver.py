@@ -78,7 +78,7 @@ def test_happy_path_full_sequence(tmp_path):
     assert len(res.outcomes) == 2
     assert calls == ["load", ("task", "a"), ("task", "b"), ("report", "R1", 2),
                      "disarm", "stop", "restart"]
-    assert _final_phase(tmp_path) == ss.PHASE_RESTART_AO
+    assert _final_phase(tmp_path) == ss.PHASE_RECOVERED  # healthy runs now END terminal (f13742f: the driver stamps its own last act)
 
 
 # ---- #670 FIX (b): acceptance-task gating on parked features --------------
@@ -120,7 +120,7 @@ def test_acceptance_skipped_when_feature_parked(tmp_path):
     assert "feature-a" not in skipped[0].detail        # merged features are NOT named
     # Teardown still converges normally (the guard is a CODE-loop continue, not an early return).
     assert res.outcome == "complete" and res.restart_ok
-    assert _final_phase(tmp_path) == ss.PHASE_RESTART_AO
+    assert _final_phase(tmp_path) == ss.PHASE_RECOVERED  # healthy runs now END terminal (f13742f: the driver stamps its own last act)
 
 
 def test_acceptance_runs_when_all_features_merged(tmp_path):
@@ -247,7 +247,7 @@ def test_never_zero_on_run_task_exception(tmp_path):
         _driver(tmp_path, _ops(calls, run_task=boom)).run()
     # the teardown STILL restored the assistant before re-raising
     assert "disarm" in calls and "stop" in calls and "restart" in calls
-    assert _final_phase(tmp_path) == ss.PHASE_RESTART_AO
+    assert _final_phase(tmp_path) == ss.PHASE_RECOVERED  # healthy runs now END terminal (f13742f: the driver stamps its own last act)
 
 
 # ---- per-task cancel ------------------------------------------------------
@@ -410,7 +410,7 @@ def test_never_zero_on_base_exception(tmp_path):
     with pytest.raises(KeyboardInterrupt):
         _driver(tmp_path, _ops(calls, run_task=boom)).run()
     assert "disarm" in calls and "stop" in calls and "restart" in calls
-    assert _final_phase(tmp_path) == ss.PHASE_RESTART_AO
+    assert _final_phase(tmp_path) == ss.PHASE_RECOVERED  # healthy runs now END terminal (f13742f: the driver stamps its own last act)
 
 
 def test_teardown_step_raise_still_restarts(tmp_path):
@@ -655,7 +655,7 @@ def test_design_phase_iterates_and_feeds_feedback_back(tmp_path):
     assert res.design_signal is not None and res.design_signal["should_iterate"] is False
     # never-zero restore still reached after the design loop.
     assert "disarm" in calls and "restart" in calls
-    assert _final_phase(tmp_path) == ss.PHASE_RESTART_AO
+    assert _final_phase(tmp_path) == ss.PHASE_RECOVERED  # healthy runs now END terminal (f13742f: the driver stamps its own last act)
 
 
 def test_design_phase_stops_when_no_iterate(tmp_path):
@@ -867,7 +867,7 @@ def test_critic_phase_fires_and_sets_signal(tmp_path):
     calls = []
     captured: list = []
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         captured.append((app_dir, base_branch))
         calls.append("critic")
         return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
@@ -894,7 +894,7 @@ def test_critic_phase_iterates_and_feeds_findings_back(tmp_path):
         {"should_iterate": False, "verdict": "MERGE", "findings": ""},
     ])
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         calls.append("critic")
         return next(seq)
 
@@ -919,14 +919,14 @@ def test_critic_phase_iterates_and_feeds_findings_back(tmp_path):
     assert calls.count("stop") == 1
     # the LAST critic result is carried on the driver result (a loop signal, not a verdict).
     assert res.critic_signal is not None and res.critic_signal["verdict"] == "MERGE"
-    assert _final_phase(tmp_path) == ss.PHASE_RESTART_AO
+    assert _final_phase(tmp_path) == ss.PHASE_RECOVERED  # healthy runs now END terminal (f13742f: the driver stamps its own last act)
 
 
 def test_critic_phase_stops_at_iteration_cap(tmp_path):
     # A never-satisfied critic: should_iterate stays True -> bounded by max_critic_iterations.
     calls = []
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         calls.append("critic")
         return {"should_iterate": True, "verdict": "FIX FIRST",
                 "findings": "1. x.py:1 - x - wrong"}
@@ -943,7 +943,7 @@ def test_critic_phase_fail_soft_on_fix_run_task_raise(tmp_path):
     # and the 14B is restored (NEVER-ZERO).
     calls = []
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         calls.append("critic")
         return {"should_iterate": True, "verdict": "FIX FIRST",
                 "findings": "1. x.py:1 - x - wrong"}
@@ -971,7 +971,7 @@ def test_critic_phase_breaks_when_reload_fails(tmp_path):
         calls.append("load")
         return loads["n"] == 1      # the CODE-loop load succeeds; the fix reload fails
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         calls.append("critic")
         return {"should_iterate": True, "verdict": "FIX FIRST",
                 "findings": "1. x.py:1 - x - wrong"}
@@ -993,7 +993,7 @@ def test_critic_phase_skipped_when_nothing_merged(tmp_path):
                            detail="not merged")
 
     res = _driver(tmp_path, _ops(calls, run_task=parked,
-                                 run_critic=lambda a, b: critic_calls.append(1)),
+                                 run_critic=lambda a, b, s="": critic_calls.append(1)),
                   tasks=[_MERGED_TASK]).run()
     assert critic_calls == []           # nothing merged -> _critic_target is None -> skipped
     assert res.critic_signal is None    # never set
@@ -1010,7 +1010,7 @@ def test_critic_phase_skipped_when_cancel_requested(tmp_path):
         return state["n"] > 1      # False for the task; True at the critic phase check
 
     res = _driver(tmp_path, _ops(calls, cancel_requested=cancel,
-                                 run_critic=lambda a, b: critic_calls.append(1)),
+                                 run_critic=lambda a, b, s="": critic_calls.append(1)),
                   tasks=[_MERGED_TASK]).run()
     assert res.outcome == "complete"    # the CODE loop did not cancel
     assert critic_calls == []           # the critic was skipped by the cancel guard
@@ -1022,7 +1022,7 @@ def test_critic_phase_does_not_call_stop_ovms(tmp_path):
     # start-llm -Force internally to swap models. Only the teardown stop should appear.
     calls = []
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         calls.append("critic")
         return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
 
@@ -1031,12 +1031,70 @@ def test_critic_phase_does_not_call_stop_ovms(tmp_path):
     assert calls.count("critic") == 1   # the critic DID run
 
 
+# ---- #693: the critic diffs from main's PRE-dispatch HEAD --------------------
+
+
+def test_critic_receives_pre_dispatch_base_sha(tmp_path):
+    # #693: a multi-commit agent branch fast-forwarded onto an unchanged main collapses to
+    # linear history, so the script-side HEAD~1..HEAD fallback sees only the LAST commit.
+    # The driver must record the repo's HEAD BEFORE its first task runs and hand the critic
+    # that FIRST reading — never a post-merge head.
+    calls = []
+    heads = iter(["sha-pre-dispatch", "sha-after-task"])
+    captured: list = []
+
+    def critic(app_dir, base_branch, base_sha=""):
+        captured.append((app_dir, base_sha))
+        return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
+
+    _driver(tmp_path, _ops(calls, run_critic=critic,
+                           repo_head=lambda repo: next(heads, "sha-late")),
+            tasks=[_MERGED_TASK]).run()
+    assert captured == [("C:/proj/app", "sha-pre-dispatch")]
+
+
+def test_critic_base_sha_pinned_to_first_task_of_repo(tmp_path):
+    # Two tasks in one repo: the base recorded before task 1 must survive task 2's
+    # pre-task read (setdefault semantics) — the critic reviews ALL the merged work.
+    calls = []
+    heads = iter(["sha-0", "sha-1", "sha-2"])
+    captured: list = []
+
+    def critic(app_dir, base_branch, base_sha=""):
+        captured.append(base_sha)
+        return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
+
+    _driver(tmp_path, _ops(calls, run_critic=critic,
+                           repo_head=lambda repo: next(heads, "sha-late")),
+            tasks=_TASKS).run()
+    assert captured == ["sha-0"]
+
+
+def test_critic_base_sha_empty_when_head_unreadable(tmp_path):
+    # repo_head raising must degrade to "" (the script-side Resolve-CriticRange fallback),
+    # never crash the loop or invent a base.
+    calls = []
+    captured: list = []
+
+    def critic(app_dir, base_branch, base_sha=""):
+        captured.append(base_sha)
+        return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
+
+    def boom(_repo):
+        raise RuntimeError("git unavailable")
+
+    res = _driver(tmp_path, _ops(calls, run_critic=critic, repo_head=boom),
+                  tasks=[_MERGED_TASK]).run()
+    assert res.outcome == "complete"
+    assert captured == [""]
+
+
 def test_critic_phase_fires_before_design_phase(tmp_path):
     # Ordering guarantee: the critic fires in the call list BEFORE the first design stop.
     # Use _WEB_TASK so BOTH phases are eligible (visual + merged).
     calls = []
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         calls.append("critic")
         return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
 
@@ -1067,7 +1125,7 @@ def test_critic_target_finds_first_merged_with_repo(tmp_path):
         return TaskOutcome(task=t["task"], outcome="processed",
                            result=results[t["task"]], detail="ok")
 
-    def critic(app_dir, base_branch):
+    def critic(app_dir, base_branch, base_sha=""):
         seen_app_dirs.append(app_dir)
         calls.append("critic")
         return {"should_iterate": False, "verdict": "MERGE", "findings": ""}

@@ -1,0 +1,61 @@
+{
+  "benchmark": "xgrammar_stop_token_crash_fix_verification",
+  "timestamp": "2026-07-05T15:34:27",
+  "issue": "openvinotoolkit/openvino.genai #725-class bug (Vikunja #725), upstream issue TBD",
+  "surface": "ov::genai::LLMPipeline with a triggered StructuralTagsConfig grammar + speculative decoding (draft_model)",
+  "environment": {
+    "openvino_genai_baseline": "2026.2.1.0-3123-7dea0459b2a (win_amd64 cp311 wheel, stock/unpatched)",
+    "openvino_genai_source_commit": "7dea045 (releases/2026/2) -- the exact commit the baseline wheel was built from",
+    "openvino_source_dir": "C:/Users/mrbla/oss/openvino (build-x86_64/RelWithDebInfo, local dev build, CPU plugin linked; GPU plugin not linked in this local checkout)",
+    "python": "3.11.9",
+    "os": "Windows 11 Pro (build 26200)",
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2 integrated), driver 32.0.101.8826",
+    "note_on_devices": "Baseline reproduced on GPU (the officially reported/affected device). Patched-build verification run on CPU because the official Python .pyd is ABI-locked to the exact release build (a .dll-only swap fails DLL load), and a from-source Python-bindings rebuild against the local OpenVINO checkout has no linked GPU plugin. The bug is a sampler state-machine ordering error (IsTerminated() checked after FillNextTokenBitmask() instead of before), which is device-independent, so CPU is a valid substitute for proving the fix removes the crash."
+  },
+  "models": {
+    "target": {"name": "Qwen3-14B", "quantization": "INT4", "dir": "models/qwen3-14b/openvino-int4-gpu"},
+    "draft": {"name": "Qwen3-0.6B (pruned 6-layer)", "quantization": "INT8", "dir": "models/qwen3-0.6b-pruned-6l/openvino-int8-gpu"}
+  },
+  "methodology": {
+    "grammar": "triggered StructuralTagsConfig, trigger=\"<tool_call>\", JSON-schema body (tool-call shape)",
+    "decode": "greedy (do_sample=false), max_new_tokens=512, num_assistant_tokens=3 when draft attached",
+    "prompt_set": "19 generic conversational prompts (docs/upstream/725_xgrammar_stop_token/repro_prompts_generic.json), none requiring a tool call",
+    "reproducer_python": "docs/upstream/725_xgrammar_stop_token/xgrammar_standalone_repro.py",
+    "reproducer_cpp": "oss/openvino.genai/samples/cpp/text_generation/xgrammar_stop_token_repro.cpp (mirrors the Python reproducer; standalone C++ sample, not upstreamed)"
+  },
+  "results": [
+    {
+      "label": "baseline (unpatched, stock release wheel), GPU, spec-decode ON",
+      "device": "GPU",
+      "passes": 5,
+      "generations": 95,
+      "crashes": 1,
+      "crash_case": "generic-11",
+      "crash_signature": "grammar_matcher.cc:627: Check failed: (!IsStopTokenAccepted())",
+      "matches_prior_report": true
+    },
+    {
+      "label": "patched (fix applied, rebuilt from source), CPU, spec-decode ON",
+      "device": "CPU",
+      "passes": 5,
+      "generations": 95,
+      "crashes": 0,
+      "elapsed_s": 5075.9,
+      "note": "same sample size as the baseline row above, for a clean before/after comparison"
+    },
+    {
+      "label": "patched (fix applied), CPU, spec-decode OFF (control)",
+      "device": "CPU",
+      "passes": 1,
+      "generations": 19,
+      "crashes": 0,
+      "note": "control: confirms the fix does not change behavior when speculative decoding is not in play"
+    }
+  ],
+  "not_measured": [
+    "patched build performance on GPU (no local GPU-plugin build available; performance is not the concern here, correctness is)",
+    "throughput/latency deltas from the fix (expected to be zero -- the change is a branch reorder, not a hot-path algorithm change)",
+    "crash rate beyond n=95 per arm (a larger N would tighten the confidence interval on the ~1% baseline rate, but 0/95 patched vs 1/95 baseline at matched sample size is the comparison that matters for this fix)"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "aggregates": {
+    "errors": 0,
+    "evaluated": 20,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "passed": 20,
+    "skipped_hardware": 1,
+    "total": 21
+  },
+  "cases": {
+    "oq-fmode-001": "pass",
+    "oq-fmode-002": "pass",
+    "oq-fmode-003": "pass",
+    "oq-fmode-004": "pass",
+    "oq-model-b2-job-001": "skipped_hardware",
+    "oq-sens-001": "pass",
+    "oq-sens-002": "pass",
+    "oq-sens-003": "pass",
+    "oq-sens-004": "pass",
+    "oq-sound-001": "pass",
+    "oq-sound-002": "pass",
+    "oq-static-001": "pass",
+    "oq-static-002": "pass",
+    "oq-static-003": "pass",
+    "oq-static-004": "pass",
+    "oq-static-005": "pass",
+    "oq-static-006": "pass",
+    "oq-static-007": "pass",
+    "oq-static-008": "pass",
+    "oq-static-009": "pass",
+    "oq-static-010": "pass"
+  },
+  "generated_at": "2026-07-08T00:40:10.675321+00:00",
+  "git_sha": "b303182",
+  "suite": "oracle_quality"
+}

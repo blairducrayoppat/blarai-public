@@ -1,0 +1,110 @@
+{
+  "schema": "jobplan/v1",
+  "plan_id": "gold-b3-budget-web",
+  "goal": "I want a simple page I can open in my web browser to keep track of my budget. It needs somewhere to remember my entries between visits, a way for me to add an expense with an amount and a category, a running total that updates as I add things, a view of my spending grouped by category so I can see where the money goes, and one main page that brings all of that together so I can actually use it day to day.",
+  "repo": "C:/Users/mrbla/projects/battery-b3-budget-web",
+  "tasks": [
+    {
+      "id": "storage-module",
+      "prompt": "Build the persistence layer for a browser budget tracker in this repo: an ES module src/storage.mjs that remembers budget entries between visits. Export loadEntries() returning the stored entries array, saveEntries(entries), and addEntry(entry) which appends and persists. An entry is {amount, category, dateISO}. Use window.localStorage when available with a clean in-memory fallback so the module is testable under node:test. Include node:test unit tests.",
+      "depends_on": [],
+      "contract": {
+        "creates": ["src/storage.mjs"],
+        "exports": [
+          "loadEntries()",
+          "saveEntries(entries)",
+          "addEntry(entry)"
+        ],
+        "notes": "entry = {amount: number, category: string, dateISO: 'YYYY-MM-DD'}. localStorage-backed with an in-memory fallback (no window) so node:test can exercise it; addEntry appends + persists."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "add-expense-feature",
+      "prompt": "Build the add-expense logic for the budget tracker: src/add.mjs exporting addExpense(amount, category, dateISO) which validates the input (amount is a positive finite number, category is a non-empty string, dateISO is YYYY-MM-DD), persists the entry via the existing storage module's addEntry, and returns the stored entry. Invalid input throws an Error with a readable message and stores nothing. Include node:test unit tests.",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/add.mjs"],
+        "exports": ["addExpense(amount, category, dateISO)"],
+        "notes": "Validates then persists via storage-module addEntry; throws on amount <= 0 / empty category / non-ISO date, storing nothing on failure."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "running-total-feature",
+      "prompt": "Build the running-total logic for the budget tracker: src/totals.mjs exporting runningTotal(entries) which sums the amount of every entry and returns the total rounded to 2 decimal places (a number). An empty array returns 0. Include node:test unit tests covering the empty case and floating-point rounding (e.g. 0.1 + 0.2).",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/totals.mjs"],
+        "exports": ["runningTotal(entries)"],
+        "notes": "Pure function over the storage-module entry shape; returns Number rounded to 2dp; [] -> 0."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "category-breakdown-feature",
+      "prompt": "Build the category-breakdown logic for the budget tracker: src/categories.mjs exporting totalsByCategory(entries) which groups entries by category and returns an array of {category, total} objects, totals rounded to 2 decimal places, sorted by total descending (ties by category name ascending). An empty array returns []. Include node:test unit tests.",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/categories.mjs"],
+        "exports": ["totalsByCategory(entries)"],
+        "notes": "Pure function over the storage-module entry shape; [{category, total}] sorted total desc then category asc; totals 2dp."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "budget-page",
+      "prompt": "Build the main budget tracker page wiring the existing modules together: index.html (a static page loading browser ES modules, no framework, no build step) plus src/page.mjs exporting renderPage(root) that renders an add-expense form (amount, category, date), the entry list, the running total, and the by-category breakdown into the given root element, re-rendering after each add. Wire the form to the existing addExpense, the total to runningTotal, the breakdown to totalsByCategory, and load persisted entries on startup via loadEntries. Include node:test unit tests for renderPage using a minimal DOM stub.",
+      "depends_on": ["add-expense-feature", "running-total-feature", "category-breakdown-feature"],
+      "contract": {
+        "creates": ["index.html", "src/page.mjs"],
+        "exports": ["renderPage(root)"],
+        "notes": "Fan-in join: imports add.mjs, totals.mjs, categories.mjs, storage.mjs — never reimplements them. Static browser ES modules only; renderPage is DOM-stub-testable."
+      },
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [
+    {"after_wave": 1, "status": "pending"},
+    {"after_wave": 2, "status": "pending"},
+    {"after_wave": 3, "status": "pending"}
+  ],
+  "job_acceptance": {
+    "criteria": [
+      {
+        "id": "j1",
+        "text": "the project's node test suite passes on the integrated tree",
+        "tier": "build",
+        "check": "node --test exits 0 at the repo root"
+      },
+      {
+        "id": "j2",
+        "text": "an added expense is persisted and comes back from storage",
+        "tier": "behavior",
+        "check": "addExpense(12.5, 'groceries', '2026-07-01') then loadEntries() contains it"
+      },
+      {
+        "id": "j3",
+        "text": "the running total reflects every added expense",
+        "tier": "behavior",
+        "check": "after adding 12.50 and 7.25, runningTotal(loadEntries()) === 19.75"
+      },
+      {
+        "id": "j4",
+        "text": "spending is grouped by category with correct sums",
+        "tier": "behavior",
+        "check": "two groceries entries + one fuel entry -> totalsByCategory returns groceries with their sum first"
+      },
+      {
+        "id": "j5",
+        "text": "the page shows the form, the total, and the breakdown together and updates after an add",
+        "tier": "visual",
+        "check": "open index.html in a browser; add an expense; the list, total, and category view all update"
+      }
+    ],
+    "oracle_path": "tests/acceptance.job.test.mjs",
+    "status": "pending"
+  },
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "797a858dba472aeb4119dd212a77a81e7b1d89dbaac4b52e38a956a4699fbacf"
+}

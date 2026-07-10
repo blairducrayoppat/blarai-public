@@ -42,7 +42,6 @@ testpaths = [
     "tests/harness",
     "tests/pa_quality_benchmark",
     "tests/substrate_benchmark",
-    "tools/tests",
     "tools/perf_contrib/tests",
 ]
 addopts = "--strict-markers -v --import-mode=importlib -m 'not slow and not hardware and not winui'"

@@ -1,0 +1,23 @@
+{
+  "run_id": "live-negatives-20260706-000634",
+  "date": "2026-07-06 00:06:34",
+  "proofs": {
+    "N1": {
+      "caught": true,
+      "pre_gate": "verify=pass; tests=pass (python)",
+      "post_gate": "verify=fail; tests=fail (python) | storage' (C:\\\\Users\\\\mrbla\\\\projects\\\\battery-neg-n1\\\\storage.py)\\n=========================== short test summary info ===========================\\nERROR test_consumer.py\\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\\n1 error in 0.26s\"},{\"name\":\"py:mutation\",\"status\":\"pass\",\"seconds\":0.4,\"detail\":\"mutation: no mutants measured ("
+    },
+    "N2": {
+      "caught": true,
+      "unit_green": true,
+      "oracle": "nonzero exit; nts(): # The JOB criterion: negative amounts are refused with ValueError. import pytest > with pytest.raises(ValueError): ^^^^^^^^^^^^^^^^^^^^^^^^^ E Failed: DID NOT RAISE ValueError tests\\test_job_acceptance.py:6: Failed =========================== short test summary info =========================== FAILED tests/test_job_acceptance.py::test_add_rejects_negative_amounts - Fail... 1 f"
+    },
+    "N3": {
+      "caught": true,
+      "graded_original": true,
+      "tree_restored_exactly": true,
+      "oracle": "nonzero exit; nts(): # The JOB criterion: negative amounts are refused with ValueError. import pytest > with pytest.raises(ValueError): ^^^^^^^^^^^^^^^^^^^^^^^^^ E Failed: DID NOT RAISE ValueError tests\\test_job_acceptance.py:6: Failed =========================== short test summary info ============"
+    }
+  },
+  "all_caught": true
+}

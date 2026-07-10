@@ -677,7 +677,7 @@ deck = {
                  "severity": "High", "status": "MITIGATED", "grade": "TESTED", "ticket": "#641 (Decision 8)",
                  "was": "Selecting the guest deployment profile dropped mTLS, identity binding, weight verification, and measured boot all at once — a whole-perimeter collapse from one config choice.",
                  "gap": "The catastrophic path is closed by the interlock (network-facing + dev-mode = refuse-to-start) and production-by-default resolution — BUT the committed guest file still literally contains dev_mode=true; the file-level hardening the audit asked for is still owed before #598.",
-                 "evidence": "interlock at the launcher; resolve_dev_mode(GUEST, override=False)=False in test; guest_runtime.toml still has dev_mode=true. Honest: safe-by-construction, not yet safe-by-config."},
+                 "evidence": "interlock at the launcher; resolve_dev_mode(GUEST, override=False)=False in test; guest_runtime.toml now ships dev_mode=false (#641, 2026-07-07) — safe-by-construction AND by-config. (Guest mTLS cert provisioning remains the #615 ceremony.)"},
                 {"title": "Dependency supply chain unpinned",
                  "severity": "Medium", "status": "MITIGATED", "grade": "TESTED", "ticket": "#560",
                  "was": "All dependencies floated with no upper bound, no lockfile, no hash verification — a future install could pull a compromised release.",

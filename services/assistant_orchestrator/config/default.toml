@@ -320,22 +320,33 @@ illustration_lora_sha256 = "b4c8132f85ab7d75f5789eaf0054153a6011b505719f1253fb7d
 enabled = true
 
 # Increment-2 swap: pre-load headroom gate — GiB of free RAM required after BlarAI
-# fully steps aside, before the 30B is loaded. 21 GiB (LA-set) matches start-llm's own
-# coder-30b gate ($needGB=21 over Available MBytes/1024 = GiB) — the number the
-# operator's real 30B runs succeed from on this box. It aborts only on a genuinely-
-# too-low ambient (a full step-aside frees ~26 GiB, so it rarely binds), and aborts
-# GRACEFULLY (restores the 14B). (Milestone-1's one-time marginal load measured a
-# ~22-23 GiB peak; the gate matches start-llm's proven value, graceful regardless.)
-# Tunable without a code change (pre-go-live config key, #670).
-swap_min_free_gb = 21.0
+# fully steps aside, before the 30B is loaded. 20 GiB (LA-set 2026-07-09, #777) —
+# MEASURED on the current substrate (OpenVINO GenAI 2026.2.1, warm compile cache):
+# a supervised load from a 19.85 GiB ambient completed READY in ~13s with NO page
+# storm (Available floor 4.6 GiB, disk saturated ~10s of weight staging only),
+# zero gate-step slowdown under the post-load squeeze, and a normal generation.
+# The prior 21 matched start-llm's gate and the 2026-06-21 era (OV 2026.1.0,
+# lowest observed success 23.1 GiB) — that dataset never TESTED below 23.1; #777
+# converted the inference into a measurement. Caveat honestly carried: the #777
+# run was WARM-cache; a rare COLD load (post-OVMS-upgrade, #747 class) stages
+# more and is backstopped by the 480s load deadline + this gate's GRACEFUL abort
+# (restores the 14B). Keep in lockstep with start-llm's $needGB and the battery
+# lean-preflight ($LEAN_GATE_GIB = this + 0.5). Tunable without a code change.
+swap_min_free_gb = 20.0
 
 # Problem-2 (#670): out-of-band OVERALL-run budget (seconds). A watchdog in the detached
 # swap driver force-kills a wedged run-fleet child and tears down to restore the 14B if the
 # whole task loop exceeds this — the backstop for a hung/over-long coding task that would
-# otherwise strand the 30B resident (the live failure this fix closes). 5400 s (90 min) is a
-# generous ceiling: live runs were ~50 min for 8-9 tasks, and the per-task de-deadlock makes
-# normal runs finish well under it. A value <= 0 DISABLES the watchdog (full back-compat).
-swap_run_budget_s = 5400.0
+# otherwise strand the 30B resident (the live failure this fix closes). A value <= 0
+# DISABLES the watchdog (full back-compat).
+# #757 (night-2, 2026-07-07): the old 5400 s (90 min) ceiling was sized to pre-plan-graph
+# runs (~50 min for 8-9 tasks); a 5-task battery job's BUILDS alone measured 74-79 min
+# (B4/B6 journals), so the budget tree-killed the final acceptance-tests task mid-candidate
+# and the job oracle never ran. 10800 s (3 h) gives the measured build phase + a full
+# worst-case acceptance task real headroom; run-fleet's idle-detection and the per-task
+# ceiling (swap_ops.TASK_TIMEOUT_S) remain the wedge defenses — this is an abort bound,
+# not a wait: healthy runs still finish in ~45-95 min.
+swap_run_budget_s = 10800.0
 
 # Pre-go-live (#670): the dispatch target is config-driven, NOT compiled in. These two
 # roots locate (a) the agentic-setup fleet — its scripts/ + state/ (queue + runs) derive
@@ -351,6 +362,44 @@ projects_dir = "C:/Users/mrbla/projects"
 # the launcher to exit, so the WinUI shows the notice before its window closes for the
 # swap. A live-tuned knob (#670) — adjust without a code change if the message is missed.
 step_aside_grace_s = 2.0
+
+# M2 plan-graph (W1, #740): when true, the swap driver plans a big dispatch as a
+# dependency-ordered JobPlan (shared/fleet/plan_graph.py — validated waves, context
+# packs, per-wave integration gates, evidence-gated statuses) instead of today's flat
+# serial task queue. false is BYTE-IDENTICAL today-behavior: the knob gates the new
+# planner layer only — no plan artifact is written, no wave compiler runs, nothing
+# changes anywhere. ON since the W8 live proof (2026-07-05 run 20260705-214803-bd —
+# a real 6-task dependency graph executed in waves on the Arc 140V; #740/#748; the
+# LA's proven-features-default-LIVE rule).
+plan_graph = true
+
+# #749 dispatch→Vikunja bridge: one durable ticket per dispatched job in a
+# dedicated Vikunja project (created at dispatch, outcome at REPORT, closed only
+# on a GREEN + oracle-passed scorecard, left OPEN on PARKED-HONEST/STALLED with
+# evidence pointers — the operator's across-jobs actionable queue). OUTCOMES
+# ONLY, never heartbeats. Loopback-only (:3456), FAIL-SOFT (a Vikunja outage
+# never affects a run), and it is dispatch-side dev tooling — the sealed AO
+# runtime grows NO new egress (the socket lives under tools/, not the runtime).
+# DEFAULT OFF until the supervised live proof; even on, an unset project id (0)
+# refuses to post.
+vikunja_bridge = false
+vikunja_bridge_project_id = 0
+
+# #744 guest-certified oracle (plan §10.3, the S4 residual): when true, the swap
+# driver re-runs the JOB-level acceptance oracle inside the NIC-less Alpine guest
+# (BlarAI-Orchestrator, vsock 50001) as an ADVISORY isolation certificate — once
+# per job, in the teardown's RAM-free window (after UNLOAD-30B, before RESTART-AO),
+# source-only over the UC-003 staging-corridor pattern. It NEVER changes the job
+# verdict or attribution: the host gate stays the fidelity gate; the guest result
+# lands beside it as evidence (guest-oracle.json), with any host-pass/guest-fail
+# divergence flagged. LIVE since the 2026-07-08 LA-supervised go-live ceremony
+# (#744): the blarai-oracle guest service is provisioned (vsock 50002, pytest
+# 9.1.1 + hypothesis in the NIC-less Alpine guest), the AF_HYPERV transport is
+# registered at real_run_guest_oracle, and the corridor was proven live in both
+# directions (a passed AND a failed round-trip) before this flip. Fail-soft:
+# an unreachable guest is an honest not-run in guest-oracle.json — never a
+# verdict change, never a blocked 14B restore.
+guest_oracle_enabled = true
 
 [security]
 fail_closed = true

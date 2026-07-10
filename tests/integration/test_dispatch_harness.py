@@ -304,6 +304,48 @@ def test_doom_detected_when_stalled_and_idle():
     assert classify_run_health(prev, cur, stall_grace_s=90) is DoomVerdict.DOOMED
 
 
+def test_doom_verify_gate_workers_are_watched():
+    # night-20260709 B4 false-doom: the [3/5] verify gate spawns uv/ruff/git as NATIVE
+    # processes; none were in _CODER_PROC_NAMES, so a working verify read as "no coder
+    # process active". The names are load-bearing — removing any re-arms the false doom.
+    from tools.dispatch_harness.monitor import _CODER_PROC_NAMES
+
+    assert {"uv", "ruff", "git"} <= set(_CODER_PROC_NAMES)
+
+
+def test_doom_grace_survives_a_silent_verify_gate_gap():
+    # The B4 kill shape (night-20260709): phase CODE, every watched log ~200 s stale (the
+    # verify gate's checks write nothing until they finish), no watched-name CPU. At the old
+    # 90 s grace this DOOMED a job inside the gate's own 600 s budget; at the production 240 s
+    # it must read WAITING (the overall bound remains the backstop for true hangs).
+    prev = _sig(wall_now=1000.0, journal=900.0, fleet_log=900.0, cpu=False, phase="CODE")
+    cur = _sig(wall_now=1100.0, journal=900.0, fleet_log=900.0, cpu=False, phase="CODE")
+    assert classify_run_health(prev, cur, stall_grace_s=90) is DoomVerdict.DOOMED  # the old bug
+    assert classify_run_health(prev, cur, stall_grace_s=240) is DoomVerdict.WAITING  # the fix
+
+
+def test_doom_still_fires_past_the_production_grace():
+    # The raised grace must NOT blind the detector: a run silent past 240 s is still DOOMED.
+    prev = _sig(wall_now=1000.0, journal=700.0, fleet_log=700.0, cpu=False, phase="CODE")
+    cur = _sig(wall_now=1100.0, journal=700.0, fleet_log=700.0, cpu=False, phase="CODE")  # 400s
+    assert classify_run_health(prev, cur, stall_grace_s=240) is DoomVerdict.DOOMED
+
+
+def test_doom_production_grace_default_is_the_registered_240():
+    # The dataclass default, the harness defaults, and the registry row must agree (the
+    # lesson-217 family-drift class; the registry gate cross-checks the row, this locks the
+    # siblings to each other).
+    import inspect
+
+    from tools.dispatch_harness.harness import DispatchHarness
+    from tools.dispatch_harness.monitor import RunMonitor
+
+    assert RunMonitor.__dataclass_fields__["stall_grace_s"].default == 240.0
+    assert DispatchHarness.__dataclass_fields__["stall_grace_s"].default == 240.0
+    sig = inspect.signature(DispatchHarness.for_live)
+    assert sig.parameters["stall_grace_s"].default == 240.0
+
+
 def test_doom_not_declared_within_grace():
     # Stalled but the freshest progress is younger than the grace window -> WAITING, not DOOMED.
     prev = _sig(wall_now=1000.0, journal=970.0, cpu=False)
@@ -393,6 +435,24 @@ def test_sweep_report_render_and_dict():
 
 def test_sweep_report_empty_render():
     assert "no jobs ran" in SweepReport().render()
+
+
+def test_job_report_carries_the_driver_job_verdict():
+    # #748: the JOB truth (the driver's scorecard verdict) rides the report
+    # first-class — MERGED + COMPLETE alone must never read as job success.
+    j = JobReport(repo="r", goal="g", outcome="MERGED", verdict="COMPLETE",
+                  job_verdict="PARKED-HONEST", job_attribution="BUILD")
+    d = j.to_dict()
+    assert d["job_verdict"] == "PARKED-HONEST"
+    assert d["job_attribution"] == "BUILD"
+    sweep = SweepReport()
+    sweep.add(j)
+    text = sweep.render()
+    assert "JOB=PARKED-HONEST (BUILD)" in text
+    # Legacy runs (no scorecard) render exactly as before — no JOB= segment.
+    legacy = SweepReport()
+    legacy.add(JobReport(repo="r", goal="g", outcome="MERGED", verdict="COMPLETE"))
+    assert "JOB=" not in legacy.render()
 
 
 # ===========================================================================
@@ -935,3 +995,115 @@ def test_run_monitor_reads_swap_progress_tail(tmp_path):
     )
     result = mon.run()
     assert "stepping aside for the 30B" in result.progress_tail
+
+
+# ---------------------------------------------------------------------------
+# M2 W6 (#740) — the watch.py plan view (render_plan + the --plan wiring)
+# ---------------------------------------------------------------------------
+# render_plan is PURE (display-only over the persisted plan.json dict), so these run
+# with no state dir at all; the --plan flag test drives main() against a tmp state
+# dir via a monkeypatched _state_dir (no live fleet touched).
+
+from tools.dispatch_harness.watch import _plan_path, render_plan  # noqa: E402
+
+
+def _raw_plan() -> dict:
+    return {
+        "schema": "jobplan/v1",
+        "plan_id": "20260705-x",
+        "goal": "a budget tracker web app",
+        "repo": "C:/Users/mrbla/projects/budget",
+        "tasks": [
+            {"id": "storage", "prompt": "p", "depends_on": [], "status": "merged"},
+            {"id": "report", "prompt": "p", "depends_on": ["storage"],
+             "status": "building"},
+            {"id": "util", "prompt": "p", "depends_on": [], "status": "pending"},
+        ],
+        "integration_nodes": [{"after_wave": 1, "status": "passed"}],
+        "job_acceptance": {"criteria": [], "oracle_path": "tests/test_job_acceptance.py",
+                           "status": "pending"},
+        "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 1},
+    }
+
+
+def test_render_plan_groups_waves_and_shows_statuses():
+    text = render_plan(_raw_plan())
+    assert "PLAN 20260705-x" in text
+    assert "a budget tracker web app" in text
+    # Wave 1 = the two roots (original order); wave 2 = the dependent.
+    w1 = text.index("wave 1:")
+    w2 = text.index("wave 2:")
+    assert w1 < text.index("storage: merged") < w2
+    assert w1 < text.index("util: pending") < w2
+    assert text.index("report: building") > w2
+    assert "(deps: storage)" in text
+    assert "after wave 1: passed" in text
+    assert "job acceptance: pending" in text
+    assert "re-decompose budget: 1/2 spent" in text
+
+
+def test_render_plan_tolerates_garbage_and_cycles():
+    junk = {"tasks": [{"id": "a", "depends_on": ["b"], "status": "pending"},
+                      {"id": "b", "depends_on": ["a"], "status": "pending"},
+                      "not-a-dict"],
+            "integration_nodes": "nope", "job_acceptance": None}
+    text = render_plan(junk)          # never raises; cycle dumps flat
+    assert "a: pending" in text and "b: pending" in text
+    assert render_plan({})            # a fully-empty plan still renders a header
+
+
+def test_render_plan_unknown_dep_treated_as_external():
+    raw = _raw_plan()
+    raw["tasks"][1]["depends_on"] = ["not-in-plan"]
+    text = render_plan(raw)
+    assert "report" in text           # an unknown ref never wedges the grouping
+
+
+def test_watch_plan_flag_prints_plan(tmp_path, monkeypatch, capsys):
+    import tools.dispatch_harness.watch as watch
+
+    state = tmp_path / "state"
+    (state / "fleet-swap").mkdir(parents=True)
+    _plan_path(state).write_text(json.dumps(_raw_plan()), encoding="utf-8")
+    monkeypatch.setattr(watch, "_state_dir", lambda: state)
+    rc = watch.main(["--plan"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "PLAN 20260705-x" in out and "wave 1:" in out
+
+
+def test_watch_plan_flag_absent_plan_reports_and_exits_nonzero(tmp_path, monkeypatch, capsys):
+    import tools.dispatch_harness.watch as watch
+
+    state = tmp_path / "state"
+    (state / "fleet-swap").mkdir(parents=True)
+    monkeypatch.setattr(watch, "_state_dir", lambda: state)
+    rc = watch.main(["--plan"])
+    assert rc == 1
+    assert "no persisted plan" in capsys.readouterr().out
+
+
+def test_snapshot_prepends_plan_view_when_plan_exists(tmp_path, monkeypatch, capsys):
+    import tools.dispatch_harness.watch as watch
+
+    state = tmp_path / "state"
+    run = state / "fleet-runs" / "R1"
+    run.mkdir(parents=True)
+    (state / "fleet-swap").mkdir(parents=True)
+    _plan_path(state).write_text(json.dumps(_raw_plan()), encoding="utf-8")
+    watch.snapshot(state, run, tail=4)
+    out = capsys.readouterr().out
+    assert "PLAN 20260705-x" in out
+    assert out.index("PLAN 20260705-x") < out.index("=== RUN R1")
+
+
+def test_snapshot_no_plan_renders_exactly_as_before(tmp_path, capsys):
+    import tools.dispatch_harness.watch as watch
+
+    state = tmp_path / "state"
+    run = state / "fleet-runs" / "R1"
+    run.mkdir(parents=True)
+    watch.snapshot(state, run, tail=4)
+    out = capsys.readouterr().out
+    assert "PLAN" not in out          # plan_graph=false leaves the view byte-identical
+    assert "=== RUN R1" in out

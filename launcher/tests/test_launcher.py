@@ -7,6 +7,7 @@ Does NOT actually start VMs or Textual apps — all components are mocked.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -980,3 +981,204 @@ class TestGoLiveFlag:
         # The flag sets this env var in-process (see main()); the config then enables.
         monkeypatch.setenv("BLARAI_GUEST_PARSER_ENABLED", "true")
         assert load_guest_parser_config().enabled is True
+
+
+class _HardExitCalled(BaseException):
+    """Sentinel raised by the mocked ``os._exit`` so the test can observe it.
+
+    BaseException (not Exception) so no fail-soft handler in ``main()`` can
+    swallow it — exactly like the real ``os._exit``, nothing downstream runs.
+    """
+
+
+class TestInstanceLockRefusal:
+    """The #670 single-instance refusal path: hard exit, nothing touched.
+
+    Gate-integrity regression lock for 2026-07-04: a pytest run from a
+    checkout whose ``certs/launcher.lock`` a LIVE BlarAI held reached the
+    REAL refusal path and its ``os._exit(1)`` killed the whole pytest
+    process — the standing gate truncated silently at 76% with no summary.
+    The autouse conftest guard now isolates the lock for every launcher
+    test; THIS test re-patches the lock to a refusal and pins the
+    production semantics the guard must not erase: refuse -> flush logs ->
+    hard exit 1, WITHOUT starting the VM and WITHOUT releasing (someone
+    else's) lock.
+    """
+
+    @patch("launcher.__main__.os._exit", side_effect=_HardExitCalled)
+    @patch("launcher.__main__.ensure_vm_running")
+    @patch("launcher.__main__.is_admin", return_value=True)
+    def test_refused_lock_hard_exits_before_any_service_work(
+        self,
+        _mock_admin,
+        mock_ensure_vm,
+        mock_os_exit,
+    ) -> None:
+        import launcher.__main__ as main_mod
+        from launcher.instance_lock import InstanceLockResult
+
+        refused = InstanceLockResult(acquired=False, holder_pid=4048)
+        with (
+            patch.object(
+                main_mod, "acquire_instance_lock", return_value=refused
+            ),
+            patch.object(main_mod, "release_instance_lock") as mock_release,
+        ):
+            with pytest.raises(_HardExitCalled):
+                main_mod.main()
+
+        mock_os_exit.assert_called_once_with(1)
+        # A refused instance acquired nothing and must start nothing:
+        mock_ensure_vm.assert_not_called()
+        # ...and must NEVER release the LIVE holder's lock:
+        mock_release.assert_not_called()
+
+
+def _snapshot_certs_dir(path: Path) -> "dict[str, tuple[int, int]] | None":
+    """Snapshot ``{filename: (size, mtime_ns)}`` for every file in ``path``.
+
+    Returns ``None`` when ``path`` is absent, so "absent before AND after"
+    compares equal while "absent before, present after" (a fresh mint) does not.
+    Used by the #751 isolation locks to prove the REAL ``<repo_root>/certs/`` is
+    neither created nor modified by a launcher test.
+    """
+    if not path.exists():
+        return None
+    return {
+        p.name: (p.stat().st_size, p.stat().st_mtime_ns)
+        for p in sorted(path.iterdir())
+        if p.is_file()
+    }
+
+
+class TestPerBootCertIsolation:
+    """#751: the standing gate must never mint into the REAL ``<repo_root>/certs/``.
+
+    Root cause (lesson 55 recurrence, observed 2026-07-06): ``main()`` in
+    production posture (the HOST default) calls
+    ``provision_per_boot_certs(repo_root=<repo_root>)`` at Step 1.5, minting nine
+    per-boot PEMs into ``<repo_root>/certs/`` — the SAME dir the shipped PA config
+    reads (``certs/pa_server.pem`` / ``certs/ca.pem``). Running the standing gate
+    from the operator's LIVE checkout therefore rotated the CA out from under a
+    running AO whose in-memory CA no longer matched disk →
+    ``CERTIFICATE_VERIFY_FAILED``. The ``LOCALAPPDATA`` redirect the test-isolation
+    discipline relies on does NOT cover ``certs/`` (it lives in the repo, not under
+    ``LOCALAPPDATA``). The autouse ``conftest.py`` fixture now redirects the mint to
+    a tmp dir; these locks pin that isolation so it cannot silently regress.
+    """
+
+    def test_fixture_redirects_cert_mint_away_from_repo_certs(self) -> None:
+        """The autouse fixture patches the mint binding to write tmp, not the repo.
+
+        Safe by construction — no ``main()`` drive: the binding is already
+        redirected, so a mint call carrying a production ``repo_root`` still lands
+        in tmp. Proves (a) the ``launcher.__main__`` binding is NOT the real
+        function and (b) a mint targeting ``<repo_root>/certs/`` writes a tmp dir,
+        leaving the real certs dir byte-for-byte unchanged — while the REAL cert
+        minting still runs (coverage preserved).
+        """
+        import launcher.__main__ as main_mod
+        from shared.security.cert_provisioning import (
+            provision_per_boot_certs as real_fn,
+        )
+
+        # (a) the binding main() uses is the redirect wrapper, not the real fn.
+        assert main_mod.provision_per_boot_certs is not real_fn, (
+            "the autouse cert-isolation fixture must redirect "
+            "launcher.__main__.provision_per_boot_certs (#751)"
+        )
+
+        repo_root = Path(main_mod.__file__).resolve().parent.parent
+        repo_certs = repo_root / "certs"
+        before = _snapshot_certs_dir(repo_certs)
+
+        # Call exactly as main() does at Step 1.5: repo_root=<repo_root>.
+        certs = main_mod.provision_per_boot_certs(repo_root=repo_root)
+
+        # The REAL mint ran (coverage) but landed in tmp, NOT <repo_root>/certs/.
+        assert certs.ca_cert_path.exists(), "the real per-boot mint must have run"
+        assert repo_certs not in certs.ca_cert_path.parents, (
+            f"per-boot certs must NOT be minted into {repo_certs}; "
+            f"got {certs.ca_cert_path}"
+        )
+        # And the real certs dir is unchanged by the call (created-or-modified → fail).
+        assert _snapshot_certs_dir(repo_certs) == before, (
+            f"the redirected mint must not create or modify {repo_certs}"
+        )
+
+    @patch("launcher.__main__.AssistantOrchestratorService")
+    @patch("launcher.__main__.PolicyAgentService")
+    @patch("launcher.__main__.BlarAIApp")
+    @patch("launcher.__main__.TransportGateway")
+    @patch("launcher.__main__.build_session_store")
+    @patch("launcher.__main__.build_shared_pipeline")
+    @patch("launcher.__main__._run_uat2_prompt_flow_preflight", return_value=True)
+    @patch("launcher.__main__.ensure_vm_running", return_value=True)
+    @patch("launcher.__main__.get_vm_state")
+    @patch("launcher.__main__.is_admin", return_value=True)
+    def test_production_boot_does_not_touch_repo_certs(
+        self,
+        _mock_admin,
+        mock_vm_state,
+        _mock_ensure_vm,
+        _mock_prompt_flow,
+        mock_build_pipeline,
+        mock_build_store,
+        mock_gateway_cls,
+        mock_app_cls,
+        mock_policy_service_cls,
+        mock_orchestrator_service_cls,
+    ) -> None:
+        """End-to-end: a full production ``main()`` leaves ``<repo_root>/certs/`` untouched.
+
+        Same mock stack as ``test_production_happy_path`` — the CONFIRMED culprit:
+        without the fixture, one run of it mints nine PEMs into the real certs dir.
+        A fail-fast pre-assert refuses to drive ``main()`` if the redirect
+        regressed, so this lock can never itself pollute the live certs.
+        """
+        import launcher.__main__ as main_mod
+        from launcher.__main__ import VMState, main
+        from shared.security.cert_provisioning import (
+            provision_per_boot_certs as real_fn,
+        )
+
+        # FAIL FAST: never drive a real production mint if the redirect regressed.
+        assert main_mod.provision_per_boot_certs is not real_fn, (
+            "cert-mint redirect missing — refusing to drive main() into a real "
+            "<repo_root>/certs/ mint (#751)"
+        )
+
+        repo_certs = Path(main_mod.__file__).resolve().parent.parent / "certs"
+        before = _snapshot_certs_dir(repo_certs)
+
+        mock_vm_state.return_value = VMState.RUNNING
+        mock_build_result = MagicMock()
+        mock_build_result.ok = True
+        mock_build_result.pipeline = MagicMock()
+        mock_build_result.error = None
+        mock_build_pipeline.return_value = mock_build_result
+        mock_build_store.return_value = MagicMock()
+        mock_gateway = MagicMock()
+        mock_gateway.check_pa_status = AsyncMock(return_value=True)
+        mock_gateway_cls.return_value = mock_gateway
+        mock_app_cls.return_value = MagicMock()
+        mock_policy_service = MagicMock()
+        mock_policy_service.start.return_value = True
+        mock_policy_service.running = True
+        mock_policy_service_cls.from_runtime_mode.return_value = mock_policy_service
+        mock_orchestrator_service = MagicMock()
+        mock_orchestrator_service.start.return_value = True
+        mock_orchestrator_service.running = True
+        mock_orchestrator_service_cls.from_runtime_mode.return_value = (
+            mock_orchestrator_service
+        )
+
+        assert main() == 0
+
+        # The production boot reached Step 1.5 (the cert mint) but the fixture
+        # redirected it to tmp: the REAL certs dir is unchanged — absent stays
+        # absent, or present-with-identical (size, mtime) for every file.
+        assert _snapshot_certs_dir(repo_certs) == before, (
+            f"production main() must not create or modify {repo_certs} — the "
+            f"per-boot mint must be redirected to tmp (#751)"
+        )

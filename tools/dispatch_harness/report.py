@@ -28,6 +28,13 @@ class JobReport:
     run_id: str = ""
     outcome: str = ""               # MERGED | PARKED | BLOCKED | NOTHING | UNKNOWN | NONE | ""
     verdict: str = ""               # the monitor's DoomVerdict (COMPLETE/DOOMED/FAILED/…)
+    # #748: the DRIVER's job-level verdict (§9.4 taxonomy — GREEN/PARKED-HONEST/…),
+    # adopted from the run's driver-emitted scorecard.json when present ("" = legacy
+    # run / no scorecard). `verdict` above is run-health ONLY (a PARKED job is still a
+    # COMPLETE run); reading MERGED+COMPLETE as job success was the run-4 misread this
+    # field closes — the JOB truth must ride the report first-class.
+    job_verdict: str = ""
+    job_attribution: str = ""       # PLAN | BUILD | VERIFY | HARNESS ("" when green/absent)
     expected: str = ""              # the job's expected outcome (annotation only)
     wall_clock_s: float = 0.0
     stop_reason: str = ""           # why the monitor stopped (doom/timeout/failure), if any
@@ -101,7 +108,10 @@ class SweepReport:
             )
             lines.append(
                 f"     run_id={j.run_id or '—'}  status={status}  outcome={outcome}"
-                f"  ({j.wall_clock_s:.0f}s){exp}"
+                + (f"  JOB={j.job_verdict}"
+                   + (f" ({j.job_attribution})" if j.job_attribution else "")
+                   if j.job_verdict else "")
+                + f"  ({j.wall_clock_s:.0f}s){exp}"
             )
             if j.stop_reason:
                 lines.append(f"     stopped: {j.stop_reason}")

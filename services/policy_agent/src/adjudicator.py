@@ -181,6 +181,7 @@ class HybridAdjudicator:
         manifest_path: str | None = None,
         model_bin_path: str | None = None,
         audit_log: AuditLog | None = None,
+        require_signed_manifest: bool = False,
     ) -> None:
         """Initialize the HybridAdjudicator.
 
@@ -198,6 +199,12 @@ class HybridAdjudicator:
                 every AdjudicationContext is persisted before being returned.
                 AuditSinkError propagates to the caller — write failures are
                 explicit (Fail-Closed: never silently dropped).
+            require_signed_manifest: When True, the Stage-2 per-request weight
+                re-verification loads the manifest through the TPM-signature-
+                checked path (#571), so a manifest.json rewritten at runtime
+                alongside a tampered weight is rejected. Sourced from
+                ``[security].require_signed_manifest``. Default False preserves
+                the prior unsigned re-hash behavior.
         """
         self._npu = npu_inference
         self._acl_matrix = acl_matrix
@@ -206,6 +213,7 @@ class HybridAdjudicator:
         self._manifest_path = manifest_path
         self._model_bin_path = model_bin_path
         self._audit_log = audit_log
+        self._require_signed_manifest = require_signed_manifest
         self._adjudication_count: int = 0
 
     @classmethod
@@ -219,6 +227,7 @@ class HybridAdjudicator:
         manifest_path: str | None = None,
         model_bin_path: str | None = None,
         audit_log: AuditLog | None = None,
+        require_signed_manifest: bool = False,
     ) -> "HybridAdjudicator":
         """Factory method: construct from individual config objects.
 
@@ -233,6 +242,7 @@ class HybridAdjudicator:
             manifest_path=manifest_path,
             model_bin_path=model_bin_path,
             audit_log=audit_log,
+            require_signed_manifest=require_signed_manifest,
         )
 
     # -- Properties ---------------------------------------------------------
@@ -368,6 +378,7 @@ class HybridAdjudicator:
             integrity_result = verify_weight_integrity(
                 model_path=self._model_bin_path,
                 manifest_path=self._manifest_path,
+                require_signed=self._require_signed_manifest,
             )
             t_integrity_end = time.perf_counter()
             integrity_ms = (t_integrity_end - t_integrity_start) * 1000.0

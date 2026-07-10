@@ -172,3 +172,81 @@ def test_plan_generate_fn_is_greedy_and_strips_hidden_blocks():
     assert out == '[{"task": "t"}]'                    # <think> block stripped
     assert captured["config"].do_sample is False       # greedy / temp-0 equivalent
     assert captured["max_new_tokens"] > 0
+
+
+def test_plan_generate_fn_uses_minimal_plan_system_prompt():
+    """#748 tool-bait lock: the PLAN call must ride the minimal no-tools planning
+    system prompt, never the conversational persona — whose tool directive baited
+    the live 14B into answering the decompose request with a <tool_call> (greedy,
+    deterministic) that the strip reduced to '' → minimal single-task fallback."""
+    from services.assistant_orchestrator.src.entrypoint import _PLAN_SYSTEM_PROMPT
+
+    captured = {}
+
+    class _FakeInference:
+        def generate_text(self, prompt, max_new_tokens=None, config=None, **kw):
+            captured.update(kw)
+            return SimpleNamespace(text="[]")
+
+    stub = SimpleNamespace(_inference=_FakeInference())
+    AssistantOrchestratorService._plan_generate_fn(stub)("decompose this idea")
+    assert captured.get("system_prompt") == _PLAN_SYSTEM_PROMPT
+    assert "no tool calls" in _PLAN_SYSTEM_PROMPT
+    assert "/no_think" in _PLAN_SYSTEM_PROMPT
+
+
+def test_plan_generate_fn_raises_on_hidden_blocks_only_response():
+    """#748: a response that is ENTIRELY hidden blocks (tool-call-only or
+    all-<think>) must RAISE with the evidence, never silently return '' —
+    the live failure shape was <tool_call>search_knowledge...</tool_call>
+    as the model's whole answer to the decompose prompt."""
+    import pytest
+
+    class _FakeInference:
+        def generate_text(self, prompt, max_new_tokens=None, config=None, **_kw):
+            return SimpleNamespace(
+                text='<tool_call>{"name": "search_knowledge", "arguments": {}}</tool_call>'
+            )
+
+    stub = SimpleNamespace(_inference=_FakeInference())
+    gen = AssistantOrchestratorService._plan_generate_fn(stub)
+    with pytest.raises(RuntimeError, match="no answer text"):
+        gen("decompose this idea")
+
+
+def test_plan_generate_fn_never_arms_tool_call_grammar():
+    """#748 root-cause lock: the PLAN call's GenerationConfig must carry
+    tool_call_grammar=False EXPLICITLY. The dataclass-default arming crashed the
+    live plan generation on #725's xgrammar stop-token bug (grammar_matcher.cc:627)
+    on every dispatch — the whole M2 plan-graph silently fell back to one task."""
+    captured = {}
+
+    class _FakeInference:
+        def generate_text(self, prompt, max_new_tokens=None, config=None, **_kw):
+            captured["config"] = config
+            return SimpleNamespace(text="[]")
+
+    stub = SimpleNamespace(_inference=_FakeInference())
+    AssistantOrchestratorService._plan_generate_fn(stub)("decompose this idea")
+    assert captured["config"].tool_call_grammar is False
+
+
+def test_plan_generate_fn_raises_on_fail_closed_error():
+    """#748 fail-loud lock: a generation-layer failure (fail-closed result with
+    text='' and the cause only in .error) must RAISE, never return '' — the
+    silent empty was indistinguishable from an empty model answer and collapsed
+    every plan to the minimal single-task fallback with err='' in the logs.
+    The raise routes into the consumers' designed degradation, e2e-proven by
+    ``test_plan_handler_raising_generator_never_crashes`` above."""
+    import pytest
+
+    class _FakeInference:
+        def generate_text(self, prompt, max_new_tokens=None, config=None, **_kw):
+            return SimpleNamespace(
+                text="", error="Generation error — Fail-Closed: xgrammar boom"
+            )
+
+    stub = SimpleNamespace(_inference=_FakeInference())
+    gen = AssistantOrchestratorService._plan_generate_fn(stub)
+    with pytest.raises(RuntimeError, match="PLAN generation failed"):
+        gen("decompose this idea")

@@ -1,0 +1,31 @@
+{
+  "schema": "battery-card/v1",
+  "id": "B3",
+  "title": "budget tracker web app (node-web, 5-unit fan-in) — the Stage-2 demo",
+  "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B3",
+  "stack": "node-web",
+  "units": 5,
+  "shape": "fan-in",
+  "repo": "battery-b3-budget-web",
+  "sandbox_only": true,
+  "clarify_answer": "web",
+  "run_budget_s": 21600,
+  "run_budget_note": "#740 re-grain 2026-07-08 (LA-directed): B3's first campaign run measured node/web tasks at 40-85 min EACH (5 tasks + gates + acceptance ~4.5-6.5 h), STALLED on the 3 h default. 6 h envelope over the measured worst case; per-card so the default stays tight for every other job. Not a shrink of the card (that would change the Stage-2 demo it measures).",
+  "goal": "I want a simple page I can open in my web browser to keep track of my budget. It needs somewhere to remember my entries between visits, a way for me to add an expense with an amount and a category, a running total that updates as I add things, a view of my spending grouped by category so I can see where the money goes, and one main page that brings all of that together so I can actually use it day to day.",
+  "rigs": [],
+  "expected_outcome": {
+    "must_verify_tiers": ["build", "behavior"],
+    "human_tiers_expected": ["visual"],
+    "oracle": {
+      "expected": true,
+      "ecosystem": "node",
+      "path": "tests/acceptance.job.test.mjs"
+    },
+    "allowed_terminal_verdicts": ["GREEN", "PARKED-HONEST", "RECOVERED"],
+    "target_verdict": "GREEN",
+    "min_dependency_edges": 6,
+    "expects_context_packs": true,
+    "expects_waves_gte": 3,
+    "notes": "Doubles as Stage-2, the demo the operator watches (plan §3.2). Exercises the W4 node job-oracle generalization (node:test over .mjs modules) + the visual tier: visual criteria render STATUS_EYEBALL / UNVERIFIED-until-eyeball, never auto-passed. GREEN is judged on the objective tiers only; the eyeball tier is handed to the operator explicitly."
+  }
+}

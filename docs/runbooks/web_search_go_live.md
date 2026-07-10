@@ -40,6 +40,12 @@ request.
 - Eval locks: `gov-pf-007` (the endpoint is RULE-3-DENIED while the allowlist
   is empty — the go-live tripwire THIS ceremony flips) and `gov-adj-008` (the
   loop-level D4 denial while dormant).
+- **Live-contract probe** (Vikunja #739, the L188 control):
+  `services/assistant_orchestrator/src/websearch/probe.py` — a cheap, standalone
+  `--probe` command that exercises the REAL Kagi contract (auth-header shape,
+  endpoint/method, `data.search` response schema) with the provisioned key and
+  exits nonzero on drift. Run it at **Step 3.5** to catch a contract change (the
+  #724 v0→v1 401) BEFORE the ceremony's first live GET, not during it.
 
 ## Preconditions (verify BEFORE starting)
 
@@ -125,6 +131,39 @@ before merge. Merge the branch per normal review.
    blob is absent/malformed — re-run the provisioning step.
    (Rotation later = re-run the same provisioning command; the blob is
    overwritten. See `docs/runbooks/kagi_key_provisioning.md`.)
+
+## Step 3.5 — Probe the live Kagi contract (cheap drift check — catches #724 early)
+
+Before flipping the flag and booting the whole app, prove the live external
+contract with one cheap command. This is the L188 third-instance control
+(Vikunja #739): the probe fires ONE real fetch to `kagi.com` through the same
+egress door the adapter uses, arming the door for exactly that one fetch, and
+reports per-axis verdicts. It needs only the key from Step 3 (it does NOT need
+the Step-1 allowlist or the flag — it authorizes its own single probe fetch),
+so it is a clean early drift-catch.
+
+```powershell
+C:/Users/mrbla/blarai/.venv/Scripts/python.exe -m services.assistant_orchestrator.src.websearch.probe --probe
+```
+
+Expect `VERDICT: CONTRACT VERIFIED` and **exit 0** — auth accepted (HTTP 200),
+`data.search` present, and the adapter's own parser mapped ≥1 result. Then
+proceed to Step 4.
+
+If instead you see:
+
+- **`VERDICT: CONTRACT DRIFT` (exit 1)** — the endpoint rejected the request
+  (an `HTTP 401` here is the exact #724 signature) or the response schema
+  diverged. **STOP.** Verify `KAGI_SEARCH_ENDPOINT` (live_adapter.py), the
+  `_AUTH_SCHEME` (kagi_key_loader.py), and the v1 `data.search` parser against
+  the CURRENT Kagi API docs, correct the axes together (and re-baseline
+  `gov-pf-007` / `gov-adj-008` if the endpoint constant moved), then re-run the
+  probe until it verifies. This is the whole point of the control — catch the
+  drift here, cheaply, not at Step 6's irreversible first GET.
+- **`REFUSED` (exit 2)** — no usable key: Step 3 did not take; re-provision.
+- **`VERDICT: INCONCLUSIVE` (exit 3)** — the fetch could not be completed
+  (transport/network error, or a non-JSON body). Check connectivity to
+  `kagi.com`; this is neither a verified pass nor proof of drift.
 
 ## Step 4 — Flip the flag
 

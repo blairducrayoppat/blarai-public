@@ -97,6 +97,7 @@ def _make_adjudicator(
     model_bin_path: str | None = None,
     rate_limiter: RateLimiter | None = None,
     resource_deny_list: list[ResourceDenyRule] | None = None,
+    require_signed_manifest: bool = False,
 ) -> HybridAdjudicator:
     """Create a HybridAdjudicator with sensible defaults."""
     return HybridAdjudicator(
@@ -106,6 +107,7 @@ def _make_adjudicator(
         resource_deny_list=resource_deny_list,
         manifest_path=manifest_path,
         model_bin_path=model_bin_path,
+        require_signed_manifest=require_signed_manifest,
     )
 
 
@@ -544,6 +546,41 @@ class TestIntegrityReVerification:
             assert ctx.integrity_verified is False
             assert "integrity" in ctx.npu_result.error.lower()  # type: ignore[union-attr]
             # NPU was NOT called
+            npu.classify_car.assert_not_called()
+        finally:
+            os.unlink(bin_path)
+            os.unlink(manifest_path)
+
+    def test_require_signed_manifest_denies_unsigned_manifest(self) -> None:
+        """#571: with require_signed_manifest=True and a CORRECT-but-UNSIGNED
+        manifest (matching digest, no .sig), Stage-2 re-verify fails closed →
+        DENY without calling NPU. Proves the signed-manifest posture is threaded
+        into the per-request path (not just the boot gate); the SAME inputs
+        ALLOW when require_signed_manifest defaults False
+        (test_integrity_pass_allows_npu_inference)."""
+        bin_path = _write_temp_bin()
+        manifest_path = _write_manifest(bin_path, correct=True)  # matches; no .sig written
+        try:
+            npu = _make_gpu_stub()
+            npu.classify_car = MagicMock(  # type: ignore[assignment]
+                return_value=GPUClassificationResult(
+                    label="ALLOW", confidence=0.99, latency_ms=1.0,
+                )
+            )
+            npu._loaded = True  # type: ignore[attr-defined]
+            adj = _make_adjudicator(
+                npu=npu,
+                manifest_path=manifest_path,
+                model_bin_path=bin_path,
+                require_signed_manifest=True,
+            )
+            car = _make_car()
+            ctx = adj.adjudicate_car(car)
+
+            assert ctx.decision == AdjudicationDecision.DENY
+            assert ctx.runtime_integrity is not None
+            assert ctx.runtime_integrity.verified is False
+            assert ctx.integrity_verified is False
             npu.classify_car.assert_not_called()
         finally:
             os.unlink(bin_path)

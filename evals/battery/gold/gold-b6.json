@@ -1,0 +1,150 @@
+{
+  "schema": "jobplan/v1",
+  "plan_id": "gold-b6-inventory-cli",
+  "goal": "I run a small hobby shop out of my garage and I want a program in a command window to manage my stock. It needs to remember everything between sessions. I want to add new items with a name, a price, and how many I have; change the quantity when stock comes in or sells; remove items I no longer carry; and search for items by name. I also want it to warn me about items that are running low, tell me what my whole stock is worth, and export everything to a spreadsheet file I can open somewhere else.",
+  "repo": "C:/Users/mrbla/projects/battery-b6-inventory-cli",
+  "tasks": [
+    {
+      "id": "storage-module",
+      "prompt": "Build the persistence layer for a command-line inventory manager in this repo: src/inventory/storage.py storing items in a JSON file so stock survives between runs. Provide init_store(path) (creates the file and parent dirs if missing), read_items(path) returning a list of item dicts, and write_items(path, items). An item is {\"name\": str, \"price\": float, \"qty\": int}. Include unit tests.",
+      "depends_on": [],
+      "contract": {
+        "creates": ["src/inventory/storage.py"],
+        "exports": [
+          "init_store(path)",
+          "read_items(path)",
+          "write_items(path, items)"
+        ],
+        "notes": "item = {name: str, price: float, qty: int}; names are unique keys. JSON file storage; read_items returns [] for a missing/empty store."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "add-item-command",
+      "prompt": "Add the 'add' command to the inventory CLI: src/inventory/cli_add.py exposing add_item_command(argv) wired so `python -m inventory add --name widget --price 4.99 --qty 10` stores a new item via the existing storage module. Reject a duplicate name, a negative price, or a negative quantity with a clear message and non-zero exit. Include unit tests.",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/inventory/cli_add.py"],
+        "exports": ["add_item_command(argv)"],
+        "notes": "Persists via storage-module; name is the unique key (duplicate add exits 2); price >= 0, qty >= 0 enforced."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "update-quantity-command",
+      "prompt": "Add the 'update' command to the inventory CLI: src/inventory/cli_update.py exposing update_quantity_command(argv) wired so `python -m inventory update --name widget --delta -3` adjusts an existing item's quantity by a positive or negative delta via the existing storage module. Refuse an unknown name and refuse a delta that would take quantity below zero, each with a clear message and non-zero exit. Include unit tests.",
+      "depends_on": ["add-item-command"],
+      "contract": {
+        "creates": ["src/inventory/cli_update.py"],
+        "exports": ["update_quantity_command(argv)"],
+        "notes": "Delta-based adjustment on the add-item-command item shape; unknown name -> exit 2; resulting qty must stay >= 0."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "remove-item-command",
+      "prompt": "Add the 'remove' command to the inventory CLI: src/inventory/cli_remove.py exposing remove_item_command(argv) wired so `python -m inventory remove --name widget` deletes the named item via the existing storage module. Removing an unknown name prints a clear message and exits non-zero; removing an existing item confirms on one line. Include unit tests.",
+      "depends_on": ["add-item-command"],
+      "contract": {
+        "creates": ["src/inventory/cli_remove.py"],
+        "exports": ["remove_item_command(argv)"],
+        "notes": "Deletes by unique name via storage-module write_items; unknown name -> exit 2, store unchanged."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "search-items-command",
+      "prompt": "Add the 'search' command to the inventory CLI: src/inventory/cli_search.py exposing search_items_command(argv) wired so `python -m inventory search --name wid` prints every item whose name contains the given text (case-insensitive), one per line as '<name>  <qty>  <price>'. No matches prints 'no matches' and exits 0. Include unit tests.",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/inventory/cli_search.py"],
+        "exports": ["search_items_command(argv)"],
+        "notes": "Case-insensitive substring match on name over storage-module read_items; 'no matches' + exit 0 when empty."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "low-stock-report",
+      "prompt": "Add the 'low-stock' command to the inventory CLI: src/inventory/cli_low_stock.py exposing low_stock_command(argv) wired so `python -m inventory low-stock --threshold 5` lists every item whose quantity is at or below the threshold (default 5), lowest quantity first, one per line as '<name>  <qty>'. If nothing is low it prints 'all stock ok' and exits 0. Include unit tests.",
+      "depends_on": ["update-quantity-command"],
+      "contract": {
+        "creates": ["src/inventory/cli_low_stock.py"],
+        "exports": ["low_stock_command(argv)"],
+        "notes": "qty <= threshold (default 5), sorted ascending by qty; reads the post-update quantities via storage-module."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "stock-value-report",
+      "prompt": "Add the 'value' command to the inventory CLI: src/inventory/cli_value.py exposing stock_value_command(argv) wired so `python -m inventory value` prints the total value of the stock — the sum over every item of price times quantity — as a single line 'total stock value: <amount>' rounded to 2 decimal places. An empty store prints a total of 0.00. Include unit tests.",
+      "depends_on": ["add-item-command"],
+      "contract": {
+        "creates": ["src/inventory/cli_value.py"],
+        "exports": ["stock_value_command(argv)"],
+        "notes": "Sum(price * qty) over storage-module items, 2dp; empty store -> 0.00."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "export-csv-command",
+      "prompt": "Add the 'export' command to the inventory CLI: src/inventory/cli_export.py exposing export_csv_command(argv) wired so `python -m inventory export --out stock.csv` writes every stored item to a CSV file with the header 'name,price,qty' followed by one row per item, using the existing storage module to read them. Print the row count written; an empty store still writes the header. Include unit tests.",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/inventory/cli_export.py"],
+        "exports": ["export_csv_command(argv)"],
+        "notes": "CSV header 'name,price,qty' + one row per storage-module item; empty store writes header only; prints 'exported N item(s)'."
+      },
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [
+    {"after_wave": 1, "status": "pending"},
+    {"after_wave": 2, "status": "pending"},
+    {"after_wave": 3, "status": "pending"},
+    {"after_wave": 4, "status": "pending"}
+  ],
+  "job_acceptance": {
+    "criteria": [
+      {
+        "id": "j1",
+        "text": "the project's code compiles and its test suite passes on the integrated tree",
+        "tier": "build",
+        "check": "pytest exits 0 at the repo root"
+      },
+      {
+        "id": "j2",
+        "text": "an added item is persisted and findable by search",
+        "tier": "behavior",
+        "check": "add widget 4.99 x10, then search wid lists widget with qty 10"
+      },
+      {
+        "id": "j3",
+        "text": "quantity updates persist and drive the low-stock warning",
+        "tier": "behavior",
+        "check": "update widget by -7 (10 -> 3), then low-stock --threshold 5 lists widget at 3"
+      },
+      {
+        "id": "j4",
+        "text": "removing an item really removes it",
+        "tier": "behavior",
+        "check": "remove widget, then search widget prints 'no matches'"
+      },
+      {
+        "id": "j5",
+        "text": "the stock value is the sum of price times quantity",
+        "tier": "behavior",
+        "check": "items 4.99 x2 and 1.50 x4 -> value prints 15.98"
+      },
+      {
+        "id": "j6",
+        "text": "the CSV export contains the header and every item",
+        "tier": "behavior",
+        "check": "export writes 'name,price,qty' plus one row per stored item"
+      }
+    ],
+    "oracle_path": "tests/test_job_acceptance.py",
+    "status": "pending"
+  },
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "e05b6bc6513d696e61d550472ebfed817d197c911c0bdf4e7162d1d46ebf869b"
+}

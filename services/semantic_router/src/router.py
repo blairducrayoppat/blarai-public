@@ -159,8 +159,13 @@ class SemanticRouter:
 
             model_dir = str(Path(self._model_path).parent)
 
-            # Load tokenizer from model directory (tokenizer.json + vocab.txt)
-            self._tokenizer = AutoTokenizer.from_pretrained(model_dir)
+            # Load tokenizer from model directory (tokenizer.json + vocab.txt).
+            # Local-only: never reach the HF Hub (#633) — the runtime is
+            # air-gapped and the files are present on disk;
+            # trust_remote_code=False refuses any repo-carried code execution.
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                model_dir, local_files_only=True, trust_remote_code=False
+            )
 
             # Load ONNX model with CPU-only execution
             sess_options = ort.SessionOptions()

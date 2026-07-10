@@ -58,6 +58,30 @@ class FleetDispatchConfig:
     projects_dir: Path
     """The ONLY allowed target root — the operator's projects (never BlarAI)."""
     enqueue_timeout_s: float = 30.0
+    plan_graph: bool = False
+    """M2 W1 (#740): plan a dispatch as a dependency-ordered JobPlan
+    (``shared/fleet/plan_graph.py`` — waves, context packs, integration gates).
+    ``False`` (the default) keeps today's flat serial queue byte-identical; the
+    swap driver consumes this (Lane A2 wiring). Resolved from
+    ``[fleet_dispatch].plan_graph``."""
+    vikunja_bridge: bool = False
+    """#749: post one durable Vikunja ticket per dispatched job (created at
+    dispatch, outcome at REPORT, closed only on GREEN + oracle-passed). ``False``
+    (the dormant default, until the supervised live proof) means the bridge posts
+    NOTHING — a Vikunja outage cannot affect a run regardless (fail-soft), but
+    off is off. Resolved from ``[fleet_dispatch].vikunja_bridge``."""
+    vikunja_bridge_project_id: int = 0
+    """#749: the Vikunja project id the job tickets land in (the "BlarAI Coder
+    Jobs" project). ``0`` (the default) is UNSET — the bridge refuses to post
+    without a target project even when ``vikunja_bridge`` is on. Resolved from
+    ``[fleet_dispatch].vikunja_bridge_project_id``."""
+    guest_oracle_enabled: bool = False
+    """#744 guest-certified oracle: re-run the job-level acceptance oracle inside
+    the NIC-less Alpine guest as an ADVISORY isolation certificate (plan §10.3
+    S4 residual). ``False`` (the dormant default, until the supervised live
+    proof) means the swap driver never touches the guest-oracle seams —
+    byte-identical today-behavior. Resolved from
+    ``[fleet_dispatch].guest_oracle_enabled``."""
 
 
 @dataclass(frozen=True)
@@ -109,11 +133,32 @@ def _git() -> str | None:
     return shutil.which("git")
 
 
-def _safe_run(cmd: list[str], timeout_s: float) -> tuple[bool, str, str]:
-    """Bounded, no-shell subprocess. Returns (ok, stdout, stderr). Fail-Closed."""
+#: CREATE_NO_WINDOW for _safe_run's console-subsystem children (pwsh / git / tasklist /
+#: uv...) — #761: the detached swap driver is spawned via pythonw.exe (GUI subsystem, no
+#: console), so without this flag EVERY _safe_run child in that driver would be allocated
+#: a fresh VISIBLE console window (short git calls flash one; a wave-gate pytest/npm
+#: child holds one for up to 600s — the accidental-close hazard the ticket closes). Safe
+#: by construction: every caller captures output and none is interactive. CONSTRAINT:
+#: never apply this flag to a python LAUNCHER spawn — a HIDDEN console crashed Textual on
+#: 2026-07-06 ("Driver must be in application mode"); the launcher spawns (swap_ops /
+#: battery) use pythonw instead. 0 off-Windows (creationflags is Windows-only).
+_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
+
+def _safe_run(
+    cmd: list[str], timeout_s: float, cwd: "str | None" = None
+) -> tuple[bool, str, str]:
+    """Bounded, no-shell subprocess. Returns (ok, stdout, stderr). Fail-Closed.
+
+    ``cwd`` (M2 W4, additive — the default is byte-identical) lets a gate run inside a
+    target repo without the repo path ever entering a command STRING: the path rides
+    the process's working directory, never a shell line (§10 S1 argv-only rule).
+    ``creationflags=_NO_WINDOW`` (#761): console-subsystem children of the console-less
+    pythonw-spawned driver must not each be allocated a visible console."""
     try:
         cp = subprocess.run(  # noqa: S603 — vector argv, no shell
-            cmd, capture_output=True, text=True, timeout=timeout_s,
+            cmd, capture_output=True, text=True, timeout=timeout_s, cwd=cwd or None,
+            creationflags=_NO_WINDOW,
         )
         return (cp.returncode == 0, cp.stdout or "", cp.stderr or "")
     except subprocess.TimeoutExpired:
@@ -132,8 +177,12 @@ def validate_repo(repo: Path, projects_dir: Path) -> str | None:
         resolved = repo.resolve()
     except Exception:  # noqa: BLE001
         return "repo path could not be resolved"
-    names = {p.name for p in (resolved, *resolved.parents)}
-    if names & set(_FORBIDDEN_REPO_ROOTS):
+    # Casefold both sides: a path component 'blarai' / '.OpenClaw' must be refused as
+    # readily as 'BlarAI' / '.openclaw' (defense-in-depth; the containment check below
+    # already holds, but the NAME refusal must not miss on case — on Windows the paths
+    # are the same directory anyway). (#740 H5)
+    names = {p.name.casefold() for p in (resolved, *resolved.parents)}
+    if names & {r.casefold() for r in _FORBIDDEN_REPO_ROOTS}:
         return (
             f"refusing: {resolved} is under a forbidden root "
             f"({' / '.join(_FORBIDDEN_REPO_ROOTS)}) — fleet jobs target your "
@@ -180,6 +229,11 @@ def _classify_result(result_line: str) -> str:
         return "NOTHING"
     if "not merged" in low:
         return "PARKED"
+    if "timed out" in low:
+        # #757: a tree-killed task (per-task ceiling or budget-watchdog abort) writes an
+        # explicit TIMED OUT detail; it must round-trip through the cumulative SUMMARY as
+        # TIMEOUT, not decay to UNKNOWN (the #686 shape-divergence class).
+        return "TIMEOUT"
     return "UNKNOWN"
 
 
@@ -236,7 +290,8 @@ def _format_report(run_id: str, outcomes: list[TaskOutcome]) -> str:
         return f"Fleet run {run_id}: completed, but no task results were parsed from the summary."
     icon = {"MERGED": "✓ merged", "PARKED": "parked (review the branch)",
             "BLOCKED": "BLOCKED (possible secret — left uncommitted)",
-            "NOTHING": "no changes", "UNKNOWN": "see report"}
+            "NOTHING": "no changes", "UNKNOWN": "see report",
+            "TIMEOUT": "timed out (tree-killed — see report)"}
     lines = [f"Fleet run {run_id} — {len(outcomes)} task(s):"]
     for o in outcomes:
         lines.append(f"  • {o.task}: {icon.get(o.result, o.result)}")
@@ -501,9 +556,10 @@ def create_project(
             ok=False, message="The project path could not be resolved.",
             error="unresolvable",
         )
-    # Same forbidden-root + containment guard a dispatch target must pass.
-    names = {p.name for p in (resolved, *resolved.parents)}
-    if names & set(_FORBIDDEN_REPO_ROOTS):
+    # Same forbidden-root + containment guard a dispatch target must pass (casefolded
+    # so 'blarai' / '.OpenClaw' refuse as readily as the canonical spellings — #740 H5).
+    names = {p.name.casefold() for p in (resolved, *resolved.parents)}
+    if names & {r.casefold() for r in _FORBIDDEN_REPO_ROOTS}:
         return CreateProjectResult(
             ok=False,
             message=f"Refusing: '{slug}' resolves under a protected folder.",
@@ -582,12 +638,22 @@ _PROJECTS = Path(r"C:\Users\mrbla\projects")
 def build_default_config(
     agentic_setup_dir: "str | Path | None" = None,
     projects_dir: "str | Path | None" = None,
+    *,
+    plan_graph: bool = False,
+    vikunja_bridge: bool = False,
+    vikunja_bridge_project_id: int = 0,
+    guest_oracle_enabled: bool = False,
 ) -> FleetDispatchConfig:
     """The fleet paths for this host. The two ROOTS are config-driven
     ([fleet_dispatch].agentic_setup_dir / projects_dir, threaded from the AO config);
     an empty/None value falls back to the compiled-in default for this box. The
     scripts/queue/runs paths derive from the agentic-setup root (the fleet's fixed
-    state\\ layout), so only the root is configurable, never the internal structure."""
+    state\\ layout), so only the root is configurable, never the internal structure.
+    ``plan_graph`` threads the M2 W1 knob ([fleet_dispatch].plan_graph, #740),
+    ``vikunja_bridge`` / ``vikunja_bridge_project_id`` thread the #749 durable-ticket
+    knobs, and ``guest_oracle_enabled`` threads the #744 guest-certified-oracle knob —
+    all keyword-only with dormant defaults, so every existing caller is
+    byte-identical."""
     setup = Path(agentic_setup_dir) if agentic_setup_dir else _AGENTIC_SETUP
     projects = Path(projects_dir) if projects_dir else _PROJECTS
     return FleetDispatchConfig(
@@ -595,4 +661,8 @@ def build_default_config(
         queue_path=setup / "state" / "fleet-queue.json",
         runs_dir=setup / "state" / "fleet-runs",
         projects_dir=projects,
+        plan_graph=plan_graph,
+        vikunja_bridge=vikunja_bridge,
+        vikunja_bridge_project_id=vikunja_bridge_project_id,
+        guest_oracle_enabled=guest_oracle_enabled,
     )

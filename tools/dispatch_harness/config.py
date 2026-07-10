@@ -24,7 +24,7 @@ _DEFAULT_CONFIG = (
     _REPO_ROOT / "services" / "assistant_orchestrator" / "config" / "default.toml"
 )
 _DEFAULT_VSOCK_PORT = 5001
-_DEFAULT_RUN_BUDGET_S = 5400.0
+_DEFAULT_RUN_BUDGET_S = 10800.0  # #757: matches [fleet_dispatch].swap_run_budget_s (3 h)
 
 
 @dataclass(frozen=True)

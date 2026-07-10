@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from shared.fleet.decompose import DEFAULT_MAX_TASKS, decompose_request
+from shared.fleet.decompose import DEFAULT_MAX_TASKS, DecomposeResult, decompose_request
 
 # ---------------------------------------------------------------------------
 # Tiers
@@ -441,6 +441,29 @@ class PlanResult:
     message: str = ""
 
 
+@dataclass(frozen=True)
+class DecompositionOverride:
+    """A pre-built, caller-authorized decomposition that BYPASSES the 14B decomposer in
+    :func:`generate_plan` (the generic #752 F1 seam).
+
+    ``tasks`` are decompose-shaped ``{repo, task, prompt[, depends_on][, contract]}`` dicts
+    — the SAME shape :func:`~shared.fleet.decompose.decompose_request` emits — so they flow
+    through the identical ``compile_prompts`` -> ``build_plan_raw`` -> ``validate_plan`` ruler
+    and the caller earns NO exemption from validation (a bad override still degrades safely).
+    ``job_oracle_code`` / ``job_oracle_path`` are an OPTIONAL pre-authored JOB-level acceptance
+    oracle (#752 F2) that rides the final compiled task in place of the 14B-written one;
+    ``job_oracle_path`` must be one of :data:`JOB_ORACLE_ALLOWED_PATHS` or the driver drops it
+    (the pinned-path containment in :func:`extract_job_oracle`).
+
+    Deliberately GENERIC: it carries no knowledge of WHO built the override or WHY. The M2
+    capability battery builds diamond instances in :mod:`shared.fleet.battery_plans`; nothing
+    battery-specific lives on this type or in ``generate_plan``."""
+
+    tasks: list[dict]
+    job_oracle_code: str = ""
+    job_oracle_path: str = ""
+
+
 # ---------------------------------------------------------------------------
 # Criteria generation (the 14B proposes)
 # ---------------------------------------------------------------------------
@@ -684,6 +707,9 @@ _ASSET_MIN_EDGE = 256
 _ASSET_MAX_EDGE = 1024
 #: An asset subject shorter than this (after strip) is vacuous and dropped.
 _MIN_ASSET_SUBJECT_LEN = 3
+#: Length cap on an asset filename slug (shared by :func:`_asset_slug` and the
+#: #743 grammar schema, so the constraint and the truncation can never drift).
+_ASSET_SLUG_MAX = 40
 
 
 def _asset_slug(name: str) -> str:
@@ -692,7 +718,7 @@ def _asset_slug(name: str) -> str:
     or traversal. ``''`` (the spec is then dropped fail-closed) if nothing usable
     remains."""
     slug = re.sub(r"[^a-z0-9]+", "-", str(name).strip().lower()).strip("-")
-    return slug[:40]
+    return slug[:_ASSET_SLUG_MAX]
 
 
 def is_safe_asset_rel_path(rel: str) -> bool:
@@ -833,20 +859,31 @@ def _coerce_asset_specs(raw) -> tuple[dict, ...]:
 def _asset_specs_from_plan(
     goal: str, build_plan: "dict | None", *,
     generate_fn: Callable[[str], str], max_assets: int,
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
 ) -> tuple[dict, ...]:
     """The 14B proposes image-asset specs for a VISUAL product; the ruler disposes.
     Fail-closed to ``()`` on ANY failure OR a non-visual/unknown surface (no build_plan,
     a CLI/library/unknown surface -> no assets, ever). Non-blocking: an asset-spec failure
-    never crashes the plan (the dispatch just generates no pictures)."""
+    never crashes the plan (the dispatch just generates no pictures). #743: when the W2
+    grammar hook is provided the emission is tried schema-constrained FIRST, fail-soft
+    to today's free-text path (grammar off/erroring ⇒ byte-identical behavior)."""
     surface = ""
     if isinstance(build_plan, dict):
         surface = str(build_plan.get("surface", "")).strip().lower()
     if surface not in _ASSET_VISUAL_SURFACES:
         return ()
-    try:
-        raw = generate_fn(_ASSET_SPECS_TEMPLATE.format(max_assets=max_assets, idea=goal))
-    except Exception:  # noqa: BLE001 — an asset-spec failure must not crash the plan
-        return ()
+    prompt = _ASSET_SPECS_TEMPLATE.format(max_assets=max_assets, idea=goal)
+    raw = _grammar_first(
+        prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=asset_specs_emission_json_schema(max_assets=max_assets),
+        usable=_is_json_array_emission,
+    )
+    if raw is None:
+        try:
+            raw = generate_fn(prompt)
+        except Exception:  # noqa: BLE001 — an asset-spec failure must not crash the plan
+            return ()
     return _validate_asset_specs(raw, surface=surface, max_assets=max_assets)
 
 
@@ -1015,6 +1052,171 @@ def _parse_criteria(text: str, *, max_criteria: int) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# #743 — grammar-constrained emission for the REMAINING plan-time calls
+# ---------------------------------------------------------------------------
+#
+# W2 (#740) grammar-constrained the decompose/plan JSON via the #718 xgrammar
+# ``StructuredOutputConfig`` machinery (``decompose._generate_plan_json`` + an
+# injected ``structured_generate_fn(prompt, json_schema_text)`` adapter). This
+# section extends the SAME hook — not a second grammar pathway — to the other
+# four structured 14B calls in the PLAN sequence: acceptance criteria, product
+# assumptions, the build-signal (including the increment-4 ambiguous-platform
+# fork), and image-asset specs. Each schema is derived from the SAME enums and
+# caps its parser validates against (the module constants are the SSOT), so a
+# constrained emission can never exceed what the ruler would truncate anyway.
+#
+# Fail-soft is absolute (the W2 contract): the grammar leg is tried FIRST and
+# on ANY failure — no hook, hook raises, empty output, unusable output — the
+# caller runs today's free-text ``generate_fn`` + parse + fallback path
+# UNCHANGED. The grammar constraint may never introduce a new failure mode.
+# The oracle calls (#690 per-task / W4 job-level) are NOT constrained here:
+# they emit Python/JS CODE, not JSON — a grammar for them is a different class
+# of constraint and out of #743's scope.
+
+
+def _grammar_first(
+    prompt: str,
+    *,
+    structured_generate_fn: "Callable[[str, str], str] | None",
+    schema: dict,
+    usable: Callable[[str], bool],
+) -> "str | None":
+    """One OPTIONAL grammar-constrained emission (the W2/#718 hook, #743).
+
+    Tries *structured_generate_fn* FIRST, called as ``(prompt, json_schema_text)``.
+    Returns the raw text ONLY when the hook exists, did not raise, and produced
+    output *usable* accepts; ``None`` in EVERY other case — the caller then runs
+    today's free-text path unchanged (mirrors ``decompose._generate_plan_json``)."""
+    if structured_generate_fn is None:
+        return None
+    try:
+        raw = structured_generate_fn(prompt, json.dumps(schema))
+    except Exception:  # noqa: BLE001 — the hook must never add a failure mode
+        return None
+    if raw and usable(raw):
+        return raw
+    return None
+
+
+def _is_json_array_emission(text: str) -> bool:
+    """True iff *text* carries a parseable JSON array — INCLUDING an empty one.
+
+    The assumptions and asset-specs calls treat ``[]`` as a meaningful answer
+    ("nothing to list" — the fully-specified goal / the no-pictures product), so a
+    grammar-constrained ``[]`` is accepted rather than triggering a redundant
+    free-text retry; garbage still falls back to today's path."""
+    if not isinstance(text, str) or not text:
+        return False
+    match = _JSON_ARRAY_RE.search(text)
+    if not match:
+        return False
+    try:
+        return isinstance(json.loads(match.group(0)), list)
+    except (ValueError, TypeError):
+        return False
+
+
+def criteria_emission_json_schema(*, max_criteria: int = DEFAULT_MAX_CRITERIA) -> dict:
+    """The JSON schema for a grammar-constrained CRITERIA emission — the same
+    ``{text, tier, check}`` shape :func:`_parse_criteria` expects, with ``tier``
+    pinned to the five-tier enum and the vacuous floor applied at the source.
+    ``minItems: 1`` because an empty criteria array is never useful (the ruler
+    injects the build floor regardless) — an empty emission falls back."""
+    return {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": max_criteria,
+        "items": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "minLength": _MIN_CRITERION_LEN},
+                "tier": {"enum": sorted(ALL_TIERS)},
+                "check": {"type": "string"},
+            },
+            "required": ["text", "tier"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def assumptions_emission_json_schema(
+    *, max_assumptions: int = DEFAULT_MAX_ASSUMPTIONS
+) -> dict:
+    """The JSON schema for a grammar-constrained ASSUMPTIONS emission — a flat
+    array of short strings (:func:`_parse_assumptions`'s shape). ``[]`` is a
+    VALID constrained answer (the fully-specified goal)."""
+    return {
+        "type": "array",
+        "maxItems": max_assumptions,
+        "items": {"type": "string", "minLength": _MIN_ASSUMPTION_LEN},
+    }
+
+
+def build_plan_emission_json_schema(
+    *, max_components: int = DEFAULT_MAX_COMPONENTS
+) -> dict:
+    """The JSON schema for a grammar-constrained BUILD-SIGNAL emission — every
+    field pinned to the SAME enums :func:`_parse_build_plan` validates against
+    (:data:`SURFACE_VALUES` — including the ``ambiguous`` platform-fork sentinel —
+    :data:`LANGUAGE_HINT_VALUES` + ``null``, :data:`COMPLEXITY_VALUES`,
+    :data:`KIND_VALUES`), with ``candidates`` constrained to the REAL buildable
+    surfaces only. The ambiguous-with-<2-candidates coupling stays the PARSER's
+    job (a conditional schema is not expressible in the flat shape); the grammar
+    guarantees enum validity, the ruler still disposes."""
+    return {
+        "type": "object",
+        "properties": {
+            "surface": {"enum": sorted(SURFACE_VALUES)},
+            "candidates": {
+                "type": "array",
+                "items": {"enum": sorted(_REAL_SURFACES)},
+                "maxItems": DEFAULT_MAX_CANDIDATES,
+            },
+            # JSON-Schema enum members may be null — the "no explicit language" answer.
+            "language_hint": {"enum": sorted(LANGUAGE_HINT_VALUES) + [None]},
+            "complexity": {"enum": sorted(COMPLEXITY_VALUES)},
+            "components": {
+                "type": "array",
+                "maxItems": max_components,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "minLength": 1},
+                        "kind": {"enum": sorted(KIND_VALUES)},
+                    },
+                    "required": ["name", "kind"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["surface"],
+        "additionalProperties": False,
+    }
+
+
+def asset_specs_emission_json_schema(*, max_assets: int = DEFAULT_MAX_ASSETS) -> dict:
+    """The JSON schema for a grammar-constrained ASSET-SPECS emission — the
+    ``{name, subject, style}`` shape :func:`_validate_asset_specs` expects, with
+    ``style`` pinned to :data:`ASSET_STYLE_VALUES` and ``name`` capped at the
+    :func:`_asset_slug` length bound. ``[]`` is a VALID constrained answer (the
+    product needs no generated pictures)."""
+    return {
+        "type": "array",
+        "maxItems": max_assets,
+        "items": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "minLength": 1, "maxLength": _ASSET_SLUG_MAX},
+                "subject": {"type": "string", "minLength": _MIN_ASSET_SUBJECT_LEN},
+                "style": {"enum": sorted(ASSET_STYLE_VALUES)},
+            },
+            "required": ["name", "subject", "style"],
+            "additionalProperties": False,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # The deterministic ruler (DISPOSES — never the model)
 # ---------------------------------------------------------------------------
 
@@ -1163,6 +1365,67 @@ def _thread_build_fields(tasks: list[dict], spec: "AcceptanceSpec") -> list[dict
     return tasks
 
 
+#: Import roots an oracle uses that are NOT part of the coder's public-API contract — the test
+#: runner's own deps (pytest / hypothesis) and the standard library. Everything an oracle imports
+#: OTHER than these is a first-party symbol the coder must actually provide, so it is surfaced to
+#: the coder as a hard requirement (#752 F3). Not exhaustive by design: an unlisted stdlib module
+#: only ever ADDS a redundant "provide X" line, never drops a real first-party symbol — fail-soft
+#: toward over-stating the contract, never under-stating it.
+_ORACLE_NON_API_ROOTS: frozenset[str] = frozenset(
+    {
+        "pytest", "hypothesis", "__future__", "sys", "os", "re", "math", "json", "typing",
+        "collections", "itertools", "functools", "datetime", "unittest", "random", "string",
+        "decimal", "fractions", "pathlib", "dataclasses", "enum", "abc", "contextlib", "io",
+        "time", "warnings", "copy", "operator", "statistics", "textwrap", "argparse", "csv",
+        "hashlib", "uuid", "types", "numbers", "heapq", "bisect", "array", "queue", "struct",
+        "subprocess", "tempfile", "shutil", "glob", "logging", "inspect", "importlib",
+    }
+)
+
+
+def _oracle_import_contract(oracle_code: str) -> list[str]:
+    """The concrete first-party symbols a pytest oracle IMPORTS — the exact importable names the
+    coder must provide so the protected acceptance file can be COLLECTED (#752 F3 / B2's failure:
+    a missing or renamed one is a ``ModuleNotFoundError`` at pytest collection, so the oracle
+    never runs and the job scores RED on import-plumbing, not the coder's logic).
+
+    ``from app.core import summarize, mean`` -> ``["app.core.summarize", "app.core.mean"]``;
+    ``import app.core`` -> ``["app.core"]``. Test-runner deps and the standard library
+    (:data:`_ORACLE_NON_API_ROOTS`) are excluded; RELATIVE imports (``from . import x``) live
+    inside ``tests/`` and are not a public module, so they are skipped. Order-preserving and
+    de-duplicated. Fail-soft: anything that will not ``ast.parse`` returns ``[]`` (the generic
+    "create exactly the module(s) it imports" guidance still stands)."""
+    if not oracle_code:
+        return []
+    try:
+        tree = ast.parse(oracle_code)
+    except (SyntaxError, ValueError):  # ValueError: source with NULs etc.
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(name: str) -> None:
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.level:  # relative import (``from . import x``): within tests/, not public
+                continue
+            module = node.module or ""
+            if not module or module.split(".", 1)[0] in _ORACLE_NON_API_ROOTS:
+                continue
+            for alias in node.names:
+                # ``from app.core import *`` — no concrete symbol; fall back to the module name
+                _add(module if alias.name == "*" else f"{module}.{alias.name}")
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".", 1)[0] not in _ORACLE_NON_API_ROOTS:
+                    _add(alias.name)
+    return out
+
+
 def compile_prompts(
     tasks: list[dict], spec: AcceptanceSpec, *, oracle_code: str = ""
 ) -> list[dict]:
@@ -1227,6 +1490,30 @@ def compile_prompts(
     # oracle is single-feature MVP); a junk/absent oracle is '' and never reaches here.
     if oracle_code and len(feature) == 1:
         only = feature[0]
+        # #752 F3 — close the import-plumbing loop: parse the CONCRETE symbols the protected
+        # oracle imports and state them to the coder as a HARD public-API contract, so the
+        # coder's modules match exactly what the acceptance file collects. Without this the
+        # oracle could import a module the coder never created -> ModuleNotFoundError at pytest
+        # collection -> the oracle never runs and the job scores RED on plumbing, not logic
+        # (B2's failure). The template already pins the oracle to `app`; this holds even if the
+        # oracle's names drift. Fail-soft: no parseable first-party import -> generic guidance.
+        contract = _oracle_import_contract(oracle_code)
+        contract_line = ""
+        if contract:
+            joined = ", ".join(f"`{s}`" for s in contract)
+            all_under_app = all(s == "app" or s.startswith("app.") for s in contract)
+            where = (
+                " These belong in the project's EXISTING `app` package — extend `app/core.py` "
+                "or add an `app/<name>.py` submodule; do NOT start a second top-level package."
+                if all_under_app
+                else ""
+            )
+            contract_line = (
+                "\nYour public API MUST provide EXACTLY these importable names, because the "
+                f"protected acceptance file imports them: {joined}. If any is missing or renamed, "
+                "pytest cannot even collect the tests and the whole attempt scores zero on an "
+                f"import error, not on your logic.{where}"
+            )
         oracle_block = (
             "--- Acceptance tests (DO NOT EDIT) ---\n"
             f"A protected acceptance-test file `{ACCEPTANCE_ORACLE_PATH}` is ALREADY in this "
@@ -1235,6 +1522,7 @@ def compile_prompts(
             "require. Do NOT edit, weaken, delete, rename, or skip any test in that file — it is "
             "restored to the original before grading, so changing it cannot help and only wastes "
             "the attempt. You may add new code files freely; you may NOT modify that test file."
+            + contract_line
         )
         only["prompt"] = f"{only['prompt']}\n\n{oracle_block}"
         only["acceptance_test_code"] = oracle_code
@@ -1616,9 +1904,14 @@ _ORACLE_TEMPLATE = (
     "Write a COMPLETE Python pytest test file: the executable ACCEPTANCE TESTS the "
     "implementation below must satisfy. Return ONLY Python code — no prose, no markdown fences.\n"
     "RULES:\n"
-    "- Write ONLY tests, never the implementation. IMPORT what you test from a clearly-named "
-    "module you choose (for example `from calendar_math import add_days`); the implementer is "
-    "told to create EXACTLY the module and functions your tests import.\n"
+    "- Write ONLY tests, never the implementation. The project ALREADY contains a Python "
+    "package named `app` (its `app/core.py` holds the starter module) and the implementer "
+    "EXTENDS that package — so IMPORT everything you test FROM `app`: `from app.core import "
+    "<fn>` for the main module, or `from app.<module> import <fn>` for a submodule you name "
+    "after the behavior. Do NOT invent a new top-level module (a name like `calendar_math` or "
+    "`text_analyzer` will not exist on disk, so pytest cannot even collect the file and every "
+    "test fails on the import). Choose the function names from the criteria; the implementer "
+    "is told to create EXACTLY the `app` module(s) and functions your tests import.\n"
     "- Derive every assertion from the criteria below — assert the behavior each criterion "
     "REQUIRES, with concrete example inputs and expected outputs. Never assert what some "
     "implementation merely happens to do (a test that mirrors the code proves nothing).\n"
@@ -1739,6 +2032,253 @@ def generate_acceptance_oracle(
 
 
 # ---------------------------------------------------------------------------
+# JOB-level acceptance ORACLE (multi-task jobs) — M2 W4 (#740)
+# ---------------------------------------------------------------------------
+#
+# The #690 per-task oracle fires ONLY for single-task python plans — for MULTI-task jobs
+# the final ``acceptance-tests`` task is authored by the 30B itself, i.e. the coder
+# grades its own homework at exactly the job level where independence matters most
+# (plan §2.3 gap 3). W4 closes that: at PLAN time (the 14B resident, CROSS-MODEL by
+# construction) the 14B writes ONE job-level, spec-blind oracle asserting the GOAL's
+# behavior/smoke criteria against the interfaces the tasks DECLARE (their W2 contracts
+# — ruler-validated plan content, the only prose allowed in a prompt, §10 S2). The
+# oracle is NOT seeded into the tree at plan start — a job oracle imports modules that
+# do not exist until the last wave, so seeding it early would fail every per-task
+# gate's full-suite run. Instead its bytes ride the plan artifacts (task dict →
+# swap-state) and the driver grades the FINAL INTEGRATED tree with restore-before-
+# grade semantics: the plan-carried bytes are written over whatever is on disk at the
+# oracle path immediately before the run (so a merged edit to that path can never
+# help), and the prior disk state is restored afterwards. The job reports done ONLY
+# when this oracle passes (plan §4.5 — evidence-gated via mark_job_acceptance).
+#
+# Ecosystem honesty (mirrors #690): python (pytest) and node (node:test) only —
+# everything else fail-closed to ("", "") == today's behavior, never a false gate.
+
+#: Pinned job-oracle paths (jobplan/v1 + the §10 S1 containment allowlist — the driver
+#: refuses to write oracle bytes anywhere else, so a tampered plan cannot traverse).
+JOB_ORACLE_PATH_PYTHON = "tests/test_job_acceptance.py"
+JOB_ORACLE_PATH_NODE = "tests/acceptance.job.test.mjs"
+JOB_ORACLE_ALLOWED_PATHS: frozenset[str] = frozenset(
+    {JOB_ORACLE_PATH_PYTHON, JOB_ORACLE_PATH_NODE}
+)
+
+#: The task-dict keys the job oracle rides from PLAN to the swap driver (stamped onto
+#: the FINAL compiled task by generate_plan; popped by extract_job_oracle driver-side
+#: before the task is enqueued to the fleet).
+JOB_ORACLE_CODE_KEY = "job_oracle_code"
+JOB_ORACLE_PATH_KEY = "job_oracle_path"
+
+_JOB_ORACLE_TEMPLATE_PY = (
+    "Write a COMPLETE Python pytest test file: the executable JOB-LEVEL ACCEPTANCE "
+    "TESTS for the whole multi-part goal below, run once on the final integrated "
+    "project after every part is built. Return ONLY Python code — no prose, no "
+    "markdown fences.\n"
+    "RULES:\n"
+    "- Write ONLY tests, never the implementation. IMPORT what you test from the "
+    "modules the parts declare below (their file paths and exported signatures are "
+    "listed) — use exactly those module and function names.\n"
+    "- Derive every assertion from the criteria below — assert the behavior each "
+    "criterion REQUIRES end-to-end across the parts, with concrete inputs and "
+    "expected outputs. Never assert what an implementation merely happens to do.\n"
+    "- Name each test function `test_<behavior>`; make the file self-contained and "
+    "importable.\n"
+    "- If any test calls a CLI entry point (e.g. `main()`) in-process, it MUST first "
+    "set `sys.argv` to a plain program name (e.g. `sys.argv = ['app']`, or with the "
+    "specific arguments the test intends) — the test runner's own command-line "
+    "arguments must never leak into the application under test.\n\n"
+    "Goal:\n{goal}\n\n"
+    "The project's parts (each part's declared files and exports):\n{contracts}\n\n"
+    "Criteria to assert (the REQUIRED behavior of each):\n{criteria}\n"
+)
+
+_JOB_ORACLE_TEMPLATE_NODE = (
+    "Write a COMPLETE JavaScript (ESM) test file using the built-in `node:test` "
+    "runner: the executable JOB-LEVEL ACCEPTANCE TESTS for the whole multi-part goal "
+    "below, run once on the final integrated project after every part is built. "
+    "Return ONLY JavaScript code — no prose, no markdown fences.\n"
+    "RULES:\n"
+    "- Start with: import test from 'node:test'; import assert from 'node:assert';\n"
+    "- Write ONLY tests, never the implementation. IMPORT what you test from the "
+    "module files the parts declare below (their file paths and exported signatures "
+    "are listed) — use exactly those paths (relative from the tests/ directory, e.g. "
+    "`import {{ addExpense }} from '../src/storage.mjs';`).\n"
+    "- Derive every assertion from the criteria below — assert the behavior each "
+    "criterion REQUIRES end-to-end across the parts, with concrete inputs and "
+    "expected outputs. Never assert what an implementation merely happens to do.\n"
+    "- Use `test('...', () => {{ ... }})` blocks; no external dependencies.\n\n"
+    "Goal:\n{goal}\n\n"
+    "The project's parts (each part's declared files and exports):\n{contracts}\n\n"
+    "Criteria to assert (the REQUIRED behavior of each):\n{criteria}\n"
+)
+
+# JS fence variants a small model wraps ESM test code in (mirrors _PY_FENCE_RE).
+_JS_FENCE_RE = re.compile(
+    r"```(?:javascript|js|mjs)?\s*\n?(.*?)```", re.DOTALL | re.IGNORECASE
+)
+_JS_OPEN_FENCE_RE = re.compile(r"```(?:javascript|js|mjs)?[ \t]*\r?\n", re.IGNORECASE)
+
+
+def _extract_js_code(text: str) -> str:
+    """Best-effort extract JS source from a model reply — the three shapes
+    :func:`_extract_python_code` handles (closed fence / unclosed opener / bare)."""
+    if not text:
+        return ""
+    m = _JS_FENCE_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    m2 = _JS_OPEN_FENCE_RE.search(text)
+    if m2:
+        return _PY_TRAILING_FENCE_RE.sub("", text[m2.end():]).strip()
+    return text.strip()
+
+
+def _node_oracle_valid(code: str) -> bool:
+    """Structural validation of a node:test oracle (there is no ``ast.parse`` for JS —
+    this is the deliberately-conservative shape check): it must import the node:test
+    runner and define at least one ``test(``/``it(`` block. A file failing either is
+    not an oracle (it would 'pass' vacuously) and is rejected fail-closed."""
+    if not code or "node:test" not in code:
+        return False
+    return bool(re.search(r"\b(?:test|it)\s*\(", code))
+
+
+def _job_oracle_target(spec: "AcceptanceSpec") -> "tuple[str, str] | None":
+    """``(ecosystem, oracle_rel_path)`` for the job oracle, or ``None`` (fail-closed).
+
+    python ⇐ an explicit ``language_hint == "python"``; node ⇐ an explicit ``node``
+    hint OR a ``web`` surface with NO other hint (the fleet's web scaffold is the
+    node:http + node:test seed, so a web job's integrated tree is node-testable —
+    the Stage-2 shape). Everything else (absent/dotnet/cpp/powershell/unknown) gets
+    NO job oracle — build-only ecosystems stay honestly UNVERIFIED, never a false
+    gate."""
+    bp = spec.build_plan if isinstance(spec.build_plan, dict) else {}
+    hint = bp.get("language_hint")
+    surface = bp.get("surface")
+    if hint == "python":
+        return ("python", JOB_ORACLE_PATH_PYTHON)
+    if hint == "node" or (hint is None and surface == "web"):
+        return ("node", JOB_ORACLE_PATH_NODE)
+    return None
+
+
+def _contracts_block(tasks: list[dict]) -> str:
+    """The per-task contract summary fed to the oracle prompt — RULER-VALIDATED plan
+    content only (task slug + creates/exports/notes), never anything from built files
+    (§10 S2). Tasks without a usable contract are listed by slug alone."""
+    lines: list[str] = []
+    for t in tasks:
+        slug = str(t.get("task", "") or "").strip() or "task"
+        contract = t.get("contract") if isinstance(t.get("contract"), dict) else {}
+        bits: list[str] = []
+        creates = contract.get("creates") or []
+        exports = contract.get("exports") or []
+        notes = str(contract.get("notes", "") or "").strip()
+        if creates:
+            bits.append("creates " + ", ".join(str(c) for c in creates[:8]))
+        if exports:
+            bits.append("exports " + "; ".join(str(e) for e in exports[:8]))
+        if notes:
+            bits.append("notes: " + notes)
+        lines.append(f"- {slug}: " + ("; ".join(bits) if bits else "(no declared interface)"))
+    return "\n".join(lines)
+
+
+def generate_job_acceptance_oracle(
+    goal: str,
+    spec: "AcceptanceSpec",
+    tasks: list[dict],
+    *,
+    generate_fn: Callable[[str], str],
+) -> tuple[str, str]:
+    """PLAN-time: the 14B writes the JOB-LEVEL spec-blind oracle for a MULTI-task job.
+
+    Returns ``(code, repo_relative_path)`` or ``("", "")`` — all fail-closed, never
+    raising — when ANY of these holds:
+
+      * fewer than 2 tasks (the #690 per-task oracle owns the single-task shape);
+      * no python/node target resolves (:func:`_job_oracle_target` — .NET etc. stay
+        honestly build-only);
+      * there are no behavior/smoke criteria to assert;
+      * NO task declares a usable contract (without declared interfaces the oracle
+        would have to GUESS import names — a guessed oracle fails every job and
+        teaches nothing; the honest outcome is job-acceptance ``not-run``);
+      * the emission fails structural validation (python: ``ast.parse`` + a ``test``
+        function; node: a ``node:test`` import + a ``test(``/``it(`` block);
+      * the model call raises.
+
+    An empty result leaves the dispatch byte-identical to today (the driver records
+    job acceptance ``not-run`` — honest, never an implied pass)."""
+    if len(tasks) < 2:
+        return ("", "")
+    target = _job_oracle_target(spec)
+    if target is None:
+        return ("", "")
+    ecosystem, rel_path = target
+    test_criteria = [c for c in spec.criteria if c.tier in TEST_TIERS]
+    if not test_criteria:
+        return ("", "")
+    if not any(
+        isinstance(t.get("contract"), dict)
+        and (t["contract"].get("creates") or t["contract"].get("exports"))
+        for t in tasks
+    ):
+        return ("", "")
+    criteria_block = "\n".join(
+        f"- [{c.tier}] {c.text}" + (f"  (check: {c.check})" if c.check else "")
+        for c in test_criteria
+    )
+    template = (
+        _JOB_ORACLE_TEMPLATE_PY if ecosystem == "python" else _JOB_ORACLE_TEMPLATE_NODE
+    )
+    try:
+        raw = generate_fn(template.format(
+            goal=(goal or "").strip(),
+            contracts=_contracts_block(tasks),
+            criteria=criteria_block,
+        ))
+    except Exception:  # noqa: BLE001 — an oracle-gen failure must not crash the plan
+        return ("", "")
+    if ecosystem == "python":
+        code = _extract_python_code(raw)
+        if not code:
+            return ("", "")
+        try:
+            tree = ast.parse(code)
+        except (SyntaxError, ValueError):
+            return ("", "")
+        if not _has_test_function(tree):
+            return ("", "")
+        return (code, rel_path)
+    code = _extract_js_code(raw)
+    if not _node_oracle_valid(code):
+        return ("", "")
+    return (code, rel_path)
+
+
+def extract_job_oracle(tasks: list[dict]) -> tuple[list[dict], str, str]:
+    """Driver-side: pop the riding job-oracle fields off the task dicts.
+
+    Returns ``(cleaned_tasks, oracle_code, oracle_rel_path)`` — fresh task copies with
+    :data:`JOB_ORACLE_CODE_KEY`/:data:`JOB_ORACLE_PATH_KEY` removed (the fleet queue
+    never needs the blob), and the first non-empty code/path found. A path outside
+    :data:`JOB_ORACLE_ALLOWED_PATHS` is REFUSED (dropped to ``("", "")`` — the §10 S1
+    pinned-path containment; a tampered swap-state cannot aim the oracle write)."""
+    cleaned: list[dict] = []
+    code = ""
+    path = ""
+    for t in tasks:
+        c = dict(t)
+        raw_code = str(c.pop(JOB_ORACLE_CODE_KEY, "") or "")
+        raw_path = str(c.pop(JOB_ORACLE_PATH_KEY, "") or "")
+        if raw_code and raw_path and not code:
+            code, path = raw_code, raw_path
+        cleaned.append(c)
+    if path not in JOB_ORACLE_ALLOWED_PATHS:
+        return (cleaned, "", "")
+    return (cleaned, code, path)
+
+
+# ---------------------------------------------------------------------------
 # The PLAN step (decompose + criteria + ruler + compile) — nothing irreversible
 # ---------------------------------------------------------------------------
 
@@ -1753,6 +2293,8 @@ def generate_plan(
     max_criteria: int = DEFAULT_MAX_CRITERIA,
     max_assumptions: int = DEFAULT_MAX_ASSUMPTIONS,
     max_assets: int = DEFAULT_MAX_ASSETS,
+    decomposition_override: "DecompositionOverride | None" = None,
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
 ) -> PlanResult:
     """The 14B-resident PLAN step: decompose into tasks + an AcceptanceSpec, validate both,
     compile the criteria into the task prompts.
@@ -1765,20 +2307,59 @@ def generate_plan(
     fields are threaded onto every compiled task so they reach the fleet queue write. Nothing
     is enqueued and nothing irreversible happens here — the operator approves the spec before
     any work fires. The model call is injected so this is fully testable without the GPU.
+
+    #743: when *structured_generate_fn* is provided (the W2/#718 xgrammar adapter, called
+    ``(prompt, json_schema_text)``) EVERY structured JSON emission in the sequence —
+    decompose (threaded through to :func:`decompose_request`), criteria, assumptions,
+    build-signal, asset-specs — is tried grammar-constrained FIRST with a transparent
+    fail-soft fallback to the free-text path; ``None`` (the default) is byte-identical to
+    today. The oracle calls stay unconstrained (code emissions, not JSON).
     """
-    # 1. Decompose (reuses the increment-2 decomposer: validate_repo + model + ruler + fallback).
-    decomposed = decompose_request(
-        idea, repo, generate_fn=generate_fn, projects_dir=projects_dir, max_tasks=max_tasks
-    )
+    # 1. Decompose (reuses the increment-2 decomposer: validate_repo + model + ruler + fallback)
+    # — UNLESS a caller passed a pre-built, authorized decomposition (``decomposition_override``,
+    # #752 F1). This seam is GENERIC (no caller-/battery-specific logic here): when present, the
+    # 14B decomposer is bypassed and the override's tasks are used verbatim, so a caller that
+    # KNOWS the right shape — the M2 battery's carded diamond, whose declared shape the 14B
+    # right-sizing ruler collapses to one task — gets the graph instead of the collapse. ``None``
+    # (every production plan request) leaves the model path byte-identical to today.
+    if decomposition_override is not None:
+        decomposed = DecomposeResult(
+            ok=True,
+            tasks=[dict(t) for t in decomposition_override.tasks],
+            fell_back=False,
+            collapsed_test_intent=False,
+            message=(
+                f"Using a caller-provided {len(decomposition_override.tasks)}-task decomposition."
+            ),
+        )
+    else:
+        decomposed = decompose_request(
+            idea, repo, generate_fn=generate_fn, projects_dir=projects_dir,
+            max_tasks=max_tasks,
+            # #743: the live PLAN entry point is THIS function, so the W2 decompose hook
+            # is threaded here — without it the grammar path could never fire on a real
+            # /dispatch plan. Additive + fail-soft (None == today).
+            structured_generate_fn=structured_generate_fn,
+        )
     if not decomposed.ok:
         return PlanResult(ok=False, message=decomposed.message)
 
     # 2. Acceptance criteria — the 14B proposes; the ruler disposes (+ a build floor).
+    # #743: grammar-first over the SAME schema _parse_criteria expects; a missing/erroring
+    # hook or an unusable constrained emission runs today's free-text path UNCHANGED.
     goal = (idea or "").strip()
-    try:
-        raw = generate_fn(_CRITERIA_TEMPLATE.format(max_criteria=max_criteria, idea=goal))
-    except Exception:  # noqa: BLE001 — a criteria-gen failure must not crash the plan
-        raw = ""
+    criteria_prompt = _CRITERIA_TEMPLATE.format(max_criteria=max_criteria, idea=goal)
+    raw = _grammar_first(
+        criteria_prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=criteria_emission_json_schema(max_criteria=max_criteria),
+        usable=lambda t: bool(_parse_criteria(t, max_criteria=max_criteria)),
+    )
+    if raw is None:
+        try:
+            raw = generate_fn(criteria_prompt)
+        except Exception:  # noqa: BLE001 — a criteria-gen failure must not crash the plan
+            raw = ""
     spec = rule_spec(goal, _parse_criteria(raw, max_criteria=max_criteria), max_criteria=max_criteria)
 
     # 2b. Never end at zero tests. The right-sizing decomposer drops the model's
@@ -1801,12 +2382,22 @@ def generate_plan(
     # the operator can't answer those, the system supplies them via AGENTS.md). Fail-closed
     # AND non-blocking: a model/parse failure (or a fully-specified goal) yields no
     # assumptions and no preview section — the plan proceeds unchanged.
-    try:
-        raw_assumptions = generate_fn(
-            _ASSUMPTIONS_TEMPLATE.format(max_assumptions=max_assumptions, idea=goal)
-        )
-    except Exception:  # noqa: BLE001 — an assumptions-gen failure must not crash the plan
-        raw_assumptions = ""
+    # #743: grammar-first (array-of-strings schema). A constrained ``[]`` is a VALID
+    # answer (the fully-specified goal) — accepted, no redundant free-text retry.
+    assumptions_prompt = _ASSUMPTIONS_TEMPLATE.format(
+        max_assumptions=max_assumptions, idea=goal
+    )
+    raw_assumptions = _grammar_first(
+        assumptions_prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=assumptions_emission_json_schema(max_assumptions=max_assumptions),
+        usable=_is_json_array_emission,
+    )
+    if raw_assumptions is None:
+        try:
+            raw_assumptions = generate_fn(assumptions_prompt)
+        except Exception:  # noqa: BLE001 — an assumptions-gen failure must not crash the plan
+            raw_assumptions = ""
     assumptions = _parse_assumptions(raw_assumptions, max_assumptions=max_assumptions)
     if assumptions:
         spec = AcceptanceSpec(
@@ -1823,10 +2414,20 @@ def generate_plan(
     # and a model object it CAN parse is enum-validated to surface=unknown / language_hint=None
     # / complexity=moderate for any bad field. Attached LAST so it survives the assumptions
     # rebuild above regardless of order. None when the model emitted no parseable object.
-    try:
-        raw_build_plan = generate_fn(_BUILD_PLAN_TEMPLATE.format(idea=goal))
-    except Exception:  # noqa: BLE001 — a build-signal failure must not crash the plan
-        raw_build_plan = ""
+    # #743: grammar-first with every field enum-pinned (incl. the ``ambiguous`` fork +
+    # its real-surface ``candidates``); the parser still owns the coupling rules.
+    build_plan_prompt = _BUILD_PLAN_TEMPLATE.format(idea=goal)
+    raw_build_plan = _grammar_first(
+        build_plan_prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=build_plan_emission_json_schema(),
+        usable=lambda t: _parse_build_plan(t) is not None,
+    )
+    if raw_build_plan is None:
+        try:
+            raw_build_plan = generate_fn(build_plan_prompt)
+        except Exception:  # noqa: BLE001 — a build-signal failure must not crash the plan
+            raw_build_plan = ""
     build_plan = _parse_build_plan(raw_build_plan)
     if build_plan is not None:
         spec = AcceptanceSpec(
@@ -1843,7 +2444,7 @@ def generate_plan(
     # acceptance task); fail-closed to '' (== today's fold-the-tests-in behavior) for any other
     # ecosystem/shape or a junk emission, so a missing oracle never changes today's plan.
     oracle_code = ""
-    if len(decomposed.tasks) == 1:
+    if decomposition_override is None and len(decomposed.tasks) == 1:
         oracle_code = generate_acceptance_oracle(
             goal, spec, decomposed.tasks, generate_fn=generate_fn
         )
@@ -1857,7 +2458,8 @@ def generate_plan(
     # nothing and the coder falls back to inline SVG. Attached LAST (no rebuild follows), so
     # it survives; empty () leaves the compiled tasks byte-identical to today.
     asset_specs = _asset_specs_from_plan(
-        goal, spec.build_plan, generate_fn=generate_fn, max_assets=max_assets
+        goal, spec.build_plan, generate_fn=generate_fn, max_assets=max_assets,
+        structured_generate_fn=structured_generate_fn,
     )
     if asset_specs:
         spec = AcceptanceSpec(
@@ -1865,11 +2467,35 @@ def generate_plan(
             build_plan=spec.build_plan, asset_specs=asset_specs,
         )
 
+    # 2g. JOB-level acceptance oracle (M2 W4, #740) — the multi-task analogue of 2e. For a
+    # job of >=2 tasks the 14B writes ONE job-level spec-blind oracle (python pytest or
+    # node:test by ecosystem) asserting the GOAL criteria against the interfaces the tasks
+    # DECLARE (their W2 contracts). Its bytes ride the FINAL compiled task dict
+    # (JOB_ORACLE_CODE_KEY/JOB_ORACLE_PATH_KEY — popped by the swap driver via
+    # extract_job_oracle before enqueue, graded on the final integrated tree with
+    # restore-before-grade). Fail-closed to ("", "") — non-python/node ecosystems,
+    # criteria-less specs, contract-less plans, and junk emissions all leave the compiled
+    # tasks byte-identical to today (the driver then reports job acceptance not-run).
+    job_oracle_code, job_oracle_path = "", ""
+    if decomposition_override is not None:
+        # The caller authored the JOB-level oracle alongside the decomposition (#752 F2); it
+        # rides the final compiled task exactly like the 14B-written one below. The driver's
+        # extract_job_oracle still enforces the pinned-path containment on job_oracle_path.
+        job_oracle_code = decomposition_override.job_oracle_code
+        job_oracle_path = decomposition_override.job_oracle_path
+    elif len(decomposed.tasks) >= 2:
+        job_oracle_code, job_oracle_path = generate_job_acceptance_oracle(
+            goal, spec, decomposed.tasks, generate_fn=generate_fn
+        )
+
     # 3. Compile behavior/smoke criteria into the task prompts (fleet schema unchanged). The
     # goal-level build-signal fields are threaded onto each task here (compile_prompts). When an
     # oracle was generated, the lone feature task is told to code against it (carrying it for the
     # fleet to seed); an empty oracle leaves the compile byte-identical to today.
     tasks = compile_prompts(decomposed.tasks, spec, oracle_code=oracle_code)
+    if job_oracle_code and job_oracle_path and tasks:
+        tasks[-1][JOB_ORACLE_CODE_KEY] = job_oracle_code
+        tasks[-1][JOB_ORACLE_PATH_KEY] = job_oracle_path
     return PlanResult(
         ok=True,
         tasks=tasks,

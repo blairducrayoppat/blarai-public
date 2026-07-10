@@ -17,8 +17,8 @@ speculative_decoding_enabled = true                         # ADR-012 §2.6
 
 [security]
 fail_closed = true
-dev_mode = true
-require_signed_manifest = false  # FUT-04: off; dev_mode=true bypasses sig check anyway
+dev_mode = false  # #641: was true. resolve_dev_mode(GUEST) already forces False, so this is a no-op at runtime — it makes the shipped file match the safe resolution and removes the insecure default.
+require_signed_manifest = false  # FUT-04: capability built; the guest signed-manifest ceremony has not run. Guest profile is dormant (production runs host-mode); this no longer relies on dev_mode to bypass the sig check.
 
 [jwt]
 issuer = "policy_agent"

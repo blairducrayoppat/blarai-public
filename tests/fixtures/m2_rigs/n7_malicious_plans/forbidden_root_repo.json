@@ -1,0 +1,21 @@
+{
+  "rig": "N7",
+  "surface": "plan §9.3 N7 / §10 S1: a plan targeting a FORBIDDEN root (BlarAI's own tree) — validate_repo must refuse regardless of containment; the fleet never edits BlarAI",
+  "schema": "jobplan/v1",
+  "plan_id": "n7-forbidden-root",
+  "goal": "a plan that tries to point the coder fleet at BlarAI's own repository",
+  "repo": "C:/Users/mrbla/projects/BlarAI",
+  "tasks": [
+    {
+      "id": "self-edit",
+      "prompt": "edit BlarAI",
+      "depends_on": [],
+      "contract": {"creates": ["shared/evil.py"], "exports": [], "notes": ""},
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [{"after_wave": 1, "status": "pending"}],
+  "job_acceptance": {"criteria": [], "oracle_path": "tests/test_job_acceptance.py", "status": "pending"},
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "n/a"
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "jobplan/v1",
+  "plan_id": "gold-b1-expense-cli",
+  "goal": "I want a little program I can run from a command window to keep track of what I spend. First it needs somewhere to save my expenses so they are still there the next time I open it. Then I want to be able to type in an expense — how much it cost, what kind of thing it was (like groceries or fuel), and the day I bought it. And I want to be able to ask it for a list of everything I have spent so far, newest first, so I can look back over it.",
+  "repo": "C:/Users/mrbla/projects/battery-b1-expense-cli",
+  "tasks": [
+    {
+      "id": "storage-module",
+      "prompt": "Build the persistence layer for a command-line expense tracker in this repo: a Python module src/expenses/storage.py that saves and loads expense records to a JSON-lines file on disk so data survives between runs. Provide init_store(path) (creates the file and parent dirs if missing), append_expense(store_path, expense), and read_expenses(store_path) returning a list of expense dicts. An expense is {\"amount\": float, \"category\": str, \"date_iso\": str}. Include unit tests.",
+      "depends_on": [],
+      "contract": {
+        "creates": ["src/expenses/storage.py"],
+        "exports": [
+          "init_store(path)",
+          "append_expense(store_path, expense)",
+          "read_expenses(store_path)"
+        ],
+        "notes": "expense = {amount: float, category: str, date_iso: 'YYYY-MM-DD'}. JSON-lines file storage; init_store creates parent dirs; read_expenses returns [] for a missing/empty store."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "add-expense-command",
+      "prompt": "Add the 'add' command to the expense tracker CLI: src/expenses/cli_add.py exposing add_expense_command(argv) wired so `python -m expenses add --amount 12.50 --category groceries --date 2026-07-01` persists one expense via the existing storage module. Validate amount is a positive number and date is YYYY-MM-DD; print a one-line confirmation; exit non-zero with a clear message on bad input. Include unit tests.",
+      "depends_on": ["storage-module"],
+      "contract": {
+        "creates": ["src/expenses/cli_add.py"],
+        "exports": ["add_expense_command(argv)"],
+        "notes": "Persists via storage-module's append_expense; rejects amount <= 0 and non-ISO dates with exit code 2; prints 'added <amount> <category> <date>' on success."
+      },
+      "status": "pending"
+    },
+    {
+      "id": "list-expenses-command",
+      "prompt": "Add the 'list' command to the expense tracker CLI: src/expenses/cli_list.py exposing list_expenses_command(argv) wired so `python -m expenses list` prints every stored expense newest-first, one per line as '<date>  <amount>  <category>', using the existing storage module to read them. An empty store prints 'no expenses yet' and exits 0. Include unit tests covering ordering and the empty case.",
+      "depends_on": ["add-expense-command"],
+      "contract": {
+        "creates": ["src/expenses/cli_list.py"],
+        "exports": ["list_expenses_command(argv)"],
+        "notes": "Reads via storage-module's read_expenses; sorts newest-first by date_iso; empty store prints 'no expenses yet', exit 0."
+      },
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [
+    {"after_wave": 1, "status": "pending"},
+    {"after_wave": 2, "status": "pending"},
+    {"after_wave": 3, "status": "pending"}
+  ],
+  "job_acceptance": {
+    "criteria": [
+      {
+        "id": "j1",
+        "text": "the project's code compiles and its test suite passes on the integrated tree",
+        "tier": "build",
+        "check": "pytest exits 0 at the repo root"
+      },
+      {
+        "id": "j2",
+        "text": "an added expense is persisted and appears in the list output",
+        "tier": "behavior",
+        "check": "add 12.50 groceries 2026-07-01, then list shows a line with 2026-07-01, 12.50 and groceries"
+      },
+      {
+        "id": "j3",
+        "text": "expenses survive a restart",
+        "tier": "behavior",
+        "check": "a second process running list still shows the previously added expense"
+      },
+      {
+        "id": "j4",
+        "text": "the list is newest-first",
+        "tier": "behavior",
+        "check": "add two expenses with different dates; the later date is printed first"
+      }
+    ],
+    "oracle_path": "tests/test_job_acceptance.py",
+    "status": "pending"
+  },
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "5ad417475ca213f5aa51b8f9ad9a9ab0dde4844a78d5501b027faf9582b3cd0f"
+}

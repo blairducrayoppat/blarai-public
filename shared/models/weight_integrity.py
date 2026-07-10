@@ -182,11 +182,14 @@ def load_manifest_verified(
 def verify_weight_integrity(
     model_path: str | Path,
     manifest_path: str | Path,
+    *,
+    require_signed: bool = False,
 ) -> IntegrityCheckResult:
     """Verify a model weight file against the Known-Good Manifest.
 
     Verification steps:
-      1. Load manifest JSON from ``manifest_path``.
+      1. Load manifest JSON from ``manifest_path`` (TPM-signature-checked when
+         ``require_signed`` is set).
       2. Look up the model filename in the manifest's ``digests`` dict.
       3. Compute SHA-256 of the weight file at ``model_path``.
       4. Compare computed digest against expected digest.
@@ -194,14 +197,29 @@ def verify_weight_integrity(
     Args:
         model_path: Path to the .bin weight file.
         manifest_path: Path to the JSON manifest containing expected digests.
+        require_signed: When ``True`` the manifest is loaded through the
+            signature-checked ``load_manifest_verified`` path, so the per-request
+            re-hash trusts a signature-verified digest set rather than a raw
+            on-disk ``manifest.json`` an attacker could rewrite alongside a
+            tampered weight (#571). Sourced from
+            ``[security].require_signed_manifest``. Default ``False`` keeps every
+            existing caller (boot sweep, tests) byte-identical.
 
     Returns:
         IntegrityCheckResult. On ANY error, verified=False (Fail-Closed).
     """
     model_path = Path(model_path)
 
-    # Step 1: Load manifest
-    digests = load_manifest(manifest_path)
+    # Step 1: Load manifest. When require_signed is set (production posture), go
+    # through the TPM-signature-checked loader so a manifest.json rewritten at
+    # runtime alongside a tampered weight is rejected — closing the per-request
+    # gap where the boot gate was signed but the re-hash was not (#571). The
+    # default keeps the unsigned load byte-identical for existing callers.
+    digests = (
+        load_manifest_verified(manifest_path, require_signed=require_signed)
+        if require_signed
+        else load_manifest(manifest_path)
+    )
     if digests is None:
         return IntegrityCheckResult(
             verified=False,

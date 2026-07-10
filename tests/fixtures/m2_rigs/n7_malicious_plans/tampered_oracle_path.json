@@ -1,0 +1,21 @@
+{
+  "rig": "N7",
+  "surface": "plan §10 S1 / §10.3 (#740 H3): a well-formed plan whose HASHED job_acceptance.oracle_path was redirected to a traversal path AFTER the plan_hash was set. oracle_path is now an immutable-identity field (H3), so the retained original hash no longer matches its (redirected) body — PlanStore.load MUST REFUSE on the mismatch. An oracle redirect is a FALSE-DONE surface (point the job oracle at a trivially-passing file). REFUSED-vs-ADVISORY: REFUSED.",
+  "schema": "jobplan/v1",
+  "plan_id": "n7-oracle-tamper",
+  "goal": "a plan whose job oracle path was redirected after the hash was computed",
+  "repo": "C:/Users/mrbla/projects/battery-n7-oracle-tamper",
+  "tasks": [
+    {
+      "id": "storage-module",
+      "prompt": "build storage — the job_acceptance.oracle_path above was redirected after hashing",
+      "depends_on": [],
+      "contract": {"creates": ["src/storage.py"], "exports": ["load()"], "notes": ""},
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [{"after_wave": 1, "status": "pending"}],
+  "job_acceptance": {"criteria": [], "oracle_path": "../../evil.py", "status": "pending"},
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "2eef4463cb77b8fec38b0e93537a9a0e3ffb7c298dffd7a568a35743211550f2"
+}

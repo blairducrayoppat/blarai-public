@@ -51,6 +51,13 @@ _CODER_PROC_NAMES: tuple[str, ...] = (
     "python",          # the detached swap driver + run-fleet pwsh children
     "pwsh",
     "powershell",
+    # The [3/5] verify gate's workers (night-20260709 B4 false-doom): verify-project.ps1
+    # spawns uv/ruff/mutmut-via-uv/git as NATIVE processes that burn CPU while every watched
+    # log stays quiet by design — a doom window shorter than the gate's own budget then reads
+    # a working verify as a dead run.
+    "uv",              # ephemeral test/lint installs + runners (uv run --with pytest/mutmut)
+    "ruff",            # native lint binary
+    "git",             # worktree/diff operations between steps
 )
 
 #: CPU-percent above which a process counts as "actively working" for a sample.
@@ -263,8 +270,22 @@ class RunMonitor:
     config: FleetDispatchConfig
     run_id: str
     poll_interval_s: float = 5.0
-    stall_grace_s: float = 90.0
-    overall_timeout_s: float = 5400.0
+    # 90 -> 240 (2026-07-09, night B4 false-doom): the [3/5] verify gate runs
+    # verify-project.ps1 with a 600 s budget of its own, and its checks write
+    # NOTHING to the watched logs until they finish — so the only in-gate
+    # liveness signal is worker CPU, and a check whose worker name escapes
+    # _CODER_PROC_NAMES reads as dead at 90 s inside a window the pipeline
+    # explicitly granted. 240 s survives CPU-quiet gaps between checks while
+    # still dooming a truly dead run in minutes (the overall bound backstops).
+    # Registered: shared/timeout_registry.py.
+    stall_grace_s: float = 240.0
+    # 5400 -> 10800 (2026-07-08, #767/#757): this default was still sized to
+    # pre-plan-graph runs while every production sibling had moved to the
+    # measured 10800 family — the timeout registry's seeding inventory caught
+    # the drift (dormant: production callers pass the config value, but a
+    # dormant default must agree with its family or the first un-overridden
+    # caller inherits the stale scar). Registered: shared/timeout_registry.py.
+    overall_timeout_s: float = 10800.0
     # After a doom/timeout stop, wait up to this long for the detached swap driver to wind the
     # dispatch down to a TERMINAL phase (the 14B restored) before returning — so the harness never
     # reports "done" mid-swap-back (#686). The detached driver restores the 14B regardless.

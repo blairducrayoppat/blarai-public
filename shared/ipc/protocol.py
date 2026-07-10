@@ -238,6 +238,29 @@ class MessageType(str, Enum):
     before the WinUI window closes for the swap.  On failure ``ok=False`` (e.g. an
     enqueue refusal) and NO step-aside occurs (the 14B stays up)."""
 
+    # ── Guest-certified oracle channel (#744, plan §10.3 — DORMANT) ──
+
+    ORACLE_EXEC_REQUEST = "ORACLE_EXEC_REQUEST"
+    """Host → Guest: run the job-level acceptance oracle inside the NIC-less
+    Alpine guest as an ISOLATION CERTIFICATE on top of the host gate (#744).
+
+    SOURCE ONLY — the body is a size-capped ZIP snapshot of the integrated
+    target repo's pure-Python source (plus the plan-carried oracle bytes,
+    overlaid so a merged edit to the oracle can never help); the chunk-0
+    ``meta`` carries the pinned relative oracle path.  Chunked framing
+    contract in ``shared/ipc/oracle_channel.py`` (mirrors ``parse_channel``).
+    NO production code sends this frame until the LA's supervised go-live
+    ceremony wires a transport — structural dormancy, like the guest parser."""
+
+    ORACLE_EXEC_RESPONSE = "ORACLE_EXEC_RESPONSE"
+    """Guest → Host: the guest oracle outcome — ADVISORY evidence only.
+
+    METADATA ONLY — a small JSON body: closed-vocabulary ``status``
+    (``passed`` | ``failed`` | ``not-run``), a stable machine ``reason`` and a
+    bounded human ``evidence`` label (never file contents).  The host gate
+    remains the fidelity verdict; this response never changes verdict or
+    attribution semantics (#744 design constraint 3)."""
+
 
 @dataclass(frozen=True)
 class AdjudicationRequest:

@@ -1,0 +1,13 @@
+{
+  "rig": "N5",
+  "surface": "plan §9.3 N5 / W1 ruler: schema-valid JSON with the WRONG SHAPE (tasks is not a list) — the ruler must reject/degrade deterministically, never index into it",
+  "schema": "jobplan/v1",
+  "plan_id": "n5-wrong-shape",
+  "goal": "a plan whose tasks field is an object instead of a list",
+  "repo": "C:/Users/mrbla/projects/battery-n5-wrong-shape",
+  "tasks": {"oops": "not a list"},
+  "integration_nodes": [],
+  "job_acceptance": {"criteria": [], "oracle_path": "tests/test_job_acceptance.py", "status": "pending"},
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "n/a"
+}

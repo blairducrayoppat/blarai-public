@@ -89,8 +89,8 @@ def _build_parser() -> argparse.ArgumentParser:
     mon = p.add_argument_group("monitoring (stop-doomed-fast)")
     mon.add_argument("--poll-interval-s", type=float, default=5.0,
                      help="Seconds between progress polls (default: 5).")
-    mon.add_argument("--stall-grace-s", type=float, default=90.0,
-                     help="No-progress window that defines a doomed run (default: 90).")
+    mon.add_argument("--stall-grace-s", type=float, default=240.0,
+                     help="No-progress window that defines a doomed run (default: 240).")
     mon.add_argument("--overall-timeout-s", type=float, default=0.0,
                      help="Hard per-run cap (default: 0 = use the AO's swap_run_budget_s).")
 

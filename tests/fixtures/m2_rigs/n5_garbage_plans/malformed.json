@@ -1,0 +1,1 @@
+{"schema": "jobplan/v1", "plan_id": "n5-malformed", "goal": "a plan the 14B truncated mid-stream — plan §9.3 N5 / W1 ruler surface: unparseable model output must degrade to the deterministic fallback (single task / linear chain), logged, never crash", "tasks": [{"id": "storage-module", "prompt": "build the sto

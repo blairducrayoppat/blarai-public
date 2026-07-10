@@ -43,6 +43,19 @@ exists, the lesson or journal entry that paid for it.*
 - **`socket.AF_HYPERV` needs CPython ≥3.12** *(lessons 82, 122)*. The 3.11
   inference venv lacks it; the version bridge runs the AF_HYPERV hop in a
   short-lived 3.14 subprocess. Don't diagnose "broken design" off `bad family`.
+- **PowerShell `Tee-Object` / captured stdout hangs a server-spawning launcher too**
+  *(lesson 161; recurred 2026-06-28)*. The same grandchild-inherits-the-pipe
+  deadlock hits `start-llm.ps1 | Tee-Object` (OVMS and the proxy never let the
+  pipe reach EOF), so the wrapper never returns though the server is up. Redirect
+  to a file or poll the readiness endpoint; never hold a server launcher's pipe.
+- **`$?` after a pipeline reads the LAST segment's exit code** *(2026-07-03)*.
+  `validator | tail` makes `$?` / `$LASTEXITCODE` report `tail`'s success and
+  masks the validator's failure. Check the producing command's exit directly,
+  not a post-pipe `$?`.
+- **PowerShell 5.1 `[Parser]::ParseFile` reads a UTF-8-no-BOM `.ps1` as cp1252**
+  *(2026-07-06)*. Em-dashes and `§` in comments/strings then produce spurious
+  "unexpected token" parse errors that are NOT real. Validate UTF-8-no-BOM
+  scripts with `pwsh` (PS7) — also what the scheduled task runs (`pwsh.exe -File`).
 
 ## WinUI / GUI automation
 
@@ -76,6 +89,28 @@ exists, the lesson or journal entry that paid for it.*
   128)*, and a just-booted guest's balloon transient wears the face of a
   hardware-absent failure — measure past the warm-up window.
 
+## Node / JavaScript
+
+- **Static ESM `import`s are hoisted to module-link time** *(2026-07-06, #740)*.
+  In a `.mjs` file, no top-of-file statement (`process.exit`, a conditional, a
+  `throw`) runs before every static `import` has resolved — so an "exit early"
+  guard above imports of not-yet-built modules still hard-fails with
+  `ERR_MODULE_NOT_FOUND`. An inert seed/stub must contain no linkable specifier
+  at all: comment the body out (line comments only — a `/* */` block dies on the
+  first `*/` in a regex or glob string), or use dynamic `import()`. The trap is
+  invisible on the happy path (once the modules exist, the naive guard "works").
+  Proven live on node v24.13.0.
+
+## Security / certs & runtime state
+
+- **`provision_per_boot_certs(certs_dir=None)` writes into `<repo_root>/certs`**
+  *(lesson 55; 2026-07-06)*. Called with `certs_dir=None` (or only `repo_root=`)
+  it mints the nine per-boot PEMs into the REAL runtime cert dir — the
+  `LOCALAPPDATA` redirect does not cover it. Any test or tool that calls it that
+  way re-mints the live CA, so do NOT run the standing gate concurrently with a
+  live AO serving jobs: the re-mint orphans the AO's in-memory CA and every
+  subsequent mTLS turn fails `CERTIFICATE_VERIFY_FAILED`.
+
 ## Toolchain / runbooks
 
 - **Pin the exact interpreter in every operator-facing runbook command**
@@ -86,3 +121,53 @@ exists, the lesson or journal entry that paid for it.*
   the runtime venv** *(lesson 15; memory 2026-06-16)*. A diffusers install
   broke the numpy/transformers pins under the working inference stack — use a
   throwaway venv and route around broken exporters not on the runtime path.
+
+## Telemetry / benchmarking
+
+- **Intel UT ships two clocks and the level-zero one is unreliable** *(lesson 8;
+  2026-06-28)*. socwatch (power/thermal) stamps Unix-epoch ns; the level-zero
+  collector (GPU freq / busy / bandwidth) flags a "timestamp-units" issue and
+  stamps a different clock (~27.7 h offset in one capture), yielding only a single
+  whole-run blob. To segment level-zero by phase, anchor its sample range
+  `[min,max]` linearly onto socwatch's Unix `[min,max]` window from the same
+  `ut.exe` session — trust the level-zero clock's *linearity*, not its absolute
+  value — and validate the remap physically (the GPU-busy spike must land on the
+  power spike) before relying on it.
+- **GPU allocations read out in `cl_mem` + `usm_host`, never `usm_device`, on this
+  shared-LPDDR5X iGPU** *(lesson 8; #709)*. `usm_device` (the discrete-GPU field)
+  stays ~4 MB forever; the reserved KV pool tracks `cache_size` in `cl_mem`, and
+  weights plus buffers land in `usm_host`. Headlining `usm_device` reports a
+  permanent zero.
+
+## Git on Windows
+
+- **A clone under a deep path can "succeed" with a silently failed checkout —
+  and a scoped `git add` from that clone commits the rest of the tree as MASS
+  DELETIONS** *(2026-07-06; journal "The trailer cut in the shadow of the
+  battery")*. This repo tree carries filenames near the 260-char MAX_PATH
+  (`docs/Degenerate_0-Channel_Shape_...`), so cloning it under a long base path
+  (a session scratchpad) leaves a partial index; `git status` was never checked,
+  three paths were staged, and the commit recorded 1,785 deletions — pushed to
+  the PUBLIC repo before the stat line was read. Controls: `git config --global
+  core.longpaths true` (now set); clone working repos to a SHORT base path;
+  after any fresh clone, require `$LASTEXITCODE -eq 0` AND an empty
+  `git status --porcelain`; and READ the commit's `--stat` line before pushing —
+  a docs commit that says "1786 files changed" is the alarm, not a curiosity.
+- **GitHub's blob viewer refuses to preview/play files over ~25 MB** *(2026-07-06,
+  same publish arc)*. A README poster linked to `blob/main/media/<39MB>.mp4` lands
+  on "we can't show files that are this big" — a dead end for viewers. Link big
+  media through the repo's Pages player instead (the `demo.html`/`coder.html`
+  pattern: a `<video>` tag over the raw file streams any size), or a release asset.
+- **Windows venv `python.exe` is a launcher SHIM that spawns the base interpreter
+  as a CHILD** *(2026-07-07/08, #761)* — `DETACHED_PROCESS` on the shim does NOT
+  keep the child console-less: the console-subsystem child of a console-less
+  parent gets a fresh VISIBLE console. Use the venv's `pythonw.exe` for
+  console-less detached chains (its shim child is pythonw too). `CREATE_NO_WINDOW`
+  = a HIDDEN console — crashes Textual ("Driver must be in application mode",
+  2026-07-06); safe only for non-interactive console children (pwsh/git/tasklist).
+  And the stdio trap: under pythonw a child spawned with NO explicit std handles
+  may inherit a broken-but-present cp1252 stderr and CRASH on its first non-ASCII
+  print (the #761 banner crash) — "prints are silent no-ops under pythonw" is only
+  true when the handles are genuinely absent. Always wire detached python children
+  with DEVNULL stdin + a UTF-8 append log for stdout/stderr + PYTHONIOENCODING=utf-8
+  (the `boot_launcher_detached` pattern).

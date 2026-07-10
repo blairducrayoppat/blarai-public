@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from shared.fleet import swap_ops as so
 from shared.fleet import swap_state as ss
 from shared.fleet.dispatch import DispatchResult, FleetDispatchConfig, TaskOutcome
@@ -187,6 +189,7 @@ def test_orchestrate_validate_failure_no_handoff(tmp_path):
 # ---- reconcile_at_boot_for_roots (#670 — config-driven crash recovery) -----
 
 
+@pytest.mark.real_reconcile  # exercises the reconcile seam itself (inner call faked; #758 guard opt-out)
 def test_reconcile_at_boot_for_roots_uses_configured_root(monkeypatch):
     # #670: the boot reconciler must READ swap-state under the CONFIGURED fleet root, not
     # the compiled-in fallback — else on a custom-root box the EXECUTE writer and this
@@ -208,6 +211,7 @@ def test_reconcile_at_boot_for_roots_uses_configured_root(monkeypatch):
     assert cfg.projects_dir == Path("Y:/proj")
 
 
+@pytest.mark.real_reconcile  # exercises the reconcile seam itself (inner call faked; #758 guard opt-out)
 def test_reconcile_at_boot_for_roots_falls_back_on_empty(monkeypatch):
     # Empty roots (the "config key absent" case) fall back to the compiled-in default.
     seen = {}
@@ -298,6 +302,7 @@ def test_orchestrate_still_decomposes_then_delegates(tmp_path):
 # ---- writer-root == reconciler-root (#670) --------------------------------
 
 
+@pytest.mark.real_reconcile  # exercises the reconcile seam itself (inner call faked; #758 guard opt-out)
 def test_swap_state_writer_root_matches_reconciler_root(monkeypatch):
     # The EXECUTE writer persists swap-state under build_default_config(root); the boot
     # reconciler reads under build_default_config(root) too -> SAME path. Pin them equal so
@@ -354,6 +359,242 @@ def test_compute_relaunch_argv_falls_back_to_sys_executable_without_venv(tmp_pat
     argv, _cwd = so.compute_relaunch_argv(winui=False, repo_root=str(tmp_path))
     assert argv[0] == sys.executable
     assert argv[1:] == ["-m", "launcher"]
+
+
+# ---- #761: pythonw spawn chain — no VISIBLE console, no HIDDEN console -----
+#
+# Root cause (#761 c.1424): ``.venv\Scripts\python.exe`` is the Windows venv LAUNCHER
+# SHIM — it spawns the BASE console-subsystem interpreter as a CHILD, so a
+# DETACHED_PROCESS spawn is defeated one hop down: the child, born to a console-less
+# parent, is allocated a fresh VISIBLE console the operator can accidentally close
+# (the night-2 window-close incident class). Fix: the detached launcher/driver chain
+# spawns via pythonw.exe (GUI subsystem — no console EVER), and NEVER via
+# CREATE_NO_WINDOW — a HIDDEN console is the exact shape that crashed Textual on
+# 2026-07-06 ("Driver must be in application mode"). pwsh/git children of the now
+# console-less driver are the inverse case: console-subsystem, non-interactive,
+# output-redirected — they DO ride CREATE_NO_WINDOW (the C15 audit outcome).
+
+_CREATE_NO_WINDOW = 0x08000000
+_DETACHED_PROCESS = 0x00000008
+
+
+def _fake_venv(tmp_path, *, pythonw=True):
+    scripts = tmp_path / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "python.exe").write_text("")
+    if pythonw:
+        (scripts / "pythonw.exe").write_text("")
+    return scripts
+
+
+def test_venv_pythonw_resolves_when_present(tmp_path):
+    scripts = _fake_venv(tmp_path)
+    assert so._venv_pythonw(tmp_path) == str(scripts / "pythonw.exe")
+
+
+def test_venv_pythonw_falls_back_to_venv_python_when_absent(tmp_path):
+    # No pythonw in the venv -> _venv_python's result, unchanged (never a broken spawn).
+    scripts = _fake_venv(tmp_path, pythonw=False)
+    assert so._venv_pythonw(tmp_path) == str(scripts / "python.exe")
+
+
+def test_pythonw_sibling_resolves_and_falls_back(tmp_path):
+    py = tmp_path / "python.exe"
+    py.write_text("")
+    assert so.pythonw_sibling(str(py)) == str(py)        # no sibling -> unchanged
+    pyw = tmp_path / "pythonw.exe"
+    pyw.write_text("")
+    assert so.pythonw_sibling(str(py)) == str(pyw)       # sibling present -> preferred
+    other = tmp_path / "python3.exe"
+    other.write_text("")
+    assert so.pythonw_sibling(str(other)) == str(other)  # non-standard name -> unchanged
+
+
+def test_compute_relaunch_argv_emits_pythonw_path(tmp_path):
+    # #761: the relaunch argv (the spec the detached driver respawns at swap-back) is
+    # THE source of the visible swap-back window — it must carry pythonw.exe.
+    scripts = _fake_venv(tmp_path)
+    argv, _cwd = so.compute_relaunch_argv(winui=True, repo_root=str(tmp_path))
+    assert argv[0] == str(scripts / "pythonw.exe")
+    assert argv[1:] == ["-m", "launcher", "--winui"]
+
+
+def test_spawn_detached_driver_uses_pythonw_sibling(tmp_path, monkeypatch):
+    import subprocess as sp
+    import sys
+
+    scripts = _fake_venv(tmp_path)
+    captured = {}
+
+    def fake_popen(cmd, **kw):
+        captured["cmd"] = cmd
+        captured["kw"] = kw
+
+    monkeypatch.setattr(sys, "executable", str(scripts / "python.exe"))
+    monkeypatch.setattr(sp, "Popen", fake_popen)
+    so._spawn_detached_driver(tmp_path / "spec.json")
+    assert captured["cmd"][0] == str(scripts / "pythonw.exe")
+    assert captured["cmd"][1:3] == ["-m", "shared.fleet.swap_ops"]
+    flags = captured["kw"]["creationflags"]
+    assert flags & _DETACHED_PROCESS
+    # 2026-07-06 incident pin: NEVER CREATE_NO_WINDOW on a python-launcher spawn — a
+    # HIDDEN console crashed Textual ("Driver must be in application mode").
+    assert flags & _CREATE_NO_WINDOW == 0
+
+
+def test_spawn_detached_driver_falls_back_to_sys_executable(tmp_path, monkeypatch):
+    import subprocess as sp
+    import sys
+
+    scripts = _fake_venv(tmp_path, pythonw=False)
+    captured = {}
+    monkeypatch.setattr(sys, "executable", str(scripts / "python.exe"))
+    monkeypatch.setattr(sp, "Popen", lambda cmd, **kw: captured.update(cmd=cmd))
+    so._spawn_detached_driver(tmp_path / "spec.json")
+    assert captured["cmd"][0] == str(scripts / "python.exe")  # never a broken spawn
+
+
+def test_restart_launcher_never_create_no_window(tmp_path, monkeypatch):
+    # The relaunch spawn keeps DETACHED on BOTH branches (the argv carries pythonw via
+    # the spec); pin that neither branch reaches for the crash-shape CREATE_NO_WINDOW
+    # (the 2026-07-06 Textual application-mode incident).
+    import subprocess as sp
+
+    flags_seen = []
+
+    class _P:
+        def poll(self):
+            return None
+
+    def fake_popen(cmd, **kw):
+        flags_seen.append(kw.get("creationflags", 0))
+        if len(flags_seen) == 1:
+            raise OSError("not in a job object")   # exercise the BREAKAWAY-less fallback too
+        return _P()
+
+    monkeypatch.setattr(sp, "Popen", fake_popen)
+    ops = so.build_swap_ops(_cfg(tmp_path), run_id="R", old_pid=1,
+                            relaunch_argv=["pyw.exe", "-m", "launcher"], relaunch_cwd="C:/x")
+    ops.restart_launcher()
+    assert len(flags_seen) == 2                    # primary + OSError-fallback branch
+    for flags in flags_seen:
+        assert flags & _DETACHED_PROCESS
+        assert flags & _CREATE_NO_WINDOW == 0
+
+
+def test_spawn_detached_driver_gives_the_child_real_std_handles(tmp_path, monkeypatch):
+    """2026-07-08 live-verify catch: a pythonw child with no explicit std handles
+    can inherit a broken-but-present stderr and die on its first non-ASCII print
+    (the relaunched launcher crashed encoding its BANNER, cp1252, SWAP_FAILED).
+    Every detached python spawn must wire DEVNULL in + a UTF-8 log out +
+    PYTHONIOENCODING=utf-8, the proven boot_launcher_detached shape."""
+    import subprocess as sp
+    import sys
+
+    scripts = _fake_venv(tmp_path)
+    captured = {}
+
+    def fake_popen(cmd, **kw):
+        captured["cmd"] = cmd
+        captured["kw"] = kw
+
+    monkeypatch.setattr(sys, "executable", str(scripts / "python.exe"))
+    monkeypatch.setattr(sp, "Popen", fake_popen)
+    so._spawn_detached_driver(tmp_path / "spec.json")
+    kw = captured["kw"]
+    assert kw["stdin"] == sp.DEVNULL
+    assert kw["stdout"] is not None and kw["stderr"] == sp.STDOUT
+    assert kw["env"]["PYTHONIOENCODING"] == "utf-8"
+    # the stdio log lands beside the spec (the fleet-swap dir)
+    assert (tmp_path / "driver-stdio.log").exists()
+
+
+def test_restart_launcher_gives_the_child_real_std_handles(tmp_path, monkeypatch):
+    """The leg-3 crash itself: the relaunch Popen passed NO std handles — fine
+    for the old visible-console python.exe child, fatal under the #761 pythonw
+    chain. Both branches (BREAKAWAY + fallback) must wire the handles + env."""
+    import subprocess as sp
+
+    seen = []
+
+    class _P:
+        def poll(self):
+            return None
+
+    def fake_popen(cmd, **kw):
+        seen.append(kw)
+        if len(seen) == 1:
+            raise OSError("not in a job object")
+        return _P()
+
+    monkeypatch.setattr(sp, "Popen", fake_popen)
+    ops = so.build_swap_ops(_cfg(tmp_path), run_id="R", old_pid=1,
+                            relaunch_argv=["pyw.exe", "-m", "launcher"], relaunch_cwd="C:/x")
+    ops.restart_launcher()
+    assert len(seen) == 2
+    for kw in seen:
+        assert kw["stdin"] == sp.DEVNULL
+        assert kw["stdout"] is not None and kw["stderr"] == sp.STDOUT
+        assert kw["env"]["PYTHONIOENCODING"] == "utf-8"
+    assert (so.swap_dir(_cfg(tmp_path)) / "ao-relaunch.log").exists()
+
+
+def test_run_to_logfile_children_get_no_window(tmp_path):
+    # #761 C15 audit outcome: the start-llm pwsh child rides CREATE_NO_WINDOW —
+    # console-subsystem, non-interactive, file-redirected; under the console-less
+    # pythonw driver it would otherwise be allocated a fresh VISIBLE console.
+    import os
+    from types import SimpleNamespace
+
+    captured = {}
+
+    def fake_run(cmd, **kw):
+        captured.update(kw)
+        return SimpleNamespace(returncode=0)
+
+    assert so._run_to_logfile(["pwsh"], log_path=tmp_path / "l.log", timeout_s=5.0,
+                              run=fake_run) is True
+    assert captured["creationflags"] == so._NO_WINDOW
+    assert so._NO_WINDOW == (_CREATE_NO_WINDOW if os.name == "nt" else 0)
+
+
+def test_run_to_logfile_tree_children_get_no_window(tmp_path):
+    # Same audit outcome for the LONG-LIVED run-fleet pwsh subtree — an hours-long
+    # visible console is the exact accidental-close hazard #761 closes.
+    captured = {}
+
+    def fake_popen(cmd, **kw):
+        captured.update(kw)
+        return _FakeProc(rc=0)
+
+    ok, _timed_out = so._run_to_logfile_tree(
+        ["pwsh"], log_path=tmp_path / "l.log", timeout_s=5.0,
+        popen=fake_popen, terminate_tree=lambda p: None,
+    )
+    assert ok is True
+    assert captured["creationflags"] == so._NO_WINDOW
+
+
+def test_safe_run_children_get_no_window(monkeypatch):
+    # _safe_run is the same mechanism one level down: pwsh/git/tasklist children of the
+    # console-less driver (short flashes; a wave-gate pytest child holds one ~600s).
+    import os
+    import subprocess as sp
+    from types import SimpleNamespace
+
+    from shared.fleet import dispatch as fd
+
+    captured = {}
+
+    def fake_run(cmd, **kw):
+        captured.update(kw)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    ok, _out, _err = fd._safe_run(["git", "status"], 5.0)
+    assert ok is True
+    assert captured["creationflags"] == fd._NO_WINDOW
+    assert fd._NO_WINDOW == (_CREATE_NO_WINDOW if os.name == "nt" else 0)
 
 
 # ---- (1) start-llm launch: no inheritable capture pipe (#670 run-2) --------
@@ -419,7 +660,7 @@ def test_real_load_30b_wires_per_run_log_and_start_llm(tmp_path, monkeypatch):
     assert so.real_load_30b(cfg, "RID-7") is True
     assert seen["cmd"][-3:] == ["-Model", "coder-30b", "-Force"]
     assert seen["log_path"] == cfg.runs_dir / "RID-7" / "start-llm.log"
-    assert seen["timeout_s"] == 300.0
+    assert seen["timeout_s"] == 480.0   # #747: cold compile-cache load headroom (~289s live)
 
 
 def test_safe_run_still_captures_stdout_for_parsing_callers():
@@ -524,11 +765,11 @@ def test_run_to_logfile_tree_no_capture_and_on_spawn(tmp_path):
         captured["kw"] = kw
         return _FakeProc(rc=0)
 
-    ok = so._run_to_logfile_tree(
+    ok, timed_out = so._run_to_logfile_tree(
         ["pwsh", "-File", "run-fleet.ps1"], log_path=tmp_path / "runs" / "R" / "t.log",
         timeout_s=5.0, on_spawn=seen.append, popen=fake_popen, terminate_tree=lambda p: None,
     )
-    assert ok is True
+    assert ok is True and timed_out is False
     kw = captured["kw"]
     assert "capture_output" not in kw                  # never the deadlock-prone capture pipe
     assert kw["stderr"] is subprocess.STDOUT and kw["close_fds"] is True
@@ -545,7 +786,7 @@ def test_real_run_task_uses_tree_runner_and_per_task_log(tmp_path, monkeypatch):
 
     def fake_tree(cmd, *, log_path, timeout_s, on_spawn=None):
         seen.update(cmd=cmd, log_path=log_path, timeout_s=timeout_s, on_spawn=on_spawn)
-        return True
+        return True, False
 
     monkeypatch.setattr(so, "_run_to_logfile_tree", fake_tree)
     cfg = so.build_default_config(str(tmp_path / "agentic"), str(tmp_path / "projects"))
@@ -556,7 +797,7 @@ def test_real_run_task_uses_tree_runner_and_per_task_log(tmp_path, monkeypatch):
     oc = so.real_run_task(cfg, "RID", {"repo": "X", "task": "t", "prompt": "p"}, on_spawn=sentinel)
     assert "run-fleet.ps1" in str(seen["cmd"]) and seen["cmd"][-2:] == ["-RunId", "RID"]
     assert seen["log_path"] == cfg.runs_dir / "RID" / "run-fleet-t.log"
-    assert seen["timeout_s"] == 3600.0
+    assert seen["timeout_s"] == so.TASK_TIMEOUT_S
     assert seen["on_spawn"] is sentinel                # the budget-watchdog seam is wired
     assert oc.task == "t" and oc.result == "MERGED"
 
@@ -564,14 +805,182 @@ def test_real_run_task_uses_tree_runner_and_per_task_log(tmp_path, monkeypatch):
 def test_run_to_logfile_tree_treekills_whole_tree_on_timeout(tmp_path):
     killed, seen = [], []
     proc = _FakeProc(timeout_first=True)
-    ok = so._run_to_logfile_tree(
+    ok, timed_out = so._run_to_logfile_tree(
         ["x"], log_path=tmp_path / "l.log", timeout_s=0.01,
         on_spawn=seen.append, popen=lambda *a, **k: proc,
         terminate_tree=lambda p: killed.append(p),
     )
     assert ok is False
+    assert timed_out is True                           # #757: the kill is REPORTED, not swallowed
     assert killed == [proc]                            # the WHOLE held tree, not proc.kill() alone
     assert seen[-1] is None                            # holder cleared BEFORE the kill
+
+
+# ==========================================================================
+# #757 — honest timeout labeling: a tree-killed task must never masquerade as
+# a mystery "no SUMMARY line" (the night-2 diagnosability defect: B4+B6 burned
+# a full diagnostic cycle because the budget kill wore the parser's clothes).
+# ==========================================================================
+
+
+def test_run_to_logfile_tree_nonzero_exit_is_not_timed_out(tmp_path):
+    # A normal failure (rc != 0) must NOT be labeled a timeout — the honest-timeout
+    # rewrite keys off this flag, so a false positive here would mislabel real failures.
+    ok, timed_out = so._run_to_logfile_tree(
+        ["x"], log_path=tmp_path / "l.log", timeout_s=5.0,
+        popen=lambda *a, **k: _FakeProc(rc=1), terminate_tree=lambda p: None,
+    )
+    assert ok is False and timed_out is False
+
+
+def test_real_run_task_timeout_yields_honest_timeout_outcome(tmp_path, monkeypatch):
+    # The night-2 miss, reproduced: run-fleet is tree-killed before it writes a SUMMARY
+    # line for the task. The outcome must SAY timeout — not "no SUMMARY line".
+    monkeypatch.setattr(so, "_run_to_logfile_tree",
+                        lambda *a, **k: (False, True))
+    cfg = so.build_default_config(str(tmp_path / "agentic"), str(tmp_path / "projects"))
+    (cfg.runs_dir / "RID").mkdir(parents=True, exist_ok=True)
+    # SUMMARY.txt exists but carries only the PREVIOUS task (run-fleet overwrites per
+    # task and died before writing this one) — exactly the B4/B6 shape.
+    (cfg.runs_dir / "RID" / "SUMMARY.txt").write_text(
+        "- earlier-task: processed\n  RESULT: MERGED into your project\n", encoding="utf-8")
+    oc = so.real_run_task(cfg, "RID", {"repo": "X", "task": "acceptance-tests", "prompt": "p"})
+    assert oc.task == "acceptance-tests"
+    assert oc.result == "TIMEOUT" and oc.outcome == "timeout"
+    assert "TIMED OUT" in oc.detail and "per-task ceiling" in oc.detail
+    assert "no SUMMARY line" not in oc.detail
+
+
+def test_real_run_task_parsed_summary_wins_over_timeout(tmp_path, monkeypatch):
+    # If run-fleet DID write the task's SUMMARY line before the kill landed, the parsed
+    # outcome is the truth — the timeout flag must not overwrite a real result.
+    monkeypatch.setattr(so, "_run_to_logfile_tree",
+                        lambda *a, **k: (False, True))
+    cfg = so.build_default_config(str(tmp_path / "agentic"), str(tmp_path / "projects"))
+    (cfg.runs_dir / "RID").mkdir(parents=True, exist_ok=True)
+    (cfg.runs_dir / "RID" / "SUMMARY.txt").write_text(
+        "- t: processed\n  RESULT: MERGED into your project\n", encoding="utf-8")
+    oc = so.real_run_task(cfg, "RID", {"repo": "X", "task": "t", "prompt": "p"})
+    assert oc.result == "MERGED"
+
+
+def test_real_run_task_no_summary_without_timeout_keeps_unknown(tmp_path, monkeypatch):
+    # The legacy fallback survives unchanged for the genuinely-unexplained miss (run-fleet
+    # exited on its own without writing the line): still UNKNOWN / "no SUMMARY line".
+    monkeypatch.setattr(so, "_run_to_logfile_tree",
+                        lambda *a, **k: (False, False))
+    cfg = so.build_default_config(str(tmp_path / "agentic"), str(tmp_path / "projects"))
+    (cfg.runs_dir / "RID").mkdir(parents=True, exist_ok=True)
+    oc = so.real_run_task(cfg, "RID", {"repo": "X", "task": "t", "prompt": "p"})
+    assert oc.result == "UNKNOWN" and "no SUMMARY line" in oc.detail
+
+
+def test_build_swap_ops_budget_kill_is_labeled_timeout(tmp_path, monkeypatch):
+    # The B4/B6 killer: the overall-run budget watchdog tree-kills run-fleet mid-task.
+    # real_run_task sees no SUMMARY line; the ops wrapper must rewrite the mystery into
+    # an explicit budget timeout WHEN the stop event says the budget fired.
+    import threading
+
+    from shared.fleet.dispatch import TaskOutcome
+
+    monkeypatch.setattr(so, "real_run_task",
+                        lambda *a, **k: TaskOutcome(
+                            task="acceptance-tests", outcome="unknown", result="UNKNOWN",
+                            detail="no SUMMARY line for this task"))
+    cfg = _cfg(tmp_path)
+    stop = threading.Event()
+    ops = so.build_swap_ops(cfg, run_id="R", old_pid=1, relaunch_argv=["py"],
+                            relaunch_cwd="C:/x", stop_event=stop)
+    # Budget NOT fired -> the unknown passes through untouched (no false timeouts).
+    oc = ops.run_task({"repo": "X", "task": "acceptance-tests", "prompt": "p"})
+    assert oc.result == "UNKNOWN"
+    # Budget fired -> honest, explicit label naming the budget.
+    stop.set()
+    oc = ops.run_task({"repo": "X", "task": "acceptance-tests", "prompt": "p"})
+    assert oc.result == "TIMEOUT" and oc.outcome == "timeout"
+    assert "overall run budget" in oc.detail and "TIMED OUT" in oc.detail
+
+
+def test_build_swap_ops_budget_fire_never_rewrites_a_real_outcome(tmp_path, monkeypatch):
+    # A task that finished (SUMMARY parsed) just before the budget fired keeps its real
+    # outcome — the rewrite only claims the no-SUMMARY mystery, never actual results.
+    import threading
+
+    from shared.fleet.dispatch import TaskOutcome
+
+    monkeypatch.setattr(so, "real_run_task",
+                        lambda *a, **k: TaskOutcome(
+                            task="t", outcome="processed", result="MERGED",
+                            detail="RESULT: MERGED into your project"))
+    cfg = _cfg(tmp_path)
+    stop = threading.Event()
+    stop.set()
+    ops = so.build_swap_ops(cfg, run_id="R", old_pid=1, relaunch_argv=["py"],
+                            relaunch_cwd="C:/x", stop_event=stop)
+    oc = ops.run_task({"repo": "X", "task": "t", "prompt": "p"})
+    assert oc.result == "MERGED"
+
+
+def test_timeout_outcome_roundtrips_through_cumulative_summary(tmp_path):
+    # #686 lock, extended to the new vocab: the cumulative SUMMARY.txt written for a
+    # TIMEOUT outcome must read back as TIMEOUT through the ONE shared parse_summary
+    # (harness + gateway /dispatch status) — a detail shape that drops the RESULT: prefix
+    # would silently classify it as NONE at swap-back (the #686 failure class).
+    from shared.fleet.dispatch import TaskOutcome, parse_summary
+
+    cfg = _cfg(tmp_path)
+    outs = [
+        TaskOutcome(task="built", outcome="processed", result="MERGED",
+                    detail="RESULT: MERGED into your project"),
+        TaskOutcome(task="acceptance-tests", outcome="timeout", result="TIMEOUT",
+                    detail="RESULT: TIMED OUT - the overall run budget elapsed mid-task; "
+                           "run-fleet was tree-killed before it wrote a SUMMARY line"),
+    ]
+    so.write_cumulative_report(cfg, "RID", outs)
+    text = (cfg.runs_dir / "RID" / "SUMMARY.txt").read_text(encoding="utf-8")
+    parsed = parse_summary(text)
+    assert [(o.task, o.result) for o in parsed] == [
+        ("built", "MERGED"), ("acceptance-tests", "TIMEOUT")]
+    assert parsed[1].outcome == "timeout"
+
+
+def test_per_task_ceiling_dominates_runfleet_worst_case():
+    # #757 headroom lock: run-fleet's legitimate single-task worst case is up to 3
+    # candidates x MaxRunMinutes=60 + reviews/merge overhead. The night-2 ceiling (3600s)
+    # EQUALLED one candidate's budget — zero headroom; the ceiling must dominate the
+    # worst case so it never clips honest work (the budget watchdog is the binding bound).
+    assert so.TASK_TIMEOUT_S >= 3 * 3600 + 1800
+
+
+# ---- #693: real_run_critic threads the pre-dispatch base SHA to the script ----
+
+
+def test_real_run_critic_passes_base_ref_only_when_given(tmp_path, monkeypatch):
+    # Non-empty base_sha -> "-BaseRef <sha>" on the critic-run.ps1 command line (the
+    # multi-commit fast-forward fix); empty -> omitted so the script's Resolve-CriticRange
+    # fallback chain applies unchanged (pre-#693 behavior preserved).
+    seen = {}
+    monkeypatch.setattr(so, "real_load_14b", lambda c, r: True)
+    monkeypatch.setattr(so, "real_wait_ready", lambda: True)
+
+    def fake_run(cmd, *, log_path, timeout_s, **kw):
+        seen["cmd"] = list(cmd)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("VERDICT: MERGE", encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(so, "_run_to_logfile", fake_run)
+    cfg = _cfg(tmp_path)
+
+    so.real_run_critic(cfg, "RID", "C:/app", "main", "sha-base")
+    i = seen["cmd"].index("-BaseRef")
+    assert seen["cmd"][i + 1] == "sha-base"
+
+    so.real_run_critic(cfg, "RID", "C:/app", "main", "")
+    assert "-BaseRef" not in seen["cmd"]
+
+    so.real_run_critic(cfg, "RID", "C:/app", "main")     # back-compat default
+    assert "-BaseRef" not in seen["cmd"]
 
 
 # ---- _CurrentChild: reuse-safe abort + structurally-inert at teardown ------
@@ -769,6 +1178,33 @@ def test_run_swap_builds_fresh_per_run_instances(tmp_path, monkeypatch):
     assert len(created) == 2 and created[0] is not created[1]   # fresh per run
 
 
+def test_run_swap_stamps_driver_pid_into_state(tmp_path, monkeypatch):
+    # #758: the driver records its OWN pid + create-time into the swap state at takeover,
+    # so a concurrent AO boot's reconcile can tell a LIVE swap from a CRASHED one instead
+    # of killing the healthy run (the 2026-07-07 incident).
+    import os
+
+    import shared.fleet.swap_driver as sd_mod
+
+    monkeypatch.setattr(sd_mod.SwapDriver, "run", lambda self: None)
+    cfg = _cfg(tmp_path)
+    ss.write_swap_state(
+        ss.SwapState(run_id="R1", session_id="s", phase=ss.PHASE_HANDOFF, tasks=[]),
+        path=so.swap_state_path(cfg),
+    )
+    spec = {"run_id": "R1", "session_id": "s", "old_pid": 1, "relaunch_argv": ["py"],
+            "relaunch_cwd": "C:/x", "gate_gb": 21.0, "run_budget_s": 0.0,
+            "scripts_dir": str(cfg.scripts_dir), "queue_path": str(cfg.queue_path),
+            "runs_dir": str(cfg.runs_dir), "projects_dir": str(cfg.projects_dir)}
+    spec_path = so.swap_dir(cfg) / "spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+    so.run_swap(spec_path)
+    state = ss.read_swap_state(so.swap_state_path(cfg))
+    assert state.driver_pid == os.getpid()          # THIS process was the driver
+    assert state.driver_pid_created > 0.0           # psutil create-time recorded
+    assert ss.driver_alive(state) is True           # and the real probe agrees it is live
+
+
 def test_run_swap_wires_watchdog_when_budget_positive(tmp_path, monkeypatch):
     # The budget>0 seam (run_swap) is the load-bearing A/B production assembly: it builds a
     # BudgetWatchdog whose abort is THIS run's _CurrentChild.abort and whose request_stop is THIS
@@ -945,3 +1381,341 @@ def test_build_swap_ops_wires_run_design_loop(tmp_path, monkeypatch):
     assert seen == {"config": cfg, "run_id": "RID", "app_dir": "C:/proj/app",
                     "goal": "a landing page", "vcj": '["hero"]'}
     assert result == {"should_iterate": False}
+
+
+# ---------------------------------------------------------------------------
+# #750 fix 1 — real_backend_ready readiness hardening (stability + launcher-alive)
+# ---------------------------------------------------------------------------
+
+
+def _scripted_connect(results):
+    """A ``_try_connect`` stand-in yielding successive bools from *results* (last repeats)."""
+    seq = list(results)
+    state = {"i": 0}
+
+    def _c(port, timeout_s=2.0):
+        i = state["i"]
+        state["i"] = i + 1
+        return seq[i] if i < len(seq) else seq[-1]
+
+    return _c
+
+
+def test_backend_ready_verifies_a_stably_up_ao(monkeypatch):
+    monkeypatch.setattr(so, "_try_connect", _scripted_connect([True]))   # always accepts
+    seen = []
+    ok = so.real_backend_ready(5001, sleep=lambda _s: None, stable_polls=3,
+                               launcher_alive=lambda: True, observe=seen.append)
+    assert ok is True
+    assert any(e["event"] == "verified-ready" for e in seen)
+
+
+def test_backend_ready_rejects_bind_then_die(monkeypatch):
+    # The night-1 false-positive: one accept, then the listener is gone. A single connect
+    # must NOT be trusted -- the stability re-poll catches it.
+    monkeypatch.setattr(so, "_try_connect", _scripted_connect([True, False]))
+    seen = []
+    ok = so.real_backend_ready(5001, timeout_s=6.0, poll_s=3.0, sleep=lambda _s: None,
+                               stable_polls=3, stable_gap_s=2.0,
+                               launcher_alive=lambda: True, observe=seen.append)
+    assert ok is False                                   # not fooled by a single accept
+    assert any(e["event"] == "unstable" for e in seen)
+
+
+def test_backend_ready_aborts_fast_when_launcher_died(monkeypatch):
+    # A lingering socket may still accept, but if the spawned launcher PROCESS is gone the
+    # readiness aborts immediately -> the driver spawns fresh instead of trusting it.
+    monkeypatch.setattr(so, "_try_connect", _scripted_connect([True]))
+    sleeps = {"n": 0}
+    seen = []
+    ok = so.real_backend_ready(
+        5001, timeout_s=180.0,
+        sleep=lambda _s: sleeps.__setitem__("n", sleeps["n"] + 1),
+        launcher_alive=lambda: False, observe=seen.append)
+    assert ok is False
+    assert sleeps["n"] == 0                              # returned at once, no 180s poll
+    assert any(e["event"] == "launcher-died" for e in seen)
+
+
+def test_backend_ready_catches_launcher_dying_mid_stability(monkeypatch):
+    monkeypatch.setattr(so, "_try_connect", _scripted_connect([True]))   # socket stays up
+    alive = iter([True, False])   # alive at the first accept, dead during the stability re-poll
+    ok = so.real_backend_ready(5001, timeout_s=6.0, sleep=lambda _s: None,
+                               stable_polls=3, launcher_alive=lambda: next(alive, False))
+    assert ok is False
+
+
+def test_backend_ready_times_out_when_never_up(monkeypatch):
+    monkeypatch.setattr(so, "_try_connect", _scripted_connect([False]))
+    seen = []
+    ok = so.real_backend_ready(5001, timeout_s=6.0, poll_s=3.0, sleep=lambda _s: None,
+                               launcher_alive=lambda: True, observe=seen.append)
+    assert ok is False
+    assert any(e["event"] == "timeout" for e in seen)
+
+
+def test_build_swap_ops_wires_backend_ready_with_launcher_alive_and_observer(tmp_path, monkeypatch):
+    # Fix 1 is only real if the guard is WIRED: build_swap_ops must call real_backend_ready with
+    # the launcher-alive probe (relaunch_in_flight) AND an observer -> the swap-progress trail.
+    cfg = _cfg(tmp_path)
+    captured = {}
+
+    def fake_real(port, launcher_alive=None, observe=None, **kw):
+        captured.update(port=port, launcher_alive=launcher_alive, observe=observe)
+        if observe:
+            observe({"event": "verified-ready", "stable_polls": 3})
+        return True
+
+    monkeypatch.setattr(so, "real_backend_ready", fake_real)
+    ops = so.build_swap_ops(cfg, run_id="RID", old_pid=1, relaunch_argv=["py"],
+                            relaunch_cwd="C:/x", ao_port=5001)
+    assert ops.backend_ready() is True
+    assert captured["port"] == 5001
+    assert callable(captured["launcher_alive"])       # relaunch_in_flight is wired in
+    assert callable(captured["observe"])              # the progress-log observer is wired in
+    trail = so.read_swap_progress(cfg, "RID")
+    assert "backend-ready probe: verified-ready" in trail
+
+
+# ==========================================================================
+# #744 guest-certified oracle — spec threading + live wiring (DORMANT)
+# ==========================================================================
+
+
+def test_prepare_and_launch_swap_spec_carries_guest_oracle_knob(tmp_path):
+    # The knob rides config -> spec exactly like plan_graph; the shipped default is
+    # False (the legacy _cfg carries no explicit value -> dataclass default).
+    cfg = _cfg(tmp_path)
+    so.prepare_and_launch_swap(
+        cfg, run_id="R1", session_id="s1",
+        tasks=[{"repo": "X", "task": "a", "prompt": "p"}],
+        old_pid=1, relaunch_argv=["py"], relaunch_cwd="C:/x",
+        gate_gb=21.0, spawn=lambda p: None,
+    )
+    spec = json.loads((so.swap_dir(cfg) / "spec.json").read_text(encoding="utf-8"))
+    assert spec["guest_oracle_enabled"] is False
+
+    state = tmp_path / "state"
+    cfg_on = FleetDispatchConfig(
+        scripts_dir=tmp_path / "scripts", queue_path=state / "fleet-queue.json",
+        runs_dir=state / "fleet-runs", projects_dir=tmp_path / "projects",
+        guest_oracle_enabled=True,
+    )
+    so.prepare_and_launch_swap(
+        cfg_on, run_id="R2", session_id="s1",
+        tasks=[{"repo": "X", "task": "a", "prompt": "p"}],
+        old_pid=1, relaunch_argv=["py"], relaunch_cwd="C:/x",
+        gate_gb=21.0, spawn=lambda p: None,
+    )
+    spec = json.loads((so.swap_dir(cfg_on) / "spec.json").read_text(encoding="utf-8"))
+    assert spec["guest_oracle_enabled"] is True
+
+
+def test_run_swap_threads_guest_oracle_knob_to_driver(tmp_path, monkeypatch):
+    # spec -> SwapDriver(guest_oracle_enabled=...) — and a PRE-#744 spec (no key at
+    # all) resolves False, so crash-recovery re-reads of old specs stay legacy.
+    import shared.fleet.swap_driver as sd_mod
+
+    seen = {}
+    real_init = sd_mod.SwapDriver.__init__
+
+    def spy_init(self, *a, guest_oracle_enabled=False, **k):
+        seen.setdefault("values", []).append(guest_oracle_enabled)
+        real_init(self, *a, guest_oracle_enabled=guest_oracle_enabled, **k)
+
+    monkeypatch.setattr(sd_mod.SwapDriver, "__init__", spy_init)
+    monkeypatch.setattr(sd_mod.SwapDriver, "run", lambda self: None)
+    cfg = _cfg(tmp_path)
+    ss.write_swap_state(
+        ss.SwapState(run_id="R1", session_id="s", phase=ss.PHASE_HANDOFF, tasks=[]),
+        path=so.swap_state_path(cfg),
+    )
+    base = {"run_id": "R1", "session_id": "s", "old_pid": 1, "relaunch_argv": ["py"],
+            "relaunch_cwd": "C:/x", "gate_gb": 21.0, "run_budget_s": 0.0,
+            "scripts_dir": str(cfg.scripts_dir), "queue_path": str(cfg.queue_path),
+            "runs_dir": str(cfg.runs_dir), "projects_dir": str(cfg.projects_dir)}
+    spec_path = so.swap_dir(cfg) / "spec.json"
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+
+    spec_path.write_text(json.dumps(base), encoding="utf-8")          # pre-#744 spec
+    so.run_swap(spec_path)
+    spec_path.write_text(json.dumps({**base, "guest_oracle_enabled": True}),
+                         encoding="utf-8")
+    so.run_swap(spec_path)
+    assert seen["values"] == [False, True]
+
+
+def test_real_write_guest_oracle_persists_block_fail_soft(tmp_path):
+    cfg = _cfg(tmp_path)
+    block = {"schema": "guest-oracle/v1", "status": "not-run",
+             "reason": "guest-transport-unregistered", "advisory": True}
+    so.real_write_guest_oracle(cfg, "R1", block)
+    on_disk = json.loads(
+        so.guest_oracle_evidence_path(cfg, "R1").read_text(encoding="utf-8"))
+    assert on_disk == block
+    # Fail-soft: an unserializable block must never raise into teardown.
+    so.real_write_guest_oracle(cfg, "R1", {"bad": object()})
+
+
+def test_real_run_guest_oracle_uses_the_registered_transport(tmp_path, monkeypatch):
+    # CONSCIOUSLY AMENDED at the 2026-07-08 go-live ceremony (#744): the former
+    # transport-dormancy lock becomes the live-wiring lock. The call site must
+    # BUILD the factory and pass its callable to the pipeline — proven here
+    # with an injected factory (a TEST MUST NEVER live-call the corridor: the
+    # first post-flip gate run reached the REAL guest from inside pytest,
+    # today's gate-vs-live-fleet class one more time — hence the seam).
+    import shared.fleet.guest_oracle_transport as got
+
+    calls = {}
+
+    def fake_factory(*, vsock_port):
+        calls["port"] = vsock_port
+
+        def transport(snapshot_zip, oracle_rel_path):
+            calls["shipped"] = (len(snapshot_zip), oracle_rel_path)
+            return {"status": "passed", "reason": "", "evidence": "exit 0 (fake guest)"}
+
+        return transport
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", fake_factory)
+    cfg = _cfg(tmp_path)
+    repo = tmp_path / "proj"
+    (repo / "tests").mkdir(parents=True)
+    (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n")
+    assert calls["port"] == so.GUEST_ORACLE_VSOCK_PORT == 50002
+    assert calls["shipped"][1] == "tests/test_job_acceptance.py"
+    assert res["status"] == "passed"
+    assert "passed" in so.read_swap_progress(cfg, "R1")
+
+
+def test_real_run_guest_oracle_degrades_honestly_when_factory_fails(tmp_path, monkeypatch):
+    # The fail-soft half of the registration: a factory failure (missing 3.14
+    # bridge) degrades to transport=None — an honest not-run with the trail
+    # line, NEVER a raise into the swap teardown.
+    import shared.fleet.guest_oracle_transport as got
+
+    def broken_factory(*, vsock_port):
+        raise got.BridgeUnavailableError("no 3.12+ interpreter")
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", broken_factory)
+    cfg = _cfg(tmp_path)
+    repo = tmp_path / "proj"
+    (repo / "tests").mkdir(parents=True)
+    (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n")
+    assert res["status"] == "not-run"
+    assert res["reason"] == "guest-transport-unregistered"
+    assert "transport unavailable" in so.read_swap_progress(cfg, "R1")
+
+
+def test_build_swap_ops_wires_guest_oracle_seams(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    seen = {}
+    monkeypatch.setattr(
+        so, "real_run_guest_oracle",
+        lambda c, rid, repo, rel, code: seen.update(
+            run=(rid, repo, rel, code)) or {"status": "not-run", "reason": "x"})
+    monkeypatch.setattr(
+        so, "real_write_guest_oracle",
+        lambda c, rid, block: seen.update(write=(rid, block)))
+    ops = so.build_swap_ops(cfg, run_id="RID", old_pid=1, relaunch_argv=["py"],
+                            relaunch_cwd="C:/x",
+                            tasks=[{"repo": "X", "task": "a", "prompt": "p"}])
+    ops.run_guest_oracle("X", "tests/test_job_acceptance.py")
+    ops.write_guest_oracle({"status": "not-run"})
+    assert seen["run"][0] == "RID" and seen["run"][2] == "tests/test_job_acceptance.py"
+    assert seen["write"] == ("RID", {"status": "not-run"})
+
+
+# ---------------------------------------------------------------------------
+# #740 B3 re-grain: per-card run-budget override (consume-once, fresh, clamped)
+# ---------------------------------------------------------------------------
+
+
+def test_pending_run_budget_round_trip_and_consume_once(tmp_path):
+    cfg = _cfg(tmp_path)
+    assert so.read_pending_run_budget(cfg) is None          # absent -> default
+    so.write_pending_run_budget(cfg, 21600.0)
+    assert so.read_pending_run_budget(cfg) == 21600.0        # honored once
+    assert so.read_pending_run_budget(cfg) is None           # CONSUMED (deleted)
+
+
+def test_pending_run_budget_clears_on_nonpositive(tmp_path):
+    cfg = _cfg(tmp_path)
+    so.write_pending_run_budget(cfg, 21600.0)
+    so.write_pending_run_budget(cfg, 0.0)                    # a default card clears it
+    assert so.read_pending_run_budget(cfg) is None
+
+
+def test_pending_run_budget_clamped_to_max(tmp_path):
+    cfg = _cfg(tmp_path)
+    so.write_pending_run_budget(cfg, 999999.0)
+    assert so.read_pending_run_budget(cfg) == so.CARD_RUN_BUDGET_MAX_S
+
+
+def test_pending_run_budget_stale_is_ignored(tmp_path):
+    import json
+    cfg = _cfg(tmp_path)
+    p = so.pending_run_budget_path(cfg)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    # A budget written 'long ago' (beyond the freshness window) is a stale file
+    # from a dispatch that never fired — it must NOT apply to a later job.
+    p.write_text(json.dumps({"run_budget_s": 21600.0,
+                             "written_at": 0.0}), encoding="utf-8")
+    assert so.read_pending_run_budget(cfg) is None
+    assert not p.exists()  # still consumed (deleted) so it can't linger
+
+
+def test_pending_run_budget_garbage_is_none(tmp_path):
+    cfg = _cfg(tmp_path)
+    p = so.pending_run_budget_path(cfg)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("{not json", encoding="utf-8")
+    assert so.read_pending_run_budget(cfg) is None
+
+
+# ---- #744 host/guest oracle runner parity (c.1526) -----------------------------
+#
+# The host job oracle and the guest-certified oracle must grade with IDENTICAL
+# runner versions, or version skew manufactures fake DIVERGENCE rows in the
+# #744 agreement matrix. The guest venv is pinned by the provisioning ceremony
+# (pytest 9.1.1 / hypothesis 6.155.7 — docs/security/guest_oracle_provisioning
+# _record.md); these locks pin the host to the same versions and the host-side
+# dep-scan allowlist to exactly the provisioned roots. The day either lock
+# fails IS a guest re-provisioning ceremony.
+
+_GUEST_PINNED_RUNNERS = ("pytest==9.1.1", "hypothesis==6.155.7")
+
+
+def test_host_oracle_uv_calls_pin_the_guest_runner_versions():
+    import inspect
+
+    src = inspect.getsource(so)
+    for pin in _GUEST_PINNED_RUNNERS:
+        # Both uv call sites (the verify-step test run and the job-oracle
+        # grade run) must carry the pin — 2 occurrences each, minimum.
+        assert src.count(f'"--with", "{pin}"') >= 2, (
+            f"host oracle uv call lost its version pin {pin!r} — either "
+            "restore it or run the matching guest re-provisioning ceremony "
+            "and update _GUEST_PINNED_RUNNERS (#744 c.1526)"
+        )
+    # The un-pinned form must be gone everywhere.
+    assert '"--with", "pytest",' not in src
+    assert '"--with", "hypothesis",' not in src
+
+
+def test_guest_dep_scan_allowlist_matches_provisioned_runners():
+    from shared.fleet import guest_oracle as go
+
+    assert go.GUEST_AVAILABLE_IMPORT_ROOTS == frozenset(
+        {"pytest", "_pytest", "hypothesis"}
+    ), (
+        "GUEST_AVAILABLE_IMPORT_ROOTS drifted from the provisioned guest venv "
+        "(pytest + hypothesis, #744 ceremony + c.1526). Extend it only "
+        "alongside a guest provisioning ceremony."
+    )

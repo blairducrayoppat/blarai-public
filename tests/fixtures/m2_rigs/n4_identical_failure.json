@@ -1,0 +1,34 @@
+{
+  "rig": "N4",
+  "surface": "plan §9.3 N4 / W5 failure policy: a task that fails IDENTICALLY on every candidate and attempt must trigger exactly ONE evidence-fed re-decomposition, then exhaust its budget and park the subtree with structured evidence — never loop, never silently continue",
+  "task_id": "storage-module",
+  "attempts": [
+    {
+      "attempt": 1,
+      "summary": "Fleet run N4-RIG — 1 task(s):\n- storage-module: processed\n    RESULT: Task parked - not merged (tests failed; branch kept for audit).\n",
+      "evidence": {
+        "tests": "fail",
+        "verify": "fail",
+        "first_assertion": "AssertionError: read_expenses() returned 0 rows, expected 3"
+      }
+    },
+    {
+      "attempt": 2,
+      "summary": "Fleet run N4-RIG — 1 task(s):\n- storage-module: processed\n    RESULT: Task parked - not merged (tests failed; branch kept for audit).\n",
+      "evidence": {
+        "tests": "fail",
+        "verify": "fail",
+        "first_assertion": "AssertionError: read_expenses() returned 0 rows, expected 3"
+      }
+    },
+    {
+      "attempt": 3,
+      "summary": "Fleet run N4-RIG — 1 task(s):\n- storage-module: processed\n    RESULT: Task parked - not merged (tests failed; branch kept for audit).\n",
+      "evidence": {
+        "tests": "fail",
+        "verify": "fail",
+        "first_assertion": "AssertionError: read_expenses() returned 0 rows, expected 3"
+      }
+    }
+  ]
+}

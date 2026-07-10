@@ -37,10 +37,14 @@
 > nothing about them. They are now folded into the standing gate so a green run is real coverage. The
 > default `pytest` marker filter (`addopts`) now also deselects `hardware` + `winui` (matching the marker
 > docs), so the GPU boot-smoke (#619 real-model tier), the GUI harness (#621), and the socket E2E (`slow`)
-> stay dev-machine-only. **Still outside the gate:** `tools/tests` (4 pre-existing collection errors,
-> #626) + the benchmark dirs (`tests/pa_quality_benchmark`, `tests/substrate_benchmark`) — excluded from
-> the explicit gate paths until #626 is fixed, after which a bare `pytest` can become the gate. Treat this
-> scope as the authority; the named-scope rows above await a re-measure pass.
+> stay dev-machine-only. **Still outside the gate:** the benchmark dirs (`tests/pa_quality_benchmark`,
+> `tests/substrate_benchmark`) — excluded from the explicit gate paths. (`tools/tests` was REMOVED
+> 2026-07-04, closing #626: its 4 collection errors were stale orphans of the platform-separation
+> extraction — the modules they import (`tools._project_context`, `tools._vikunja_client`) and the
+> maintained twin copies of all 6 test files live in devplatform, where the suite runs green (85 passed,
+> 2026-07-04) against the real modules. With the orphans gone, full-suite collection is clean and a bare
+> `pytest` becoming the gate is unblocked.) Treat this scope as the authority; the named-scope rows above
+> await a re-measure pass.
 
 ---
 

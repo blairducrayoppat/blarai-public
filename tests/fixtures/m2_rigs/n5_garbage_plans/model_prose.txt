@@ -1,0 +1,9 @@
+Sure! I'd be happy to help you plan this project. Rig N5 (plan §9.3 / W1-W2
+surface): a 14B reply that contains NO parseable JSON array at all — the
+deterministic parser must yield zero candidates and the dispatch must fall
+back to a single validated task, never crash and never produce zero work.
+
+First, we should think carefully about the storage layer. Then the add
+command would be a natural second step, and finally the list command brings
+it all together. Let me know if you would like me to elaborate on any of
+these steps before we begin!

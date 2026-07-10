@@ -300,8 +300,8 @@ class GenerationConfig:
     only affects ``do_sample=True`` runs, so the greedy production default is
     unchanged. Set via ``[generation].min_p`` to A/B answer quality (Session 2)."""
 
-    tool_call_grammar: bool = True
-    """#718 — grammar-constrained tool calls. When True (default) and the
+    tool_call_grammar: bool = False
+    """#718 — grammar-constrained tool calls. When True and the
     installed OpenVINO GenAI exposes ``StructuredOutputConfig`` /
     ``StructuralTagsConfig``, generation carries a TRIGGERED xgrammar
     constraint: free text is unaffected, but the moment the model emits the
@@ -313,7 +313,18 @@ class GenerationConfig:
     Fail-soft: an older GenAI build without the API, or a construction error,
     logs once and generates unconstrained — parse-time schema validation in
     ``tools.parse_tool_call`` remains the guard. Set via
-    ``[generation].tool_call_grammar``."""
+    ``[generation].tool_call_grammar``.
+
+    Default False (#748): the grammar is OPT-IN — only the conversational
+    turn path, which resolves the TOML knob, ever arms it. The prior True
+    default silently armed every OTHER ``GenerationConfig()`` construction
+    (the #670 PLAN call, KV-warm prefills, the websearch loop) even while
+    the production TOML said off after the #725 live crash — and the PLAN
+    call deterministically hit that same xgrammar stop-token crash
+    (``grammar_matcher.cc:627``), came back as a fail-closed EMPTY string,
+    and silently degraded every multi-task plan to the single-task fallback
+    (the M2 live-verify blocker, #748). A crash-prone constraint must never
+    be armed by accident of a default."""
 
 
 # ---------------------------------------------------------------------------
@@ -849,6 +860,7 @@ class OrchestratorGPUInference:
         config: GenerationConfig | None = None,
         response_depth_mode: str = "standard",
         stream_callback: Callable[[str], bool] | None = None,
+        system_prompt: str | None = None,
     ) -> GenerationResult:
         """High-level text generation: tokenize → generate → decode.
 
@@ -862,6 +874,12 @@ class OrchestratorGPUInference:
             session_id: Session ID for KV-cache warm/cold tracking.
             config: Generation parameters.
             response_depth_mode: Verbosity mode: concise, standard, detailed.
+            system_prompt: Optional override for the conversational system
+                prompt (#748) — internal STRUCTURAL emissions (the #670 PLAN
+                sequence) must not ride the tool-advertising persona, which
+                live-baited the 14B into answering the decompose request with
+                a ``<tool_call>`` instead of the JSON array. ``None`` keeps
+                today's conversational prompt for every other caller.
 
         Returns:
             GenerationResult with decoded ``text`` field.
@@ -881,6 +899,7 @@ class OrchestratorGPUInference:
         formatted_prompt = self._format_chat_prompt(
             prompt,
             response_depth_mode=response_depth_mode,
+            system_prompt=system_prompt,
         )
 
         try:
@@ -904,6 +923,7 @@ class OrchestratorGPUInference:
         self,
         user_prompt: str,
         response_depth_mode: str = "standard",
+        system_prompt: str | None = None,
     ) -> str:
         """Wrap a raw user prompt in the model's chat template.
 
@@ -912,13 +932,18 @@ class OrchestratorGPUInference:
         a manual Qwen ChatML format if the tokenizer method is absent.
 
         The system prompt ensures English output from multilingual models.
+        ``system_prompt`` overrides the conversational default for internal
+        structural emissions (#748); ``None`` keeps today's behavior.
         """
         effective_user_prompt = self._augment_user_prompt_for_depth(
             user_prompt,
             response_depth_mode=response_depth_mode,
         )
+        effective_system = (
+            system_prompt if system_prompt is not None else _DEFAULT_SYSTEM_PROMPT
+        )
         messages = [
-            {"role": "system", "content": _DEFAULT_SYSTEM_PROMPT},
+            {"role": "system", "content": effective_system},
             {"role": "user", "content": effective_user_prompt},
         ]
 
@@ -934,7 +959,7 @@ class OrchestratorGPUInference:
 
         # Manual ChatML fallback (Qwen format)
         return (
-            f"<|im_start|>system\n{_DEFAULT_SYSTEM_PROMPT}<|im_end|>\n"
+            f"<|im_start|>system\n{effective_system}<|im_end|>\n"
             f"<|im_start|>user\n{effective_user_prompt}<|im_end|>\n"
             f"<|im_start|>assistant\n"
         )
@@ -1209,6 +1234,23 @@ class OrchestratorGPUInference:
             if not output_text and streamed_chunks:
                 output_text = "".join(streamed_chunks)
 
+            # #748 diagnostic (env-gated; zero-cost unset): capture the RAW decoded
+            # output BEFORE the ADR-012 think-strip below — an unclosed <think>
+            # overflow is deleted ENTIRELY by that strip, indistinguishable upstream
+            # from an empty generation. Same dump file the decompose layer writes;
+            # this exact dump distinguished the #748 mechanism stack live.
+            try:
+                import os as _os
+                _dbg = _os.environ.get("BLARAI_DECOMPOSE_DEBUG")
+                if _dbg:
+                    with open(_dbg, "a", encoding="utf-8") as _f:
+                        _f.write(
+                            f"\n=== raw model output PRE-think-strip (len={len(output_text)}, "
+                            f"prompt_tail={prompt[-160:]!r}) ===\n{output_text}\n"
+                        )
+            except Exception:
+                pass
+
             # ADR-012 §2.4: Strip thinking blocks — user never sees internal reasoning.
             # Handles both complete blocks and unclosed trailing blocks.
             output_text = re.sub(
@@ -1218,6 +1260,18 @@ class OrchestratorGPUInference:
                 flags=re.DOTALL,
             ).strip()
         except Exception as exc:  # noqa: BLE001
+            # #748 diagnostic (env-gated; zero-cost unset): a generation exception is
+            # converted to a fail-closed EMPTY result whose .error callers may not
+            # read — make it visible in the dump before it vanishes (this is how the
+            # swallowed #725 xgrammar crash was finally seen).
+            try:
+                import os as _os
+                _dbg = _os.environ.get("BLARAI_DECOMPOSE_DEBUG")
+                if _dbg:
+                    with open(_dbg, "a", encoding="utf-8") as _f:
+                        _f.write(f"\n=== GENERATION EXCEPTION (pre-fail-closed): {exc!r} ===\n")
+            except Exception:
+                pass
             return self._fail_closed(f"Generation error — Fail-Closed: {exc}")
 
         t_end = time.perf_counter()

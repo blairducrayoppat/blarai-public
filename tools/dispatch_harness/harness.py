@@ -30,6 +30,7 @@ Two modes:
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import time
 from dataclasses import dataclass
@@ -73,10 +74,18 @@ class DispatchHarness:
     session_id: str = "harness"
     default_clarify_answer: str = "1"
     dry_run: bool = False
-    # Monitoring knobs (defaults match the production swap_run_budget_s ceiling).
+    # #749: when True (and config.vikunja_bridge is on), run_job posts the driver's
+    # per-job outcome to the durable Vikunja ticket after adopting the scorecard.
+    # Default False. The battery keeps this OFF and owns the AUTHORITATIVE post
+    # itself (after its FALSE-DONE cross-check), so a battery job posts exactly one
+    # outcome comment — never two. A standalone/real-dispatch caller opts in.
+    report_outcomes_to_vikunja: bool = False
+    # Monitoring knobs (defaults match the production swap_run_budget_s ceiling; 10800 per #757).
     poll_interval_s: float = 5.0
-    stall_grace_s: float = 90.0
-    overall_timeout_s: float = 5400.0
+    # 90 -> 240 (2026-07-09 night B4 false-doom; family with RunMonitor.stall_grace_s —
+    # the [3/5] verify gate's 600 s budget contains legitimately CPU-quiet, log-quiet gaps).
+    stall_grace_s: float = 240.0
+    overall_timeout_s: float = 10800.0
     # Monitor injectables (tests override clock/sleep/cpu probe; dry-run uses a fast monitor).
     monitor_factory: Callable[..., RunMonitor] | None = None
     log: Callable[[str], None] = print
@@ -96,8 +105,8 @@ class DispatchHarness:
         session_id: str = "harness",
         default_clarify_answer: str = "1",
         poll_interval_s: float = 5.0,
-        stall_grace_s: float = 90.0,
-        overall_timeout_s: float = 5400.0,
+        stall_grace_s: float = 240.0,
+        overall_timeout_s: float = 10800.0,
         log: Callable[[str], None] = print,
     ) -> "DispatchHarness":
         """Build a harness over the REAL ``TransportGateway`` (LIVE mode).
@@ -369,12 +378,55 @@ class DispatchHarness:
         report.outcome = result.outcome
         report.stop_reason = result.stop_reason
         report.progress_tail = result.progress_tail
+        # #748: adopt the DRIVER's job-level verdict from the run's scorecard.json
+        # when the plan-graph driver emitted one — the report must carry the JOB
+        # truth (PARKED-HONEST/GREEN/…) first-class, not just run-health. Fail-soft:
+        # legacy runs have no scorecard and the fields stay "".
+        driver_sc: dict | None = None
+        try:
+            sc_path = self.config.runs_dir / run_id / "scorecard.json"
+            if sc_path.is_file():
+                sc = json.loads(sc_path.read_text(encoding="utf-8"))
+                if isinstance(sc, dict):
+                    driver_sc = sc
+                    report.job_verdict = str(sc.get("verdict", "") or "")
+                    report.job_attribution = str(sc.get("attribution", "") or "")
+        except Exception:  # noqa: BLE001 — a bad scorecard must not sink the report
+            pass
         report.wall_clock_s = time.monotonic() - started
+        # #749 post-adoption: publish this job's outcome to its durable Vikunja
+        # ticket (opt-in + knob-gated; the battery leaves report_outcomes_to_vikunja
+        # OFF and posts its own cross-checked verdict instead). Wholly fail-soft.
+        self._maybe_report_to_vikunja(report, driver_sc)
         self.log(
             f"[{job.repo}] done — verdict={report.verdict} outcome={report.outcome or '—'} "
-            f"({report.wall_clock_s:.0f}s)"
+            + (f"job={report.job_verdict} " if report.job_verdict else "")
+            + f"({report.wall_clock_s:.0f}s)"
         )
         return report
+
+    def _maybe_report_to_vikunja(self, report: JobReport, driver_sc: dict | None) -> None:
+        """#749: ensure-and-update this job's durable Vikunja ticket from the driver
+        scorecard. Opt-in (``report_outcomes_to_vikunja``) AND knob-gated
+        (``config.vikunja_bridge``); a no-op without a driver scorecard (no verdict
+        to report). Wholly fail-soft — the bridge swallows its own errors, and this
+        wrapper never raises into the run."""
+        if not self.report_outcomes_to_vikunja:
+            return
+        if not getattr(self.config, "vikunja_bridge", False):
+            return
+        if not driver_sc or not report.run_id:
+            return
+        try:
+            from shared.fleet import vikunja_bridge as vb
+
+            ticket_id = vb.ensure_job_ticket(
+                self.config, report.run_id, report.goal, report.repo
+            )
+            if ticket_id is not None:
+                vb.post_outcome(self.config, ticket_id, driver_sc)
+        except Exception as exc:  # noqa: BLE001 — ticket I/O never affects a run
+            self.log(f"[{report.repo}] vikunja ticket update skipped (fail-soft): {exc}")
 
     async def run_sweep(self, jobs: list[JobSpec]) -> SweepReport:
         """Drive every job in order, accumulating a :class:`SweepReport`."""

@@ -1,0 +1,29 @@
+{
+  "schema": "battery-card/v1",
+  "id": "B5",
+  "title": "habit tracker with chart (node-web, 6 units, two chains + join)",
+  "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B5",
+  "stack": "node-web",
+  "units": 6,
+  "shape": "two-chains-join",
+  "repo": "battery-b5-habit-web",
+  "sandbox_only": true,
+  "clarify_answer": "web",
+  "goal": "I want a page in my web browser where I can keep track of daily habits. I should be able to set up the habits I care about and tick each one off on the days I do it, with everything remembered between visits. Separately, it should work out my streaks and my success rate for each habit from those ticks. Then I want a simple chart showing how I have been doing over time, and one main page that brings the tick-list and the chart together.",
+  "rigs": [],
+  "expected_outcome": {
+    "must_verify_tiers": ["build", "behavior"],
+    "human_tiers_expected": ["visual"],
+    "oracle": {
+      "expected": true,
+      "ecosystem": "node",
+      "path": "tests/acceptance.job.test.mjs"
+    },
+    "allowed_terminal_verdicts": ["GREEN", "PARKED-HONEST", "RECOVERED"],
+    "target_verdict": "GREEN",
+    "min_dependency_edges": 6,
+    "expects_context_packs": true,
+    "expects_waves_gte": 3,
+    "notes": "Two chains (storage -> tick-list UI; stats -> chart) joining at the main page. Visual criteria are eyeball-tier: rendered honestly UNVERIFIED, never auto-passed."
+  }
+}

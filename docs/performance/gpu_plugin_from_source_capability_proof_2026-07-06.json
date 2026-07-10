@@ -1,0 +1,48 @@
+{
+  "benchmark": "openvino_intel_gpu_plugin_from_source_capability_proof",
+  "timestamp": "2026-07-06T16:46:06",
+  "purpose": "First proof that the OpenVINO Intel GPU plugin can be BUILT FROM SOURCE on this machine and run coherent LLM inference on the Arc 140V. Closes the gap recorded in xgrammar_stop_token_fix_verify_2026-07-05 ('GPU plugin not linked in this local checkout'), which forced that fix's verification onto CPU. Enables independent GPU validation of OpenVINO/GenAI upstream contributions (e.g. #4082 xgrammar fix GPU re-verify; persistent-KV feature #4091/Vikunja #710).",
+  "related": ["Vikunja #710 (persistent-KV upstream)", "openvinotoolkit/openvino.genai#4091", "#4082 (xgrammar fix, prior CPU-only verify)", "docs/upstream/gpu_from_source_build_plan.md"],
+  "environment": {
+    "openvino_source_commit": "e4e180d12f (build-x86_64/RelWithDebInfo, ENABLE_INTEL_GPU=ON, ENABLE_DEBUG_CAPS=ON, ENABLE_PYTHON=OFF)",
+    "openvino_runtime_version": "2026.2.0-21369-e4e180d12fa (from-source, reported by compile_tool + benchmark_genai)",
+    "openvino_genai_commit": "7dea0459 (releases/2026/2), built against the local core dev package (build-gpu, ENABLE_PYTHON=OFF, C++ samples only)",
+    "toolchain": "VS2022 BuildTools (vcvars64), CMake + Ninja",
+    "os": "Windows 11 Pro (build 26200)",
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake), 8 cores",
+    "gpu": "Intel Arc 140V (Xe2 integrated, 16GB), driver 32.0.101.8826",
+    "python_note": "GPU capability proven via the C++ path (greedy_causal_lm / benchmark_genai). A GenAI Python-bindings stack was deliberately NOT built: the local core is ENABLE_PYTHON=OFF, so a GenAI Python build would need the core's Python bindings too (or hit the release-wheel-vs-local-core ABI wall #4082 documented). The C++ proof settles the GPU capability without that; the Python stack is a scoped follow-up needing a core rebuild with Python bindings."
+  },
+  "build": {
+    "gpu_plugin": {"target": "openvino_intel_gpu_plugin", "wall_clock_min": 40, "jobs": 8, "throttle": "none (Normal priority, all cores)", "artifact": "bin/intel64/RelWithDebInfo/openvino_intel_gpu_plugin.dll (89 MB)", "registered_in_plugins_xml": true, "note": "Incremental build on the already-configured tree; oneDNN-GPU was the long pole. Watchdog: zero stalls."},
+    "genai_samples": {"targets": ["greedy_causal_lm", "benchmark_genai"], "wall_clock_min": 7, "jobs": 8, "note": "Targeted the C++ samples to sidestep the missing openvino_c.lib (core built without the C API) and the heavy opencv/image-gen deps."}
+  },
+  "models": {
+    "target": {"name": "Qwen3-0.6B", "quantization": "INT4", "dir": "models/qwen3-0.6b/openvino-int4-gpu", "format": "OpenVINO IR (GenAI-format: model + tokenizer + detokenizer)"}
+  },
+  "methodology": {
+    "compile_proof": "compile_tool -m <model.xml> -d GPU -o <blob> : proved the from-source plugin loads, enumerates the Arc 140V, and compiles the INT4 LLM for GPU (LoadNetwork 10062 ms, 377 MB blob, exit 0).",
+    "throughput_proof": "benchmark_genai -m <model_dir> -p 'The capital of France is' -d GPU -n 3 (3 iterations, 20 output tokens each).",
+    "coherence_proof": "greedy_causal_lm <model_dir> 'The capital of France is' with the sample's device flipped CPU->GPU (one-line local edit, reverted after) : produced coherent, correct text.",
+    "decode": "greedy (do_sample=false); benchmark default max_new_tokens=20"
+  },
+  "results": {
+    "capability": "PROVEN",
+    "coherence": "PASS -- greedy_causal_lm on GPU generated coherent, correct text: '<think>...France's capital is Paris... The capital of France is Paris, and that's correct...'",
+    "throughput_tokens_per_s": {"mean": 39.95, "stdev": 15.17},
+    "ttft_ms": {"mean": 52.14, "stdev": 7.16},
+    "tpot_ms_per_token": {"mean": 25.03, "stdev": 9.51},
+    "generate_time_ms": {"mean": 529.38, "stdev": 37.56},
+    "tokenization_ms": {"mean": 1.71, "stdev": 0.63},
+    "detokenization_ms": {"mean": 1.47, "stdev": 0.86},
+    "model_load_gpu_compile_ms": 10603,
+    "prompt_tokens": 5,
+    "output_tokens": 20
+  },
+  "not_measured": [
+    "Larger models on the from-source GPU plugin (only the 0.6B INT4 draft was exercised)",
+    "Co-resident cost (14B + this build), prefill-length sweep, prefix-caching",
+    "A comparison of from-source-GPU throughput vs the release-wheel GPU throughput (sanity cross-check deferred)",
+    "GenAI Python-bindings-on-GPU (scoped follow-up; C++ path used for this proof)"
+  ]
+}

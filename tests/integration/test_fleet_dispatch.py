@@ -85,6 +85,27 @@ def test_validate_repo_refuses_blarai_component(tmp_path):
     assert err and "forbidden" in err
 
 
+def test_validate_repo_refuses_lowercase_blarai_component(tmp_path):
+    # #740 H5: the forbidden-root NAME refusal must be case-INSENSITIVE (defense-in-depth;
+    # on Windows 'blarai' and 'BlarAI' are the same dir). The old case-sensitive check
+    # accepted a lowercase spelling nested under projects_dir (containment held, but the
+    # name refusal missed) — this reproduces that miss and locks the casefold fix.
+    cfg = _cfg(tmp_path)
+    bad = cfg.projects_dir / "blarai" / "x"
+    (bad / ".git").mkdir(parents=True)
+    err = validate_repo(bad, cfg.projects_dir)
+    assert err and "forbidden" in err
+
+
+def test_validate_repo_refuses_mixedcase_openclaw_component(tmp_path):
+    # #740 H5: '.OpenClaw' must refuse as readily as '.openclaw'.
+    cfg = _cfg(tmp_path)
+    bad = cfg.projects_dir / ".OpenClaw" / "x"
+    (bad / ".git").mkdir(parents=True)
+    err = validate_repo(bad, cfg.projects_dir)
+    assert err and "forbidden" in err
+
+
 # ---- enqueue (mocked subprocess) ------------------------------------------
 
 
@@ -198,6 +219,18 @@ def test_classify_result_forms():
     assert _classify_result("RESULT: Nothing to merge.") == "NOTHING"
     assert _classify_result("RESULT: NOT merged. parked on branch") == "PARKED"
     assert _classify_result("RESULT: MERGED into your project") == "MERGED"
+
+
+def test_classify_result_timed_out_is_timeout():
+    # #757 honest labeling: a tree-killed task writes an explicit TIMED OUT detail; the
+    # classifier must surface it as TIMEOUT (not UNKNOWN) so /dispatch status and the
+    # cumulative-SUMMARY round-trip stay honest.
+    assert _classify_result(
+        "RESULT: TIMED OUT - the overall run budget elapsed mid-task") == "TIMEOUT"
+    assert _classify_result(
+        "RESULT: TIMED OUT - per-task ceiling (14400s) elapsed") == "TIMEOUT"
+    # The existing vocab is untouched by the new branch (#686 byte-shape caution).
+    assert _classify_result("RESULT: something else entirely") == "UNKNOWN"
 
 
 def test_read_summary_reports_outcomes(tmp_path):

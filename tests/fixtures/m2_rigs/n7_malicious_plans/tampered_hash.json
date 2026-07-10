@@ -1,0 +1,21 @@
+{
+  "rig": "N7",
+  "surface": "plan §9.3 N7 / §10 S1: a well-formed plan whose body was edited AFTER the hash was set (on-disk tamper between write and read) — load-time re-validation + the plan_hash check must catch the mismatch and refuse/park, never execute the tampered body",
+  "schema": "jobplan/v1",
+  "plan_id": "n7-tampered-hash",
+  "goal": "a plan whose goal text was altered after the plan_hash was computed",
+  "repo": "C:/Users/mrbla/projects/battery-n7-tampered",
+  "tasks": [
+    {
+      "id": "storage-module",
+      "prompt": "build storage — but the goal above was tampered after hashing",
+      "depends_on": [],
+      "contract": {"creates": ["src/storage.py"], "exports": ["load()"], "notes": ""},
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [{"after_wave": 1, "status": "pending"}],
+  "job_acceptance": {"criteria": [], "oracle_path": "tests/test_job_acceptance.py", "status": "pending"},
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+}

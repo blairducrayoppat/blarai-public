@@ -17,6 +17,7 @@ verdict (which fails both, on purpose).
 | `pa_classification` | PA verdicts (ALLOW/DENY/ESCALATE) over golden CARs. Deterministic-rule cases run the REAL pre-filter -> rule engine -> decision matrix (mocked-ALLOW GPU so rules stay non-appealable). `mode: "model"` cases are the ISS-3 territory — nuanced CARs no rule catches — and need the real Qwen3-14B on the Arc 140V. | Only `mode: "model"` cases |
 | `tool_calling` | Parse fidelity (`tools.parse_tool_call`), allowlist enforcement (`pgov.TOOL_CALL_ALLOWLIST`), and dispatch outcomes through the REAL registry (`tools.execute`, SAFE-tier only), including adversarial/malformed/injection-shaped outputs. | No |
 | `governance` | Deterministic governance verdicts: `tools.risk_tier` fail-closed tiers, the Layer-3 untrusted-content lock predicate, `DeterministicPolicyChecker.check` (RULE 1-10, welded air-gap), the #570 dispatch-adjudication seam, and the #639 no-verifier ESCALATE->DENY default. | No |
+| `answer_quality` | The AO's free-text answers, scored AS THE USER SEES THEM (production think-strip imported from `entrypoint._strip_hidden_blocks`) against a deterministic rubric (`evals/rubric.py`): identity, stable facts, instruction-following format, think-tag/system-prompt/datamark leakage, grounded-context fidelity (chunks injected through the REAL `ContextManager` grounding path), injection resistance (embedded-instruction canaries), and uncertainty honesty. `mode: "offline"` cases score committed fixture responses — they regression-lock the RUBRIC and pin exemplar answers, not the live model; `mode: "model"` cases drive the real Qwen3-14B AO generation path on the Arc 140V. | Only `mode: "model"` cases |
 
 ## Running
 
@@ -37,11 +38,13 @@ Model-in-the-loop cases (Arc 140V only — never in CI):
 
 ```powershell
 .venv\Scripts\python.exe -m evals.run --suite pa_classification --include-hardware
+.venv\Scripts\python.exe -m evals.run --suite answer_quality --include-hardware
 ```
 
 The standing gate exercises the deterministic suites via
-`tests/integration/test_eval_harness.py`; the hardware tier is the
-`@pytest.mark.hardware` test in the same file (deselected by default).
+`tests/integration/test_eval_harness.py` and
+`tests/integration/test_eval_answer_quality.py`; the hardware tiers are the
+`@pytest.mark.hardware` tests in those files (deselected by default).
 
 ## Baselines and regression semantics
 
@@ -72,13 +75,21 @@ their tag.
 
 ## What is NOT covered (honestly)
 
-- **AO conversational answer quality** — no golden set scores the 14B's
-  free-text answers (the websearch benchmark covers one slice; a general
-  answer-quality suite would need an LLM-judge or human rubric — out of
-  scope here).
+- **Answer fluency / helpfulness** — the `answer_quality` suite is a
+  DETERMINISTIC rubric: it measures containment, absence (leakage,
+  injection canaries), format compliance, grounding fidelity, and length —
+  NOT whether an answer is fluent, well-organised, or genuinely helpful.
+  Grading those needs a judge; the documented follow-on is a
+  local-14B-as-judge suite (the same model scoring transcripts against a
+  rubric prompt — no cloud judge under the privacy mandate). Offline cases
+  measure the rubric engine and pin exemplar answers; only `mode: "model"`
+  cases on hardware measure the live model. (The websearch benchmark
+  remains authoritative for its search-answer slice.)
 - **The full AO tool LOOP** — the harness drives parse/allowlist/tier/
-  adjudicate/execute as functions; it does not run the streaming loop in
-  `entrypoint.py` end-to-end (the AO's own tests do).
+  adjudicate/execute as functions, and `answer_quality` drives
+  `generate_text` single-shot over a `ContextManager`-composed context; it
+  does not run the streaming tool loop in `entrypoint.py` end-to-end (the
+  AO's own tests do).
 - **The Layer-3 predicate is a MIRROR** — it is inline in the AO tool loop
   and not importable; `evals/suites/governance.py:layer3_lock_decision`
   mirrors it (tier input still comes from the real `tools.risk_tier`), and

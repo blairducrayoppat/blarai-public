@@ -1,0 +1,115 @@
+{
+  "schema": "blarai-docset-manifest/v1",
+  "staged_utc": "2026-07-06T06:44:11+00:00",
+  "approval": "LA-approved 2026-07-05 (Vikunja #746/#740 \u2014 first slice: Python 3.11 + pytest + Hypothesis + MDN web + Node)",
+  "dest": "C:\\Users\\mrbla\\BlarAI\\models\\docsets",
+  "artifacts": [
+    {
+      "name": "python-3.11-official-text",
+      "url": "https://docs.python.org/3.11/archives/python-3.11.13-docs-text.zip",
+      "file": "python-3.11-docs-text.zip",
+      "sha256": "26046adae070aa48cc7a38640c0a5e06961abd34f6d3310941d1fc6e7f816ace",
+      "bytes": 3943918
+    },
+    {
+      "name": "devdocs-python-3.11-index",
+      "url": "https://documents.devdocs.io/python~3.11/index.json",
+      "file": "devdocs/python~3.11/index.json",
+      "sha256": "5303d94c0ec9351ac27c43874ea9a4acdcf1f54dac8b68ced632190adddfbec2",
+      "bytes": 1287088
+    },
+    {
+      "name": "devdocs-python-3.11-db",
+      "url": "https://documents.devdocs.io/python~3.11/db.json",
+      "file": "devdocs/python~3.11/db.json",
+      "sha256": "fc7dac82b437db1ee3434e83485fb12070c767933012391f0c5186c46659d6d3",
+      "bytes": 17729110
+    },
+    {
+      "name": "pytest-readthedocs-html",
+      "url": "https://docs.pytest.org/_/downloads/en/stable/htmlzip/",
+      "file": "pytest-docs-html.zip",
+      "sha256": "c276de41eb05862972b9590753a978384e460c3f76b283bba623a2d6cac0557b",
+      "bytes": 746011
+    },
+    {
+      "name": "devdocs-javascript-index",
+      "url": "https://documents.devdocs.io/javascript/index.json",
+      "file": "devdocs/javascript/index.json",
+      "sha256": "6583cd725e9ac56b69bacb2a4800da677b9c7b230ae25d6981b7da324597c0f6",
+      "bytes": 122416
+    },
+    {
+      "name": "devdocs-javascript-db",
+      "url": "https://documents.devdocs.io/javascript/db.json",
+      "file": "devdocs/javascript/db.json",
+      "sha256": "910a6ed51f10f656dd48d35e0e50ab68b398cd19debade57b0fe5cde15de6188",
+      "bytes": 14278590
+    },
+    {
+      "name": "devdocs-dom-index",
+      "url": "https://documents.devdocs.io/dom/index.json",
+      "file": "devdocs/dom/index.json",
+      "sha256": "8c547c181386aa284e1098fb2e46b204bf6397a150787fee426c4e2c273db246",
+      "bytes": 712505
+    },
+    {
+      "name": "devdocs-dom-db",
+      "url": "https://documents.devdocs.io/dom/db.json",
+      "file": "devdocs/dom/db.json",
+      "sha256": "d7d3e9dbd0706a172cc5417cc7e77091ed81b8ddbed81193d97b55bd112bac31",
+      "bytes": 63397971
+    },
+    {
+      "name": "devdocs-html-index",
+      "url": "https://documents.devdocs.io/html/index.json",
+      "file": "devdocs/html/index.json",
+      "sha256": "ab2c5ed475b2e3677aa88849b0188b3dc4df4d9edd739c7c817f25c28e6ccedb",
+      "bytes": 20851
+    },
+    {
+      "name": "devdocs-html-db",
+      "url": "https://documents.devdocs.io/html/db.json",
+      "file": "devdocs/html/db.json",
+      "sha256": "5008fc0f8a95c497137f0bc5fe483f484b765764faf1394b58eb0ce9fd71850c",
+      "bytes": 5529381
+    },
+    {
+      "name": "devdocs-css-index",
+      "url": "https://documents.devdocs.io/css/index.json",
+      "file": "devdocs/css/index.json",
+      "sha256": "eba6e858010866af1292ef0fbc52989b3cd0398e8ec4469746d1e98b4755128f",
+      "bytes": 89241
+    },
+    {
+      "name": "devdocs-css-db",
+      "url": "https://documents.devdocs.io/css/db.json",
+      "file": "devdocs/css/db.json",
+      "sha256": "cd1f9ab152438fd324d278db147ac3170644b25d9b4b1e5f96a738d95dac9b08",
+      "bytes": 19009926
+    },
+    {
+      "name": "devdocs-node-index",
+      "url": "https://documents.devdocs.io/node/index.json",
+      "file": "devdocs/node/index.json",
+      "sha256": "42995e78a635c655c721c1451ec25c546df3139a825d5af579fb8e80a325dc63",
+      "bytes": 383516
+    },
+    {
+      "name": "devdocs-node-db",
+      "url": "https://documents.devdocs.io/node/db.json",
+      "file": "devdocs/node/db.json",
+      "sha256": "9b7f85b2a6d1e99c8c982dd13185a67eb6fd4dc0e080a157f623543479f07f08",
+      "bytes": 6856259
+    },
+    {
+      "name": "hypothesis-readthedocs-html",
+      "url": "https://hypothesis.readthedocs.io/_/downloads/en/latest/htmlzip/",
+      "file": "hypothesis-docs-html.zip",
+      "sha256": "d918fd731cfe3e3a0ab8a318b755482b0ebee4fcdceacd0c69585958b530ba4c",
+      "bytes": 474234
+    }
+  ],
+  "misses": [],
+  "total_bytes": 134581017
+}

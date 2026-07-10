@@ -1,0 +1,41 @@
+{
+  "model": "qwen3.6-27b-int4-ov",
+  "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "conditions": {
+    "A_plain": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_200": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in "
+    },
+    "B_no_think_switch": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_200": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - Question: \"How many bytes are in one kilobyte?\"\n   - Constraint: \"/no_think\" (This means I should provide a direct, concise answer without "
+    },
+    "C_enable_thinking_control": {
+      "attempted": [
+        "generate(enable_thinking=False): ACCEPTED"
+      ],
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_200": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in "
+    }
+  },
+  "introspection": {
+    "pipe": [
+      "finish_chat",
+      "set_chat_template",
+      "start_chat"
+    ],
+    "generation_config_think": [],
+    "tokenizer": [
+      "apply_chat_template",
+      "chat_template",
+      "get_original_chat_template",
+      "set_chat_template"
+    ]
+  }
+}

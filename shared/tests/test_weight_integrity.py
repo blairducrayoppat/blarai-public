@@ -7,7 +7,8 @@ against the Known-Good Manifest pattern.
 Test groups:
   A. compute_sha256 (3 tests) — hash correctness on real temp files.
   B. load_manifest (6 tests) — JSON parsing, error handling.
-  C. verify_weight_integrity (5 tests) — end-to-end verification.
+  C. verify_weight_integrity (6 tests) — end-to-end verification, incl. the
+     #571 require_signed per-request fail-closed lock.
 """
 
 from __future__ import annotations
@@ -232,6 +233,37 @@ class TestVerifyWeightIntegrity:
                 result = verify_weight_integrity(model_path, manifest_path)
                 assert result.verified is False
                 assert "not found in manifest" in result.error.lower()
+            finally:
+                os.unlink(manifest_path)
+        finally:
+            os.unlink(model_path)
+
+    def test_require_signed_fails_closed_on_unsigned_manifest(self) -> None:
+        """#571: require_signed=True with no .sig present → verified=False even
+        though the digest matches. The per-request re-hash must honor the
+        signature requirement (production posture), not only the boot gate — so
+        an attacker who rewrites the weight AND manifest.json at runtime (but
+        cannot forge the TPM signature) is still denied."""
+        content = b"valid model weights for PA classifier"
+        model_path = _write_temp(content, suffix=".bin")
+        try:
+            expected_digest = hashlib.sha256(content).hexdigest()
+            manifest_path = _write_manifest(
+                {Path(model_path).name: expected_digest}
+            )
+            try:
+                # Baseline: the SAME inputs verify with require_signed=False
+                # (default) — proving the digest itself matches.
+                baseline = verify_weight_integrity(model_path, manifest_path)
+                assert baseline.verified is True
+                # With require_signed=True and no signature file present, the
+                # signature-checked loader fails closed (no TPM call needed —
+                # a missing .sig under require_signed is a hard deny).
+                result = verify_weight_integrity(
+                    model_path, manifest_path, require_signed=True
+                )
+                assert result.verified is False
+                assert result.error is not None
             finally:
                 os.unlink(manifest_path)
         finally:

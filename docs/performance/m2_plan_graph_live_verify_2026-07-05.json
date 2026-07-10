@@ -1,0 +1,59 @@
+{
+  "date": "2026-07-05",
+  "title": "M2 plan-graph live-verify — first dependency-graph dispatches on Arc 140V (Vikunja #740/#748)",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2, integrated)",
+    "ram": "32 GB LPDDR5X shared (31.323 GB usable)",
+    "gpu_driver": "32.0.101.8826"
+  },
+  "software": {
+    "openvino": "2026.2.1-21919-ede283a88e3",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a",
+    "planner_model": "Qwen3-14B INT4 (embedded LLMPipeline, speculative decoding via Qwen3-0.6B pruned-6L INT8 draft)",
+    "coder_model": "Qwen3-Coder-30B-A3B INT4 (OVMS :8000 behind the :8099 repair proxy, continuous batching, best-of-N C=3)"
+  },
+  "methodology": "tools.dispatch_harness one-goal dispatch (auto-approve) of a 3-part python-cli goal (B1-shaped: expense tracker - storage/add/list) through the M2 plan-graph path (plan_graph=true): 14B decomposes to a dependency graph (greedy, deterministic), ruler validates + right-sizes, swap driver executes waves serially (per-task fleet gate + best-of-3), per-wave integration gate on the integrated main, plan-time job oracle grades the final tree. Sandbox repos under C:/Users/mrbla/projects (m2-verify, m2-verify2). Times from the harness wall-clock + driver scorecard.",
+  "runs": [
+    {
+      "run_id": "20260705-214803-bd",
+      "label": "run 4 - first real graph execution (pre oracle-seeding)",
+      "decompose": "raw_len=2168, 8 candidates parsed (post #748 JSON repair), ruler right-sized to 6 tasks",
+      "graph": "6 tasks / 4 waves: storage -> {add, list, test-storage} -> main -> acceptance-tests (diamond + fan-in)",
+      "waves_gated": "4/4 integration gates PASSED (verify + tests on integrated main)",
+      "context_packs": "assembled + logged + consumed for every dependent task; as-built AST signatures corrected a contract divergence (planned function API vs built class API)",
+      "job_oracle": "FAILED honestly - oracle import layout unreachable (2 stacked defects: bare-pytest sys.path + oracle never shown to the coder)",
+      "job_verdict": "PARKED-HONEST (attribution BUILD)",
+      "wall_clock_s": 2517,
+      "false_done": false
+    },
+    {
+      "run_id": "20260705-224742-bd",
+      "label": "run 5 - fresh sandbox, oracle seeded (fix verification)",
+      "decompose": "byte-identical raw (greedy determinism), 8 candidates, 6-task plan",
+      "waves_gated": "4/4 integration gates PASSED; the seeded guard-wrapped oracle SKIPPED in every gate (no false red)",
+      "seeding": "PROVEN - oracle committed to the sandbox main pre-wave-1 (0a8d595), job-spec sentence in every task prompt, imports RESOLVED at grade time",
+      "job_oracle": "6/7 tests PASSED on the integrated tree (all behavioral criteria green); single red = the launch-smoke test called main() in-process and pytest's argv leaked into the app's parser (template hardened + regression-locked post-run)",
+      "job_verdict": "PARKED-HONEST (attribution BUILD); the report layer carried job_verdict first-class (the run-4 report defect fix, verified live)",
+      "wall_clock_s": 3891,
+      "false_done": false
+    }
+  ],
+  "diagnostics_fixed": [
+    "#748 defect 1: PLAN GenerationConfig() inherited tool_call_grammar=True (dataclass default) while the TOML said OFF post-#725 - xgrammar grammar_matcher.cc:627 stop-token crash on EVERY plan generation, swallowed to an empty string by the fail-closed path (error only in the unread .error field)",
+    "#748 defect 2: PLAN rode the conversational system prompt - the tool directive baited a <tool_call>search_knowledge</tool_call> answer to the decompose request; stripped to empty",
+    "#748 defect 3: the 14B's otherwise-perfect 8-task graph closed with ']]' instead of '}]' - json.loads failed; fixed with a bounded deterministic bracket repair",
+    "run-4 defect 4: job-oracle runner used the bare pytest CLI (tests/-homed oracle cannot import root modules); fixed with python -m pytest",
+    "run-4 defect 5: the job oracle was never seeded into the repo (the coder never saw the spec whose imports define the layout); fixed by seed-before-wave-1 with a module-level pytest.skip guard (gates skip it; grading overwrites with plan bytes)",
+    "run-5 defect 6: the oracle template's launch-smoke tests call main() in-process without argv isolation - pytest's own flags leak into the app's parser, a structurally unfair red for every argv-reading CLI; template now instructs sys.argv isolation (locked)",
+    "run-4 defect 7 (report surface): the harness report said outcome=MERGED/verdict=COMPLETE/ok=true for a PARKED-HONEST job (run-health semantics misread as job success); the report now adopts the driver scorecard's job_verdict/job_attribution first-class (verified live on run 5)"
+  ],
+  "not_measured": [
+    "thermal state (evening runs, no cold/warm control)",
+    "per-task token throughput (fleet-level timing only)",
+    "best-of-N candidate distribution per task (fleet logs carry it; not aggregated here)",
+    "14B plan-generation latency in isolation (PLAN sequence timed only end-to-end inside the harness)",
+    "node-stack plan-graph jobs (python-cli only tonight; node oracle seeding not yet designed)"
+  ],
+  "notes": "The zero-FALSE-DONE invariant held live in both runs: run 4 reported PARKED-HONEST with all 6 tasks merged and 4/4 wave gates green (unit-green != job-green rendered honestly). Greedy decompose is byte-reproducible across runs (identical raw_len/candidates). Wall-clock ~42 min for a 6-task graph job is consistent with the program plan's 1-3 h honest estimate for 5-task jobs."
+}

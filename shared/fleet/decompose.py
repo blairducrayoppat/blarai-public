@@ -69,12 +69,15 @@ GPU; the live wiring passes the AO's ``generate_text``. DORMANT until enabled.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
 from shared.fleet.dispatch import slugify_task, validate_repo
+
+logger = logging.getLogger(__name__)
 
 #: Hard cap on tasks from one idea (a swap runs them all in one 30B residency).
 DEFAULT_MAX_TASKS = 8
@@ -95,11 +98,95 @@ _OVERSIZE_MIN_MARKERS = 2
 #: then enforces the real ``max_tasks`` cap on the survivors.
 _PARSE_CEILING = 32
 
+# ---------------------------------------------------------------------------
+# M2 W2 (#740) — graph-field elicitation caps + tolerant cleaning
+# ---------------------------------------------------------------------------
+# The SAME decompose call now ALSO elicits ``depends_on`` + ``contract`` per task
+# (additive JSON fields; plan §5 W2 — no 7th structured call). These constants are
+# the SSOT for the contract bounds: ``plan_graph``'s ruler imports them, and the
+# grammar schema below embeds them, so cleaning, validation, and constrained
+# emission can never drift apart. Contract text is the ONLY plan-sourced
+# human-language a context pack may carry (§10 S2), hence the hard caps and the
+# control-char strip (an escape-evasion surface once composed into prompts/logs).
+
+#: Pinned jobplan/v1 bound: ``contract.notes`` <= 280 chars.
+CONTRACT_NOTES_MAX = 280
+#: Defensive bounds beyond the pinned minimum: entries per contract list / chars per entry.
+CONTRACT_LIST_MAX = 32
+CONTRACT_ITEM_MAX = 256
+
+#: Control characters (incl. newlines) stripped from contract strings.
+_CTRL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def clean_str_list(raw: object, *, max_items: int, max_len: int) -> list[str]:
+    """Tolerant string-list cleaning: non-list ⇒ ``[]``; non-str/empty items dropped;
+    control chars stripped; item length and item count capped. Order-preserving,
+    deduped. Shared by this module's contract parse and ``plan_graph``'s ruler."""
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        cleaned = _CTRL_RE.sub("", item).strip()[:max_len]
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            out.append(cleaned)
+        if len(out) >= max_items:
+            break
+    return out
+
+
+def clean_contract_fields(raw: object) -> dict:
+    """Normalize a raw contract into ``{"creates", "exports", "notes"}`` (possibly all
+    empty). Non-dict input ⇒ the all-empty shape — a malformed contract must NEVER
+    block a task (pinned invariant). Newlines in ``notes`` collapse to spaces (a
+    one-line interface card, not documentation)."""
+    if not isinstance(raw, dict):
+        return {"creates": [], "exports": [], "notes": ""}
+    notes_raw = raw.get("notes", "")
+    notes = (
+        _CTRL_RE.sub(" ", notes_raw).strip()[:CONTRACT_NOTES_MAX]
+        if isinstance(notes_raw, str) else ""
+    )
+    return {
+        "creates": clean_str_list(raw.get("creates"), max_items=CONTRACT_LIST_MAX,
+                                  max_len=CONTRACT_ITEM_MAX),
+        "exports": clean_str_list(raw.get("exports"), max_items=CONTRACT_LIST_MAX,
+                                  max_len=CONTRACT_ITEM_MAX),
+        "notes": notes,
+    }
+
+
+def _clean_depends_on(raw: object) -> "list[str] | None":
+    """Tolerant ``depends_on`` cleaning. ``None`` ⇒ the field was absent or garbage
+    (the key is OMITTED from the task — the task does not vote for graph-awareness,
+    so an all-omitted plan degrades to today's serial chain at plan build). A valid
+    list ⇒ slugified, deduped refs (possibly ``[]`` — an EXPLICIT independent root).
+    A ref with no alphanumerics is dropped rather than slugified: ``slugify_task``'s
+    ``"task"`` fallback would otherwise INVENT a phantom ref."""
+    if not isinstance(raw, list):
+        return None
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str) or not any(ch.isalnum() for ch in item):
+            continue
+        slug = slugify_task(item)
+        if slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return out
+
 _DECOMPOSE_TEMPLATE = (
     "You are decomposing a software change request into the FEWEST coherent coding "
     "tasks for an automated coding agent. Return ONLY a JSON array (no prose) of at "
     'most {max_tasks} objects, each {{"task": "<kebab-case-slug>", "prompt": "<one '
-    'precise instruction>"}}.\n\n'
+    'precise instruction>", "depends_on": ["<task slug this builds on>"], '
+    '"contract": {{"creates": ["<relative file path>"], "exports": ["<public '
+    'signature>"], "notes": "<data shapes, one short line>"}}}}.\n\n'
     "RULES — fewest coherent tasks, never atomic splits:\n"
     "- Prefer ONE task. Split ONLY when the request genuinely spans INDEPENDENT units "
     "of work (e.g. separate features, separate commands a user invokes).\n"
@@ -122,6 +209,15 @@ _DECOMPOSE_TEMPLATE = (
     "(This does NOT loosen the rules above: a single function or a single small screen is "
     "still ONE task — this only forbids the opposite error of cramming many independent parts "
     "into one run.)\n"
+    "- DISTINCT-OUTPUT PIPELINE: a goal that asks for SEVERAL DISTINCT OUTPUTS, or a PIPELINE "
+    "of distinct stages (first produce A; then from A produce B and C; then combine them into "
+    "D), is MULTIPLE tasks — ONE per distinct output or stage — even when it is described as a "
+    "small 'toolkit', 'utility', 'helper', 'library', or 'script'. Diminutive words ('little', "
+    "'simple', 'tidy', 'just', 'quick', 'basic') describe TONE, not size: COUNT THE DISTINCT "
+    "OUTPUTS/STAGES the goal names, never the adjectives. (Still bounded by the rules above: a "
+    "SINGLE stage or a single computation is ONE task — this catches only the opposite error "
+    "of collapsing a genuinely multi-stage pipeline into one lump because it was asked for "
+    "modestly.)\n"
     "- The PRIMARY functionality the user asks for must ALWAYS be built — there must "
     "be a task that produces it. When a goal names a core deliverable (a calculator, a "
     "parser, a game) alongside decorative or secondary aspects (theming, a custom window "
@@ -130,11 +226,106 @@ _DECOMPOSE_TEMPLATE = (
     "must include building the calculator's actual arithmetic/operations, not only the "
     "rocket visuals.\n"
     "- Each task's prompt must be self-contained and name a single coherent deliverable.\n\n"
+    # M2 W2 (#740): dependency + interface elicitation on the SAME call — additive JSON
+    # fields the deterministic plan ruler validates (absent/garbage fields degrade to
+    # today's serial chain; the model's graph is a PROPOSAL, never an order).
+    "GRAPH FIELDS — dependencies and interfaces, for the automated scheduler:\n"
+    '- "depends_on": the "task" slugs (from THIS array ONLY) of the tasks this one '
+    "builds DIRECTLY on; [] for an independent task. Never reference a slug that is "
+    "not in the array.\n"
+    '- "contract": the interface this task will create — "creates": the relative file '
+    'paths it adds; "exports": the public function/class signatures other tasks may '
+    'import; "notes": ONE short line on data shapes (under 280 characters). Use empty '
+    "values when unsure — never invent.\n\n"
+    # A shape-only few-shot pair: the pipeline case (distinct outputs -> several tasks, the
+    # #740 M2 under-decomposition fix) beside the coherent-small-app case (one task) so the
+    # model sees BOTH bounds. The 'little toolkit ... report' example directly counters the
+    # diminutive-framing under-scope that collapsed a 4-stage text-stats pipeline to 1 task.
+    "EXAMPLES (shape only -- mirror the COUNT, not the wording):\n"
+    "- 'a little toolkit that reads text: break it into words, then work out how often each "
+    "word appears AND which neighbouring word-pairs occur most, then pull both into one tidy "
+    "report' -> FOUR tasks: tokenize-text; count-word-frequencies; count-bigram-frequencies; "
+    "compose-combined-report (four distinct outputs; 'little'/'tidy' do not make them one).\n"
+    "- 'a rocket-themed calculator with add, subtract, and clear buttons' -> ONE task (a "
+    "single small screen and the behavior of the controls on it; the theme is not a unit).\n\n"
     "Request:\n{idea}\n"
+    # /no_think — the MAIN decompose is a STRUCTURAL JSON enumeration (same class as
+    # _SPLIT_TEMPLATE below). With W2's bigger per-task shape (depends_on + contract), a
+    # <think> block overflows _PLAN_MAX_NEW_TOKENS and TRUNCATES the JSON array → parse fails
+    # → minimal single-task fallback. This was the M2 live-verify failure (2026-07-05, #740):
+    # a 3-task goal fell back to a 1-task plan. Suppress thinking here too (ADR-012 §2.4).
+    "/no_think\n"
 )
 
 # Pull the first JSON array out of a model response (it may wrap it in prose/fences).
 _JSON_ARRAY_RE = re.compile(r"\[.*\]", re.DOTALL)
+
+
+def _repair_json_array(span: str) -> str:
+    """Bounded deterministic repair for ALMOST-valid model JSON (#748 live-verify:
+    the 14B emitted a perfect 8-task dependency graph and closed the final task
+    object with ``]]`` instead of ``}]`` — one wrong closer at the tail cost the
+    entire graph and every plan collapsed to the minimal single-task fallback).
+
+    A string-aware bracket-stack walk over the extracted array span:
+      * a MISMATCHED closer auto-closes the scopes the model forgot (``]`` while a
+        ``{`` is open ⇒ insert ``}`` first);
+      * a STRAY closer with no matching opener is dropped;
+      * scopes (and an unterminated string) still open at EOF are closed;
+      * a dangling comma before any inserted closer is removed.
+
+    Pure and deterministic — model proposes, THIS disposes. Only ever invoked
+    AFTER ``json.loads`` failed, so valid output is never touched; if the repair
+    still does not parse, the caller keeps today's ``[]``-fallback semantics."""
+
+    def _drop_dangling_comma(buf: list[str]) -> None:
+        while buf and buf[-1] in " \t\r\n":
+            buf.pop()
+        if buf and buf[-1] == ",":
+            buf.pop()
+
+    out: list[str] = []
+    stack: list[str] = []
+    in_str = False
+    esc = False
+    for ch in span:
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            continue
+        if ch in "[{":
+            stack.append(ch)
+            out.append(ch)
+            continue
+        if ch in "]}":
+            want = "[" if ch == "]" else "{"
+            while stack and stack[-1] != want:
+                opener = stack.pop()
+                _drop_dangling_comma(out)
+                out.append("]" if opener == "[" else "}")
+            if not stack:
+                continue  # stray closer — drop it
+            stack.pop()
+            _drop_dangling_comma(out)
+            out.append(ch)
+            continue
+        out.append(ch)
+    if in_str:
+        out.append('"')
+    while stack:
+        opener = stack.pop()
+        _drop_dangling_comma(out)
+        out.append("]" if opener == "[" else "}")
+    return "".join(out)
 
 #: The #691 envelope UPPER-bound "go finer" prompt — used ONLY on a single task the first pass
 #: under-split. It deliberately biases toward MORE granularity (the opposite of the decompose
@@ -147,13 +338,20 @@ _SPLIT_TEMPLATE = (
     "it into the FEWEST sequential steps that are EACH independently buildable and verifiable "
     "and each of which leaves the project in a WORKING state. Return ONLY a JSON array (no "
     'prose) of at most {max_tasks} objects, each {{"task": "<kebab-case-slug>", "prompt": "<one '
-    'precise instruction>"}}.\n\n'
+    'precise instruction>", "depends_on": ["<task slug this builds on>"], '
+    '"contract": {{"creates": ["<relative file path>"], "exports": ["<public '
+    'signature>"], "notes": "<data shapes, one short line>"}}}}.\n\n'
     "RULES:\n"
     "- Each step is ONE coherent unit — one screen, one user command, one endpoint, one service "
     "— small enough to finish and test quickly.\n"
-    "- Order them so each builds on the last (the foundational unit first).\n"
+    "- Order them so each builds on the last (the foundational unit first), and record that "
+    'order in "depends_on" (slugs from THIS array only; [] for the foundational step).\n'
     "- Do NOT split a single function or a single small screen into sub-steps, and do NOT add "
     "separate 'write tests' / 'scaffold' / 'set-up' steps (testing is handled downstream).\n"
+    "- DISTINCT data transformations or DISTINCT reported outputs ARE separate steps: "
+    "tokenizing text, computing one statistic, computing a DIFFERENT statistic, and assembling "
+    "a combined report over them are FOUR steps, not one -- even for a tool described as "
+    "'little', 'simple', or 'tidy'. Count the distinct outputs the task names, not its adjectives.\n"
     "- If the task is ALREADY a single coherent short step, return an array containing just that "
     "one task — do NOT invent splits.\n\n"
     "Task:\n{prompt}\n"
@@ -274,27 +472,54 @@ _MULTI_UNIT_RE = re.compile(r"\b(and|also|plus|then)\b|[,;]|\s/\s", re.IGNORECAS
 
 @dataclass(frozen=True)
 class DecomposeResult:
-    """Outcome of decomposition. ``tasks`` are ``{repo, task, prompt}`` dicts."""
+    """Outcome of decomposition. ``tasks`` are ``{repo, task, prompt}`` dicts, plus
+    OPTIONAL ``depends_on`` / ``contract`` keys when the model provided usable graph
+    fields (M2 W2 — absent keys keep the legacy shape byte-identical; the plan
+    builder treats an all-absent plan as today's serial chain)."""
 
     ok: bool
     tasks: list[dict] = field(default_factory=list)
     fell_back: bool = False   # True if the model output was unusable → single task
     collapsed_test_intent: bool = False  # True if the ruler dropped >=1 structural-test
     split_oversize: bool = False  # True if the #691 envelope split replaced an under-split lump
+    used_grammar: bool = False  # True if the MAIN emission ran grammar-constrained (W2)
     message: str = ""
 
 
 def _parse_candidates(text: str, *, max_tasks: int) -> list[dict]:
-    """Best-effort parse of the model output into ``[{task, prompt}]``; ``[]`` on failure."""
+    """Best-effort parse of the model output into ``[{task, prompt}]``; ``[]`` on failure.
+
+    M2 W2: ALSO carries the optional graph fields when present-and-valid — a cleaned
+    ``depends_on`` (slugified refs; an explicit ``[]`` is kept, marking a deliberate
+    independent root) and a normalized non-empty ``contract``. Absent/garbage fields
+    are simply OMITTED (tolerant — never a new failure mode; the legacy two-key shape
+    is what every pre-W2 caller still sees)."""
     if not text:
         return []
     match = _JSON_ARRAY_RE.search(text)
-    if not match:
-        return []
+    if match:
+        span = match.group(0)
+    else:
+        # #748: hard truncation can eat EVERY closing bracket, so the strict
+        # regex never matches — repair from the first opener to EOF instead of
+        # giving up (bare-token junk still fails json.loads → today's []).
+        start = text.find("[")
+        if start == -1:
+            return []
+        span = text[start:]
     try:
-        data = json.loads(match.group(0))
+        data = json.loads(span)
     except (ValueError, TypeError):
-        return []
+        # #748: one wrong closer at the tail of an otherwise-perfect graph must
+        # not cost the whole plan — try the bounded deterministic repair before
+        # giving up (repair-then-parse; still-broken keeps today's [] fallback).
+        try:
+            data = json.loads(_repair_json_array(span))
+        except (ValueError, TypeError):
+            return []
+        logger.info(
+            "decompose: JSON repair salvaged the array (span_len=%d)", len(span)
+        )
     if not isinstance(data, list):
         return []
     out: list[dict] = []
@@ -304,7 +529,15 @@ def _parse_candidates(text: str, *, max_tasks: int) -> list[dict]:
         task = str(item.get("task", "")).strip()
         prompt = str(item.get("prompt", "")).strip()
         if task and prompt:
-            out.append({"task": task, "prompt": prompt})
+            cand: dict = {"task": task, "prompt": prompt}
+            deps = _clean_depends_on(item.get("depends_on"))
+            if deps is not None:
+                cand["depends_on"] = deps
+            if isinstance(item.get("contract"), dict):
+                contract = clean_contract_fields(item["contract"])
+                if contract["creates"] or contract["exports"] or contract["notes"]:
+                    cand["contract"] = contract
+            out.append(cand)
         if len(out) >= max_tasks:
             break
     return out
@@ -517,12 +750,95 @@ def _unit_marker_count(idea: str) -> int:
     return sum(1 for _ in _MULTI_UNIT_RE.finditer(idea or ""))
 
 
+# ---------------------------------------------------------------------------
+# M2 W2 (#740) — grammar-constrained plan emission (the #718 xgrammar path)
+# ---------------------------------------------------------------------------
+
+
+def plan_emission_json_schema(*, max_tasks: int = DEFAULT_MAX_TASKS) -> dict:
+    """The JSON schema for grammar-constrained plan emission.
+
+    The #718 machinery already proves the substrate: OpenVINO GenAI
+    ``StructuredOutputConfig`` composes with speculative decoding + streaming on the
+    production pipeline shape (``gpu_inference._build_tool_call_structured_output``
+    uses its ``structural_tags_config`` face; THIS schema targets its ``json_schema``
+    face — whole-response constraint, since a plan emission IS the response, not a
+    triggered tag). The live adapter (an AO-side ``structured_generate_fn`` that sets
+    ``gen_config.structured_output_config``) is the driver wiring (Lane A2 / W8);
+    this module stays model-free. The caps mirror the cleaning constants above, so a
+    constrained emission can never exceed what the ruler would truncate anyway."""
+    contract_list = {
+        "type": "array",
+        "items": {"type": "string", "maxLength": CONTRACT_ITEM_MAX},
+        "maxItems": CONTRACT_LIST_MAX,
+    }
+    return {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": max_tasks,
+        "items": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "minLength": 1, "maxLength": 64},
+                "prompt": {"type": "string", "minLength": 1},
+                "depends_on": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 64},
+                    "maxItems": max_tasks,
+                },
+                "contract": {
+                    "type": "object",
+                    "properties": {
+                        "creates": contract_list,
+                        "exports": contract_list,
+                        "notes": {"type": "string", "maxLength": CONTRACT_NOTES_MAX},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["task", "prompt"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def _generate_plan_json(
+    prompt: str,
+    *,
+    generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None",
+    max_tasks: int,
+) -> tuple[str, bool, str]:
+    """One plan emission with the OPTIONAL grammar hook: ``(raw, used_grammar, error)``.
+
+    When *structured_generate_fn* is provided it is tried FIRST — called as
+    ``(prompt, json_schema_text)`` for a schema-constrained emission. Fail-soft,
+    never a new refusal: an exception, an empty return, or output the tolerant
+    parser cannot use falls TRANSPARENTLY back to today's free-text ``generate_fn``
+    + regex-parse path, so the hook can only ever improve parse fidelity. With no
+    hook the behavior is byte-identical to the pre-W2 call."""
+    if structured_generate_fn is not None:
+        try:
+            raw = structured_generate_fn(
+                prompt, json.dumps(plan_emission_json_schema(max_tasks=max_tasks))
+            )
+        except Exception:  # noqa: BLE001 — the hook must never add a failure mode
+            raw = ""
+        if raw and _parse_candidates(raw, max_tasks=_PARSE_CEILING):
+            return raw, True, ""
+    try:
+        return generate_fn(prompt), False, ""
+    except Exception as exc:  # noqa: BLE001 — a model failure must not crash the dispatch
+        return "", False, str(exc)
+
+
 def _split_oversize_task(
     idea: str,
     single_task: dict,
     repo_target: str,
     *,
     generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
     max_tasks: int,
     max_depth: int,
 ) -> list[dict] | None:
@@ -537,11 +853,12 @@ def _split_oversize_task(
     only). The model failure is swallowed (a split error must never crash or change the plan)."""
     if max_depth <= 1:
         return None
-    try:
-        raw = generate_fn(
-            _SPLIT_TEMPLATE.format(max_tasks=max_tasks, prompt=single_task.get("prompt", ""))
-        )
-    except Exception:  # noqa: BLE001 — a split-gen failure must not crash the dispatch
+    raw, _used_grammar, _err = _generate_plan_json(
+        _SPLIT_TEMPLATE.format(max_tasks=max_tasks, prompt=single_task.get("prompt", "")),
+        generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
+        max_tasks=max_tasks,
+    )
+    if not raw:
         return None
     children = _parse_candidates(raw, max_tasks=_PARSE_CEILING)
     survivors, _ = _collapse(children)
@@ -551,11 +868,106 @@ def _split_oversize_task(
     return accepted if len(accepted) >= 2 else None
 
 
+# ---------------------------------------------------------------------------
+# M2 W5 (#740) — evidence-fed re-decomposition of a consistently-failing task
+# ---------------------------------------------------------------------------
+
+#: Hard cap on the failing-evidence block fed back into a planner prompt (plan §10 S3:
+#: coder-authored strings reach the planner ONLY structurally extracted + capped).
+FAILURE_EVIDENCE_MAX_CHARS = 500
+
+#: Lines worth keeping from gate/oracle output: test identifiers, assertion lines,
+#: error classes, exit codes, and the fleet's own RESULT/TESTS/VERIFY signal lines.
+_EVIDENCE_LINE_RE = re.compile(
+    r"(FAILED|ERROR|AssertionError|assert\b|Traceback|exit(?:\s*code)?[=:\s]\s*\d+"
+    r"|RESULT:|TESTS:|VERIFY:|test_[\w.]+|::test|not ok\b|# fail)",
+    re.IGNORECASE,
+)
+
+
+def build_failure_evidence(*sources: str, max_chars: int = FAILURE_EVIDENCE_MAX_CHARS) -> str:
+    """STRUCTURAL extraction of failing evidence for the re-decompose prompt (§10 S3).
+
+    Coder-authored text (an assertion message IS coder output) must never ride prose
+    into the 14B planner's prompt, so this keeps only lines matching the structural
+    evidence shapes (test ids, assert/error lines, exit codes, the fleet's signal
+    lines), control-strips them, caps each line, dedupes, and caps the whole block.
+    Empty input (or nothing structural) ⇒ ``''`` — the caller then feeds no evidence
+    block at all rather than inventing one."""
+    lines: list[str] = []
+    seen: set[str] = set()
+    for source in sources:
+        for raw in str(source or "").splitlines():
+            line = _CTRL_RE.sub(" ", raw).strip()
+            if not line or not _EVIDENCE_LINE_RE.search(line):
+                continue
+            line = line[:200]
+            if line in seen:
+                continue
+            seen.add(line)
+            lines.append(line)
+    out = "\n".join(lines)
+    return out[:max_chars]
+
+
+#: The failing-evidence context wrapped around a re-decomposed task's prompt. The
+#: evidence block is STRUCTURAL (build_failure_evidence) — never raw coder prose.
+_FAILURE_CONTEXT_TEMPLATE = (
+    "{prompt}\n\n"
+    "NOTE: a previous automated attempt at this exact task FAILED its verification. "
+    "The structural evidence was:\n{evidence}\n"
+    "Break the work into smaller steps that each avoid repeating that failure."
+)
+
+
+def split_failed_task(
+    task: dict,
+    evidence: str,
+    *,
+    generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
+    max_tasks: int = DEFAULT_MAX_TASKS,
+) -> "list[dict] | None":
+    """W5 — ONE evidence-fed re-decomposition of a consistently-failing task.
+
+    Reuses the #691 ``_SPLIT_TEMPLATE`` machinery (the proven "go finer" path) with the
+    task's prompt AUGMENTED by the structurally-extracted failing evidence (never raw
+    coder prose — §10 S3), runs the children through the SAME right-sizing ruler, and
+    returns them ONLY on a strict improvement (>=2 coherent tasks). ``None`` keeps the
+    original (the caller then parks it — bounded by design; the budget lives in the
+    plan's ``redecompose_budget`` and is spent by the CALLER via
+    ``plan_graph.spend_redecompose``). A model failure is swallowed (a split error must
+    never crash the run — the subtree parks honestly instead)."""
+    prompt = str(task.get("prompt", "") or "").strip()
+    if not prompt:
+        return None
+    evidence = build_failure_evidence(evidence)
+    seed = (
+        _FAILURE_CONTEXT_TEMPLATE.format(prompt=prompt, evidence=evidence)
+        if evidence else prompt
+    )
+    raw, _used_grammar, _err = _generate_plan_json(
+        _SPLIT_TEMPLATE.format(max_tasks=max_tasks, prompt=seed),
+        generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
+        max_tasks=max_tasks,
+    )
+    if not raw:
+        return None
+    children = _parse_candidates(raw, max_tasks=_PARSE_CEILING)
+    survivors, _ = _collapse(children)
+    accepted = _ruler(survivors, str(task.get("repo", "") or ""), max_tasks=max_tasks)
+    return accepted if len(accepted) >= 2 else None
+
+
 def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[dict]:
     """Deterministic acceptance: well-formed, slugged, deduped, capped. NEVER the model.
 
     The right-sizing (``_collapse``) has already run; this enforces shape + the final
-    ``max_tasks`` cap on the survivors.
+    ``max_tasks`` cap on the survivors — and RE-MAPS the graph (M2 W2): after collapse,
+    dedupe, and the cap, every surviving ``depends_on`` ref must point at a SURVIVING
+    sibling slug (refs to collapsed/deduped/capped-away tasks and self-refs are
+    removed). The key itself is preserved once the model emitted it — an emptied-out
+    ``depends_on: []`` still marks a graph-aware task (an independent root).
     """
     accepted: list[dict] = []
     seen: set[str] = set()
@@ -568,9 +980,19 @@ def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[
         if slug in seen:
             continue
         seen.add(slug)
-        accepted.append({"repo": repo_target, "task": slug, "prompt": prompt})
+        entry: dict = {"repo": repo_target, "task": slug, "prompt": prompt}
+        if "depends_on" in cand:
+            entry["depends_on"] = list(cand.get("depends_on") or [])
+        if "contract" in cand:
+            entry["contract"] = cand["contract"]
+        accepted.append(entry)
         if len(accepted) >= max_tasks:
             break
+    survivors = {e["task"] for e in accepted}
+    for e in accepted:
+        if "depends_on" in e:
+            e["depends_on"] = [r for r in e["depends_on"]
+                               if r in survivors and r != e["task"]]
     return accepted
 
 
@@ -582,15 +1004,20 @@ def decompose_request(
     projects_dir: Path,
     max_tasks: int = DEFAULT_MAX_TASKS,
     max_depth: int = DEFAULT_MAX_DEPTH,
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
 ) -> DecomposeResult:
     """Decompose *idea* into right-sized fleet tasks for *repo*. Fail-closed + fallback.
 
     1. Validate *repo* (an existing git repo under *projects_dir*, never BlarAI/
        .openclaw — reuses the engine's ``validate_repo``). Invalid → reject.
     2. Ask the 14B (``generate_fn``) to break the idea into the fewest coherent tasks.
+       When *structured_generate_fn* is provided (M2 W2 — an adapter over the #718
+       xgrammar ``StructuredOutputConfig`` path, called ``(prompt, json_schema)``),
+       the emission is tried grammar-constrained FIRST with a transparent fail-soft
+       fallback to the free-text path — never a new refusal.
     3. RIGHT-SIZE: parse generously, ``_collapse`` the structural/scaffold splits, then
-       run the DETERMINISTIC ruler (slug + dedupe + cap). A clearly-small (leaf) goal is
-       capped to a single task. ≥1 task → use them.
+       run the DETERMINISTIC ruler (slug + dedupe + cap + graph re-map). A clearly-small
+       (leaf) goal is capped to a single task. ≥1 task → use them.
     4. Otherwise FALL BACK to one validated task (the idea as the prompt) — a dispatch
        never silently produces zero work.
 
@@ -608,15 +1035,35 @@ def decompose_request(
     if not idea:
         return DecomposeResult(ok=False, message="Nothing to dispatch — the idea is empty.")
 
-    try:
-        raw = generate_fn(_DECOMPOSE_TEMPLATE.format(max_tasks=max_tasks, idea=idea))
-    except Exception as exc:  # noqa: BLE001 — a model failure must not crash the dispatch
-        raw = ""
-        gen_error = str(exc)
-    else:
-        gen_error = ""
+    raw, used_grammar, gen_error = _generate_plan_json(
+        _DECOMPOSE_TEMPLATE.format(max_tasks=max_tasks, idea=idea),
+        generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
+        max_tasks=max_tasks,
+    )
 
     candidates = _parse_candidates(raw, max_tasks=_PARSE_CEILING)
+    # #740 live-verify diagnostic: make the decompose outcome visible in the AO log so a
+    # minimal-fallback root cause (malformed JSON / no array / truncation / think block) is
+    # never invisible again.
+    logger.info(
+        "decompose: raw_len=%d used_grammar=%s parsed_candidates=%d gen_error=%r",
+        len(raw or ""), used_grammar, len(candidates), gen_error,
+    )
+    if not candidates:
+        logger.warning("decompose: NO candidates parsed — raw head: %r", (raw or "")[:800])
+    # #740/#748 live diagnostic (env-gated; zero-cost unset): raw-output dump — bypasses the AO
+    # logging config, which does not emit this module's logger to stdout. Set
+    # BLARAI_DECOMPOSE_DEBUG=<path> to capture. This dump + its gpu_inference twins localized the
+    # #748 three-defect stack (swallowed xgrammar crash / tool-bait / tail bracket slip).
+    try:
+        import os as _os
+        _dbg = _os.environ.get("BLARAI_DECOMPOSE_DEBUG")
+        if _dbg:
+            with open(_dbg, "a", encoding="utf-8") as _f:
+                _f.write(f"\n=== decompose raw (len={len(raw or '')} cands={len(candidates)} "
+                         f"grammar={used_grammar} err={gen_error!r}) ===\n{raw or ''}\n")
+    except Exception:
+        pass
     # Right-size: _collapse removes the structural/scaffold/per-test-case splits, leaving
     # the fewest coherent FEATURE tasks (a one-function goal -> 1). The ruler then enforces
     # the max_tasks cap. The leaf stop-condition (_is_leaf_goal) is the recursion-bound
@@ -637,7 +1084,8 @@ def decompose_request(
     ):
         replacement = _split_oversize_task(
             idea, tasks[0], repo_target,
-            generate_fn=generate_fn, max_tasks=max_tasks, max_depth=max_depth,
+            generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
+            max_tasks=max_tasks, max_depth=max_depth,
         )
         if replacement:
             tasks = replacement
@@ -652,6 +1100,7 @@ def decompose_request(
             tasks=tasks,
             collapsed_test_intent=collapsed_test_intent,
             split_oversize=split_oversize,
+            used_grammar=used_grammar,
             message=msg,
         )
 

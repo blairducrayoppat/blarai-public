@@ -54,7 +54,7 @@ class _ExecHarness:
             fleet_dispatch_enabled=enabled,
             fleet_dispatch_agentic_setup_dir=str(tmp_path / "agentic"),
             fleet_dispatch_projects_dir=str(tmp_path / "projects"),
-            swap_min_free_gb=21.0,
+            swap_min_free_gb=20.0,
             step_aside_grace_s=grace,
         )
         self._asset_calls: list = []
@@ -77,6 +77,22 @@ class _ExecHarness:
         AssistantOrchestratorService.fleet_dispatch_agentic_setup_dir
     )
     fleet_dispatch_projects_dir = AssistantOrchestratorService.fleet_dispatch_projects_dir
+    # M2 (#740): the real property reads getattr(cfg, ..., False) — the SimpleNamespace
+    # carries no plan_graph key, so this resolves False (the flat-queue default) here.
+    fleet_dispatch_plan_graph = AssistantOrchestratorService.fleet_dispatch_plan_graph
+    # #749: the EXECUTE handler now reads these durable-ticket knobs to thread them into
+    # the fleet config. Same getattr-with-default pattern -> the SimpleNamespace carries no
+    # key, so they resolve to the dormant defaults (False / 0). (Without these bindings the
+    # handler AttributeErrors -> the 4-test gate-red the #746 build surfaced on main.)
+    fleet_dispatch_vikunja_bridge = AssistantOrchestratorService.fleet_dispatch_vikunja_bridge
+    fleet_dispatch_vikunja_bridge_project_id = (
+        AssistantOrchestratorService.fleet_dispatch_vikunja_bridge_project_id
+    )
+    # #744: the EXECUTE handler threads the guest-oracle knob into the fleet config;
+    # the SimpleNamespace carries no key, so it resolves False (the dormant default).
+    fleet_dispatch_guest_oracle_enabled = (
+        AssistantOrchestratorService.fleet_dispatch_guest_oracle_enabled
+    )
     swap_min_free_gb = AssistantOrchestratorService.swap_min_free_gb
     step_aside_grace_s = AssistantOrchestratorService.step_aside_grace_s
 
@@ -189,7 +205,7 @@ def test_fire_swap_passes_pid_safety_gate_and_relaunch(monkeypatch):
 
     monkeypatch.setattr(entrypoint, "execute_swap_dispatch", _fake_execute)
     stub = SimpleNamespace(
-        swap_min_free_gb=21.0,
+        swap_min_free_gb=20.0,
         swap_run_budget_s=5400.0,                          # #670 P2 out-of-band budget
         _swap_relaunch_argv=["py", "-m", "launcher", "--winui"],
         _swap_relaunch_cwd="C:/repo",
@@ -198,11 +214,41 @@ def test_fire_swap_passes_pid_safety_gate_and_relaunch(monkeypatch):
         stub, "RID", "s", [{"repo": "R", "task": "t", "prompt": "p"}], None
     )
     assert captured["old_pid"] == os.getpid()             # the launcher PID = this process
-    assert captured["gate_gb"] == 21.0                    # the CONFIGURED safety threshold
+    assert captured["gate_gb"] == 20.0                    # the CONFIGURED safety threshold
     assert captured["run_budget_s"] == 5400.0             # the CONFIGURED overall-run budget
     assert captured["relaunch_argv"] == ["py", "-m", "launcher", "--winui"]
     assert captured["relaunch_cwd"] == "C:/repo"
     assert captured["tasks"] == [{"repo": "R", "task": "t", "prompt": "p"}]
+
+
+def test_fire_swap_honors_a_staged_per_card_budget(monkeypatch, tmp_path):
+    # #740 B3 re-grain: a fresh pending-budget file overrides the config default
+    # for THIS dispatch (consume-once). Absent → the config value (above).
+    from shared.fleet.dispatch import FleetDispatchConfig
+    from shared.fleet.swap_ops import write_pending_run_budget
+
+    captured = {}
+
+    def _fake_execute(run_id, session_id, tasks, *, config, gate_gb, run_budget_s,
+                      old_pid, relaunch_argv, relaunch_cwd):
+        captured["run_budget_s"] = run_budget_s
+        return _ok(run_id)
+
+    monkeypatch.setattr(entrypoint, "execute_swap_dispatch", _fake_execute)
+    cfg = FleetDispatchConfig(
+        scripts_dir=tmp_path / "s", queue_path=tmp_path / "state" / "q.json",
+        runs_dir=tmp_path / "state" / "runs", projects_dir=tmp_path / "p")
+    write_pending_run_budget(cfg, 21600.0)
+    stub = SimpleNamespace(
+        swap_min_free_gb=20.0, swap_run_budget_s=10800.0,
+        _swap_relaunch_argv=[], _swap_relaunch_cwd="")
+    AssistantOrchestratorService._fire_swap(
+        stub, "RID", "s", [{"repo": "R", "task": "t", "prompt": "p"}], cfg)
+    assert captured["run_budget_s"] == 21600.0            # the per-card budget won
+    # And it was CONSUMED — a second dispatch falls back to the config default.
+    AssistantOrchestratorService._fire_swap(
+        stub, "RID2", "s", [{"repo": "R", "task": "t", "prompt": "p"}], cfg)
+    assert captured["run_budget_s"] == 10800.0
 
 
 def test_set_swap_context_stores_relaunch_and_callable():
@@ -234,4 +280,58 @@ def test_swap_run_budget_resolver_clamps_non_positive():
     assert resolved(-10.0) == 0.0          # negative disables
     assert resolved(0) == 0.0
     assert resolved("bad") == 0.0          # non-numeric disables (never crash the resolver)
-    assert fget(SimpleNamespace(_resolved_config=None)) == 5400.0
+    assert fget(SimpleNamespace(_resolved_config=None)) == 10800.0   # field default (#757)
+
+
+# ---- #744 guest-certified oracle knob (dormant) -----------------------------
+
+
+def test_guest_oracle_resolver_fail_closed_defaults():
+    # The resolver is fail-closed at every layer: cfg None (early boot), a missing
+    # key, and an explicit false ALL resolve to False; only an explicit true enables.
+    fget = AssistantOrchestratorService.fleet_dispatch_guest_oracle_enabled.fget
+
+    assert fget(SimpleNamespace(_resolved_config=None)) is False
+    assert fget(SimpleNamespace(_resolved_config=SimpleNamespace())) is False
+    assert fget(SimpleNamespace(_resolved_config=SimpleNamespace(
+        fleet_dispatch_guest_oracle_enabled=False))) is False
+    assert fget(SimpleNamespace(_resolved_config=SimpleNamespace(
+        fleet_dispatch_guest_oracle_enabled=True))) is True
+
+
+def test_execute_threads_guest_oracle_knob_into_fleet_config(tmp_path):
+    # The EXECUTE handler builds the fleet config with guest_oracle_enabled resolved
+    # from [fleet_dispatch].guest_oracle_enabled — the value the spec then carries to
+    # the detached driver. Dormant default here (no key on the harness namespace).
+    events: list = []
+    h = _ExecHarness(tmp_path, fire_result=_ok(), step_aside=lambda: events.append("step_aside"))
+    t = _FakeTransport(events)
+    h._handle_execute_request(t, "rid", {"session_id": "s", "run_id": "RID-DET",
+                                         "tasks": [{"repo": "R", "task": "a", "prompt": "p"}]})
+    assert h._fire_calls[0]["config"].guest_oracle_enabled is False
+
+    # Knob ON: the same handler threads True through to the fleet config.
+    events2: list = []
+    h2 = _ExecHarness(tmp_path, fire_result=_ok(), step_aside=lambda: events2.append("step_aside"))
+    h2._resolved_config.fleet_dispatch_guest_oracle_enabled = True
+    t2 = _FakeTransport(events2)
+    h2._handle_execute_request(t2, "rid", {"session_id": "s", "run_id": "RID-DET",
+                                           "tasks": [{"repo": "R", "task": "a", "prompt": "p"}]})
+    assert h2._fire_calls[0]["config"].guest_oracle_enabled is True
+
+
+def test_default_toml_ships_guest_oracle_enabled():
+    # CONSCIOUSLY AMENDED at the 2026-07-08 LA-supervised go-live ceremony
+    # (#744): the guest oracle is LIVE — blarai-oracle provisioned in the guest
+    # (vsock 50002), the AF_HYPERV transport registered, the corridor proven in
+    # both directions before the flip. This lock now pins the LIVE posture the
+    # same way it pinned dormancy: a silent flip BACK is a regression too
+    # (default-proven-features-to-LIVE doctrine).
+    import tomllib
+    from pathlib import Path
+
+    toml_path = (Path(entrypoint.__file__).resolve().parents[1]
+                 / "config" / "default.toml")
+    with toml_path.open("rb") as fh:
+        cfg = tomllib.load(fh)
+    assert cfg["fleet_dispatch"]["guest_oracle_enabled"] is True

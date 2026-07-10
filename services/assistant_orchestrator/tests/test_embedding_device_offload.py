@@ -187,7 +187,9 @@ class TestFailSoftFallback:
         monkeypatch.setattr(
             transformers.AutoTokenizer,
             "from_pretrained",
-            classmethod(lambda _cls, _dir: _RecordingTokenizer()),
+            # **_kwargs absorbs the #633 hardening kwargs (local_files_only,
+            # trust_remote_code) the LeakageDetector now passes.
+            classmethod(lambda _cls, _dir, **_kwargs: _RecordingTokenizer()),
         )
 
     def test_openvino_failure_falls_back_to_ort_cpu(

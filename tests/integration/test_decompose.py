@@ -351,3 +351,38 @@ def test_decompose_template_carries_envelope_framing():
     # tasks, each buildable in one short run) alongside the existing anti-over-split rules.
     assert "envelope" in dc._DECOMPOSE_TEMPLATE.lower()
     assert "one short automated run" in dc._DECOMPOSE_TEMPLATE.lower()
+
+
+def test_multipart_pipeline_response_survives_as_multiple_tasks(tmp_path):
+    # M2 under-decomposition (B2) plumbing lock: when the 14B DOES emit the distinct-output
+    # pipeline as several feature tasks (tokenize -> {word-freq, bigram-freq} -> report), the
+    # deterministic path (parse -> _collapse -> ruler) must keep ALL of them, never re-collapse
+    # a genuine multi-stage pipeline to one. The LIVE fix (the 14B emitting >=2 for the 'little
+    # toolkit' phrasing) is the prompt lever + a GPU re-test; THIS locks that a correct
+    # multi-task response is not wrongly re-collapsed, and that four distinct outputs are 4.
+    proj = _projects(tmp_path)
+    goal = ("a little toolkit that reads text, breaks it into words, counts how often each word "
+            "appears and which neighbouring pairs occur most, then writes one tidy report")
+    payload = json.dumps([
+        {"task": "tokenize-text", "prompt": "Break the input text into a list of words."},
+        {"task": "count-word-frequencies", "prompt": "Count how often each word appears."},
+        {"task": "count-bigram-frequencies", "prompt": "Count neighbouring word pairs."},
+        {"task": "compose-combined-report", "prompt": "Combine both counts into one report."},
+    ])
+    res = dc.decompose_request(goal, "myapp", generate_fn=_gen(payload), projects_dir=proj)
+    assert res.ok and not res.fell_back
+    slugs = [t["task"] for t in res.tasks]
+    assert slugs == ["tokenize-text", "count-word-frequencies",
+                     "count-bigram-frequencies", "compose-combined-report"], slugs
+
+
+def test_decompose_templates_carry_distinct_output_pipeline_guidance():
+    # Doc-lock (M2 #740 under-decomposition fix): both emission prompts must teach that a
+    # distinct-output PIPELINE is several tasks and that diminutive words ('little'/'tidy')
+    # describe tone, not count — the prompt lever against the B2 'little toolkit' under-scope.
+    dt = dc._DECOMPOSE_TEMPLATE.lower()
+    assert "distinct output" in dt                      # the pipeline rule
+    assert "little" in dt and "tidy" in dt              # the diminutive-framing counter
+    assert "tokenize-text" in dc._DECOMPOSE_TEMPLATE    # the pipeline few-shot survives edits
+    st = dc._SPLIT_TEMPLATE.lower()
+    assert "distinct" in st and "adjectives" in st      # the split backstop carries it too

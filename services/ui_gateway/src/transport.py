@@ -65,6 +65,7 @@ from services.ui_gateway.src.constants import (
     PA_HANDSHAKE_BACKOFF_BASE_S,
     PA_HANDSHAKE_MAX_RETRIES,
     PA_HANDSHAKE_TIMEOUT_S,
+    PLAN_RESPONSE_TIMEOUT_S,
     PROMPT_RESPONSE_TIMEOUT_S,
     STREAM_TOKEN_BUFFER_LIMIT,
     TOOL_CALL_BUFFER_MAX_TOKENS,
@@ -525,11 +526,19 @@ class TransportGateway:
                 transport.close()
             raise ConnectionError(f"PA handshake failed: {exc}") from exc
 
-    async def _open_prompt_transport(self) -> VsockTransport | None:
+    async def _open_prompt_transport(
+        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S
+    ) -> VsockTransport | None:
         """Create a fresh connection to the Orchestrator for a prompt.
 
         The Orchestrator processes one message per accepted connection,
         so each prompt requires its own transport.
+
+        ``timeout_s`` (#766): the receive budget for THIS message. Defaults to
+        the per-prompt budget; the dispatch PLAN call passes the longer
+        ``PLAN_RESPONSE_TIMEOUT_S`` (a PLAN is ~6 chained 14B calls and a cold
+        just-swapped-back AO legitimately exceeds 180 s — the 2026-07-07
+        battery STALLED B4/B6 on exactly that).
 
         Returns:
             Connected VsockTransport, or None on failure (Fail-Closed).
@@ -537,19 +546,21 @@ class TransportGateway:
         if self._dev_mode:
             config = VsockConfig(
                 address=VsockAddress(cid=0, port=self._port),
-                timeout_ms=int(PROMPT_RESPONSE_TIMEOUT_S * 1000),
+                timeout_ms=int(timeout_s * 1000),
             )
             transport = VsockTransport(config, dev_mode=True)
             connected = await asyncio.to_thread(transport.connect)
             return transport if connected else None
         elif self._host_mode:
             # Production host-mode: loopback + mTLS (fidelity-2 / SDV §4).
-            return await asyncio.to_thread(self._connect_host_loopback_mtls)
+            return await asyncio.to_thread(self._connect_host_loopback_mtls, timeout_s)
         else:
             # Production guest-mode: AF_HYPERV + mTLS (#615 — activated).
-            return await asyncio.to_thread(self._connect_hyperv)
+            return await asyncio.to_thread(self._connect_hyperv, timeout_s)
 
-    def _connect_host_loopback_mtls(self) -> VsockTransport | None:
+    def _connect_host_loopback_mtls(
+        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S
+    ) -> VsockTransport | None:
         """Create a loopback + mTLS connection to the PA server (host-mode production).
 
         Production host-mode (all services on the same Windows host):
@@ -596,7 +607,7 @@ class TransportGateway:
                 return None
 
             raw = _socket_mod.socket(_socket_mod.AF_INET, _socket_mod.SOCK_STREAM)
-            raw.settimeout(PROMPT_RESPONSE_TIMEOUT_S)
+            raw.settimeout(timeout_s)
             raw.connect(("127.0.0.1", self._port))
             wrapped = ssl_ctx.wrap_socket(raw, server_side=False)
 
@@ -605,7 +616,7 @@ class TransportGateway:
                 mtls_cert_path=self._mtls_cert_path,
                 mtls_key_path=self._mtls_key_path,
                 ca_cert_path=self._ca_cert_path,
-                timeout_ms=int(PROMPT_RESPONSE_TIMEOUT_S * 1000),
+                timeout_ms=int(timeout_s * 1000),
             )
             return VsockTransport(
                 config,
@@ -617,7 +628,9 @@ class TransportGateway:
             logger.error("Host-mode loopback+mTLS connect failed: %s", exc)
             return None
 
-    def _connect_hyperv(self) -> VsockTransport | None:
+    def _connect_hyperv(
+        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S
+    ) -> VsockTransport | None:
         """Create an AF_HYPERV connection to the Orchestrator VM with mTLS.
 
         #615 (guest boundary): the Windows AF_HYPERV sockaddr is the
@@ -659,7 +672,7 @@ class TransportGateway:
             mtls_cert_path=self._mtls_cert_path,
             mtls_key_path=self._mtls_key_path,
             ca_cert_path=self._ca_cert_path,
-            timeout_ms=int(PROMPT_RESPONSE_TIMEOUT_S * 1000),
+            timeout_ms=int(timeout_s * 1000),
         )
         raw: _socket_mod.socket | None = None
         try:
@@ -952,7 +965,12 @@ class TransportGateway:
                 "tasks": [], "criteria": {},
             }
 
-        transport = await self._open_prompt_transport()
+        # #766: a PLAN is ~6 chained 14B calls; against a cold just-swapped-back
+        # AO the per-prompt 180 s budget expired mid-sequence and STALLED the job
+        # ("No response") while the AO was still generating — use the PLAN budget.
+        transport = await self._open_prompt_transport(
+            timeout_s=PLAN_RESPONSE_TIMEOUT_S
+        )
         if transport is None:
             return _error(
                 "Could not connect to the Assistant Orchestrator (Fail-Closed)."

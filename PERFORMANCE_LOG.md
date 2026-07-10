@@ -56,6 +56,177 @@ affect performance:
 
 ---
 
+### 2026-07-08 — Qwen3.6-27B dense on the Arc 140V: coherent, fits, and half the speed the bandwidth math promised (#768, Stage-1 smoke)
+
+First measured run of the Qwen3.6 generation on this hardware — `OpenVINO/Qwen3.6-27B-int4-ov`
+(official Intel INT4_ASYM g128, 14.63 GB on disk), the natively-multimodal dense 27B evaluated as
+a Qwen3-14B + Qwen3-VL-8B consolidation successor. Run standalone (AO stopped, exclusive GPU,
+coordinated with the M2 battery campaign's manager — daytime window, campaign untouched).
+
+**Hardware/stack:** Intel Core Ultra 7 258V (Lunar Lake), Arc 140V iGPU, 32 GB LPDDR5X
+(31.323 GB effective). OpenVINO 2026.2.1 / GenAI 2026.2.1.0. Driver: 32.0.101.8826.
+**Harness:** `scripts/benchmark_vlm_text_inference.py` (NEW — VLMPipeline text-only; prompt set
+v1 + pp probe pp-v1 byte-identical to `benchmark_gpu_inference.py`; 5 measured + 2 warmup,
+greedy, 256 max tokens, 30 s cooldowns). VLMPipeline is forced: OpenVINO GenAI classes Qwen3.6
+as a visual-language model; no LLMPipeline path and **no speculative decoding runs for this
+family on OpenVINO today** (no Qwen3.6-vocab classic/EAGLE-3 draft anywhere; DFlash currently
+vLLM/SGLang-only — though openvino.genai **#3938** (open) is an active effort to enable DFlash
+with Qwen3.6 support in the continuous-batching pipeline; found same-day, tracked as revisit
+trigger 1 in `docs/MODEL_EVALUATION_QWEN36_27B.md`).
+
+| Metric | value |
+|--------|-------|
+| Generation (tok/s) | **3.59 median** (mean 4.02, P95 5.6; short-answer P1 runs 5.0–6.1, sustained 256-token runs 3.2–3.7) |
+| Prefill pp (tok/s) | **219 median** (vs the 14B dense's ~1960 on the same silicon) |
+| TTFT (ms) | 876 median |
+| Load (warm weights, cold compile) | 33.1 s load; first-ever GPU compile ~20 min one-time (subsequent loads use the compiled path) |
+| Memory | 15.9 GB GPU-committed; system-available 24.9 → 10.0 GB after load, min 8.56 GB during; full recovery to 24.9 GB on exit |
+| Errors | 0 across all 20 measured + 2 warmup generations |
+
+**Finding 1 — output is coherent (short prompts); the #3870 scare was conversion-side and is
+CLOSED.** Every captured output (all 20 in the result JSON) is fully coherent — correct facts,
+clean `<think>` reasoning traces, proper formatting. Same-day thread-read correction: #3870 was
+closed upstream 2026-06-08 — root cause a broken optimum-intel export recipe affecting
+SELF-converted models (+ a reporter-side GPU-compiler update), so the official OpenVINO org
+conversion we ran was never in its blast radius; and its failure mode was long-prompt-dependent
+(60–80+ tokens) while this benchmark's prompts are short. Net: short-prompt coherence PROVEN on
+this config; long-prompt coherence (production system prompt ~840–970 tokens) remains an
+explicit pre-swap check, tracked in `docs/MODEL_EVALUATION_QWEN36_27B.md`.
+
+**Finding 2 — the model is compute-bound on immature kernels, not bandwidth-bound.** The
+pre-run estimate (~5.5–7 tok/s) assumed the measured ~90 GB/s effective bandwidth over ~14 GB
+of weights. Measured decode is roughly half that, and the tell is prefill: 219 pp vs the 14B's
+~1960 on identical silicon — a 9x gap that weight streaming cannot explain. The Gated-DeltaNet
+hybrid (48 of 64 blocks linear-attention) is new to the GPU plugin and its kernels are plainly
+unoptimized. Consequence for the successor decision: today's 3.6 tok/s is a **software** number,
+not a physics number — the physics ceiling remains ~9.7 — so it should improve with OpenVINO
+releases, and re-measuring on version bumps is cheap (harness + weights now resident).
+
+**Not measured:** vision/image inputs (text-only probe); co-resident cost (benchmarked alone —
+the 27B cannot co-reside with the 14B anyway); long-context decode (256-token generations);
+thermal steady-state beyond the 5-run window; ThinkingCap fine-tune (identical architecture —
+these numbers transfer; no OV conversion exists yet).
+
+Machine-readable record (incl. all 20 full output texts as the #3870 evidence):
+`docs/performance/benchmark_vlm_text_qwen3.6-27b-int4-ov_2026-07-08_16-21-18.json`.
+Decision context + research record: `docs/MODEL_EVALUATION_QWEN36_27B.md`; ticket #768.
+
+### 2026-07-06 — The GPU plugin, built from source at last: coherent inference on the Arc 140V (#710, upstream)
+
+*Methodology note: this is a **capability proof via `benchmark_genai` / `greedy_causal_lm`** (OpenVINO GenAI C++ samples) on a **from-source** build — NOT the standing `benchmark_gpu_inference.py` series, so its throughput is not directly comparable to the 14B runtime entries. Machine-readable record: `docs/performance/gpu_plugin_from_source_capability_proof_2026-07-06.json`.*
+
+For the first time, the OpenVINO Intel GPU plugin is built from source on this
+machine and runs coherent LLM inference on the Arc 140V. We had built the core +
+CPU plugin and GenAI from source before, but the GPU plugin had never been
+linked — which is exactly why the #4082 xgrammar fix could only be verified on
+CPU (that record names the gap in its own words: "GPU plugin not linked in this
+local checkout"). This closes it.
+
+The build was the fast path the plan predicted: an incremental compile of the one
+missing `openvino_intel_gpu_plugin` target on the already-configured tree (the
+GPU=ON configure had already passed), ~40 min at `-j8` with oneDNN-GPU the long
+pole, producing an 89 MB `openvino_intel_gpu_plugin.dll` registered in
+`plugins.xml`. `compile_tool` then compiled the qwen3-0.6b INT4 model for GPU in
+~10s (377 MB blob) — proof the plugin loads, talks to the Arc driver, and compiles
+a real model.
+
+The inference proof took the C++ path deliberately. The obvious route — rebuild
+GenAI with Python bindings and call LLMPipeline from Python — walks straight into
+the ABI wall #4082 already documented, because the local core is
+`ENABLE_PYTHON=OFF` and a Python GenAI against a release-wheel core mismatches. So
+I built GenAI's C++ samples against the local core instead (targeting
+`greedy_causal_lm` + `benchmark_genai` to sidestep both the missing
+`openvino_c.lib` and the heavy opencv deps). `benchmark_genai -d GPU` generated 20
+tokens at **~40 tok/s** (TTFT 52 ms, TPOT 25 ms/token) — inference runs. Then
+`greedy_causal_lm` with its device flipped to GPU produced the coherence shot:
+*"…France's capital is Paris… and that's correct…"* — coherent, correct, from the
+from-source GPU plugin.
+
+The trade-off on the record: I did NOT build the GenAI Python stack tonight (a
+scoped follow-up needing the core rebuilt with Python bindings). The C++ proof
+settles the capability question — can we build + run GPU from source — without
+paying for the Python ABI reconciliation, which belongs to the feature-build
+phase, not the capability proof.
+
+**Next:** the capability unlocks the #4082 xgrammar-fix GPU re-verify (the
+`structured_output_generation` C++ sample is a no-Python path to it) and, if Intel
+greenlights #4091, the persistent-KV feature's independent GPU validation. Perf
+recorded community-grade in the companion JSON; the upstream offer drafts stay the
+operator's to post.
+
+---
+
+### 2026-07-06 — OVMS compiled-model cache for the coder swap: 289s cold → 12s warm (#747)
+
+Hardware: Intel Core Ultra 7 258V (Lunar Lake) / Intel Arc 140V GPU (16 GB, Xe2),
+GPU driver 32.0.101.8826. Software: OpenVINO Model Server 2026.2 (5e9dcfc46),
+OpenVINO backend 2026.2.0-21902, GenAI backend 2026.2.0.0-3121, Windows 11
+(10.0.26200). Model: coder-30b (Qwen3-Coder-30B-A3B, INT4), task `text_generation`
+(continuous batching), `--target_device GPU`.
+
+The dispatch fleet swaps the 30B coder in and out for every coding job, so the
+model-LOAD time is paid on every swap. This enables the OpenVINO compiled-model
+on-disk cache (`--cache_dir`, folded by OVMS into the CB-LLM plugin_config as
+`CACHE_DIR`; on GPU it caches compiled kernels as `.cl_cache`). The #740/W7
+attempt was reverted because a Windows **backslash** path makes the folded
+plugin_config JSON invalid (`\U` is not a valid JSON escape → "Plugin config is
+in wrong format"); the fix is a **forward-slash** path.
+
+Measured (wall-clock, `start-llm.ps1 -Model coder-30b -Force`; success = the model
+appears in `GET :8000/v3/models`; n=1 per condition, low-variance):
+
+| condition | load time | note |
+|-----------|-----------|------|
+| cold (empty cache) | **~289 s** | compile + write ~16 GB of `.cl_cache` (one-time; recurs on cache invalidation) |
+| warm (cache hit) | **~12 s** | load compiled kernels, no recompile |
+| no-cache baseline | ~30–90 s | the pre-cache range documented in `start-llm.ps1` (not re-measured on this box) |
+
+Payoff: **~18–78 s saved per swap** once warm. Cost: a one-time ~289 s cold load
+(now pre-warmed) that recurs only on cache invalidation. The cold 289 s exceeded
+the old 240 s load deadline, so this also bumped `start-llm.ps1` (240→480 s) and
+`swap_ops.real_load_30b` (300→480 s) so a cold load can't false-fail a swap — the
+live-load test catching that latent trap is exactly why #747 mandated it.
+
+**Not measured:** inference throughput (this is LOAD time only), co-resident
+memory with the 14B, cache-invalidation frequency. Machine-readable:
+`docs/performance/ovms_compile_cache_coder30b_2026-07-06.json`.
+
+### 2026-07-05 — First dependency-graph dispatches on the Arc 140V: the M2 plan-graph live-verify (#740/#748)
+
+**What changed:** not a throughput measurement — the first live executions of the M2 plan-graph orchestration (dependency-ordered waves, context packs, per-wave integration gates, plan-time job oracle) on real hardware, and the defect set they surfaced and closed. Two full runs of the B1-shaped 3-part python-cli goal through `tools.dispatch_harness`, `plan_graph=true`.
+
+**Setup:** Core Ultra 7 258V / Arc 140V (driver 32.0.101.8826), OpenVINO 2026.2.1 + GenAI 2026.2.1.0. Planner Qwen3-14B INT4 (embedded, spec-decode via the 0.6B draft); coder Qwen3-Coder-30B-A3B INT4 (OVMS, best-of-N C=3). Sandbox repos under `projects/`.
+
+**Results:**
+
+| Run | Graph | Waves/gates | Job oracle | Verdict | Wall |
+|-----|-------|-------------|------------|---------|------|
+| `20260705-214803-bd` | 6 tasks / 4 waves (diamond+fan-in) | 4/4 gates PASSED | FAILED (oracle layout unreachable — 2 defects) | PARKED-HONEST (BUILD) | 2517 s |
+| `20260705-224742-bd` | identical (greedy decompose is byte-reproducible) | 4/4 PASSED; seeded guarded oracle SKIPPED in gates | 6/7 PASSED (all behavioral criteria); 1 red = argv leak into the launch smoke | PARKED-HONEST (BUILD) | 3891 s |
+
+**Defects closed on the way** (full detail: `docs/performance/m2_plan_graph_live_verify_2026-07-05.json` + Vikunja #748): the #748 three-layer empty-plan stack (a swallowed #725 xgrammar crash — the PLAN call was the last grammar-armed path; a tool-call bait from the conversational system prompt; a tail bracket slip fixed by deterministic JSON repair), the job-oracle runner's bare-`pytest` sys.path miss, oracle seeding (the coder now sees the job spec it is graded against), the oracle template's argv hygiene, and the harness report now carrying the driver's job verdict first-class.
+
+**Zero-FALSE-DONE held in both runs** — all six tasks merged and every wave gate green, and the system still refused to report the job done while its oracle was red. Wall-clock ~42–65 min for a 6-task graph job is consistent with the plan's 1–3 h honest estimate. **Not measured:** thermal state (evening runs), per-task token throughput, best-of-N candidate distributions, isolated 14B plan latency, node-stack jobs.
+
+---
+
+### 2026-07-05 — xgrammar stop-token crash fix: verified, before/after, same commit (#725)
+
+**What changed:** not a throughput measurement — a crash-rate verification for the fix to the upstream `#725`-class bug (`grammar_matcher.cc:627: Check failed: (!IsStopTokenAccepted())`), which fires intermittently when a triggered structural-tags grammar is combined with speculative decoding. Root cause: `XGrammarLogitsTransformer::apply()` in `openvino.genai`'s `xgrammar_backend.cpp` called `FillNextTokenBitmask()` before checking `IsTerminated()`; under spec-decode the draft proposes tokens past the accepted stop, so `apply()` runs once more on an already-terminated matcher and the CHECK fires. Fix: reorder the two lines (check first, fill second) + a companion guard in `accept_tokens()`.
+
+**Methodology:** rebuilt `openvino.genai` from source at `7dea045` (`releases/2026/2`) — the exact commit the installed crashing wheel (`2026.2.1.0-3123-7dea0459b2a`) was built from — so this is a same-commit before/after, not a cross-version diff. Reproducer: 19 generic conversational prompts, triggered `StructuralTagsConfig` (trigger `<tool_call>`), greedy decode, `max_new_tokens=512`, `num_assistant_tokens=3` with the draft attached. Target Qwen3-14B INT4, draft Qwen3-0.6B (pruned 6L) INT8.
+
+**Results (5 passes / 95 generations per arm — matched sample size):**
+
+| Arm | Device | Generations | Crashes |
+|-----|--------|-------------|---------|
+| Baseline (unpatched, stock wheel), spec-decode ON | GPU (Arc 140V) | 95 | 1 (`generic-11`, same signature as the original report) |
+| Patched (fix applied, rebuilt from source), spec-decode ON | CPU | 95 | 0 |
+
+**Notes:** the patched-build verification ran on CPU rather than GPU — the official Python `.pyd` is ABI-locked to the exact release build (swapping only the patched `.dll` into the venv fails DLL load with "procedure not found"), and a from-source Python-bindings rebuild against the local OpenVINO checkout has no linked GPU plugin (object files present, never linked). Built a standalone C++ reproducer instead (`oss/openvino.genai/samples/cpp/text_generation/xgrammar_stop_token_repro.cpp`, mirrors the Python one) against the patched library + the local build's CPU plugin — fully self-consistent, no ABI crossing. The bug is a sampler state-machine ordering error, device-independent, so CPU is a valid substitute for proving the fix; it is not a substitute for a GPU throughput measurement (none was attempted — performance is not the question here). Elapsed: 5075.9 s / 95 generations on CPU (~53.4 s/generation, CPU-bound 14B — not a throughput claim, just for time-budgeting future CPU verification runs). Full record: `docs/performance/xgrammar_stop_token_fix_verify_2026-07-05_15-34-27.json`.
+
+---
+
 ### 2026-07-02 — First grammar-constrained tool call on the real 14B, and the first measured ISS-3 number (#717, #718)
 
 **What changed:** #718 replaced the homemade `<tool_call>NAME(args)</tool_call>`
@@ -2000,3 +2171,114 @@ Model load time: XXXX ms
 *Entries above this line are real benchmark results. Entries below are older.*
 
 <!-- First real entry will be pasted here after baseline run -->
+
+## 2026-07-07 — First live answer-quality measurement + PA-classification re-measure (Arc 140V, evening eval window)
+
+**Hardware:** Intel Core Ultra 7 258V (Lunar Lake), Arc 140V (Xe2 iGPU), 32 GB LPDDR5X.
+**Stack:** OpenVINO GenAI (production config), Qwen3-14B INT4-GPU + Qwen3-0.6B pruned-6L INT8 draft
+(speculative decoding ON, production system prompt + strip pipeline), NPU embedding offload per #720.
+**Tree:** blarai main `1deed99`. **Methodology:** `python -m evals.run --suite <s> --include-hardware`
+— the committed golden sets driven through the REAL production generation paths (answer_quality: the
+real ContextManager grounding + `_strip_hidden_blocks`; pa_classification: the real adjudication
+path), deterministic rubric scoring, committed baselines, single run each (N=1; variance NOT measured).
+App closed; the AO stopped for the window and restored after.
+
+**answer_quality (FIRST live measurement of the 19 model-in-the-loop cases):**
+35/40 passed (87.5%), 0 errors, 0 regressions (exit 0). The 5 fails are the baseline-tracked known
+deficiencies: `aq-fact-mod-02`, `aq-inj-mod-01/02/03` (injection-resistance — the security-relevant
+cluster), `aq-unc-mod-02` (uncertainty honesty). Evidence:
+`phase2_gates/evidence/eval_answer_quality_model_1deed99.json`.
+
+**pa_classification:** 35/35 passed (100.0%), 0 errors (exit 0). Evidence:
+`phase2_gates/evidence/eval_pa_classification_model_1deed99.json`.
+Comparison caveat (named, not glossed): the 2026-07-02 ISS-3 figure (26/30 = 86.7%, evidence
+`eval_pa_classification_model_897afd9.json`) came from a different-shaped probe set; today's clean
+sheet is the SUITE at this SHA, not a like-for-like re-run of that probe. ISS-3's disposition should
+re-examine whether the 4 false-DENY cases are represented in today's suite before claiming the
+over-denial resolved.
+
+**Not measured:** co-resident cost (no image/VLM partner loaded), answer variance across runs,
+tool_calling/governance model slices (offline-green only this window).
+
+**Addendum (same evening, ~22:10) — ISS-3 closure evidence:** pa_classification re-run twice more
+back-to-back at the same tree (`1deed99`) for the variance check: **35/35 and 35/35** — three
+consecutive clean sheets (runs 1-3), the four 2026-07-02 false-DENY cases (pa-mdl-001/002/006/008)
+passing in every run. Run-to-run variance eliminated as the explanation; the standing eval gate
+re-measures these exact cases at every future hardware ceremony (a regression exits 1). ISS-3
+CLOSED on this evidence — attribution honestly recorded as a side effect of the intervening
+generation-substrate fixes (most plausibly #725), not a deliberate tuning change. Evidence:
+`eval_pa_classification_model_1deed99_run2.json` / `_run3.json`.
+
+
+### 2026-07-09 — Prefix-caching A/B re-validation, full S1–S8 matrix (#711)
+
+Hardware: Intel Core Ultra 7 258V / Arc 140V iGPU (16GB shared), 32 GB LPDDR5X.
+OpenVINO GenAI 2026.2.1.0-3123-7dea0459b2a / OpenVINO 2026.2.1-21919; model
+Qwen3-14B INT4-GPU via the PRODUCTION `build_shared_pipeline` seam (spec-decode
++ cache_size=3 as shipped); non-production controls labelled `direct_control`.
+Methodology: N=5 timed + 2 warmup discarded per (angle × arm), fresh pipeline
+per combo with del/gc/settle, 120s inter-combo cooldowns; streamer-callback
+TTFT; fixed version-controlled prompt sets. Full data:
+`docs/performance/prefix_caching_ab_ov2026_2_1_0_2026-07-09_18-02-15.json`.
+
+Headlines (ON vs OFF):
+- S1 shared-prefix warm TTFT: 6352 → **348 ms** (18.2x); warm total latency
+  17.6 → 9.2 s; decode 4.91 → 6.02 tok/s.
+- S2 realistic 10-turn agentic session: cumulative 66.0 → **43.0 s** (-35%);
+  per-turn TTFT after turn 1: ~2.5-2.9 s → ~0.41-0.46 s.
+- S3 no-reuse worst case: NO regression (ON measured slightly better —
+  noise-level; the carrying cost of an unused cache is ~nil).
+- S4 16K max context: warm-identical TTFT 88.0 s → **0.99 s median**, BUT
+  bimodal (p95 69.9 s — the 3 GB pool can evict a 16K prefix, #709 class);
+  cold-unique +8.6% (77.7 → 84.3 s) — the one real cost found.
+- S5 spec-decode interaction: caching does NOT collapse spec (spec/no-spec
+  ratio ≈ 0.73 ON vs 0.78 OFF — same shape both arms). SEPARATE FINDING:
+  spec-decode measured NET-NEGATIVE on this short-generation prompt set in
+  BOTH arms (e.g. OFF arm 3.97 tok/s spec vs 5.06 no-spec) — filed for
+  investigation; acceptance % not exposed by this GenAI build (ratio recorded).
+- S6 correctness: **outputs byte-identical ON vs OFF** across the temp-0 set
+  (5/5 sha256 match, repeats identical within arm) — caching does not alter
+  outputs.
+- S7 memory: 14B-only sys peak 11.74 vs 11.75 GiB — ON adds nothing at rest
+  (KV pool fixed at cache_size regardless; hit savings structurally
+  unmeasurable, honest-caveat carried from #709).
+- S8 pinned preference-block cost curve (feeds #770-M1 P9): warm-hit TTFT is
+  FLAT (~0.37-0.49 s) across 579/1158/2382-token actual blocks — with caching,
+  block SIZE is ~free per turn; cold and one-line-edit prefill scale ~linearly
+  (~8.3 ms/token; edit ≈ 2.8 s at 579 tok, 4.7 s at 1158). Anomaly recorded
+  honestly: the OFF-arm 1024 case measured warm > cold (18.4 s vs 6.0 s) —
+  suspected thermal ramp late in the 2h matrix; does not affect the ON-arm
+  decision data.
+
+Not measured: cache-hit memory savings (structurally invisible — pool fixed);
+paired-SDXL co-resident (separate supervised step); thermal steady-state
+plateau (--steady-state variant not run); spec acceptance %.
+
+VERDICT vs the plan's pre-committed criteria: **KEEP ON** — S1/S2 real win ✓,
+S6 zero output drift ✓, S5 no caching-specific spec collapse ✓, S3 no
+regression ✓, S4 cold +8.6% at 16K accepted against the 88x warm win (and 16K
+turns are rare in production). Workload-conditional split not warranted on
+this evidence. LA ratification recorded on #711.
+
+
+### 2026-07-09 — Swap-gate floor measurement (#777): 30B load from a 19.85 GiB ambient
+
+Hardware: Intel Core Ultra 7 258V / Arc 140V iGPU, 32 GB LPDDR5X. OpenVINO GenAI
+2026.2.1.0-3123; Qwen3-Coder-30B INT4 via OVMS; WARM compile cache. Methodology:
+ballast pinned Available to 19.85 GiB; start-llm -Force; 1.5s sampler (Available +
+%Disk Time); gate-step A/B (pytest slice x3 healthy vs squeezed); generation smoke.
+LA-requested after correctly challenging that no load below 23.1 GiB had ever been
+TESTED (the June "20.1 not viable" was gate-declined inference on the older
+substrate). Criteria pre-committed on #777 BEFORE the run.
+
+Results: READY in ~13 s; NO page storm — Available floor 4.6 GiB (the 2026-06-21
+Available→67 MB scenario did not recur), disk saturated ~10 s of weight staging
+only; gate-step timings unchanged under the squeeze (1.25/1.02/1.01 s vs
+1.33/1.07/0.97 s healthy); 30B generation normal (4.5 s tool-turn smoke).
+
+Decision: all three criteria MET → `swap_min_free_gb` 21.0→20.0 (blarai
+`2fd7006c`), start-llm `$needGB` 21→20 and battery lean-preflight 21.5→20.5
+(agentic-setup `02e4936`), all in lockstep. Not measured (named): COLD-cache load
+from 20 GiB (rare, post-upgrade #747 class — backstopped by the 480 s deadline +
+the gate''s graceful abort), sustained full-dispatch workload at ~5 GiB Available,
+N>1. Evidence: `docs/performance/swap_gate_floor_2026-07-09/`.

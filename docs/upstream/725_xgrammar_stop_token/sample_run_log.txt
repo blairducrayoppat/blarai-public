@@ -1,0 +1,8 @@
+[repro] loaded in 11.1s draft=ON
+[repro] CRASH #1 gen=11 case=generic-11
+[23:36:43] C:\Jenkins\workspace\private-ci\ie\build-windows-vs2022@2\b\repos\openvino.genai\.py-build-cmake_cache\cp311-cp311-win_amd64\_deps\xgrammar-src\cpp\grammar_matcher.cc:627: Check failed: (!IsStopTokenAccepted()) is false: GrammarMatcher has terminated after accepting the stop token, but is
+[repro] pass 1: 19 gens, 1 crashes
+[repro] pass 2: 38 gens, 1 crashes
+[repro] pass 3: 57 gens, 1 crashes
+[repro] pass 4: 76 gens, 1 crashes
+[repro] DONE gens=76 crashes=1

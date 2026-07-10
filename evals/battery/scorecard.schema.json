@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "blarai://evals/battery/scorecard.schema.json",
+  "title": "M2 battery per-job scorecard (battery-scorecard/v1)",
+  "description": "One battery job's machine-readable outcome (plan §9.4 scoring). STRUCTURAL ONLY (plan §10 S6): evidence carries file pointers and short statuses, never raw logs — every free-string field is single-line and length-capped. Runtime twin: tools/dispatch_harness/scorecard.py (stdlib validator; a drift lock in tests/integration/test_battery_runner.py pins the two together).",
+  "type": "object",
+  "required": ["schema", "job_id", "verdict", "attribution", "wall_clock_s", "evidence", "versions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "battery-scorecard/v1"},
+    "job_id": {"type": "string", "minLength": 1, "description": "The battery card id this scores (B1..B8)."},
+    "verdict": {
+      "enum": ["GREEN", "PARKED-HONEST", "FALSE-DONE", "STALLED", "RECOVERED"],
+      "description": "Closed taxonomy (plan §9.4). FALSE-DONE is program-failing at any layer, any time."
+    },
+    "attribution": {
+      "enum": ["", "PLAN", "BUILD", "VERIFY", "HARNESS"],
+      "description": "Failure attribution: required (non-empty) for every non-GREEN verdict; must be empty for GREEN."
+    },
+    "wall_clock_s": {"type": "number", "minimum": 0},
+    "samples_consumed": {"type": "integer", "minimum": -1, "default": -1, "description": "Best-of-N candidates consumed; -1 = not instrumented."},
+    "packs_consumed": {"type": "integer", "minimum": -1, "default": -1, "description": "Context packs consumed; -1 = not instrumented."},
+    "interventions": {"type": "integer", "minimum": 0, "default": 0, "description": "Human interventions mid-run. Battery hard gate: the sum across a run is 0."},
+    "run_id": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 200},
+    "plan_id": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 200},
+    "repo": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 500},
+    "card_path": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 500},
+    "evidence": {
+      "type": "object",
+      "description": "Evidence POINTERS (paths) + short structured statuses — never raw log content. The optional 'oracle_status' key is the FALSE-DONE cross-check hook.",
+      "properties": {
+        "oracle_status": {"enum": ["passed", "failed", "not-run", "unknown"]}
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 1000},
+          {"type": "array", "items": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 1000}}
+        ]
+      }
+    },
+    "versions": {
+      "type": "object",
+      "description": "Reproducibility stamp (community-grade): blarai commit, python, runner version; name what is NOT measured rather than implying coverage.",
+      "additionalProperties": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 200}
+    },
+    "started_utc": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 64},
+    "finished_utc": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 64},
+    "dry_run": {"type": "boolean", "default": false},
+    "notes": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 500}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "GREEN"}}},
+      "then": {"properties": {"attribution": {"const": ""}}}
+    },
+    {
+      "if": {"properties": {"verdict": {"enum": ["PARKED-HONEST", "FALSE-DONE", "STALLED", "RECOVERED"]}}},
+      "then": {"properties": {"attribution": {"enum": ["PLAN", "BUILD", "VERIFY", "HARNESS"]}}}
+    }
+  ]
+}

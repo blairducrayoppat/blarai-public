@@ -1,0 +1,21 @@
+{
+  "rig": "N7",
+  "surface": "plan §10 S1 / §10.3 (#740 H3): a well-formed plan whose task status was flipped to 'merged' and job_acceptance.status to 'passed' on disk. Status is OUTSIDE the immutable-identity hash (advisory, NOT integrity-covered), so the retained hash STILL matches — PlanStore.load SUCCEEDS and the loaded status rides through as ADVISORY. The contract (module INTEGRITY CONTRACT note; Lane A2): a driver MUST re-derive done-ness from a fresh oracle run, never trust the persisted status as proof of completion. REFUSED-vs-ADVISORY: ADVISORY (load succeeds; status is not evidence).",
+  "schema": "jobplan/v1",
+  "plan_id": "n7-advisory-status",
+  "goal": "a plan whose completion status was flipped on disk (advisory only, not integrity-covered)",
+  "repo": "C:/Users/mrbla/projects/battery-n7-advisory",
+  "tasks": [
+    {
+      "id": "storage-module",
+      "prompt": "build storage — the status fields were flipped on disk (advisory, outside the hash)",
+      "depends_on": [],
+      "contract": {"creates": ["src/storage.py"], "exports": ["load()"], "notes": ""},
+      "status": "merged"
+    }
+  ],
+  "integration_nodes": [{"after_wave": 1, "status": "passed"}],
+  "job_acceptance": {"criteria": [], "oracle_path": "tests/test_job_acceptance.py", "status": "passed"},
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "922e1bd0fa2b8e7e7b01fe6b00e1e50dbc523158a78ab8f2f7c90d5c65797b86"
+}

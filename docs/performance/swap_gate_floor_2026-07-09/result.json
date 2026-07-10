@@ -1,0 +1,36 @@
+{
+  "decision": "all three pre-committed criteria MET -> swap_min_free_gb 21.0 -> 20.0 (blarai 2fd7006c), start-llm needGB 21 -> 20 + lean-preflight 21.5 -> 20.5 (agentic-setup 02e4936)",
+  "date_local": "2026-07-09 18:08",
+  "test": "swap-gate floor measurement (#777)",
+  "hardware": "Intel Core Ultra 7 258V / Arc 140V iGPU, 32 GB LPDDR5X",
+  "substrate": {
+    "compile_cache": "WARM (.cl_cache present)",
+    "model": "Qwen3-Coder-30B INT4 via OVMS (start-llm coder-30b)",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a"
+  },
+  "results": {
+    "disk_saturation_s": 10,
+    "ambient_gib": 19.85,
+    "page_storm": "NONE (Available never approached zero; June 2026-06-21 Available->67MB scenario did not recur)",
+    "gate_step_healthy_s": [
+      1.33,
+      1.07,
+      0.97
+    ],
+    "gate_step_squeezed_s": [
+      1.25,
+      1.02,
+      1.01
+    ],
+    "available_floor_gib": 4.6,
+    "load_wall_s": 13,
+    "generation_smoke_s": 4.5,
+    "ready": true
+  },
+  "methodology": "ballast process pinned Available to 19.85 GiB (target 20.0); start-llm -Force (gate bypassed FOR THE TEST); 1.5s-interval sampler (Available MBytes + %Disk Time); gate-step workload = pytest tests/integration/test_swap_ops.py x3 before (healthy) and after (squeezed); 30B generation smoke via :8099",
+  "not_measured": [
+    "COLD compile-cache load from 20 GiB (post-OVMS-upgrade class, #747 — backstopped by the 480s deadline + graceful abort)",
+    "sustained full-dispatch workload at 4.9 GiB Available (only a 3x pytest slice + one generation)",
+    "N=1 load (single supervised run)"
+  ]
+}

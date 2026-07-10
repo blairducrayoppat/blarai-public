@@ -1,0 +1,643 @@
+{
+  "harness": "prefix_caching_ab",
+  "schema_version": 1,
+  "plan": "docs/performance/prefix_caching_ab_validation_plan.md",
+  "vikunja": "#711",
+  "generated_utc": "2026-07-10T01:02:15Z",
+  "environment": {
+    "cpu": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+    "os": "Windows 10.0.26200",
+    "python": "3.11.9",
+    "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+    "total_ram_gib": 31.32,
+    "mem_ceiling_gib": 31.323,
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+    "gpu_driver": "unavailable"
+  },
+  "methodology": {
+    "ab_protocol": "flag flipped PER ARM (never pinned): fresh pipeline per (angle x enable_prefix_caching) combo, del+gc+settle between",
+    "pipeline": "primary arms use the PRODUCTION seam build_shared_pipeline(..., enable_prefix_caching=<arm>) \u2014 INT4 14B + pruned-6L draft, spec-decode ON, per-request num_assistant_tokens=3 (DEC-01/ISS-1); non-production controls (cache_size != 3, spec-OFF sub-arms) use a direct mirrored build and are labelled pipeline_kind=direct_control",
+    "runs": 5,
+    "warmup_discarded": 2,
+    "aggregates": "median + std + p95 (+ mean, n) on every metric",
+    "ttft": "streamer-callback hardware-timed first token",
+    "do_sample": false,
+    "cache_size_gb": 3,
+    "thermal": "cooldown-separated combos (120.0 s)",
+    "memory_instruments": {
+      "gpu_mem_*": "GPU_MEMORY_STATISTICS (cl_mem ~ reserved KV pool, usm_host ~ weights/working)",
+      "sys_peak_used_gib": "psutil avail-RAM delta vs the 31.323 GiB ceiling (shared-LPDDR5X iGPU proxy)",
+      "caveat": "blind to prefix-cache hit savings (pool reserved at cache_size); watched for pressure only"
+    },
+    "prompts": "fixed version-controlled builders in this script (unit-tested byte-stability)"
+  },
+  "config": {
+    "angles": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8"
+    ],
+    "runs": 5,
+    "warmup": 2,
+    "cache_size": 3,
+    "gen_tokens": 128,
+    "s2_turns": 10,
+    "s5_gen_tokens": 256,
+    "prefix_tokens": 3072,
+    "cooldown_s": 120.0,
+    "steady_state": false,
+    "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft_model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu"
+  },
+  "steady_state_warmup": null,
+  "results": [
+    {
+      "angle": "S1",
+      "description": "shared-prefix repeated turns (fixed ~3K system+tools prefix, distinct short queries)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "prefix_tokens_actual": 3839,
+        "ttft_cold_first_ms": 6118.5,
+        "tpot_cold_first_ms": 162.88,
+        "ttft_warm_ms": {
+          "median": 6352.13,
+          "mean": 6405.11,
+          "std": 461.25,
+          "p95": 7028.66,
+          "n": 5
+        },
+        "tpot_warm_ms": {
+          "median": 203.84,
+          "mean": 199.18,
+          "std": 22.74,
+          "p95": 224.55,
+          "n": 5
+        },
+        "total_latency_warm_ms": {
+          "median": 17563.39,
+          "mean": 17055.63,
+          "std": 1878.57,
+          "p95": 19519.96,
+          "n": 5
+        },
+        "decode_tok_s_warm": 4.91,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 861216,
+          "usm_host": 8984460278,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.91
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "prefix_tokens_actual": 3839,
+        "ttft_cold_first_ms": 5968.9,
+        "tpot_cold_first_ms": 161.93,
+        "ttft_warm_ms": {
+          "median": 348.42,
+          "mean": 348.06,
+          "std": 3.71,
+          "p95": 352.18,
+          "n": 5
+        },
+        "tpot_warm_ms": {
+          "median": 166.06,
+          "mean": 166.98,
+          "std": 2.68,
+          "p95": 170.99,
+          "n": 5
+        },
+        "total_latency_warm_ms": {
+          "median": 9153.39,
+          "mean": 9268.77,
+          "std": 507.09,
+          "p95": 10006.82,
+          "n": 5
+        },
+        "decode_tok_s_warm": 6.02,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 930210,
+          "usm_host": 8984452598,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.73
+      },
+      "warm_ttft_on_over_off": 0.055
+    },
+    {
+      "angle": "S2",
+      "description": "realistic agentic multi-turn (fixed system+tools, history grows each turn)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "turns": 10,
+        "per_turn_ttft_median_ms": [
+          2073.1,
+          2085.8,
+          2192.5,
+          2276.5,
+          2458.3,
+          2800.4,
+          2770.6,
+          2745.0,
+          2826.7,
+          2948.3
+        ],
+        "cumulative_session_ms": {
+          "median": 66034.85,
+          "mean": 66842.15,
+          "std": 16239.79,
+          "p95": 85797.97,
+          "n": 5
+        },
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 726586,
+          "usm_host": 8984459316,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.81
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "turns": 10,
+        "per_turn_ttft_median_ms": [
+          2128.7,
+          442.8,
+          418.7,
+          400.1,
+          415.1,
+          448.6,
+          408.3,
+          416.3,
+          462.7,
+          430.8
+        ],
+        "cumulative_session_ms": {
+          "median": 42988.95,
+          "mean": 41114.45,
+          "std": 6507.86,
+          "p95": 47198.24,
+          "n": 5
+        },
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 731654,
+          "usm_host": 8982627332,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.366,
+        "sys_peak_used_gib": 11.8
+      }
+    },
+    {
+      "angle": "S3",
+      "description": "no-reuse worst case (every prompt fully unique via nonce prefix)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "ttft_ms": {
+          "median": 4022.39,
+          "mean": 4047.68,
+          "std": 499.41,
+          "p95": 4669.95,
+          "n": 5
+        },
+        "tpot_ms": {
+          "median": 214.29,
+          "mean": 203.76,
+          "std": 34.01,
+          "p95": 242.71,
+          "n": 5
+        },
+        "decode_tok_s": 4.67,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 656464,
+          "usm_host": 8982625042,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.366,
+        "sys_peak_used_gib": 11.74
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "ttft_ms": {
+          "median": 3820.28,
+          "mean": 3879.43,
+          "std": 361.85,
+          "p95": 4356.01,
+          "n": 5
+        },
+        "tpot_ms": {
+          "median": 194.03,
+          "mean": 186.31,
+          "std": 27.5,
+          "p95": 217.49,
+          "n": 5
+        },
+        "decode_tok_s": 5.15,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 826906,
+          "usm_host": 8982625462,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.366,
+        "sys_peak_used_gib": 11.77
+      }
+    },
+    {
+      "angle": "S4",
+      "description": "long context 16K at the shipped cache_size (starved-pool interaction, #709)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "context": 16384,
+        "cache_size_gb": 3,
+        "ttft_cold_unique_ms": {
+          "median": 77666.41,
+          "mean": 75342.96,
+          "std": 7518.79,
+          "p95": 82971.2,
+          "n": 5
+        },
+        "ttft_warm_identical_ms": {
+          "median": 87991.01,
+          "mean": 87959.28,
+          "std": 2676.99,
+          "p95": 91106.22,
+          "n": 5
+        },
+        "errors": [],
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 2486636,
+          "usm_host": 8984471286,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 12.06
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "context": 16384,
+        "cache_size_gb": 3,
+        "ttft_cold_unique_ms": {
+          "median": 84323.53,
+          "mean": 81982.75,
+          "std": 4635.11,
+          "p95": 86795.87,
+          "n": 5
+        },
+        "ttft_warm_identical_ms": {
+          "median": 993.96,
+          "mean": 18256.58,
+          "std": 34437.47,
+          "p95": 69951.51,
+          "n": 5
+        },
+        "errors": [],
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 3844620,
+          "usm_host": 8984471286,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.86
+      }
+    },
+    {
+      "angle": "S5",
+      "description": "spec-decode acceptance / speedup (spec-ON vs spec-OFF per caching arm)",
+      "off": {
+        "tpot_ms_spec_on": {
+          "median": 252.19,
+          "mean": 254.61,
+          "std": 8.63,
+          "p95": 267.6,
+          "n": 5
+        },
+        "decode_tok_s_spec_on": 3.97,
+        "acceptance_rate": "unavailable",
+        "pipeline_kind_spec_on": "shared_pipeline_production_seam",
+        "tpot_ms_spec_off_control": {
+          "median": 197.72,
+          "mean": 205.29,
+          "std": 18.26,
+          "p95": 229.92,
+          "n": 5
+        },
+        "decode_tok_s_spec_off_control": 5.06,
+        "spec_speedup_x": 0.78
+      },
+      "on": {
+        "tpot_ms_spec_on": {
+          "median": 291.46,
+          "mean": 269.76,
+          "std": 39.44,
+          "p95": 303.16,
+          "n": 5
+        },
+        "decode_tok_s_spec_on": 3.43,
+        "acceptance_rate": "unavailable",
+        "pipeline_kind_spec_on": "shared_pipeline_production_seam",
+        "tpot_ms_spec_off_control": {
+          "median": 212.23,
+          "mean": 209.94,
+          "std": 4.71,
+          "p95": 214.59,
+          "n": 5
+        },
+        "decode_tok_s_spec_off_control": 4.71,
+        "spec_speedup_x": 0.73
+      }
+    },
+    {
+      "angle": "S6",
+      "description": "correctness / determinism (exact output equality OFF vs ON, temp=0)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "outputs": [
+          {
+            "prompt_index": 0,
+            "sha256": "4ba6794bed139e3e08f630a56736fb9abc0601701e0e036877c61546a3bb557f",
+            "head": "<think>\nOkay, the user is asking to name the four seasons in order, separated by commas. Let me think. The seasons are t",
+            "len": 586,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 1,
+            "sha256": "45378bdbf9a4817f83e137de8f7a846f03cf2d42633e8fed545e7724e9582c75",
+            "head": "<think>\nOkay, the user wants me to reply with exactly the JSON {\"status\": \"ok\", \"count\": 3}. Let me make sure I understa",
+            "len": 568,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 2,
+            "sha256": "5c9535480325dfa10708e3a280f1c9ea0526690bab8a9abb9af54830ed96be33",
+            "head": "<think>\nOkay, the user is asking for three primary colors, one per line. Let me start by recalling what primary colors a",
+            "len": 635,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 3,
+            "sha256": "641ecf470ae950228eba7d25763d527b3df9f91491e8213478e53ef00aaf093a",
+            "head": "<think>\nOkay, the user wants a summary of the standing instructions in one sentence. Let me look at the provided text ag",
+            "len": 635,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 4,
+            "sha256": "41890138cdcf8da970a5b8432550ac975e63ec85f110cef6410262b76a792e87",
+            "head": "<think>\nOkay, let me figure out what 17 multiplied by 23 is. Hmm, I need to do this multiplication step by step. Maybe I",
+            "len": 391,
+            "repeat_identical": true
+          }
+        ],
+        "within_arm_repeat_identical": true
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "outputs": [
+          {
+            "prompt_index": 0,
+            "sha256": "4ba6794bed139e3e08f630a56736fb9abc0601701e0e036877c61546a3bb557f",
+            "head": "<think>\nOkay, the user is asking to name the four seasons in order, separated by commas. Let me think. The seasons are t",
+            "len": 586,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 1,
+            "sha256": "45378bdbf9a4817f83e137de8f7a846f03cf2d42633e8fed545e7724e9582c75",
+            "head": "<think>\nOkay, the user wants me to reply with exactly the JSON {\"status\": \"ok\", \"count\": 3}. Let me make sure I understa",
+            "len": 568,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 2,
+            "sha256": "5c9535480325dfa10708e3a280f1c9ea0526690bab8a9abb9af54830ed96be33",
+            "head": "<think>\nOkay, the user is asking for three primary colors, one per line. Let me start by recalling what primary colors a",
+            "len": 635,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 3,
+            "sha256": "641ecf470ae950228eba7d25763d527b3df9f91491e8213478e53ef00aaf093a",
+            "head": "<think>\nOkay, the user wants a summary of the standing instructions in one sentence. Let me look at the provided text ag",
+            "len": 635,
+            "repeat_identical": true
+          },
+          {
+            "prompt_index": 4,
+            "sha256": "41890138cdcf8da970a5b8432550ac975e63ec85f110cef6410262b76a792e87",
+            "head": "<think>\nOkay, let me figure out what 17 multiplied by 23 is. Hmm, I need to do this multiplication step by step. Maybe I",
+            "len": 391,
+            "repeat_identical": true
+          }
+        ],
+        "within_arm_repeat_identical": true
+      },
+      "outputs_identical": true
+    },
+    {
+      "angle": "S7",
+      "description": "co-resident pressure \u2014 14B-only memory instruments vs the 31.323 GiB ceiling",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "sdxl_paired": false,
+        "gpu_mem_before_bytes": {
+          "cl_mem": 0,
+          "unknown": 0,
+          "usm_device": 0,
+          "usm_host": 0,
+          "usm_shared": 0
+        },
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 861216,
+          "usm_host": 8984460278,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.74,
+        "headroom_vs_ceiling_gib": 11.44
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "sdxl_paired": false,
+        "gpu_mem_before_bytes": {
+          "cl_mem": 0,
+          "unknown": 0,
+          "usm_device": 0,
+          "usm_host": 0,
+          "usm_shared": 0
+        },
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 930210,
+          "usm_host": 8984452598,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.75,
+        "headroom_vs_ceiling_gib": 11.39
+      }
+    },
+    {
+      "angle": "S8",
+      "description": "pinned operator-preference-block cost curve (cold / warm-hit / one-line-edit)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "sizes": [
+          {
+            "block_target_tokens": 256,
+            "block_actual_tokens": 579,
+            "ttft_cold_ms": 940.1,
+            "ttft_warm_ms": {
+              "median": 860.68,
+              "mean": 857.73,
+              "std": 4.93,
+              "p95": 862.15,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 865.1
+          },
+          {
+            "block_target_tokens": 512,
+            "block_actual_tokens": 1158,
+            "ttft_cold_ms": 1597.3,
+            "ttft_warm_ms": {
+              "median": 1536.35,
+              "mean": 1537.06,
+              "std": 4.63,
+              "p95": 1542.58,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 1540.3
+          },
+          {
+            "block_target_tokens": 1024,
+            "block_actual_tokens": 2382,
+            "ttft_cold_ms": 5977.3,
+            "ttft_warm_ms": {
+              "median": 18370.52,
+              "mean": 18317.8,
+              "std": 901.56,
+              "p95": 19469.57,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 20552.9
+          },
+          {
+            "block_target_tokens": 2048,
+            "block_actual_tokens": 4764,
+            "ttft_cold_ms": 39911.7,
+            "ttft_warm_ms": {
+              "median": 41328.11,
+              "mean": 41274.55,
+              "std": 322.85,
+              "p95": 41677.07,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 41648.3
+          }
+        ],
+        "note": "cold and post-edit TTFTs are single-shot by nature (the first exposure consumes the cache state); warm TTFT carries the full median/std/p95 aggregate"
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "sizes": [
+          {
+            "block_target_tokens": 256,
+            "block_actual_tokens": 579,
+            "ttft_cold_ms": 4741.3,
+            "ttft_warm_ms": {
+              "median": 421.89,
+              "mean": 439.29,
+              "std": 34.43,
+              "p95": 491.97,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 2790.4
+          },
+          {
+            "block_target_tokens": 512,
+            "block_actual_tokens": 1158,
+            "ttft_cold_ms": 10302.6,
+            "ttft_warm_ms": {
+              "median": 490.75,
+              "mean": 491.6,
+              "std": 7.09,
+              "p95": 499.04,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 4739.1
+          },
+          {
+            "block_target_tokens": 1024,
+            "block_actual_tokens": 2382,
+            "ttft_cold_ms": 19837.4,
+            "ttft_warm_ms": {
+              "median": 365.87,
+              "mean": 446.25,
+              "std": 147.6,
+              "p95": 672.79,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 10511.4
+          },
+          {
+            "block_target_tokens": 2048,
+            "block_actual_tokens": 4764,
+            "ttft_cold_ms": 40957.3,
+            "ttft_warm_ms": {
+              "median": 800.3,
+              "mean": 794.64,
+              "std": 11.17,
+              "p95": 807.15,
+              "n": 5
+            },
+            "ttft_after_one_line_edit_ms": 21298.2
+          }
+        ],
+        "note": "cold and post-edit TTFTs are single-shot by nature (the first exposure consumes the cache state); warm TTFT carries the full median/std/p95 aggregate"
+      }
+    }
+  ],
+  "not_measured": [
+    "prefix-cache HIT memory savings -- the reserved KV pool is fixed at cache_size regardless of hits, so GPU/host memory readouts are blind to hit savings; the caching win is read from TTFT/throughput only (plan honest-caveat, carried from #709)",
+    "S7 measures the 14B-only footprint; the paired-SDXL co-resident run needs the image model staged and is a separate supervised step",
+    "thermal steady-state plateau (cooldown-separated run; re-run with --steady-state for the sustained-throttled comparison)",
+    "spec-decode acceptance % \u2014 this GenAI build does not expose extended perf metrics; speedup ratio recorded instead"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "rig": "N7",
+  "surface": "plan §9.3 N7 / §10 S1: a plan whose repo target escapes projects_dir via ../ traversal — validate_repo containment (re-checked at LOAD, not just creation) must refuse; nothing may execute outside projects_dir",
+  "schema": "jobplan/v1",
+  "plan_id": "n7-path-traversal",
+  "goal": "a plan that tries to target a repo outside the sandbox by climbing out of the projects dir",
+  "repo": "C:/Users/mrbla/projects/../../blarai",
+  "tasks": [
+    {
+      "id": "escape-task",
+      "prompt": "write to the escaped repo",
+      "depends_on": [],
+      "contract": {"creates": ["evil.py"], "exports": [], "notes": ""},
+      "status": "pending"
+    }
+  ],
+  "integration_nodes": [{"after_wave": 1, "status": "pending"}],
+  "job_acceptance": {"criteria": [], "oracle_path": "tests/test_job_acceptance.py", "status": "pending"},
+  "redecompose_budget": {"per_task": 1, "per_job": 2, "spent": 0},
+  "plan_hash": "n/a"
+}

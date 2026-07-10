@@ -410,10 +410,15 @@ class TestGrammarSchema:
 
 
 class TestStructuredOutputWiring:
-    def test_generation_config_knob_defaults_on(self) -> None:
+    def test_generation_config_knob_defaults_off(self) -> None:
+        """#748: the grammar is OPT-IN — armed only by the conversational path
+        resolving [generation].tool_call_grammar. The prior True default silently
+        armed every other GenerationConfig() construction (the #670 PLAN call
+        crashed on #725's xgrammar stop-token bug and every multi-task plan
+        collapsed to the single-task fallback) while the production TOML said off."""
         from services.assistant_orchestrator.src.gpu_inference import GenerationConfig
 
-        assert GenerationConfig().tool_call_grammar is True
+        assert GenerationConfig().tool_call_grammar is False
 
     def test_builder_matches_installed_api(self) -> None:
         """With the installed GenAI exposing the structured-output API the

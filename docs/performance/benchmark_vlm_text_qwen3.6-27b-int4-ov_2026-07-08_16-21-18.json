@@ -1,0 +1,249 @@
+{
+  "benchmark": "vlm_text_inference",
+  "model": "qwen3.6-27b-int4-ov",
+  "device": "GPU",
+  "timestamp": "2026-07-08T16:21:18",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "prompt_set_version": "v1",
+  "prefill_probe_version": "pp-v1",
+  "runs": 5,
+  "warmup": 2,
+  "cooldown_s": 30.0,
+  "max_new_tokens": 256,
+  "load_seconds": 33.1,
+  "sys_available_gb_before_load": 24.91,
+  "sys_available_gb_after_load": 9.96,
+  "sys_available_gb_min_during": 8.56,
+  "generation": {
+    "median_tps": 3.59,
+    "mean_tps": 4.02,
+    "p95_tps": 5.6,
+    "median_ttft_ms": 876.0,
+    "errors": []
+  },
+  "prefill": {
+    "median_pp_tok_per_sec": 219.0,
+    "runs": [
+      {
+        "input_tokens": 441,
+        "prefill_ms": 2011.8744000210427,
+        "prefill_tok_per_sec": 219.19857422281802,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 1414.8861000139732,
+        "prefill_tok_per_sec": 311.68586644228446,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 1787.61180001311,
+        "prefill_tok_per_sec": 246.6978568818833,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 4265.731399995275,
+        "prefill_tok_per_sec": 103.38203666562046,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 2442.54039999214,
+        "prefill_tok_per_sec": 180.54972601534826,
+        "error": null
+      }
+    ]
+  },
+  "coherence_note": "Full output texts below are the openvino.genai #3870 reproduction evidence \u2014 judged by the reviewer, not by this script.",
+  "gen_runs": [
+    {
+      "prompt_index": 0,
+      "token_count": 135,
+      "latency_first_token_ms": 633.7056000193115,
+      "latency_total_ms": 27416.98219999671,
+      "throughput_tok_per_sec": 5.040458716694653,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"What is the capital city of France?\"\n2.  **Retrieve Knowledge**: I know from general knowledge that France is a country in Western Europe, and its capital city is Paris.\n3.  **Verify Accuracy**: This is a well-established, universally accepted fact. No ambiguity or controversy exists.\n4.  **Formulate Response**: Keep it direct and accurate. \"The capital city of France is Paris.\"\n5.  **Final Output Generation**: Output the response.\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 801.5113000001293,
+      "latency_total_ms": 61813.3405999979,
+      "throughput_tok_per_sec": 4.195907628686841,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in computing/data storage.\n3.  **Recognize Ambiguity/Context:** There are two common definitions:\n   - Binary definition (traditional computing): 1 KB = 1024 bytes (2^10)\n   - Decimal definition (SI/metric, used by storage manufacturers and networking): 1 KB = 1000 bytes\n   - Modern standard (IEC): 1 KiB = 1024 bytes, 1 KB = 1000 bytes\n4.  **Formulate Answer:** \n   - Acknowledge both definitions clearly.\n   - Explain the historical/contextual usage.\n   - State the modern standard (IEC) to avoid confusion.\n   - Keep it concise and accurate.\n5.  **Draft Response (mental):** \n   It depends on the context:\n   - In traditional computing and operating systems, 1 kilobyte (KB) = 1,024",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 748.0723999906331,
+      "latency_total_ms": 70096.02229998563,
+      "throughput_tok_per_sec": 3.691529459330397,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language (no jargon, or explain jargon simply)\n   - **Goal:** Make it accessible to someone without a technical background\n\n2.  **Identify Key Concepts of Transformers:**\n   - What is it? A type of neural network architecture\n   - What does it do? Processes sequences of data (like text, audio, images)\n   - Key innovation: Attention mechanism\n   - Why is it important? Powers modern AI (LLMs, translation, image generation, etc.)\n   - How does it work? Parallel processing, self-attention, encoder-decoder structure (originally), positional encoding\n\n3.  **Translate to Plain Language:**\n   - *Neural network* \u2192 A computer system that learns patterns from data, inspired by how brains work\n   - *Transformer* \u2192 A specific design for these networks that's especially good at handling sequences (like sentences)\n   - *Attention mechanism* \u2192 The ability to focus on the most relevant parts of the input when making a decision\n   - *Parallel processing* \u2192 Processes everything at once instead of",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 1028.3261000004131,
+      "latency_total_ms": 76538.78740000073,
+      "throughput_tok_per_sec": 3.3902587216746207,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Core Question 1:** What is it? (Definition/Concept).\n    *   **Core Question 2:** Why does it help with inference speed? (Mechanism/Benefits).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of it like rounding numbers.\n    *   *Technical definition:* It's a technique to reduce the precision of the numbers used to represent model weights and activations.\n    *   *Standard vs. Quantized:* Standard is usually 32-bit floating point (FP32). Quantized is often 8-bit integer (INT8) or even lower (INT4, binary).\n    *   *Key components:* Weights (parameters) and Activations (intermediate outputs).\n\n3.  **Explain the \"Why\" (Inference Speed & Efficiency):**\n    *   *Hardware perspective:* Computers (CPUs, GPUs, TPUs) are designed to process specific data types.\n    *",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 135,
+      "latency_first_token_ms": 612.9030000010971,
+      "latency_total_ms": 22631.424399995012,
+      "throughput_tok_per_sec": 6.131201888971405,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"What is the capital city of France?\"\n2.  **Retrieve Knowledge**: I know from general knowledge that France is a country in Western Europe, and its capital city is Paris.\n3.  **Verify Accuracy**: This is a well-established, universally accepted fact. No ambiguity or controversy exists.\n4.  **Formulate Response**: Keep it direct and accurate. \"The capital city of France is Paris.\"\n5.  **Final Output Generation**: Output the response.\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 756.3149999768939,
+      "latency_total_ms": 69018.37759997579,
+      "throughput_tok_per_sec": 3.750252925993539,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in computing/data storage.\n3.  **Recognize Ambiguity/Context:** There are two common definitions:\n   - Binary definition (traditional computing): 1 KB = 1024 bytes (2^10)\n   - Decimal definition (SI/metric, used by storage manufacturers and networking): 1 KB = 1000 bytes\n   - Modern standard (IEC): 1 KiB = 1024 bytes, 1 KB = 1000 bytes\n4.  **Formulate Answer:** \n   - Acknowledge both definitions clearly.\n   - Explain the historical/contextual usage.\n   - State the modern standard (IEC) to avoid confusion.\n   - Keep it concise and accurate.\n5.  **Draft Response (mental):** \n   It depends on the context:\n   - In traditional computing and operating systems, 1 kilobyte (KB) = 1,024",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 975.6618000101298,
+      "latency_total_ms": 78404.11650002352,
+      "throughput_tok_per_sec": 3.3062780471577167,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language (no jargon, or explain jargon simply)\n   - **Goal:** Make it accessible to someone without a technical background\n\n2.  **Identify Key Concepts of Transformers:**\n   - What is it? A type of neural network architecture\n   - What does it do? Processes sequences of data (like text, audio, images)\n   - Key innovation: Attention mechanism\n   - Why is it important? Powers modern AI (LLMs, translation, image generation, etc.)\n   - How does it work? Parallel processing, self-attention, encoder-decoder structure (originally), positional encoding\n\n3.  **Translate to Plain Language:**\n   - *Neural network* \u2192 A computer system that learns patterns from data, inspired by how brains work\n   - *Transformer* \u2192 A specific design for these networks that's especially good at handling sequences (like sentences)\n   - *Attention mechanism* \u2192 The ability to focus on the most relevant parts of the input when making a decision\n   - *Parallel processing* \u2192 Processes everything at once instead of",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 1095.6226999987848,
+      "latency_total_ms": 80858.55760000413,
+      "throughput_tok_per_sec": 3.2095107874470004,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Core Question 1:** What is it? (Definition/Concept).\n    *   **Core Question 2:** Why does it help with inference speed? (Mechanism/Benefits).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of it like rounding numbers.\n    *   *Technical definition:* It's a technique to reduce the precision of the numbers used to represent model weights and activations.\n    *   *Standard vs. Quantized:* Standard is usually 32-bit floating point (FP32). Quantized is often 8-bit integer (INT8) or even lower (INT4, binary).\n    *   *Key components:* Weights (parameters) and Activations (intermediate outputs).\n\n3.  **Explain the \"Why\" (Inference Speed & Efficiency):**\n    *   *Hardware perspective:* Computers (CPUs, GPUs, TPUs) are designed to process specific data types.\n    *",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 135,
+      "latency_first_token_ms": 650.4163999925368,
+      "latency_total_ms": 24829.418600013014,
+      "throughput_tok_per_sec": 5.583356950928507,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"What is the capital city of France?\"\n2.  **Retrieve Knowledge**: I know from general knowledge that France is a country in Western Europe, and its capital city is Paris.\n3.  **Verify Accuracy**: This is a well-established, universally accepted fact. No ambiguity or controversy exists.\n4.  **Formulate Response**: Keep it direct and accurate. \"The capital city of France is Paris.\"\n5.  **Final Output Generation**: Output the response.\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 764.8732000088785,
+      "latency_total_ms": 70938.50899999961,
+      "throughput_tok_per_sec": 3.6480937189809084,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in computing/data storage.\n3.  **Recognize Ambiguity/Context:** There are two common definitions:\n   - Binary definition (traditional computing): 1 KB = 1024 bytes (2^10)\n   - Decimal definition (SI/metric, used by storage manufacturers and networking): 1 KB = 1000 bytes\n   - Modern standard (IEC): 1 KiB = 1024 bytes, 1 KB = 1000 bytes\n4.  **Formulate Answer:** \n   - Acknowledge both definitions clearly.\n   - Explain the historical/contextual usage.\n   - State the modern standard (IEC) to avoid confusion.\n   - Keep it concise and accurate.\n5.  **Draft Response (mental):** \n   It depends on the context:\n   - In traditional computing and operating systems, 1 kilobyte (KB) = 1,024",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 968.9368999970611,
+      "latency_total_ms": 77500.74379998841,
+      "throughput_tok_per_sec": 3.345014450456271,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language (no jargon, or explain jargon simply)\n   - **Goal:** Make it accessible to someone without a technical background\n\n2.  **Identify Key Concepts of Transformers:**\n   - What is it? A type of neural network architecture\n   - What does it do? Processes sequences of data (like text, audio, images)\n   - Key innovation: Attention mechanism\n   - Why is it important? Powers modern AI (LLMs, translation, image generation, etc.)\n   - How does it work? Parallel processing, self-attention, encoder-decoder structure (originally), positional encoding\n\n3.  **Translate to Plain Language:**\n   - *Neural network* \u2192 A computer system that learns patterns from data, inspired by how brains work\n   - *Transformer* \u2192 A specific design for these networks that's especially good at handling sequences (like sentences)\n   - *Attention mechanism* \u2192 The ability to focus on the most relevant parts of the input when making a decision\n   - *Parallel processing* \u2192 Processes everything at once instead of",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 1102.9987999936566,
+      "latency_total_ms": 78170.40350000025,
+      "throughput_tok_per_sec": 3.3217674968621087,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Core Question 1:** What is it? (Definition/Concept).\n    *   **Core Question 2:** Why does it help with inference speed? (Mechanism/Benefits).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of it like rounding numbers.\n    *   *Technical definition:* It's a technique to reduce the precision of the numbers used to represent model weights and activations.\n    *   *Standard vs. Quantized:* Standard is usually 32-bit floating point (FP32). Quantized is often 8-bit integer (INT8) or even lower (INT4, binary).\n    *   *Key components:* Weights (parameters) and Activations (intermediate outputs).\n\n3.  **Explain the \"Why\" (Inference Speed & Efficiency):**\n    *   *Hardware perspective:* Computers (CPUs, GPUs, TPUs) are designed to process specific data types.\n    *",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 135,
+      "latency_first_token_ms": 661.4610999822617,
+      "latency_total_ms": 24776.307199994335,
+      "throughput_tok_per_sec": 5.598211136828794,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"What is the capital city of France?\"\n2.  **Retrieve Knowledge**: I know from general knowledge that France is a country in Western Europe, and its capital city is Paris.\n3.  **Verify Accuracy**: This is a well-established, universally accepted fact. No ambiguity or controversy exists.\n4.  **Formulate Response**: Keep it direct and accurate. \"The capital city of France is Paris.\"\n5.  **Final Output Generation**: Output the response.\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 832.1579999756068,
+      "latency_total_ms": 71846.86799999326,
+      "throughput_tok_per_sec": 3.6048869311715324,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in computing/data storage.\n3.  **Recognize Ambiguity/Context:** There are two common definitions:\n   - Binary definition (traditional computing): 1 KB = 1024 bytes (2^10)\n   - Decimal definition (SI/metric, used by storage manufacturers and networking): 1 KB = 1000 bytes\n   - Modern standard (IEC): 1 KiB = 1024 bytes, 1 KB = 1000 bytes\n4.  **Formulate Answer:** \n   - Acknowledge both definitions clearly.\n   - Explain the historical/contextual usage.\n   - State the modern standard (IEC) to avoid confusion.\n   - Keep it concise and accurate.\n5.  **Draft Response (mental):** \n   It depends on the context:\n   - In traditional computing and operating systems, 1 kilobyte (KB) = 1,024",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 1001.6998999926727,
+      "latency_total_ms": 76971.76849999232,
+      "throughput_tok_per_sec": 3.369748174743667,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language (no jargon, or explain jargon simply)\n   - **Goal:** Make it accessible to someone without a technical background\n\n2.  **Identify Key Concepts of Transformers:**\n   - What is it? A type of neural network architecture\n   - What does it do? Processes sequences of data (like text, audio, images)\n   - Key innovation: Attention mechanism\n   - Why is it important? Powers modern AI (LLMs, translation, image generation, etc.)\n   - How does it work? Parallel processing, self-attention, encoder-decoder structure (originally), positional encoding\n\n3.  **Translate to Plain Language:**\n   - *Neural network* \u2192 A computer system that learns patterns from data, inspired by how brains work\n   - *Transformer* \u2192 A specific design for these networks that's especially good at handling sequences (like sentences)\n   - *Attention mechanism* \u2192 The ability to focus on the most relevant parts of the input when making a decision\n   - *Parallel processing* \u2192 Processes everything at once instead of",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 1290.4861999850255,
+      "latency_total_ms": 78270.14609999605,
+      "throughput_tok_per_sec": 3.3255537934633472,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Core Question 1:** What is it? (Definition/Concept).\n    *   **Core Question 2:** Why does it help with inference speed? (Mechanism/Benefits).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of it like rounding numbers.\n    *   *Technical definition:* It's a technique to reduce the precision of the numbers used to represent model weights and activations.\n    *   *Standard vs. Quantized:* Standard is usually 32-bit floating point (FP32). Quantized is often 8-bit integer (INT8) or even lower (INT4, binary).\n    *   *Key components:* Weights (parameters) and Activations (intermediate outputs).\n\n3.  **Explain the \"Why\" (Inference Speed & Efficiency):**\n    *   *Hardware perspective:* Computers (CPUs, GPUs, TPUs) are designed to process specific data types.\n    *",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 135,
+      "latency_first_token_ms": 646.9235999975353,
+      "latency_total_ms": 24957.59520001593,
+      "throughput_tok_per_sec": 5.553116846014976,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"What is the capital city of France?\"\n2.  **Retrieve Knowledge**: I know from general knowledge that France is a country in Western Europe, and its capital city is Paris.\n3.  **Verify Accuracy**: This is a well-established, universally accepted fact. No ambiguity or controversy exists.\n4.  **Formulate Response**: Keep it direct and accurate. \"The capital city of France is Paris.\"\n5.  **Final Output Generation**: Output the response.\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 919.6948999888264,
+      "latency_total_ms": 72578.12069999636,
+      "throughput_tok_per_sec": 3.5725038213157774,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about the definition of a kilobyte (KB) in computing/data storage.\n3.  **Recognize Ambiguity/Context:** There are two common definitions:\n   - Binary definition (traditional computing): 1 KB = 1024 bytes (2^10)\n   - Decimal definition (SI/metric, used by storage manufacturers and networking): 1 KB = 1000 bytes\n   - Modern standard (IEC): 1 KiB = 1024 bytes, 1 KB = 1000 bytes\n4.  **Formulate Answer:** \n   - Acknowledge both definitions clearly.\n   - Explain the historical/contextual usage.\n   - State the modern standard (IEC) to avoid confusion.\n   - Keep it concise and accurate.\n5.  **Draft Response (mental):** \n   It depends on the context:\n   - In traditional computing and operating systems, 1 kilobyte (KB) = 1,024",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 946.1447999929078,
+      "latency_total_ms": 75860.40599999251,
+      "throughput_tok_per_sec": 3.417239867273781,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language (no jargon, or explain jargon simply)\n   - **Goal:** Make it accessible to someone without a technical background\n\n2.  **Identify Key Concepts of Transformers:**\n   - What is it? A type of neural network architecture\n   - What does it do? Processes sequences of data (like text, audio, images)\n   - Key innovation: Attention mechanism\n   - Why is it important? Powers modern AI (LLMs, translation, image generation, etc.)\n   - How does it work? Parallel processing, self-attention, encoder-decoder structure (originally), positional encoding\n\n3.  **Translate to Plain Language:**\n   - *Neural network* \u2192 A computer system that learns patterns from data, inspired by how brains work\n   - *Transformer* \u2192 A specific design for these networks that's especially good at handling sequences (like sentences)\n   - *Attention mechanism* \u2192 The ability to focus on the most relevant parts of the input when making a decision\n   - *Parallel processing* \u2192 Processes everything at once instead of",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 1061.8581000017002,
+      "latency_total_ms": 77872.30309998267,
+      "throughput_tok_per_sec": 3.3328800529675804,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Core Question 1:** What is it? (Definition/Concept).\n    *   **Core Question 2:** Why does it help with inference speed? (Mechanism/Benefits).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of it like rounding numbers.\n    *   *Technical definition:* It's a technique to reduce the precision of the numbers used to represent model weights and activations.\n    *   *Standard vs. Quantized:* Standard is usually 32-bit floating point (FP32). Quantized is often 8-bit integer (INT8) or even lower (INT4, binary).\n    *   *Key components:* Weights (parameters) and Activations (intermediate outputs).\n\n3.  **Explain the \"Why\" (Inference Speed & Efficiency):**\n    *   *Hardware perspective:* Computers (CPUs, GPUs, TPUs) are designed to process specific data types.\n    *",
+      "error": null
+    }
+  ],
+  "not_measured": [
+    "speculative decoding (does not exist for this pipeline class/model family)",
+    "co-resident cost (benchmarked alone)",
+    "vision/image inputs (text-only probe)",
+    "long-context decode (256-token generations only)"
+  ]
+}

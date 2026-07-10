@@ -157,3 +157,44 @@ async def test_gateway_dormant_fires_nothing_even_with_seams_wired():
         "s", DispatchCommand(kind="run", repo="r", goal="g")
     )
     assert "off" in reply.lower() or "dormant" in reply.lower()  # disabled BEFORE either seam
+
+
+# ---------------------------------------------------------------------------
+# #766 — the PLAN receive budget (the cold-AO PLAN-timeout class)
+# ---------------------------------------------------------------------------
+
+
+class _TimeoutCaptureHarness:
+    """Real ``_plan_transport_call`` body over a captured ``_open_prompt_transport``
+    — pins WHICH receive budget the PLAN frame is opened with (#766: the 180 s
+    per-prompt budget expired mid-PLAN against a cold just-swapped-back AO and
+    STALLED B4/B6; the PLAN call must use PLAN_RESPONSE_TIMEOUT_S)."""
+
+    def __init__(self) -> None:
+        from shared.ipc.protocol import MessageFramer
+
+        self._framer = MessageFramer()
+        self.opened_with: list[float] = []
+
+    async def _open_prompt_transport(self, timeout_s=None):
+        self.opened_with.append(timeout_s)
+        return None  # fail-closed after capture — the budget is the assertion
+
+    _plan_transport_call = TransportGateway._plan_transport_call
+
+
+@pytest.mark.asyncio
+async def test_plan_transport_opens_with_the_plan_budget_not_the_prompt_budget():
+    from services.ui_gateway.src.constants import (
+        PLAN_RESPONSE_TIMEOUT_S,
+        PROMPT_RESPONSE_TIMEOUT_S,
+    )
+
+    h = _TimeoutCaptureHarness()
+    result = await h._plan_transport_call(b"frame")
+    assert h.opened_with == [PLAN_RESPONSE_TIMEOUT_S]
+    assert result["ok"] is False                       # fail-closed shape preserved
+    # The relation itself is load-bearing: the PLAN budget must dominate the
+    # per-prompt budget (a PLAN is ~6 chained calls), and must stay finite.
+    assert PLAN_RESPONSE_TIMEOUT_S > PROMPT_RESPONSE_TIMEOUT_S
+    assert PLAN_RESPONSE_TIMEOUT_S <= 900.0

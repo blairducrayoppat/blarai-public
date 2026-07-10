@@ -33,8 +33,13 @@ def test_write_read_round_trip(tmp_path):
 
 def test_no_conversation_field_persisted():
     # Privacy ruling: the record carries ONLY these fields — no conversation.
+    # plan_hash (M2 #740) is a sha256 hex of the persisted JobPlan artifact — pure
+    # integrity metadata, no content of any kind (the tamper re-pin, §10 S1).
+    # driver_pid / driver_pid_created (#758) are process-liveness metadata (the
+    # reconciler's crashed-vs-live gate) — likewise content-free.
     fields = set(ss.SwapState.__dataclass_fields__)
-    assert fields == {"run_id", "session_id", "phase", "tasks", "ts", "error"}
+    assert fields == {"run_id", "session_id", "phase", "tasks", "ts", "error",
+                      "plan_hash", "driver_pid", "driver_pid_created"}
     for forbidden in ("conversation", "conv", "messages", "turns", "history"):
         assert forbidden not in fields
 
@@ -228,3 +233,191 @@ def test_is_in_flight():
     assert ss.is_in_flight(_state(phase=ss.PHASE_IDLE)) is False
     assert ss.is_in_flight(_state(phase=ss.PHASE_RECOVERED)) is False
     assert ss.is_in_flight(None) is False
+
+
+# ---- #758: recovery presumes a CRASH — a live driver means hands-off --------
+# The 2026-07-07 incident: an AO boot mid-dispatch (a pytest gate run) "recovered"
+# a HEALTHY swap — stopped the real OVMS mid-request, disarmed the sentinel, and
+# stamped RECOVERED over the live run, killing the battery job.
+
+
+def test_reconcile_live_driver_is_hands_off(tmp_path):
+    swap_p = tmp_path / "swap.json"
+    sentinel = tmp_path / "server-should-run.txt"
+    sentinel.write_text("coder-30b", encoding="utf-8")
+    ss.write_swap_state(_state(phase=ss.PHASE_CODE), path=swap_p)
+    calls = []
+    res = ss.reconcile_swap_state(
+        swap_state_path=swap_p, sentinel_path=sentinel, runs_dir=tmp_path / "runs",
+        stop_ovms=lambda: calls.append(1),
+        driver_alive_probe=lambda st: True,          # the driver is ALIVE
+    )
+    assert res.in_flight is True
+    assert "still running" in res.message.lower()
+    assert sentinel.exists()                          # NOT disarmed
+    assert calls == []                                # OVMS NOT stopped (the kill class)
+    assert ss.read_swap_state(swap_p).phase == ss.PHASE_CODE   # NOT stamped RECOVERED
+
+
+def test_reconcile_dead_driver_recovers_as_before(tmp_path):
+    swap_p = tmp_path / "swap.json"
+    sentinel = tmp_path / "server-should-run.txt"
+    sentinel.write_text("coder-30b", encoding="utf-8")
+    ss.write_swap_state(_state(phase=ss.PHASE_CODE), path=swap_p)
+    calls = []
+    res = ss.reconcile_swap_state(
+        swap_state_path=swap_p, sentinel_path=sentinel, runs_dir=tmp_path / "runs",
+        stop_ovms=lambda: calls.append(1),
+        driver_alive_probe=lambda st: False,         # the driver is DEAD -> real crash
+    )
+    assert res.in_flight is True
+    assert not sentinel.exists() and calls == [1]     # full recovery
+    assert ss.read_swap_state(swap_p).phase == ss.PHASE_RECOVERED
+
+
+def test_driver_alive_real_probe():
+    import os
+
+    import psutil
+
+    me = os.getpid()
+    created = float(psutil.Process(me).create_time())
+    assert ss.driver_alive(_state(driver_pid=me, driver_pid_created=created)) is True
+    # A create-time mismatch = pid reuse -> NOT the recorded driver.
+    assert ss.driver_alive(
+        _state(driver_pid=me, driver_pid_created=created - 3600.0)) is False
+    # Legacy record (no pid) and a plainly-dead pid both fail closed to "recover".
+    assert ss.driver_alive(_state(driver_pid=0)) is False
+    assert ss.driver_alive(None) is False
+
+
+def test_swap_state_driver_pid_roundtrip_and_with_phase(tmp_path):
+    p = tmp_path / "swap.json"
+    st = _state(phase=ss.PHASE_CODE, driver_pid=4242, driver_pid_created=123.5)
+    ss.write_swap_state(st, path=p)
+    back = ss.read_swap_state(p)
+    assert back.driver_pid == 4242 and back.driver_pid_created == 123.5
+    advanced = back.with_phase(ss.PHASE_CRITIC)
+    assert advanced.driver_pid == 4242 and advanced.driver_pid_created == 123.5
+    # Legacy JSON without the fields reads back as 0/0.0 (pre-#758 behavior preserved).
+    p.write_text(
+        '{"run_id": "r", "session_id": "s", "phase": "CODE", "tasks": []}',
+        encoding="utf-8",
+    )
+    legacy = ss.read_swap_state(p)
+    assert legacy.driver_pid == 0 and legacy.driver_pid_created == 0.0
+
+
+def test_driver_phase_writes_carry_the_driver_stamp(tmp_path):
+    """#758 follow-up (2026-07-08): the driver entrypoint stamped driver_pid
+    into the swap-state after spawn — but SwapDriver._phase constructed a
+    FRESH SwapState, so the driver's very first phase write clobbered the
+    stamp back to 0/0.0 (found LIVE: the real current.json read phase CODE,
+    driver_pid 0 mid-battery), leaving the reconciler's driver-alive gate
+    inert exactly when it must tell a live dispatch from a crashed one.
+    Every _phase write must carry the driver's own pid + create-time, and
+    driver_alive must hold on the read-back."""
+    import os
+
+    from shared.fleet import swap_driver as sd
+
+    p = tmp_path / "swap.json"
+    driver = sd.SwapDriver(
+        run_id="R1", session_id="s1", tasks=[],
+        swap_state_path=p, ops=None, sleep=lambda _s: None,
+    )
+    driver._phase(ss.PHASE_CODE)
+    st = ss.read_swap_state(p)
+    assert st is not None and st.phase == ss.PHASE_CODE
+    assert st.driver_pid == os.getpid(), (
+        "the CODE phase write dropped the #758 driver stamp — the clobber "
+        "this lock exists for"
+    )
+    assert ss.driver_alive(st) is True
+    # The stamp must survive EVERY subsequent write (incl. error re-writes),
+    # not just the first — one unstamped write un-guards the rest of the run.
+    driver._phase(ss.PHASE_UNLOAD_30B, error="x")
+    st2 = ss.read_swap_state(p)
+    assert st2 is not None and st2.driver_pid == os.getpid()
+    assert ss.driver_alive(st2) is True
+
+
+def test_driver_run_stamps_terminal_phase_on_healthy_completion(tmp_path):
+    """2026-07-08 (B4 wedge): before the driver-alive stamp survived phase
+    writes, the terminal RECOVERED came from the restarted AO's boot reconcile
+    — whose recover branch only fired because driver_pid read 0. Once the
+    stamp was carried correctly, the reconcile went hands-off on the
+    still-alive driver and NOTHING ever stamped terminal: B4's run finished at
+    05:34 and the battery monitor waited blind until its 3 h doom. A healthy
+    driver must stamp its OWN run terminal as its last act."""
+    from shared.fleet import swap_driver as sd
+
+    p = tmp_path / "swap.json"
+    calls = []
+    ops = sd.SwapOps(
+        available_gb=lambda: 26.0,
+        backend_alive=lambda: False,
+        load_30b=lambda: True,
+        wait_ready=lambda: True,
+        run_task=lambda t: sd.TaskOutcome(
+            task=t["task"], outcome="processed", result="MERGED", detail="ok"),
+        cancel_requested=lambda: False,
+        disarm_watchdog=lambda: calls.append("disarm"),
+        stop_ovms=lambda: calls.append("stop"),
+        write_report=lambda rid, outs: calls.append("report"),
+        restart_launcher=lambda: calls.append("restart"),
+        backend_ready=lambda: True,
+        signal_failure=lambda msg: calls.append(("signal", msg)),
+    )
+    driver = sd.SwapDriver(
+        run_id="R1", session_id="s1",
+        tasks=[{"repo": str(tmp_path), "task": "t1", "prompt": "p"}],
+        swap_state_path=p, ops=ops, gate_gb=21.0, sleep=lambda _s: None,
+    )
+    result = driver.run()
+    assert result.restart_ok is True
+    st = ss.read_swap_state(p)
+    assert st is not None and st.phase == ss.PHASE_RECOVERED, (
+        "a healthy driver run must END on a terminal phase — the monitor "
+        "completes only on one, and the reconcile's recover branch no longer "
+        "fires for a correctly-stamped live driver (the B4 wedge)"
+    )
+    assert not ss.is_in_flight(st)
+
+
+def test_driver_run_leaves_in_flight_when_restore_fails(tmp_path):
+    """The crash-net half of the same fix: a FAILED 14B restore must NOT stamp
+    terminal — the state stays in-flight so the next AO boot's reconcile keeps
+    ownership of the unhealthy path (disarm + stop + operator message)."""
+    from shared.fleet import swap_driver as sd
+
+    p = tmp_path / "swap.json"
+    ops = sd.SwapOps(
+        available_gb=lambda: 26.0,
+        backend_alive=lambda: False,
+        load_30b=lambda: True,
+        wait_ready=lambda: True,
+        run_task=lambda t: sd.TaskOutcome(
+            task=t["task"], outcome="processed", result="MERGED", detail="ok"),
+        cancel_requested=lambda: False,
+        disarm_watchdog=lambda: None,
+        stop_ovms=lambda: None,
+        write_report=lambda rid, outs: None,
+        restart_launcher=lambda: None,
+        backend_ready=lambda: False,   # the restore never comes up
+        signal_failure=lambda msg: None,
+    )
+    driver = sd.SwapDriver(
+        run_id="R1", session_id="s1",
+        tasks=[{"repo": str(tmp_path), "task": "t1", "prompt": "p"}],
+        swap_state_path=p, ops=ops, gate_gb=21.0, sleep=lambda _s: None,
+        restart_retries=1, restart_backoff_s=0.0,
+    )
+    result = driver.run()
+    assert result.restart_ok is False
+    st = ss.read_swap_state(p)
+    assert st is not None and st.phase != ss.PHASE_RECOVERED
+    assert ss.is_in_flight(st), (
+        "a failed restore must stay in-flight — the reconcile owns the "
+        "unhealthy path"
+    )

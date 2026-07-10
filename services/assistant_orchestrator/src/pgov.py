@@ -709,6 +709,16 @@ class LeakageDetector:
         "NPU"/"GPU" compile the same ONNX via OpenVINO on that device,
         falling SOFT back to the CPU path on any compile failure (#720).
 
+        Performance note (Vikunja #553, resolved 2026-06-04): timing this method
+        in a *standalone* process shows ~5-8s, but ~92% of that is the one-time
+        ``from transformers import AutoTokenizer`` below — which ``gpu_inference``
+        already imports at module load for the 14B, before the Substrate builds.
+        In the running AO the marginal cost here is ~0.3s (paid at boot inside the
+        AO-entrypoint slice). Do NOT "optimize" this load based on isolated
+        profiling; the tax is a measurement artifact. See PERFORMANCE_LOG.md
+        (2026-06-04 substrate entry), BUILD_JOURNAL lesson 36, and
+        tests/substrate_benchmark/ to re-measure.
+
         Returns:
             True if loaded successfully, False on error (Fail-Closed).
         """
@@ -718,7 +728,12 @@ class LeakageDetector:
 
             model_dir = str(Path(self._model_path).parent)
 
-            self._tokenizer = AutoTokenizer.from_pretrained(model_dir)
+            # Local-only tokenizer load: never reach the HF Hub (#633). The
+            # runtime is air-gapped and the files are on disk;
+            # trust_remote_code=False refuses any repo-carried code execution.
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                model_dir, local_files_only=True, trust_remote_code=False
+            )
 
             # ── OpenVINO device offload (#720, fail-soft) ────────────────
             # A non-CPU device compiles the SAME fp16 ONNX through OpenVINO.

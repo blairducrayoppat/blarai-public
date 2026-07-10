@@ -133,7 +133,22 @@ _VISION_QUERY_MAX_TOKENS: int = 96
 
 # Cap on the 14B's acceptance-PLAN completion (#670). The tasks/criteria JSON is small
 # (a handful of objects); this bounds the direct, deterministic single-shot generation.
-_PLAN_MAX_NEW_TOKENS: int = 1024
+_PLAN_MAX_NEW_TOKENS: int = 2048  # bumped 1024->2048 (#740 live-verify): W2's graph JSON
+# (depends_on + contract per task, up to 8 tasks) overflowed 1024 and truncated → minimal
+# fallback. Paired with /no_think on the decompose template; a max, so short plans are unaffected.
+
+# #748: the PLAN sequence is an INTERNAL structural emission — it must not ride the
+# conversational system prompt, whose tool directive live-baited the 14B into answering
+# the decompose request with `<tool_call>{"name": "search_knowledge", ...}` instead of
+# the JSON array (greedy decode chose it deterministically; _strip_hidden_blocks then
+# reduced the response to '' and every plan collapsed to the minimal single-task
+# fallback). Minimal persona, JSON-only directive, NO tools advertised, /no_think
+# (ADR-012 §2.4 — structural calls suppress thinking, same posture as the PA).
+_PLAN_SYSTEM_PROMPT: str = (
+    "You are the deterministic planning layer of a local coding fleet. "
+    "Respond with ONLY the exact output the request asks for (usually a JSON "
+    "array) — no prose, no explanations, no tool calls. /no_think"
+)
 
 # Hidden model blocks that must never leak into a VLM query (defensive: the AO
 # default is /no_think, but strip anyway so a stray block can't become a query).
@@ -471,13 +486,14 @@ class AssistantOrchestratorEntrypointConfig:
     a ~22-23 GiB peak; the gate matches start-llm's proven value, and is GRACEFUL anyway —
     a marginal load thrashes-then-loads, never a hard fail.) Resolved from
     [fleet_dispatch].swap_min_free_gb."""
-    swap_run_budget_s: float = 5400.0
+    swap_run_budget_s: float = 10800.0
     """Out-of-band OVERALL-run budget for the model swap (#670 Problem 2), in **seconds**: a
     watchdog in the detached driver force-kills a wedged run-fleet child and tears down to
     restore the 14B if the whole task loop exceeds this — the backstop for a hung/over-long
-    coding task that would otherwise strand the 30B resident. 5400 s (90 min) is a generous
-    ceiling (live runs were ~50 min for 8-9 tasks; the per-task de-deadlock makes normal runs
-    finish well under it). A value <= 0 DISABLES the watchdog (full back-compat / dormancy).
+    coding task that would otherwise strand the 30B resident. 10800 s (3 h) per #757: the old
+    5400 s clipped a 5-task battery job whose builds alone measured 74-79 min, killing the
+    final acceptance task; this is an abort bound, not a wait (healthy runs finish ~45-95 min).
+    A value <= 0 DISABLES the watchdog (full back-compat / dormancy).
     Resolved from [fleet_dispatch].swap_run_budget_s."""
 
     fleet_dispatch_agentic_setup_dir: str = ""
@@ -489,6 +505,28 @@ class AssistantOrchestratorEntrypointConfig:
     """The operator's projects ROOT — the ONLY allowed dispatch target (the fleet
     refuses ~/BlarAI regardless). Resolved from [fleet_dispatch].projects_dir (#670);
     empty falls back to the build_default_config default."""
+    fleet_dispatch_plan_graph: bool = False
+    """M2 plan-graph mode (W1-W6, #740): a dispatch is planned as a dependency-ordered
+    JobPlan (waves, context packs, integration gates, job oracle) instead of the flat
+    serial queue. Fail-closed: a missing key resolves to False — byte-identical
+    today-behavior. Resolved from [fleet_dispatch].plan_graph; flips to true only after
+    the W8 live proof (the proven-features-default-LIVE rule, recorded on #740)."""
+    fleet_dispatch_vikunja_bridge: bool = False
+    """#749 dispatch→Vikunja bridge: post one durable ticket per dispatched job.
+    Fail-closed: a missing key resolves to False (dormant). Dispatch-side dev
+    tooling — the sealed runtime grows no egress. Resolved from
+    [fleet_dispatch].vikunja_bridge (default OFF until the supervised live proof)."""
+    fleet_dispatch_vikunja_bridge_project_id: int = 0
+    """#749: the Vikunja project id job tickets land in. 0 = unset (the bridge
+    refuses to post without a target). Resolved from
+    [fleet_dispatch].vikunja_bridge_project_id."""
+    fleet_dispatch_guest_oracle_enabled: bool = False
+    """#744 guest-certified oracle: re-run the job-level acceptance oracle inside
+    the NIC-less Alpine guest as an ADVISORY isolation certificate (plan §10.3 S4
+    residual). Fail-closed: a missing key resolves to False — the swap driver
+    never touches the guest-oracle seams, byte-identical today-behavior. Resolved
+    from [fleet_dispatch].guest_oracle_enabled (default OFF until the supervised
+    live in-guest proof)."""
     step_aside_grace_s: float = 2.0
     """EXECUTE reply-then-exit grace (seconds): the AO waits this long after sending the
     "stepping aside" reply before signalling the launcher to exit, so the WinUI shows the
@@ -829,9 +867,9 @@ class AssistantOrchestratorService:
         instant-timeout (#670 P2)."""
         cfg = self._resolved_config
         if cfg is None:
-            return 5400.0
+            return 10800.0
         try:
-            b = float(getattr(cfg, "swap_run_budget_s", 5400.0))
+            b = float(getattr(cfg, "swap_run_budget_s", 10800.0))
         except (TypeError, ValueError):
             return 0.0
         return b if b > 0 else 0.0
@@ -847,6 +885,53 @@ class AssistantOrchestratorService:
         """Resolved ``[fleet_dispatch].projects_dir`` (the only allowed target root, #670)."""
         cfg = self._resolved_config
         return str(getattr(cfg, "fleet_dispatch_projects_dir", "")) if cfg is not None else ""
+
+    @property
+    def fleet_dispatch_plan_graph(self) -> bool:
+        """Resolved ``[fleet_dispatch].plan_graph`` (M2 #740). Fail-closed: ``False``
+        before ``start()`` resolves the config and on a missing key — the flat-queue
+        path, byte-identical today-behavior."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_plan_graph", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_vikunja_bridge(self) -> bool:
+        """Resolved ``[fleet_dispatch].vikunja_bridge`` (#749). Fail-closed: ``False``
+        before ``start()`` resolves the config and on a missing key — the bridge
+        posts nothing (dormant default)."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_vikunja_bridge", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_vikunja_bridge_project_id(self) -> int:
+        """Resolved ``[fleet_dispatch].vikunja_bridge_project_id`` (#749). ``0`` (unset)
+        means the bridge refuses to post even when enabled."""
+        cfg = self._resolved_config
+        return (
+            int(getattr(cfg, "fleet_dispatch_vikunja_bridge_project_id", 0))
+            if cfg is not None
+            else 0
+        )
+
+    @property
+    def fleet_dispatch_guest_oracle_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].guest_oracle_enabled`` (#744). Fail-closed:
+        ``False`` before ``start()`` resolves the config and on a missing key —
+        the swap driver never touches the guest-oracle seams (dormant default)."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_guest_oracle_enabled", False))
+            if cfg is not None
+            else False
+        )
 
     @property
     def step_aside_grace_s(self) -> float:
@@ -1323,11 +1408,24 @@ class AssistantOrchestratorService:
             swap_min_free_gb=float(fleet_dispatch.get("swap_min_free_gb", 21.0)),
             # #670 P2: out-of-band overall-run budget (s); the resolver property + the driver's
             # _coerce_budget both clamp a non-positive value to 0.0 (disabled, never instant-timeout).
-            swap_run_budget_s=float(fleet_dispatch.get("swap_run_budget_s", 5400.0)),
+            swap_run_budget_s=float(fleet_dispatch.get("swap_run_budget_s", 10800.0)),
             fleet_dispatch_agentic_setup_dir=str(
                 fleet_dispatch.get("agentic_setup_dir", "")
             ),
             fleet_dispatch_projects_dir=str(fleet_dispatch.get("projects_dir", "")),
+            # M2 plan-graph (W1-W6, #740). Fail-closed: absent key -> False (the flat
+            # serial queue, byte-identical today-behavior).
+            fleet_dispatch_plan_graph=bool(fleet_dispatch.get("plan_graph", False)),
+            # #749 dispatch→Vikunja bridge. Fail-closed: absent keys -> off / unset.
+            fleet_dispatch_vikunja_bridge=bool(fleet_dispatch.get("vikunja_bridge", False)),
+            fleet_dispatch_vikunja_bridge_project_id=int(
+                fleet_dispatch.get("vikunja_bridge_project_id", 0) or 0
+            ),
+            # #744 guest-certified oracle. Fail-closed: absent key -> False (the
+            # swap driver never touches the guest-oracle seams).
+            fleet_dispatch_guest_oracle_enabled=bool(
+                fleet_dispatch.get("guest_oracle_enabled", False)
+            ),
             step_aside_grace_s=float(fleet_dispatch.get("step_aside_grace_s", 2.0)),
             image_gen_model_dir=str(
                 image_generation.get(
@@ -2145,7 +2243,23 @@ class AssistantOrchestratorService:
         (``do_sample=False``, reproducible), hidden <think>/<tool_call> blocks stripped.
         This is the LIVE generation wrapper (the only part validated on hardware); the
         unit tests inject a fake generator in its place, mirroring how ``decompose``
-        takes an injected ``generate_fn``."""
+        takes an injected ``generate_fn``.
+
+        Three #748 invariants (the M2 live-verify blocker — two stacked mechanisms
+        produced the same silent-empty symptom):
+          * ``tool_call_grammar=False`` — the PLAN emission is a raw JSON array,
+            never a tool call; the armed grammar deterministically crashed the
+            plan generation (#725's xgrammar stop-token crash) on every dispatch.
+          * ``system_prompt=_PLAN_SYSTEM_PROMPT`` — the conversational persona's
+            tool directive baited the model into a ``<tool_call>`` answer that
+            the strip reduced to ``""``; structural emissions ride a minimal
+            no-tools planning prompt instead.
+          * a generation-layer failure RAISES instead of returning ``""`` — both
+            a fail-closed ``.error`` result and a hidden-blocks-only response
+            were previously indistinguishable from an empty model answer and
+            silently degraded every plan to the single-task fallback. Every
+            consumer (decompose + the acceptance sub-generations) catches
+            generate_fn exceptions by design and records the error visibly."""
 
         def _generate(prompt: str) -> str:
             result = self._inference.generate_text(
@@ -2154,9 +2268,49 @@ class AssistantOrchestratorService:
                 config=GenerationConfig(
                     max_new_tokens=_PLAN_MAX_NEW_TOKENS,
                     do_sample=False,  # greedy / temp-0 equivalent — reproducible
+                    tool_call_grammar=False,  # #748: raw JSON emission, never grammar-armed
                 ),
+                system_prompt=_PLAN_SYSTEM_PROMPT,  # #748: no tool bait, no persona
             )
-            return _strip_hidden_blocks(getattr(result, "text", "") or "")
+            # #748 diagnostic (env-gated): capture the TRUE result shape (error/
+            # truncated/token count + the pre-_strip_hidden_blocks text) — this dump
+            # is what caught the swallowed xgrammar crash the first time.
+            try:
+                import os as _os
+                _dbg = _os.environ.get("BLARAI_DECOMPOSE_DEBUG")
+                if _dbg:
+                    with open(_dbg, "a", encoding="utf-8") as _f:
+                        _f.write(
+                            f"\n=== plan_generate result (err={getattr(result, 'error', None)!r} "
+                            f"tokens={getattr(result, 'token_count', None)} "
+                            f"truncated={getattr(result, 'truncated', None)} "
+                            f"text_len={len(getattr(result, 'text', '') or '')}) ===\n"
+                            f"{getattr(result, 'text', '') or ''}\n"
+                        )
+            except Exception:
+                pass
+            # #748: fail LOUD on a generation-layer failure. generate_text converts
+            # internal exceptions to a fail-closed result whose text is "" and whose
+            # cause lives only in .error; returning "" here made that failure
+            # indistinguishable from an empty model answer and silently collapsed
+            # every plan to the minimal fallback. Raising routes it into the
+            # consumers' designed error paths (recorded, visible, still degrades).
+            gen_error = getattr(result, "error", None)
+            if gen_error:
+                raise RuntimeError(f"PLAN generation failed: {gen_error}")
+            raw_text = getattr(result, "text", "") or ""
+            stripped = _strip_hidden_blocks(raw_text)
+            if raw_text.strip() and not stripped:
+                # #748: the model produced SOMETHING, but nothing outside hidden
+                # blocks — a tool-call-only or all-<think> response (live-caught:
+                # <tool_call>search_knowledge</tool_call> as the whole answer).
+                # A silent '' is indistinguishable from an empty answer; fail loud
+                # into the same designed degradation, with the evidence attached.
+                raise RuntimeError(
+                    "PLAN generation produced no answer text (hidden blocks only; "
+                    f"raw head: {raw_text[:200]!r})"
+                )
+            return stripped
 
         return _generate
 
@@ -2190,11 +2344,29 @@ class AssistantOrchestratorService:
         try:
             from shared.fleet.acceptance import generate_plan
 
+            projects_dir = self._fleet_projects_dir()
+            # #752 F1/F2: a battery card can DECLARE a plan shape the 14B right-sizing ruler
+            # otherwise collapses (B2's 4-unit diamond -> 1 task -> flat-queue degrade). For a
+            # sandbox ``battery-*`` repo whose card authorises it, use the card-built decomposition
+            # + job oracle instead of the 14B decompose. resolve_plan_override returns None for
+            # EVERY non-battery repo (a name lacking the ``battery-`` prefix never even reads a
+            # card), so production plan generation is byte-identical. All battery coupling lives in
+            # shared.fleet.battery_plans; generate_plan only sees a generic decomposition_override.
+            try:
+                from shared.fleet import battery_plans
+
+                decomposition_override = battery_plans.resolve_plan_override(
+                    repo, projects_dir=projects_dir
+                )
+            except Exception:  # noqa: BLE001 — a battery lookup must never crash a real plan
+                decomposition_override = None
+
             plan = generate_plan(
                 goal,
                 repo,
                 generate_fn=self._plan_generate_fn(),
-                projects_dir=self._fleet_projects_dir(),
+                projects_dir=projects_dir,
+                decomposition_override=decomposition_override,
             )
         except Exception as exc:  # noqa: BLE001 — fail-closed: never crash the AO loop
             logger.error("PLAN request failed: %s", exc, exc_info=True)
@@ -2240,11 +2412,20 @@ class AssistantOrchestratorService:
         old_pid = the launcher PID (this process); gate_gb = the configured safety threshold;
         relaunch from the launcher context. The swap-state WRITE uses ``config`` — the
         AO-resolved root the boot reconciler reads (writer-root == reconciler-root, #670)."""
+        # #740 B3 re-grain (2026-07-08): a per-card run budget staged by the
+        # battery runner overrides the config default for THIS dispatch only
+        # (consume-once, freshness-guarded, clamped — read_pending_run_budget).
+        # Absent → the config value, byte-identical to every non-per-card job.
+        from shared.fleet.swap_ops import read_pending_run_budget
+
+        run_budget_s = read_pending_run_budget(config)
+        if run_budget_s is None:
+            run_budget_s = self.swap_run_budget_s
         return execute_swap_dispatch(
             run_id, session_id, tasks,
             config=config,
             gate_gb=self.swap_min_free_gb,
-            run_budget_s=self.swap_run_budget_s,
+            run_budget_s=run_budget_s,
             old_pid=os.getpid(),
             relaunch_argv=getattr(self, "_swap_relaunch_argv", []),
             relaunch_cwd=getattr(self, "_swap_relaunch_cwd", ""),
@@ -2293,6 +2474,17 @@ class AssistantOrchestratorService:
         config = build_default_config(
             self.fleet_dispatch_agentic_setup_dir or None,
             self.fleet_dispatch_projects_dir or None,
+            # M2 (#740): the plan-graph knob rides the config -> the spec -> the
+            # detached driver. False (default) keeps the flat queue byte-identical.
+            plan_graph=self.fleet_dispatch_plan_graph,
+            # #749: the durable-ticket knobs ride the config so the driver's REPORT
+            # phase can post outcomes (the driver-side wiring is a tracked TODO —
+            # the seam is present, dormant until #749's driver leg lands).
+            vikunja_bridge=self.fleet_dispatch_vikunja_bridge,
+            vikunja_bridge_project_id=self.fleet_dispatch_vikunja_bridge_project_id,
+            # #744: the guest-oracle knob rides the config -> the spec -> the
+            # detached driver. False (default) never touches the guest seams.
+            guest_oracle_enabled=self.fleet_dispatch_guest_oracle_enabled,
         )
         # UC-010 SEAM A (DORMANT behind BLARAI_ENABLE_ASSET_GENERATION): with the 14B
         # STILL resident and BEFORE the swap, generate the planned image assets and commit

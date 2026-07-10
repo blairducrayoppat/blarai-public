@@ -115,6 +115,76 @@ def _agent_log(state: Path, task: str) -> Path | None:
     return cands[0] if cands else None
 
 
+def _plan_path(state: Path) -> Path:
+    """The persisted M2 JobPlan artifact for the current swap (plan-graph mode)."""
+    return state / "fleet-swap" / "plan.json"
+
+
+def _read_plan(state: Path) -> dict | None:
+    """Best-effort read of the persisted plan (display-only — the DRIVER re-validates
+    on load; the watcher only renders). None when absent/unparseable."""
+    try:
+        data = json.loads(_plan_path(state).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+_PLAN_STATUS_ICON = {
+    "pending": " ", "ready": "~", "building": ">", "merged": "+",
+    "parked": "P", "blocked": "B", "skipped": "-",
+}
+
+
+def render_plan(raw: dict) -> str:
+    """Render a persisted JobPlan as the W6 plan view: tasks grouped into waves
+    (a tolerant frontier walk over the raw dicts — display-only), per-task status,
+    integration-gate outcomes, the job-acceptance finish line, and the re-decompose
+    budget. Pure (unit-tested); tolerant of partial/garbage plans."""
+    tasks = [t for t in raw.get("tasks", []) if isinstance(t, dict)]
+    lines = [
+        f"=== PLAN {raw.get('plan_id', '?')}  |  goal: {str(raw.get('goal', '') or '(none)')[:80]} ===",
+    ]
+    # Tolerant wave grouping: repeatedly take every unplaced task whose deps are placed.
+    placed: set[str] = set()
+    remaining = {str(t.get('id', '')): t for t in tasks if t.get('id')}
+    order = [str(t.get('id', '')) for t in tasks if t.get('id')]
+    wave_no = 0
+    while remaining:
+        frontier = [
+            tid for tid in order
+            if tid in remaining
+            and all(d in placed or d not in order for d in (remaining[tid].get("depends_on") or []))
+        ]
+        if not frontier:  # cycle/garbage — dump the rest flat
+            frontier = [tid for tid in order if tid in remaining]
+        wave_no += 1
+        lines.append(f"wave {wave_no}:")
+        for tid in frontier:
+            t = remaining.pop(tid)
+            placed.add(tid)
+            status = str(t.get("status", "?"))
+            icon = _PLAN_STATUS_ICON.get(status, "?")
+            deps = ", ".join(t.get("depends_on") or [])
+            dep_str = f"  (deps: {deps})" if deps else ""
+            lines.append(f"  [{icon}] {tid}: {status}{dep_str}")
+    nodes = [n for n in raw.get("integration_nodes", []) if isinstance(n, dict)]
+    if nodes:
+        lines.append("integration gates:")
+        for n in nodes:
+            lines.append(f"  after wave {n.get('after_wave', '?')}: {n.get('status', '?')}")
+    acc = raw.get("job_acceptance") if isinstance(raw.get("job_acceptance"), dict) else {}
+    lines.append(
+        f"job acceptance: {acc.get('status', '?')}  (oracle: {acc.get('oracle_path', '?')})"
+    )
+    budget = raw.get("redecompose_budget") if isinstance(raw.get("redecompose_budget"), dict) else {}
+    if budget:
+        lines.append(
+            f"re-decompose budget: {budget.get('spent', 0)}/{budget.get('per_job', 0)} spent"
+        )
+    return "\n".join(lines)
+
+
 def _gate(task_log: Path | None) -> dict:
     """Pull the gate signals + verdict + RESULT from a run-fleet task log (best-effort)."""
     d = {"phase": "", "tests": "", "verify": "", "verdict": "", "result": "", "parked": False, "merged": False}
@@ -137,6 +207,11 @@ def _gate(task_log: Path | None) -> dict:
 
 
 def snapshot(state: Path, run: Path, tail: int) -> dict:
+    # M2 (#740): a plan-graph dispatch persists its JobPlan — show the wave/status
+    # view first so the operator sees where the job stands, not just the current task.
+    plan = _read_plan(state)
+    if plan is not None:
+        print("\n" + render_plan(plan))
     task, _ = _active_task(run)
     alog = _agent_log(state, task) if task else None
     tlog = _task_log(run, task) if task else None
@@ -175,9 +250,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--interval", type=float, default=15.0, help="--follow poll seconds")
     p.add_argument("--stop-on-park", action="store_true",
                    help="trip the driver's cancel sentinel the instant a task parks (fail-fast)")
+    p.add_argument("--plan", action="store_true",
+                   help="print ONLY the persisted JobPlan view (M2 plan-graph runs) and exit")
     args = p.parse_args(argv)
 
     state = _state_dir()
+    if args.plan:
+        plan = _read_plan(state)
+        if plan is None:
+            print("no persisted plan found at", _plan_path(state))
+            return 1
+        print(render_plan(plan))
+        return 0
     run = Path(args.run) if args.run else _latest_run(state)
     if not run:
         print("no fleet run found under", state / "fleet-runs")

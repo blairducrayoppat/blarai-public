@@ -29,6 +29,23 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _guard_fleet_reconcile_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Scoped-run belt for the root-conftest reconcile guard (#758).
+
+    service.start() runs reconcile_at_boot_for_roots; with the minimal test
+    config's EMPTY [fleet_dispatch] roots it falls back to this box's REAL
+    fleet root and can kill a live dispatch (stop the real OVMS + stamp
+    RECOVERED — the 2026-07-07 incident).  The root conftest carries the
+    primary guard, but a SCOPED run rooted at the AO package (#720 precedent
+    above) does not load it — this duplicate covers that path.  No test in
+    this package exercises the reconcile itself.
+    """
+    import shared.fleet.swap_ops as _so
+
+    monkeypatch.setattr(_so, "reconcile_at_boot_for_roots", lambda *a, **k: None)
+
+
+@pytest.fixture(autouse=True)
 def _isolate_user_data_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
 ) -> None:

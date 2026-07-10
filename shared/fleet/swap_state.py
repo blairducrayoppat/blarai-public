@@ -78,6 +78,23 @@ class SwapState:
     tasks: list[dict] = field(default_factory=list)
     ts: str = ""        # stamped by the caller (this layer does not read the clock)
     error: str = ""
+    # M2 plan-graph (W1/Lane A2, #740): the WRITE-TIME hash of the persisted JobPlan
+    # artifact, re-pinned on every plan persist (whatever hash the PlanStore minted —
+    # scheme-agnostic; per the W1 hardening the hash covers the IMMUTABLE plan identity,
+    # with statuses deliberately outside it as advisory resumption hints only). '' for a
+    # non-plan run — every legacy record reads back byte-identically. Defense-in-depth
+    # against on-disk plan tamper (§10 S1): the self-hash in plan.json can be recomputed
+    # by a tamperer; this pin cannot.
+    plan_hash: str = ""
+    # #758: the DETACHED driver's pid + process-create-time, stamped by run_swap when the
+    # driver takes over. The reconciler uses these to tell a CRASHED swap (driver dead ->
+    # recover) from a LIVE one (driver alive -> hands off): on 2026-07-07 an AO boot
+    # mid-dispatch "recovered" a healthy swap — stopped the real OVMS mid-request and
+    # stamped RECOVERED over the live run. create-time guards pid reuse. 0/0.0 (every
+    # legacy record, and the AO-written RESERVE..HANDOFF phases before the driver's first
+    # write) preserves the pre-#758 behavior: reconcile recovers unconditionally.
+    driver_pid: int = 0
+    driver_pid_created: float = 0.0
 
     def with_phase(self, phase: str, *, error: str = "", ts: str = "") -> "SwapState":
         """A copy advanced to *phase* (identity + tasks preserved)."""
@@ -88,6 +105,9 @@ class SwapState:
             tasks=self.tasks,
             ts=ts or self.ts,
             error=error or self.error,
+            plan_hash=self.plan_hash,
+            driver_pid=self.driver_pid,
+            driver_pid_created=self.driver_pid_created,
         )
 
 
@@ -116,6 +136,14 @@ def read_swap_state(path: Path) -> SwapState | None:
         return None
     if not isinstance(data, dict) or not data.get("run_id"):
         return None
+    try:
+        driver_pid = int(data.get("driver_pid", 0) or 0)
+    except (TypeError, ValueError):
+        driver_pid = 0
+    try:
+        driver_pid_created = float(data.get("driver_pid_created", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        driver_pid_created = 0.0
     return SwapState(
         run_id=str(data.get("run_id", "")),
         session_id=str(data.get("session_id", "")),
@@ -123,6 +151,9 @@ def read_swap_state(path: Path) -> SwapState | None:
         tasks=list(data.get("tasks", []) or []),
         ts=str(data.get("ts", "")),
         error=str(data.get("error", "")),
+        plan_hash=str(data.get("plan_hash", "")),
+        driver_pid=driver_pid,
+        driver_pid_created=driver_pid_created,
     )
 
 
@@ -147,12 +178,38 @@ class ReconcileResult:
     message: str = ""                # human-facing line for the session (or "")
 
 
+def driver_alive(state: "SwapState | None") -> bool:
+    """True iff the swap's recorded DETACHED driver process is still running (#758).
+
+    Keys off the ``driver_pid`` + ``driver_pid_created`` the driver stamps at takeover;
+    the create-time match (±2 s — process create-times are stable, the tolerance only
+    absorbs float/clock rounding) guards pid reuse. Fail-CLOSED to "not alive": no pid
+    recorded (legacy record / pre-driver phases), psutil unavailable, or any probe error
+    -> False, preserving the pre-#758 recovery behavior (recover rather than strand a
+    genuinely-crashed swap forever).
+    """
+    if state is None or not state.driver_pid:
+        return False
+    try:
+        import psutil
+
+        proc = psutil.Process(state.driver_pid)
+        if not proc.is_running():
+            return False
+        if state.driver_pid_created > 0:
+            return abs(float(proc.create_time()) - state.driver_pid_created) < 2.0
+        return True
+    except Exception:  # noqa: BLE001 — an unprobeable driver must not block recovery
+        return False
+
+
 def reconcile_swap_state(
     *,
     swap_state_path: Path,
     sentinel_path: Path,
     runs_dir: Path,
     stop_ovms: Callable[[], None],
+    driver_alive_probe: "Callable[[SwapState | None], bool] | None" = None,
 ) -> ReconcileResult:
     """Boot-time convergence to "14B up, 30B down". Idempotent; runs every boot.
 
@@ -164,6 +221,13 @@ def reconcile_swap_state(
        persisted phase + whether ``SUMMARY.txt`` for the run exists, then mark the
        record RECOVERED so a second boot is a clean no-op.
 
+    #758 PRECONDITION: recovery presumes the swap CRASHED. When the recorded driver
+    process is still ALIVE (``driver_alive_probe``, default :func:`driver_alive`),
+    the swap is healthy — a boot that "recovered" it would kill the live run (stop
+    its OVMS mid-task + stamp RECOVERED over it, the 2026-07-07 incident). In that
+    case this is HANDS-OFF: nothing disarmed, nothing stopped, nothing stamped —
+    the driver finishes and restores the 14B itself.
+
     The caller (the normal backend boot) cold-loads the 14B AFTER this returns.
     """
     # GATE FIRST (F2): only a BlarAI swap that was mid-flight gets recovered. With NO
@@ -174,6 +238,21 @@ def reconcile_swap_state(
     state = read_swap_state(swap_state_path)
     if not is_in_flight(state):
         return ReconcileResult(in_flight=False)
+
+    # #758 GATE SECOND: a LIVE driver means the swap did not crash — hands off.
+    probe = driver_alive_probe if driver_alive_probe is not None else driver_alive
+    if probe(state):
+        return ReconcileResult(
+            in_flight=True,
+            run_id=state.run_id,
+            session_id=state.session_id,
+            summary_available=False,
+            message=(
+                f"Coding dispatch {state.run_id} is STILL RUNNING (its driver process "
+                f"is alive) — left untouched; it restores the assistant when it "
+                f"finishes. Check `/dispatch status {state.run_id}`."
+            ),
+        )
 
     # A real BlarAI swap was mid-flight -> converge to "14B up, 30B down":
     # 1. DISARM the sentinel OUR start-llm armed (so the watchdog can't re-raise OUR 30B).

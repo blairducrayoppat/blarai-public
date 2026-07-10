@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,6 +35,7 @@ from shared.fleet.dispatch import (
     build_default_config,
     new_run_id,
     parse_summary,
+    read_acceptance_record,
     slugify_task,
     validate_repo,
 )
@@ -90,11 +92,103 @@ def cancel_path(config: FleetDispatchConfig) -> Path:
     return swap_dir(config) / "cancel"
 
 
+def pending_run_budget_path(config: FleetDispatchConfig) -> Path:
+    return swap_dir(config) / "pending-run-budget.json"
+
+
+# Per-card run-budget override (#740 B3 re-grain, 2026-07-08). The battery runner
+# and the AO are SEPARATE processes and the AO stays up across jobs, so a
+# per-card budget reaches the AO's driver watchdog through this small
+# CONSUME-ONCE file rather than a live-protocol change or a per-job reboot.
+#: Freshness window: an override older than this is IGNORED (stale-file guard —
+#: a runner that wrote a budget then never dispatched must not silently apply it
+#: to a later job; era-rot class, lesson 195). The runner writes it moments
+#: before each dispatch.
+PENDING_RUN_BUDGET_FRESH_S: float = 300.0
+#: Hard clamp on any per-card budget the AO will honor (a card cannot request an
+#: unbounded run). 8 h covers the longest measured card (B3 ~6.5 h) with margin.
+CARD_RUN_BUDGET_MAX_S: float = 28800.0
+
+
+def write_pending_run_budget(config: FleetDispatchConfig, seconds: float) -> None:
+    """Runner side: stage a per-card driver budget for the NEXT dispatch.
+
+    Fail-soft: a write failure just means the AO uses its config default. A
+    non-positive value CLEARS any prior override (so a default-budget card after
+    a B3 can never inherit B3's window)."""
+    import json
+    import time
+
+    path = pending_run_budget_path(config)
+    try:
+        if seconds and seconds > 0:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(
+                json.dumps({"run_budget_s": float(seconds), "written_at": time.time()}),
+                encoding="utf-8",
+            )
+            os.replace(tmp, path)
+        else:
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def read_pending_run_budget(config: FleetDispatchConfig) -> float | None:
+    """AO side: CONSUME (read + delete) a fresh per-card budget override, or None.
+
+    Fail-closed to the config default: absent, unreadable, stale (> the freshness
+    window), or non-positive all return None. Deletes on read so one override can
+    never bleed into a second dispatch. Clamped to CARD_RUN_BUDGET_MAX_S."""
+    import json
+    import time
+
+    try:
+        path = pending_run_budget_path(config)
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, AttributeError):
+        return None
+    # Consume-once: delete immediately, before honoring — a torn/hostile file
+    # still cannot survive to a later dispatch.
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    try:
+        data = json.loads(raw)
+        seconds = float(data.get("run_budget_s", 0.0))
+        written_at = float(data.get("written_at", 0.0))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    if seconds <= 0:
+        return None
+    if time.time() - written_at > PENDING_RUN_BUDGET_FRESH_S:
+        return None  # stale: the dispatch it was written for never fired
+    return min(seconds, CARD_RUN_BUDGET_MAX_S)
+
+
 def status_path(config: FleetDispatchConfig, run_id: str) -> Path:
     return swap_dir(config) / f"SWAP_FAILED_{run_id}.txt"
 
 
 # ---- real side-effecting ops (live) ---------------------------------------
+
+#: CREATE_NO_WINDOW — for CONSOLE-SUBSYSTEM children (pwsh / tasklist) of the
+#: console-less detached driver ONLY (#761). The driver is spawned via pythonw.exe
+#: (GUI subsystem, no console), so every console-subsystem child would otherwise be
+#: allocated a fresh VISIBLE console window — the accidental-close hazard of the
+#: night-2 (2026-07-06 23:53) window-close incident class, multiplied per child.
+#: These children are non-interactive by construction (``-NonInteractive`` pwsh,
+#: stdin DEVNULL, output captured or file-redirected), so a hidden console is safe.
+#: CONSTRAINT — NEVER apply this flag to a python/pythonw LAUNCHER spawn
+#: (``restart_launcher`` / ``_spawn_detached_driver`` / battery
+#: ``boot_launcher_detached``): a HIDDEN console is the exact shape that crashed
+#: Textual on 2026-07-06 ("Driver must be in application mode"). The launcher chain
+#: uses pythonw.exe (no console AT ALL -> Textual's proven headless-driver fallback)
+#: instead — see :func:`pythonw_sibling`. Guarded to 0 off-Windows (creationflags
+#: raises on POSIX; this module's live paths are Windows-only, its pure paths not).
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 
 def real_stop_ovms() -> None:
@@ -126,6 +220,7 @@ def real_ovms_alive() -> bool:
         cp = subprocess.run(  # noqa: S603,S607 — short, parsed; no long-lived grandchildren
             ["tasklist", "/FI", "IMAGENAME eq ovms.exe", "/NH"],
             capture_output=True, text=True, timeout=10,
+            creationflags=_NO_WINDOW,  # console child of a console-less driver (#761)
         )
         return "ovms" in (cp.stdout or "").lower()
     except Exception:  # noqa: BLE001 — unreadable -> False (boot reconciler is the backstop)
@@ -216,6 +311,11 @@ def _run_to_logfile(
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "w", encoding="utf-8", errors="replace") as fh:
+            # #761: CREATE_NO_WINDOW — this pwsh child is a console-subsystem exe born
+            # to the console-less (pythonw-spawned) driver; without the flag Windows
+            # allocates it a fresh VISIBLE console. Safe: -NonInteractive, stdin
+            # DEVNULL, output file-redirected (the 2026-07-06 Textual hidden-console
+            # crash constraint applies only to python-launcher spawns, never pwsh).
             cp = run(
                 cmd,
                 stdin=subprocess.DEVNULL,
@@ -223,6 +323,7 @@ def _run_to_logfile(
                 stderr=subprocess.STDOUT,
                 close_fds=True,
                 timeout=timeout_s,
+                creationflags=_NO_WINDOW,
             )
         return cp.returncode == 0
     except subprocess.TimeoutExpired:
@@ -241,15 +342,18 @@ def _run_to_logfile_tree(
     on_spawn=None,
     popen=subprocess.Popen,
     terminate_tree=None,
-) -> bool:
+) -> "tuple[bool, bool]":
     """Run a LONG-LIVED subprocess (run-fleet) with stdout+stderr -> ``log_path`` (a real FILE,
     never a captured pipe — the #670 run-2 deadlock) + ``close_fds``, then wait. On TIMEOUT,
     TREE-KILL the whole subtree (``pwsh -> opencode -> playwright-msedge``) via the held ``Popen``
     handle (the PRIMARY wedge defense — reuse-proof for the direct child), NOT ``subprocess.run``'s
     direct-child-only kill that orphans grandchildren. ``on_spawn(proc)`` registers the live child
     with the budget-watchdog holder and ``on_spawn(None)`` deregisters on EVERY exit; when None the
-    helper is a pure file-redirect tree-killable runner. Returns ``ok = (returncode == 0)``;
-    fail-closed. ``popen`` / ``terminate_tree`` injected for tests."""
+    helper is a pure file-redirect tree-killable runner. Returns ``(ok, timed_out)`` —
+    ``ok = (returncode == 0)``, fail-closed; ``timed_out`` is True ONLY for the tree-kill branch
+    (#757: the kill must be REPORTED so the caller can label the outcome honestly, not swallowed
+    into a generic False that reads like a normal failure). ``popen`` / ``terminate_tree``
+    injected for tests."""
     if terminate_tree is None:
         from shared.fleet.proc_tree import terminate_process_tree
         terminate_tree = terminate_process_tree
@@ -257,8 +361,13 @@ def _run_to_logfile_tree(
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "w", encoding="utf-8", errors="replace") as fh:
+            # #761: CREATE_NO_WINDOW — same rationale as _run_to_logfile: run-fleet's
+            # pwsh subtree is console-subsystem under a console-less driver, and a
+            # LONG-LIVED visible console (hours) is the exact accidental-close hazard
+            # this ticket closes. Non-interactive by construction; never a launcher.
             proc = popen(cmd, stdin=subprocess.DEVNULL, stdout=fh,
-                         stderr=subprocess.STDOUT, close_fds=True)
+                         stderr=subprocess.STDOUT, close_fds=True,
+                         creationflags=_NO_WINDOW)
             if on_spawn is not None:
                 try:
                     on_spawn(proc)
@@ -280,12 +389,12 @@ def _run_to_logfile_tree(
                     terminate_tree(proc)
                 except Exception:  # noqa: BLE001
                     pass
-                return False
-        return rc == 0
+                return False, True
+        return rc == 0, False
     except OSError:
-        return False
+        return False, False
     except Exception:  # noqa: BLE001 — fail-closed: any error is a task failure
-        return False
+        return False, False
     finally:
         # Deregister on EVERY exit path. The timeout branch already cleared; a redundant
         # clear is harmless (register(None) is idempotent).
@@ -359,6 +468,15 @@ class _CurrentChild:
                 pass
 
 
+#: start-llm.ps1 load ceiling — BOTH model loads (the 30B and the 14B critic swap).
+#: 480s (not 300): #747 — a COLD compile-cache load measured ~289s live (compile + writing
+#: ~15 GB of .cl_cache); start-llm's own deadline was bumped to 480 to match. A WARM load is
+#: ~12s, far under this; the ceiling only bites cold (first install / OVMS upgrade). The
+#: never-zero teardown restores the 14B if a load ever genuinely hangs to the ceiling.
+#: Registered: shared/timeout_registry.py (#767 item 2 — the literal named as a constant).
+START_LLM_TIMEOUT_S = 480.0
+
+
 def real_load_30b(config: FleetDispatchConfig, run_id: str = "") -> bool:
     """``start-llm.ps1 -Model coder-30b -Force`` (brief §4: -Force is MANDATORY).
 
@@ -371,7 +489,8 @@ def real_load_30b(config: FleetDispatchConfig, run_id: str = "") -> bool:
     cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-File", str(script),
            "-Model", _CODER_MODEL_ID, "-Force"]
     base = (config.runs_dir / run_id) if run_id else config.runs_dir
-    return _run_to_logfile(cmd, log_path=base / "start-llm.log", timeout_s=300.0)
+    return _run_to_logfile(cmd, log_path=base / "start-llm.log",
+                           timeout_s=START_LLM_TIMEOUT_S)
 
 
 def real_load_14b(config: FleetDispatchConfig, run_id: str = "") -> bool:
@@ -385,7 +504,8 @@ def real_load_14b(config: FleetDispatchConfig, run_id: str = "") -> bool:
     cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-File", str(script),
            "-Model", _CRITIC_MODEL_ID, "-Force"]
     base = (config.runs_dir / run_id) if run_id else config.runs_dir
-    return _run_to_logfile(cmd, log_path=base / "start-14b.log", timeout_s=300.0)
+    return _run_to_logfile(cmd, log_path=base / "start-14b.log",
+                           timeout_s=START_LLM_TIMEOUT_S)  # #747 cold-cache headroom (see the constant)
 
 
 def _ps_single_quote(value: str) -> str:
@@ -479,6 +599,14 @@ def _coerce_design_loop_result(data: dict) -> dict:
     }
 
 
+#: One capture+critique design pass ceiling (#688 Phase 3; design value, never bitten) —
+#: bounds the pwsh ``Invoke-CritiquePass`` subprocess (headless capture + in-process VLM
+#: critique). The design phase is fail-soft/best-effort: expiry degrades to the no-op
+#: fallback and can never block the driver's teardown.
+#: Registered: shared/timeout_registry.py (#767 item 2 — the literal named as a constant).
+DESIGN_LOOP_TIMEOUT_S = 180.0
+
+
 def real_run_design_loop(
     config: FleetDispatchConfig,
     run_id: str,
@@ -513,7 +641,7 @@ def real_run_design_loop(
         cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-Command", command]
         base = (config.runs_dir / run_id) if run_id else config.runs_dir
         log_path = base / "design-critique.log"
-        ok = _run_to_logfile(cmd, log_path=log_path, timeout_s=180.0)
+        ok = _run_to_logfile(cmd, log_path=log_path, timeout_s=DESIGN_LOOP_TIMEOUT_S)
         if not ok:
             return dict(_DESIGN_LOOP_FALLBACK)
         try:
@@ -528,11 +656,20 @@ def real_run_design_loop(
         return dict(_DESIGN_LOOP_FALLBACK)
 
 
+#: One 14B cross-model critic pass ceiling (#687 task 2; design value ~10 min, never
+#: bitten) — bounds ``critic-run.ps1`` (a full-diff review on the just-swapped-in 14B).
+#: Fail-soft: expiry returns the critic fallback, never raises, and can NEVER block the
+#: driver's teardown or the 14B restore (#687 task 2 NEVER-ZERO).
+#: Registered: shared/timeout_registry.py (#767 item 2 — the literal named as a constant).
+CRITIC_RUN_TIMEOUT_S = 600.0
+
+
 def real_run_critic(
     config: FleetDispatchConfig,
     run_id: str,
     app_dir: str,
     base_branch: str,
+    base_sha: str = "",
 ) -> dict:
     """Load the 14B and run ONE critic pass over the merged diff (#687 task 2).
 
@@ -540,6 +677,11 @@ def real_run_critic(
     ``real_wait_ready`` (belt-and-suspenders port check), then ``critic-run.ps1`` via
     :func:`_run_to_logfile` (NOT a captured pipe — avoids the #670 run-2 grandchild deadlock);
     parse the VERDICT from the logfile.
+
+    ``base_sha`` (#693): main's pre-dispatch HEAD, recorded by the driver before the repo's
+    first task ran. Non-empty -> passed as ``-BaseRef`` so the script diffs ``<base>..HEAD``
+    (ALL the merged work, robust to a multi-commit fast-forward); empty -> omitted and the
+    script's ``Resolve-CriticRange`` fallback applies (the pre-#693 behavior).
 
     Returns ``{should_iterate, verdict, findings}``. FAIL-SOFT: ANY failure (load failed,
     port not up, pwsh missing, non-zero exit, unparseable output, timeout ~10 min) returns a
@@ -554,9 +696,11 @@ def real_run_critic(
         cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-File", str(script),
                "-AppDir", app_dir, "-BaseBranch", base_branch,
                "-Model", _CRITIC_MODEL_ID]
+        if base_sha:
+            cmd += ["-BaseRef", base_sha]
         base = (config.runs_dir / run_id) if run_id else config.runs_dir
         log_path = base / "critic-run.log"
-        ok = _run_to_logfile(cmd, log_path=log_path, timeout_s=600.0)
+        ok = _run_to_logfile(cmd, log_path=log_path, timeout_s=CRITIC_RUN_TIMEOUT_S)
         if not ok:
             return dict(_CRITIC_FALLBACK)
         try:
@@ -571,6 +715,527 @@ def real_run_critic(
         return dict(_CRITIC_FALLBACK)
 
 
+# ---- M2 plan-graph live ops (W3-W6, #740) ----------------------------------
+
+
+_HEX_REF_RE = None  # lazily-compiled in real_dep_delta (keeps module import light)
+
+#: File extensions the as-built signature extractor reads (context_pack dispatch set).
+_DELTA_SOURCE_SUFFIXES = (".py", ".mjs", ".js")
+#: Per-file read ceiling for signature extraction (a generated source file beyond this
+#: is documentation-scale; its signatures are not worth the read).
+_DELTA_MAX_FILE_BYTES = 262_144
+
+
+def real_repo_head(repo: str) -> str:
+    """``git rev-parse HEAD`` of *repo* ('' when unreadable) — brackets a task's merge
+    for the W3 as-built delta. Bounded + fail-soft (a pack degrades to contract-only)."""
+    ok, out, _err = _safe_run(["git", "-C", str(repo), "rev-parse", "HEAD"], 15.0)
+    head = (out or "").strip()
+    return head if ok and head else ""
+
+
+def real_dep_delta(repo: str, base_ref: str, merge_ref: str) -> dict:
+    """The W3 as-built delta: ``git diff --name-only base..merge`` + STRUCTURAL
+    signature extraction (``context_pack.extract_signatures`` — Python ast / mjs
+    export-line regex; never comments, docstrings, or bodies — §10 S2/N6).
+
+    The refs come from our own ``real_repo_head`` reads, but are re-validated as hex
+    anyway (defense-in-depth: nothing that is not a commit hash reaches the git argv).
+    Fail-soft ``{}`` on any error — the pack then carries the contract alone."""
+    import re as _re
+
+    from shared.fleet import context_pack as _cp
+
+    global _HEX_REF_RE
+    if _HEX_REF_RE is None:
+        _HEX_REF_RE = _re.compile(r"\A[0-9a-f]{4,40}\Z")
+    try:
+        base = str(base_ref or "").strip().lower()
+        merge = str(merge_ref or "").strip().lower()
+        if not _HEX_REF_RE.match(base) or not _HEX_REF_RE.match(merge) or base == merge:
+            return {}
+        ok, out, _err = _safe_run(
+            ["git", "-C", str(repo), "diff", "--name-only", f"{base}..{merge}"], 30.0)
+        if not ok:
+            return {}
+        files = [ln.strip() for ln in (out or "").splitlines() if ln.strip()][:24]
+        signatures: list[str] = []
+        for rel in files:
+            if not rel.lower().endswith(_DELTA_SOURCE_SUFFIXES):
+                continue
+            path = Path(repo) / rel
+            try:
+                if not path.is_file() or path.stat().st_size > _DELTA_MAX_FILE_BYTES:
+                    continue
+                source = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            signatures.extend(_cp.extract_signatures(rel, source))
+            if len(signatures) >= 48:
+                break
+        return {"files": files, "signatures": signatures[:48]}
+    except Exception:  # noqa: BLE001 — fail-soft: a delta failure degrades the pack only
+        return {}
+
+
+def context_packs_log_path(config: FleetDispatchConfig, run_id: str) -> Path:
+    return config.runs_dir / run_id / "context-packs.log"
+
+
+def real_log_pack(config: FleetDispatchConfig, run_id: str, task_id: str, pack: str) -> None:
+    """Append one task's context pack VERBATIM to the run's pack audit log (plan §4.4 —
+    every pack logged for auditability; the §10 S2 review surface). Fail-soft."""
+    try:
+        path = context_packs_log_path(config, run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(f"=== context pack: {task_id} ===\n{pack}\n\n")
+    except OSError:
+        pass
+
+
+def _parse_verify_overall(text: str) -> str:
+    """Pull ``overall`` from verify-project.ps1's ``-Json`` output (scan lines in
+    reverse for a JSON object carrying it — robust to leading progress noise).
+    ``'none'`` when unparseable (could-not-run, never a fail)."""
+    for raw in reversed((text or "").splitlines()):
+        line = raw.strip()
+        if not (line.startswith("{") and line.endswith("}")):
+            continue
+        try:
+            data = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(data, dict) and "overall" in data:
+            return str(data.get("overall", "none") or "none").strip().lower()
+    # verify-project -Json may pretty-print; fall back to a whole-body parse.
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and "overall" in data:
+            return str(data.get("overall", "none") or "none").strip().lower()
+    except (ValueError, TypeError):
+        pass
+    return "none"
+
+
+def _evidence_tail(text: str, cap: int = 400) -> str:
+    """A structural, capped tail of gate/oracle output for evidence lines (§10 S3)."""
+    flat = " ".join(str(text or "").split())
+    return flat[-cap:] if len(flat) > cap else flat
+
+
+def real_run_wave_gate(
+    config: FleetDispatchConfig,
+    run_id: str,
+    repo: str,
+    *,
+    surface: str = "",
+    language_hint: str = "",
+    run=_safe_run,
+) -> dict:
+    """W4 wave gate: the deterministic verify gate + the full test suite on the
+    INTEGRATED target-repo main (never a worktree) — the same two signals the per-task
+    fleet gate reads, invoked the same way (``verify-project.ps1 -Path <repo> -Json``
+    + ``pytest``/``npm test`` in the repo).
+
+    Honesty contract: ``ok=False`` ONLY on an explicit failure (verify ``fail`` or a
+    failing test run); ``ok=None`` when NEITHER signal could run (could-not-run — the
+    caller records the wave UNVERIFIED, mirroring the fleet's non-blocking ``none``
+    posture); ``ok=True`` when at least one signal ran and none failed. Repo paths ride
+    argv / ``cwd`` only — never a shell string (§10 S1). Fail-soft on every error."""
+    try:
+        from shared.fleet.acceptance import detect_ecosystem
+
+        verify = "none"
+        verify_tail = ""
+        script = config.scripts_dir / "verify-project.ps1"
+        if script.is_file():
+            cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-File", str(script),
+                   "-Path", str(repo), "-Json", "-TimeoutSec", "600"]
+            if surface:
+                cmd += ["-Surface", str(surface)]
+            if language_hint:
+                cmd += ["-LanguageHint", str(language_hint)]
+            _ok, out, err = run(cmd, 660.0)
+            verify = _parse_verify_overall(out)
+            if verify == "fail":
+                verify_tail = _evidence_tail(out + "\n" + err)
+
+        tests = "none"
+        tests_tail = ""
+        eco = detect_ecosystem(Path(repo))
+        if eco == "python":
+            uv = shutil.which("uv")
+            if uv:
+                ok_t, out_t, err_t = run(
+                    [uv, "run", "--no-project", "--with", "pytest==9.1.1",
+                     "--with", "hypothesis==6.155.7", "pytest", "-x", "-q"],
+                    600.0, str(repo))
+                tests = "pass" if ok_t else "fail"
+                if not ok_t:
+                    tests_tail = _evidence_tail(out_t + "\n" + err_t)
+        elif eco == "node":
+            # A constant literal command — no data ever enters the string; the repo
+            # rides cwd. (npm is a .cmd shim on Windows; pwsh hosts it, argv-safe.)
+            ok_t, out_t, err_t = run(
+                [_pwsh(), "-NoProfile", "-NonInteractive", "-Command", "npm test"],
+                600.0, str(repo))
+            tests = "pass" if ok_t else "fail"
+            if not ok_t:
+                tests_tail = _evidence_tail(out_t + "\n" + err_t)
+
+        if verify == "fail" or tests == "fail":
+            ok_flag: "bool | None" = False
+        elif verify == "none" and tests == "none":
+            ok_flag = None
+        else:
+            ok_flag = True
+        evidence = f"verify={verify}; tests={tests} ({eco})"
+        fail_tail = verify_tail or tests_tail
+        if fail_tail:
+            evidence += f" | {fail_tail}"
+        # Append to the run's wave-gate audit log (best-effort).
+        try:
+            log = config.runs_dir / run_id / "wave-gates.log"
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with log.open("a", encoding="utf-8") as fh:
+                fh.write(f"repo={repo} :: {evidence}\n")
+        except OSError:
+            pass
+        return {"ok": ok_flag, "evidence": evidence}
+    except Exception as exc:  # noqa: BLE001 — gate machinery failure is could-not-run
+        return {"ok": None, "evidence": f"wave gate could not run: {type(exc).__name__}"}
+
+
+#: Module-level skip guard prepended to the SEEDED copy of the job oracle (#748 run
+#: 20260705-214803-bd). The seeded file exists so the coder CODES TOWARD the job
+#: spec (plan §4.5 — the proven #690 per-task mechanic at job level), but it must
+#: not execute in per-task/wave gates (early waves legitimately do not satisfy it
+#: yet). Grade time is unaffected: ``real_run_job_oracle`` overwrites with the
+#: UNWRAPPED plan bytes before grading (plan bytes ALWAYS win), then restores this
+#: guarded copy — so the guard never needs an env sentinel or a gate exclusion.
+_SEED_SKIP_GUARD = (
+    "# Job-level acceptance oracle - graded on the FINAL integrated tree only.\n"
+    "# This copy skips in per-task/wave gates; the grader runs the plan-carried\n"
+    "# original. Do NOT edit this file - it is restored before grading.\n"
+    "import pytest as _pytest_seed_guard\n"
+    '_pytest_seed_guard.skip("job-level oracle - graded on the final integrated tree",'
+    " allow_module_level=True)\n\n"
+)
+
+#: Node seed guard header (#740) — the ``.mjs`` equivalent of :data:`_SEED_SKIP_GUARD`,
+#: with one structural difference forced by the language: static ESM imports are
+#: HOISTED — module *linking* resolves every ``import`` before ANY body statement
+#: runs, so a top-of-file ``process.exit(0)`` can never beat an import of a
+#: not-yet-built module (proven live on node v24: ``ERR_MODULE_NOT_FOUND`` at link
+#: time, the file fails, exit 1). The seeded node copy therefore contains NO
+#: executable oracle statement at all: its only static import is the
+#: always-resolvable ``node:test`` builtin, it registers ONE explicitly-SKIPPED test
+#: (``node --test`` reports ``skipped 1`` / exit 0 in file-arg, discovery, and bare
+#: ``node`` invocations — the ``pytest.skip`` mirror), and the oracle body follows
+#: LINE-COMMENTED via :func:`_seed_guard_wrap_node` — still the readable job spec
+#: the coder codes toward (its commented imports state the required module layout),
+#: but inert by construction. ``// `` per line, never a ``/* */`` block: common
+#: oracle content (``/a*/`` regexes, ``'src/**/*.mjs'`` globs) contains ``*/`` and
+#: would terminate a block comment early. Grade time is unaffected:
+#: ``real_run_job_oracle`` overwrites with the UNWRAPPED plan bytes before grading
+#: (plan bytes ALWAYS win), then restores this guarded copy — so the guard never
+#: needs an env sentinel or a gate exclusion (same contract as the python guard).
+_SEED_SKIP_GUARD_NODE = (
+    "// Job-level acceptance oracle - graded on the FINAL integrated tree only.\n"
+    "// This SEEDED copy is inert in per-task/wave gates: the oracle body below is\n"
+    "// line-commented (a hoisted static import of a not-yet-built module can never\n"
+    "// execute) and the single registered test SKIPS. The grader replaces this\n"
+    "// whole file with the plan-carried original before running it.\n"
+    "// Do NOT edit this file - it is restored before grading.\n"
+    "import { test as __blarai_seed_skip } from 'node:test';\n"
+    "__blarai_seed_skip(\n"
+    "  'job-level acceptance oracle (seeded copy - graded on the final integrated"
+    " tree)',\n"
+    "  { skip: 'seeded oracle: graded on the final integrated tree only' },\n"
+    "  () => {},\n"
+    ");\n"
+    "// ---- seeded oracle spec below (READ it: the imports define the required\n"
+    "// ---- module layout the FINAL integrated app must satisfy) ----\n"
+)
+
+
+def _seed_guard_wrap_node(oracle_code: str) -> str:
+    """The guarded node seed: :data:`_SEED_SKIP_GUARD_NODE` + the oracle body with
+    EVERY line ``// ``-prefixed. Deterministic (idempotence compares exact bytes);
+    content-safe for arbitrary plan-generated JS (a line comment ends only at a
+    newline, and the split guarantees none survives inside a line)."""
+    body = "\n".join("// " + line for line in oracle_code.splitlines())
+    return _SEED_SKIP_GUARD_NODE + body + "\n"
+
+
+def real_seed_job_oracle(
+    config: FleetDispatchConfig,
+    run_id: str,
+    repo: str,
+    rel_path: str,
+    oracle_code: str,
+    *,
+    run=_safe_run,
+) -> dict:
+    """Seed the job oracle INTO the target repo before wave 1 (#748): write the
+    guard-wrapped oracle at the pinned path and COMMIT it, so every task worktree
+    (branched from main) carries the job spec the coder must code toward. Without
+    this the oracle grades a module layout nobody ever promised the coder — the
+    run-4 live failure (`from commands.add import ...` vs the as-built root files).
+
+    Containment mirrors ``real_run_job_oracle``: pinned paths only. The seed guard
+    is per-ecosystem — ``.py`` gets the module-level ``pytest.skip`` prologue
+    (:data:`_SEED_SKIP_GUARD`; python executes top-to-bottom, so the skip fires
+    before any oracle import), ``.mjs`` gets the hoisting-proof ``node:test``
+    skip wrapper (:func:`_seed_guard_wrap_node`; static ESM imports resolve
+    before ANY body statement, so the seeded copy carries the oracle body
+    line-commented instead — see :data:`_SEED_SKIP_GUARD_NODE`). A pinned path
+    with no designed guard is refused fail-closed, never seeded unguarded.
+    Fail-soft: any refusal/failure returns ``ok=False`` and the run proceeds
+    exactly as before seeding existed (the oracle still grades at the end)."""
+    from shared.fleet.acceptance import JOB_ORACLE_ALLOWED_PATHS
+
+    if not oracle_code:
+        return {"ok": False, "evidence": "no job oracle was generated at plan time"}
+    if rel_path not in JOB_ORACLE_ALLOWED_PATHS:
+        return {"ok": False,
+                "evidence": f"refused oracle path {rel_path!r} (not a pinned oracle path)"}
+    if rel_path.endswith(".py"):
+        seeded = _SEED_SKIP_GUARD + oracle_code
+    elif rel_path.endswith(".mjs"):
+        seeded = _seed_guard_wrap_node(oracle_code)
+    else:
+        # Defense-in-depth: JOB_ORACLE_ALLOWED_PATHS carries only .py/.mjs today,
+        # but a future pinned path with an undesigned guard must refuse — an
+        # UNGUARDED seed would execute (and fail) in every per-task/wave gate.
+        return {"ok": False,
+                "evidence": f"no seed guard designed for {rel_path!r} — not seeded"}
+    try:
+        target = Path(repo) / rel_path
+        if target.is_file() and target.read_text(encoding="utf-8") == seeded:
+            return {"ok": True, "evidence": "already seeded"}
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(seeded, encoding="utf-8")
+        git = shutil.which("git")
+        if not git:
+            return {"ok": False, "evidence": "git unavailable — oracle written but not committed"}
+        ok_a, out_a, err_a = run([git, "add", "--", rel_path], 60.0, str(repo))
+        if not ok_a:
+            return {"ok": False,
+                    "evidence": f"git add failed; {_evidence_tail(out_a + chr(10) + err_a)}"}
+        ok_c, out_c, err_c = run(
+            [git, "commit", "-m",
+             "chore(m2): seed protected job-level acceptance oracle (#740)"],
+            60.0, str(repo))
+        if not ok_c:
+            combined = out_c + "\n" + err_c
+            if "nothing to commit" in combined.lower():
+                return {"ok": True, "evidence": "already committed"}
+            return {"ok": False,
+                    "evidence": f"git commit failed; {_evidence_tail(combined)}"}
+        return {"ok": True, "evidence": f"seeded + committed {rel_path}"}
+    except Exception as exc:  # noqa: BLE001 — seeding failure must never block the run
+        return {"ok": False, "evidence": f"seeding failed: {type(exc).__name__}"}
+
+
+def real_run_job_oracle(
+    config: FleetDispatchConfig,
+    run_id: str,
+    repo: str,
+    rel_path: str,
+    oracle_code: str,
+    *,
+    run=_safe_run,
+) -> dict:
+    """W4 job oracle on the FINAL INTEGRATED tree, restore-before-grade (#690 posture):
+
+      1. containment: *rel_path* must be one of the PINNED oracle paths (a tampered
+         plan/swap-state cannot aim the write — §10 S1) and *oracle_code* non-empty;
+      2. restore-before-grade: the PLAN-CARRIED bytes are written over whatever is on
+         disk at that path (a merged edit to the oracle can never help), with the
+         prior disk state captured;
+      3. grade: ``pytest <path>`` (via the fleet's proven ``uv`` invocation) or
+         ``node --test <path>`` by extension, cwd=repo (argv-only);
+      4. restore: the prior disk state is put back (or the file removed if absent
+         before), so the operator's tree is left exactly as the merges made it — the
+         run dir keeps the audit copy + the outcome.
+
+    Returns ``{"status": "passed"|"failed"|"not-run", "evidence": str}``; every
+    machinery failure is an honest ``not-run`` (never an implied pass)."""
+    from shared.fleet.acceptance import JOB_ORACLE_ALLOWED_PATHS
+
+    if not oracle_code:
+        return {"status": "not-run", "evidence": "no job oracle was generated at plan time"}
+    if rel_path not in JOB_ORACLE_ALLOWED_PATHS:
+        return {"status": "not-run",
+                "evidence": f"refused oracle path {rel_path!r} (not a pinned oracle path)"}
+    target = Path(repo) / rel_path
+    prior: "bytes | None" = None
+    try:
+        # Audit copy first (survives whatever happens to the working tree).
+        try:
+            audit = config.runs_dir / run_id / f"job-oracle-{Path(rel_path).name}"
+            audit.parent.mkdir(parents=True, exist_ok=True)
+            audit.write_text(oracle_code, encoding="utf-8")
+        except OSError:
+            pass
+        try:
+            if target.is_file():
+                prior = target.read_bytes()
+        except OSError:
+            prior = None
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(oracle_code, encoding="utf-8")   # plan bytes ALWAYS win
+        if rel_path.endswith(".py"):
+            uv = shutil.which("uv")
+            if not uv:
+                return {"status": "not-run", "evidence": "uv unavailable — oracle not run"}
+            # `python -m pytest`, NEVER the bare `pytest` CLI (#748 live-verify run
+            # 20260705-214803-bd): the oracle lives in tests/ and imports the built
+            # modules from the repo ROOT (`from main import main`). Bare pytest does
+            # not put the CWD on sys.path, so collection died with
+            # ModuleNotFoundError on a CORRECT build — an every-job VERIFY-harness
+            # false-red. `-m pytest` inserts the CWD (the integrated repo root).
+            # Versions pinned to the provisioned GUEST venv (pytest 9.1.1 /
+            # hypothesis 6.155.7, pure wheels) so host and guest oracles grade
+            # with identical runners — un-pinned, uv resolved fresh per run
+            # (pytest 8-or-9 by interpreter, hypothesis drifting), a
+            # non-deterministic grader and a fake-DIVERGENCE manufacturer for
+            # the #744 agreement matrix.  Change only with a matching guest
+            # re-provisioning ceremony (#744 c.1526).
+            cmd = [uv, "run", "--no-project", "--with", "pytest==9.1.1",
+                   "--with", "hypothesis==6.155.7",
+                   "python", "-m", "pytest", "-q", rel_path]
+        else:
+            node = shutil.which("node")
+            if not node:
+                return {"status": "not-run", "evidence": "node unavailable — oracle not run"}
+            cmd = [node, "--test", rel_path]
+        ok, out, err = run(cmd, 600.0, str(repo))
+        status = "passed" if ok else "failed"
+        return {"status": status,
+                "evidence": f"{'exit 0' if ok else 'nonzero exit'}; {_evidence_tail(out + chr(10) + err)}"}
+    except Exception as exc:  # noqa: BLE001 — machinery failure is an honest not-run
+        return {"status": "not-run", "evidence": f"job oracle could not run: {type(exc).__name__}"}
+    finally:
+        # Restore the tree exactly as the merges left it (best-effort, fail-soft).
+        try:
+            if prior is not None:
+                target.write_bytes(prior)
+            else:
+                target.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+#: #744 go-live: the guest oracle service's vsock port. 50002 = 0xC352 (hv_sock
+#: GUID 0000c352-facb-11e6-bd58-64006a7986d3, host-registered at the ceremony);
+#: the guest PARSER owns 50001. A lock pins this equal to the guest service's
+#: own DEFAULT_ORACLE_PORT so the two sides can never silently diverge.
+GUEST_ORACLE_VSOCK_PORT: int = 50002
+
+
+def real_run_guest_oracle(
+    config: FleetDispatchConfig, run_id: str, repo: str, rel_path: str, oracle_code: str
+) -> dict:
+    """#744: the live guest-oracle executor — the host pipeline over the SAME
+    plan-carried oracle bytes the host gate grades (snapshot → overlay → offline
+    dep scan → deterministic zip), shipped to the NIC-less guest over AF_HYPERV
+    and re-run there with real pytest.
+
+    GO-LIVE (LA-supervised ceremony, 2026-07-08 — the #744 c.1445 one-line
+    registration, consciously amending the former structural-dormancy locks):
+    the transport factory is REGISTERED here, targeting the ``blarai-oracle``
+    guest service on vsock port **50002** (the parser owns 50001; provisioning
+    record: docs/security/guest_oracle_provisioning_record.md). Live-proven at
+    the ceremony BEFORE this line was written: reachable probe + a passed AND
+    a failed round-trip through the real bridge, guest, and pytest.
+
+    Fail-soft at every layer: a factory failure (missing 3.14 bridge, bad
+    config) degrades to ``transport=None`` — the pipeline then reports an
+    honest ``not-run`` after proving the snapshot shippable; the returned
+    callable itself never raises; the driver's ``_guard`` wraps the phase."""
+    from shared.fleet.guest_oracle import run_guest_oracle
+    from shared.fleet.guest_oracle_transport import (
+        BridgeUnavailableError,
+        GuestOracleTransportError,
+        make_guest_oracle_transport,
+    )
+
+    try:
+        transport = make_guest_oracle_transport(vsock_port=GUEST_ORACLE_VSOCK_PORT)
+    except (BridgeUnavailableError, GuestOracleTransportError, OSError) as exc:
+        write_swap_progress(
+            config, run_id,
+            f"Guest oracle transport unavailable ({type(exc).__name__}) — "
+            "certificate not-run this job",
+        )
+        transport = None
+    result = run_guest_oracle(repo, rel_path, oracle_code, transport=transport)
+    write_swap_progress(
+        config, run_id,
+        f"Guest oracle pipeline: {result.get('status', 'not-run')}"
+        + (f" ({result.get('reason')})" if result.get("reason") else ""),
+    )
+    return result
+
+
+def guest_oracle_evidence_path(config: FleetDispatchConfig, run_id: str) -> Path:
+    """The advisory guest-oracle certificate block for a run (#744) — beside
+    scorecard.json; a SEPARATE artifact so the pinned, battery-adopted scorecard
+    schema is untouched."""
+    return config.runs_dir / run_id / "guest-oracle.json"
+
+
+def real_write_guest_oracle(config: FleetDispatchConfig, run_id: str, block: dict) -> None:
+    """Persist the advisory guest-oracle evidence block (#744). Fail-soft."""
+    try:
+        path = guest_oracle_evidence_path(config, run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(block, indent=2), encoding="utf-8")
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def scorecard_path(config: FleetDispatchConfig, run_id: str) -> Path:
+    return config.runs_dir / run_id / "scorecard.json"
+
+
+def real_write_scorecard(config: FleetDispatchConfig, run_id: str, scorecard: dict) -> None:
+    """Persist the machine-readable job scorecard (W6, plan §4.3/§9.4), enriching the
+    evidence POINTERS with this run's artifact paths (pointers, never raw logs — the
+    §10 S6 structural rule). Fail-soft."""
+    try:
+        sc = dict(scorecard)
+        ev = dict(sc.get("evidence") or {})
+        ev.setdefault("summary", str(config.runs_dir / run_id / "SUMMARY.txt"))
+        ev.setdefault("job_summary", str(job_summary_path(config, run_id)))
+        ev.setdefault("progress", str(swap_progress_path(config, run_id)))
+        ev.setdefault("packs", str(context_packs_log_path(config, run_id)))
+        sc["evidence"] = ev
+        path = scorecard_path(config, run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(sc, indent=2), encoding="utf-8")
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def job_summary_path(config: FleetDispatchConfig, run_id: str) -> Path:
+    return config.runs_dir / run_id / "JOB_SUMMARY.txt"
+
+
+def real_write_job_summary(config: FleetDispatchConfig, run_id: str, text: str) -> None:
+    """Persist the human JOB_SUMMARY (W6) next to SUMMARY.txt. Fail-soft."""
+    try:
+        path = job_summary_path(config, run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    except OSError:
+        pass
+
+
 def write_single_task_queue(config: FleetDispatchConfig, task: dict) -> Path:
     """Write a one-task queue file for a per-task run-fleet invocation (cancel granularity)."""
     qpath = swap_dir(config) / "task-queue.json"
@@ -579,25 +1244,39 @@ def write_single_task_queue(config: FleetDispatchConfig, task: dict) -> Path:
     return qpath
 
 
+#: Per-task run-fleet ceiling (#757). Must DOMINATE run-fleet's legitimate single-task worst
+#: case (up to 3 candidates x MaxRunMinutes=60 + reviews + merge/gate overhead ~= 3.5 h) so it
+#: never clips honest work: the night-2 value (3600 s) EQUALLED one candidate's budget — zero
+#: headroom — though the actual B4/B6 killer was the overall-run budget. This ceiling is the
+#: wedge backstop for the budget-disabled path; whenever ``swap_run_budget_s`` is set, the
+#: budget watchdog is the binding bound, and run-fleet's own idle-detection (#682) is the fast
+#: kill for a stuck coder.
+TASK_TIMEOUT_S = 14400.0
+
+
 def real_run_task(config: FleetDispatchConfig, run_id: str, task: dict, *, on_spawn=None) -> TaskOutcome:
     """Run ONE task via run-fleet (shared -RunId accumulates done.txt), parse its outcome.
 
     #670 P2: run-fleet is a LONG-LIVED subtree (``pwsh -> opencode -> playwright-msedge``); it
     MUST NOT use the capture-pipe ``_safe_run`` (a grandchild inherits the pipe on Windows and
-    deadlocks the wait past the 3600s timeout — the CODE wedge that left the 30B resident).
+    deadlocks the wait past the per-task timeout — the CODE wedge that left the 30B resident).
     Redirect to a per-run-per-task LOG FILE via :func:`_run_to_logfile_tree` (no inheritable pipe;
     tree-kill on timeout). We parse SUMMARY.txt from disk, so dropping captured stdout costs
     nothing. ``on_spawn`` (ONLY the live run-task path passes a real one) hands the child to the
     budget watchdog; ``real_load_30b`` MUST pass None (start-llm is OVMS's parent — registering
-    its child would let the budget abort tree-kill OVMS)."""
+    its child would let the budget abort tree-kill OVMS).
+
+    #757: a tree-killed task yields an EXPLICIT timeout outcome. The old fall-through ("no
+    SUMMARY line for this task") wore the parser's clothes and cost night-2 a full diagnostic
+    cycle; a parsed SUMMARY line still wins (a result that raced the kill is real work)."""
     qpath = write_single_task_queue(config, task)
     script = config.scripts_dir / "run-fleet.ps1"
     name = str(task.get("task", ""))
     log_path = config.runs_dir / run_id / f"run-fleet-{slugify_task(name)}.log"
-    _run_to_logfile_tree(
+    _ok, timed_out = _run_to_logfile_tree(
         [_pwsh(), "-NoProfile", "-NonInteractive", "-File", str(script),
          "-Queue", str(qpath), "-RunId", run_id],
-        log_path=log_path, timeout_s=3600.0, on_spawn=on_spawn,
+        log_path=log_path, timeout_s=TASK_TIMEOUT_S, on_spawn=on_spawn,
     )
     # run-fleet overwrites SUMMARY.txt with THIS invocation's task; parse it.
     summary = config.runs_dir / run_id / "SUMMARY.txt"
@@ -608,6 +1287,11 @@ def real_run_task(config: FleetDispatchConfig, run_id: str, task: dict, *, on_sp
     for oc in outcomes:
         if oc.task == name:
             return oc
+    if timed_out:
+        return TaskOutcome(
+            task=name, outcome="timeout", result="TIMEOUT",
+            detail=(f"RESULT: TIMED OUT - per-task ceiling ({int(TASK_TIMEOUT_S)}s) elapsed; "
+                    "run-fleet was tree-killed before it wrote a SUMMARY line"))
     return TaskOutcome(task=name, outcome="unknown", result="UNKNOWN",
                        detail="no SUMMARY line for this task")
 
@@ -727,26 +1411,78 @@ _NEW_GROUP = 0x00000200         # CREATE_NEW_PROCESS_GROUP
 _BREAKAWAY = 0x01000000         # CREATE_BREAKAWAY_FROM_JOB
 
 
-def real_backend_ready(port: int = 5001, timeout_s: float = 180.0,
-                       poll_s: float = 3.0, sleep=None) -> bool:
-    """Poll the relaunched AO listener (loopback) until it accepts a connection.
-
-    Waits up to *timeout_s* because the fresh launcher must cold-load the 14B
-    before the AO listens — readiness is "the new backend is actually up", not
-    "the relaunch command returned" (design §2.3)."""
+def _try_connect(port: int, timeout_s: float = 2.0) -> bool:
+    """One loopback TCP connect attempt to *port* — True iff it is accepted. The
+    air-gap import control forbids a runtime HTTP client, so liveness is socket-only."""
     import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
+
+
+def real_backend_ready(port: int = 5001, timeout_s: float = 180.0,
+                       poll_s: float = 3.0, sleep=None,
+                       *, stable_polls: int = 3, stable_gap_s: float = 2.0,
+                       launcher_alive=None, observe=None) -> bool:
+    """Confirm the relaunched AO is SERVING and STAYS serving on :port — #750 fix 1.
+
+    Readiness is "the new backend is actually up", not "the relaunch command returned"
+    (design §2.3): the fresh launcher must cold-load the 14B before the AO listens, so
+    we poll up to *timeout_s*. The night-1 false-positive (#750): a bare single
+    ``socket.create_connection`` returned True for a launcher that bound :5001 in the
+    single-instance-lock race (lesson 209), got connected-to, then EXITED — so the swap
+    driver honestly-but-wrongly logged "14B is back" over a dead AO, and every later
+    battery job STALLED. Two hardenings close it:
+
+      * **STABILITY** — readiness requires ``stable_polls`` consecutive accepted
+        connections ``stable_gap_s`` apart, not one. A bind-then-die listener passes the
+        first connect and fails the follow-ups.
+      * **LAUNCHER-ALIVE** — ``launcher_alive()`` (wired live to ``relaunch_in_flight``:
+        is the spawned ``python -m launcher`` still running?) is checked before and through
+        the wait. If the launcher PROCESS died, readiness aborts FAST and returns False, so
+        the driver's retry spawns a fresh launcher instead of trusting a lingering socket.
+
+    ``observe(dict)`` (optional) records what each probe saw — the residency evidence that
+    5+ sequential swap-backs produce zero false-readies. Back-compat: the defaults
+    (``launcher_alive`` -> always-alive, no observer) keep a patient poll plus the new
+    stability requirement; the LIVE wiring passes the real ``relaunch_in_flight`` and a
+    progress-log observer."""
     import time
 
     sleep = sleep or time.sleep
+    alive = launcher_alive or (lambda: True)
+    stable_polls = max(1, int(stable_polls))
     waited = 0.0
     while waited < timeout_s:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=2):
+        if not alive():
+            if observe:
+                observe({"event": "launcher-died", "waited_s": round(waited, 1)})
+            return False   # the spawned launcher exited -> retry spawns fresh, no lingering-socket trust
+        if _try_connect(port):
+            # First accept — now prove it STAYS up (and the launcher stays alive) across
+            # stable_polls checks. A bind-then-die listener trips one of these follow-ups.
+            stable = 1
+            for _ in range(stable_polls - 1):
+                sleep(stable_gap_s)
+                waited += stable_gap_s
+                if not alive() or not _try_connect(port):
+                    stable = 0
+                    break
+                stable += 1
+            if stable >= stable_polls:
+                if observe:
+                    observe({"event": "verified-ready", "stable_polls": stable_polls,
+                             "waited_s": round(waited, 1)})
                 return True
-        except OSError:
-            pass
+            if observe:
+                observe({"event": "unstable", "waited_s": round(waited, 1)})
         sleep(poll_s)
         waited += poll_s
+    if observe:
+        observe({"event": "timeout", "timeout_s": timeout_s})
     return False
 
 
@@ -776,31 +1512,105 @@ def build_swap_ops(
         in ("1", "true", "yes", "on")
     )
 
+    # RESTART-AO hardening (M2 routed-in W7, risk R5): hold the LAST spawned relaunch so
+    # the retry loop can tell "still starting" from "dead" — a second spawn while the
+    # first is cold-loading the 14B would hit the launcher's single-instance lock and
+    # exit immediately, silently burning the attempt (the 2026-07-03 failure shape).
+    relaunch_holder: dict = {"proc": None}
+
     def restart_launcher() -> None:
+        # #761 live-verify catch (2026-07-08): the relaunch child MUST get real,
+        # valid standard handles. This Popen used to pass none — survivable only
+        # because the pre-#761 python.exe child got a fresh VISIBLE console (the
+        # exact window #761 removes). Under the pythonw chain the child's stderr
+        # wrapper was a cp1252 dead end and the launcher crashed encoding its own
+        # startup BANNER (UnicodeEncodeError at _banner, three retries, SWAP_FAILED)
+        # — the AO never came back. Mirror the PROVEN boot_launcher_detached
+        # wiring: DEVNULL stdin, UTF-8 append log for stdout+stderr, and
+        # PYTHONIOENCODING=utf-8 so every wrapper Python builds on these handles
+        # is banner-safe.
+        log_path = swap_dir(config) / "ao-relaunch.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        env = dict(os.environ)
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        fh = open(  # noqa: SIM115 — handle is inherited by the child
+            log_path, "a", encoding="utf-8", errors="replace")
         try:
-            subprocess.Popen(relaunch_argv, cwd=relaunch_cwd or None,  # noqa: S603
-                             creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY,
-                             close_fds=True)
-        except OSError:
-            subprocess.Popen(relaunch_argv, cwd=relaunch_cwd or None,  # noqa: S603
-                             creationflags=_DETACHED | _NEW_GROUP, close_fds=True)
+            try:
+                relaunch_holder["proc"] = subprocess.Popen(  # noqa: S603
+                    relaunch_argv, cwd=relaunch_cwd or None,
+                    stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
+                    creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY,
+                    close_fds=True, env=env)
+            except OSError:
+                relaunch_holder["proc"] = subprocess.Popen(  # noqa: S603
+                    relaunch_argv, cwd=relaunch_cwd or None,
+                    stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
+                    creationflags=_DETACHED | _NEW_GROUP, close_fds=True, env=env)
+        finally:
+            fh.close()  # the child inherited the fd; our handle is free to close
+
+    def relaunch_in_flight() -> bool:
+        proc = relaunch_holder.get("proc")
+        if proc is None:
+            return False
+        try:
+            return proc.poll() is None   # alive == starting or up
+        except Exception:  # noqa: BLE001 — unreadable -> unknown -> legacy respawn
+            return False
+
+    # M2 W4: the job oracle's code rides the approved task dicts (stamped by
+    # generate_plan; path-validated by extract_job_oracle) — the closure threads it to
+    # the live oracle run. The DRIVER passes the plan's pinned oracle path per call.
+    from shared.fleet.acceptance import extract_job_oracle
+
+    _, job_oracle_code, _job_oracle_path = extract_job_oracle(tasks)
+
+    def _run_task_honest_kill(task: dict) -> TaskOutcome:
+        # ONLY the live run-task path registers a child with the budget-watchdog holder; the
+        # LOAD path (real_load_30b) does NOT, so the budget abort can never tree-kill OVMS.
+        oc = real_run_task(
+            config, run_id, task,
+            on_spawn=(current_child.register if current_child is not None else None))
+        # #757 honest labeling: when the overall-run budget watchdog tree-killed run-fleet
+        # mid-task, the no-SUMMARY miss is a BUDGET kill, not a mystery — night-2 (B4+B6)
+        # burned a full diagnostic cycle because it read "no SUMMARY line for this task".
+        # Rewrite ONLY that fallback; a real parsed outcome (even one that raced the kill)
+        # always wins, and an unexplained miss without a budget fire stays UNKNOWN.
+        if (stop_event is not None and stop_event.is_set()
+                and getattr(oc, "result", "") == "UNKNOWN"
+                and "no SUMMARY line" in (getattr(oc, "detail", "") or "")):
+            return TaskOutcome(
+                task=oc.task, outcome="timeout", result="TIMEOUT",
+                detail=("RESULT: TIMED OUT - the overall run budget elapsed mid-task; "
+                        "run-fleet was tree-killed before it wrote a SUMMARY line"))
+        return oc
 
     return SwapOps(
         available_gb=real_available_gb,
         backend_alive=lambda: real_backend_alive(old_pid),
         load_30b=lambda: real_load_30b(config, run_id),
         wait_ready=real_wait_ready,
-        # ONLY the live run-task path registers a child with the budget-watchdog holder; the
-        # LOAD path (real_load_30b) does NOT, so the budget abort can never tree-kill OVMS.
-        run_task=lambda task: real_run_task(
-            config, run_id, task,
-            on_spawn=(current_child.register if current_child is not None else None)),
+        run_task=_run_task_honest_kill,
         cancel_requested=lambda: cancel_path(config).exists(),
         disarm_watchdog=lambda: _rm(sentinel_path(config)),
         stop_ovms=real_stop_ovms,
         write_report=lambda rid, outs: write_cumulative_report(config, rid, outs),
         restart_launcher=restart_launcher,
-        backend_ready=lambda: real_backend_ready(ao_port),
+        # #750 fix 1: readiness must PROVE the AO is serving and staying up — a stability
+        # re-poll + the launcher-alive guard (relaunch_in_flight) reject the bind-then-die
+        # false-positive that made night-1 log "14B is back" over a dead AO. The observer
+        # writes each probe outcome to the swap-progress trail (the residency evidence that
+        # sequential swap-backs produce zero false-readies).
+        backend_ready=lambda: real_backend_ready(
+            ao_port,
+            launcher_alive=relaunch_in_flight,
+            observe=lambda info: write_swap_progress(
+                config, run_id,
+                "backend-ready probe: " + str(info.get("event", "?"))
+                + "".join(f" {k}={v}" for k, v in info.items() if k != "event"),
+            ),
+        ),
         signal_failure=lambda msg: write_failure_status(config, run_id, msg),
         # Same run-id-keyed progress log the AO started — the detached driver continues the
         # trail (30B loading -> gate -> fleet -> swapping back -> 14B restored) under the SAME
@@ -827,13 +1637,49 @@ def build_swap_ops(
         # operator's live dispatches. Set BLARAI_ENABLE_CRITIC=1/true to activate (the live-verify
         # ceremony); unset -> the no-op default (byte-identical to before this feature shipped).
         run_critic=(
-            (lambda app_dir, base: real_run_critic(config, run_id, app_dir, base))
+            (lambda app_dir, base, base_sha="": real_run_critic(
+                config, run_id, app_dir, base, base_sha))
             if critic_on
             else _noop_critic
         ),
         # Observable enablement: the driver logs ACTIVE/DORMANT from this so a dormant run is never
         # mistaken for a working one (and vice-versa). Same predicate as run_critic — they can't drift.
         critic_enabled=critic_on,
+        # ---- M2 plan-graph live seams (W3-W6, #740). Wired unconditionally — the driver
+        # only CALLS them in plan mode (plan_graph=false never reaches them), and each is
+        # individually fail-soft, so legacy runs are behavior-identical.
+        repo_head=real_repo_head,
+        dep_delta=real_dep_delta,
+        log_pack=lambda task_id, pack: real_log_pack(config, run_id, task_id, pack),
+        run_wave_gate=lambda repo: real_run_wave_gate(
+            config, run_id, repo,
+            surface=str((tasks[0] if tasks else {}).get("surface", "") or ""),
+            language_hint=str((tasks[0] if tasks else {}).get("language_hint", "") or ""),
+        ),
+        run_job_oracle=lambda repo, rel: real_run_job_oracle(
+            config, run_id, repo, rel, job_oracle_code),
+        # #748: seed the job oracle into the repo before wave 1 so the coder codes
+        # toward the job spec (plan §4.5) — guard-wrapped (skips in gates), grade
+        # unaffected (plan bytes overwrite at grade time).
+        seed_job_oracle=lambda repo, rel: real_seed_job_oracle(
+            config, run_id, repo, rel, job_oracle_code),
+        # The mid-swap re-decompose MODEL TRANSPORT is deliberately NOT live-wired yet:
+        # the 14B planner is not resident during CODE and no fleet script exposes a
+        # free-text generation seam the driver could argv-invoke. The deterministic
+        # policy (budgets, strict-improvement replace, ruler re-validation, park-on-
+        # refuse) is fully built + regression-locked against the seam; wiring a live
+        # transport is a W8 residency-choreography step (noted in the Lane A2 report).
+        # Default: no re-planner -> the failed task parks honestly (today's behavior).
+        write_scorecard=lambda sc: real_write_scorecard(config, run_id, sc),
+        write_job_summary=lambda text: real_write_job_summary(config, run_id, text),
+        relaunch_in_flight=relaunch_in_flight,
+        # #744 guest-certified oracle — wired unconditionally (the driver only CALLS
+        # these when guest_oracle_enabled rides the spec as true), and the executor is
+        # itself STRUCTURALLY TRANSPORT-DORMANT (transport=None -> honest not-run)
+        # until the supervised go-live ceremony. Double lock, like the egress door.
+        run_guest_oracle=lambda repo, rel: real_run_guest_oracle(
+            config, run_id, repo, rel, job_oracle_code),
+        write_guest_oracle=lambda block: real_write_guest_oracle(config, run_id, block),
     )
 
 
@@ -948,6 +1794,12 @@ def prepare_and_launch_swap(
         "queue_path": str(config.queue_path),
         "runs_dir": str(config.runs_dir),
         "projects_dir": str(config.projects_dir),
+        # M2 (#740): the [fleet_dispatch].plan_graph knob rides the spec to the detached
+        # driver. False (the default) = today's flat queue, byte-identical behavior.
+        "plan_graph": bool(getattr(config, "plan_graph", False)),
+        # #744: the [fleet_dispatch].guest_oracle_enabled knob rides the spec the same
+        # way. False (the default) = the driver never touches the guest-oracle seams.
+        "guest_oracle_enabled": bool(getattr(config, "guest_oracle_enabled", False)),
     }
     spec_path = swap_dir(config) / "spec.json"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
@@ -958,10 +1810,34 @@ def prepare_and_launch_swap(
 def _spawn_detached_driver(spec_path: Path) -> None:
     import sys
 
-    subprocess.Popen(  # noqa: S603
-        [sys.executable, "-m", "shared.fleet.swap_ops", "--spec", str(spec_path)],
-        creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY, close_fds=True,
-    )
+    # #761: spawn via the pythonw sibling when one exists — sys.executable through the
+    # venv python.exe shim re-spawns a console-subsystem child that is allocated a fresh
+    # VISIBLE console despite DETACHED_PROCESS (this driver's conhost was diagnosed live
+    # 2026-07-07 morning). Fallback is sys.executable unchanged.
+    # NO CREATE_NO_WINDOW on any python-launcher spawn — see the _NO_WINDOW constraint.
+    #
+    # Live-verify catch (2026-07-08): "under pythonw a stray print is a silent
+    # no-op" — the claim this comment used to make — is FALSE when a child
+    # inherits a broken-but-present handle: the relaunched LAUNCHER died encoding
+    # its banner to a cp1252 stderr. Give the driver real handles the same way
+    # boot_launcher_detached does (DEVNULL in, UTF-8 append log out,
+    # PYTHONIOENCODING=utf-8), so a stray print/traceback lands in the log
+    # instead of crashing or vanishing.
+    log_path = spec_path.with_name("driver-stdio.log")
+    env = dict(os.environ)
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    fh = open(  # noqa: SIM115 — handle is inherited by the child
+        log_path, "a", encoding="utf-8", errors="replace")
+    try:
+        subprocess.Popen(  # noqa: S603
+            [pythonw_sibling(sys.executable), "-m", "shared.fleet.swap_ops",
+             "--spec", str(spec_path)],
+            stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
+            creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY, close_fds=True,
+            env=env,
+        )
+    finally:
+        fh.close()  # the child inherited the fd; our handle is free to close
 
 
 def _coerce_budget(value) -> float:
@@ -973,6 +1849,97 @@ def _coerce_budget(value) -> float:
     except (TypeError, ValueError):
         return 0.0
     return b if b > 0 else 0.0
+
+
+def plan_path(config: FleetDispatchConfig) -> Path:
+    """The persisted JobPlan artifact for the CURRENT swap (plan-graph mode only)."""
+    return swap_dir(config) / "plan.json"
+
+
+def build_job_plan(
+    config: FleetDispatchConfig, run_id: str, tasks: list[dict]
+):
+    """M2 (#740): build + validate + persist the JobPlan for a plan-graph dispatch.
+
+    Returns ``(plan, plan_store, degraded, cleaned_tasks)``. The DEGRADE-TO-TODAY rule
+    is absolute: any refusal (unrunnable plan input) returns ``(None, None, False,
+    cleaned_tasks)`` and the caller runs the legacy flat queue — a dispatch never fails
+    because planning got fancier (plan §4.1 principle 2). Steps:
+
+      1. pop the riding job-oracle fields (``acceptance.extract_job_oracle`` — the
+         pinned-path containment lives there);
+      2. stamp the appended ``acceptance-tests`` task's ``depends_on`` (seam note (a));
+      3. ``build_plan_raw`` (goal/criteria from the task dicts + the run's
+         acceptance.json record) → ``validate_plan`` (the ruler, incl. repo
+         containment) → ``PlanStore.write`` (the §10 S1 hashed artifact).
+    """
+    from shared.fleet.acceptance import extract_job_oracle
+    from shared.fleet.plan_graph import (
+        DEFAULT_ORACLE_PATH,
+        PlanStore,
+        build_plan_raw,
+        stamp_acceptance_task_deps,
+        validate_plan,
+    )
+
+    cleaned, _oracle_code, oracle_rel = extract_job_oracle(tasks)
+    if not cleaned:
+        return (None, None, False, cleaned)
+    # DEGRADE-TO-TODAY (M2, under-decomposition safety net): a plan of fewer than 2 tasks has
+    # NO job-level acceptance oracle (generate_job_acceptance_oracle refuses <2 tasks — the
+    # #690 per-task oracle owns the single-task shape) and NO dependency graph to schedule.
+    # Running it as a 1-task plan-graph job would produce an UNGRADEABLE job (no job oracle ->
+    # the driver records job acceptance not-run and STALLS at [VERIFY] even though the lone
+    # task merged clean — the live B2 failure, 2026-07-06). Degrade to the legacy flat queue so
+    # the per-task path (build/test/verify + the #690 per-task oracle the task still carries)
+    # grades the single task -> GREEN-able. Mirrors the absolute refusal rule above (plan §4.1
+    # principle 2): a dispatch never gets a WORSE outcome because planning got fancier.
+    if len(cleaned) < 2:
+        write_swap_progress(
+            config, run_id,
+            "Plan-graph declined a <2-task plan (no job oracle, no graph to schedule) — "
+            "degrading to the flat task queue so the per-task oracle grades the single task "
+            "(today's serial behavior).",
+        )
+        return (None, None, False, cleaned)
+    stamped = stamp_acceptance_task_deps(cleaned)
+    record = read_acceptance_record(config, run_id) or {}
+    spec_dict = record.get("spec") if isinstance(record.get("spec"), dict) else {}
+    criteria = [
+        str(c.get("text", "") or "")
+        for c in (spec_dict.get("criteria") or [])
+        if isinstance(c, dict) and str(c.get("text", "") or "").strip()
+    ]
+    goal = str(spec_dict.get("goal", "") or (stamped[0].get("goal", "") if stamped else ""))
+    repo = str(stamped[0].get("repo", "") or "")
+    raw = build_plan_raw(
+        plan_id=run_id, goal=goal, repo=repo, tasks=stamped,
+        criteria=criteria, oracle_path=oracle_rel or DEFAULT_ORACLE_PATH,
+    )
+    validation = validate_plan(raw, projects_dir=config.projects_dir)
+    if not validation.ok or validation.plan is None:
+        write_swap_progress(
+            config, run_id,
+            f"Plan-graph refused ({validation.reason}) — degrading to the flat task "
+            "queue (today's serial behavior).",
+        )
+        return (None, None, False, stamped)
+    store = PlanStore(plan_path(config), projects_dir=config.projects_dir)
+    try:
+        plan = store.write(validation.plan)
+    except OSError:
+        write_swap_progress(
+            config, run_id,
+            "Plan artifact could not be persisted — degrading to the flat task queue.",
+        )
+        return (None, None, False, stamped)
+    if validation.degraded:
+        write_swap_progress(
+            config, run_id,
+            "Plan-graph DEGRADED to the original-order linear chain (cycle) — logged, "
+            "not hidden.",
+        )
+    return (plan, store, validation.degraded, stamped)
 
 
 def run_swap(spec_path: Path):
@@ -987,9 +1954,46 @@ def run_swap(spec_path: Path):
         queue_path=Path(spec["queue_path"]),
         runs_dir=Path(spec["runs_dir"]),
         projects_dir=Path(spec["projects_dir"]),
+        plan_graph=bool(spec.get("plan_graph", False)),
+        # #744: absent key -> False (fail-closed dormancy; pre-#744 spec files
+        # re-read after a crash recovery resolve to the legacy behavior).
+        guest_oracle_enabled=bool(spec.get("guest_oracle_enabled", False)),
     )
-    tasks = ss.read_swap_state(swap_state_path(config))
-    tasks = tasks.tasks if tasks else []
+    state = ss.read_swap_state(swap_state_path(config))
+    tasks = state.tasks if state else []
+    # #758: stamp THIS (the detached driver) process into the swap state, so a concurrent
+    # AO boot's reconcile can tell a LIVE swap from a CRASHED one (driver alive ->
+    # hands-off; dead -> recover). Without this, any AO boot mid-dispatch "recovered" the
+    # healthy swap — stopped the real OVMS mid-task and stamped RECOVERED over the live
+    # run (2026-07-07). create-time guards pid reuse; psutil-less degrades to pid-only.
+    if state is not None:
+        from dataclasses import replace as _dc_replace
+
+        created = 0.0
+        try:
+            import psutil
+
+            created = float(psutil.Process(os.getpid()).create_time())
+        except Exception:  # noqa: BLE001 — pid-only still guards (narrow reuse window)
+            created = 0.0
+        try:
+            ss.write_swap_state(
+                _dc_replace(state, driver_pid=os.getpid(), driver_pid_created=created),
+                path=swap_state_path(config),
+            )
+        except OSError:
+            pass  # fail-soft: an unstamped record degrades to pre-#758 recovery behavior
+    # M2 (#740): plan-graph mode — build/validate/persist the JobPlan; ANY refusal
+    # degrades to the legacy flat queue (plan=None), never a new failure mode. The
+    # driver's task list is the CLEANED set (job-oracle blob popped; acceptance task
+    # dep-stamped); build_swap_ops keeps the ORIGINAL dicts (it extracts the oracle
+    # code itself, and the worktree sweep reads only repo/task keys).
+    plan = None
+    store = None
+    degraded = False
+    driver_tasks = tasks
+    if config.plan_graph and tasks:
+        plan, store, degraded, driver_tasks = build_job_plan(config, spec["run_id"], tasks)
     # PER-RUN budget-watchdog instances (never module globals / filesystem sentinels) — a fresh
     # _CurrentChild + stop_event so a prior run's budget-timeout can never poison this one.
     current_child = _CurrentChild()
@@ -1004,9 +2008,11 @@ def run_swap(spec_path: Path):
                                request_stop=stop_event.set)
                 if budget_s > 0 else None)
     return SwapDriver(
-        run_id=spec["run_id"], session_id=spec["session_id"], tasks=tasks,
+        run_id=spec["run_id"], session_id=spec["session_id"], tasks=driver_tasks,
         swap_state_path=swap_state_path(config), ops=ops,
-        gate_gb=float(spec.get("gate_gb", 21.0)), budget_watchdog=watchdog,
+        gate_gb=float(spec.get("gate_gb", 20.0)), budget_watchdog=watchdog,
+        plan=plan, plan_store=store, plan_degraded=degraded,
+        guest_oracle_enabled=config.guest_oracle_enabled,
     ).run()
 
 
@@ -1041,6 +2047,40 @@ def _venv_python(repo_root: Path) -> str:
     return sys.executable
 
 
+def pythonw_sibling(python_exe: str) -> str:
+    """The GUI-subsystem ``pythonw.exe`` beside *python_exe*, else *python_exe* unchanged.
+
+    #761 root cause: on Windows ``.venv\\Scripts\\python.exe`` is the venv LAUNCHER
+    SHIM — it spawns the BASE console-subsystem interpreter as a CHILD, so a
+    ``DETACHED_PROCESS`` spawn is defeated one hop down: the child, born to a
+    console-less parent, is allocated a fresh VISIBLE console (the
+    "Administrator: ...python.exe" window the operator can accidentally close — the
+    night-2 window-close incident class). ``pythonw.exe`` is GUI-subsystem the whole
+    way down (its shim child is ``pythonw`` too): no console is ever allocated, and
+    the Textual launcher takes its PROVEN headless-driver fallback — the same one a
+    DETACHED spawn already exercised. Deliberately NOT ``CREATE_NO_WINDOW``: a HIDDEN
+    console is the exact shape that crashed Textual on 2026-07-06 ("Driver must be
+    in application mode"). Fail-safe: no sibling (POSIX layout, non-standard exe
+    name) -> the original interpreter unchanged, never a broken spawn."""
+    path = Path(python_exe)
+    if path.name.lower() == "python.exe":
+        sibling = path.with_name("pythonw.exe")
+        if sibling.exists():
+            return str(sibling)
+    return python_exe
+
+
+def _venv_pythonw(repo_root: Path) -> str:
+    """``_venv_python``'s GUI-subsystem sibling for the DETACHED relaunch argv (#761):
+    resolve ``.venv/Scripts/pythonw.exe`` when present, else fall back to
+    ``_venv_python``'s result (a POSIX venv, or a Scripts dir without pythonw) so the
+    relaunch never breaks — it merely keeps the pre-#761 visible-console behavior."""
+    candidate = repo_root.joinpath(".venv", "Scripts", "pythonw.exe")
+    if candidate.exists():
+        return str(candidate)
+    return _venv_python(repo_root)
+
+
 def compute_relaunch_argv(
     *,
     winui: bool,
@@ -1053,10 +2093,13 @@ def compute_relaunch_argv(
     repo root). The launcher captures its OWN mode at startup + hands these to the driver via
     the spec; the driver respawns them. Pure + unit-testable — the actual exit/relaunch is
     live-only (Phase B). ``python_exe`` / ``repo_root`` are injectable; the live default for
-    the interpreter is the checkout's ``.venv`` (NOT ``sys.executable`` — #670 run-1 bug 2),
-    and the default root is this checkout's repo root."""
+    the interpreter is the checkout's ``.venv`` **pythonw.exe** (NOT ``sys.executable`` —
+    #670 run-1 bug 2 — and NOT the venv ``python.exe`` shim, whose console-subsystem child
+    defeats DETACHED_PROCESS and presents the accidentally-closable visible console the
+    swap-back was showing — #761; see :func:`pythonw_sibling`), and the default root is
+    this checkout's repo root."""
     root = Path(repo_root) if repo_root else Path(__file__).resolve().parents[2]
-    py = python_exe or _venv_python(root)
+    py = python_exe or _venv_pythonw(root)
     argv = [str(py), "-m", "launcher"]
     if winui:
         argv.append("--winui")

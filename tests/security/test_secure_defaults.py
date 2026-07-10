@@ -24,6 +24,7 @@ import pytest
 _REPO = Path(__file__).resolve().parents[2]
 _AO_CONFIG = _REPO / "services/assistant_orchestrator/config/default.toml"
 _GUEST_CONFIG = _REPO / "services/assistant_orchestrator/config/guest_runtime.toml"
+_PA_GUEST_CONFIG = _REPO / "services/policy_agent/config/guest_runtime.toml"
 
 # The ratified secure-by-default posture (ADR-023 EA-3/EA-4 + the [security] block).
 _SECURE_PGOV = {
@@ -71,4 +72,25 @@ def test_guest_runtime_config_gate_secure_if_present() -> None:
     if "block_tools_on_untrusted_content" in pgov:
         assert pgov["block_tools_on_untrusted_content"] is True, (
             "guest_runtime.toml [pgov] block_tools_on_untrusted_content must be true"
+        )
+
+
+def test_guest_runtime_configs_ship_dev_mode_off() -> None:
+    """#641: both guest-runtime configs must ship dev_mode=false. The guest
+    profile is dormant (production runs host-mode) and resolve_dev_mode(GUEST)
+    already forces False — but the shipped file must MATCH that safe resolution
+    rather than carrying an insecure dev_mode=true a future guest-boot path could
+    honor. A flip back to true (the pre-#641 state) trips this test loudly, the
+    same regression-guard purpose ADR-023 §1 established for the Layer-3 lock."""
+    for path in (_GUEST_CONFIG, _PA_GUEST_CONFIG):
+        if not path.exists():
+            pytest.skip(f"{path.name} absent")
+        security = _load(path).get("security", {})
+        assert security.get("dev_mode") is False, (
+            f"{path.parent.parent.name}/{path.name} [security] dev_mode must be "
+            f"false (#641 secure default); got {security.get('dev_mode')!r}"
+        )
+        assert security.get("fail_closed") is True, (
+            f"{path.parent.parent.name}/{path.name} [security] fail_closed must "
+            f"be true; got {security.get('fail_closed')!r}"
         )
