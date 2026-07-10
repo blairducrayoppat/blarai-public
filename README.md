@@ -4,10 +4,11 @@
 
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
-local disk, and **zero external network dependency by default**. It is not a
-prototype or a wrapper around a cloud API. It is a long-term platform, designed
-to survive hardware generations, with a security and governance architecture
-treated as the primary engineering artifact rather than an afterthought.
+local disk, and **zero external network dependency by default**. It is a
+personal research project and my long-term local AI system — not a wrapper
+around a cloud API. It's designed to survive hardware generations, with a
+security and governance architecture treated as a primary engineering artifact
+from the start, not an afterthought.
 
 The design premise is uncompromising: a system that holds decades of a person's
 private data must assume every component can fail or be subverted, must fail

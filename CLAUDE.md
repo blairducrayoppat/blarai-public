@@ -4,7 +4,8 @@
 
 BlarAI is a personal, locally-run, security-first AI system designed for decades of use.
 It runs entirely on local hardware with zero external network dependency and hardware-rooted trust.
-This is not a prototype — it is a long-term platform that evolves across hardware generations.
+It is a personal research project — my long-term local AI system, built to
+evolve across hardware generations.
 
 **Current state**: USE-CASE-001 (Policy Agent) and USE-CASE-004 (Assistant Orchestrator)
 are OPERATIONAL. 7 Use Cases defined in `Use Cases_FINAL.md` constitute the full vision.
