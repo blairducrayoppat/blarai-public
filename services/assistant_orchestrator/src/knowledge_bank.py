@@ -114,14 +114,19 @@ import logging
 import re
 import sqlite3
 import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any, NamedTuple
 
 from services.assistant_orchestrator.src.substrate import (
     EMBED_DIM,
+    EMBED_MODEL_NAME,
+    EMBED_MODEL_REVISION,
     EmbedFn,
+    EmbedModelMismatch,
     _harden_db_file_dacl,
     chunk_text,
+    detect_embed_model_mismatch,
 )
 
 logger = logging.getLogger(__name__)
@@ -230,6 +235,34 @@ CREATE TABLE IF NOT EXISTS generated_images (
 );
 CREATE INDEX IF NOT EXISTS idx_generated_images_session ON generated_images(session_id);
 CREATE INDEX IF NOT EXISTS idx_generated_images_hash ON generated_images(image_hash);
+
+-- Operator preferences (Learning Loops Loop 1, #770 M1) — the OPERATOR_PREFERENCE
+-- provenance tier's verbatim store.  P7: SAME substrate, same DEK, same
+-- born-encrypted discipline — no new store.  P2: ``body`` is the operator's
+-- utterance VERBATIM (never LLM-paraphrased); ``type_tag`` is a cosmetic label
+-- (address-form|standing-rule|fact).  P5: last-writer-wins with audit history —
+-- an edit UPDATEs the active row in place (stable pref_id + created => stable,
+-- append-minimal render order, P9) and inserts a ``superseded`` audit row
+-- carrying the prior verbatim body; a delete flips status to ``deleted``
+-- (audit retained, excluded from rendering).  P6: NO decay column, NO expiry.
+-- P8: the ONLY writer is the AO PREFERENCE_WRITE handler (the explicit operator
+-- command path); no model-callable tool references this table — locked by
+-- test_preference_write_authority.py.  NEVER chunked / embedded / indexed
+-- (not a retrieval surface; the pinned block is rendered directly from rows).
+CREATE TABLE IF NOT EXISTS operator_preferences (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    pref_id     TEXT NOT NULL UNIQUE,             -- uuid4().hex stable id
+    status      TEXT NOT NULL DEFAULT 'active',   -- active|superseded|deleted
+    type_tag    TEXT NOT NULL,                    -- cosmetic label (plaintext)
+    supersedes  TEXT,                             -- audit chain: pref_id this row is history OF
+    subject     BLOB,                             -- encrypted (FieldCipher, AAD-bound)
+    body        BLOB NOT NULL,                    -- encrypted verbatim (FieldCipher, AAD-bound)
+    source      TEXT NOT NULL,                    -- 'operator-explicit' (M1's only source)
+    created     TEXT NOT NULL,
+    updated     TEXT NOT NULL,
+    expires     TEXT                              -- #770 M2 W2: operator-stated ISO date (YYYY-MM-DD); NULL = no expiry (P6: the SYSTEM never decides to forget)
+);
+CREATE INDEX IF NOT EXISTS idx_operator_preferences_status ON operator_preferences(status);
 """
 
 
@@ -322,6 +355,52 @@ class GeneratedImageMeta(NamedTuple):
     created_at: str
 
 
+class OperatorPreference(NamedTuple):
+    """A decrypted operator-preference row (Learning Loops Loop 1, #770 M1).
+
+    ``body`` is the operator's utterance VERBATIM (P2 — stored byte-identical,
+    never paraphrased).  ``status`` is ``active`` (rendered into the pinned
+    block), ``superseded`` (audit history of an edit — the prior verbatim body,
+    never rendered), or ``deleted`` (audit tombstone, never rendered).
+    """
+
+    pref_id: str
+    status: str
+    type_tag: str
+    subject: str
+    body: str
+    source: str
+    supersedes: str
+    """pref_id of the ACTIVE row this audit row is history of ('' for active rows)."""
+    created: str
+    updated: str
+    expires: str = ""
+    """#770 M2 W2 — operator-stated ISO expiry date (YYYY-MM-DD), or '' for none.
+    The pinned block stops rendering the row on/after this date; /preferences
+    still LISTS it, flagged expired.  P6-safe: the SYSTEM never decides to forget
+    — only the operator's own stated bound applies, and nothing is auto-deleted."""
+
+
+#: Cosmetic preference type labels (design §3.2 envelope).  A mis-tag is
+#: cosmetic, never lossy — an unrecognized tag COERCES to the default rather
+#: than refusing the write (the body, the load-bearing part, stays verbatim).
+PREFERENCE_TYPE_TAGS: frozenset[str] = frozenset(
+    {"address-form", "standing-rule", "fact"}
+)
+DEFAULT_PREFERENCE_TYPE_TAG: str = "standing-rule"
+
+#: Deterministic near-duplicate/contradiction threshold (P5): Jaccard overlap
+#: of normalized token sets at or above this flags a REQUIRES_CONFIRMATION.
+#: Deliberately deterministic + offline (no embed dependency) for M1; the M2
+#: propose-and-confirm flow may refine it.
+PREFERENCE_SIMILARITY_THRESHOLD: float = 0.6
+
+
+def _pref_similarity_tokens(text: str) -> frozenset[str]:
+    """Normalized token set for the deterministic preference-similarity check."""
+    return frozenset(t for t in re.split(r"[^a-z0-9]+", text.lower()) if t)
+
+
 class KnowledgeHit(NamedTuple):
     """A single hybrid-retrieval hit."""
 
@@ -367,6 +446,17 @@ def _generated_image_aad_id(session_id: str, image_id: str) -> str:
     the decrypt-quarantine path.
     """
     return f"{session_id}|{image_id}"
+
+
+def _pref_aad_id(pref_id: str) -> str:
+    """Natural row identity for operator_preferences AAD binding (#770 M1).
+
+    The row's own ``pref_id`` (a ``uuid4().hex`` string).  Audit rows carry
+    their OWN pref_id, so a superseded body's ciphertext re-encrypts under the
+    audit row's identity — a ciphertext relocated between rows or columns
+    fails authentication (the same discipline as every other encrypted table).
+    """
+    return pref_id
 
 
 # The local image scheme the cleaner rewrites refs to (mirrors
@@ -473,6 +563,12 @@ class EncryptedKnowledgeBank:
             reopen under a DIFFERENT configured window refuses retrieval and
             approve loudly (``KNOWLEDGE_EMBED_WINDOW_MISMATCH``) instead of
             silently mixing embedding depths (ADR-031 §3).
+        embed_model / embed_model_revision: Identity of the model *embed_fn*
+            actually runs (Vikunja #794).  Recorded in ``knowledge_meta`` at
+            first creation; a reopen under a DIFFERENT identity loud-disables the
+            VECTOR limb only — BM25/lexical retrieval keeps working — instead of
+            fusing cosine scores from a different embedding space (ADR-031 §7
+            loud-disable middle ground).
     """
 
     #: Regression-lock attribute (same contract as EncryptedSubstrateStore).
@@ -485,6 +581,8 @@ class EncryptedKnowledgeBank:
         cipher: "FieldCipher",  # type: ignore[name-defined]  # noqa: F821
         retrieve_k: int = DEFAULT_RETRIEVE_K,
         embed_max_tokens: int = KNOWLEDGE_EMBED_MAX_TOKENS,
+        embed_model: str = EMBED_MODEL_NAME,
+        embed_model_revision: str = EMBED_MODEL_REVISION,
     ) -> None:
         from shared.security.field_cipher import FieldCipher  # local import; no circular dep
 
@@ -524,7 +622,8 @@ class EncryptedKnowledgeBank:
         # ORIGINAL value on reopen so a config drift is detectable below.
         for key, value in (
             ("embed_dim", str(EMBED_DIM)),
-            ("embed_model", "bge-small-en-v1.5"),
+            ("embed_model", embed_model),
+            ("embed_model_revision", embed_model_revision),
             ("embed_max_tokens", str(self._embed_max_tokens)),
             ("schema_version", "1"),
         ):
@@ -559,6 +658,20 @@ class EncryptedKnowledgeBank:
                 stored_window,
                 self._embed_max_tokens,
             )
+
+        # Stored-vs-configured embedding-MODEL identity cross-check (#794).  A
+        # DIFFERENT model/revision than the one whose vectors are on disk means
+        # cosine scores are being compared across two embedding spaces.  Posture:
+        # loud-disable the VECTOR limb ONLY (ADR-031 §7 middle ground) — BM25 does
+        # not depend on the embedder, so lexical retrieval keeps working while the
+        # cosine limb is skipped in retrieve().  None ⇒ identity agrees.
+        self._embed_model_mismatch: EmbedModelMismatch | None = detect_embed_model_mismatch(
+            self._conn,
+            "knowledge_meta",
+            embed_model,
+            embed_model_revision,
+            "knowledge.db",
+        )
 
         # In-RAM retrieval state, built once at DEK-unlock (construction) from
         # APPROVED chunks and extended incrementally on approve.  All access is
@@ -616,6 +729,21 @@ class EncryptedKnowledgeBank:
             logger.info(
                 "Knowledge bank migration: added generated_images.saved "
                 "(existing rows -> not-saved; UC-010 Phase 1 #667)"
+            )
+
+        # #770 M2 W2: operator-stated preference expiry. A nullable column so
+        # existing rows migrate to NULL (no expiry — an M1 preference stays
+        # unbounded, which is exactly its prior behaviour).  Plaintext ISO date
+        # (not content-bearing — it is a bound the operator SAID, not a secret);
+        # NULL never renders as expired.
+        if not self._has_column("operator_preferences", "expires"):
+            self._conn.execute(
+                "ALTER TABLE operator_preferences ADD COLUMN expires TEXT"
+            )
+            self._conn.commit()
+            logger.info(
+                "Knowledge bank migration: added operator_preferences.expires "
+                "(existing rows -> NULL/no-expiry; #770 M2 W2)"
             )
 
     # ── Lifecycle ────────────────────────────────────────────────────────
@@ -1758,6 +1886,315 @@ class EncryptedKnowledgeBank:
 
     # ── Read (single record: hard fail-closed; bulk: quarantine) ────────
 
+    # ── Operator preferences (Learning Loops Loop 1, #770 M1) ───────────
+
+    def _enc_pref_field(self, column: str, pref_id: str, value: str) -> bytes:
+        """Encrypt a content-bearing preference column, AAD-bound to its row."""
+        from shared.security.field_cipher import make_aad_for
+
+        return self._cipher.encrypt(
+            value.encode("utf-8"),
+            aad=make_aad_for("operator_preferences", column, _pref_aad_id(pref_id)),
+        )
+
+    def _dec_pref_field(self, column: str, pref_id: str, blob: bytes) -> str:
+        """Decrypt a content-bearing preference column (hard fail-closed)."""
+        from shared.security.field_cipher import make_aad_for
+
+        return self._cipher.decrypt(
+            bytes(blob),
+            aad=make_aad_for("operator_preferences", column, _pref_aad_id(pref_id)),
+        ).decode("utf-8")
+
+    @staticmethod
+    def _coerce_pref_type_tag(type_tag: str) -> str:
+        """Coerce an unrecognized type tag to the default (cosmetic, never lossy)."""
+        tag = type_tag.strip()
+        return tag if tag in PREFERENCE_TYPE_TAGS else DEFAULT_PREFERENCE_TYPE_TAG
+
+    def store_preference(
+        self,
+        body: str,
+        type_tag: str = DEFAULT_PREFERENCE_TYPE_TAG,
+        subject: str = "",
+        source: str = "operator-explicit",
+        expires: str = "",
+    ) -> OperatorPreference:
+        """Persist one operator preference VERBATIM (P2), born-encrypted.
+
+        Validation (Fail-Closed — raises :class:`KnowledgeBankError` with a
+        stable ``PREFERENCE_*`` code prefix):
+
+          * ``PREFERENCE_EMPTY`` — an empty/whitespace-only body.
+          * ``PREFERENCE_BODY_TOO_LONG`` — body over
+            ``shared.preference_budgets.PREFERENCE_BODY_MAX_CHARS`` (P4).
+          * ``PREFERENCE_COUNT_CAP`` — the active tier is at
+            ``PREFERENCE_MAX_COUNT`` (P4).
+
+        The body is stored byte-verbatim — this method never trims, rewrites,
+        or paraphrases it (P2: small models cannot recover from summarization
+        loss; the store must not either).  ``type_tag``/``subject`` are the
+        thin cosmetic envelope; an unrecognized tag coerces to the default.
+
+        NOTE (P4 — the third cap): the pinned-block TOKEN cap is enforced at
+        the single operator write door (the AO PREFERENCE_WRITE handler checks
+        the candidate render BEFORE calling this method) and backstopped by
+        deterministic truncation in the renderer; it is deliberately NOT
+        re-checked here to keep the renderer dependency out of the store.
+        """
+        if not body or not body.strip():
+            raise KnowledgeBankError(
+                "PREFERENCE_EMPTY: preference body must be non-empty"
+            )
+        from shared.preference_budgets import (
+            PREFERENCE_BODY_MAX_CHARS,
+            PREFERENCE_MAX_COUNT,
+        )
+
+        if len(body) > PREFERENCE_BODY_MAX_CHARS:
+            raise KnowledgeBankError(
+                f"PREFERENCE_BODY_TOO_LONG: {len(body)} chars exceeds the "
+                f"{PREFERENCE_BODY_MAX_CHARS}-char cap (P4)"
+            )
+        if self.count_preferences() >= PREFERENCE_MAX_COUNT:
+            raise KnowledgeBankError(
+                f"PREFERENCE_COUNT_CAP: the active tier is at the "
+                f"{PREFERENCE_MAX_COUNT}-preference cap (P4); delete or edit "
+                f"an existing preference first"
+            )
+
+        pref_id = uuid.uuid4().hex
+        resolved_tag = self._coerce_pref_type_tag(type_tag)
+        # Encrypt BEFORE opening the transaction — a cipher failure must
+        # surface with zero DML executed (the store-wide discipline).
+        enc_subject = self._enc_pref_field("subject", pref_id, subject)
+        enc_body = self._enc_pref_field("body", pref_id, body)
+        expiry = expires.strip() or None  # '' -> NULL (no expiry)
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO operator_preferences("
+                "pref_id, status, type_tag, supersedes, subject, body, "
+                "source, created, updated, expires) "
+                "VALUES(?, 'active', ?, NULL, ?, ?, ?, ?, ?, ?)",
+                (pref_id, resolved_tag, enc_subject, enc_body, source, now, now,
+                 expiry),
+            )
+        logger.info(
+            "Operator preference stored: %s (tag=%s, %d chars, expires=%s) -- "
+            "verbatim, born-encrypted (#770 M1/M2)",
+            pref_id, resolved_tag, len(body), expiry or "never",
+        )
+        return OperatorPreference(
+            pref_id=pref_id,
+            status="active",
+            type_tag=resolved_tag,
+            subject=subject,
+            body=body,
+            source=source,
+            supersedes="",
+            created=now,
+            updated=now,
+            expires=expiry or "",
+        )
+
+    def list_preferences(
+        self, include_history: bool = False
+    ) -> list[OperatorPreference]:
+        """Return operator preferences in the DETERMINISTIC render order.
+
+        Order is INSERTION order (the monotonic ``id`` rowid) — stable across
+        calls and processes and immune to same-timestamp collisions (two
+        preferences stored in the same clock tick must still append in the
+        order the operator issued them — P9: the pinned block renders
+        byte-stable and a new preference appends at the END; ``created``
+        timestamps are audit metadata, not the sort key).  An in-place edit
+        keeps its rowid, so its line position is stable too.  Default returns
+        ACTIVE rows only (the render feed); ``include_history=True`` adds
+        superseded/deleted audit rows (the P5 audit trail), same ordering.
+
+        Bulk read — decrypt-quarantine (ADR-025 §2.7): a row whose fields
+        cannot decrypt is skipped and logged, never returned as plaintext.
+        """
+        from shared.security.field_cipher import FieldCipherError
+
+        where = "" if include_history else "WHERE status='active'"
+        rows = self._conn.execute(
+            "SELECT pref_id, status, type_tag, supersedes, subject, body, "
+            f"source, created, updated, expires FROM operator_preferences {where} "
+            "ORDER BY id ASC"
+        ).fetchall()
+        out: list[OperatorPreference] = []
+        for row in rows:
+            pref_id = str(row[0])
+            try:
+                subject = (
+                    self._dec_pref_field("subject", pref_id, row[4])
+                    if row[4] is not None
+                    else ""
+                )
+                body = self._dec_pref_field("body", pref_id, row[5])
+            except FieldCipherError:
+                logger.warning(
+                    "PREFERENCE_ROW_DECRYPT_QUARANTINE pref_id=%s -- row "
+                    "skipped (ADR-025 §2.7)",
+                    pref_id,
+                )
+                continue
+            out.append(
+                OperatorPreference(
+                    pref_id=pref_id,
+                    status=str(row[1]),
+                    type_tag=str(row[2]),
+                    subject=subject,
+                    body=body,
+                    source=str(row[6]),
+                    supersedes=str(row[3]) if row[3] is not None else "",
+                    created=str(row[7]),
+                    updated=str(row[8]),
+                    expires=str(row[9]) if row[9] is not None else "",
+                )
+            )
+        return out
+
+    def count_preferences(self) -> int:
+        """Count of ACTIVE preference rows (the P4 count-cap feed)."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM operator_preferences WHERE status='active'"
+        ).fetchone()
+        return int(row[0]) if row else 0
+
+    def get_preference(self, pref_id: str) -> OperatorPreference | None:
+        """Return one ACTIVE preference by id, or None (unknown / not active)."""
+        for pref in self.list_preferences():
+            if pref.pref_id == pref_id:
+                return pref
+        return None
+
+    def update_preference(
+        self, pref_id: str, new_body: str
+    ) -> OperatorPreference | None:
+        """Last-writer-wins in-place edit with an audit trail (P5).
+
+        The ACTIVE row keeps its ``pref_id`` and ``created`` (so the pinned
+        block's deterministic order and line identity are stable — P9
+        append-minimal edits: only the edited line's bytes change) and gets
+        the new verbatim body; the PRIOR verbatim body is preserved as a new
+        ``superseded`` audit row pointing back via ``supersedes``.  Audit rows
+        are born-encrypted and excluded from rendering.
+
+        Returns the updated preference, or ``None`` when *pref_id* is unknown
+        or not active (Fail-Closed: editing history is not a thing).
+
+        Raises:
+            KnowledgeBankError: ``PREFERENCE_EMPTY`` / ``PREFERENCE_BODY_TOO_LONG``
+                on an invalid new body (same P4 validation as a fresh store).
+        """
+        if not new_body or not new_body.strip():
+            raise KnowledgeBankError(
+                "PREFERENCE_EMPTY: preference body must be non-empty"
+            )
+        from shared.preference_budgets import PREFERENCE_BODY_MAX_CHARS
+
+        if len(new_body) > PREFERENCE_BODY_MAX_CHARS:
+            raise KnowledgeBankError(
+                f"PREFERENCE_BODY_TOO_LONG: {len(new_body)} chars exceeds the "
+                f"{PREFERENCE_BODY_MAX_CHARS}-char cap (P4)"
+            )
+        current = self.get_preference(pref_id)
+        if current is None:
+            return None
+
+        audit_id = uuid.uuid4().hex
+        # Re-encrypt the prior body under the AUDIT row's own identity (the
+        # AAD binds ciphertext to its row — a moved blob fails authentication).
+        enc_audit_subject = self._enc_pref_field("subject", audit_id, current.subject)
+        enc_audit_body = self._enc_pref_field("body", audit_id, current.body)
+        enc_new_body = self._enc_pref_field("body", pref_id, new_body)
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO operator_preferences("
+                "pref_id, status, type_tag, supersedes, subject, body, "
+                "source, created, updated) "
+                "VALUES(?, 'superseded', ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    audit_id, current.type_tag, pref_id,
+                    enc_audit_subject, enc_audit_body,
+                    current.source, current.created, now,
+                ),
+            )
+            self._conn.execute(
+                "UPDATE operator_preferences SET body=?, updated=? "
+                "WHERE pref_id=? AND status='active'",
+                (enc_new_body, now, pref_id),
+            )
+        logger.info(
+            "Operator preference updated in place: %s (audit row %s retains "
+            "the prior verbatim body -- P5 last-writer-wins)",
+            pref_id, audit_id,
+        )
+        return OperatorPreference(
+            pref_id=pref_id,
+            status="active",
+            type_tag=current.type_tag,
+            subject=current.subject,
+            body=new_body,
+            source=current.source,
+            supersedes="",
+            created=current.created,
+            updated=now,
+            expires=current.expires,  # #770 M2 W2: an edit preserves the operator's stated bound
+        )
+
+    def delete_preference(self, pref_id: str) -> bool:
+        """Soft-delete one ACTIVE preference (audit tombstone retained, P5).
+
+        Flips ``status`` to ``deleted`` — the row leaves the pinned-block
+        render feed and the count cap immediately, but its verbatim body
+        stays as encrypted audit history.  Returns ``False`` when *pref_id*
+        is unknown or not active (idempotent — deleting twice is a no-op).
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        with self._conn:
+            cursor = self._conn.execute(
+                "UPDATE operator_preferences SET status='deleted', updated=? "
+                "WHERE pref_id=? AND status='active'",
+                (now, pref_id),
+            )
+        deleted = cursor.rowcount > 0
+        if deleted:
+            logger.info("Operator preference deleted (audit retained): %s", pref_id)
+        return deleted
+
+    def find_similar_preference(self, body: str) -> OperatorPreference | None:
+        """Deterministic near-duplicate/contradiction probe (P5 confirm seam).
+
+        Compares normalized token sets (Jaccard) of *body* against every
+        ACTIVE preference; the highest-overlap row at or above
+        ``PREFERENCE_SIMILARITY_THRESHOLD`` is returned (ties break to the
+        deterministic list order).  Deliberately deterministic and offline —
+        no embedding dependency — so the REQUIRES_CONFIRMATION path is
+        reproducible in the standing gate.  M2's propose-and-confirm flow may
+        refine the similarity signal; the CONFIRMATION requirement itself is
+        the locked behaviour.
+        """
+        candidate_tokens = _pref_similarity_tokens(body)
+        if not candidate_tokens:
+            return None
+        best: OperatorPreference | None = None
+        best_score = 0.0
+        for pref in self.list_preferences():
+            existing_tokens = _pref_similarity_tokens(pref.body)
+            if not existing_tokens:
+                continue
+            union = candidate_tokens | existing_tokens
+            score = len(candidate_tokens & existing_tokens) / len(union)
+            if score >= PREFERENCE_SIMILARITY_THRESHOLD and score > best_score:
+                best = pref
+                best_score = score
+        return best
+
     def get_doc(self, doc_uuid: str) -> KnowledgeDoc:
         """Return one decrypted document record.
 
@@ -1844,6 +2281,18 @@ class EncryptedKnowledgeBank:
 
     # ── Hybrid retrieval (cosine + BM25 via reciprocal-rank fusion) ─────
 
+    @property
+    def embed_model_mismatch(self) -> EmbedModelMismatch | None:
+        """The detected embedding-model identity mismatch, or ``None`` (#794).
+
+        When non-``None`` the VECTOR limb is loud-disabled: :meth:`retrieve` skips
+        the cosine limb and serves BM25/lexical results only (BM25 does not depend
+        on the embedder).  A construction-time ``EMBED_MODEL_IDENTITY_MISMATCH``
+        ERROR named the rebuild path.  Distinct from the embed-WINDOW mismatch,
+        which hard-refuses retrieve/approve.
+        """
+        return self._embed_model_mismatch
+
     def _check_embed_window(self, operation: str) -> None:
         """Refuse embedding-dependent operations on a window-mismatched store.
 
@@ -1877,6 +2326,12 @@ class EncryptedKnowledgeBank:
             KnowledgeBankError: When the store's recorded embed window does
                 not match the configured one (loud refusal, never a silently
                 wrong-depth query — ADR-031 §3).
+
+        Vector-limb identity guard (#794): when the store's recorded embedding
+        MODEL identity does not match the configured one, the cosine limb is
+        skipped entirely and only BM25/lexical results are returned (loud-disable,
+        not a hard refusal — BM25 does not depend on the embedder).  The query is
+        not embedded at all in that state.
         """
         self._check_embed_window("retrieve")
         if k is None:
@@ -1885,23 +2340,25 @@ class EncryptedKnowledgeBank:
             return []
         import numpy as np
 
-        # Embed the query OUTSIDE the lock (model inference must not serialise
-        # on the cache lock) — mirrors the substrate retrieve pattern.  The
-        # no-VLM guard wraps the single-element query list too: retrieval is
-        # text-only and never touches knowledge_images (display-only store).
-        q = np.asarray(self._embed(_guard_embed_input([query])), dtype=np.float32)
-        q_vec = q[0] if q.ndim == 2 else q
+        vector_disabled = self._embed_model_mismatch is not None
+        q_vec = None
+        if not vector_disabled:
+            # Embed the query OUTSIDE the lock (model inference must not serialise
+            # on the cache lock) — mirrors the substrate retrieve pattern.  The
+            # no-VLM guard wraps the single-element query list too: retrieval is
+            # text-only and never touches knowledge_images (display-only store).
+            q = np.asarray(self._embed(_guard_embed_input([query])), dtype=np.float32)
+            q_vec = q[0] if q.ndim == 2 else q
 
         with self._lock:
-            if not self._chunk_vecs:
-                return []
-
-            keys = list(self._chunk_vecs.keys())
-            matrix = np.vstack([self._chunk_vecs[key] for key in keys])
-            scores = matrix @ q_vec
-            vector_ranked: list[tuple[str, int]] = [
-                keys[int(i)] for i in np.argsort(scores)[::-1]
-            ]
+            # Vector limb — skipped when the embedding-model identity is
+            # mismatched (#794); the lexical limb below still runs.
+            vector_ranked: list[tuple[str, int]] = []
+            if not vector_disabled and self._chunk_vecs:
+                keys = list(self._chunk_vecs.keys())
+                matrix = np.vstack([self._chunk_vecs[key] for key in keys])
+                scores = matrix @ q_vec
+                vector_ranked = [keys[int(i)] for i in np.argsort(scores)[::-1]]
 
             lexical_ranked: list[tuple[str, int]] = []
             match_expr = _fts_match_expr(query)
@@ -1912,6 +2369,12 @@ class EncryptedKnowledgeBank:
                     (match_expr,),
                 ).fetchall()
                 lexical_ranked = [(str(r[0]), int(r[1])) for r in rows]
+
+            # Both limbs empty ⇒ nothing to return.  Covers a store with no
+            # approved chunks AND a disabled vector limb whose lexical query
+            # matched nothing (the loud-disable degradation, not an error).
+            if not vector_ranked and not lexical_ranked:
+                return []
 
             fused: dict[tuple[str, int], float] = {}
             for ranked in (vector_ranked, lexical_ranked):

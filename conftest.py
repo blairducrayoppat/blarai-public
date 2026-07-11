@@ -300,6 +300,31 @@ def _guard_fleet_reconcile(
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _disarm_launcher_atexit_cleanup() -> Generator[None, None, None]:
+    """No pytest process may leave the launcher's production teardown armed (#783).
+
+    Any test that drives ``launcher.__main__.main()`` arms ``_cleanup`` via
+    ``atexit`` (correct in production).  At interpreter exit the test's mocks
+    are long torn down, so the handler fires with REAL bindings — and the
+    ``policy=always`` VM ratchet then force-stops the REAL BlarAI-Orchestrator
+    VM from a test run (three gate runs did exactly that on 2026-07-09, the
+    first night the VM was deliberately kept Running for the guest oracle).
+
+    This is the test-side belt to the production-side fix (registration moved
+    from module scope into ``main()``): at session teardown — while pytest
+    still controls the process — unregister the handler so interpreter exit
+    has nothing to fire.  ``atexit.unregister`` is a no-op if never registered.
+    """
+    yield
+    import atexit as _atexit
+    import sys as _sys
+
+    _m = _sys.modules.get("launcher.__main__")
+    if _m is not None and hasattr(_m, "_cleanup"):
+        _atexit.unregister(_m._cleanup)
+
+
+@pytest.fixture(scope="session", autouse=True)
 def _ao_port_leak_detector() -> Generator[None, None, None]:
     """Session-scoped autouse fixture that detects AO loopback port leaks.
 

@@ -1,0 +1,42 @@
+{
+  "schema": "blarai-perf/v1",
+  "date": "2026-07-10",
+  "title": "Option (c) coder-in-VM memory feasibility — 30B + a 6 GB toolchain VM co-residence",
+  "purpose": "Answer the load-bearing memory question for security Decision 1's hybrid direction: does the cross-platform coder executing inside the network-less Alpine VM fit the 31.323 GiB ceiling alongside the 30B coder model?",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) iGPU",
+    "ram": "32 GB LPDDR5X (31.323 GiB effective, one shared pool)"
+  },
+  "model": "Qwen3-Coder-30B-A3B INT4 (OVMS)",
+  "compile_cache": "warm",
+  "method": "self-restoring: stop AO (lean) -> start-llm coder-30b -Force -> measure In-Use -> add a STATIC 6 GB Hyper-V VM (toolchain-guest proxy; host reserves the 6 GB) -> measure peak In-Use -> reset VM config + stop 30B + restart AO. ~2 GiB coordinator dev-session overhead present (named).",
+  "ceiling_gib": 31.323,
+  "measurements": {
+    "baseline_ao_up_no_30b_inuse_gib": 19.72,
+    "lean_ao_stopped_inuse_gib": 7.1,
+    "the_30b_alone_lean": {
+      "inuse_gib": 22.03,
+      "available_gib": 9.3,
+      "derived_30b_footprint_gib": 14.9,
+      "headroom_for_a_vm_gib": 9.29
+    },
+    "the_30b_plus_static_6gb_vm": {
+      "peak_inuse_gib": 27.5,
+      "available_floor_gib": 3.82,
+      "headroom_gib": 3.82,
+      "vm_state": "Running",
+      "vm_added_gib": 5.47,
+      "verdict": "FITS"
+    },
+    "lean_box_adjustment_note": "subtract ~2 GiB coordinator-session overhead -> ~5.8 GiB headroom with the 6 GB VM"
+  },
+  "verdict": "Option (c) is MEMORY-FEASIBLE: the 30B + a 6 GB coder-toolchain VM co-reside at 27.5 GiB, under the 31.323 GiB ceiling, with headroom. The RAM concern that gated the Decision-1 hybrid direction is answered.",
+  "not_measured": [
+    "guest-vs-host code-execution SPEED (needs a vsock-driven build in the guest — separate harness)",
+    "the VM's ACTUAL toolchain memory use under a real build (static 6 GB is an upper-bound reservation proxy, conservative)",
+    "N>1 repeats",
+    "cold-cache 30B load"
+  ],
+  "cross_reference": "#777 (30B footprint ~15 GiB, consistent); Decision 1 (#787 c.1574); PERFORMANCE_LOG.md 2026-07-10"
+}

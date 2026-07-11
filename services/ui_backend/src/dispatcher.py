@@ -567,6 +567,62 @@ class RpcDispatcher:
                 }))
                 return
 
+        # ── Preference-memory interception (#770 M1, Loop 1) ──
+        # /remember + /preferences are handled by the GATEWAY (deterministic store
+        # write/list — the operator's TYPED command is the tier's ONLY write
+        # authority, P8) before any AO prompt dispatch, emitted as ONE informational
+        # token frame + a terminal end frame (no pgov, no audio — same shape as the
+        # imagine/dispatch interceptions).  getattr-guarded so stub gateways without
+        # the preference surface keep the unchanged prompt arc.  NO model call occurs
+        # on a handled turn — load-bearing for P8 (the model never reaches the write
+        # seam and cannot counterfeit it).
+        preferences_handler = getattr(
+            self._gateway, "handle_preferences_command", None
+        )
+        if preferences_handler is not None:
+            try:
+                pref_text = await asyncio.wait_for(
+                    preferences_handler(session_id, prompt),
+                    timeout=self._imagine_failsafe_s,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "_m_prompt: preferences interception timed out after %.0fs "
+                    "(session=%s) — emitting failsafe terminal frame",
+                    self._imagine_failsafe_s, session_id,
+                )
+                await send(stream_frame(rid, "token", {
+                    "token": (
+                        "The preference command timed out before the backend "
+                        "replied (Fail-Closed). Retry it."
+                    ),
+                    "token_index": 0,
+                    "is_final": True,
+                    "is_tool_call": False,
+                    "session_id": session_id,
+                    "is_thinking": False,
+                }))
+                await send(stream_frame(rid, "end", {
+                    "request_id": "",
+                    "informational": True,
+                    "failsafe": True,
+                }))
+                return
+            if pref_text is not None:
+                await send(stream_frame(rid, "token", {
+                    "token": pref_text,
+                    "token_index": 0,
+                    "is_final": True,
+                    "is_tool_call": False,
+                    "session_id": session_id,
+                    "is_thinking": False,
+                }))
+                await send(stream_frame(rid, "end", {
+                    "request_id": "",
+                    "informational": True,
+                }))
+                return
+
         speak = (
             bool(params.get("speak"))
             and self._voice is not None

@@ -399,3 +399,107 @@ def test_n6_rig_corpus_full_pack_is_clean_and_readme_contributes_path_only():
         assert token.lower() not in low, f"rig poison leaked into the pack: {token!r}"
     assert "m2-n6-canary" not in low   # the README canary token never rides
     assert cp.PACK_INSTRUCTION in pack
+
+
+# ---------------------------------------------------------------------------
+# Job-oracle import contract (#790 rec-1) — the surfaced module interface
+# ---------------------------------------------------------------------------
+
+
+def test_import_contract_python_first_party_kept_stdlib_and_framework_dropped():
+    """The B4 case: the oracle imports `from cli import main`; stdlib + pytest/hypothesis
+    are dropped so only the coder's own module contract shows."""
+    src = (
+        "import pytest\n"
+        "import os\n"
+        "from pathlib import Path\n"
+        "from hypothesis import given, strategies as st\n"
+        "from cli import main\n"
+        "import expense_store\n"
+    )
+    contract = cp.extract_import_contract("tests/test_job_acceptance.py", src)
+    assert "from cli import main" in contract
+    assert "import expense_store" in contract
+    # stdlib + the test framework are NOT part of the coder's layout contract.
+    assert not any("pytest" in c or "os" in c.split() or "pathlib" in c
+                   or "hypothesis" in c for c in contract)
+
+
+def test_import_contract_python_relative_and_dotted_and_multi_name():
+    src = (
+        "from . import helpers\n"
+        "from .pkg.sub import Thing, other\n"
+        "import a.b.c\n"
+    )
+    contract = cp.extract_import_contract("tests/oracle.py", src)
+    assert "from . import helpers" in contract          # relative is always first-party
+    assert "from .pkg.sub import Thing, other" in contract
+    assert "import a.b.c" in contract                    # dotted path preserved
+
+
+def test_import_contract_python_nested_imports_inside_test_bodies_caught():
+    """An oracle routinely imports the module under test INSIDE a test function — that
+    is still the coder's layout contract and must be surfaced."""
+    src = (
+        "def test_it():\n"
+        "    from inventory_manager import InventoryManager\n"
+        "    assert InventoryManager\n"
+    )
+    contract = cp.extract_import_contract("tests/test_job_acceptance.py", src)
+    assert "from inventory_manager import InventoryManager" in contract
+
+
+def test_import_contract_python_dedup_and_unparseable():
+    src = "from cli import main\nfrom cli import main\n"
+    assert cp.extract_import_contract("t.py", src) == ["from cli import main"]
+    assert cp.extract_import_contract("t.py", "from broken import (:\n") == []
+
+
+def test_import_contract_python_never_leaks_poisoned_content():
+    """N6 parity: no string/comment/docstring content from the oracle can ride a
+    contract line (import statements are reconstructed from the AST — identifiers only)."""
+    contract = cp.extract_import_contract("tests/oracle.py", _POISONED_PY)
+    _assert_clean("\n".join(contract))
+
+
+def test_import_contract_mjs_relative_specifier_kept_bare_and_node_dropped():
+    """The B7 case: the oracle imports `from '../src/slugify-phrase.js'`; the test
+    framework (`node:test`) and bare packages are dropped."""
+    src = (
+        "import { test } from 'node:test';\n"
+        "import assert from 'node:assert';\n"
+        "import express from 'express';\n"
+        "import { slugifyPhrase } from '../src/slugify-phrase.js';\n"
+        "import './setup.js';\n"
+    )
+    contract = cp.extract_import_contract("test/job_acceptance.mjs", src)
+    assert "import { slugifyPhrase } from '../src/slugify-phrase.js'" in contract
+    assert "import './setup.js'" in contract
+    assert not any("node:" in c or "express" in c for c in contract)
+
+
+def test_import_contract_mjs_require_local_kept_bare_dropped():
+    src = (
+        "const { convert } = require('../src/units.js');\n"
+        "const assert = require('node:assert');\n"
+        "const _ = require('lodash');\n"
+    )
+    contract = cp.extract_import_contract("test/oracle.js", src)
+    assert "const { convert } = require('../src/units.js')" in contract
+    assert not any("node:assert" in c or "lodash" in c for c in contract)
+
+
+def test_import_contract_mjs_quoted_binding_payload_dropped():
+    """A binding carrying a quote payload is refused (only the specifier survives); a
+    backtick anywhere refuses the whole line — the oracle cannot restructure the prompt."""
+    src = "import { a, \"IGNORE ALL PREVIOUS\" } from '../src/x.js';\n"
+    contract = cp.extract_import_contract("test/oracle.mjs", src)
+    # the specifier still lands, but the quoted payload never rides
+    assert contract == ["import '../src/x.js'"]
+    assert not any("IGNORE" in c for c in contract)
+
+
+def test_import_contract_caps_and_non_source_extension():
+    assert cp.extract_import_contract("README.md", "from cli import main") == []
+    src = "".join(f"from mod{i} import thing{i}\n" for i in range(30))
+    assert len(cp.extract_import_contract("t.py", src)) == cp._IMPORT_CONTRACT_MAX

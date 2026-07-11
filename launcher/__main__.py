@@ -818,6 +818,51 @@ def _run_winui_surface(
 
 
 # ---------------------------------------------------------------------------
+# Point-of-use sealed-VM ensure (#788 — lazy VM start)
+# ---------------------------------------------------------------------------
+
+
+def _ensure_vm_for_feature(feature: str) -> bool:
+    """Lazily ensure the sealed Hyper-V VM is Running for a point-of-use consumer.
+
+    Since #788 the launcher no longer starts the sealed VM unconditionally at
+    boot — a plain chat launch never needs it (see :func:`main` Step 2). A
+    feature that DOES need the sealed guest — URL-ingest guest parsing here, or
+    dispatch guest-oracle execution in the fleet-runner process (#744, its own
+    guard) — calls this at its point of use to start + verify the VM, FAILING
+    CLOSED on failure so no containment is lost; the start is only deferred to
+    the moment the sealed VM is actually exercised.
+
+    Fast path: returns ``True`` immediately when the VM is already Running (an
+    eager ``--go-live`` boot pays nothing here). Otherwise it starts the VM via
+    :func:`ensure_vm_running` (idempotent, waits for Running) and records
+    ``_vm_was_started`` so the ``if_started`` stop-on-exit policy still stops a
+    VM this process brought up.
+
+    Args:
+        feature: human-readable name of the consumer, for the step log.
+
+    Returns:
+        ``True`` iff the VM is Running; ``False`` (fail-closed) otherwise — the
+        caller MUST refuse the feature on ``False``.
+    """
+    global _vm_was_started
+    if get_vm_state() == VMState.RUNNING:
+        return True
+    _step(f"Sealed VM not running — starting it now for {feature} (lazy, #788)…")
+    if ensure_vm_running():
+        _vm_was_started = True
+        _step("VM running ✓")
+        return True
+    logger.error("Point-of-use sealed-VM start FAILED for %s (fail-closed)", feature)
+    _step(
+        f"Sealed VM start FAILED for {feature} — capability UNAVAILABLE "
+        "(fail-closed)."
+    )
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Guest parser bring-up (#655 Stage C — ADR-030 §3 guest-homed parsing)
 # ---------------------------------------------------------------------------
 
@@ -866,6 +911,24 @@ def _maybe_start_guest_parser() -> "GuestParserManager | None":  # noqa: F821
         logger.info(
             "Guest parser disabled (guest_parser.enabled=false) — URL-ingest "
             "parse capability unavailable; ingest URL mode refuses (ADR-030)."
+        )
+        set_guest_parser_manager(None)
+        return None
+
+    # #788 point-of-use fail-closed: the guest parser EXERCISES the sealed VM
+    # (the AF_HYPERV bridge handshake, Copy-VMFile deploy, and vsock health all
+    # require the Alpine guest up). Since #788 the VM is no longer guaranteed
+    # Running at boot in the normal path — only --go-live boots it eagerly — so
+    # ensure it HERE, at the guest parser's point of use, before anything that
+    # needs it. Fail-closed: if the sealed VM cannot be brought up, park NO
+    # manager (guest_parser_available() → False → URL ingest refuses, ADR-030
+    # §3) and return. (Guard ADDED by #788; the pre-existing ingest-side
+    # refuse-when-unavailable check remains the outer lock. In --go-live mode
+    # boot already started the VM eagerly, so this returns True instantly.)
+    if not _ensure_vm_for_feature("guest parser (URL ingest)"):
+        _step(
+            "Guest parser: sealed VM unavailable — URL-ingest parse capability "
+            "UNAVAILABLE (fail-closed); boot continues."
         )
         set_guest_parser_manager(None)
         return None
@@ -1129,7 +1192,14 @@ def _cleanup() -> None:
     logger.info("Cleanup: complete")
 
 
-atexit.register(_cleanup)
+# NOTE (#783): _cleanup is registered with atexit inside main(), NOT here at
+# module scope.  Module-scope registration armed the FULL production teardown
+# (including the policy=always real Stop-VM against BlarAI-Orchestrator) in
+# EVERY process that merely imports this module — which is every standing-gate
+# pytest run.  Three gate runs on 2026-07-09 each force-stopped the live guest
+# VM at interpreter exit (LOCALAPPDATA redirection scopes data, not the
+# hypervisor).  Importing must be side-effect-free; only an actual launcher
+# boot owns the teardown.
 
 
 def _request_step_aside() -> None:
@@ -1234,6 +1304,11 @@ def main() -> int:
     global _session_store, _policy_agent_service
     global _orchestrator_service, _vm_was_started, _guest_parser_manager
     global _instance_lock_path, _shared_pipeline
+
+    # #783: arm the production teardown ONLY when actually booting the launcher.
+    # A bare import (pytest collection, tooling) must never register a handler
+    # that can stop the real Hyper-V VM at interpreter exit.
+    atexit.register(_cleanup)
 
     try:
         runtime_mode = resolve_deployment_mode()
@@ -1469,58 +1544,94 @@ def main() -> int:
             input("\n  Press Enter to exit…")
             return 1
 
-    # ── Step 2: Start Hyper-V VM ──────────────────────────────────
-    _step("Starting BlarAI-Orchestrator VM…")
+    # ── Step 2: Sealed Hyper-V VM — LAZY unless --go-live (#788) ──────────
+    # The sealed guest VM's ONLY consumers are the URL-ingest guest parser
+    # (dormant; brought up at boot only under --go-live) and the dispatch
+    # guest oracle (dispatch-only, run in a separate fleet-runner process —
+    # #744, its own ensure-start). Plain chat never exercises the VM, so a
+    # normal launch no longer pays the ~10-15s Alpine cold-boot nor holds the
+    # ~1-2 GB it would never touch.
+    #
+    # FAIL-CLOSED CONTAINMENT IS NOT REMOVED — IT IS DEFERRED TO POINT-OF-USE.
+    # A feature that needs the sealed guest starts + verifies it and fails
+    # closed THERE (see `_ensure_vm_for_feature` and its call inside
+    # `_maybe_start_guest_parser`; the dispatch-oracle guard is #744's, in the
+    # fleet runner). No protection is lost — only the start is deferred to the
+    # moment the sealed VM is actually used.
+    #
+    # SECURITY POSTURE NOTE (#788 → #787 Phase-2 coverage matrix): this turns
+    # the always-present sealed VM (an unconditional containment component) into
+    # a present-on-demand one. Surfaced deliberately for the coverage matrix —
+    # no containment is weakened, only the start is deferred.
+    if _go_live_requested():
+        # --go-live → EAGER (behaviour unchanged): the guest parser is deployed
+        # at boot, so the sealed VM MUST be up now. Fail-closed abort on a
+        # VM-start failure (the guest parser is the point of use, and it is a
+        # boot-time consumer in this mode).
+        _step("Starting BlarAI-Orchestrator VM (--go-live: eager for URL ingest)…")
 
-    vm_initial_state = get_vm_state()
-    _vm_was_started = vm_initial_state != VMState.RUNNING
+        vm_initial_state = get_vm_state()
+        _vm_was_started = vm_initial_state != VMState.RUNNING
 
-    vm_ok = ensure_vm_running()
-    if vm_ok:
-        _step("VM running ✓")
-        activation_evidence["steps"]["vm_running"] = True
+        if ensure_vm_running():
+            _step("VM running ✓")
+            activation_evidence["steps"]["vm_running"] = True
 
-        # ── Step 2.4: Guest parser bring-up (#655 Stage C) ─────────
-        # Deploy + start the guest-homed parser when [guest_parser] enables
-        # it (launcher/config/default.toml; DISABLED by default until the
-        # controlled activation session).  Capability-fail-closed,
-        # boot-fail-soft: a parser that cannot come up leaves URL-mode
-        # ingest refusing (ADR-030 §3) but never blocks the boot.
-        #
-        # --go-live (#655): translate the elevation-surviving CLI flag into the
-        # in-process enable BEFORE the config is read, so the operator can open
-        # URL ingest for THIS session from a desktop .bat without a terminal.
-        # The committed default stays enabled=false (welded at rest); the next
-        # boot without --go-live is welded again.
-        if _go_live_requested():
+            # ── Step 2.4: Guest parser bring-up (#655 Stage C) ─────────
+            # Deploy + start the guest-homed parser (ADR-030 §3 guest-homed
+            # parsing). Capability-fail-closed, boot-fail-soft: a parser that
+            # cannot come up leaves URL-mode ingest refusing but never blocks
+            # the boot.
+            #
+            # --go-live translates the elevation-surviving CLI flag into the
+            # in-process enable BEFORE the config is read, so the operator can
+            # open URL ingest for THIS session from a desktop .bat without a
+            # terminal. The committed default stays enabled=false (welded at
+            # rest); the next boot without --go-live is welded again.
             os.environ["BLARAI_GUEST_PARSER_ENABLED"] = "true"
             _step(
                 "--go-live: operator URL-ingest ENABLED for this session "
                 "(per-session; committed default stays welded — next boot "
                 "without --go-live is deny-by-default again)."
             )
-        _guest_parser_manager = _maybe_start_guest_parser()
-        activation_evidence["steps"]["guest_parser"] = (
-            _guest_parser_manager.state.value
-            if _guest_parser_manager is not None
-            else "disabled"
-        )
+            _guest_parser_manager = _maybe_start_guest_parser()
+            activation_evidence["steps"]["guest_parser"] = (
+                _guest_parser_manager.state.value
+                if _guest_parser_manager is not None
+                else "disabled"
+            )
+        else:
+            _vm_was_started = False
+            logger.error("VM start failed — aborting (Fail-Closed)")
+            activation_evidence["failure"] = {
+                "timestamp": _timestamp(),
+                "stage": "vm_start",
+                "code": "VM_START_FAILED",
+                "message": "Hyper-V VM failed to start.",
+                "disposition": "FAIL",
+                "fail_closed": "true",
+            }
+            _record_activation_evidence(activation_evidence)
+            _step("ERROR: VM start failed (Fail-Closed).")
+            _step("Check %s for details." % _LOG_PATH)
+            input("\n  Press Enter to exit…")
+            return 1
     else:
+        # Normal (lazy) mode: defer the sealed VM to point-of-use. Plain chat
+        # needs no guest VM; the guest parser stays welded (enabled=false → URL
+        # ingest refuses) and no oracle dispatch is in flight at boot. If a
+        # VM-needing feature fires this session it starts + verifies the VM and
+        # fails closed AT THAT POINT (`_ensure_vm_for_feature`), so containment
+        # is preserved — only the start is deferred.
         _vm_was_started = False
-        logger.error("VM start failed — aborting (Fail-Closed)")
-        activation_evidence["failure"] = {
-            "timestamp": _timestamp(),
-            "stage": "vm_start",
-            "code": "VM_START_FAILED",
-            "message": "Hyper-V VM failed to start.",
-            "disposition": "FAIL",
-            "fail_closed": "true",
-        }
-        _record_activation_evidence(activation_evidence)
-        _step("ERROR: VM start failed (Fail-Closed).")
-        _step("Check %s for details." % _LOG_PATH)
-        input("\n  Press Enter to exit…")
-        return 1
+        _step(
+            "Sealed VM start DEFERRED (lazy, #788) — plain chat needs no guest "
+            "VM; a feature that needs it (URL ingest / dispatch oracle) starts + "
+            "verifies it at point-of-use and fails closed there. Relaunch with "
+            "--go-live for eager URL-ingest bring-up."
+        )
+        activation_evidence["steps"]["vm_running"] = "deferred"
+        activation_evidence["steps"]["guest_parser"] = "disabled"
 
     # ── Step 2.5: Build shared LLMPipeline ────────────────────────
     # ADR-012 §2.1 / §3.1: "single compilation, shared weights" across PA + AO.

@@ -1,0 +1,776 @@
+{
+  "harness": "spec_decode_ab",
+  "schema_version": 1,
+  "vikunja": "#778",
+  "question": "Is speculative decoding net-negative on short turns but ~2x on long answers on OpenVINO GenAI 2026.2.1? Reconcile #711 S5 vs the ISS-1 ~2x closure.",
+  "generated_utc": "2026-07-10T21:22:08Z",
+  "environment": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "cpu_platform": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+    "os": "Windows 10.0.26200",
+    "python": "3.11.9",
+    "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+    "total_ram_gib": 31.32,
+    "mem_ceiling_gib": 31.323,
+    "ram_spec": "32 GB LPDDR5X (shared CPU/iGPU)",
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+    "gpu_uarch": "20.4.4",
+    "gpu_driver": "32.0.101.8826"
+  },
+  "methodology": {
+    "spec_on": "build_shared_pipeline production seam \u2014 INT4 14B + pruned-6L INT8 draft wired, cache_size=3, prefix_caching=True; per-request num_assistant_tokens=3 (DEC-01/ISS-1)",
+    "spec_off": "no-draft LLMPipeline, same GPU knobs + cache_size=3 + prefix_caching \u2014 autoregressive by construction (ADR-012 counterfactual; = the #711 S5 spec-OFF control)",
+    "substrate_fact": "a draft-wired pipeline on GenAI 2026.2.1 REQUIRES num_assistant_tokens XOR assistant_confidence_threshold on every request (pipeline_impl.cpp:178); there is no per-request draft disengage, so ON/OFF are two builds",
+    "interleave": "rounds; each round runs BOTH arms, leading arm alternates per round (ABAB at the arm-block grain); one pipeline resident at a time (two 14B pipelines exceed the 31.3 GB ceiling)",
+    "shapes": {
+      "short": "~30-80 gen tokens (max_new=100), realistic conversational/tool-call turns",
+      "long": "~400-600 gen tokens (max_new=500), realistic long-answer questions"
+    },
+    "prompts": "realistic version-controlled prompts (NOT #711 nonce filler \u2014 nonce text has near-zero draft acceptance by construction); shared system+tools prefix, fresh nonce-tagged user turn per run",
+    "generation": "do_sample=False (greedy), repetition_penalty=1.1 (production [generation] posture)",
+    "metrics": "runtime perf metrics \u2014 SDPerModelsPerfMetrics (ON) / PerfMetrics (OFF) via list-form generate \u2014 ttft/tpot/throughput/generated + ON accepted/draft_proposed; plus wall-clock total turn time",
+    "decode_tok_s": "1000/TPOT \u2014 steady-state, EXCLUDES prefill",
+    "runs_per_cell": 6,
+    "rounds": 3,
+    "runs_per_block": 2,
+    "warmup_discarded_per_block": 2,
+    "build_times_s": {
+      "on": [
+        20.8,
+        47.9,
+        27.3
+      ],
+      "off": [
+        19.8,
+        32.8,
+        13.5
+      ]
+    }
+  },
+  "results": {
+    "short": {
+      "on": {
+        "n": 6,
+        "decode_tok_s": {
+          "median": 5.333,
+          "mean": 5.273,
+          "std": 0.746,
+          "p95": 6.114,
+          "min": 3.981,
+          "max": 6.122,
+          "n": 6
+        },
+        "prefill_ms": {
+          "median": 352.379,
+          "mean": 422.169,
+          "std": 160.942,
+          "p95": 677.379,
+          "min": 239.299,
+          "max": 727.081,
+          "n": 6
+        },
+        "total_turn_ms": {
+          "median": 16524.975,
+          "mean": 14260.665,
+          "std": 5090.935,
+          "p95": 19196.583,
+          "min": 6658.93,
+          "max": 19364.43,
+          "n": 6
+        },
+        "total_turn_tok_s": {
+          "median": 5.257,
+          "mean": 5.165,
+          "std": 0.812,
+          "p95": 6.053,
+          "min": 3.719,
+          "max": 6.054,
+          "n": 6
+        },
+        "runtime_throughput_tok_s": {
+          "median": 5.333,
+          "mean": 5.273,
+          "std": 0.746,
+          "p95": 6.114,
+          "min": 3.981,
+          "max": 6.122,
+          "n": 6
+        },
+        "generated_tokens": {
+          "median": 100.0,
+          "mean": 76.667,
+          "std": 33.003,
+          "p95": 100.0,
+          "min": 29.0,
+          "max": 100.0,
+          "n": 6
+        },
+        "metrics_types": [
+          "SDPerModelsPerfMetrics"
+        ],
+        "acceptance": {
+          "total_accepted": 244,
+          "total_generated": 460,
+          "total_draft_proposed": 678,
+          "accepted_per_generated": 0.5304,
+          "accepted_per_draft_proposed": 0.3599
+        }
+      },
+      "off": {
+        "n": 6,
+        "decode_tok_s": {
+          "median": 3.179,
+          "mean": 3.178,
+          "std": 0.201,
+          "p95": 3.434,
+          "min": 2.878,
+          "max": 3.467,
+          "n": 6
+        },
+        "prefill_ms": {
+          "median": 473.694,
+          "mean": 524.682,
+          "std": 177.764,
+          "p95": 759.199,
+          "min": 340.606,
+          "max": 769.117,
+          "n": 6
+        },
+        "total_turn_ms": {
+          "median": 30391.9,
+          "mean": 27897.34,
+          "std": 8261.732,
+          "p95": 34519.265,
+          "min": 9970.32,
+          "max": 35170.75,
+          "n": 6
+        },
+        "total_turn_tok_s": {
+          "median": 3.174,
+          "mean": 3.144,
+          "std": 0.222,
+          "p95": 3.422,
+          "min": 2.843,
+          "max": 3.461,
+          "n": 6
+        },
+        "runtime_throughput_tok_s": {
+          "median": 3.179,
+          "mean": 3.178,
+          "std": 0.201,
+          "p95": 3.434,
+          "min": 2.878,
+          "max": 3.467,
+          "n": 6
+        },
+        "generated_tokens": {
+          "median": 100.0,
+          "mean": 88.167,
+          "std": 26.46,
+          "p95": 100.0,
+          "min": 29.0,
+          "max": 100.0,
+          "n": 6
+        },
+        "metrics_types": [
+          "PerfMetrics"
+        ]
+      }
+    },
+    "long": {
+      "on": {
+        "n": 6,
+        "decode_tok_s": {
+          "median": 4.67,
+          "mean": 4.664,
+          "std": 0.355,
+          "p95": 5.073,
+          "min": 4.281,
+          "max": 5.108,
+          "n": 6
+        },
+        "prefill_ms": {
+          "median": 609.574,
+          "mean": 692.996,
+          "std": 349.026,
+          "p95": 1247.062,
+          "min": 376.86,
+          "max": 1441.092,
+          "n": 6
+        },
+        "total_turn_ms": {
+          "median": 108352.44,
+          "mean": 108338.173,
+          "std": 8060.958,
+          "p95": 117121.595,
+          "min": 98197.5,
+          "max": 117220.09,
+          "n": 6
+        },
+        "total_turn_tok_s": {
+          "median": 4.631,
+          "mean": 4.641,
+          "std": 0.347,
+          "p95": 5.056,
+          "min": 4.265,
+          "max": 5.092,
+          "n": 6
+        },
+        "runtime_throughput_tok_s": {
+          "median": 4.67,
+          "mean": 4.664,
+          "std": 0.355,
+          "p95": 5.073,
+          "min": 4.281,
+          "max": 5.108,
+          "n": 6
+        },
+        "generated_tokens": {
+          "median": 500.0,
+          "mean": 500.0,
+          "std": 0.0,
+          "p95": 500.0,
+          "min": 500.0,
+          "max": 500.0,
+          "n": 6
+        },
+        "metrics_types": [
+          "SDPerModelsPerfMetrics"
+        ],
+        "acceptance": {
+          "total_accepted": 1518,
+          "total_generated": 3000,
+          "total_draft_proposed": 4705,
+          "accepted_per_generated": 0.506,
+          "accepted_per_draft_proposed": 0.3226
+        }
+      },
+      "off": {
+        "n": 6,
+        "decode_tok_s": {
+          "median": 3.151,
+          "mean": 3.161,
+          "std": 0.145,
+          "p95": 3.358,
+          "min": 2.937,
+          "max": 3.395,
+          "n": 6
+        },
+        "prefill_ms": {
+          "median": 574.694,
+          "mean": 700.971,
+          "std": 377.792,
+          "p95": 1311.874,
+          "min": 373.952,
+          "max": 1498.946,
+          "n": 6
+        },
+        "total_turn_ms": {
+          "median": 159033.66,
+          "mean": 158903.923,
+          "std": 7542.063,
+          "p95": 169123.448,
+          "min": 147340.58,
+          "max": 171395.25,
+          "n": 6
+        },
+        "total_turn_tok_s": {
+          "median": 3.145,
+          "mean": 3.154,
+          "std": 0.149,
+          "p95": 3.355,
+          "min": 2.917,
+          "max": 3.393,
+          "n": 6
+        },
+        "runtime_throughput_tok_s": {
+          "median": 3.151,
+          "mean": 3.161,
+          "std": 0.145,
+          "p95": 3.358,
+          "min": 2.937,
+          "max": 3.395,
+          "n": 6
+        },
+        "generated_tokens": {
+          "median": 500.0,
+          "mean": 500.0,
+          "std": 0.0,
+          "p95": 500.0,
+          "min": 500.0,
+          "max": 500.0,
+          "n": 6
+        },
+        "metrics_types": [
+          "PerfMetrics"
+        ]
+      }
+    }
+  },
+  "reconciliation": {
+    "per_shape": {
+      "short": {
+        "decode_speedup_on_over_off": 1.678,
+        "total_turn_speedup_on_over_off": 1.656,
+        "on_decode_tok_s": 5.333,
+        "off_decode_tok_s": 3.179,
+        "on_total_turn_tok_s": 5.257,
+        "off_total_turn_tok_s": 3.174,
+        "acceptance_per_generated": 0.5304,
+        "acceptance_per_draft_proposed": 0.3599,
+        "gen_tokens_median_on": 100.0,
+        "gen_tokens_median_off": 100.0,
+        "off_metrics_types": [
+          "PerfMetrics"
+        ],
+        "on_metrics_types": [
+          "SDPerModelsPerfMetrics"
+        ]
+      },
+      "long": {
+        "decode_speedup_on_over_off": 1.482,
+        "total_turn_speedup_on_over_off": 1.472,
+        "on_decode_tok_s": 4.67,
+        "off_decode_tok_s": 3.151,
+        "on_total_turn_tok_s": 4.631,
+        "off_total_turn_tok_s": 3.145,
+        "acceptance_per_generated": 0.506,
+        "acceptance_per_draft_proposed": 0.3226,
+        "gen_tokens_median_on": 500.0,
+        "gen_tokens_median_off": 500.0,
+        "off_metrics_types": [
+          "PerfMetrics"
+        ],
+        "on_metrics_types": [
+          "SDPerModelsPerfMetrics"
+        ]
+      }
+    }
+  },
+  "ordered_run_log": [
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 343.4897,
+      "tpot_ms": 163.3365,
+      "throughput_tok_s_runtime": 6.1223,
+      "generated_tokens": 100,
+      "input_tokens": 166,
+      "accepted_tokens": 44,
+      "draft_proposed_tokens": 172,
+      "wall_total_ms": 16531.65,
+      "total_turn_tok_s": 6.049,
+      "decode_tok_s": 6.122,
+      "output_sha256": "de4565b273c8c538",
+      "output_head": "<think>\nOkay, the user is asking for the capital of France. Let me think. I reme",
+      "arm": "on",
+      "shape": "short",
+      "round": 0
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 239.2995,
+      "tpot_ms": 164.2361,
+      "throughput_tok_s_runtime": 6.0888,
+      "generated_tokens": 100,
+      "input_tokens": 166,
+      "accepted_tokens": 61,
+      "draft_proposed_tokens": 128,
+      "wall_total_ms": 16518.3,
+      "total_turn_tok_s": 6.054,
+      "decode_tok_s": 6.089,
+      "output_sha256": "de6abf65e0dfd579",
+      "output_head": "<think>\nOkay, the user wants to convert 10 kilometers to miles. Let me recall th",
+      "arm": "on",
+      "shape": "short",
+      "round": 0
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 1441.0919,
+      "tpot_ms": 201.2642,
+      "throughput_tok_s_runtime": 4.9686,
+      "generated_tokens": 500,
+      "input_tokens": 177,
+      "accepted_tokens": 254,
+      "draft_proposed_tokens": 787,
+      "wall_total_ms": 101893.62,
+      "total_turn_tok_s": 4.907,
+      "decode_tok_s": 4.969,
+      "output_sha256": "046689f9acc7c7f0",
+      "output_head": "<think>\nOkay, I need to explain the TCP three-way handshake and the importance o",
+      "arm": "on",
+      "shape": "long",
+      "round": 0
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 664.9709,
+      "tpot_ms": 228.7011,
+      "throughput_tok_s_runtime": 4.3725,
+      "generated_tokens": 500,
+      "input_tokens": 172,
+      "accepted_tokens": 263,
+      "draft_proposed_tokens": 756,
+      "wall_total_ms": 114811.26,
+      "total_turn_tok_s": 4.355,
+      "decode_tok_s": 4.373,
+      "output_sha256": "5e1f9db238d6118b",
+      "output_head": "<think>\nOkay, I need to explain how public-key cryptography works and why it off",
+      "arm": "on",
+      "shape": "long",
+      "round": 0
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 769.1175,
+      "tpot_ms": 347.4802,
+      "throughput_tok_s_runtime": 2.8779,
+      "generated_tokens": 100,
+      "input_tokens": 166,
+      "wall_total_ms": 35170.75,
+      "total_turn_tok_s": 2.843,
+      "decode_tok_s": 2.878,
+      "output_sha256": "355fb2a04f6210fc",
+      "output_head": "<think>\nOkay, the user is asking for the capital of France. Let me think. I reme",
+      "arm": "off",
+      "shape": "short",
+      "round": 0
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 368.2775,
+      "tpot_ms": 325.2097,
+      "throughput_tok_s_runtime": 3.0749,
+      "generated_tokens": 100,
+      "input_tokens": 166,
+      "wall_total_ms": 32564.81,
+      "total_turn_tok_s": 3.071,
+      "decode_tok_s": 3.075,
+      "output_sha256": "de6abf65e0dfd579",
+      "output_head": "<think>\nOkay, the user wants to convert 10 kilometers to miles. Let me recall th",
+      "arm": "off",
+      "shape": "short",
+      "round": 0
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 1498.9457,
+      "tpot_ms": 340.4697,
+      "throughput_tok_s_runtime": 2.9371,
+      "generated_tokens": 500,
+      "input_tokens": 177,
+      "wall_total_ms": 171395.25,
+      "total_turn_tok_s": 2.917,
+      "decode_tok_s": 2.937,
+      "output_sha256": "a5f2ba8453692be5",
+      "output_head": "<think>\nOkay, I need to explain the TCP three-way handshake and the importance o",
+      "arm": "off",
+      "shape": "long",
+      "round": 0
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 750.6575,
+      "tpot_ms": 323.3465,
+      "throughput_tok_s_runtime": 3.0927,
+      "generated_tokens": 500,
+      "input_tokens": 172,
+      "wall_total_ms": 162103.51,
+      "total_turn_tok_s": 3.084,
+      "decode_tok_s": 3.093,
+      "output_sha256": "1c587bf5a0fd2d4a",
+      "output_head": "<think>\nOkay, I need to explain how public-key cryptography works and why it off",
+      "arm": "off",
+      "shape": "long",
+      "round": 0
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 729.443,
+      "tpot_ms": 330.0006,
+      "throughput_tok_s_runtime": 3.0303,
+      "generated_tokens": 29,
+      "input_tokens": 169,
+      "wall_total_ms": 9970.32,
+      "total_turn_tok_s": 2.909,
+      "decode_tok_s": 3.03,
+      "output_sha256": "868ee35b9114ec31",
+      "output_head": ": {\"name\": \"check_item\", \"arguments\": {\"item\": 37}}\n\n</think>\n\nFix authenticatio",
+      "arm": "off",
+      "shape": "short",
+      "round": 1
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 361.5366,
+      "tpot_ms": 304.5942,
+      "throughput_tok_s_runtime": 3.2831,
+      "generated_tokens": 100,
+      "input_tokens": 168,
+      "wall_total_ms": 30517.97,
+      "total_turn_tok_s": 3.277,
+      "decode_tok_s": 3.283,
+      "output_sha256": "ec010dd75c88de2a",
+      "output_head": "<think>\nOkay, the user wants me to check the status of checklist item 7. Let me ",
+      "arm": "off",
+      "shape": "short",
+      "round": 1
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 432.8857,
+      "tpot_ms": 324.3723,
+      "throughput_tok_s_runtime": 3.0829,
+      "generated_tokens": 500,
+      "input_tokens": 173,
+      "wall_total_ms": 162308.04,
+      "total_turn_tok_s": 3.081,
+      "decode_tok_s": 3.083,
+      "output_sha256": "bb85868e53e742df",
+      "output_head": "<think>\nOkay, let me figure out how to help the user set up a secure home networ",
+      "arm": "off",
+      "shape": "long",
+      "round": 1
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 631.3817,
+      "tpot_ms": 307.9739,
+      "throughput_tok_s_runtime": 3.247,
+      "generated_tokens": 500,
+      "input_tokens": 174,
+      "wall_total_ms": 154312.35,
+      "total_turn_tok_s": 3.24,
+      "decode_tok_s": 3.247,
+      "output_sha256": "84bd6e6b56660229",
+      "output_head": "<think>\nOkay, I need to explain the difference between processes and threads. Le",
+      "arm": "off",
+      "shape": "long",
+      "round": 1
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 727.0814,
+      "tpot_ms": 251.1896,
+      "throughput_tok_s_runtime": 3.9811,
+      "generated_tokens": 29,
+      "input_tokens": 169,
+      "accepted_tokens": 12,
+      "draft_proposed_tokens": 53,
+      "wall_total_ms": 7797.64,
+      "total_turn_tok_s": 3.719,
+      "decode_tok_s": 3.981,
+      "output_sha256": "61df70993e840363",
+      "output_head": ": {\"name\": \"check_item\", \"arguments\": {\"item\": 31}}\n\n</think>\n\nFix authenticatio",
+      "arm": "on",
+      "shape": "short",
+      "round": 1
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 333.6006,
+      "tpot_ms": 191.8688,
+      "throughput_tok_s_runtime": 5.2119,
+      "generated_tokens": 100,
+      "input_tokens": 168,
+      "accepted_tokens": 56,
+      "draft_proposed_tokens": 139,
+      "wall_total_ms": 19364.43,
+      "total_turn_tok_s": 5.164,
+      "decode_tok_s": 5.212,
+      "output_sha256": "ec010dd75c88de2a",
+      "output_head": "<think>\nOkay, the user wants me to check the status of checklist item 7. Let me ",
+      "arm": "on",
+      "shape": "short",
+      "round": 1
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 376.8595,
+      "tpot_ms": 233.3092,
+      "throughput_tok_s_runtime": 4.2862,
+      "generated_tokens": 500,
+      "input_tokens": 173,
+      "accepted_tokens": 248,
+      "draft_proposed_tokens": 794,
+      "wall_total_ms": 116826.11,
+      "total_turn_tok_s": 4.28,
+      "decode_tok_s": 4.286,
+      "output_sha256": "35ee62109bb878e2",
+      "output_head": "<think>\nOkay, let me figure out how to help the user set up a secure home networ",
+      "arm": "on",
+      "shape": "long",
+      "round": 1
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 623.9178,
+      "tpot_ms": 233.6107,
+      "throughput_tok_s_runtime": 4.2806,
+      "generated_tokens": 500,
+      "input_tokens": 174,
+      "accepted_tokens": 232,
+      "draft_proposed_tokens": 838,
+      "wall_total_ms": 117220.09,
+      "total_turn_tok_s": 4.265,
+      "decode_tok_s": 4.281,
+      "output_sha256": "a081606b993e3970",
+      "output_head": "<think>\nOkay, I need to explain the difference between processes and threads. Le",
+      "arm": "on",
+      "shape": "long",
+      "round": 1
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 528.2737,
+      "tpot_ms": 183.3161,
+      "throughput_tok_s_runtime": 5.4551,
+      "generated_tokens": 100,
+      "input_tokens": 163,
+      "accepted_tokens": 56,
+      "draft_proposed_tokens": 138,
+      "wall_total_ms": 18693.04,
+      "total_turn_tok_s": 5.35,
+      "decode_tok_s": 5.455,
+      "output_sha256": "1efbeda65168c18f",
+      "output_head": "<think>\nOkay, the user is asking what a firewall does in one sentence. Let me st",
+      "arm": "on",
+      "shape": "short",
+      "round": 2
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 361.2673,
+      "tpot_ms": 209.3402,
+      "throughput_tok_s_runtime": 4.7769,
+      "generated_tokens": 31,
+      "input_tokens": 165,
+      "accepted_tokens": 15,
+      "draft_proposed_tokens": 48,
+      "wall_total_ms": 6658.93,
+      "total_turn_tok_s": 4.655,
+      "decode_tok_s": 4.777,
+      "output_sha256": "28f25ff58253f55b",
+      "output_head": ": {\"name\": \"search_knowledge\", \"arguments\": {\"query\": \"Linux commands for disk u",
+      "arm": "on",
+      "shape": "short",
+      "round": 2
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 455.9077,
+      "tpot_ms": 195.7866,
+      "throughput_tok_s_runtime": 5.1076,
+      "generated_tokens": 500,
+      "input_tokens": 176,
+      "accepted_tokens": 265,
+      "draft_proposed_tokens": 752,
+      "wall_total_ms": 98197.5,
+      "total_turn_tok_s": 5.092,
+      "decode_tok_s": 5.108,
+      "output_sha256": "08c2e1a10f7e1894",
+      "output_head": "<think>\nOkay, I need to explain how a modern CPU instruction pipeline works, cov",
+      "arm": "on",
+      "shape": "long",
+      "round": 2
+    },
+    {
+      "metrics_type": "SDPerModelsPerfMetrics",
+      "ttft_ms": 595.2296,
+      "tpot_ms": 201.3312,
+      "throughput_tok_s_runtime": 4.9669,
+      "generated_tokens": 500,
+      "input_tokens": 173,
+      "accepted_tokens": 256,
+      "draft_proposed_tokens": 778,
+      "wall_total_ms": 101080.46,
+      "total_turn_tok_s": 4.947,
+      "decode_tok_s": 4.967,
+      "output_sha256": "5962e7cfd43f082b",
+      "output_head": "<think>\nOkay, let me try to figure out how HTTPS works step by step. The user wa",
+      "arm": "on",
+      "shape": "long",
+      "round": 2
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 579.1108,
+      "tpot_ms": 299.8474,
+      "throughput_tok_s_runtime": 3.335,
+      "generated_tokens": 100,
+      "input_tokens": 163,
+      "wall_total_ms": 30265.83,
+      "total_turn_tok_s": 3.304,
+      "decode_tok_s": 3.335,
+      "output_sha256": "b58d7a2f5b807bc5",
+      "output_head": "<think>\nOkay, the user is asking what a firewall does, specifically in one sente",
+      "arm": "off",
+      "shape": "short",
+      "round": 2
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 340.6059,
+      "tpot_ms": 288.4116,
+      "throughput_tok_s_runtime": 3.4673,
+      "generated_tokens": 100,
+      "input_tokens": 165,
+      "wall_total_ms": 28894.36,
+      "total_turn_tok_s": 3.461,
+      "decode_tok_s": 3.467,
+      "output_sha256": "a092f5b2f8858e1f",
+      "output_head": "<think>\nOkay, the user is asking for three Linux commands to check disk usage, s",
+      "arm": "off",
+      "shape": "short",
+      "round": 2
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 373.9516,
+      "tpot_ms": 294.5172,
+      "throughput_tok_s_runtime": 3.3954,
+      "generated_tokens": 500,
+      "input_tokens": 176,
+      "wall_total_ms": 147340.58,
+      "total_turn_tok_s": 3.393,
+      "decode_tok_s": 3.395,
+      "output_sha256": "c88cdaa8438383ab",
+      "output_head": "<think>\nOkay, I need to explain how a modern CPU instruction pipeline works, cov",
+      "arm": "off",
+      "shape": "long",
+      "round": 2
+    },
+    {
+      "metrics_type": "PerfMetrics",
+      "ttft_ms": 518.0055,
+      "tpot_ms": 311.5127,
+      "throughput_tok_s_runtime": 3.2101,
+      "generated_tokens": 500,
+      "input_tokens": 173,
+      "wall_total_ms": 155963.81,
+      "total_turn_tok_s": 3.206,
+      "decode_tok_s": 3.21,
+      "output_sha256": "0290e4db446b1127",
+      "output_head": "<think>\nOkay, let me try to figure out how HTTPS works step by step. The user wa",
+      "arm": "off",
+      "shape": "long",
+      "round": 2
+    }
+  ],
+  "not_measured": [
+    "draft ACCEPTANCE is exposed by this GenAI build and IS recorded here (accepted/generated + accepted/draft_proposed) \u2014 not a gap; noted because #711 S5 wrongly logged it 'unavailable' (called a nonexistent method).",
+    "N=6 per cell (rounds x runs_per_block) \u2014 small-N medians; std/p95/min/max are reported so spread is visible.",
+    "spec ON vs OFF are two CONSTRUCTIONS (draft-wired vs no-draft) because a draft-wired pipeline on GenAI 2026.2.1 requires a per-request spec param and cannot be disengaged per-request \u2014 so interleaving is at the arm-BLOCK grain (per-round lead swap), NOT single-generation; within-round thermal drift is controlled, ambient day-to-day variation is not.",
+    "coordinator-session RAM overhead (~2 GiB of this box's used RAM is THIS measurement session + MCP servers, not the model).",
+    "single dedicated GPU window on one day; no multi-day thermal envelope.",
+    "TTFT/prefill is measured with the shared system prefix cache-WARM (as in a live session); the cold first-prefill is absorbed by the per-block warmup.",
+    "co-resident cost (14B + anything else) is NOT measured \u2014 one pipeline is resident at a time, matching the AO-only posture."
+  ],
+  "box_state": {
+    "ao_started": false,
+    "ovms_started": false,
+    "free_gib_at_start": 22.53,
+    "free_gib_at_end": 13.89
+  }
+}

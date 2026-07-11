@@ -160,6 +160,9 @@ def test_flat_scorecard_has_same_keys_as_plan_scorecard():
     assert sc["waves"] == []
     assert sc["job_acceptance"] == {"status": "not-run", "oracle_path": "", "evidence": ""}
     assert sc["evidence"]["oracle_status"] == "not-run"
+    # #789: a flat run is marked mode "flat" so the battery segments it OUT of the
+    # plan-graph GREEN-rate denominator (structurally non-GREEN; measurement fairness).
+    assert sc["evidence"]["mode"] == "flat"
     assert sc["tasks"] == [{"id": "a", "status": "", "result": "MERGED",
                             "detail": "RESULT: MERGED"}]
 

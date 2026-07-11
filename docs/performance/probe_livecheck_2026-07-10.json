@@ -1,0 +1,57 @@
+{
+  "schema": "blarai-perf/v1",
+  "date": "2026-07-10",
+  "title": "Probe-not-predict live-verify (#784): first real 30B probe outside a job",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) iGPU",
+    "ram": "32 GB LPDDR5X (31.323 GiB effective)"
+  },
+  "software": {
+    "openvino_genai": "2026.2.1",
+    "ovms": true,
+    "gpu_driver": "32.0.101.8826"
+  },
+  "model": "Qwen3-Coder-30B-A3B INT4 (OVMS)",
+  "compile_cache": "warm",
+  "methodology": "tools.dispatch_harness.probe executor, live on merged main 8bea7c54; measure Available -> (if >= floor) stop resident 14B AO -> load 30B -> wait to serve on :8000 -> always restore AO. --json outcome, n=1 per condition. Coordinator dev-session ~2 GiB overhead present.",
+  "conditions": [
+    {
+      "name": "clean_happy_path",
+      "note": "probe from the AO's own repo root; finds + tree-kills the live AO; 30B loads into FREED RAM; representative",
+      "available_gb_at_start": 15.22,
+      "min_free_gb_floor": 12.0,
+      "ao_stopped": true,
+      "outcome": "READY",
+      "exit_code": 0,
+      "load_seconds": 15.5,
+      "ao_restored": true
+    },
+    {
+      "name": "co_resident_artifact",
+      "note": "probe from a WORKTREE; wrong certs/ root -> no-lock-pid -> AO NOT stopped -> 30B loaded co-resident with the 14B; NOT representative, kept as honest contrast",
+      "available_gb_at_start": 9.83,
+      "min_free_gb_floor": 9.0,
+      "ao_stopped": false,
+      "outcome": "READY",
+      "exit_code": 0,
+      "load_seconds": 34.8
+    },
+    {
+      "name": "below_floor_backstop",
+      "note": "graceful sanity-abort; nothing touched",
+      "available_gb_at_start": 9.81,
+      "min_free_gb_floor": 15.0,
+      "outcome": "BELOW_FLOOR",
+      "exit_code": 3,
+      "load_seconds": 0.0
+    }
+  ],
+  "not_measured": [
+    "COLD-cache 30B load via the probe",
+    "N>1 repeats",
+    "the probe under a real marginal-band battery admission (tonight's live exercise once the agentic admission merges)",
+    "co-resident inference throughput"
+  ],
+  "cross_reference": "PERFORMANCE_LOG.md 2026-07-10; #777 swap_gate_floor_2026-07-09 (~13s from 19.85 GiB ambient, consistent)"
+}

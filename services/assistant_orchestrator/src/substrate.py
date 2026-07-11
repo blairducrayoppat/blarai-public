@@ -48,6 +48,7 @@ Design decisions (recorded in ADR-016):
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 import threading
 import time
@@ -73,6 +74,30 @@ def _harden_db_file_dacl(db_path: str) -> None:
     ensure_owner_only_dacl(db_path)
 
 EMBED_DIM: int = 384
+
+# ── Embedding-model identity (Vikunja #794, study §2.2b / verdict row 3) ─────
+# The identity of the embedding model that PRODUCED a store's vectors, stamped
+# into ``<store>_meta`` at build and cross-checked at load.  A mismatch means the
+# configured embedder is not the one whose vectors are on disk — cosine scores
+# across two embedding spaces are meaningless ("swapped the embedder, the scores
+# are now garbage").  On mismatch the VECTOR limb is loud-disabled (the ADR-031
+# §7 middle ground) rather than silently served: the substrate (vector-only)
+# returns no memory; the knowledge bank keeps its BM25/lexical limb.  This is
+# C5 — what you configure is not what runs — applied to the vector index; it
+# becomes load-bearing the day bge-small is ever upgraded (the model-upgrade
+# watch is a standing project item).
+EMBED_MODEL_NAME: str = "bge-small-en-v1.5"
+# The "revision" component: the export/precision-variant directory that produced
+# the vectors (e.g. ``onnx-fp16`` vs a future ``onnx-int8`` re-export).  Derived
+# in production from ``[pgov].embedding_model_path``; this default matches the
+# shipped config path's variant AND the identity every pre-#794 store was built
+# under, so the load-time migration stamps a legacy store without a false alarm.
+EMBED_MODEL_REVISION: str = "onnx-fp16"
+
+# Meta tables the identity check is allowed to read (guards the table name that
+# is interpolated into SQL — the callers are internal and pass a literal, but the
+# allowlist makes the no-injection property explicit).
+_IDENTITY_META_TABLES: frozenset[str] = frozenset({"substrate_meta", "knowledge_meta"})
 
 # Chunking defaults. Tokens are approximated as ~4 characters, so ~512 tokens is
 # ~2048 chars with ~64-token (~256 char) overlap — the redirect's default.
@@ -138,6 +163,120 @@ def stored_embed_max_tokens(db_path: str) -> int:
         return int(row[0]) if row is not None else LEGACY_EMBED_MAX_TOKENS
     except (sqlite3.Error, ValueError, TypeError):
         return LEGACY_EMBED_MAX_TOKENS
+
+
+class EmbedModelMismatch(NamedTuple):
+    """A detected embedding-model identity mismatch (stored vs configured).
+
+    Present on a store whose recorded ``embed_model`` / ``embed_model_revision``
+    do not match the identity the running embedder was configured with.  While
+    set, the store's vector limb is loud-disabled (Vikunja #794).
+    """
+
+    stored_model: str
+    stored_revision: str
+    configured_model: str
+    configured_revision: str
+
+
+def resolve_embed_model_identity(model_path: str | None) -> tuple[str, str]:
+    """Derive the ``(name, revision)`` identity of the embedding model from its path.
+
+    The configured model file (e.g. ``models/bge-small-en-v1.5/onnx-fp16/model.onnx``)
+    is the single source of truth for which embedder runs; its last two directory
+    segments name the model and its export/precision variant.  A path that does
+    not parse to at least a variant directory falls back to the shipped baseline
+    constants.  Accepts either path separator on any host.  NEVER raises —
+    identity resolution must not block boot.
+    """
+    if not model_path:
+        return EMBED_MODEL_NAME, EMBED_MODEL_REVISION
+    parts = [p for p in re.split(r"[\\/]+", str(model_path)) if p]
+    # Drop a trailing filename (a segment carrying a dot) so only directory
+    # segments remain — the variant dir is the last, the model name the one above.
+    if parts and "." in parts[-1]:
+        parts = parts[:-1]
+    if len(parts) >= 2:
+        return parts[-2], parts[-1]
+    if len(parts) == 1:
+        return parts[0], EMBED_MODEL_REVISION
+    return EMBED_MODEL_NAME, EMBED_MODEL_REVISION
+
+
+def embed_model_rebuild_instruction(store_label: str, mismatch: EmbedModelMismatch) -> str:
+    """Operator-facing message naming the identity mismatch and the rebuild path."""
+    return (
+        f"{store_label}: embedding-model identity mismatch — stored vectors were "
+        f"produced by {mismatch.stored_model}@{mismatch.stored_revision} but the "
+        f"configured embedder is {mismatch.configured_model}@"
+        f"{mismatch.configured_revision}.  Cosine scores across different "
+        f"embedding spaces are meaningless, so the VECTOR limb is DISABLED "
+        f"(loud-disable, ADR-031 §7); BM25/lexical retrieval is unaffected where "
+        f"present.  Rebuild: re-embed this store with the configured model (the "
+        f"ADR-031 §3 re-embed ceremony) or restore the prior "
+        f"[pgov].embedding_model_path."
+    )
+
+
+def detect_embed_model_mismatch(
+    conn: sqlite3.Connection,
+    meta_table: str,
+    configured_model: str,
+    configured_revision: str,
+    store_label: str,
+) -> EmbedModelMismatch | None:
+    """Cross-check the stored embedding-model identity against the configured one.
+
+    The caller has already stamped ``embed_model`` / ``embed_model_revision`` into
+    ``meta_table`` via ``INSERT OR IGNORE`` (so a fresh store adopts the configured
+    identity and a legacy store missing the revision key is migrated to it — the
+    "stamp existing rows as the current model" migration).  This reads the stored
+    identity back and compares it: on a genuine mismatch (a store previously
+    stamped under a DIFFERENT identity) it logs a stable
+    ``EMBED_MODEL_IDENTITY_MISMATCH`` ERROR carrying the rebuild instruction and
+    returns the mismatch record; otherwise ``None``.
+
+    Fail-safe: an unexpected DB error or an unrecognised ``meta_table`` is treated
+    as "no mismatch" — identity resolution must never block boot, and the
+    per-row decrypt-quarantine controls remain the confidentiality backstop.
+    """
+    if meta_table not in _IDENTITY_META_TABLES:
+        logger.warning(
+            "detect_embed_model_mismatch: unrecognised meta_table %r — skipping "
+            "identity check (fail-safe).",
+            meta_table,
+        )
+        return None
+    try:
+        stored = dict(
+            conn.execute(
+                f"SELECT key, value FROM {meta_table} "  # noqa: S608 — table name allowlisted above
+                "WHERE key IN ('embed_model', 'embed_model_revision')"
+            ).fetchall()
+        )
+    except sqlite3.Error as exc:
+        logger.warning(
+            "detect_embed_model_mismatch: could not read %s (%s) — skipping "
+            "identity check (fail-safe).",
+            meta_table,
+            exc,
+        )
+        return None
+    stored_model = str(stored.get("embed_model", configured_model))
+    stored_revision = str(stored.get("embed_model_revision", configured_revision))
+    if stored_model == configured_model and stored_revision == configured_revision:
+        return None
+    mismatch = EmbedModelMismatch(
+        stored_model=stored_model,
+        stored_revision=stored_revision,
+        configured_model=configured_model,
+        configured_revision=configured_revision,
+    )
+    logger.error(
+        "EMBED_MODEL_IDENTITY_MISMATCH event=EMBED_MODEL_IDENTITY_MISMATCH %s",
+        embed_model_rebuild_instruction(store_label, mismatch),
+    )
+    return mismatch
 
 
 class RetrievedChunk(NamedTuple):
@@ -229,9 +368,20 @@ class SubstrateStore:
         db_path: Path to the substrate SQLite file (``:memory:`` for tests).
         embed_fn: Callable mapping ``list[str]`` to an ``(N, 384)`` numpy array
             of L2-normalised float32 embeddings (the PGOV bge-small embedder).
+        embed_model: Name of the model the supplied *embed_fn* actually runs.
+            Recorded in ``substrate_meta`` at first creation; a reopen under a
+            DIFFERENT identity loud-disables the vector limb (Vikunja #794).
+        embed_model_revision: The export/precision-variant of that model (same
+            recorded-once + mismatch-check discipline as *embed_model*).
     """
 
-    def __init__(self, db_path: str, embed_fn: EmbedFn) -> None:
+    def __init__(
+        self,
+        db_path: str,
+        embed_fn: EmbedFn,
+        embed_model: str = EMBED_MODEL_NAME,
+        embed_model_revision: str = EMBED_MODEL_REVISION,
+    ) -> None:
         self._embed = embed_fn
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         _harden_db_file_dacl(db_path)
@@ -240,16 +390,36 @@ class SubstrateStore:
         # so freed pages are zeroed at COMMIT (WAL stores zero at checkpoint).
         self._conn.execute("PRAGMA secure_delete=ON")
         self._conn.executescript(_SCHEMA)
-        self._conn.execute(
-            "INSERT OR IGNORE INTO substrate_meta(key, value) VALUES('embed_dim', ?)",
-            (str(EMBED_DIM),),
-        )
-        self._conn.execute(
-            "INSERT OR IGNORE INTO substrate_meta(key, value) VALUES('embed_model', ?)",
-            ("bge-small-en-v1.5",),
-        )
+        # Embedding identity meta (#794).  INSERT OR IGNORE keeps a pre-existing
+        # store's ORIGINAL stamp, so a fresh store adopts the configured identity
+        # while a store built under a different one is detected below.
+        for _k, _v in (
+            ("embed_dim", str(EMBED_DIM)),
+            ("embed_model", embed_model),
+            ("embed_model_revision", embed_model_revision),
+        ):
+            self._conn.execute(
+                "INSERT OR IGNORE INTO substrate_meta(key, value) VALUES(?, ?)",
+                (_k, _v),
+            )
         self._conn.commit()
+        # Vector-limb identity guard (#794): on mismatch, retrieve returns no
+        # results (the substrate is vector-only) rather than cosine scores from a
+        # different model's space.  None ⇒ identity agrees, vector limb live.
+        self._embed_model_mismatch = detect_embed_model_mismatch(
+            self._conn, "substrate_meta", embed_model, embed_model_revision, "substrate.db"
+        )
         logger.info("SubstrateStore initialised: %s", db_path)
+
+    @property
+    def embed_model_mismatch(self) -> EmbedModelMismatch | None:
+        """The detected embedding-model identity mismatch, or ``None``.
+
+        When non-``None`` the vector limb is loud-disabled (Vikunja #794): a
+        construction-time ``EMBED_MODEL_IDENTITY_MISMATCH`` ERROR was logged and
+        :meth:`retrieve` returns no results until the store is re-embedded.
+        """
+        return self._embed_model_mismatch
 
     def close(self) -> None:
         self._conn.close()
@@ -331,8 +501,17 @@ class SubstrateStore:
 
         Returns:
             Document hits then turn hits, each sorted by descending similarity.
+            An empty list when the embedding-model identity is mismatched — the
+            substrate is vector-only, so a loud-disabled vector limb (#794) means
+            no memory rather than cosine scores from a different model's space.
         """
         if not query.strip():
+            return []
+        if self._embed_model_mismatch is not None:
+            # Vector limb disabled (#794): the store's vectors were produced by a
+            # different embedder than the one configured now.  Serving cosine
+            # scores across the two spaces is the exact silent-garbage failure
+            # this guard exists to refuse.  The ERROR was logged at construction.
             return []
         import numpy as np
 
@@ -497,6 +676,8 @@ class EncryptedSubstrateStore:
         embed_fn: EmbedFn,
         cipher: "FieldCipher",  # type: ignore[name-defined]  # noqa: F821
         embed_cache_idle_unload_s: int = DEFAULT_EMBED_CACHE_IDLE_UNLOAD_S,
+        embed_model: str = EMBED_MODEL_NAME,
+        embed_model_revision: str = EMBED_MODEL_REVISION,
     ) -> None:
         from shared.security.field_cipher import FieldCipher  # local import; no circular dep
         if not isinstance(cipher, FieldCipher):
@@ -514,17 +695,25 @@ class EncryptedSubstrateStore:
         # so freed pages are zeroed at COMMIT (WAL stores zero at checkpoint).
         self._conn.execute("PRAGMA secure_delete=ON")
         self._conn.executescript(_SCHEMA)
-        self._conn.execute(
-            "INSERT OR IGNORE INTO substrate_meta(key, value) VALUES('embed_dim', ?)",
-            (str(EMBED_DIM),),
-        )
-        self._conn.execute(
-            "INSERT OR IGNORE INTO substrate_meta(key, value) VALUES('embed_model', ?)",
-            ("bge-small-en-v1.5",),
-        )
+        # Embedding identity meta (#794) — same recorded-once discipline as the
+        # plaintext store; INSERT OR IGNORE preserves a prior store's stamp.
+        for _k, _v in (
+            ("embed_dim", str(EMBED_DIM)),
+            ("embed_model", embed_model),
+            ("embed_model_revision", embed_model_revision),
+        ):
+            self._conn.execute(
+                "INSERT OR IGNORE INTO substrate_meta(key, value) VALUES(?, ?)",
+                (_k, _v),
+            )
         # Apply encrypted-schema additions (idempotent via try/except).
         self._apply_encrypted_schema()
         self._conn.commit()
+        # Vector-limb identity guard (#794): mismatch ⇒ retrieve returns nothing
+        # rather than cosine scores from a different model's embedding space.
+        self._embed_model_mismatch = detect_embed_model_mismatch(
+            self._conn, "substrate_meta", embed_model, embed_model_revision, "substrate.db"
+        )
 
         # ── Embedding-cache state + idle-unload (Vikunja #611) ────────────
         # All cache transitions (load / unload / lazy-reload) and the
@@ -563,6 +752,16 @@ class EncryptedSubstrateStore:
             len(self._embed_cache),
             self._idle_unload_s,
         )
+
+    @property
+    def embed_model_mismatch(self) -> EmbedModelMismatch | None:
+        """The detected embedding-model identity mismatch, or ``None`` (#794).
+
+        When non-``None`` the vector limb is loud-disabled: a construction-time
+        ``EMBED_MODEL_IDENTITY_MISMATCH`` ERROR was logged and :meth:`retrieve`
+        returns no results until the store is re-embedded.
+        """
+        return self._embed_model_mismatch
 
     def _apply_encrypted_schema(self) -> None:
         """Idempotent application of encrypted-schema migrations."""
@@ -914,8 +1113,15 @@ class EncryptedSubstrateStore:
         lazily here under ``self._lock`` (race-safe against the idle monitor), so
         a retrieval after an idle-unload returns identical results to one before
         it.  The last-access clock is bumped so active use defers the next unload.
+
+        Returns an empty list when the embedding-model identity is mismatched
+        (#794): the vector limb is loud-disabled rather than served across two
+        embedding spaces.
         """
         if not query.strip():
+            return []
+        if self._embed_model_mismatch is not None:
+            # Vector limb disabled (#794) — see the construction-time ERROR log.
             return []
         import numpy as np
 

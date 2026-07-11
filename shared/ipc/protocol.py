@@ -197,6 +197,42 @@ class MessageType(str, Enum):
     (never content).  A delete/mark of an unknown id is ``ok=True, found=false``
     (idempotent no-op — the store's own contract), NOT an error."""
 
+    # ── Operator preferences (Learning Loops Loop 1, #770 M1) ──
+
+    PREFERENCE_WRITE_REQUEST = "PREFERENCE_WRITE_REQUEST"
+    """Gateway → Orchestrator: one explicit operator preference command.
+
+    Carries ``op`` (``remember`` | ``edit`` | ``delete``) + the operator's
+    verbatim ``body`` (remember/edit) and/or the full 32-hex ``pref_id``
+    (edit/delete).  THE ONLY WRITE PATH to the auto-injected
+    OPERATOR_PREFERENCE tier (P8): this frame originates exclusively from the
+    gateway's slash-command parse of operator-typed text — no model-callable
+    tool, no ingest path, and no AO-internal code emits it (structural
+    absence, locked by test_preference_write_authority.py)."""
+
+    PREFERENCE_WRITE_RESULT = "PREFERENCE_WRITE_RESULT"
+    """Orchestrator → Gateway: outcome of a PREFERENCE_WRITE_REQUEST.
+
+    Carries ``ok`` + the echoed ``op`` + ``status`` (``stored`` | ``updated``
+    | ``deleted`` | ``requires_confirmation`` | ``refused``) + ``pref_id``,
+    and on a P5 near-duplicate/contradiction the ``conflict`` record
+    (``{pref_id, body}``) the confirmation must resolve.  ``error_code`` /
+    ``message`` carry labels on refusal (P4 caps, unknown id, no store)."""
+
+    PREFERENCE_LIST_REQUEST = "PREFERENCE_LIST_REQUEST"
+    """Gateway → Orchestrator: list the ACTIVE operator-preference tier.
+
+    No payload beyond the envelope.  The reply carries the operator's own
+    decrypted preference bodies back to the operator's own UI over the local
+    pipe/vsock — the same trust geometry as PROMPT_REQUEST prompt text."""
+
+    PREFERENCE_LIST_RESPONSE = "PREFERENCE_LIST_RESPONSE"
+    """Orchestrator → Gateway: the ACTIVE preference rows, deterministic order.
+
+    ``preferences`` (each projected onto the pinned PREFERENCE_LIST_KEYS) +
+    ``total``.  Capped at PREFERENCE_MAX_COUNT rows — the store's own count
+    cap guarantees one 64 KB frame always suffices (no truncation limb)."""
+
     # ── Headless-coding dispatch (agentic-setup brief §9, #670 — DORMANT) ──
 
     PLAN_REQUEST = "PLAN_REQUEST"
@@ -1209,4 +1245,211 @@ class MessageFramer:
             "found": bool(payload.get("found", False)),
             "error_code": str(payload.get("error_code", "")),
             "message": str(payload.get("message", "")),
+        }
+
+    # ── Operator preferences (Learning Loops Loop 1, #770 M1) ───────────
+
+    #: Operations accepted on a PREFERENCE_WRITE_REQUEST (Fail-Closed at encode).
+    #: ``confirm``/``dismiss`` (#770 M2 W1) resolve a staged model PROPOSAL by
+    #: opaque ``token`` — the operator-typed/clicked confirm hop; the AO reads the
+    #: STAGED verbatim bytes and commits (P2 across the proposal hop, P8 write
+    #: authority preserved — the model never re-supplies the body at confirm).
+    PREFERENCE_WRITE_OPS: frozenset[str] = frozenset(
+        {"remember", "edit", "delete", "confirm", "dismiss"}
+    )
+
+    #: Write-result statuses (Fail-Closed at encode).  ``dismissed`` (#770 M2 W1)
+    #: is a confirmed-nothing outcome; a confirmed proposal reuses
+    #: ``stored``/``updated``/``deleted`` per the staged action.
+    PREFERENCE_WRITE_STATUSES: frozenset[str] = frozenset(
+        {
+            "stored", "updated", "deleted", "requires_confirmation", "refused",
+            "dismissed",
+        }
+    )
+
+    #: Ordered keys carried per preference on a PREFERENCE_LIST_RESPONSE frame.
+    #: Each record is projected onto exactly these keys at encode AND decode so
+    #: a stray caller key can never inflate the envelope.
+    PREFERENCE_LIST_KEYS: tuple[str, ...] = (
+        "pref_id",
+        "type_tag",
+        "subject",
+        "body",
+        "created",
+        "updated",
+        "expires",  # #770 M2 W2 — operator-stated ISO expiry ('' = none)
+    )
+
+    @classmethod
+    def _normalize_preference_record(cls, record: dict[str, Any]) -> dict[str, str]:
+        """Project one preference record onto the pinned key set (all str)."""
+        return {key: str(record.get(key, "")) for key in cls.PREFERENCE_LIST_KEYS}
+
+    def encode_preference_write_request(
+        self,
+        *,
+        op: str,
+        body: str = "",
+        pref_id: str = "",
+        token: str = "",
+        expires: str = "",
+        request_id: str = "",
+    ) -> bytes:
+        """Encode an operator preference-write command (gateway → AO).
+
+        ``token`` (#770 M2 W1) carries the staged-proposal handle for the
+        ``confirm``/``dismiss`` ops; it is empty for ``remember``/``edit``/
+        ``delete``.  The confirm frame deliberately carries NO body — the AO
+        commits the STAGED verbatim bytes, so a model restatement cannot change
+        what is written (confirm-hop integrity).
+
+        Raises:
+            ValueError: If *op* is not in :attr:`PREFERENCE_WRITE_OPS`
+                (Fail-Closed at encode — a malformed op never crosses IPC).
+        """
+        if op not in self.PREFERENCE_WRITE_OPS:
+            raise ValueError(
+                f"Invalid preference-write op {op!r}; "
+                f"expected one of {sorted(self.PREFERENCE_WRITE_OPS)}"
+            )
+        return self.encode(
+            MessageType.PREFERENCE_WRITE_REQUEST,
+            {
+                "op": op, "body": body, "pref_id": pref_id, "token": token,
+                "expires": expires,
+            },
+            request_id,
+        )
+
+    def encode_preference_write_result(
+        self,
+        *,
+        ok: bool,
+        op: str,
+        status: str,
+        pref_id: str = "",
+        conflict: dict[str, Any] | None = None,
+        token: str = "",
+        error_code: str = "",
+        message: str = "",
+        request_id: str = "",
+    ) -> bytes:
+        """Encode the outcome of a PREFERENCE_WRITE_REQUEST (AO → gateway).
+
+        ``conflict`` (P5) carries the near-duplicate row a REQUIRES_CONFIRMATION
+        must resolve — projected onto ``{pref_id, body}`` only.  ``token`` (#770
+        M2 W2) carries the staged-proposal handle a one-step contradiction
+        confirm resolves — the operator confirms it with /remember-confirm.
+
+        Raises:
+            ValueError: If *status* is not in :attr:`PREFERENCE_WRITE_STATUSES`.
+        """
+        if status not in self.PREFERENCE_WRITE_STATUSES:
+            raise ValueError(
+                f"Invalid preference-write status {status!r}; "
+                f"expected one of {sorted(self.PREFERENCE_WRITE_STATUSES)}"
+            )
+        norm_conflict = (
+            {
+                "pref_id": str(conflict.get("pref_id", "")),
+                "body": str(conflict.get("body", "")),
+            }
+            if conflict
+            else None
+        )
+        return self.encode(
+            MessageType.PREFERENCE_WRITE_RESULT,
+            {
+                "ok": ok,
+                "op": op,
+                "status": status,
+                "pref_id": pref_id,
+                "conflict": norm_conflict,
+                "token": token,
+                "error_code": error_code,
+                "message": message,
+            },
+            request_id,
+        )
+
+    def decode_preference_write_result(self, data: bytes) -> dict[str, Any]:
+        """Decode JSON bytes into a PREFERENCE_WRITE_RESULT payload dict.
+
+        Raises:
+            ValueError: If the message is not a PREFERENCE_WRITE_RESULT.
+        """
+        msg_type, _rid, payload = self.decode(data)
+        if msg_type != MessageType.PREFERENCE_WRITE_RESULT:
+            raise ValueError(
+                f"Expected PREFERENCE_WRITE_RESULT, got {msg_type.value}"
+            )
+        raw_conflict = payload.get("conflict")
+        conflict = (
+            {
+                "pref_id": str(raw_conflict.get("pref_id", "")),
+                "body": str(raw_conflict.get("body", "")),
+            }
+            if isinstance(raw_conflict, dict)
+            else None
+        )
+        return {
+            "ok": bool(payload.get("ok", False)),
+            "op": str(payload.get("op", "")),
+            "status": str(payload.get("status", "")),
+            "pref_id": str(payload.get("pref_id", "")),
+            "conflict": conflict,
+            "token": str(payload.get("token", "")),
+            "error_code": str(payload.get("error_code", "")),
+            "message": str(payload.get("message", "")),
+        }
+
+    def encode_preference_list_request(self, *, request_id: str = "") -> bytes:
+        """Encode a preference-list request (gateway → AO)."""
+        return self.encode(
+            MessageType.PREFERENCE_LIST_REQUEST, {}, request_id,
+        )
+
+    def encode_preference_list_response(
+        self,
+        *,
+        preferences: "list[dict[str, Any]]",
+        request_id: str = "",
+    ) -> bytes:
+        """Encode the ACTIVE preference listing (AO → gateway).
+
+        Each record is projected onto the pinned :attr:`PREFERENCE_LIST_KEYS`
+        so a stray field can never ride the frame.  The store's
+        PREFERENCE_MAX_COUNT cap bounds the frame size (no truncation limb).
+        """
+        norm = [self._normalize_preference_record(r) for r in preferences]
+        return self.encode(
+            MessageType.PREFERENCE_LIST_RESPONSE,
+            {"preferences": norm, "total": len(norm)},
+            request_id,
+        )
+
+    def decode_preference_list_response(self, data: bytes) -> dict[str, Any]:
+        """Decode JSON bytes into a PREFERENCE_LIST_RESPONSE payload dict.
+
+        Records are re-normalised onto the pinned key set on decode too
+        (defence in depth — a hostile AO cannot inject extra keys).
+
+        Raises:
+            ValueError: If the message is not a PREFERENCE_LIST_RESPONSE.
+        """
+        msg_type, _rid, payload = self.decode(data)
+        if msg_type != MessageType.PREFERENCE_LIST_RESPONSE:
+            raise ValueError(
+                f"Expected PREFERENCE_LIST_RESPONSE, got {msg_type.value}"
+            )
+        raw = payload.get("preferences", [])
+        preferences: list[dict[str, str]] = []
+        if isinstance(raw, list):
+            for record in raw:
+                if isinstance(record, dict):
+                    preferences.append(self._normalize_preference_record(record))
+        return {
+            "preferences": preferences,
+            "total": int(payload.get("total", len(preferences))),
         }

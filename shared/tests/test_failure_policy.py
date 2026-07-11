@@ -617,3 +617,84 @@ def test_pre_code_budget_stop_scorecard_is_stalled(tmp_path):
     sc = _scorecard(calls)
     assert sc["verdict"] == "STALLED" and sc["attribution"] == "HARNESS"
     assert all(t["status"] == "pending" for t in sc["tasks"])
+
+
+# ---------------------------------------------------------------------------
+# #790 rec-1 — the job-oracle import contract surfaced into task prompts
+# ---------------------------------------------------------------------------
+
+
+def test_oracle_import_contract_surfaced_into_task_prompt(tmp_path):
+    """`_fleet_task_for` appends the oracle's import lines to the coder's prompt (the
+    B4/B6/B7 unlock), and an EMPTY contract appends nothing (byte-identical to before)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    ptask = driver._plan.tasks[0]
+
+    driver._oracle_import_contract = ["from cli import main", "import expense_store"]
+    ft = driver._fleet_task_for(ptask)
+    assert "from cli import main" in ft["prompt"]
+    assert "import expense_store" in ft["prompt"]
+    assert "do not rename or relocate them" in ft["prompt"]
+
+    driver._oracle_import_contract = []
+    ft2 = driver._fleet_task_for(ptask)
+    assert "imports this exact module interface" not in ft2["prompt"]
+
+
+def test_run_plan_waves_populates_contract_from_seam(tmp_path):
+    """End to end: the driver resolves `SwapOps.job_oracle_contract` once and every
+    task's prompt (incl. the first, dependency-less one — the contract is oracle-
+    derived, not dependency-derived) carries it."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    prompts: list[str] = []
+
+    def run_task(t):
+        prompts.append(str(t.get("prompt", "")))
+        return _merged(t)
+
+    ops = _ops(
+        [], run_task=run_task,
+        seed_job_oracle=lambda repo, rel: {"ok": True, "evidence": "seeded"},
+        job_oracle_contract=lambda: ["from inventory_manager import InventoryManager"],
+    )
+    _driver(tmp_path, ops, tasks, plan).run()
+    assert prompts, "no task ran"
+    assert "from inventory_manager import InventoryManager" in prompts[0]
+    assert all("from inventory_manager import InventoryManager" in p for p in prompts)
+
+
+def test_contract_seam_failure_is_fail_soft(tmp_path):
+    """A raising `job_oracle_contract` seam must never block the run — the contract
+    just stays empty (the run proceeds exactly as before the feature)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+
+    def boom():
+        raise RuntimeError("extraction blew up")
+
+    ops = _ops([], job_oracle_contract=boom)
+    result = _driver(tmp_path, ops, tasks, plan).run()
+    assert result.outcome == "complete"
+
+
+# ---------------------------------------------------------------------------
+# #789 — the plan-graph scorecard carries evidence.mode == "plan-graph"
+# ---------------------------------------------------------------------------
+
+
+def test_plan_scorecard_marks_mode_plan_graph(tmp_path):
+    """A plan-graph run stamps evidence.mode = "plan-graph" so the battery counts it in
+    the GREEN-rate denominator (a flat run stamps "flat" and is excluded, #789)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls: list = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["evidence"]["mode"] == "plan-graph"

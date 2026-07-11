@@ -625,6 +625,29 @@ def test_job_oracle_prompt_carries_contracts_and_criteria():
     assert "It adds expenses correctly" in seen["prompt"]
 
 
+#: A BROKEN hypothesis JOB oracle: `st.text(min_length=1)` raises TypeError at collection.
+_BROKEN_HYP_JOB_ORACLE = (
+    "from hypothesis import given\n"
+    "from hypothesis import strategies as st\n"
+    "from src.m0 import f0\n"
+    "\n\n"
+    "@given(st.text(min_length=1))\n"
+    "def test_f0(s):\n"
+    "    assert f0(s) is not None\n"
+)
+
+
+def test_job_oracle_repairs_hypothesis_kwargs():
+    # The job-level generator also repairs the known-invalid Hypothesis size kwargs before its
+    # structural validation, so a mis-emitted property test seeds collectable (battery job B1).
+    code, path = generate_job_acceptance_oracle(
+        "a budget tracker", _spec(language_hint="python"), _contract_tasks(),
+        generate_fn=lambda p: _BROKEN_HYP_JOB_ORACLE)
+    assert path == JOB_ORACLE_PATH_PYTHON
+    assert "min_length" not in code
+    assert "st.text(min_size=1)" in code
+
+
 @pytest.mark.parametrize("case", ["single", "no_target", "no_criteria", "no_contracts",
                                   "junk_py", "junk_node", "raises"])
 def test_job_oracle_fail_closed(case):

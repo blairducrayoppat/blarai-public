@@ -7,6 +7,8 @@ Does NOT actually start VMs or Textual apps — all components are mocked.
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -246,13 +248,15 @@ class TestLauncherMain:
         result = main()
         assert result == 1
 
+    @patch.object(sys, "argv", ["launcher", "--go-live"])
+    @patch("launcher.__main__._maybe_start_guest_parser", return_value=None)
     @patch("launcher.__main__.input", return_value="")
     @patch("launcher.__main__.AssistantOrchestratorService")
     @patch("launcher.__main__.PolicyAgentService")
     @patch("launcher.__main__.ensure_vm_running", return_value=False)
     @patch("launcher.__main__.get_vm_state")
     @patch("launcher.__main__.is_admin", return_value=True)
-    def test_vm_failure_is_fatal(
+    def test_vm_failure_is_fatal_in_go_live_mode(
         self,
         _mock_admin,
         mock_vm_state,
@@ -260,8 +264,16 @@ class TestLauncherMain:
         _mock_policy_service_cls,
         _mock_orchestrator_service_cls,
         _mock_input,
+        _mock_guest_parser,
     ) -> None:
-        """VM start failure must abort launcher (Fail-Closed)."""
+        """#788: VM start failure must abort launcher (Fail-Closed) in --go-live.
+
+        Under --go-live the sealed VM is EAGER (the guest parser is a boot-time
+        consumer), so a VM-start failure is fatal — exactly as the VM start was
+        always fatal before #788. In the NORMAL (lazy) mode the VM is not
+        started at boot at all; that path is covered by
+        ``test_normal_mode_defers_vm_start``.
+        """
         from launcher.__main__ import VMState, main
 
         mock_vm_state.return_value = VMState.OFF
@@ -328,6 +340,215 @@ class TestLauncherMain:
 
         result = main()
         assert result == 1
+
+
+# ---------------------------------------------------------------------------
+# #788: lazy sealed-VM start (normal chat defers the guest VM to point-of-use)
+# ---------------------------------------------------------------------------
+
+
+class TestLazyVmStart788:
+    """The sealed Hyper-V VM starts LAZILY unless ``--go-live`` (#788).
+
+    Normal chat never exercises the guest VM, so a normal launch must NOT pay
+    the ~10-15s Alpine cold-boot; ``--go-live`` keeps the eager bring-up (the
+    guest parser is a boot-time consumer in that mode). The fail-closed
+    containment is preserved by deferring the VM start to point-of-use — see
+    ``TestEnsureVmForFeature`` and ``TestGuestParserPointOfUseFailClosed``.
+
+    Both tests drive the FULL ``main()`` (the strongest wiring lock) and patch
+    ``_cleanup`` so the atexit-registered teardown never touches a real VM.
+    """
+
+    @patch.object(sys, "argv", ["launcher"])  # NO --go-live -> lazy
+    @patch("launcher.__main__._cleanup")  # neutralise the atexit teardown
+    @patch("launcher.__main__.AssistantOrchestratorService")
+    @patch("launcher.__main__.PolicyAgentService")
+    @patch("launcher.__main__.BlarAIApp")
+    @patch("launcher.__main__.TransportGateway")
+    @patch("launcher.__main__.build_session_store")
+    @patch("launcher.__main__.build_shared_pipeline")
+    @patch("launcher.__main__._run_uat2_prompt_flow_preflight", return_value=True)
+    @patch("launcher.__main__.ensure_vm_running", return_value=True)
+    @patch("launcher.__main__.get_vm_state")
+    @patch("launcher.__main__.is_admin", return_value=True)
+    def test_normal_mode_defers_vm_start(
+        self,
+        _mock_admin,
+        mock_vm_state,
+        mock_ensure_vm,
+        _mock_prompt_flow,
+        mock_build_pipeline,
+        mock_build_store,
+        mock_gateway_cls,
+        mock_app_cls,
+        mock_policy_service_cls,
+        mock_orchestrator_service_cls,
+        _mock_cleanup,
+    ) -> None:
+        """(1) Normal (lazy) mode: main() must NOT start the VM at boot."""
+        from launcher.__main__ import VMState, main
+
+        mock_vm_state.return_value = VMState.RUNNING
+
+        mock_build_result = MagicMock()
+        mock_build_result.ok = True
+        mock_build_result.pipeline = MagicMock()
+        mock_build_result.error = None
+        mock_build_pipeline.return_value = mock_build_result
+
+        mock_build_store.return_value = MagicMock()
+        mock_gateway = MagicMock()
+        mock_gateway.check_pa_status = AsyncMock(return_value=True)
+        mock_gateway_cls.return_value = mock_gateway
+        mock_app_cls.return_value = MagicMock()
+
+        mock_policy_service = MagicMock()
+        mock_policy_service.start.return_value = True
+        mock_policy_service.running = True
+        mock_policy_service_cls.from_runtime_mode.return_value = mock_policy_service
+
+        mock_orchestrator_service = MagicMock()
+        mock_orchestrator_service.start.return_value = True
+        mock_orchestrator_service.running = True
+        mock_orchestrator_service_cls.from_runtime_mode.return_value = (
+            mock_orchestrator_service
+        )
+
+        result = main()
+
+        assert result == 0
+        # The load-bearing assertion: NO eager VM start in normal chat mode.
+        mock_ensure_vm.assert_not_called()
+
+    @patch.object(sys, "argv", ["launcher", "--go-live"])  # eager
+    @patch("launcher.__main__._cleanup")  # neutralise the atexit teardown
+    @patch("launcher.__main__._maybe_start_guest_parser", return_value=None)
+    @patch("launcher.__main__.AssistantOrchestratorService")
+    @patch("launcher.__main__.PolicyAgentService")
+    @patch("launcher.__main__.BlarAIApp")
+    @patch("launcher.__main__.TransportGateway")
+    @patch("launcher.__main__.build_session_store")
+    @patch("launcher.__main__.build_shared_pipeline")
+    @patch("launcher.__main__._run_uat2_prompt_flow_preflight", return_value=True)
+    @patch("launcher.__main__.ensure_vm_running", return_value=True)
+    @patch("launcher.__main__.get_vm_state")
+    @patch("launcher.__main__.is_admin", return_value=True)
+    def test_go_live_mode_starts_vm_eager(
+        self,
+        _mock_admin,
+        mock_vm_state,
+        mock_ensure_vm,
+        _mock_prompt_flow,
+        mock_build_pipeline,
+        mock_build_store,
+        mock_gateway_cls,
+        mock_app_cls,
+        mock_policy_service_cls,
+        mock_orchestrator_service_cls,
+        _mock_guest_parser,
+        _mock_cleanup,
+    ) -> None:
+        """(2) --go-live: main() starts the VM eagerly (unchanged behaviour)."""
+        from launcher.__main__ import VMState, main
+
+        mock_vm_state.return_value = VMState.RUNNING
+
+        mock_build_result = MagicMock()
+        mock_build_result.ok = True
+        mock_build_result.pipeline = MagicMock()
+        mock_build_result.error = None
+        mock_build_pipeline.return_value = mock_build_result
+
+        mock_build_store.return_value = MagicMock()
+        mock_gateway = MagicMock()
+        mock_gateway.check_pa_status = AsyncMock(return_value=True)
+        mock_gateway_cls.return_value = mock_gateway
+        mock_app_cls.return_value = MagicMock()
+
+        mock_policy_service = MagicMock()
+        mock_policy_service.start.return_value = True
+        mock_policy_service.running = True
+        mock_policy_service_cls.from_runtime_mode.return_value = mock_policy_service
+
+        mock_orchestrator_service = MagicMock()
+        mock_orchestrator_service.start.return_value = True
+        mock_orchestrator_service.running = True
+        mock_orchestrator_service_cls.from_runtime_mode.return_value = (
+            mock_orchestrator_service
+        )
+
+        try:
+            result = main()
+        finally:
+            # main() sets this in-process under --go-live; do not leak it.
+            os.environ.pop("BLARAI_GUEST_PARSER_ENABLED", None)
+
+        assert result == 0
+        # The load-bearing assertion: --go-live keeps the eager VM start.
+        mock_ensure_vm.assert_called_once()
+
+
+class TestEnsureVmForFeature:
+    """#788 point-of-use primitive: lazily ensure the sealed VM, fail closed."""
+
+    @patch("launcher.__main__.ensure_vm_running")
+    @patch("launcher.__main__.get_vm_state")
+    def test_fast_path_when_already_running(self, mock_state, mock_ensure) -> None:
+        """Already-Running VM: return True without a redundant start."""
+        import launcher.__main__ as m
+
+        mock_state.return_value = m.VMState.RUNNING
+        assert m._ensure_vm_for_feature("unit") is True
+        mock_ensure.assert_not_called()
+
+    @patch("launcher.__main__.ensure_vm_running", return_value=True)
+    @patch("launcher.__main__.get_vm_state")
+    def test_starts_and_verifies_when_down(
+        self, mock_state, mock_ensure, monkeypatch
+    ) -> None:
+        """VM down + start succeeds: return True and record _vm_was_started."""
+        import launcher.__main__ as m
+
+        monkeypatch.setattr(m, "_vm_was_started", False)
+        mock_state.return_value = m.VMState.OFF
+        assert m._ensure_vm_for_feature("unit") is True
+        mock_ensure.assert_called_once()
+        assert m._vm_was_started is True
+
+    @patch("launcher.__main__.ensure_vm_running", return_value=False)
+    @patch("launcher.__main__.get_vm_state")
+    def test_fails_closed_when_start_fails(self, mock_state, mock_ensure) -> None:
+        """(3) VM down + start FAILS: return False (fail-closed)."""
+        import launcher.__main__ as m
+
+        mock_state.return_value = m.VMState.OFF
+        assert m._ensure_vm_for_feature("unit") is False
+
+
+class TestGuestParserPointOfUseFailClosed:
+    """#788: the guest parser refuses (fail-closed) when the sealed VM is down.
+
+    In lazy mode the VM is not guaranteed up at boot; the guest parser now
+    ensures it at its point of use and parks NO manager on failure, so
+    ``guest_parser_available()`` is False and URL ingest refuses (ADR-030 §3).
+    """
+
+    @patch("launcher.__main__._ensure_vm_for_feature", return_value=False)
+    def test_guest_parser_fails_closed_when_vm_unavailable(
+        self, mock_ensure_feature
+    ) -> None:
+        import launcher.__main__ as m
+        from launcher import guest_parser as gp
+
+        fake_cfg = MagicMock()
+        fake_cfg.enabled = True
+        with patch.object(gp, "load_guest_parser_config", return_value=fake_cfg):
+            result = m._maybe_start_guest_parser()
+
+        assert result is None
+        assert gp.get_guest_parser_manager() is None
+        mock_ensure_feature.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

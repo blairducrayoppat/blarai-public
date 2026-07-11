@@ -873,6 +873,35 @@ class BatterySummary:
     def interventions_total(self) -> int:
         return sum(s.interventions for s in self.scorecards)
 
+    @property
+    def green(self) -> int:
+        return sum(1 for s in self.scorecards if s.verdict == VERDICT_GREEN)
+
+    @property
+    def plan_graph_eligible(self) -> int:
+        """Jobs that ran plan-graph mode — the ONLY jobs that CAN earn GREEN (a
+        flat-queue job has no job oracle and is STALLED/PARKED by construction, #789).
+        The honest GREEN-rate denominator (``evidence.mode == "plan-graph"``, stamped
+        by the driver's ``build_scorecard``)."""
+        return sum(1 for s in self.scorecards
+                   if (s.evidence or {}).get("mode") == "plan-graph")
+
+    @property
+    def flat_queue(self) -> int:
+        """Jobs that degraded to the flat queue — structurally non-GREEN (under-
+        decomposed to <2 tasks, #789). Reported SEPARATELY so they do not depress the
+        plan-graph coder rate. This is measurement fairness, NOT green-gaming: the
+        verdict of each such job is untouched (a flat run still never reads GREEN)."""
+        return sum(1 for s in self.scorecards
+                   if (s.evidence or {}).get("mode") == "flat")
+
+    @property
+    def mode_unknown(self) -> int:
+        """Jobs with no mode stamp — a synthesized STALLED/HARNESS card (the driver
+        never emitted a scorecard: crash/could-not-run before either mode). Neither
+        eligible nor flat; surfaced so the buckets always sum to the total."""
+        return len(self.scorecards) - self.plan_graph_eligible - self.flat_queue
+
     def exit_code(self) -> int:
         """2 = FALSE-DONE present (program-failing); 1 = STALLED present (harness
         needs attention); 0 = every job honest (GREEN/PARKED-HONEST/RECOVERED)."""
@@ -893,6 +922,20 @@ class BatterySummary:
             "hard_gates": {
                 "false_done": self.false_done,
                 "interventions_total": self.interventions_total,
+            },
+            # #789 measurement fairness: the GREEN-rate over PLAN-GRAPH-ELIGIBLE jobs
+            # only. A flat-queue job (under-decomposed to <2 tasks) cannot GREEN by
+            # construction, so counting it in the denominator quietly depresses the
+            # coder's rate. Excluding it is an HONEST denominator, not green-gaming —
+            # flat + mode-unknown are reported here too, never hidden, and no verdict
+            # is altered. ``green_over_eligible``/``_total`` are "g/n" strings (n≥0).
+            "reliability": {
+                "green": self.green,
+                "plan_graph_eligible": self.plan_graph_eligible,
+                "flat_queue": self.flat_queue,
+                "mode_unknown": self.mode_unknown,
+                "green_over_eligible": f"{self.green}/{self.plan_graph_eligible}",
+                "green_over_total": f"{self.green}/{len(self.scorecards)}",
             },
             # #744: the host-vs-guest agreement tally — the measurement the
             # advisory certificate exists to accumulate (gating is the LA's
@@ -918,6 +961,16 @@ class BatterySummary:
             if s.notes:
                 lines.append(f"     note: {s.notes}")
         lines.append("")
+        # #789: the honest denominator — GREEN over plan-graph-eligible jobs, with the
+        # raw rate and the structurally-non-GREEN flat count both shown (never hidden).
+        rel = (
+            f"reliability: GREEN {self.green}/{self.plan_graph_eligible} "
+            f"plan-graph-eligible (raw {self.green}/{len(self.scorecards)}); "
+            f"flat-queue={self.flat_queue} (structurally non-GREEN, #789)"
+        )
+        if self.mode_unknown:
+            rel += f"; mode-unknown={self.mode_unknown}"
+        lines.append(rel)
         lines.append(
             f"hard gates: FALSE-DONE={self.false_done} "
             f"[{'OK' if not self.false_done else 'PROGRAM-FAILING'}]  "

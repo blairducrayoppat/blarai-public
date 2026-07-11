@@ -824,6 +824,64 @@ def test_battery_summary_carries_the_agreement_tally():
     assert tally["guest-not-run"] == 0
 
 
+def test_battery_summary_segments_green_rate_over_plan_graph_eligible():
+    """#789 measurement fairness: the GREEN-rate denominator is plan-graph-eligible
+    jobs ONLY. A flat-queue job (structurally non-GREEN by under-decomposition) is
+    reported SEPARATELY, not counted against the coder — and no verdict is altered.
+
+    The night-20260709 shape: B2 GREEN (plan-graph), B4/B6/B7 PARKED (plan-graph),
+    B1/B5 PARKED (flat). Raw = 1/6; the honest coder rate = 1/4 plan-graph-eligible."""
+    from tools.dispatch_harness.battery import BatterySummary
+    from tools.dispatch_harness.scorecard import Scorecard
+
+    def sc(job, verdict, mode, attribution=""):
+        return Scorecard(job_id=job, verdict=verdict, attribution=attribution,
+                         evidence={"mode": mode} if mode else {})
+
+    summary = BatterySummary(out_dir="x", dry_run=True)
+    summary.scorecards.extend([
+        sc("B2", "GREEN", "plan-graph"),
+        sc("B4", "PARKED-HONEST", "plan-graph", "BUILD"),
+        sc("B6", "PARKED-HONEST", "plan-graph", "BUILD"),
+        sc("B7", "PARKED-HONEST", "plan-graph", "BUILD"),
+        sc("B1", "PARKED-HONEST", "flat", "BUILD"),
+        sc("B5", "PARKED-HONEST", "flat", "BUILD"),
+    ])
+    assert summary.green == 1
+    assert summary.plan_graph_eligible == 4
+    assert summary.flat_queue == 2
+    assert summary.mode_unknown == 0
+    rel = summary.to_dict()["reliability"]
+    assert rel["green_over_eligible"] == "1/4"   # the honest coder rate
+    assert rel["green_over_total"] == "1/6"      # the raw rate, still shown
+    assert rel["flat_queue"] == 2
+    # The render surfaces the honest denominator + the flat count, hiding neither.
+    text = summary.render()
+    assert "GREEN 1/4 plan-graph-eligible" in text
+    assert "flat-queue=2" in text
+
+
+def test_battery_summary_mode_unknown_bucket_and_no_eligible_jobs():
+    """A synthesized STALLED/HARNESS card (no mode) is mode-unknown — neither eligible
+    nor flat — and a run with zero eligible jobs reports 'g/0' without dividing."""
+    from tools.dispatch_harness.battery import BatterySummary
+    from tools.dispatch_harness.scorecard import Scorecard
+
+    summary = BatterySummary(out_dir="x", dry_run=True)
+    summary.scorecards.extend([
+        Scorecard(job_id="B1", verdict="STALLED", attribution="HARNESS",
+                  evidence={"oracle_status": "unknown"}),           # no mode
+        Scorecard(job_id="B5", verdict="PARKED-HONEST", attribution="BUILD",
+                  evidence={"mode": "flat"}),
+    ])
+    assert summary.plan_graph_eligible == 0
+    assert summary.flat_queue == 1
+    assert summary.mode_unknown == 1
+    rel = summary.to_dict()["reliability"]
+    assert rel["green_over_eligible"] == "0/0"
+    assert rel["mode_unknown"] == 1
+
+
 def test_guest_oracle_evidence_is_a_valid_evidence_string(tmp_path):
     """2026-07-08 night-killer repro: the folded certificate was a DICT, the
     fail-closed writer refused it, and the runner died 4 min into the first

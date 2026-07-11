@@ -24,6 +24,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from shared.fleet import swap_state as ss
 from shared.fleet.decompose import DEFAULT_MAX_TASKS, decompose_request
@@ -1137,8 +1138,53 @@ def real_run_job_oracle(
 GUEST_ORACLE_VSOCK_PORT: int = 50002
 
 
+# --- #744 c.1565 sequential ensure-start VM controls (LESSON 224 side-effect scoping) ---
+# The oracle probe needs the NIC-less orchestrator guest VM UP, but the nightly
+# battery reboots the AO between jobs and each launcher-exit stops the guest
+# (policy=always), so by this teardown RAM-free probe window the guest is DOWN and
+# the probe reported ``not-run: guest-unreachable`` every night. These thin wrappers
+# REUSE the launcher's existing VM-lifecycle primitives (``launcher.vm_manager`` —
+# the SAME ``ensure_vm_running``/``stop_vm`` the launcher itself calls; no Hyper-V is
+# reimplemented here), imported LAZILY so swap_ops stays importable in the guest/host
+# contexts that never touch Hyper-V, and INJECTABLE into ``real_run_guest_oracle`` so
+# no test ever starts or stops the real VM. The fail-soft try/except lives at the one
+# call site, so an injected double that raises is handled identically to the real
+# primitive returning False.
+
+def _default_guest_vm_running() -> bool:
+    """True iff the orchestrator guest VM is already in the Running state — the
+    signal that lets the oracle path leave an already-up guest exactly as it found
+    it (only a guest WE start is stopped again; LESSON 224 side-effect scoping)."""
+    from launcher.vm_manager import VMState, get_vm_state
+    return get_vm_state() == VMState.RUNNING
+
+
+def _default_ensure_guest_running() -> bool:
+    """Ensure-start the orchestrator guest VM for the oracle probe — reuses the
+    launcher's fail-closed :func:`launcher.vm_manager.ensure_vm_running` (True iff
+    the guest is Running)."""
+    from launcher.vm_manager import ensure_vm_running
+    return bool(ensure_vm_running())
+
+
+def _default_stop_guest() -> bool:
+    """Stop the orchestrator guest VM again after the probe — reuses the launcher's
+    :func:`launcher.vm_manager.stop_vm` so the guest footprint returns to ZERO
+    outside the probe window."""
+    from launcher.vm_manager import stop_vm
+    return bool(stop_vm())
+
+
 def real_run_guest_oracle(
-    config: FleetDispatchConfig, run_id: str, repo: str, rel_path: str, oracle_code: str
+    config: FleetDispatchConfig,
+    run_id: str,
+    repo: str,
+    rel_path: str,
+    oracle_code: str,
+    *,
+    guest_vm_running: "Callable[[], bool]" = _default_guest_vm_running,
+    ensure_guest_running: "Callable[[], bool]" = _default_ensure_guest_running,
+    stop_guest: "Callable[[], bool]" = _default_stop_guest,
 ) -> dict:
     """#744: the live guest-oracle executor — the host pipeline over the SAME
     plan-carried oracle bytes the host gate grades (snapshot → overlay → offline
@@ -1153,10 +1199,21 @@ def real_run_guest_oracle(
     the ceremony BEFORE this line was written: reachable probe + a passed AND
     a failed round-trip through the real bridge, guest, and pytest.
 
-    Fail-soft at every layer: a factory failure (missing 3.14 bridge, bad
-    config) degrades to ``transport=None`` — the pipeline then reports an
-    honest ``not-run`` after proving the snapshot shippable; the returned
-    callable itself never raises; the driver's ``_guard`` wraps the phase."""
+    #744 c.1565 SEQUENTIAL ensure-start: this probe fires in the teardown RAM-free
+    window (14B/30B unloaded) where the battery's between-jobs AO reboots have left
+    the guest VM DOWN — so the probe used to report ``guest-unreachable`` every
+    night. Bring the guest UP here, probe, then RESTORE its prior footprint so it
+    never competes with the 30B during code phases (the parallelism optimisation —
+    overlapping VM boot with the 30B unload — is a SEPARATE follow-up, #744 c.1566).
+    Side-effect scoping (LESSON 224): a guest that was ALREADY running is left
+    running; only one WE start is stopped again.
+
+    Fail-soft at every layer AND INVARIANT: an ensure-start failure (or any
+    guest-unreachable condition) degrades to an honest ``not-run`` — NEVER a
+    blocked restore, NEVER a verdict change; the guest-stop is still attempted
+    (fail-soft); a factory failure (missing 3.14 bridge, bad config) degrades to
+    ``transport=None``; the returned callable itself never raises; the driver's
+    ``_guard`` wraps the phase."""
     from shared.fleet.guest_oracle import run_guest_oracle
     from shared.fleet.guest_oracle_transport import (
         BridgeUnavailableError,
@@ -1164,22 +1221,56 @@ def real_run_guest_oracle(
         make_guest_oracle_transport,
     )
 
+    # Record the prior footprint BEFORE touching the VM: only a guest we start is
+    # stopped again (an unreadable state is treated as "not running" — fail-soft).
     try:
-        transport = make_guest_oracle_transport(vsock_port=GUEST_ORACLE_VSOCK_PORT)
-    except (BridgeUnavailableError, GuestOracleTransportError, OSError) as exc:
+        was_running = bool(guest_vm_running())
+    except Exception:  # noqa: BLE001 — an unreadable VM state is treated as "not running"
+        was_running = False
+
+    try:
+        try:
+            started = bool(ensure_guest_running())
+        except Exception:  # noqa: BLE001 — ensure-start failure is an honest not-run
+            started = False
+        if not started:
+            write_swap_progress(
+                config, run_id,
+                "Guest oracle: the guest VM could not be started for the probe — "
+                "certificate not-run this job (advisory; verdict unchanged)",
+            )
+            return {
+                "status": "not-run",
+                "reason": "guest-unreachable",
+                "evidence": "the guest VM could not be started for the oracle probe",
+            }
+
+        try:
+            transport = make_guest_oracle_transport(vsock_port=GUEST_ORACLE_VSOCK_PORT)
+        except (BridgeUnavailableError, GuestOracleTransportError, OSError) as exc:
+            write_swap_progress(
+                config, run_id,
+                f"Guest oracle transport unavailable ({type(exc).__name__}) — "
+                "certificate not-run this job",
+            )
+            transport = None
+        result = run_guest_oracle(repo, rel_path, oracle_code, transport=transport)
         write_swap_progress(
             config, run_id,
-            f"Guest oracle transport unavailable ({type(exc).__name__}) — "
-            "certificate not-run this job",
+            f"Guest oracle pipeline: {result.get('status', 'not-run')}"
+            + (f" ({result.get('reason')})" if result.get("reason") else ""),
         )
-        transport = None
-    result = run_guest_oracle(repo, rel_path, oracle_code, transport=transport)
-    write_swap_progress(
-        config, run_id,
-        f"Guest oracle pipeline: {result.get('status', 'not-run')}"
-        + (f" ({result.get('reason')})" if result.get("reason") else ""),
-    )
-    return result
+        return result
+    finally:
+        # RESTORE the guest footprint to ZERO outside this probe window. ALWAYS
+        # attempted (even after an ensure-start failure — ensure_vm_running may have
+        # left the guest mid-Start), but ONLY for a guest we started; fail-soft — a
+        # stop failure must NEVER derail the swap teardown or touch the verdict.
+        if not was_running:
+            try:
+                stop_guest()
+            except Exception:  # noqa: BLE001 — stop failure must never derail the swap
+                pass
 
 
 def guest_oracle_evidence_path(config: FleetDispatchConfig, run_id: str) -> Path:
@@ -1563,8 +1654,9 @@ def build_swap_ops(
     # generate_plan; path-validated by extract_job_oracle) — the closure threads it to
     # the live oracle run. The DRIVER passes the plan's pinned oracle path per call.
     from shared.fleet.acceptance import extract_job_oracle
+    from shared.fleet.context_pack import extract_import_contract
 
-    _, job_oracle_code, _job_oracle_path = extract_job_oracle(tasks)
+    _, job_oracle_code, job_oracle_path = extract_job_oracle(tasks)
 
     def _run_task_honest_kill(task: dict) -> TaskOutcome:
         # ONLY the live run-task path registers a child with the budget-watchdog holder; the
@@ -1663,6 +1755,13 @@ def build_swap_ops(
         # unaffected (plan bytes overwrite at grade time).
         seed_job_oracle=lambda repo, rel: real_seed_job_oracle(
             config, run_id, repo, rel, job_oracle_code),
+        # #790 rec-1: the oracle's first-party import surface (module paths + names the
+        # final tree must provide), extracted from the SAME plan-time oracle code the
+        # seeder/grader use. Pure + deterministic; [] when no oracle rides the run. The
+        # driver surfaces it into every plan-graph task's context so the coder builds
+        # toward the imports the wave-final oracle grades (the B4/B6/B7 park class).
+        job_oracle_contract=lambda: extract_import_contract(
+            job_oracle_path, job_oracle_code),
         # The mid-swap re-decompose MODEL TRANSPORT is deliberately NOT live-wired yet:
         # the 14B planner is not resident during CODE and no fleet script exposes a
         # free-text generation seam the driver could argv-invoke. The deterministic

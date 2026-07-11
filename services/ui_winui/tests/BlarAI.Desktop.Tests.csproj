@@ -36,6 +36,12 @@
       only — no WinUI. The Link attribute keeps the build output clean.
     -->
     <Compile Include="..\Services\ImageResolver.Core.cs" Link="ImageResolver.Core.cs" />
+    <!--
+      #770 M2 W1 — the dependency-free preference-proposal card parser. Pure
+      System.Text.RegularExpressions; no WinUI, so the headless runner covers the
+      token gate + block extraction the MarkdownBlock card render relies on.
+    -->
+    <Compile Include="..\Services\PreferenceProposalCard.Core.cs" Link="PreferenceProposalCard.Core.cs" />
   </ItemGroup>
 
 </Project>

@@ -51,6 +51,20 @@ public sealed class MarkdownBlock : ContentControl
     /// </summary>
     public static Func<string, CancellationToken, Task<byte[]?>>? ImageBytesResolver { get; set; }
 
+    /// <summary>
+    /// Sender for an operator-preference PROPOSAL card's Save/Dismiss buttons
+    /// (#770 M2 W1), injected ONCE at MainWindow init. The AO streams a
+    /// <c>[[PREFERENCE-PROPOSAL token=…]]…[[/PREFERENCE-PROPOSAL]]</c> block inside
+    /// the assistant message; <see cref="BuildProposalCard"/> renders a card whose
+    /// buttons invoke this with EXACTLY <c>/remember-confirm &lt;token&gt;</c> /
+    /// <c>/remember-dismiss &lt;token&gt;</c> — the same operator-typed commands
+    /// the text fallback names. P8: this sends a COMMAND (operator authority);
+    /// only the opaque token crosses, never a model-supplied body. Left
+    /// <c>null</c> in tests / before wiring, in which case the buttons are inert
+    /// (the readable text still names the commands to type).
+    /// </summary>
+    public static Func<string, Task>? ProposalCommandSender { get; set; }
+
     public static readonly DependencyProperty MarkdownProperty =
         DependencyProperty.Register(
             nameof(Markdown), typeof(string), typeof(MarkdownBlock),
@@ -99,6 +113,30 @@ public sealed class MarkdownBlock : ContentControl
                 }
                 i++; // consume closing fence (or run off the end if unclosed)
                 root.Children.Add(BuildCodeBlock(code.ToString().TrimEnd('\n'), lang));
+            }
+            else if (line.TrimStart().StartsWith(Services.PreferenceProposalCard.OpenPrefix))
+            {
+                // #770 M2 W1 — operator-preference PROPOSAL card. The open marker
+                // line carries the 16-hex staging token; collect the readable body
+                // until the close marker, then render a card with Save/Dismiss
+                // buttons. A malformed token renders the body as plain prose (never
+                // a card) — the forged-token gate at the render boundary.
+                FlushProse();
+                string token = Services.PreferenceProposalCard.TokenFromOpenMarker(line.Trim());
+                var cardBody = new StringBuilder();
+                i++;
+                while (i < lines.Length &&
+                       !lines[i].TrimStart().StartsWith(Services.PreferenceProposalCard.CloseMarker))
+                {
+                    cardBody.Append(lines[i]).Append('\n');
+                    i++;
+                }
+                i++; // consume the close marker (or run off the end if unclosed)
+                string body = cardBody.ToString().Trim('\n');
+                if (Services.PreferenceProposalCard.IsValidToken(token))
+                    root.Children.Add(BuildProposalCard(token, body));
+                else
+                    root.Children.Add(BuildProse(body));
             }
             else
             {
@@ -412,6 +450,72 @@ public sealed class MarkdownBlock : ContentControl
         grid.Children.Add(codeText);
 
         border.Child = grid;
+        return border;
+    }
+
+    // ── Preference proposal card: readable text + Save/Dismiss (#770 M2 W1) ───
+
+    /// <summary>
+    /// Render an operator-preference PROPOSAL as a card: the shared backend's
+    /// readable text (shown as LITERAL text — never re-parsed as markdown, so a
+    /// proposed body's <c>*</c>/<c>[]</c> can't become formatting) plus Save and
+    /// Dismiss buttons. The buttons emit EXACTLY
+    /// <c>PreferenceProposalCard.ConfirmCommand(token)</c> /
+    /// <c>DismissCommand(token)</c> via <see cref="ProposalCommandSender"/> — the
+    /// same operator-typed commands the text names (P8: operator authority; only
+    /// the token crosses). Both buttons disable after one click (a proposal is
+    /// single-use; the AO's token pop is the authoritative one-shot).
+    /// </summary>
+    private static UIElement BuildProposalCard(string token, string body)
+    {
+        var border = new Border
+        {
+            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorSecondaryBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["AccentControlElevationBorderBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(14, 12, 14, 12),
+        };
+
+        var stack = new StackPanel { Spacing = 10 };
+        stack.Children.Add(new TextBlock
+        {
+            Text = body,
+            TextWrapping = TextWrapping.Wrap,
+            IsTextSelectionEnabled = true,
+        });
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var save = new Button { Content = "Save preference" };
+        var dismiss = new Button { Content = "Dismiss" };
+
+        async void SendThenDisable(string command)
+        {
+            save.IsEnabled = false;
+            dismiss.IsEnabled = false;
+            var sender = ProposalCommandSender;
+            if (sender is not null && command.Length > 0)
+            {
+                try { await sender(command); }
+                catch { /* send failure is surfaced by the send path itself */ }
+            }
+        }
+
+        save.Click += (_, _) =>
+            SendThenDisable(Services.PreferenceProposalCard.ConfirmCommand(token));
+        dismiss.Click += (_, _) =>
+            SendThenDisable(Services.PreferenceProposalCard.DismissCommand(token));
+
+        buttons.Children.Add(dismiss);
+        buttons.Children.Add(save);
+        stack.Children.Add(buttons);
+
+        border.Child = stack;
         return border;
     }
 }

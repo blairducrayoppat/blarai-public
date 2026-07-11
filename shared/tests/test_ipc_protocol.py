@@ -73,6 +73,13 @@ class TestMessageType:
             "IMAGE_LIST_RESPONSE",
             "IMAGE_MANAGE_REQUEST",
             "IMAGE_MANAGE_RESULT",
+            # Operator preferences (Learning Loops Loop 1, #770 M1) — the
+            # /remember + /preferences write/list legs over the gateway→AO
+            # leg; the WRITE leg is the tier's ONLY write path (P8):
+            "PREFERENCE_WRITE_REQUEST",
+            "PREFERENCE_WRITE_RESULT",
+            "PREFERENCE_LIST_REQUEST",
+            "PREFERENCE_LIST_RESPONSE",
             # Headless-coding dispatch — the Acceptance-Layer PLAN + EXECUTE steps (#670):
             "PLAN_REQUEST",
             "PLAN_RESULT",

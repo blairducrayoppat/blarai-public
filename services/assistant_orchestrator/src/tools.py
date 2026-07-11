@@ -463,6 +463,38 @@ def _web_search(query: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# propose_preference (#770 M2 W1) — a DRAFT surface, never a store write
+# ---------------------------------------------------------------------------
+# The 14B may PROPOSE a standing preference mid-conversation; the operator sees a
+# confirm card and the write happens ONLY when the operator types/clicks
+# /remember-confirm, which rides the existing operator preference write door (P8 preserved
+# STRUCTURALLY — study §5.1 source isolation between the proposal channel and the
+# write channel). This tool is REGISTERED so the model can call it (schema +
+# allowlist + #570 per-dispatch PA adjudication + GUARDED risk tier + lock-exempt
+# so it can fire under untrusted content per D-1(a) — the untrusted-context card
+# FLAG is the weak-signal defense, not a lock that would kill legitimate captures
+# in knowledge-heavy sessions). Its ACTUAL handling is session-aware and lives in
+# the AO tool loop (entrypoint._handle_propose_preference: reads the store for the
+# P5 add-vs-retract/replace decision, stages the verbatim bytes, streams the
+# card). This registry body is therefore a FAIL-CLOSED directive notice — never
+# the production path: the loop intercepts propose_preference BEFORE tools.execute
+# (test_propose_preference_intercepted_before_execute locks that), and a direct
+# execute() (a stray caller/test) gets the notice, never a store write.
+PROPOSE_PREFERENCE_DIRECT_NOTICE: str = (
+    "Preference proposals are shown to you as a confirm card by the assistant; "
+    "there is nothing to run here. Reply /remember to save a preference directly."
+)
+
+
+def _propose_preference(args: str) -> str:
+    """DORMANT registry body — see the section note. The real, session-aware
+    proposal handling is the AO tool loop's ``_handle_propose_preference``; this
+    body is reached only by a direct ``execute()`` (never the production path)
+    and returns a deterministic notice, never a store write."""
+    return PROPOSE_PREFERENCE_DIRECT_NOTICE
+
+
+# ---------------------------------------------------------------------------
 # Registry — each tool takes a single string arg ("" if none provided)
 # ---------------------------------------------------------------------------
 
@@ -481,6 +513,10 @@ _REGISTRY: dict[str, Callable[[str], str]] = {
     # single 'query' string. Neither ever raises into the loop.
     "search_knowledge": _search_knowledge,
     "web_search": _web_search,
+    # #770 M2 W1 — a DRAFT surface (renders a confirm card, never a store write).
+    # The registry body is a fail-closed notice; the real session-aware handling
+    # is the AO tool loop (see the section note above _propose_preference).
+    "propose_preference": _propose_preference,
 }
 """Maps tool name -> callable taking a single string arg ('' if none)."""
 
@@ -639,6 +675,59 @@ TOOL_SCHEMAS: dict[str, dict[str, object]] = {
             },
         },
     },
+    # #770 M2 W1 — propose_preference. A standing-preference DRAFT: shows the
+    # operator a confirm card, saves nothing until they confirm. type_tag and
+    # intent are plain strings validated in the AO handler (NOT schema enums —
+    # the schema feeds the xgrammar structural-tags builder verbatim and the
+    # codebase keeps constraint keywords the installed GenAI has not proven out
+    # of it; the handler clamps type_tag to the tier's tags and intent to
+    # save/remove, fail-safe).
+    "propose_preference": {
+        "type": "function",
+        "function": {
+            "name": "propose_preference",
+            "description": (
+                "Propose saving (or removing) a STANDING operator preference — a "
+                "durable instruction about HOW to respond that should apply to "
+                "every future conversation (for example 'always use metric "
+                "units', 'call me Blair', 'no source citations'). Use this ONLY "
+                "when the user states a lasting preference or correction about "
+                "your behaviour, never for a one-off request. This saves nothing "
+                "on its own: it shows the user a card they must confirm. To "
+                "propose removing a standing preference the user no longer wants, "
+                "set intent to 'remove'."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": (
+                            "The preference in the user's own words, as a "
+                            "standing instruction (e.g. 'Always use metric "
+                            "units'). For a removal, the preference to remove."
+                        ),
+                    },
+                    "type_tag": {
+                        "type": "string",
+                        "description": (
+                            "Preference kind: 'standing-rule' (default), "
+                            "'address-form', or 'fact'."
+                        ),
+                    },
+                    "intent": {
+                        "type": "string",
+                        "description": (
+                            "'save' to propose saving this preference (default), "
+                            "or 'remove' to propose removing an existing one."
+                        ),
+                    },
+                },
+                "required": ["text"],
+                "additionalProperties": False,
+            },
+        },
+    },
 }
 """Hermes/Qwen3-style function spec per tool (SSOT for prompt + validation +
 grammar). Must mirror ``_REGISTRY`` exactly — no more, no less."""
@@ -656,7 +745,12 @@ _PRIMARY_STRING_PARAM: dict[str, str] = {
 # Tools whose registry callable consumes the CANONICAL JSON arguments string
 # WHOLE (multi-parameter tools — the body parses its own typed params).
 # Overrides _PRIMARY_STRING_PARAM extraction in _coerce_args_string.
-_JSON_ARGS_TOOLS: frozenset[str] = frozenset({"search_knowledge"})
+# propose_preference is listed so a direct execute() hands its fail-closed
+# notice body the whole args object (harmless — it never touches the store); the
+# production path is the AO loop's session-aware handler, not execute().
+_JSON_ARGS_TOOLS: frozenset[str] = frozenset(
+    {"search_knowledge", "propose_preference"}
+)
 
 
 def arguments_schema(tool_name: str) -> dict[str, object] | None:
@@ -786,6 +880,17 @@ _TOOL_RISK_TIER: dict[str, RiskTier] = {
     # door (RULE 3 + empty allowlist) and by the runner's absence. Under
     # untrusted content it locks exactly like the other GUARDED tools.
     "web_search": RiskTier.GUARDED,
+    # GUARDED (#770 M2 W1): propose_preference RENDERS a confirm card and stages
+    # verbatim bytes — it performs NO store write (P8: the write door is the AO
+    # operator preference write handler, reached only by an operator-typed confirm) and NO
+    # egress. The redirectable parameter is the proposed text, which an injection
+    # could shape into a plausible-preference nudge — so it is GUARDED, and its
+    # danger is bounded to "a card the operator must confirm" (lock-exempt below,
+    # so it can fire under untrusted content with the untrusted-context flag as
+    # the defense — D-1(a)). Not SAFE (it reads the store + stages); not
+    # DANGEROUS (no egress / irreversible mutation — the card is inert until the
+    # operator confirms).
+    "propose_preference": RiskTier.GUARDED,
 }
 """Declared risk tier per tool. The four core tools are SAFE: pure-Python, no
 network, no filesystem, no exec (see module docstring). ``generate_image``,
@@ -884,12 +989,18 @@ def risk_tier(tool_name: str) -> RiskTier:
 # never exempt (the gate locks it exactly as before). Every entry MUST be a
 # GUARDED (never a DANGEROUS) tool with the bounded-danger property above; the
 # `test_lock_exempt_tools_are_all_guarded` lock enforces that invariant.
-_LOCK_EXEMPT_TOOLS: frozenset[str] = frozenset({"search_knowledge", "generate_image"})
+_LOCK_EXEMPT_TOOLS: frozenset[str] = frozenset(
+    {"search_knowledge", "generate_image", "propose_preference"}
+)
 """Tools whose Layer-3 action-lock is lifted on bounded-danger grounds
-(ADR-023 Amendment 4, rungs 1 + 2). A per-tool allowlist, not a provenance
-rule. `search_knowledge` (non-exfiltratable local read) + `generate_image` (a
-no-side-effect directive shim). The #570 PA adjudication still runs on every
-dispatch."""
+(ADR-023 Amendment 4, rungs 1 + 2; #770 M2 W1). A per-tool allowlist, not a
+provenance rule. `search_knowledge` (non-exfiltratable local read) +
+`generate_image` (a no-side-effect directive shim) + `propose_preference` (#770
+M2 W1 — renders a confirm card and stages verbatim bytes; NO store write and NO
+egress, so an injection can at most induce a proposal the operator sees, flagged
+untrusted-context, and must confirm; D-1(a) requires it to fire under untrusted
+content BECAUSE the card flag — not a lock — is the weak-signal defense). The
+#570 PA adjudication still runs on every dispatch."""
 
 
 def is_lock_exempt(tool_name: str) -> bool:

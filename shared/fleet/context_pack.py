@@ -232,6 +232,157 @@ def extract_signatures(rel_path: str, source: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Job-oracle import contract (#790 rec-1) — the FIRST-PARTY module interface the
+# final integrated tree must provide, surfaced so the coder builds toward it
+# ---------------------------------------------------------------------------
+#
+# The B4/B6/B7 park class (night-20260709): the coder MERGED working code, then the
+# wave-final job oracle failed at `from cli import main` / `from inventory_manager
+# import InventoryManager` / `import … from '../src/slugify-phrase.js'` — a module the
+# coder placed at a different path than the oracle imports. The seeded oracle is
+# guard-hidden during node gates, so "unit-green ≠ job-green" surfaced only at the end.
+# Surfacing the oracle's import LINES into every task's context turns that silent
+# layout-divergence into an explicit contract the coder codes toward.
+
+#: Per-contract-line length cap (an import line, not a paragraph).
+_IMPORT_LINE_MAX = 120
+#: Max import lines surfaced — an oracle imports a handful of first-party modules;
+#: more than this is noise that would crowd a small coder's prompt.
+_IMPORT_CONTRACT_MAX = 12
+
+#: Test-framework top-level modules an oracle imports to RUN the tests, never the
+#: coder's own layout it grades — dropped so the contract shows only first-party names.
+_ORACLE_IMPORT_SKIP: frozenset[str] = frozenset(
+    {"pytest", "_pytest", "hypothesis", "unittest", "nose", "nose2", "mock"}
+)
+
+
+def _py_import_contract(source: str) -> list[str]:
+    """First-party import STATEMENTS a Python oracle imports against — ``import a.b`` /
+    ``from a import x, y`` / relative ``from .a import z`` — with stdlib and the test
+    framework dropped. Reconstructed from the AST (module names + dotted paths only),
+    so no string/comment/default content can ride (the N6 guarantee). Imports nested
+    inside test functions ARE included: an oracle routinely imports the module under
+    test inside its test body. Unparseable source ⇒ ``[]`` (fail-soft)."""
+    import sys
+
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+    stdlib = getattr(sys, "stdlib_module_names", frozenset())
+
+    def _first_party(top: str) -> bool:
+        return bool(top) and top not in stdlib and top not in _ORACLE_IMPORT_SKIP
+
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(line: str) -> None:
+        cleaned = _clean_token(line, max_len=_IMPORT_LINE_MAX)
+        if cleaned and _quote_free(cleaned) and cleaned not in seen:
+            seen.add(cleaned)
+            out.append(cleaned)
+
+    # ast.walk is deterministic (module-level children first, then nested), so the
+    # module's own imports lead and the output is byte-stable for a given source.
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if _first_party(alias.name.split(".")[0]):
+                    _add(f"import {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            # A relative import (level > 0) is ALWAYS first-party; an absolute one only
+            # when its top package is neither stdlib nor a known test framework.
+            if node.level == 0 and not _first_party(module.split(".")[0]):
+                continue
+            names = [a.name for a in node.names if a.name]
+            if not names:
+                continue
+            target = "." * node.level + module
+            _add(f"from {target} import {', '.join(names)}")
+    return out[:_IMPORT_CONTRACT_MAX]
+
+
+def _first_party_specifier(spec: str) -> bool:
+    """An ESM/CJS import specifier is FIRST-PARTY (a file the coder must place) when it
+    is a relative/absolute PATH — never a bare package (``express``) or a ``node:``
+    builtin. A quote/backtick inside a specifier (never in a real path) refuses it."""
+    s = str(spec).strip()
+    return bool(s) and (s.startswith("./") or s.startswith("../") or s.startswith("/")) and (
+        _quote_free(s)
+    )
+
+
+_MJS_IMPORT_FROM_RE = re.compile(
+    r"""^\s*import\s+(?P<what>.+?)\s+from\s+(?P<q>['"])(?P<spec>[^'"]+)(?P=q)"""
+)
+_MJS_SIDE_EFFECT_IMPORT_RE = re.compile(
+    r"""^\s*import\s+(?P<q>['"])(?P<spec>[^'"]+)(?P=q)"""
+)
+_MJS_REQUIRE_RE = re.compile(
+    r"""(?:const|let|var)\s+(?P<what>[^=;]+?)\s*=\s*require\(\s*(?P<q>['"])(?P<spec>[^'"]+)(?P=q)\s*\)"""
+)
+
+
+def _mjs_import_contract(source: str) -> list[str]:
+    """First-party import STATEMENTS an mjs/js oracle imports against, from its import
+    LINES only (never bodies/comments). A specifier is kept only when it is a local
+    path (:func:`_first_party_specifier`) — bare packages + ``node:`` builtins (the test
+    framework) are dropped. The specifier is re-emitted single-quoted BY US; a binding
+    (``what``) carrying a quote payload is dropped, and a backtick anywhere refuses the
+    line — so no string content from the oracle can restructure the prompt."""
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(line: str) -> None:
+        cleaned = _clean_token(line, max_len=_IMPORT_LINE_MAX)
+        if cleaned and "`" not in cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            out.append(cleaned)
+
+    def _binding(raw: str) -> str:
+        what = " ".join(_clean_token(raw, max_len=80).split())
+        return what if _quote_free(what) else ""
+
+    for raw in (source or "").splitlines():
+        m = _MJS_IMPORT_FROM_RE.match(raw)
+        if m and _first_party_specifier(m.group("spec")):
+            what, spec = _binding(m.group("what")), m.group("spec").strip()
+            _add(f"import {what} from '{spec}'" if what else f"import '{spec}'")
+            continue
+        m = _MJS_SIDE_EFFECT_IMPORT_RE.match(raw)
+        if m and _first_party_specifier(m.group("spec")):
+            _add(f"import '{m.group('spec').strip()}'")
+            continue
+        m = _MJS_REQUIRE_RE.search(raw)
+        if m and _first_party_specifier(m.group("spec")):
+            what, spec = _binding(m.group("what")), m.group("spec").strip()
+            _add(f"const {what} = require('{spec}')" if what else f"require('{spec}')")
+    return out[:_IMPORT_CONTRACT_MAX]
+
+
+def extract_import_contract(rel_path: str, source: str) -> list[str]:
+    """The module-import surface a job-acceptance oracle imports against — the exact
+    module paths + public names the FINAL integrated tree must provide, surfaced into
+    every plan-graph task's context so the coder builds toward the layout the oracle
+    grades instead of a divergent one it is never shown (#790 rec-1).
+
+    Dispatch by extension (``.py`` → ast; ``.mjs``/``.js`` → import-line regex; other
+    → ``[]``). STRUCTURAL + deterministic: import STATEMENTS only, never bodies or
+    string content; stdlib + the test framework dropped so only the coder's own module
+    contract shows; each line control-stripped, length-capped, de-duplicated. Same
+    input ⇒ byte-identical output (regression-locked)."""
+    low = str(rel_path).lower()
+    if low.endswith(".py"):
+        return _py_import_contract(source or "")
+    if low.endswith((".mjs", ".js")):
+        return _mjs_import_contract(source or "")
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Pack assembly (deterministic, capped)
 # ---------------------------------------------------------------------------
 

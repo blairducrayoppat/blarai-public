@@ -654,6 +654,198 @@ def test_generate_acceptance_oracle_prompt_carries_criteria_and_task():
     assert "ACCEPTANCE CRITERIA" not in captured["p"]
 
 
+# ---- _repair_hypothesis_strategy_kwargs (the B1 collectability fix) --------
+#
+# The 14B routinely emits `st.text(min_length=1)` — but Hypothesis strategies bound length
+# with min_size/max_size, so the strategy call raises TypeError at COLLECTION and the whole
+# oracle file is un-collectable. No coder candidate can EVER pass it, yet the job is blamed on
+# the coder (battery job B1, deterministic since 2026-07-07). ast.parse does NOT catch it (the
+# call is syntactically valid), so the repair must run BEFORE structural validation.
+
+#: A B1-shaped BROKEN oracle: three `min_length=` kwargs on one @given line + a nested
+#: `st.text(min_length=1)` inside `st.lists(..., max_length=3)`.
+_BROKEN_HYP_ORACLE = (
+    "from hypothesis import given\n"
+    "from hypothesis import strategies as st\n"
+    "from expense_cli import add_expense, list_expenses\n"
+    "\n\n"
+    "@given(st.text(min_length=1), st.floats(allow_nan=False), st.text(min_length=1))\n"
+    "def test_add_expense_roundtrip(name, amount, note):\n"
+    "    assert add_expense(name, amount, note) is not None\n"
+    "\n\n"
+    "@given(st.lists(st.text(min_length=1), max_length=3))\n"
+    "def test_list_expenses(items):\n"
+    "    assert isinstance(list_expenses(items), list)\n"
+)
+
+#: The same oracle already CORRECT — the repair must leave it byte-identical.
+_CLEAN_HYP_ORACLE = (
+    "from hypothesis import given\n"
+    "from hypothesis import strategies as st\n"
+    "from expense_cli import add_expense\n"
+    "\n\n"
+    "@given(st.text(min_size=1), st.floats(allow_nan=False))\n"
+    "def test_add(name, amount):\n"
+    "    assert add_expense(name, amount) is not None\n"
+)
+
+
+def _install_fake_hypothesis(monkeypatch):
+    """Register a FAITHFUL hypothesis stub in sys.modules (the runtime venv has no hypothesis —
+    the fleet gate runs it via ephemeral `uv run --with hypothesis`). The stub's strategies
+    accept ONLY min_size/max_size (like the real library) and raise the SAME TypeError on
+    min_length/max_length, so exec'ing an oracle against it reproduces collection exactly:
+    the broken form raises, the repaired form runs clean."""
+    import sys
+    import types
+
+    strat = types.ModuleType("hypothesis.strategies")
+
+    def text(*, min_size=0, max_size=None, alphabet=None):
+        return ("text", min_size, max_size)
+
+    def lists(elements=None, *, min_size=0, max_size=None):
+        return ("lists", min_size, max_size)
+
+    def integers(*, min_value=None, max_value=None):
+        return ("integers",)
+
+    def floats(*, allow_nan=True, allow_infinity=True):
+        return ("floats",)
+
+    strat.text = text
+    strat.lists = lists
+    strat.integers = integers
+    strat.floats = floats
+
+    hyp = types.ModuleType("hypothesis")
+
+    def given(*args, **kwargs):
+        def deco(fn):
+            return fn
+
+        return deco
+
+    hyp.given = given
+    hyp.strategies = strat
+    monkeypatch.setitem(sys.modules, "hypothesis", hyp)
+    monkeypatch.setitem(sys.modules, "hypothesis.strategies", strat)
+
+
+def test_repair_rewrites_min_and_max_length_to_size():
+    out = acc._repair_hypothesis_strategy_kwargs(_BROKEN_HYP_ORACLE)
+    assert "min_length" not in out and "max_length" not in out       # every kwarg rewritten
+    assert out.count("min_size=1") == 3                              # all three on the @given line
+    assert "max_size=3" in out                                       # the st.lists bound
+    import ast as _ast
+    _ast.parse(out)                                                  # still valid python
+
+
+def test_repair_broken_oracle_is_collectable_repaired_and_not_before(monkeypatch):
+    # [kill] the load-bearing proof: against a faithful hypothesis stub the BROKEN oracle raises
+    # TypeError at exec (== pytest collection), the REPAIRED oracle exec's clean (collects).
+    # Self-contained (no app import) so the ONLY thing that can raise is the strategy call.
+    exec_broken = (
+        "from hypothesis import given\n"
+        "from hypothesis import strategies as st\n"
+        "\n\n"
+        "@given(st.text(min_length=1), st.lists(st.integers(), max_length=3))\n"
+        "def test_x(s, xs):\n"
+        "    assert True\n"
+    )
+    _install_fake_hypothesis(monkeypatch)
+    with pytest.raises(TypeError):
+        exec(compile(exec_broken, "<broken-oracle>", "exec"), {})
+    repaired = acc._repair_hypothesis_strategy_kwargs(exec_broken)
+    assert "min_size=1" in repaired and "max_size=3" in repaired
+    exec(compile(repaired, "<repaired-oracle>", "exec"), {})        # no exception -> collectable
+
+
+def test_repair_clean_oracle_is_byte_identical():
+    # No target kwargs -> byte-identical (the repair must never touch a correct oracle).
+    assert acc._repair_hypothesis_strategy_kwargs(_CLEAN_HYP_ORACLE) == _CLEAN_HYP_ORACLE
+
+
+def test_repair_noop_without_hypothesis_import_is_byte_identical():
+    # Scope guard: no `hypothesis` reference -> min_length/max_length cannot be a strategy kwarg,
+    # so the code is returned unchanged even though it contains those kwarg forms.
+    no_hyp = (
+        "from wtforms.validators import Length\n"
+        "def build(min_length=1):\n"
+        "    return Length(min_length=min_length, max_length=8)\n"
+    )
+    assert acc._repair_hypothesis_strategy_kwargs(no_hyp) == no_hyp
+
+
+def test_repair_leaves_comments_and_strings_untouched():
+    # AST-scoped to call-site kwargs: min_length inside a COMMENT or a STRING literal survives;
+    # only the actual strategy keyword argument is rewritten. (Documents the boundary.)
+    mixed = (
+        "from hypothesis import given\n"
+        "from hypothesis import strategies as st\n"
+        "\n"
+        "# min_length=1 is the documented constraint\n"
+        "DOC = 'other validators use min_length=1 too'\n"
+        "\n\n"
+        "@given(st.text(min_length=1))\n"
+        "def test_x(s):\n"
+        "    assert s\n"
+    )
+    out = acc._repair_hypothesis_strategy_kwargs(mixed)
+    assert "# min_length=1 is the documented constraint" in out      # comment untouched
+    assert "'other validators use min_length=1 too'" in out         # string literal untouched
+    assert "st.text(min_size=1)" in out                             # only the kwarg renamed
+
+
+def test_repair_leaves_def_params_and_assignments_untouched():
+    # AST-scoping means def-parameter DEFAULTS and plain assignments are NOT ast.keyword nodes
+    # and are never rewritten — only the call-site strategy kwarg is.
+    scoped = (
+        "from hypothesis import given\n"
+        "from hypothesis import strategies as st\n"
+        "\n"
+        "def helper(min_length=2):\n"
+        "    return min_length\n"
+        "\n"
+        "max_length = 9\n"
+        "\n\n"
+        "@given(st.text(min_length=1))\n"
+        "def test_x(s):\n"
+        "    assert helper() and max_length and s\n"
+    )
+    out = acc._repair_hypothesis_strategy_kwargs(scoped)
+    assert "def helper(min_length=2):" in out                        # def-param default preserved
+    assert "return min_length" in out                                # body reference preserved
+    assert "max_length = 9" in out                                   # assignment preserved
+    assert "st.text(min_size=1)" in out                              # only the call-site kwarg
+
+
+def test_repair_is_idempotent_and_empty_safe():
+    once = acc._repair_hypothesis_strategy_kwargs(_BROKEN_HYP_ORACLE)
+    assert acc._repair_hypothesis_strategy_kwargs(once) == once      # second pass is a no-op
+    assert acc._repair_hypothesis_strategy_kwargs("") == ""          # empty input is safe
+
+
+def test_generate_acceptance_oracle_repairs_hypothesis_kwargs():
+    # End-to-end through the per-task (#690) generator: a broken hypothesis oracle now SEEDS
+    # repaired (before the fix it seeded broken and failed every candidate at collection).
+    spec = AcceptanceSpec(
+        goal="expense cli",
+        criteria=(AcceptanceCriterion("c1", "adds an expense", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "simple", "components": []},
+    )
+    code = acc.generate_acceptance_oracle(
+        "expense cli", spec, [{"prompt": "build add_expense"}],
+        generate_fn=lambda p: _BROKEN_HYP_ORACLE,
+    )
+    assert code                                                      # seeds (not fail-closed to '')
+    assert "min_length" not in code and "max_length" not in code
+    assert "min_size=1" in code
+    import ast as _ast
+    _ast.parse(code)
+
+
 # ---- parse_task_report ----------------------------------------------------
 
 

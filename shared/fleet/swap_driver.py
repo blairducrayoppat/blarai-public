@@ -125,6 +125,14 @@ def _noop_seed_job_oracle(_repo: str, _rel_path: str) -> dict:
     return {"ok": False, "evidence": "oracle seeding unavailable"}
 
 
+def _noop_job_oracle_contract() -> list[str]:
+    """Default ``SwapOps.job_oracle_contract`` (#790 rec-1) — no oracle code bound ⇒ an
+    EMPTY import contract (the coder gets no import-surface hint; byte-identical to
+    before this feature). The live seam extracts the first-party import lines from the
+    same plan-time oracle code the seeder/grader use."""
+    return []
+
+
 def _noop_redecompose(_task: dict, _evidence: str) -> "list[dict] | None":
     """Default ``SwapOps.redecompose`` — no re-planner available ⇒ ``None`` (the failed
     task parks and its dependents skip — today's honest behavior). The live model
@@ -350,6 +358,13 @@ class SwapOps:
     # — the job-level oracle on the final integrated tree (W4; restore-before-grade).
     run_job_oracle: Callable[[str, str], dict] = _noop_job_oracle
     seed_job_oracle: Callable[[str, str], dict] = _noop_seed_job_oracle
+    # #790 rec-1: the job oracle's FIRST-PARTY import surface (module paths + public
+    # names the final integrated tree must provide), extracted from the plan-time
+    # oracle code. Surfaced into every plan-graph task's context so the coder builds
+    # toward the imports the wave-final oracle grades (the B4/B6/B7 merged-but-failed
+    # park class). INDEPENDENT of seeding — a coder benefits from the contract even
+    # when the oracle file itself could not be seeded. [] = no oracle rides the run.
+    job_oracle_contract: Callable[[], list[str]] = _noop_job_oracle_contract
     # (fleet_task, evidence) -> replacement children or None — the ONE evidence-fed
     # re-decompose of a consistently-failing task (W5; budgets enforced by the driver).
     redecompose: Callable[[dict, str], "list[dict] | None"] = _noop_redecompose
@@ -532,6 +547,11 @@ def build_scorecard(
     oracle_status = acc_status if acc_status in ("passed", "failed", "not-run") else "unknown"
     evidence = {k: str(v) for k, v in (evidence_paths or {}).items()}
     evidence["oracle_status"] = oracle_status
+    # #789 measurement fairness: mark the dispatch MODE so the battery can compute the
+    # GREEN-rate over plan-graph-eligible jobs only (a flat-queue job cannot GREEN by
+    # construction, so counting it in the denominator quietly depresses the coder's
+    # rate). "plan-graph" jobs CAN earn GREEN; this is the honest-denominator signal.
+    evidence["mode"] = "plan-graph"
     notes = []
     if cancelled:
         notes.append("cancelled by the operator mid-run")
@@ -651,7 +671,11 @@ def build_flat_scorecard(
         "not_measured": ["samples_consumed"],
         "notes": ("flat-queue mode (no plan-graph): job-level verdict computed from "
                   "per-task outcomes; no job oracle ran"),
-        "evidence": {"oracle_status": "not-run"},
+        # #789: mark MODE "flat" — a flat-queue run is structurally non-GREEN (no job
+        # oracle to prove the whole; compute_flat_verdict never returns GREEN). The
+        # battery segments the GREEN-rate on this so an under-decomposed job does not
+        # depress the plan-graph coder rate (measurement fairness, NOT green-gaming).
+        "evidence": {"oracle_status": "not-run", "mode": "flat"},
     }
 
 
@@ -817,6 +841,10 @@ class SwapDriver:
         self._critic_signal: "dict | None" = None
         self._guest_oracle_enabled = bool(guest_oracle_enabled)
         self._guest_oracle_signal: "dict | None" = None
+        # #790 rec-1: the job oracle's first-party import contract, resolved once at the
+        # top of the wave loop and appended to every task's prompt. [] = no oracle /
+        # extraction unavailable (byte-identical to before the feature).
+        self._oracle_import_contract: list[str] = []
         # #758 driver-alive stamp — computed ONCE here and carried on EVERY phase
         # write below. The entrypoint's post-spawn stamp alone was clobbered back
         # to 0/0.0 by the driver's first _phase write (found live 2026-07-08:
@@ -1320,6 +1348,20 @@ class SwapDriver:
                 "every test in it pass (its imports define the required module layout). "
                 "Do NOT edit, weaken, or delete it; it is restored before grading."
             )
+        # #790 rec-1: surface the oracle's exact import lines (module paths + public
+        # names). This is the coder's most actionable signal — the B4/B6/B7 park class
+        # was a merged app whose modules the wave-final oracle could not import. Fired
+        # whenever the contract resolved, independent of whether the file itself seeded.
+        contract = getattr(self, "_oracle_import_contract", None) or []
+        if contract and self._plan is not None:
+            lines = "\n".join(f"  {c}" for c in contract)
+            prompt = (
+                f"{prompt}\n\nThe job-acceptance oracle that grades the FINAL integrated "
+                "application imports this exact module interface — build your code so "
+                "these imports resolve (a merged-but-failed job is most often a module "
+                f"the oracle cannot import):\n{lines}\nProvide these EXACT module paths "
+                "and public names; do not rename or relocate them."
+            )
         base["prompt"] = prompt
         pack = self._build_pack(ptask)
         if pack:
@@ -1451,6 +1493,21 @@ class SwapDriver:
             self._progress(
                 f"Job oracle NOT seeded ({evidence or 'unavailable'}) — the coder "
                 "builds without seeing it; it still grades the final tree."
+            )
+        # #790 rec-1: resolve the oracle's first-party import contract ONCE and surface
+        # it into every task's prompt (below, in _fleet_task_for). Independent of the
+        # seed result above — the import surface is the coder's most actionable signal
+        # even when the file itself did not seed. Fail-soft: any error ⇒ no contract.
+        try:
+            self._oracle_import_contract = list(self._ops.job_oracle_contract() or [])
+        except Exception:  # noqa: BLE001 — an extraction failure must never block the run
+            self._oracle_import_contract = []
+        if self._oracle_import_contract:
+            self._progress(
+                "Job oracle import contract surfaced to every task: "
+                + "; ".join(self._oracle_import_contract[:6])
+                + (" …" if len(self._oracle_import_contract) > 6 else "")
+                + " (build these exact module paths so the wave-final oracle can import)."
             )
         wave_no = 0
         while True:

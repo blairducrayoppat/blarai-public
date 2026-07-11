@@ -262,6 +262,22 @@ Tool call names are prefixed `mcp__vikunja__` (e.g. `mcp__vikunja__project_summa
 - On completion, mark it done via `complete_task` and comment with results.
 - On failure, comment with summary — do NOT mark complete.
 
+**Shipping closes the ticket (NON-NEGOTIABLE, adopted 2026-07-10 via #798).**
+Landing a capability CLOSES its Vikunja ticket in the same motion that merges
+it — the same standing as the BUILD_JOURNAL-entry-per-ship rule and the
+DECISION_REGISTER-in-the-same-change rule. When a merge makes a ticket's
+capability live, the merging agent adds a one-line closure comment citing the
+shipping commit SHA (or evidence path) and marks the ticket done via
+`complete_task`. A capability that is live but whose ticket is still open is
+an **incomplete ship** — it is how each new session re-reads a shipped feature
+as "not started," and the confusion recurs (minted after #577/#598/#540 were
+each misread as dormant). For work that lands only partially, the same
+discipline requires a dated **"CURRENT STATE (YYYY-MM-DD)"** top comment
+stating built-vs-remaining with evidence, so the ticket never silently drifts
+from reality. Umbrella/epic tickets close when their last in-scope limb lands;
+genuinely new residuals get their own ticket rather than holding the parent
+open.
+
 ### Vikunja Server
 The Vikunja server must be running for MCP tools to work. If tools fail with connection errors:
 ```powershell

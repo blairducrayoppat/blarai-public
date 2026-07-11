@@ -35,6 +35,7 @@ SUITE_NAMES: tuple[str, ...] = (
     "governance",
     "answer_quality",
     "oracle_quality",
+    "preference_memory",
 )
 
 

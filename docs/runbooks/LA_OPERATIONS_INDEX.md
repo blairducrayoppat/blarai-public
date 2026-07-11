@@ -65,6 +65,7 @@ These are the two runbooks you'll use most day-to-day. Fleet Reports is your inb
 | Situation | Runbook |
 |---|---|
 | You just rebooted your laptop and want to verify the fleet came back up | [LA_REBOOT_CHECKLIST.md](LA_REBOOT_CHECKLIST.md) |
+| The laptop died / is being reformatted and you need to rebuild EVERYTHING from backups | [DISASTER_RECOVERY_RESTORE.md](DISASTER_RECOVERY_RESTORE.md) (master; a copy rides the OneDrive backup root, refreshed nightly) |
 | You need to pause the fleet, register scheduled tasks, rotate credentials, or do any install-level work | [AUTONOMOUS_FLEET_OPERATIONS.md](AUTONOMOUS_FLEET_OPERATIONS.md) |
 | You see a stash backlog, working tree on the wrong branch, an orphaned EA worktree, or a merge-gate ESCALATE on a path mismatch | [../governance/fleet-hygiene.md](../governance/fleet-hygiene.md) (Recovery procedures R1-R6) |
 | You're about to change `wake_launcher.ps1`, `tools/autonomy_budget/`, or anything that affects how the fleet manages working-tree state | [../governance/fleet-hygiene.md](../governance/fleet-hygiene.md) (drift catalogue + stash policy + worktree topology) |

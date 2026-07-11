@@ -55,6 +55,21 @@ BACKEND_PASSTHROUGH_SLASH_COMMANDS: tuple[str, ...] = (
     "/save",
     "/images",
     "/dispatch",
+    # Operator-preference memory (#770 M1, Loop 1): /remember saves the operator's
+    # verbatim words as a standing preference; /preferences lists/edits/deletes the
+    # active tier.  Parsed by the GATEWAY (transport.py parse_preference_command ->
+    # PreferencesCoordinator, intercepted in ui_backend dispatcher._m_prompt before
+    # AO dispatch).  The operator's typed command is the tier's ONLY write authority
+    # (P8) — no model output ever reaches this seam.
+    "/remember",
+    "/preferences",
+    # Operator-preference PROPOSAL confirm/dismiss (#770 M2 W1): resolve a card
+    # the 14B proposed via propose_preference.  These carry an opaque staging
+    # token and ride the SAME PREFERENCE_WRITE door (P8 — the operator's typed/
+    # clicked confirm is the write authority; the model never re-supplies the
+    # body).  The WinUI proposal card's Save/Dismiss buttons emit exactly these.
+    "/remember-confirm",
+    "/remember-dismiss",
 )
 
 __all__ = ["BACKEND_PASSTHROUGH_SLASH_COMMANDS"]

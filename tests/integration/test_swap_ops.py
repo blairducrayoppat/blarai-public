@@ -1383,6 +1383,42 @@ def test_build_swap_ops_wires_run_design_loop(tmp_path, monkeypatch):
     assert result == {"should_iterate": False}
 
 
+def test_build_swap_ops_wires_job_oracle_contract_from_riding_oracle(tmp_path):
+    """#790 rec-1: build_swap_ops must extract the oracle's first-party import contract
+    from the SAME oracle code riding the approved task dicts — the exact module surface
+    the wave-final oracle imports, so the driver can surface it to the coder."""
+    from shared.fleet.acceptance import JOB_ORACLE_CODE_KEY, JOB_ORACLE_PATH_KEY
+
+    cfg = _cfg(tmp_path)
+    oracle_code = (
+        "import pytest\n"
+        "from cli import main\n"
+        "def test_smoke():\n"
+        "    assert main is not None\n"
+    )
+    tasks = [
+        {"repo": "battery-x", "task": "a", "prompt": "pa", "depends_on": []},
+        {"repo": "battery-x", "task": "acceptance-tests", "prompt": "grade",
+         "depends_on": ["a"],
+         JOB_ORACLE_CODE_KEY: oracle_code,
+         JOB_ORACLE_PATH_KEY: "tests/test_job_acceptance.py"},
+    ]
+    ops = so.build_swap_ops(cfg, run_id="RID", old_pid=1, relaunch_argv=["py"],
+                            relaunch_cwd="C:/x", tasks=tasks)
+    contract = ops.job_oracle_contract()
+    assert "from cli import main" in contract
+    assert not any("pytest" in c for c in contract)   # the test framework is dropped
+
+
+def test_build_swap_ops_job_oracle_contract_empty_without_oracle(tmp_path):
+    """No oracle rides the tasks ⇒ an empty contract (byte-identical to before #790)."""
+    cfg = _cfg(tmp_path)
+    ops = so.build_swap_ops(cfg, run_id="RID", old_pid=1, relaunch_argv=["py"],
+                            relaunch_cwd="C:/x",
+                            tasks=[{"repo": "battery-x", "task": "a", "prompt": "p"}])
+    assert ops.job_oracle_contract() == []
+
+
 # ---------------------------------------------------------------------------
 # #750 fix 1 — real_backend_ready readiness hardening (stability + launcher-alive)
 # ---------------------------------------------------------------------------
@@ -1582,12 +1618,20 @@ def test_real_run_guest_oracle_uses_the_registered_transport(tmp_path, monkeypat
     repo = tmp_path / "proj"
     (repo / "tests").mkdir(parents=True)
     (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    # #744 c.1565: inject the ensure-start/stop VM seam so the test NEVER touches the
+    # real Hyper-V guest — the guest is DOWN, ensure-start brings it up, and it is
+    # STOPPED again after the probe (LESSON 224 side-effect scoping).
+    calls["stopped"] = 0
     res = so.real_run_guest_oracle(
         cfg, "R1", str(repo), "tests/test_job_acceptance.py",
-        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n")
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: calls.__setitem__("stopped", calls["stopped"] + 1) or True)
     assert calls["port"] == so.GUEST_ORACLE_VSOCK_PORT == 50002
     assert calls["shipped"][1] == "tests/test_job_acceptance.py"
     assert res["status"] == "passed"
+    assert calls["stopped"] == 1  # a guest we started is stopped again after the probe
     assert "passed" in so.read_swap_progress(cfg, "R1")
 
 
@@ -1605,12 +1649,246 @@ def test_real_run_guest_oracle_degrades_honestly_when_factory_fails(tmp_path, mo
     repo = tmp_path / "proj"
     (repo / "tests").mkdir(parents=True)
     (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    stopped = []
     res = so.real_run_guest_oracle(
         cfg, "R1", str(repo), "tests/test_job_acceptance.py",
-        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n")
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True)
     assert res["status"] == "not-run"
     assert res["reason"] == "guest-transport-unregistered"
+    assert stopped == [1]  # the guest is still stopped after a transport-fail probe
     assert "transport unavailable" in so.read_swap_progress(cfg, "R1")
+
+
+# ---------------------------------------------------------------------------
+# #744 c.1565 — sequential ensure-start: bring the guest VM UP for the probe in
+# the teardown RAM-free window, then restore its prior footprint. Fail-soft is
+# INVARIANT (guest-unreachable => honest not-run, never a blocked restore, never
+# a verdict change) and NO test touches the real Hyper-V VM (the ensure/stop/state
+# seam is injected or launcher.vm_manager is monkeypatched).
+# ---------------------------------------------------------------------------
+
+
+def _ok_transport_factory(status="passed"):
+    """A make_guest_oracle_transport double whose transport ships and returns
+    ``status`` — no real corridor, no real guest."""
+    def factory(*, vsock_port):
+        def transport(snapshot_zip, oracle_rel_path):
+            return {"status": status, "reason": "", "evidence": f"{status} (fake guest)"}
+        return transport
+    return factory
+
+
+def _oracle_repo(tmp_path):
+    repo = tmp_path / "proj"
+    (repo / "tests").mkdir(parents=True)
+    (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    return repo
+
+
+def test_real_run_guest_oracle_ensure_starts_then_probes_then_stops_in_order(
+        tmp_path, monkeypatch):
+    # The load-bearing sequence: ensure-start BEFORE the probe ships, STOP AFTER.
+    import shared.fleet.guest_oracle_transport as got
+
+    events = []
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+
+    def ship_seam(*, vsock_port):
+        def transport(snapshot_zip, oracle_rel_path):
+            events.append("probe")
+            return {"status": "passed", "reason": "", "evidence": "ok"}
+        return transport
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", ship_seam)
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: events.append("ensure") or True,
+        stop_guest=lambda: events.append("stop") or True)
+    assert res["status"] == "passed"
+    # ensure-start happens before the probe ships; the guest is stopped after.
+    assert events == ["ensure", "probe", "stop"]
+
+
+def test_real_run_guest_oracle_guest_unreachable_when_ensure_start_fails(
+        tmp_path, monkeypatch):
+    # ensure-start FAILS -> honest not-run(guest-unreachable); the transport factory
+    # is NEVER built/probed, the guest-stop is still attempted, verdict untouched.
+    import shared.fleet.guest_oracle_transport as got
+
+    factory_calls = []
+
+    def spy_factory(*, vsock_port):
+        factory_calls.append(vsock_port)
+        raise AssertionError("transport must not be built when the guest is unreachable")
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", spy_factory)
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: False,
+        stop_guest=lambda: stopped.append(1) or True)
+    assert res == {"status": "not-run", "reason": "guest-unreachable",
+                   "evidence": "the guest VM could not be started for the oracle probe"}
+    assert factory_calls == []          # no probe when the guest never came up
+    assert stopped == [1]               # stop still attempted (may have half-started)
+    assert "could not be started" in so.read_swap_progress(cfg, "R1")
+
+
+def test_real_run_guest_oracle_ensure_start_raise_is_guest_unreachable(
+        tmp_path, monkeypatch):
+    # An ensure-start that RAISES is treated identically to False — honest not-run,
+    # never a raise into the swap teardown.
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+
+    def boom():
+        raise OSError("hyper-v RPC down")
+
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=boom,
+        stop_guest=lambda: stopped.append(1) or True)
+    assert res["status"] == "not-run" and res["reason"] == "guest-unreachable"
+    assert stopped == [1]
+
+
+def test_real_run_guest_oracle_probe_not_run_after_ensure_start_still_stops(
+        tmp_path, monkeypatch):
+    # probe machinery reports not-run (e.g. deps-unavailable) AFTER a good ensure-start
+    # -> the honest not-run is passed through and the guest is STILL stopped.
+    import shared.fleet.guest_oracle as go
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    monkeypatch.setattr(
+        go, "run_guest_oracle",
+        lambda repo, rel, code, transport=None: {
+            "status": "not-run", "reason": "deps-unavailable", "evidence": "offline"})
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py", "x = 1\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True)
+    assert res["status"] == "not-run" and res["reason"] == "deps-unavailable"
+    assert stopped == [1]
+
+
+def test_real_run_guest_oracle_guest_failure_preserved_and_stops(tmp_path, monkeypatch):
+    # A LEGITIMATE guest test FAILURE (status=failed — the divergence signal) is
+    # PRESERVED, never swallowed to not-run, and the guest is stopped afterwards.
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory("failed"))
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 3\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True)
+    assert res["status"] == "failed"    # preserved, NOT converted to not-run
+    assert stopped == [1]
+
+
+def test_real_run_guest_oracle_already_running_guest_is_left_running(
+        tmp_path, monkeypatch):
+    # LESSON 224 side-effect scoping: a guest that was ALREADY running is left
+    # running — only a guest WE started is stopped again.
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: True,          # already up (some other path owns it)
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True)
+    assert res["status"] == "passed"
+    assert stopped == []                        # never stop a guest we did not start
+
+
+def test_real_run_guest_oracle_stop_failure_never_raises(tmp_path, monkeypatch):
+    # A stop failure in the finally must NEVER derail the swap or change the verdict.
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+
+    def stop_boom():
+        raise OSError("stop-vm RPC failed")
+
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=stop_boom)
+    assert res["status"] == "passed"            # probe result survives the stop failure
+
+
+def test_real_run_guest_oracle_state_probe_failure_defaults_to_stop(
+        tmp_path, monkeypatch):
+    # If the prior-state probe itself raises, treat the guest as "not running" so the
+    # guest we start is still stopped afterwards (fail-soft, footprint-safe).
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+
+    def state_boom():
+        raise OSError("get-vm RPC failed")
+
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py", "x = 1\n",
+        guest_vm_running=state_boom,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True)
+    assert res["status"] == "passed"
+    assert stopped == [1]
+
+
+def test_default_vm_controls_reuse_launcher_primitives(monkeypatch):
+    # The production defaults REUSE the launcher's VM-lifecycle primitives (no Hyper-V
+    # is reimplemented in swap_ops). Proven with launcher.vm_manager monkeypatched, so
+    # the REAL VM is never touched.
+    import launcher.vm_manager as vm
+
+    monkeypatch.setattr(vm, "ensure_vm_running", lambda: True)
+    monkeypatch.setattr(vm, "stop_vm", lambda: True)
+    monkeypatch.setattr(vm, "get_vm_state", lambda: vm.VMState.RUNNING)
+    assert so._default_ensure_guest_running() is True
+    assert so._default_stop_guest() is True
+    assert so._default_guest_vm_running() is True
+    monkeypatch.setattr(vm, "get_vm_state", lambda: vm.VMState.OFF)
+    assert so._default_guest_vm_running() is False
 
 
 def test_build_swap_ops_wires_guest_oracle_seams(tmp_path, monkeypatch):

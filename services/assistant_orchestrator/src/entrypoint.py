@@ -62,6 +62,7 @@ import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, replace as dataclass_replace
 from pathlib import Path
+from typing import NamedTuple
 
 from shared.crypto.jwt_validator import AgenticJWTValidator
 from shared.inference import image_gen as image_gen
@@ -85,8 +86,19 @@ from shared.constants import (
 )
 from services.assistant_orchestrator.src.context_manager import ContextManager, Provenance
 from services.assistant_orchestrator.src.gpu_inference import (
+    _DEFAULT_SYSTEM_PROMPT,
     GenerationConfig,
     OrchestratorGPUInference,
+)
+from services.assistant_orchestrator.src.preference_block import (
+    compose_system_prompt,
+    render_preference_block,
+)
+from services.assistant_orchestrator.src.proposal_staging import ProposalStaging
+from shared.ipc.preference_proposal import (
+    ProposalAction,
+    ProposalCard,
+    render_proposal_block,
 )
 from shared.fleet.swap_ops import execute_swap_dispatch, write_swap_progress
 from services.assistant_orchestrator.src.pgov import (
@@ -217,6 +229,21 @@ def self_or_cls_error_code(prefix: str, code: str) -> str:
     if code.startswith(normalized_prefix):
         return code
     return f"{prefix}_{code}"
+
+
+class ProposeOutcome(NamedTuple):
+    """Result of handling a ``propose_preference`` dispatch (#770 M2 W1).
+
+    ``card_block`` is the machine-detectable confirm card streamed to the
+    operator (``""`` when the proposal was refused — nothing to show); ``note``
+    is a short SYSTEM-authored line appended to the tool loop so the model knows
+    it proposed (and does not re-propose) and continues answering.  Neither
+    field ever carries a store write — the write happens only when the operator
+    confirms (P8).
+    """
+
+    card_block: str
+    note: str
 
 
 def _adjudicate_tool_dispatch(
@@ -755,6 +782,22 @@ class AssistantOrchestratorService:
         # means ingest + knowledge retrieval are OFF (feature-level loud-disable
         # — INGEST_* frames get clear error frames; chat is unaffected).
         self._knowledge = None
+        # Pinned operator-preference block cache (#770 M1, P9). Rendered
+        # lazily from the knowledge bank's OPERATOR_PREFERENCE tier on the
+        # first conversational turn and reused byte-identically every turn
+        # thereafter (prefix-cache alignment); invalidated ONLY by a
+        # successful PREFERENCE_WRITE (the operator's explicit command path
+        # — P8), so an edit invalidates the prefix exactly once. None =
+        # not-yet-rendered; "" = rendered-empty (no active preferences).
+        self._pref_block_cache: str | None = None
+        # Preference-proposal staging (#770 M2 W1). Ephemeral, system-owned,
+        # bounded store of the VERBATIM bytes the 14B proposed via
+        # propose_preference; the operator's typed/clicked /remember-confirm
+        # pops one and commits it through the PREFERENCE_WRITE door. This is the
+        # confirm-hop integrity mechanism (P2 across the proposal hop): the model
+        # never re-supplies the body at confirm time — the wire carries only a
+        # token. Structurally write-free (study §5.1 source isolation).
+        self._proposal_staging = ProposalStaging()
         # FieldCipher shared by the knowledge bank and the ingest staging
         # read-side (same DEK — ADR-025 §2.1); set inside _build_knowledge_bank.
         self._ingest_cipher = None
@@ -1096,6 +1139,9 @@ class AssistantOrchestratorService:
         # AO boot — a deliberate middle ground between the substrate's silent
         # degrade and the session-store's refuse-to-start.
         self._knowledge = self._build_knowledge_bank()
+        # #770 M1: a (re)start binds a fresh bank — the pinned preference
+        # block must re-render from IT, never from a prior bank's cache.
+        self._pref_block_cache = None
         # #719 — model-callable knowledge retrieval (search_knowledge, GUARDED).
         # Registered ONLY when the bank exists: with the bank disabled/failed
         # the tool returns its deterministic unavailable notice. The runner is
@@ -1222,6 +1268,9 @@ class AssistantOrchestratorService:
             self._knowledge = None
         self._ingest_cipher = None
         self._ingest_audit = None
+        # #770 M1: the pinned block is rendered from the bank just closed —
+        # a later start() must re-render, never serve stale bytes.
+        self._pref_block_cache = None
         self._running = False
         logger.info("Assistant Orchestrator entrypoint stopped.")
 
@@ -2216,6 +2265,12 @@ class AssistantOrchestratorService:
         if msg_type == MessageType.IMAGE_MANAGE_REQUEST:
             return self._handle_image_manage_request(transport, request_id, payload)
 
+        if msg_type == MessageType.PREFERENCE_WRITE_REQUEST:
+            return self._handle_preference_write_request(transport, request_id, payload)
+
+        if msg_type == MessageType.PREFERENCE_LIST_REQUEST:
+            return self._handle_preference_list_request(transport, request_id, payload)
+
         if msg_type == MessageType.PLAN_REQUEST:
             return self._handle_plan_request(transport, request_id, payload)
 
@@ -2761,6 +2816,7 @@ class AssistantOrchestratorService:
             from services.assistant_orchestrator.src import pgov
             from services.assistant_orchestrator.src.substrate import (
                 EncryptedSubstrateStore,
+                resolve_embed_model_identity,
                 stored_embed_max_tokens,
             )
             from services.ui_gateway.src.session_store import StoreProvisioningError
@@ -2878,11 +2934,20 @@ class AssistantOrchestratorService:
             def _embed_substrate(texts: list[str]):  # noqa: ANN202 — EmbedFn shape
                 return embed_documents(texts, max_length=embed_window)
 
+            # Embedding-model identity (#794): derived from the model file the
+            # detector actually loads, so a config swap of [pgov].embedding_model_path
+            # is detectable against a store's recorded identity on reopen.
+            embed_model, embed_model_revision = resolve_embed_model_identity(
+                getattr(detector, "_model_path", None)
+            )
+
             store = EncryptedSubstrateStore(
                 db_path=db_path,
                 embed_fn=_embed_substrate,
                 cipher=cipher,
                 embed_cache_idle_unload_s=idle_unload_s,
+                embed_model=embed_model,
+                embed_model_revision=embed_model_revision,
             )
             # Production-wiring regression lock: has_encryption MUST be True.
             assert store.has_encryption is True, (
@@ -3288,6 +3353,579 @@ class AssistantOrchestratorService:
         )
         return _result(True, found)
 
+    # ── Operator preferences (Learning Loops Loop 1, #770 M1) ───────────
+
+    #: Anchored full-32-hex preference-id gate (the forged-id pattern the
+    #: image-manage path established): validated BEFORE the store is touched.
+    _PREF_ID_RE = re.compile(r"\A[0-9a-f]{32}\Z")
+
+    def _pinned_preference_block(self) -> str:
+        """The byte-stable pinned preference block for this process (P9).
+
+        Rendered lazily from the knowledge bank's ACTIVE tier and cached;
+        every conversational turn reuses the identical bytes until a
+        PREFERENCE_WRITE invalidates the cache (an edit invalidates the
+        prefix exactly once).  Fail-SOFT: no bank / a broken store renders ""
+        — a preference-store fault must degrade to the pre-#770 prompt, never
+        kill conversation.  ("" is also the zero-preference render, which
+        keeps the system prompt byte-identical to the pre-#770 build.)
+        """
+        if self._pref_block_cache is None:
+            block = ""
+            if self._knowledge is not None:
+                try:
+                    block = render_preference_block(
+                        self._knowledge.list_preferences()
+                    )
+                except Exception as exc:  # noqa: BLE001 — fail-soft to no block
+                    logger.error(
+                        "Pinned preference block render failed (fail-soft to "
+                        "no block): %s", exc,
+                    )
+                    block = ""
+            self._pref_block_cache = block
+        return self._pref_block_cache
+
+    def _effective_system_prompt(self) -> str | None:
+        """System prompt for the conversational path, with the pinned block.
+
+        ``None`` (the zero-preference / no-bank case) keeps generate_text on
+        today's ``_DEFAULT_SYSTEM_PROMPT`` byte-identically; otherwise the
+        block composes at the FIXED slot after the static persona (P9 — see
+        ``preference_block.compose_system_prompt``).  Internal structural
+        emissions (the PLAN path, #748) never ride this — preferences shape
+        conversation only.
+        """
+        block = self._pinned_preference_block()
+        if not block:
+            return None
+        return compose_system_prompt(_DEFAULT_SYSTEM_PROMPT, block)
+
+    def _handle_preference_write_request(
+        self,
+        transport: VsockTransport,
+        request_id: str,
+        payload: dict[str, object],
+    ) -> bool:
+        """Handle a PREFERENCE_WRITE_REQUEST — THE write door to the tier (P8).
+
+        This handler is the ONLY code path that writes the auto-injected
+        OPERATOR_PREFERENCE tier, and its frames originate exclusively from
+        the gateway's parse of operator-typed ``/remember`` / ``/preferences``
+        commands.  No model-callable tool references it (structural absence —
+        ``test_preference_write_authority.py``).
+
+        Ops (Fail-Closed on anything else):
+          * ``remember`` — P5 near-duplicate probe first: a similar ACTIVE
+            row returns ``requires_confirmation`` + the conflict record and
+            stores NOTHING (M1 stub — the M2 WinUI card lands the confirm
+            flow; tonight the confirmation path is an explicit
+            ``/preferences edit``).  Then the P4 token-cap pre-check on the
+            candidate render, then the verbatim store.
+          * ``edit`` — anchored-id gate, existence check, P4 pre-check on the
+            replaced render, then last-writer-wins update (audit retained).
+          * ``delete`` — anchored-id gate, soft-delete (audit retained).
+
+        Every successful write invalidates the pinned-block cache (P9: the
+        prefix re-renders exactly once, on the next turn).
+        """
+        from services.assistant_orchestrator.src.knowledge_bank import (
+            DEFAULT_PREFERENCE_TYPE_TAG,
+            KnowledgeBankError,
+            OperatorPreference,
+        )
+
+        def _result(**kwargs: object) -> bool:
+            return transport.send(
+                self._framer.encode_preference_write_result(
+                    request_id=request_id, **kwargs,  # type: ignore[arg-type]
+                )
+            )
+
+        op = str(payload.get("op", "")).strip()
+        body = str(payload.get("body", ""))
+        pref_id = str(payload.get("pref_id", "")).strip()
+        expires = str(payload.get("expires", "")).strip()  # #770 M2 W2 (ISO or '')
+
+        if op not in self._framer.PREFERENCE_WRITE_OPS:
+            return _result(
+                ok=False, op=op or "unknown", status="refused",
+                error_code="INVALID_OP",
+                message="Unknown preference operation (Fail-Closed).",
+            )
+        if self._knowledge is None:
+            return _result(
+                ok=False, op=op, status="refused", error_code="NO_STORE",
+                message=(
+                    "The preference store is unavailable (knowledge bank not "
+                    "provisioned) — Fail-Closed."
+                ),
+            )
+
+        def _cap_message() -> str:
+            from shared.preference_budgets import PINNED_BLOCK_TOKEN_CAP
+
+            return (
+                f"Storing this would push the pinned preference block over "
+                f"its {PINNED_BLOCK_TOKEN_CAP}-token budget (P4). Delete or "
+                f"shorten an existing preference first (/preferences)."
+            )
+
+        try:
+            if op in ("confirm", "dismiss"):
+                return self._commit_staged_proposal(op, payload, _result, _cap_message)
+
+            if op == "remember":
+                similar = self._knowledge.find_similar_preference(body)
+                if similar is not None:
+                    # #770 M2 W2 — one-step contradiction confirm: stage a REPLACE
+                    # proposal and hand back its token so the operator resolves it
+                    # with /remember-confirm (supersede-in-place) — no manual
+                    # /preferences edit hop.  Still writes NOTHING here (the M1
+                    # requires-confirmation contract holds: no silent last-writer).
+                    staged = self._proposal_staging.stage(
+                        action=ProposalAction.REPLACE,
+                        body=body,
+                        type_tag=DEFAULT_PREFERENCE_TYPE_TAG,
+                        target_pref_id=similar.pref_id,
+                        provenance_label="your /remember command",
+                        untrusted_context=False,
+                        target_body=similar.body,
+                    )
+                    return _result(
+                        ok=True, op=op, status="requires_confirmation",
+                        pref_id=similar.pref_id,
+                        conflict={"pref_id": similar.pref_id, "body": similar.body},
+                        token=staged.token,
+                        message=(
+                            "This looks like it replaces an existing preference. "
+                            "Nothing was saved yet — confirm to replace it."
+                        ),
+                    )
+                candidate = OperatorPreference(
+                    pref_id="0" * 32, status="active",
+                    type_tag=DEFAULT_PREFERENCE_TYPE_TAG, subject="",
+                    body=body, source="operator-explicit", supersedes="",
+                    created="", updated="",
+                )
+                from services.assistant_orchestrator.src.preference_block import (
+                    block_fits_budget,
+                )
+                if not block_fits_budget(
+                    self._knowledge.list_preferences() + [candidate]
+                ):
+                    return _result(
+                        ok=False, op=op, status="refused",
+                        error_code="PREFERENCE_TOKEN_CAP", message=_cap_message(),
+                    )
+                stored = self._knowledge.store_preference(body, expires=expires)
+                self._pref_block_cache = None  # P9: re-render once, next turn
+                return _result(
+                    ok=True, op=op, status="stored", pref_id=stored.pref_id,
+                    message="Preference saved verbatim.",
+                )
+
+            # edit / delete both require a well-formed id BEFORE the store is
+            # consulted (the forged-id gate pattern).
+            if not self._PREF_ID_RE.fullmatch(pref_id):
+                return _result(
+                    ok=False, op=op, status="refused",
+                    error_code="INVALID_PREF_ID",
+                    message="Malformed preference id (Fail-Closed).",
+                )
+
+            if op == "edit":
+                current = self._knowledge.get_preference(pref_id)
+                if current is None:
+                    return _result(
+                        ok=False, op=op, status="refused",
+                        error_code="UNKNOWN_ID",
+                        message="No active preference with that id.",
+                    )
+                from services.assistant_orchestrator.src.preference_block import (
+                    block_fits_budget,
+                )
+                candidates = [
+                    p._replace(body=body) if p.pref_id == pref_id else p
+                    for p in self._knowledge.list_preferences()
+                ]
+                if not block_fits_budget(candidates):
+                    return _result(
+                        ok=False, op=op, status="refused",
+                        error_code="PREFERENCE_TOKEN_CAP", message=_cap_message(),
+                    )
+                updated = self._knowledge.update_preference(pref_id, body)
+                if updated is None:  # raced away — treat as unknown
+                    return _result(
+                        ok=False, op=op, status="refused",
+                        error_code="UNKNOWN_ID",
+                        message="No active preference with that id.",
+                    )
+                self._pref_block_cache = None  # P9: re-render once, next turn
+                return _result(
+                    ok=True, op=op, status="updated", pref_id=pref_id,
+                    message=(
+                        "Preference updated (last-writer-wins; the prior "
+                        "wording is kept as audit history)."
+                    ),
+                )
+
+            # op == "delete"
+            deleted = self._knowledge.delete_preference(pref_id)
+            if not deleted:
+                return _result(
+                    ok=False, op=op, status="refused", error_code="UNKNOWN_ID",
+                    message="No active preference with that id.",
+                )
+            self._pref_block_cache = None  # P9: re-render once, next turn
+            return _result(
+                ok=True, op=op, status="deleted", pref_id=pref_id,
+                message="Preference deleted (audit history retained).",
+            )
+        except KnowledgeBankError as exc:
+            # The store's own P4/P2 validation (empty body, char cap, count
+            # cap) — surface the stable PREFERENCE_* code as the error code.
+            code = str(exc).split(":", 1)[0].strip() or "PREFERENCE_REFUSED"
+            return _result(
+                ok=False, op=op, status="refused", error_code=code,
+                message=str(exc),
+            )
+        except Exception as exc:  # noqa: BLE001 — Fail-Closed error shape
+            logger.error("Preference write failed: %s", exc)
+            return _result(
+                ok=False, op=op, status="refused", error_code="PREFERENCE_ERROR",
+                message="Preference operation failed (Fail-Closed).",
+            )
+
+    def _commit_staged_proposal(
+        self,
+        op: str,
+        payload: "dict[str, object]",
+        result_fn: "Callable[..., bool]",
+        cap_message_fn: "Callable[[], str]",
+    ) -> bool:
+        """Resolve a ``confirm``/``dismiss`` of a staged model proposal (#770 M2 W1).
+
+        The operator's typed/clicked confirm/dismiss arrives here (via the
+        PREFERENCE_WRITE door) carrying only an opaque ``token``.  The AO pops
+        the staged proposal and commits the STAGED VERBATIM bytes — the model
+        never re-supplies the body, so a restatement cannot change what is
+        written (confirm-hop integrity, P2 across the proposal hop).  ``confirm``
+        HONOURS the staged add-vs-replace-vs-retract decision (the operator
+        already judged the card — the confirm IS the resolution of the P5
+        near-duplicate question, so no P5 re-check re-refuses it).
+
+        Called inside ``_handle_preference_write_request``'s try/except, so a
+        store ``KnowledgeBankError`` (empty/char-cap/count-cap) surfaces through
+        the outer handler's stable-code path.
+        """
+        from services.assistant_orchestrator.src.knowledge_bank import (
+            OperatorPreference,
+        )
+        from services.assistant_orchestrator.src.preference_block import (
+            block_fits_budget,
+        )
+
+        token = str(payload.get("token", "")).strip()
+
+        if op == "dismiss":
+            # Idempotent: consume the staged proposal (if any); nothing is saved
+            # either way — the desired end-state is "not staged, nothing written".
+            self._proposal_staging.pop(token)
+            return result_fn(
+                ok=True, op=op, status="dismissed", pref_id="",
+                message="Proposal dismissed — nothing was saved.",
+            )
+
+        # op == "confirm"
+        staged = self._proposal_staging.pop(token)
+        if staged is None:
+            return result_fn(
+                ok=False, op=op, status="refused", error_code="UNKNOWN_TOKEN",
+                message=(
+                    "That preference proposal is no longer available (already "
+                    "confirmed, dismissed, or expired)."
+                ),
+            )
+
+        if staged.action is ProposalAction.RETRACT:
+            # Idempotent removal: the desired end-state is "row not active".
+            self._knowledge.delete_preference(staged.target_pref_id)
+            self._pref_block_cache = None  # P9: re-render once, next turn
+            return result_fn(
+                ok=True, op=op, status="deleted", pref_id=staged.target_pref_id,
+                message="Preference removed (audit history retained).",
+            )
+
+        if staged.action is ProposalAction.REPLACE:
+            target = self._knowledge.get_preference(staged.target_pref_id)
+            if target is not None:
+                candidates = [
+                    p._replace(body=staged.body)
+                    if p.pref_id == staged.target_pref_id
+                    else p
+                    for p in self._knowledge.list_preferences()
+                ]
+                if not block_fits_budget(candidates):
+                    return result_fn(
+                        ok=False, op=op, status="refused",
+                        error_code="PREFERENCE_TOKEN_CAP", message=cap_message_fn(),
+                    )
+                updated = self._knowledge.update_preference(
+                    staged.target_pref_id, staged.body
+                )
+                if updated is None:  # raced away — treat as unknown
+                    return result_fn(
+                        ok=False, op=op, status="refused", error_code="UNKNOWN_ID",
+                        message="No active preference with that id.",
+                    )
+                self._pref_block_cache = None  # P9: re-render once, next turn
+                return result_fn(
+                    ok=True, op=op, status="updated", pref_id=staged.target_pref_id,
+                    message=(
+                        "Preference replaced (last-writer-wins; the prior wording "
+                        "is kept as audit history)."
+                    ),
+                )
+            # The REPLACE target vanished between propose and confirm — the
+            # contradiction it would have superseded is already gone, so honour
+            # the operator's intent and store the proposed body as new (ADD).
+
+        # ADD (or the REPLACE-target-gone fall-through): store the STAGED body
+        # verbatim.  No P5 re-check — the operator confirmed the card.
+        candidate = OperatorPreference(
+            pref_id="0" * 32, status="active", type_tag=staged.type_tag,
+            subject="", body=staged.body, source="operator-explicit",
+            supersedes="", created="", updated="",
+        )
+        if not block_fits_budget(self._knowledge.list_preferences() + [candidate]):
+            return result_fn(
+                ok=False, op=op, status="refused",
+                error_code="PREFERENCE_TOKEN_CAP", message=cap_message_fn(),
+            )
+        stored = self._knowledge.store_preference(
+            staged.body, type_tag=staged.type_tag
+        )
+        self._pref_block_cache = None  # P9: re-render once, next turn
+        return result_fn(
+            ok=True, op=op, status="stored", pref_id=stored.pref_id,
+            message="Preference saved verbatim.",
+        )
+
+    def _handle_preference_list_request(
+        self,
+        transport: VsockTransport,
+        request_id: str,
+        payload: dict[str, object],
+    ) -> bool:
+        """Handle a PREFERENCE_LIST_REQUEST — the ACTIVE tier, render order.
+
+        Returns the operator's own decrypted preference rows (the /preferences
+        listing) in the SAME deterministic insertion order the
+        pinned block renders, so the listing's numbering is stable and maps
+        1:1 onto block lines.  No bank → an empty listing (total 0), never an
+        error (mirrors the image-list contract).
+        """
+        if self._knowledge is None:
+            return transport.send(
+                self._framer.encode_preference_list_response(
+                    preferences=[], request_id=request_id,
+                )
+            )
+        try:
+            prefs = self._knowledge.list_preferences()
+        except Exception as exc:  # noqa: BLE001 — Fail-Closed: empty, not a crash
+            logger.error("list_preferences failed: %s", exc)
+            return transport.send(
+                self._framer.encode_preference_list_response(
+                    preferences=[], request_id=request_id,
+                )
+            )
+        records = [
+            {
+                "pref_id": p.pref_id,
+                "type_tag": p.type_tag,
+                "subject": p.subject,
+                "body": p.body,
+                "created": p.created,
+                "updated": p.updated,
+                "expires": p.expires,  # #770 M2 W2 (ISO date; '' = no expiry)
+            }
+            for p in prefs
+        ]
+        return transport.send(
+            self._framer.encode_preference_list_response(
+                preferences=records, request_id=request_id,
+            )
+        )
+
+    # ── Preference proposals (Learning Loops Loop 1, #770 M2 W1) ─────────
+
+    #: Model-proposal intents accepted on propose_preference (fail-safe default).
+    _PROPOSE_INTENTS: frozenset[str] = frozenset({"save", "remove"})
+
+    @staticmethod
+    def _parse_propose_args(tool_args: str) -> tuple[str, str, str]:
+        """Extract ``(text, type_tag, intent)`` from a propose_preference dispatch.
+
+        Canonical-JSON args (the native tool path) yield the typed fields; a bare
+        string is treated whole as the proposed text with defaults.  ``type_tag``
+        clamps to the tier's tags (default ``standing-rule``); ``intent`` clamps
+        to ``save``/``remove`` (default ``save``) — fail-safe, never refused here
+        (the AO handler owns refusal).
+        """
+        import json
+
+        from services.assistant_orchestrator.src.knowledge_bank import (
+            DEFAULT_PREFERENCE_TYPE_TAG,
+            PREFERENCE_TYPE_TAGS,
+        )
+
+        text = tool_args
+        type_tag = DEFAULT_PREFERENCE_TYPE_TAG
+        intent = "save"
+        stripped = tool_args.strip()
+        if stripped.startswith("{"):
+            try:
+                parsed = json.loads(stripped)
+            except (json.JSONDecodeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict):
+                raw_text = parsed.get("text", "")
+                text = raw_text if isinstance(raw_text, str) else ""
+                raw_tag = parsed.get("type_tag", "")
+                if isinstance(raw_tag, str) and raw_tag.strip() in PREFERENCE_TYPE_TAGS:
+                    type_tag = raw_tag.strip()
+                raw_intent = parsed.get("intent", "")
+                if (
+                    isinstance(raw_intent, str)
+                    and raw_intent.strip().casefold()
+                    in AssistantOrchestratorService._PROPOSE_INTENTS
+                ):
+                    intent = raw_intent.strip().casefold()
+        return text.strip(), type_tag, intent
+
+    def _handle_propose_preference(
+        self, tool_args: str, session_id: str
+    ) -> ProposeOutcome:
+        """Handle a ``propose_preference`` dispatch — render a confirm CARD, no write.
+
+        Session-aware (the tool loop special-cases this BEFORE ``tools.execute``):
+        reads the store for the P5 add-vs-retract/replace decision (§2.2a — a
+        near-duplicate/negating ADD is steered to a REPLACE card, an
+        ``intent=remove`` to a RETRACT card, never stored alongside), stages the
+        VERBATIM proposed bytes (confirm-hop integrity — the model never
+        re-supplies the body at confirm time), and returns the streamed card
+        block plus a short model-facing note.  Performs NO store write (P8 — the
+        write door is ``_handle_preference_write_request``, reached only by the
+        operator's typed/clicked confirm).  Fail-soft: any refusal returns an
+        empty ``card_block`` + an explanatory note; conversation is never broken.
+        """
+        from shared.preference_budgets import PREFERENCE_BODY_MAX_CHARS
+
+        text, type_tag, intent = self._parse_propose_args(tool_args)
+        if not text:
+            return ProposeOutcome(
+                "", "No preference proposal was shown (the proposed text was empty)."
+            )
+        if len(text) > PREFERENCE_BODY_MAX_CHARS:
+            return ProposeOutcome(
+                "",
+                "No preference proposal was shown: the proposed preference is "
+                f"longer than the {PREFERENCE_BODY_MAX_CHARS}-character limit for a "
+                "standing preference. Ask the user to state a shorter version.",
+            )
+        if self._knowledge is None:
+            return ProposeOutcome(
+                "",
+                "No preference proposal was shown (the preference store is "
+                "unavailable).",
+            )
+
+        # Provenance + the D-1(a) untrusted-context flag (the weak-signal defense).
+        untrusted = False
+        has_docs = False
+        cm = self._context_manager
+        if cm is not None:
+            try:
+                untrusted = bool(cm.has_untrusted_content(session_id))
+                has_docs = bool(cm.has_user_loaded_documents(session_id))
+            except Exception:  # noqa: BLE001 — fail-safe: assume no context signal
+                untrusted, has_docs = False, False
+        if untrusted:
+            provenance_label = (
+                "content from a document or web result in this conversation"
+            )
+        elif has_docs:
+            provenance_label = "a document you loaded into this conversation"
+        else:
+            provenance_label = "your last message"
+
+        # Decide the action against the ACTIVE tier (deterministic P5 probe).
+        try:
+            actives = self._knowledge.list_preferences()
+            similar = self._knowledge.find_similar_preference(text)
+        except Exception as exc:  # noqa: BLE001 — fail-soft
+            logger.error("propose_preference store read failed: %s", exc)
+            return ProposeOutcome(
+                "",
+                "No preference proposal was shown (could not read the "
+                "preference store).",
+            )
+
+        def _number_of(pref_id: str) -> int:
+            for index, pref in enumerate(actives, start=1):
+                if pref.pref_id == pref_id:
+                    return index
+            return 0
+
+        if intent == "remove":
+            if similar is None:
+                return ProposeOutcome(
+                    "",
+                    "No matching standing preference was found to remove; nothing "
+                    "was proposed. The user can run /preferences to see the list.",
+                )
+            staged = self._proposal_staging.stage(
+                action=ProposalAction.RETRACT,
+                body="",
+                type_tag=similar.type_tag,
+                target_pref_id=similar.pref_id,
+                provenance_label=provenance_label,
+                untrusted_context=untrusted,
+                target_number=_number_of(similar.pref_id),
+                target_body=similar.body,
+            )
+        elif similar is not None:
+            # §2.2a — an ADD that near-duplicates/negates an existing row is
+            # steered to a REPLACE card, never stored alongside it.
+            staged = self._proposal_staging.stage(
+                action=ProposalAction.REPLACE,
+                body=text,
+                type_tag=type_tag,
+                target_pref_id=similar.pref_id,
+                provenance_label=provenance_label,
+                untrusted_context=untrusted,
+                target_number=_number_of(similar.pref_id),
+                target_body=similar.body,
+            )
+        else:
+            staged = self._proposal_staging.stage(
+                action=ProposalAction.ADD,
+                body=text,
+                type_tag=type_tag,
+                provenance_label=provenance_label,
+                untrusted_context=untrusted,
+            )
+
+        card_block = render_proposal_block(staged.to_card())
+        note = (
+            "A preference confirmation card was shown to the user to confirm or "
+            "dismiss. Do not repeat the proposal or restate its text; continue "
+            "helping with the user's message."
+        )
+        return ProposeOutcome(card_block, note)
+
     def _generate_image_bytes(
         self,
         *,
@@ -3463,6 +4101,9 @@ class AssistantOrchestratorService:
             from services.assistant_orchestrator.src.knowledge_bank import (
                 EncryptedKnowledgeBank,
             )
+            from services.assistant_orchestrator.src.substrate import (
+                resolve_embed_model_identity,
+            )
             from services.ui_gateway.src.session_store import StoreProvisioningError
             from shared.security.dek_envelope import (
                 DekEnvelope,
@@ -3589,6 +4230,12 @@ class AssistantOrchestratorService:
             def _embed_knowledge(texts: list[str]):  # noqa: ANN202 — EmbedFn shape
                 return detector.embed_documents(texts, max_length=embed_max_tokens)
 
+            # Embedding-model identity (#794): same source as the substrate — the
+            # model file the shared detector actually loads.
+            embed_model, embed_model_revision = resolve_embed_model_identity(
+                getattr(detector, "_model_path", None)
+            )
+
             bank = EncryptedKnowledgeBank(
                 db_path=db_path,
                 embed_fn=_embed_knowledge,
@@ -3598,6 +4245,10 @@ class AssistantOrchestratorService:
                 # (not the module constant) so a config drift on reopen is
                 # detectable — the bank refuses retrieve/approve on mismatch.
                 embed_max_tokens=embed_max_tokens,
+                # Record the model identity so a swap of the embedder is
+                # detectable on reopen — loud-disables the vector limb (#794).
+                embed_model=embed_model,
+                embed_model_revision=embed_model_revision,
             )
             # Production-wiring regression lock (same contract as substrate).
             assert bank.has_encryption is True, (
@@ -4640,6 +5291,13 @@ class AssistantOrchestratorService:
             ),
             response_depth_mode=resolved.response_depth_mode,
             stream_callback=_stream_cb,
+            # Pinned operator-preference block (#770 M1, P3/P9): the byte-
+            # stable block rides at a FIXED slot after the static persona in
+            # the system prompt — cached per process, invalidated only by a
+            # PREFERENCE_WRITE, so prefix caching reuses its KV across turns.
+            # None (zero preferences / no bank) keeps today's default system
+            # prompt byte-identically (regression-locked).
+            system_prompt=self._effective_system_prompt(),
         )
         # Layer 3 — privilege separation (ADR-023, supersedes ADR-013). When
         # the session holds UNTRUSTED-provenance content (pasted external text,
@@ -4865,6 +5523,29 @@ class AssistantOrchestratorService:
                     "(ADR-023 Am.4 rung 2).",
                     tool_name, _gen_count,
                 )
+            # #770 M2 W1: propose_preference is a SESSION-AWARE draft surface —
+            # it reads the store (the P5 add-vs-retract/replace decision, §2.2a),
+            # stages the VERBATIM proposed bytes, and streams a confirm CARD to
+            # the operator. It performs NO store write (P8: the write happens only
+            # when the operator types/clicks /remember-confirm, which rides the
+            # PREFERENCE_WRITE door). Intercepted HERE, before tools.execute, so
+            # the registry's fail-closed notice body is never the production path
+            # (test_propose_preference_intercepted_before_execute locks that). The
+            # card is streamed like the egress disclosure (system-authored,
+            # operator-facing, outside the model's PGOV'd answer).
+            if tool_name == "propose_preference":
+                _propose_outcome = self._handle_propose_preference(
+                    tool_args, session_id
+                )
+                if _propose_outcome.card_block:
+                    if not _on_stream_chunk(
+                        "\n" + _propose_outcome.card_block + "\n"
+                    ):
+                        return False  # stream send failed (loop contract)
+                _tool_notes.append(f"\n\n[{_propose_outcome.note}]")
+                context = context + _tool_notes[-1]
+                continue  # next iteration lets the model finish its answer
+
             # Authorized + adjudicated tool call: execute and append result.
             try:
                 tool_result = tools.execute(tool_name, tool_args)

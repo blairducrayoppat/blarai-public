@@ -56,6 +56,10 @@ from services.ui_gateway.src.dispatch_coordinator import (
     DispatchCoordinator,
     parse_dispatch_command,
 )
+from services.ui_gateway.src.preferences_coordinator import (
+    PreferencesCoordinator,
+    parse_preference_command,
+)
 from shared.fleet.dispatch import build_default_config as _build_fleet_config
 from services.ui_gateway.src.session_store import (
     INFORMATIONAL_TURN_STATUS,
@@ -380,6 +384,16 @@ class TransportGateway:
             enabled=bool(fleet_dispatch_enabled),
             plan_fn=self._dispatch_plan_fn,
             execute_fn=self._dispatch_execute_fn,
+        )
+
+        # Operator-preferences coordinator (#770 M1, Loop 1): /remember +
+        # /preferences over the same connection-per-message AO leg.  The
+        # gateway parse of operator-typed text is the tier's ONLY write
+        # authority (P8) — no model output ever reaches this seam.  Tests
+        # replace this attribute with a coordinator built on injected fakes.
+        self._preferences_coordinator: PreferencesCoordinator = PreferencesCoordinator(
+            write_call=self._preference_write_call,
+            list_call=self._preference_list_call,
         )
 
     @property
@@ -1168,6 +1182,120 @@ class TransportGateway:
         reply = await self._dispatch_coordinator.handle_command(session_id, command)
         self._persist_informational_turn(session_id, stripped, reply)
         return reply
+
+    async def handle_preferences_command(
+        self, session_id: str, text: str
+    ) -> str | None:
+        """Intercept /remember + /preferences BEFORE prompt dispatch (#770 M1).
+
+        Gateway-side by design (the imagine/ingest/dispatch pattern).  Returns
+        the deterministic reply text when the message was a preference
+        command, or ``None`` for a normal prompt.  Handled turns persist as
+        informational turns — NO model call occurs, which is load-bearing for
+        P8: the model never sees (and can never counterfeit) the write path;
+        the operator's typed command is the sole write authority.
+        """
+        stripped = text.strip()
+        if not stripped:
+            return None
+        command = parse_preference_command(stripped)
+        if command is None:
+            return None
+        reply = await self._preferences_coordinator.handle_command(
+            session_id, command
+        )
+        self._persist_informational_turn(session_id, stripped, reply)
+        return reply
+
+    async def _preference_write_call(
+        self, op: str, body: str, pref_id: str, token: str = "",
+        expires: str = "",
+    ) -> dict[str, Any]:
+        """Send one PREFERENCE_WRITE_REQUEST over a fresh AO connection.
+
+        Connection-per-message (mirrors :meth:`_imagine_transport_call`); every
+        failure path returns an error-shaped PREFERENCE_WRITE_RESULT dict
+        (Fail-Closed), never raises.  ``token`` (#770 M2 W1) is the staged-
+        proposal handle for confirm/dismiss; ``expires`` (#770 M2 W2) is the
+        operator-stated ISO expiry on a remember; both empty otherwise.
+        """
+        def _error(message_text: str) -> dict[str, Any]:
+            return {
+                "ok": False,
+                "op": op,
+                "status": "refused",
+                "pref_id": "",
+                "conflict": None,
+                "token": "",
+                "error_code": "TRANSPORT_ERROR",
+                "message": message_text,
+            }
+
+        try:
+            message = self._framer.encode_preference_write_request(
+                op=op, body=body, pref_id=pref_id, token=token, expires=expires,
+                request_id=str(uuid.uuid4()),
+            )
+        except ValueError as exc:
+            return _error(f"Could not build the preference request: {exc}")
+
+        transport = await self._open_prompt_transport()
+        if transport is None:
+            return _error(
+                "Could not connect to the Assistant Orchestrator (Fail-Closed)."
+            )
+        try:
+            sent = await asyncio.to_thread(transport.send, message)
+            if not sent:
+                return _error("IPC send to the Assistant Orchestrator failed.")
+            resp_bytes = await asyncio.to_thread(transport.receive)
+            if resp_bytes is None:
+                return _error("No response from the Assistant Orchestrator.")
+            try:
+                return self._framer.decode_preference_write_result(resp_bytes)
+            except ValueError as exc:
+                return _error(f"Unexpected response from the Orchestrator: {exc}")
+        except Exception as exc:  # noqa: BLE001 — Fail-Closed error shape
+            logger.error("Preference write transport call failed: %s", exc)
+            return _error(f"Preference transport error: {exc}")
+        finally:
+            transport.close()
+
+    async def _preference_list_call(self) -> dict[str, Any]:
+        """Drive PREFERENCE_LIST_REQUEST → PREFERENCE_LIST_RESPONSE.
+
+        Connection-per-message.  Returns the decoded listing on success, or
+        ``{preferences: [], total: 0, error: <text>}`` on ANY failure
+        (Fail-Closed — never raises; the coordinator surfaces a non-empty
+        ``error`` as a clear message).
+        """
+        def _error(text: str) -> dict[str, Any]:
+            return {"preferences": [], "total": 0, "error": text}
+
+        message = self._framer.encode_preference_list_request(
+            request_id=str(uuid.uuid4()),
+        )
+        transport = await self._open_prompt_transport()
+        if transport is None:
+            return _error(
+                "Could not connect to the Assistant Orchestrator (Fail-Closed)."
+            )
+        try:
+            sent = await asyncio.to_thread(transport.send, message)
+            if not sent:
+                return _error("IPC send to the Assistant Orchestrator failed.")
+            resp_bytes = await asyncio.to_thread(transport.receive)
+            if resp_bytes is None:
+                return _error("No response from the Assistant Orchestrator.")
+            try:
+                return self._framer.decode_preference_list_response(resp_bytes)
+            except ValueError as exc:
+                return _error(f"Unexpected response from the Orchestrator: {exc}")
+        except Exception as exc:  # noqa: BLE001 — Fail-Closed error shape
+            logger.error("Preference list transport call failed: %s", exc)
+            return _error(f"Preference transport error: {exc}")
+        finally:
+            transport.close()
 
     async def _imagine_transport_call(self, message: bytes) -> dict[str, Any]:
         """Send one encoded IMAGE_GEN_REQUEST over a fresh AO connection.

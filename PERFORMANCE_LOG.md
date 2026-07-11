@@ -2282,3 +2282,262 @@ Decision: all three criteria MET → `swap_min_free_gb` 21.0→20.0 (blarai
 from 20 GiB (rare, post-upgrade #747 class — backstopped by the 480 s deadline +
 the gate''s graceful abort), sustained full-dispatch workload at ~5 GiB Available,
 N>1. Evidence: `docs/performance/swap_gate_floor_2026-07-09/`.
+
+### 2026-07-10 — Probe-not-predict live-verify (#784): the first real 30B probe outside a job
+
+Hardware: Intel Core Ultra 7 258V / Arc 140V iGPU, 32 GB LPDDR5X (31.323 GiB
+effective). OpenVINO GenAI 2026.2.1; Qwen3-Coder-30B-A3B INT4 via OVMS; WARM compile
+cache. Methodology: the #784 `tools.dispatch_harness.probe` executor run live on merged
+main (`8bea7c54`) — measure Available → (if >= floor) stop the resident 14B AO → load
+the 30B → wait for it to serve on `:8000` → ALWAYS restore the AO. `--json` outcome
+line; n=1 per condition; coordinator dev-session ~2 GiB overhead present (named).
+
+Results (three conditions):
+- CLEAN happy-path (probe run from the AO's own repo root — finds + tree-kills the live
+  AO, 30B loads into FREED RAM): available 15.2 GiB at probe start (floor 12.0), AO
+  stopped (pid tree-killed), **30B READY in 15.5 s**, AO restored on `:5001` via the
+  #788-lazy launcher. This is the representative number (consistent with the #777 ~13 s
+  from a 19.85 GiB ambient).
+- Co-resident artifact (probe run from a WORKTREE: wrong `certs/` root → no-lock-pid →
+  AO NOT stopped → 30B loaded ALONGSIDE the resident 14B): READY in 34.8 s. NOT
+  representative — kept as an honest contrast (the ~2.2x cost of loading co-resident
+  with the 14B under memory pressure).
+- BELOW_FLOOR backstop: available 9.8 GiB < floor 15.0 → exit 3, nothing touched (the
+  graceful sanity-abort proven live).
+
+Decision: #784 probe live-verified (backstop + clean happy-path). Cluster merged
+(`8bea7c54`); the agentic admission that WIRES the probe into the 23:00 decision is HELD
+pending investigation of an unexplained post-restore VM start (a #788 follow-up). Not
+measured (named): COLD-cache 30B load via the probe, N>1, the probe under a real
+marginal-band battery admission (tonight's live exercise once the admission side merges),
+co-resident inference throughput. Machine-readable:
+`docs/performance/probe_livecheck_2026-07-10.json`.
+
+### 2026-07-10 — Option (c) coder-in-VM MEMORY feasibility: the 30B + a 6 GB toolchain VM fits
+
+Hardware: Intel Core Ultra 7 258V / Arc 140V iGPU, 32 GB LPDDR5X (31.323 GiB effective,
+one shared pool). Qwen3-Coder-30B-A3B INT4 via OVMS; warm cache. Method (self-restoring):
+stop the AO (lean the box) → load the 30B (`start-llm -Model coder-30b -Force`) → measure
+In-Use → add a **static 6 GB Hyper-V VM** (a coder-toolchain guest proxy — Hyper-V reserves
+the 6 GB at the host, so it measures the co-resident envelope without needing a live in-guest
+workload) → measure peak In-Use → reset the VM config + stop the 30B + restart the AO.
+**~2 GiB coordinator dev-session overhead is IN these numbers** (a lean overnight box has ~2
+GiB MORE headroom). Answers the load-bearing question for the Decision-1 hybrid direction:
+does the cross-platform coder-in-VM half fit the memory ceiling?
+
+Results:
+- Baseline (AO up, no 30B): In-Use 19.72 GiB. Lean (AO stopped): In-Use 7.1 GiB.
+- **30B alone (lean): In-Use 22.03 GiB** → 30B footprint ~14.9 GiB (consistent with #777's
+  ~15 GiB); headroom for a VM = **9.29 GiB**.
+- **30B + static 6 GB VM: peak In-Use 27.5 GiB, Available floor 3.82 GiB → headroom 3.82 GiB**
+  (VM Running; the +5.47 GiB over 30B-alone confirms the 6 GB reservation took). **FITS** the
+  31.323 GiB ceiling. Lean-box adjustment: ~+2 GiB → ~5.8 GiB headroom.
+
+Verdict: option (c) — the cross-platform coder executing inside the network-less Alpine VM —
+is **MEMORY-FEASIBLE** on this hardware. The RAM concern that gated the hybrid direction is
+answered: the 30B + a 6 GB toolchain VM co-reside under the ceiling with room to spare.
+
+Not measured (named honestly): guest-vs-host code-execution SPEED (needs a vsock-driven build
+in the guest — a separate harness; the operator's prior read is speed is not the main cost);
+the VM's ACTUAL toolchain memory use under a real build (the static 6 GB is an upper-bound
+reservation proxy, conservative); N>1; cold-cache 30B load. Machine-readable:
+`docs/performance/coder_in_vm_memory_2026-07-10.json`.
+
+### 2026-07-10 — Speculative decoding A/B (#778): net-POSITIVE on BOTH short and long — the #711 S5 "net-negative" was a nonce-prompt artifact
+
+Hardware: Intel Core Ultra 7 258V (Lunar Lake) / Arc 140V (16 GB) iGPU, µarch 20.4.4,
+GPU driver 32.0.101.8826, 32 GB LPDDR5X (31.323 GiB effective, one shared pool).
+OpenVINO 2026.2.1-21919 / OpenVINO GenAI 2026.2.1.0-3123. Target Qwen3-14B INT4-GPU;
+draft Qwen3-0.6B-pruned-6L INT8-GPU. Greedy (do_sample=false), repetition_penalty=1.1
+(production [generation] posture). AO down, OVMS down for the run; one pipeline resident
+at a time. Machine-readable: `docs/performance/spec_decode_ab_ov2026_2_1_0_2026-07-10_14-22-08.json`.
+
+Question (#778): the #711 S5 angle measured spec-ON decode at ~0.73-0.78x of the spec-OFF
+control — spec-decode looked NET-NEGATIVE, contradicting the ISS-1 closure's ~2x. Is spec
+a net loss on the AO's typical SHORT turns on this substrate, only paying off on LONG answers?
+
+Method: dedicated A/B, spec ON vs OFF × two realistic shapes — SHORT conversational/tool-call
+turns (max_new=100, ~30-100 gen tokens) and LONG answers (max_new=500). N=6 per cell (4 cells),
+3 rounds × 2 runs/block, 2 warmups discarded per block. Spec ON = the production seam
+(`build_shared_pipeline` — draft wired, cache_size=3, prefix_caching, per-request
+num_assistant_tokens=3). Spec OFF = a no-draft LLMPipeline (autoregressive by construction, same
+GPU knobs) — the ADR-012 counterfactual and the same control shape as #711 S5. Arms INTERLEAVED
+at the arm-block grain with a per-round lead swap (round 0 ON-first, round 1 OFF-first, …), one
+pipeline resident at a time (two 14B pipelines exceed the ceiling). Metrics from the runtime's own
+perf metrics (SDPerModelsPerfMetrics for ON, PerfMetrics for OFF) via the list-form
+`generate([prompt], cfg)` + wall-clock turn time. decode tok/s = 1000/TPOT (steady-state, excludes
+prefill).
+
+Two methodology fixes vs #711 S5 that change the answer:
+1. #711 S5 used NONCE/FILLER prompts (random text). A 0.6B draft cannot predict random filler, so
+   acceptance is near-zero BY CONSTRUCTION there and spec can only ever lose — an artifact of the
+   probe, not the substrate. This A/B uses realistic prompts (natural, predictable text).
+2. #711 S5 logged acceptance "unavailable" because it called a nonexistent method
+   (`get_acceptance_rate`). The real GenAI 2026.2.1 API IS `extended_perf_metrics`
+   (SDPerModelsPerfMetrics) via list-form generate — acceptance is directly measurable here.
+
+Results (N=6, medians; the four cells):
+
+| cell             | decode tok/s | prefill ms | total turn ms | gen tokens | accept/generated |
+|------------------|-------------:|-----------:|--------------:|-----------:|-----------------:|
+| short / spec-ON  |     **5.33** |        352 |        16,525 |        100 |            0.530 |
+| short / spec-OFF |     **3.18** |        474 |        30,392 |        100 |     — (no draft) |
+| long / spec-ON   |     **4.67** |        610 |       108,352 |        500 |            0.506 |
+| long / spec-OFF  |     **3.15** |        575 |       159,034 |        500 |     — (no draft) |
+
+- Decode speedup ON/OFF: **short 1.68x, long 1.48x**. Total-turn speedup: short 1.66x, long 1.47x.
+- Draft acceptance (realistic text): short 53.0% of generated / 36.0% of proposed; long 50.6% /
+  32.3%. Hypothesis (b) "acceptance degraded on 2026.2.1" is REFUTED — the draft earns ~half the
+  output tokens.
+- Prefill (TTFT) is comparable ON vs OFF (spec is a decode-phase optimization); differences sit
+  inside the run-to-run spread (std 160-380 ms).
+- Losslessness confirmed: greedy outputs are BYTE-IDENTICAL ON vs OFF on matched prompts
+  (sha256 matches in the ordered run log) — spec-decode changes speed, not output.
+
+Verdict: speculative decoding is net-POSITIVE on the current substrate for BOTH shapes, and short
+turns benefit slightly MORE than long (1.68x vs 1.48x) — the OPPOSITE of the hypothesized
+"shorts lose." The predictable thinking-preamble (Qwen3 `<think>` block) has high draft acceptance
+and is a larger fraction of a short turn; long answers dilute it with lower-acceptance body text.
+The #711 S5 "net-negative" is refuted: it stacked a zero-acceptance nonce prompt set, a
+mis-called acceptance metric, and a non-interleaved (AABB) layout that let thermal drift confound
+the ratio. ADR-012's keep-spec-ON is supported; no length-conditional relaxation is indicated.
+(Posture decision is the LA's — this is the data.)
+
+Thermal honesty (the load-bearing caveat): the fanless Lunar Lake iGPU throttles under sustained
+load, and spec-ON is thermally sensitive. Cool round-0 ON runs hit ~6.1 tok/s (short) and ~5.0
+(long) → a ~2x cool-burst ratio (this, and the earlier cool rig probes, is where ISS-1's "~2x"
+and the higher cool-start numbers come from); by the throttled steady state ON settles to
+5.33/4.67 and the interleaved median lands the honest sustained ratio at 1.48-1.68x. The per-round
+lead swap is what keeps the RATIO fair despite the drift (round 0 favored ON measured cool, round 1
+favored OFF measured cool — they cancel); the absolute numbers are the throttled-sustained regime,
+which is the representative one for a long session. This large thermal sensitivity is itself why a
+non-interleaved matrix (like #711 S5) can produce an unreliable, even sign-flipped, spec verdict.
+
+Not measured (named): draft acceptance IS measured (not a gap; noted because #711 mislabeled it);
+N=6 per cell (small-N medians — std/p95/min/max are in the JSON); spec ON/OFF are two CONSTRUCTIONS
+because a draft-wired pipeline on GenAI 2026.2.1 REQUIRES num_assistant_tokens XOR
+assistant_confidence_threshold on every request (pipeline_impl.cpp:178) — there is no per-request
+draft disengage, so interleaving is arm-block, not single-generation; ~2 GiB of used RAM is the
+coordinator dev-session, not the model; single dedicated GPU window (no multi-day thermal
+envelope); prefill measured with the system prefix cache-warm; co-resident cost not measured
+(one pipeline at a time).
+
+---
+
+## 2026-07-10 — #796 Meaning-based preference-contradiction feasibility (bge-small cosine vs the deterministic Jaccard probe)
+
+**What / why.** D-3 follow-up to #792 (M2 plan §2.2). M2 gates preference near-duplicate/contradiction
+confirms on a deterministic Jaccard probe (`find_similar_preference`, threshold 0.6); the LA's direction
+is that "the smarter version is really where the value is." This measures whether the on-box
+bge-small-en-v1.5 encoder can serve as the ADVISORY meaning-based signal beside Jaccard — i.e. flag
+paraphrase/opposite-value preference pairs that reuse almost no words (the pairs Jaccard structurally
+misses) without false-alarming on word-overlapping-but-different "hard negative" pairs.
+
+**Hardware / substrate.** Intel Core Ultra 7 258V (Lunar Lake); encoder requested on the Intel AI Boost
+NPU, **served on CPU (ONNX Runtime, `ort-cpu`)** — the live AO held the single-context NPU embedding
+session throughout, so the LeakageDetector fail-soft path (`EMBED_OFFLOAD_FALLBACK`) ran; a standalone
+probe on the same box confirmed the NPU compile + numerically-identical vectors (device is a latency knob,
+not a numerics knob — #720 parity 0.999996). OpenVINO 2026.2.1; onnxruntime 1.24.2; NPU driver
+32.0.100.4778; Python 3.11.9. Model: BAAI/bge-small-en-v1.5 ONNX fp16, 384-dim, mean-pool + L2-norm,
+128-token window. Surface: `services.assistant_orchestrator.src.pgov.LeakageDetector._embed` (the exact
+production encoder). Jaccard = the production `knowledge_bank._pref_similarity_tokens` + the
+`find_similar_preference` overlap formula (imported, not reimplemented).
+
+**Methodology.** 50-pair golden set (`docs/research/fixtures/preference_contradiction_pairs.json`):
+24 should-flag positives (12 paraphrase-equivalent + 12 opposite-value/negation, all deliberately
+low word-overlap), 14 hard negatives (high word-overlap, different/compatible dimension), 12 easy
+negatives (unrelated). Per pair: bge-small cosine + production Jaccard. ROC-style threshold sweep on
+cosine (0.30–0.98 @0.01); rank-based (Mann-Whitney) AUC. Evidence JSON:
+`docs/performance/preference_contradiction_796_2026-07-10_17-08-57.json`.
+
+**Numbers.**
+
+| signal | AUC vs all-neg | AUC vs HARD-neg | hit-rate@gate | false-alarm@gate |
+|---|---|---|---|---|
+| Jaccard @0.6 (production) | 0.366 | — | **0.00** | 0.00 |
+| bge-small cosine | **0.814** | 0.661 | see sweep | see sweep |
+
+Cosine distributions (median [q25–q75]): positives 0.719 [0.596–0.780]; hard-neg 0.620 [0.564–0.673],
+max 0.793; easy-neg 0.419 [0.377–0.447], max 0.539. Cosine operating points: thr 0.57 (Youden) →
+hit 0.83 / false-alarm 0.35 (hard-neg FA **0.64**); thr 0.65 → hit 0.62 / FA 0.15 (hard-neg 0.29, easy 0);
+thr 0.70 → hit 0.54 / FA 0.12 (hard-neg 0.21, easy 0); thr 0.80 (zero hard-neg FA) → hit only 0.25.
+
+**Verdict.** Jaccard catches **0 of 24** meaning-based positives (confirmed blind — that is the D-3 gap).
+bge-small **cleanly separates true contradictions from UNRELATED preferences** (easy-neg max 0.539 < positive
+q25 0.596) and beats Jaccard decisively, but does **not** cleanly separate positives from
+word-overlapping HARD negatives (AUC 0.661; no threshold gives both high recall and low hard-neg
+false-alarm). So bge-small is (a) **sufficient as an advisory net-gain** at thr ≈ 0.65–0.70 — recall
+~0.55–0.62 of pairs Jaccard misses entirely, at a false-alarm cost that is only a dismissable "may replace
+X? — confirm" card (never data loss; Jaccard stays the floor); but (b) **insufficient as the clean "smart
+contradiction check"** the LA is really after. For that, the right model class is a **local NLI
+cross-encoder** (joint-encodes both sentences → entailment/neutral/contradiction — architecturally suited to
+"same words, different meaning"), e.g. DeBERTa-v3-base-MNLI (~184M, ~370 MB fp16) or nli-deberta-v3-small
+(~140M, ~280 MB), run as a rerank ONLY over the ≤64-row candidate set bge-small surfaces (≤64 inferences at
+write time, sub-second, off the hot path, load-on-demand + idle-unloadable — trivial vs the 31.323 GB
+ceiling). Options to the LA; no unilateral model add.
+
+**Not measured (named):** co-resident 14B contention (encoder in isolation; GPU reserved by another
+workstream); any larger encoder / NLI model actually loaded (named as the option-(b) path, not benchmarked);
+the operator's real preference corpus (synthetic set; production ≤64 rows); bge query/passage prompt-prefix
+variants (symmetric no-prefix similarity used, matching the LeakageDetector surface).
+
+---
+
+## 2026-07-10 — #795 Hybrid-vs-vector-vs-BM25 retrieval A/B on the knowledge bank (community gap-filler)
+
+**What / why.** assistant_memory_reference_study §4.2 (verdict row 6): the 2026 literature has no rigorous
+hybrid-vs-pure-vector head-to-head on an agent-memory workload, and BlarAI already runs both limbs, so the
+A/B is nearly free and publishable. Measures whether RRF fusion actually dominates either limb alone on a
+personal-note memory corpus.
+
+**Hardware / substrate.** Intel Core Ultra 7 258V (Lunar Lake); encoder requested on NPU, **served on CPU
+(`ort-cpu`)** for the same live-AO NPU-contention reason as the #796 entry (device is a latency knob, not a
+numerics knob). OpenVINO 2026.2.1; onnxruntime 1.24.2; NPU driver 32.0.100.4778. Model: bge-small-en-v1.5
+ONNX fp16, 384-dim, 512-token document window. **Retrieval surface: a REAL `EncryptedKnowledgeBank`** —
+born-encrypted, software-sealed DEK, the production submit→approve→chunk→embed→index pipeline; cosine +
+FTS5 BM25 (porter unicode61), reciprocal-rank fusion k=60. All three limb rankings reconstructed from the
+bank's own in-RAM caches with the same query embedding / `_fts_match_expr` / `RRF_K`; the hybrid ranking was
+cross-checked `== bank.retrieve()` per query (**0 mismatches** across 24 queries — the reconstruction is the
+production path).
+
+**Methodology.** 35-doc labelled personal-knowledge corpus + 24 single-gold queries
+(`docs/research/fixtures/knowledge_retrieval_ab.json`), docs sized < CHUNK_CHARS so 1 doc = 1 chunk (recall@k
+= doc-level hit@k). Queries tagged by the limb they stress: 8 vector (paraphrase / zero rare-keyword
+overlap), 8 lexical (exact part number / crypto term / proper name / domain), 8 neutral. Metrics recall@{1,3,4,5,10}
++ MRR per limb, overall + per probe. Evidence JSON:
+`docs/performance/hybrid_vs_vector_795_2026-07-10_17-13-30.json`.
+
+**Numbers (overall, 24 queries).**
+
+| limb | R@1 | R@3 | R@4 | R@5 | R@10 | MRR |
+|---|---|---|---|---|---|---|
+| vector-only | **0.958** | **1.000** | **1.000** | **1.000** | **1.000** | **0.979** |
+| bm25-only | 0.833 | 0.917 | 0.917 | 0.917 | 0.917 | 0.875 |
+| hybrid RRF (production) | 0.917 | 0.917 | 0.917 | 0.917 | 0.917 | 0.921 |
+
+Per probe: lexical and neutral queries were R@1 = 1.000 for ALL three limbs (vector already nailed the
+exact-token queries at this scale). The whole spread is in the vector-probe class (n=8): vector R@1 0.875,
+bm25 0.500, **hybrid 0.750**.
+
+**Verdict.** On this small agent-memory-style workload, **vector-only is the strongest single ranker and
+hybrid RRF sits BELOW it** (R@4 1.000 vs 0.917; MRR 0.979 vs 0.921). Root cause, named concretely: for
+pure-semantic queries whose gold doc shares **no tokens** with the query, BM25 returns the gold nowhere,
+and RRF then **buries the correct vector rank-1 hit** below docs that are mediocre-but-present in both
+limbs — q02 ("how do I get my coding setup working again?", gold at vector rank 1) → RRF rank **18**;
+q07 ("who do I reach out to if something goes wrong?", vector rank 1) → RRF rank **22**. Both fall out of
+the production top-4, a real recall regression vs vector-only. The mechanism is the production
+`_fts_match_expr` OR-joining EVERY query token (stopwords included), so the BM25 limb contributes a large
+common-word noise set with no gold-token match. The keyword limb provided **no unique win** on this corpus.
+
+**Recommendation (decision for the LA — measurement only, no production change made):** don't churn the
+architecture on 35 docs, but the study's "hybrid is now the norm" assumption does NOT transfer to BlarAI's
+current knowledge-bank scale/shape — vector-only is as good or better today. Two named, low-risk follow-ups
+worth a decision: (1) filter stopwords / require rare-term matches in `_fts_match_expr` so the BM25 limb
+stops injecting common-word noise into RRF (the direct cause of the q02/q07 demotions); (2) re-run this A/B
+on a larger real-article corpus before the episodic-tier phase, where BM25's exact-match precision should
+re-appear as corpus size and near-duplicate density grow. Keep RRF (study row 4) but re-measure at scale.
+
+**Not measured (named):** co-resident 14B contention; multi-chunk / long-article chunking (fixture docs are
+single-chunk by design); MMR / min-score floor / recency boost (study row 5, episodic-tier tuning);
+the operator's real ingested corpus (synthetic labelled set); weighted-score fusion vs RRF (this measures
+limb CONTRIBUTION, not the fusion-rule choice); graded / multi-gold relevance (single-gold binary only).

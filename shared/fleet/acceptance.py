@@ -1968,6 +1968,82 @@ def _has_test_function(tree: ast.AST) -> bool:
     return False
 
 
+#: Hypothesis strategy size-bound keyword args the 14B routinely mis-emits. Hypothesis
+#: collection-size strategies (``text`` / ``lists`` / ``sets`` / ``binary`` / …) bound their
+#: length with ``min_size`` / ``max_size``; the model reaches for the more-common
+#: ``min_length`` / ``max_length`` (valid on WTForms / Django validators, NEVER on a strategy),
+#: and ``st.text(min_length=1)`` raises ``TypeError`` at COLLECTION — the file is un-collectable,
+#: so NO coder candidate can ever pass it and the job is falsely blamed on the coder (battery
+#: job B1, deterministic since the 2026-07-07 run). ``ast.parse`` does not catch it — the call
+#: is syntactically valid — so the broken oracle passes structural validation and seeds anyway.
+_HYPOTHESIS_KWARG_RENAMES = {"min_length": "min_size", "max_length": "max_size"}
+
+
+def _repair_hypothesis_strategy_kwargs(code: str) -> str:
+    """PURE repair: rewrite the KNOWN-INVALID Hypothesis strategy size kwargs
+    (``min_length=`` -> ``min_size=``, ``max_length=`` -> ``max_size=``) in a model-generated
+    pytest oracle, so a mis-emitted property test COLLECTS instead of raising ``TypeError`` at
+    import. Idempotent, and a no-op (byte-identical) on code that has nothing to repair.
+
+    Scope + safety (deliberately conservative — this touches the measurement instrument):
+
+      * NO-OP unless the module references ``hypothesis`` AND contains one of the target kwarg
+        names; a non-hypothesis oracle (or a clean one) is returned BYTE-IDENTICAL.
+      * AST-scoped to CALL-SITE keyword arguments only (``ast.keyword`` nodes). Function-
+        parameter DEFAULTS (``def f(min_length=1)``), plain assignments (``min_length = 1``),
+        dict keys, string literals and comments are NOT ``ast.keyword`` nodes and are NEVER
+        touched — verified against CPython's AST.
+      * Renames are SURGICAL byte-offset edits over the ORIGINAL source (``col_offset`` is a
+        utf-8 byte offset), so formatting, comments and the rest of every line are preserved;
+        this is not an ``ast.unparse`` round-trip.
+      * Fail-safe: any parse failure, or any edit whose byte slice does not verify against the
+        expected identifier, returns the ORIGINAL code unchanged. The caller's existing
+        ``ast.parse`` + ``_has_test_function`` gate then makes the fail-closed decision
+        (empty result -> honest job-acceptance not-run, never an implied pass).
+
+    Boundary (documented, accepted): within a hypothesis-importing oracle a ``min_length=`` /
+    ``max_length=`` keyword argument passed to a genuinely NON-hypothesis callable would also be
+    renamed. This is vanishingly unlikely in a generated property-test oracle; these names are
+    never valid on a Hypothesis strategy, so the rewrite is a correctness improvement wherever a
+    strategy is the target, and any rewrite that produced invalid syntax is caught downstream."""
+    if not code or "hypothesis" not in code:
+        return code
+    if not any(name in code for name in _HYPOTHESIS_KWARG_RENAMES):
+        return code
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError):
+        return code
+    # (lineno, byte col_offset of the arg NAME, old_name, new_name) per call-site kwarg.
+    edits: list[tuple[int, int, str, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.keyword) and node.arg in _HYPOTHESIS_KWARG_RENAMES:
+            lineno = getattr(node, "lineno", None)
+            col = getattr(node, "col_offset", None)
+            if lineno is None or col is None:  # position missing (shouldn't happen on 3.9+)
+                return code
+            edits.append((lineno, col, node.arg, _HYPOTHESIS_KWARG_RENAMES[node.arg]))
+    if not edits:
+        return code
+    lines = code.splitlines(keepends=True)
+    by_line: dict[int, list[tuple[int, str, str]]] = {}
+    for lineno, col, old, new in edits:
+        by_line.setdefault(lineno, []).append((col, old, new))
+    for lineno, line_edits in by_line.items():
+        idx = lineno - 1
+        if idx < 0 or idx >= len(lines):
+            return code  # out-of-range position -> refuse the whole repair, keep original
+        raw = lines[idx].encode("utf-8")
+        # Apply right-to-left within a line so an earlier edit's column stays valid.
+        for col, old, new in sorted(line_edits, key=lambda e: e[0], reverse=True):
+            old_b = old.encode("utf-8")
+            if raw[col:col + len(old_b)] != old_b:
+                return code  # byte slice did not verify -> refuse, keep original (fail-safe)
+            raw = raw[:col] + new.encode("utf-8") + raw[col + len(old_b):]
+        lines[idx] = raw.decode("utf-8")
+    return "".join(lines)
+
+
 def generate_acceptance_oracle(
     goal: str,
     spec: "AcceptanceSpec",
@@ -2022,6 +2098,11 @@ def generate_acceptance_oracle(
     code = _extract_python_code(raw)
     if not code:
         return ""
+    # Repair the 14B's known-invalid Hypothesis strategy size kwargs BEFORE structural
+    # validation, so a mis-emitted property test collects instead of TypeError-ing at import
+    # (battery job B1). A no-op on an oracle that doesn't use those kwargs; still fail-closed
+    # — if repair somehow produced invalid code the ast.parse below rejects it.
+    code = _repair_hypothesis_strategy_kwargs(code)
     try:
         tree = ast.parse(code)
     except (SyntaxError, ValueError):  # ValueError: source with NULs etc.
@@ -2242,6 +2323,10 @@ def generate_job_acceptance_oracle(
         code = _extract_python_code(raw)
         if not code:
             return ("", "")
+        # Repair the known-invalid Hypothesis size kwargs before structural validation, so a
+        # mis-emitted property test collects instead of TypeError-ing at import (battery job
+        # B1). No-op on oracles without those kwargs; still fail-closed via the ast.parse below.
+        code = _repair_hypothesis_strategy_kwargs(code)
         try:
             tree = ast.parse(code)
         except (SyntaxError, ValueError):

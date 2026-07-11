@@ -354,6 +354,16 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         rationale="A force-killed process should vanish fast — a short window keeps the teardown moving toward the unconditional 14B restore.",
         review="Tracks the first-window row; both retire together with an OVMS exit event.",
     ),
+    TimeoutEntry(
+        name="ACP driver semantic idle bound (no session/update = wedged)",
+        module="tools.dispatch_harness.acp_coder",
+        attribute="ACP_IDLE_TIMEOUT_S",
+        seconds=120.0,
+        surface="ACP coder driver (#775) → the persistent opencode-acp session watchdog (dormant behind driver=acp)",
+        incident="#759 ACP spike — the healthy 30B run's MAX inter-event gap measured 83 s (the cold-prefill wait before the first token; p99 54 s, 0 gaps > 90 s), so a wedged coder is distinguishable from a thinking one at 120 s",
+        rationale="120 s clears the worst measured healthy gap (83 s) with margin, yet catches a true hang FASTER than the stdin path's 240 s transcript-idle — and on a DIRECT semantic signal that cannot confuse 'thinking' with 'dead' (the #687 CPU-false-doom class the ACP stream retires). Dormant: only fires when driver=acp.",
+        review="Re-measure the healthy inter-event gap distribution if the coder model, OVMS batching, or prefix-cache posture changes (L195 era-rot); shrink toward the measured p99 if the cold-prefill wait drops.",
+    ),
 )
 
 

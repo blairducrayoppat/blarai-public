@@ -533,6 +533,13 @@ TOOL_CALL_ALLOWLIST: frozenset[str] = frozenset({
     # instead of leaving raw <tool_call> text as the user-visible answer.
     "search_knowledge",
     "web_search",
+    # #770 M2 W1 — propose_preference. GUARDED DRAFT surface in tools._REGISTRY:
+    # it RENDERS a confirm card and stages verbatim bytes; it performs NO store
+    # write (P8 — the write happens only via the operator-typed /remember-confirm,
+    # which rides the operator preference write door). Listed here so a model
+    # emission routes to the AO's session-aware proposal handler (which intercepts
+    # it before tools.execute), not to the unauthorized-tool break.
+    "propose_preference",
 })
 """Authorized tool-call identifiers. Any reference outside this set is blocked.
 

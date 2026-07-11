@@ -73,6 +73,16 @@ public sealed partial class MainWindow : Window
         // Headless-coding dispatch to the agentic-setup fleet (brief §9) — parsed
         // by the GATEWAY (transport.py parse_dispatch_command -> DispatchCoordinator).
         "/dispatch",
+        // Operator-preference memory (#770 M1) — parsed by the GATEWAY
+        // (transport.py parse_preference_command -> PreferencesCoordinator).
+        // /remember saves the operator's verbatim words; /preferences lists/edits/deletes.
+        "/remember", "/preferences",
+        // Operator-preference PROPOSAL confirm/dismiss (#770 M2 W1) — resolve a
+        // card the 14B proposed via propose_preference; the proposal card's
+        // Save/Dismiss buttons emit these with the card's staging token. They
+        // ride the SAME PREFERENCE_WRITE door (P8) — the model never re-supplies
+        // the body, only the 16-hex token crosses.
+        "/remember-confirm", "/remember-dismiss",
     };
 
     private static bool IsBackendCommand(string text)
@@ -131,6 +141,15 @@ public sealed partial class MainWindow : Window
         // pixels inline. The delegate carries bytes only — display-only, no Uri /
         // network / launch path (see MarkdownBlock.ImageBytesResolver).
         Controls.MarkdownBlock.ImageBytesResolver = _backend.ResolveImageAsync;
+
+        // Preference proposal card (#770 M2 W1): the card's Save/Dismiss buttons
+        // send /remember-confirm <token> / /remember-dismiss <token> as a PROMPT —
+        // the gateway intercepts it before the model (P8), exactly as if the
+        // operator typed the command. The token is the only thing that crosses;
+        // the AO commits the store-side staged verbatim bytes (confirm-hop
+        // integrity).
+        Controls.MarkdownBlock.ProposalCommandSender =
+            command => SubmitPromptAsync(command, speak: false);
 
         this.Activated += OnFirstActivated;
     }
