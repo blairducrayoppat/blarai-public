@@ -140,12 +140,23 @@ def test_flat_verdict_stopped_dominates_cancelled():
 # ---------------------------------------------------------------------------
 
 
-def test_flat_scorecard_has_same_keys_as_plan_scorecard():
+def test_flat_scorecard_has_same_keys_as_plan_scorecard(tmp_path):
     """The flat card is the plan card's structural twin: same m2-scorecard/v1 keys, so
     the battery's adopt_driver_scorecard reads it identically."""
+    # #790: a representative per-task best-of-N log (new-agent-task.ps1's exact line
+    # shape) so samples_consumed recovers a REAL value via run_dir instead of the -1
+    # default — see test_flat_scorecard_samples_consumed_fallback_when_no_run_dir
+    # below for the absent-signal honesty contract, and test_integration_gate.py's
+    # test_samples_consumed_from_run_dir_* for the focused parser/summing locks.
+    (tmp_path / "run-fleet-a.log").write_text(
+        "  Best-of-N: 2 candidate(s) -> no candidate passed; kept the best of 2 by gate rank.\n"
+        "RESULT: MERGED to main\n",
+        encoding="utf-8",
+    )
     sc = sd.build_flat_scorecard(
         [_outcome("a", "MERGED")], run_id="R-FLAT", repo="battery-x", goal="g",
         wall_clock_s=1.5, cancelled=False, stopped=False, degraded=False,
+        run_dir=tmp_path,
     )
     assert sc["schema"] == sd.SCORECARD_SCHEMA
     for key in ("run_id", "plan_id", "goal", "repo", "verdict", "attribution",
@@ -154,9 +165,12 @@ def test_flat_scorecard_has_same_keys_as_plan_scorecard():
                 "interventions", "redecompose_spent", "not_measured", "notes",
                 "evidence"):
         assert key in sc, f"flat scorecard missing {key}"
-    # Adoption conventions: -1 == not instrumented; oracle_status is not-run (no oracle);
-    # waves empty; job_acceptance not-run (flat mode grades no integrated whole).
-    assert sc["samples_consumed"] == -1
+    # Adoption conventions: oracle_status is not-run (no oracle); waves empty;
+    # job_acceptance not-run (flat mode grades no integrated whole).
+    # #790: samples_consumed is RECOVERED (run_dir was supplied above) — measured
+    # this time, so it drops out of not_measured too.
+    assert sc["samples_consumed"] == 2
+    assert "samples_consumed" not in sc["not_measured"]
     assert sc["waves"] == []
     assert sc["job_acceptance"] == {"status": "not-run", "oracle_path": "", "evidence": ""}
     assert sc["evidence"]["oracle_status"] == "not-run"
@@ -165,6 +179,20 @@ def test_flat_scorecard_has_same_keys_as_plan_scorecard():
     assert sc["evidence"]["mode"] == "flat"
     assert sc["tasks"] == [{"id": "a", "status": "", "result": "MERGED",
                             "detail": "RESULT: MERGED"}]
+
+
+def test_flat_scorecard_samples_consumed_fallback_when_no_run_dir():
+    """#790 honesty contract: no run_dir supplied (the byte-identical default for
+    every caller that predates this feature) -> samples_consumed stays -1 ("not
+    instrumented") and is named in not_measured. This is the exact assertion
+    test_flat_scorecard_has_same_keys_as_plan_scorecard carried before run_dir
+    existed, now isolated under its own name."""
+    sc = sd.build_flat_scorecard(
+        [_outcome("a", "MERGED")], run_id="R-FLAT", repo="battery-x", goal="g",
+        wall_clock_s=1.5, cancelled=False, stopped=False, degraded=False,
+    )
+    assert sc["samples_consumed"] == -1
+    assert "samples_consumed" in sc["not_measured"]
 
 
 def test_flat_scorecard_interventions_and_cancelled_flags():

@@ -44,13 +44,40 @@ class TestUiGatewayConstants:
     # ── Boot-Phase-3 Handshake ────────────────────────────────────
 
     def test_pa_handshake_max_retries(self) -> None:
-        assert gw_constants.PA_HANDSHAKE_MAX_RETRIES == 3
+        # #808: derived from the 180 s budgeted schedule (was a hand-pinned 3;
+        # the ~15-18 s aggregate contradicted the documented cold-14B ceiling).
+        assert gw_constants.PA_HANDSHAKE_MAX_RETRIES == 16
 
     def test_pa_handshake_backoff_base_s(self) -> None:
         assert gw_constants.PA_HANDSHAKE_BACKOFF_BASE_S == 1.0
 
     def test_pa_handshake_timeout_s(self) -> None:
         assert gw_constants.PA_HANDSHAKE_TIMEOUT_S == 5.0
+
+    def test_pa_handshake_backoff_cap_s(self) -> None:
+        # #808: tail probe interval — worst-case staleness after the PA
+        # becomes ready inside the budget.
+        assert gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S == 15.0
+
+    def test_pa_handshake_budget_s(self) -> None:
+        # #808: aggregate planned backoff = the documented cold-14B-load
+        # ceiling (real_backend_ready / AoReensurer.boot_wait_s = 180 s).
+        assert gw_constants.PA_HANDSHAKE_BUDGET_S == 180.0
+
+    def test_pa_handshake_schedule_shape(self) -> None:
+        """#808: the schedule is the executable truth — pin its shape.
+
+        Early attempts stay fast (the healthy path is unchanged; a quick
+        recovery is caught in seconds), the tail probes every 15 s, and the
+        planned sleeps sum EXACTLY to the budget.
+        """
+        schedule = gw_constants.pa_handshake_backoff_schedule()
+        assert schedule[:4] == (1.0, 2.0, 4.0, 8.0)
+        assert set(schedule[4:]) == {gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S}
+        assert sum(schedule) == gw_constants.PA_HANDSHAKE_BUDGET_S
+        assert all(d > 0 for d in schedule)
+        assert max(schedule) == gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S
+        assert len(schedule) + 1 == gw_constants.PA_HANDSHAKE_MAX_RETRIES
 
     def test_prompt_response_timeout_s(self) -> None:
         # Raised 120 -> 180 (#561): headroom for a vision turn (VLM load +

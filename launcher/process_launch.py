@@ -49,6 +49,7 @@ from __future__ import annotations
 import ctypes
 import logging
 import subprocess
+import time
 from ctypes import wintypes
 from typing import Any
 
@@ -68,6 +69,21 @@ _SE_GROUP_INTEGRITY = 0x20
 _DISABLE_MAX_PRIVILEGE = 0x1  # CreateRestrictedToken flag
 _WIN_BUILTIN_ADMINISTRATORS_SID = 26  # WELL_KNOWN_SID_TYPE.WinBuiltinAdministratorsSid
 _INFINITE = 0xFFFFFFFF
+
+# WaitForSingleObject return codes (winbase.h) — read by the child-wait loop.
+_WAIT_OBJECT_0 = 0x00000000  # the handle is signaled: the child has exited
+_WAIT_TIMEOUT = 0x00000102  # the supervisory chunk elapsed; the child is still up
+_WAIT_FAILED = 0xFFFFFFFF  # the wait itself failed (treat the child as gone)
+
+#: Supervisory wake cadence for the launcher's WinUI child-wait (#812 / AUDIT-13).
+#: The child-wait blocks the launcher's MAIN thread until the WinUI surface
+#: exits; the previous single unconditional ``WaitForSingleObject(_INFINITE)``
+#: made launcher liveness hostage to a wedged child handle with no supervisory
+#: wake. The wait now loops in bounded chunks of this length instead, so it can
+#: never sit in one un-woken INFINITE syscall. This is a POLL CADENCE, not an
+#: abort budget — with ``timeout=None`` (the launcher's call) the wait still
+#: blocks until the child exits. REGISTERED: ``shared/timeout_registry.py``.
+_WAIT_SUPERVISORY_INTERVAL_S = 5.0
 
 
 class _STARTUPINFOW(ctypes.Structure):
@@ -160,7 +176,24 @@ class _HandleProc:
         self.pid = pid
         self.returncode: int | None = None
 
-    def wait(self) -> int:
+    def wait(self, timeout: float | None = None) -> int:
+        """Block until the child exits; raise on *timeout* if one is given.
+
+        Drop-in for ``subprocess.Popen.wait(timeout=None)``. The wait is a
+        BOUNDED-CHUNK poll loop (#812 / AUDIT-13): instead of one unconditional
+        ``WaitForSingleObject(_INFINITE)`` — which wedged the launcher's main
+        thread on a stuck child handle with no supervisory wake — it waits in
+        ``_WAIT_SUPERVISORY_INTERVAL_S`` chunks and re-checks each lap. With the
+        default ``timeout=None`` the semantics are UNCHANGED (block until the
+        child exits, return its code); a supplied ``timeout`` (seconds) bounds
+        the wait and raises ``subprocess.TimeoutExpired`` on expiry — matching
+        Popen so a supervisory caller can impose a real deadline.
+        """
+        # Popen-parity: a completed wait is cached, so re-calling never re-closes
+        # the (already-closed) handle.
+        if self.returncode is not None:
+            return self.returncode
+
         k32 = ctypes.WinDLL("kernel32", use_last_error=True)
         k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
         k32.WaitForSingleObject.restype = wintypes.DWORD
@@ -172,7 +205,33 @@ class _HandleProc:
         k32.CloseHandle.argtypes = [wintypes.HANDLE]
         k32.CloseHandle.restype = wintypes.BOOL
 
-        k32.WaitForSingleObject(self._h, _INFINITE)
+        chunk_ms = max(1, int(_WAIT_SUPERVISORY_INTERVAL_S * 1000))
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while True:
+            wait_ms = chunk_ms
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    # Handle intentionally NOT closed — the child is still up and
+                    # a caller may wait() again (Popen.wait(timeout) semantics).
+                    raise subprocess.TimeoutExpired(
+                        cmd=f"winui pid {self.pid}", timeout=timeout
+                    )
+                wait_ms = min(chunk_ms, max(1, int(remaining * 1000)))
+            result = int(k32.WaitForSingleObject(self._h, wait_ms))
+            if result == _WAIT_OBJECT_0:
+                break
+            if result == _WAIT_FAILED:
+                err = ctypes.get_last_error()
+                logger.warning(
+                    "WinUI child-wait: WaitForSingleObject failed (err %s); "
+                    "treating child pid %s as exited.",
+                    err,
+                    self.pid,
+                )
+                break
+            # _WAIT_TIMEOUT → the supervisory chunk elapsed; loop and re-check.
+
         code = wintypes.DWORD()
         k32.GetExitCodeProcess(self._h, ctypes.byref(code))
         self.returncode = int(code.value)

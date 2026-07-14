@@ -43,6 +43,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from shared.fleet import clarify as _clarify
+from shared.fleet import revise as _revise
 from shared.fleet.decompose import DEFAULT_MAX_TASKS, DecomposeResult, decompose_request
 
 # ---------------------------------------------------------------------------
@@ -368,6 +370,14 @@ class AcceptanceSpec:
     #: ``to_dict``/``from_dict`` like ``build_plan``; threaded onto every task as
     #: ``asset_specs_json``; consumed AO-side pre-swap. Default ``()`` == today.
     asset_specs: tuple[dict, ...] = ()
+    #: Requirements-clarification record (#819) — a tuple of ``{question, answer, assumed}``
+    #: dicts, the operator's answers (or the "just decide" defaults, ``assumed=True``) from
+    #: the CLARIFY stage. DISPLAY + RECORD only: rendered on the plan card
+    #: (:func:`render_criteria_preview`) and persisted in the acceptance record; the enriched
+    #: text that actually shapes the build rides the goal (see :mod:`shared.fleet.clarify`).
+    #: Attached by the gateway coordinator AFTER planning. Rides ``to_dict``/``from_dict`` like
+    #: ``asset_specs``; default ``()`` == today (every existing spec/wire payload unchanged).
+    clarifications: tuple[dict, ...] = ()
 
     @property
     def objective(self) -> tuple[AcceptanceCriterion, ...]:
@@ -386,6 +396,7 @@ class AcceptanceSpec:
             "assumptions": list(self.assumptions),
             "build_plan": self.build_plan,
             "asset_specs": [dict(a) for a in self.asset_specs],
+            "clarifications": [dict(c) for c in self.clarifications],
         }
 
     @classmethod
@@ -412,6 +423,7 @@ class AcceptanceSpec:
             assumptions=assumptions,
             build_plan=build_plan,
             asset_specs=_coerce_asset_specs(d.get("asset_specs")),
+            clarifications=_coerce_clarifications(d.get("clarifications")),
         )
 
 
@@ -439,6 +451,19 @@ class PlanResult:
     spec: AcceptanceSpec = field(default_factory=lambda: AcceptanceSpec(goal=""))
     fell_back: bool = False  # True if the task decomposition fell back to a single task
     message: str = ""
+    #: Requirements-clarification questions (#819) — a list of ``{axis, question}`` dicts.
+    #: NON-EMPTY only on the CLARIFY early-return: when the goal is underspecified and the
+    #: stage is enabled, :func:`generate_plan` asks these BEFORE decompose and returns here
+    #: with NO tasks/spec yet (the gateway coordinator renders them + holds the dispatch).
+    #: Empty ``()`` (a sufficient goal, clarify disabled, or a battery card) == today's flow.
+    questions: list[dict] = field(default_factory=list)
+    #: Plan-revision edit ops (#820) — a list of ``{op, ref, task, prompt}`` dicts. NON-EMPTY
+    #: only on the REVISE early-return: when the goal carries the revise sentinel (the operator
+    #: gave feedback on a pending plan) and the stage is enabled, :func:`generate_plan` runs the
+    #: revise model call and returns here with NO tasks/spec (the coordinator APPLIES the ops to
+    #: the existing plan — a keep is byte-identical, an add/revise is new). Empty ``()`` == not a
+    #: revise request (or a fail-soft empty revision -> the coordinator re-renders the original).
+    revision: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -853,6 +878,34 @@ def _coerce_asset_specs(raw) -> tuple[dict, ...]:
             "height": max(_ASSET_MIN_EDGE, min(_ASSET_MAX_EDGE, height)),
             "target_rel_path": rel,
         })
+    return tuple(out)
+
+
+#: A clarification answer/question shorter than this (after strip) is vacuous and dropped.
+_MIN_CLARIFICATION_LEN = 2
+
+
+def _coerce_clarifications(raw) -> tuple[dict, ...]:
+    """Reconstruct ``clarifications`` (#819) from a ``to_dict``/wire payload fail-closed:
+    keep only well-shaped ``{question, answer, assumed}`` dicts with a non-blank answer;
+    coerce ``assumed`` to a bool; drop blanks / non-dicts. ``()`` for a non-list. Never
+    raises — a malformed record must never crash a plan render or the acceptance report."""
+    if not isinstance(raw, list):
+        return ()
+    out: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        answer = str(item.get("answer", "")).strip()
+        if len(answer) < _MIN_CLARIFICATION_LEN:
+            continue
+        out.append(
+            {
+                "question": str(item.get("question", "")).strip(),
+                "answer": answer,
+                "assumed": bool(item.get("assumed", False)),
+            }
+        )
     return tuple(out)
 
 
@@ -1426,6 +1479,31 @@ def _oracle_import_contract(oracle_code: str) -> list[str]:
     return out
 
 
+def _oracle_signature_contract_line(oracle_code: str) -> str:
+    """rec-1 v3 (#826): the SIGNATURES the protected oracle CALLS, surfaced to the coder so
+    each callable is built with an ACCEPTING arity/keywords — not just a resolvable name.
+
+    The B4n2 park: the oracle called ``check_answer('cat', 'cat')`` while the coder built a
+    one-argument ``check_answer``, so the assertion could never pass and the job parked at
+    2am with no signal. #822/rec-1 surface module + import names; this adds the call shapes
+    (``check_answer(2 positional args)``, ``total()``). Fail-soft: no derivable call → ''
+    (the importable-names contract above still stands, byte-identical to pre-#826)."""
+    try:
+        from shared.fleet.interface_contract import derive_interface_contract
+
+        lines = derive_interface_contract(oracle_code).render_lines()
+    except Exception:  # noqa: BLE001 — surfacing must never break plan compilation
+        return ""
+    if not lines:
+        return ""
+    joined = "; ".join(f"`{ln}`" for ln in lines)
+    return (
+        "\nThe acceptance tests CALL these functions with these argument shapes, so build "
+        f"each to accept exactly that call: {joined}. A different signature (a wrong number "
+        "of arguments, or a missing keyword) fails the assertion even when the name resolves."
+    )
+
+
 def compile_prompts(
     tasks: list[dict], spec: AcceptanceSpec, *, oracle_code: str = ""
 ) -> list[dict]:
@@ -1523,6 +1601,7 @@ def compile_prompts(
             "restored to the original before grading, so changing it cannot help and only wastes "
             "the attempt. You may add new code files freely; you may NOT modify that test file."
             + contract_line
+            + _oracle_signature_contract_line(oracle_code)
         )
         only["prompt"] = f"{only['prompt']}\n\n{oracle_block}"
         only["acceptance_test_code"] = oracle_code
@@ -1768,6 +1847,7 @@ def render_criteria_preview(
     *,
     ecosystem: str = "unknown",
     tasks: list | None = None,
+    revise_hint: str = "",
 ) -> str:
     """The confirm-time preview the operator approves (PLAN -> WAIT).
 
@@ -1792,6 +1872,11 @@ def render_criteria_preview(
     do / look / behave) before approving a long build, and reject + add detail if one is
     wrong. Display-only: no question/answer turn. Empty/absent assumptions (a fully-
     specified goal, and every existing caller) render exactly as before — no section.
+
+    When ``revise_hint`` (#820) is non-empty, the approve/reject footer also offers the
+    free-text revise verb (the coordinator supplies the exact phrasing incl. the honest
+    remaining-revision count). Empty (every pre-#820 caller, and a plan at its revision cap)
+    renders the original approve/reject-only footer byte-identically.
     """
     lines = [f"Here's what I'll treat as DONE for: {spec.goal}", ""]
     friendly = _friendly_surface(spec)
@@ -1808,6 +1893,22 @@ def render_criteria_preview(
             "if I got one wrong):"
         )
         lines.extend(f"  - {a}" for a in spec.assumptions)
+        lines.append("")
+    # Requirements-clarification record (#819): what the operator told me when I asked, or
+    # what I decided for them ("just decide for me" -> assumed defaults). Display-only, so a
+    # wrong answer/default is caught before the ~30-minute build. Absent (a sufficient goal /
+    # clarify off) -> no section, byte-identical to before.
+    answered = [c for c in spec.clarifications if not c.get("assumed")]
+    assumed = [c for c in spec.clarifications if c.get("assumed")]
+    if answered:
+        lines.append("Here's what you told me when I asked (this shaped the plan):")
+        lines.extend(f"  - {str(c.get('answer', '')).strip()}" for c in answered)
+        lines.append("")
+    if assumed:
+        lines.append(
+            "You asked me to decide, so I assumed these (reject and tell me if one's wrong):"
+        )
+        lines.extend(f"  - {str(c.get('answer', '')).strip()}" for c in assumed)
         lines.append("")
     obj = spec.objective
     hum = spec.human
@@ -1834,7 +1935,18 @@ def render_criteria_preview(
             "verify the behavior yourself.",
         ]
 
-    lines += ["", "Reply `/dispatch approve` to start, or `/dispatch reject` to cancel."]
+    # #820: when the plan is revisable, the footer also offers the free-text refine verb (the
+    # coordinator supplies the exact phrasing incl. the honest remaining-revisions count). An
+    # empty ``revise_hint`` (every pre-#820 caller, and a plan at its revision cap) renders the
+    # original approve/reject-only footer byte-identically.
+    if revise_hint:
+        lines += [
+            "",
+            "Reply `/dispatch approve` to start, `/dispatch reject` to cancel, or "
+            + revise_hint,
+        ]
+    else:
+        lines += ["", "Reply `/dispatch approve` to start, or `/dispatch reject` to cancel."]
     return "\n".join(lines)
 
 
@@ -2148,6 +2260,11 @@ JOB_ORACLE_ALLOWED_PATHS: frozenset[str] = frozenset(
 #: before the task is enqueued to the fleet).
 JOB_ORACLE_CODE_KEY = "job_oracle_code"
 JOB_ORACLE_PATH_KEY = "job_oracle_path"
+#: The task-dict key carrying the #821 oracle-QA evidence blob (JSON) from PLAN to the
+#: swap driver — stamped on the FINAL compiled task by generate_plan, read (not enqueued)
+#: driver-side by :func:`extract_job_oracle_qa`, and merged with the seed-time F2P gate
+#: into the run's ``oracle-qa.json``. Popped from the cleaned queue tasks like the code/path.
+JOB_ORACLE_QA_KEY = "job_oracle_qa_json"
 
 _JOB_ORACLE_TEMPLATE_PY = (
     "Write a COMPLETE Python pytest test file: the executable JOB-LEVEL ACCEPTANCE "
@@ -2273,6 +2390,12 @@ def generate_job_acceptance_oracle(
 ) -> tuple[str, str]:
     """PLAN-time: the 14B writes the JOB-LEVEL spec-blind oracle for a MULTI-task job.
 
+    This is the PURE authoring primitive (unchanged): it emits + structurally validates
+    ONE oracle. The QUALITY-3 (#821) validation gate — the static well-posedness stages,
+    the criterion→test traceability matrix, and the bounded regeneration loop — wraps this
+    in :func:`author_and_qa_job_oracle`; ``generate_plan`` calls THAT so every dispatch
+    oracle is validated before it seeds.
+
     Returns ``(code, repo_relative_path)`` or ``("", "")`` — all fail-closed, never
     raising — when ANY of these holds:
 
@@ -2340,14 +2463,60 @@ def generate_job_acceptance_oracle(
     return (code, rel_path)
 
 
+def author_and_qa_job_oracle(
+    goal: str,
+    spec: "AcceptanceSpec",
+    tasks: list[dict],
+    *,
+    generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
+    reauthor: bool = True,
+) -> tuple[str, str, dict]:
+    """PLAN-time: author the job oracle (:func:`generate_job_acceptance_oracle`) AND run
+    it through the QUALITY-3 (#821) validation gate before it seeds.
+
+    Returns ``(oracle_code, rel_path, qa_evidence)``. On a clean or SOFT-only validation
+    the (possibly regenerated) code is returned with a ``seed``/``seed-partial`` evidence
+    stamp; on a HARD residual the oracle is REFUSED (code ``""`` — a bad oracle is worse
+    than none: the driver then records job acceptance not-run, honest and counted). The
+    ``qa_evidence`` dict (validation-class counts + coverage + regeneration accounting)
+    rides the final task onward and is merged with the seed-time F2P gate.
+
+    Fail-soft is absolute: an empty authored oracle, a disabled QA
+    (``BLARAI_ORACLE_QA`` off), or ANY unexpected error leaves the dispatch exactly as
+    the pre-#821 author-only path did — the authored ``(code, path)`` seeds unvalidated
+    (never a crash, never a blocked plan). ``reauthor=False`` validates + stamps a
+    caller-authorised oracle (the #752 override branch) without rewriting it."""
+    code, path = generate_job_acceptance_oracle(goal, spec, tasks, generate_fn=generate_fn)
+    if not code or not path:
+        return (code, path, {})
+    try:
+        from shared.fleet import oracle_qa
+
+        if not oracle_qa.oracle_qa_enabled():
+            return (code, path, {})
+        ecosystem = "python" if path.endswith(".py") else "node"
+        result = oracle_qa.validate_authored_oracle(
+            code, ecosystem, spec, tasks,
+            generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
+            reauthor=reauthor,
+        )
+        if result.verdict == "refuse":
+            return ("", "", result.to_evidence())
+        return (result.oracle_code, path, result.to_evidence())
+    except Exception:  # noqa: BLE001 — QA must never crash or block a plan (fail-soft)
+        return (code, path, {})
+
+
 def extract_job_oracle(tasks: list[dict]) -> tuple[list[dict], str, str]:
     """Driver-side: pop the riding job-oracle fields off the task dicts.
 
     Returns ``(cleaned_tasks, oracle_code, oracle_rel_path)`` — fresh task copies with
-    :data:`JOB_ORACLE_CODE_KEY`/:data:`JOB_ORACLE_PATH_KEY` removed (the fleet queue
-    never needs the blob), and the first non-empty code/path found. A path outside
-    :data:`JOB_ORACLE_ALLOWED_PATHS` is REFUSED (dropped to ``("", "")`` — the §10 S1
-    pinned-path containment; a tampered swap-state cannot aim the oracle write)."""
+    :data:`JOB_ORACLE_CODE_KEY`/:data:`JOB_ORACLE_PATH_KEY`/:data:`JOB_ORACLE_QA_KEY`
+    removed (the fleet queue never needs the blobs), and the first non-empty code/path
+    found. A path outside :data:`JOB_ORACLE_ALLOWED_PATHS` is REFUSED (dropped to
+    ``("", "")`` — the §10 S1 pinned-path containment; a tampered swap-state cannot aim
+    the oracle write)."""
     cleaned: list[dict] = []
     code = ""
     path = ""
@@ -2355,12 +2524,25 @@ def extract_job_oracle(tasks: list[dict]) -> tuple[list[dict], str, str]:
         c = dict(t)
         raw_code = str(c.pop(JOB_ORACLE_CODE_KEY, "") or "")
         raw_path = str(c.pop(JOB_ORACLE_PATH_KEY, "") or "")
+        c.pop(JOB_ORACLE_QA_KEY, None)  # keep the qa blob out of the enqueued task
         if raw_code and raw_path and not code:
             code, path = raw_code, raw_path
         cleaned.append(c)
     if path not in JOB_ORACLE_ALLOWED_PATHS:
         return (cleaned, "", "")
     return (cleaned, code, path)
+
+
+def extract_job_oracle_qa(tasks: list[dict]) -> str:
+    """Driver-side: READ (never pop) the #821 oracle-QA evidence JSON riding the tasks —
+    the first non-empty :data:`JOB_ORACLE_QA_KEY` found, or ``""``. Read from the ORIGINAL
+    tasks (before :func:`extract_job_oracle` cleans copies), so the seed gate can merge
+    the plan-time findings with its own F2P baseline. Pure; never raises."""
+    for t in tasks:
+        raw = t.get(JOB_ORACLE_QA_KEY)
+        if raw:
+            return str(raw)
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -2380,6 +2562,10 @@ def generate_plan(
     max_assets: int = DEFAULT_MAX_ASSETS,
     decomposition_override: "DecompositionOverride | None" = None,
     structured_generate_fn: "Callable[[str, str], str] | None" = None,
+    clarify: bool = False,
+    requirements: str = "",
+    max_questions: int = _clarify.DEFAULT_MAX_QUESTIONS,
+    revise: bool = False,
 ) -> PlanResult:
     """The 14B-resident PLAN step: decompose into tasks + an AcceptanceSpec, validate both,
     compile the criteria into the task prompts.
@@ -2399,7 +2585,85 @@ def generate_plan(
     build-signal, asset-specs — is tried grammar-constrained FIRST with a transparent
     fail-soft fallback to the free-text path; ``None`` (the default) is byte-identical to
     today. The oracle calls stay unconstrained (code emissions, not JSON).
+
+    #819 — the requirements-clarification stage. When ``clarify`` is True AND no
+    ``requirements`` were supplied AND there is no ``decomposition_override`` (a battery card
+    carries its own spec — never clarify a headless card dispatch), the 14B is asked for a FEW
+    targeted questions about the underspecified decision axes BEFORE any decompose. If it
+    returns questions, this RETURNS EARLY with them in :attr:`PlanResult.questions` and NO
+    tasks/spec — the gateway coordinator renders them, collects the operator's answers, and
+    re-plans with those answers threaded through ``requirements``. A sufficient goal yields no
+    questions and planning proceeds unchanged (the sufficiency check, not a mandatory quiz).
+    ``clarify=False`` (the default) is byte-identical to today. When ``requirements`` is
+    non-empty (the re-plan after answers), that compact block is threaded into decompose +
+    criteria + assumptions + build-signal + both oracles + EVERY compiled task prompt (the
+    coder builds to it, the oracle checks it); ``spec.goal`` stays the clean original goal.
+
+    #820 — the plan-REVISION stage. When the goal carries the revise sentinel (the operator gave
+    free-text feedback on a PENDING plan; :func:`shared.fleet.revise.compose_revision_goal`
+    embedded the feedback + the current task titles), this RETURNS EARLY with validated edit ops
+    in :attr:`PlanResult.revision` and NO tasks/spec — the gateway coordinator APPLIES the ops to
+    the existing plan (a ``keep`` is preserved byte-identically, an ``add``/``revise`` is new),
+    never a fresh decompose. Gated by ``revise`` (default False == today); ``revise=False`` on a
+    revise goal is a clean Fail-Closed refusal (the knob is off), never a fresh plan of the
+    sentinel-laden string.
     """
+    goal = (idea or "").strip()
+    req = (requirements or "").strip()
+
+    # #820 REVISE: a revise request rides the goal via the revise sentinel (feedback + the
+    # current plan's task titles). Detected FIRST — before clarify/decompose — so a revise goal
+    # never falls through to a fresh plan. The model proposes edit ops; the ruler disposes; the
+    # coordinator applies them to the existing plan. Fail-soft to () inside the helper (the
+    # coordinator then re-renders the original untouched).
+    if _revise.REVISE_SENTINEL in (idea or ""):
+        clean_goal, feedback, titles = _revise.split_revision_goal(idea)
+        if not revise:
+            return PlanResult(ok=False, message="Plan revision is turned off (Fail-Closed).")
+        ops = _revise.generate_revision_ops(
+            clean_goal,
+            titles,
+            feedback,
+            generate_fn=generate_fn,
+            structured_generate_fn=structured_generate_fn,
+        )
+        return PlanResult(
+            ok=True,
+            revision=[o.to_dict() for o in ops],
+            message=f"Proposed {len(ops)} plan-revision step(s).",
+        )
+
+    # #819 CLARIFY: ask a few targeted questions BEFORE decompose when the goal is
+    # underspecified and the stage is on. Skipped for a re-plan (requirements already given)
+    # and for a battery/headless card dispatch (decomposition_override present — the card IS
+    # the spec; clarifying it would hang the operator-less harness). generate_clarifying_questions
+    # is the sufficiency check: an empty result means the goal already carries the axes, and
+    # planning proceeds unchanged. Fail-soft to () inside the helper — never blocks a dispatch.
+    if clarify and not req and decomposition_override is None:
+        # Don't waste the operator's time clarifying a goal for a repo we can't dispatch to:
+        # pre-validate the repo (the SAME check decompose runs) and only clarify a VALID repo.
+        # An invalid repo falls through to decompose, which returns the honest ok=False error.
+        from shared.fleet.decompose import validate_repo
+
+        if validate_repo(projects_dir / repo, projects_dir) is None:
+            questions = _clarify.generate_clarifying_questions(
+                goal,
+                generate_fn=generate_fn,
+                structured_generate_fn=structured_generate_fn,
+                max_questions=max_questions,
+            )
+            if questions:
+                return PlanResult(
+                    ok=True,
+                    questions=[q.to_dict() for q in questions],
+                    message=f"Asking {len(questions)} question(s) before planning.",
+                )
+
+    # The seed the sub-generations plan FROM: the goal, enriched with the clarified
+    # requirements block when present. ``spec.goal`` stays the CLEAN goal (below) so the
+    # preview/report headers never carry the block; the seed only shapes what gets built.
+    planning_seed = (goal + "\n\n" + req) if req else goal
+
     # 1. Decompose (reuses the increment-2 decomposer: validate_repo + model + ruler + fallback)
     # — UNLESS a caller passed a pre-built, authorized decomposition (``decomposition_override``,
     # #752 F1). This seam is GENERIC (no caller-/battery-specific logic here): when present, the
@@ -2419,7 +2683,7 @@ def generate_plan(
         )
     else:
         decomposed = decompose_request(
-            idea, repo, generate_fn=generate_fn, projects_dir=projects_dir,
+            planning_seed, repo, generate_fn=generate_fn, projects_dir=projects_dir,
             max_tasks=max_tasks,
             # #743: the live PLAN entry point is THIS function, so the W2 decompose hook
             # is threaded here — without it the grammar path could never fire on a real
@@ -2432,8 +2696,9 @@ def generate_plan(
     # 2. Acceptance criteria — the 14B proposes; the ruler disposes (+ a build floor).
     # #743: grammar-first over the SAME schema _parse_criteria expects; a missing/erroring
     # hook or an unusable constrained emission runs today's free-text path UNCHANGED.
-    goal = (idea or "").strip()
-    criteria_prompt = _CRITERIA_TEMPLATE.format(max_criteria=max_criteria, idea=goal)
+    # #819: the criteria plan FROM planning_seed (goal + any clarified requirements), but
+    # rule_spec keeps spec.goal the CLEAN goal so the preview header never shows the block.
+    criteria_prompt = _CRITERIA_TEMPLATE.format(max_criteria=max_criteria, idea=planning_seed)
     raw = _grammar_first(
         criteria_prompt,
         structured_generate_fn=structured_generate_fn,
@@ -2470,7 +2735,7 @@ def generate_plan(
     # #743: grammar-first (array-of-strings schema). A constrained ``[]`` is a VALID
     # answer (the fully-specified goal) — accepted, no redundant free-text retry.
     assumptions_prompt = _ASSUMPTIONS_TEMPLATE.format(
-        max_assumptions=max_assumptions, idea=goal
+        max_assumptions=max_assumptions, idea=planning_seed
     )
     raw_assumptions = _grammar_first(
         assumptions_prompt,
@@ -2501,7 +2766,7 @@ def generate_plan(
     # rebuild above regardless of order. None when the model emitted no parseable object.
     # #743: grammar-first with every field enum-pinned (incl. the ``ambiguous`` fork +
     # its real-surface ``candidates``); the parser still owns the coupling rules.
-    build_plan_prompt = _BUILD_PLAN_TEMPLATE.format(idea=goal)
+    build_plan_prompt = _BUILD_PLAN_TEMPLATE.format(idea=planning_seed)
     raw_build_plan = _grammar_first(
         build_plan_prompt,
         structured_generate_fn=structured_generate_fn,
@@ -2531,7 +2796,7 @@ def generate_plan(
     oracle_code = ""
     if decomposition_override is None and len(decomposed.tasks) == 1:
         oracle_code = generate_acceptance_oracle(
-            goal, spec, decomposed.tasks, generate_fn=generate_fn
+            planning_seed, spec, decomposed.tasks, generate_fn=generate_fn
         )
 
     # 2f. Image-asset specs — a FOURTH separate 14B call (UC-010 dispatch, SEAM A). For a
@@ -2543,7 +2808,7 @@ def generate_plan(
     # nothing and the coder falls back to inline SVG. Attached LAST (no rebuild follows), so
     # it survives; empty () leaves the compiled tasks byte-identical to today.
     asset_specs = _asset_specs_from_plan(
-        goal, spec.build_plan, generate_fn=generate_fn, max_assets=max_assets,
+        planning_seed, spec.build_plan, generate_fn=generate_fn, max_assets=max_assets,
         structured_generate_fn=structured_generate_fn,
     )
     if asset_specs:
@@ -2561,7 +2826,18 @@ def generate_plan(
     # restore-before-grade). Fail-closed to ("", "") — non-python/node ecosystems,
     # criteria-less specs, contract-less plans, and junk emissions all leave the compiled
     # tasks byte-identical to today (the driver then reports job acceptance not-run).
-    job_oracle_code, job_oracle_path = "", ""
+    # #821 (QUALITY-3): the 14B-AUTHORED oracle runs through the oracle-QA validation gate
+    # (well-posedness + criterion→test traceability + bounded regeneration) BEFORE it
+    # seeds; a HARD-defective oracle is REFUSED (dropped to "" → honest job-acceptance
+    # not-run), and the validation-class evidence rides the final task to the seed gate.
+    #
+    # Scoping (discretionary, #821): the gate's plan-time REGENERATION arm is scoped to the
+    # 14B-authored path — a CALLER-AUTHORISED override (#752 F1/F2, e.g. the M2 battery
+    # diamonds) is a deliberate oracle the caller owns, so it stays byte-identical here (no
+    # rewrite, no static-heuristic refusal that would change the battery's controlled
+    # experiment). Both paths are still protected by the DETERMINISTIC seed-time F2P gate in
+    # real_seed_job_oracle, which refuses a confirmed-vacuous oracle regardless of origin.
+    job_oracle_code, job_oracle_path, job_oracle_qa = "", "", {}
     if decomposition_override is not None:
         # The caller authored the JOB-level oracle alongside the decomposition (#752 F2); it
         # rides the final compiled task exactly like the 14B-written one below. The driver's
@@ -2569,8 +2845,9 @@ def generate_plan(
         job_oracle_code = decomposition_override.job_oracle_code
         job_oracle_path = decomposition_override.job_oracle_path
     elif len(decomposed.tasks) >= 2:
-        job_oracle_code, job_oracle_path = generate_job_acceptance_oracle(
-            goal, spec, decomposed.tasks, generate_fn=generate_fn
+        job_oracle_code, job_oracle_path, job_oracle_qa = author_and_qa_job_oracle(
+            goal, spec, decomposed.tasks, generate_fn=generate_fn,
+            structured_generate_fn=structured_generate_fn,
         )
 
     # 3. Compile behavior/smoke criteria into the task prompts (fleet schema unchanged). The
@@ -2578,9 +2855,21 @@ def generate_plan(
     # oracle was generated, the lone feature task is told to code against it (carrying it for the
     # fleet to seed); an empty oracle leaves the compile byte-identical to today.
     tasks = compile_prompts(decomposed.tasks, spec, oracle_code=oracle_code)
+    # #819: the clarified requirements ride EVERY task context so the coder builds to them —
+    # a compact, clearly-delimited section appended to each task prompt (in addition to
+    # having seeded decompose/criteria/oracle above). No-op byte-identical when absent.
+    if req:
+        req_block = f"\n\n--- Clarified requirements (build to these) ---\n{req}"
+        for t in tasks:
+            t["prompt"] = f"{t.get('prompt', '')}{req_block}"
     if job_oracle_code and job_oracle_path and tasks:
         tasks[-1][JOB_ORACLE_CODE_KEY] = job_oracle_code
         tasks[-1][JOB_ORACLE_PATH_KEY] = job_oracle_path
+    # The #821 oracle-QA evidence rides the final task even when the oracle was REFUSED
+    # (code/path dropped to "") — a refused-defective oracle is a counted outcome the seed
+    # gate + #827 must still see, not a silent absence.
+    if job_oracle_qa and tasks:
+        tasks[-1][JOB_ORACLE_QA_KEY] = json.dumps(job_oracle_qa)
     return PlanResult(
         ok=True,
         tasks=tasks,

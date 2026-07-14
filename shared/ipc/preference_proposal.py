@@ -85,6 +85,38 @@ class ProposalAction(str, Enum):
     RETRACT = "retract"  # remove an existing row (removals-as-removals, §2.2a)
 
 
+class UntrustedContextKind(str, Enum):
+    """Which untrusted-provenance GRAIN was in the turn when a preference was
+    proposed — selects the card's provenance NOTICE (#792 grain fix).
+
+    ``ProposalCard.untrusted_context`` (the bool) gates whether ANY notice
+    shows; this enum picks WHICH one.  A proposal made while untrusted content
+    was in the turn stays ALLOWED with a notice (D-1(a) — the weak-signal
+    defense; the GATING is unchanged), but the notice is sized to the grain:
+
+      * ``NONE`` — no untrusted content; the card shows no notice.
+      * ``KNOWLEDGE_RECALL`` — the untrusted content was the operator's OWN
+        curated knowledge-bank recall (``UNTRUSTED_KNOWLEDGE``, ADR-023
+        Amendment 2).  The operator curated that content himself, so the card
+        shows a PROPORTIONATE notice, not the document/web alarm.  Set ONLY
+        when knowledge-recall is the *sole* untrusted tier present — any
+        document/web/external tier alongside it fails safe to the strong
+        warning (below).  This closes the #792 mislabel: an auto-recalled
+        knowledge bank in a fresh session no longer reads as "a document or
+        web result."
+      * ``DOCUMENT_OR_WEB`` — a loaded document, a pasted external, or a
+        web-search result was in the turn (or any other/unrecognized untrusted
+        tier).  A hostile instruction could be hiding, so the card keeps the
+        STRONG warning.  This is the safe default for a bare
+        ``untrusted_context=True`` card (a caller that has not classified the
+        grain gets the alarm, never the reassurance).
+    """
+
+    NONE = "none"
+    KNOWLEDGE_RECALL = "knowledge_recall"
+    DOCUMENT_OR_WEB = "document_or_web"
+
+
 class ProposalCard(NamedTuple):
     """One decided proposal, ready to render (the AO builds this; this module
     renders it).  ``body`` is the proposed verbatim text (ADD/REPLACE) and is
@@ -97,6 +129,7 @@ class ProposalCard(NamedTuple):
     type_tag: str
     provenance_label: str         # "your last message" / "after reading a document" ...
     untrusted_context: bool       # True when UNTRUSTED_* content was in the turn
+    untrusted_kind: UntrustedContextKind = UntrustedContextKind.NONE  # #792 grain
     target_pref_id: str = ""      # existing row id (REPLACE/RETRACT); '' for ADD
     target_number: int = 0        # existing row's 1-based /preferences number (0 if unknown)
     target_body: str = ""         # existing row's verbatim body (REPLACE/RETRACT); '' for ADD
@@ -119,8 +152,21 @@ def sanitize_for_display(body: str) -> str:
 
 
 def _untrusted_line(card: "ProposalCard") -> list[str]:
+    """The provenance NOTICE line(s) for the card, sized to the untrusted grain.
+
+    ``untrusted_context`` gates whether any notice shows; ``untrusted_kind``
+    selects the wording (#792).  Knowledge-recall gets a proportionate notice
+    (the operator's own curated content); document/web keeps the strong warning.
+    A bare ``untrusted_context=True`` with the default ``NONE`` kind falls to the
+    strong warning — the safe default for an un-classified caller (back-compat).
+    """
     if not card.untrusted_context:
         return []
+    if card.untrusted_kind is UntrustedContextKind.KNOWLEDGE_RECALL:
+        return [
+            "  Note: this came from your own curated knowledge bank - just "
+            "confirm the wording above is what you meant to save."
+        ]
     return [
         "  ! Proposed while untrusted content (a document or web result) was in "
         "the conversation - read it carefully before saving."
@@ -199,6 +245,7 @@ __all__ = [
     "PROPOSAL_BLOCK_CLOSE",
     "PROPOSAL_TOKEN_RE",
     "ProposalAction",
+    "UntrustedContextKind",
     "ProposalCard",
     "sanitize_for_display",
     "render_proposal_text",

@@ -117,17 +117,30 @@ class TestListing:
         assert record["body"] == "call me Blair"
 
     def test_decode_re_normalises_hostile_records(self) -> None:
-        # A hostile AO reply with junk records must decode to the pinned shape.
+        # A hostile AO reply cannot inject stray keys — records are projected
+        # onto the pinned key set at decode (defence in depth); a junk value
+        # on a NON-pinned key never even gets read.
         raw = framer.encode(
             MessageType.PREFERENCE_LIST_RESPONSE,
-            {"preferences": [{"evil": 1}, "not-a-dict", {"body": "x"}],
-             "total": 99},
+            {"preferences": [{"evil": 1, "body": "x"}], "total": 99},
             "r-5",
         )
         decoded = framer.decode_preference_list_response(raw)
-        assert all(set(r) == set(framer.PREFERENCE_LIST_KEYS)
-                   for r in decoded["preferences"])
-        assert len(decoded["preferences"]) == 2  # the non-dict dropped
+        (record,) = decoded["preferences"]
+        assert set(record) == set(framer.PREFERENCE_LIST_KEYS)
+        assert "evil" not in record
+        assert record["body"] == "x"
+
+    def test_decode_rejects_non_dict_record(self) -> None:
+        # #803: a non-dict record FAILS the decode (Fail-Closed) — it is no
+        # longer silently dropped into a partial listing presented as complete.
+        raw = framer.encode(
+            MessageType.PREFERENCE_LIST_RESPONSE,
+            {"preferences": [{"body": "x"}, "not-a-dict"], "total": 2},
+            "r-5",
+        )
+        with pytest.raises(ValueError, match=r"'preferences\[1\]' must be dict"):
+            framer.decode_preference_list_response(raw)
 
     def test_empty_listing(self) -> None:
         frame = framer.encode_preference_list_response(preferences=[])

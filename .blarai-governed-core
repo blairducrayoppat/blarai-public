@@ -1,0 +1,30 @@
+# BlarAI governed-core identity sentinel (ADR-039 #848, control 1)
+
+This file marks the directory tree it sits at the root of as **the BlarAI governed
+core** — the code, configuration, prompts, policy, models, keys, and governing
+documents that define what BlarAI *is* and how it behaves. BlarAI has ZERO write path
+to anything under this root (ADR-039 §2.1, the self-governance boundary).
+
+## Why this file exists
+
+The self-governance boundary refuses any coordinator action whose *target* is the
+governed core, by IDENTITY rather than by path name (a renamed clone or a junction can
+evade a name check — ADR-039 rejected alternative #1). Identity is resolved by three
+deterministic layers (`shared/coordinator/governed_core.py`):
+
+1. canonical-realpath containment (resolves symlinks / Windows junctions),
+2. git-worktree resolution (a worktree resolves to its main repo root), and
+3. **content identity — this sentinel.**
+
+A renamed *clone* of the governed core is a genuinely separate directory tree, so
+layers 1 and 2 miss it. This sentinel is the deterministic content signal that catches
+it: a candidate tree carrying this file (or the distinctive multi-file identity combo)
+IS the governed core, whatever its path or name, and the fleet refuses to act against
+it. Deleting this file does not open a write path — the multi-file identity combo and
+the human-governed dev channel remain — it only removes one deterministic signal.
+
+## Do not remove or relocate
+
+This is a governed-core artifact. It ships with every clone of the tree on purpose.
+Nothing reads it at runtime today (the boundary is DORMANT until wired by C1/#843);
+the marker exists so the boundary holds by construction once armed.

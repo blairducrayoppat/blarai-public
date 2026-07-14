@@ -49,8 +49,8 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Input, ListView, Static
 
 from services.ui_gateway.src.constants import (
-    PA_HANDSHAKE_BACKOFF_BASE_S,
     PA_HANDSHAKE_MAX_RETRIES,
+    pa_handshake_backoff_schedule,
 )
 
 from .constants import (
@@ -250,16 +250,20 @@ class BlarAIApp(App[None]):
             self._gateway.check_pa_status()
         )
         start_time = asyncio.get_running_loop().time()
-        attempt_markers: list[float] = []
+        # #808: the banner's attempt markers derive from the SAME backoff
+        # schedule the gateway's retry loop executes (capped exponential,
+        # aggregate 180 s) — a single source of truth so the display can
+        # never disagree with the budget (lesson 221).
+        backoff_schedule: tuple[float, ...] = pa_handshake_backoff_schedule()
+        attempt_markers: list[float] = [0.0]
         elapsed = 0.0
-        for attempt_index in range(PA_HANDSHAKE_MAX_RETRIES):
+        for delay in backoff_schedule:
+            elapsed += delay
             attempt_markers.append(elapsed)
-            if attempt_index < PA_HANDSHAKE_MAX_RETRIES - 1:
-                elapsed += PA_HANDSHAKE_BACKOFF_BASE_S * (2 ** attempt_index)
 
         initial_detail = (
             f"attempt 1/{PA_HANDSHAKE_MAX_RETRIES} "
-            f"(next backoff: {PA_HANDSHAKE_BACKOFF_BASE_S:.1f}s)"
+            f"(next backoff: {backoff_schedule[0]:.1f}s)"
         )
         self._write_boot_banner(
             f"[yellow]Connecting to Policy Agent…[/yellow] {initial_detail}"
@@ -281,8 +285,8 @@ class BlarAIApp(App[None]):
                 ):
                     attempt_num = attempt_displayed + 1
                     next_backoff = (
-                        PA_HANDSHAKE_BACKOFF_BASE_S * (2 ** attempt_displayed)
-                        if attempt_num < PA_HANDSHAKE_MAX_RETRIES
+                        backoff_schedule[attempt_displayed]
+                        if attempt_displayed < len(backoff_schedule)
                         else 0.0
                     )
                     if attempt_num < PA_HANDSHAKE_MAX_RETRIES:

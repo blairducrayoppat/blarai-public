@@ -34,6 +34,8 @@ _SCAN_FILES: tuple[str, ...] = (
     "shared/fleet/swap_ops.py",
     "shared/fleet/swap_driver.py",
     "shared/fleet/dispatch.py",
+    "shared/fleet/oracle_qa.py",
+    "shared/fleet/oracle_mutation.py",
     "shared/fleet/vikunja_bridge.py",
     "tools/dispatch_harness/config.py",
     "services/assistant_orchestrator/src/websearch/live_adapter.py",
@@ -49,6 +51,8 @@ _MODULE_FOR_FILE = {
     "shared/fleet/swap_ops.py": "shared.fleet.swap_ops",
     "shared/fleet/swap_driver.py": "shared.fleet.swap_driver",
     "shared/fleet/dispatch.py": "shared.fleet.dispatch",
+    "shared/fleet/oracle_qa.py": "shared.fleet.oracle_qa",
+    "shared/fleet/oracle_mutation.py": "shared.fleet.oracle_mutation",
     "shared/fleet/vikunja_bridge.py": "shared.fleet.vikunja_bridge",
     "tools/dispatch_harness/config.py": "tools.dispatch_harness.config",
     "services/assistant_orchestrator/src/websearch/live_adapter.py":
@@ -141,6 +145,52 @@ def test_monitor_default_reconciled_to_the_757_family():
         by_attr["RunMonitor.overall_timeout_s"]
         == by_attr["DispatchHarness.overall_timeout_s"]
         == by_attr["_DEFAULT_RUN_BUDGET_S"]
+    )
+
+
+def test_handshake_budget_covers_the_cold_load_ceiling():
+    # #808: the Boot-Phase-3 handshake budget exists BECAUSE the old ~15-18 s
+    # aggregate contradicted the system's own documented cold-14B ceiling
+    # (real_backend_ready / AoReensurer.boot_wait_s = 180 s). The budget must
+    # never fall below that ceiling again — the L221 pair, gate-locked.
+    by_attr = {e.attribute: e.seconds for e in REGISTRY}
+    assert (
+        by_attr["PA_HANDSHAKE_BUDGET_S"]
+        >= by_attr["real_backend_ready(timeout_s)"]
+    )
+    assert by_attr["PA_HANDSHAKE_BUDGET_S"] >= by_attr["AoReensurer.boot_wait_s"]
+
+
+def test_handshake_per_attempt_rides_inside_the_budget():
+    # #808: the per-attempt probe and the backoff cap must both be small
+    # relative to the aggregate budget, or the schedule degenerates into a
+    # handful of monster attempts (the shape the widen exists to prevent).
+    by_attr = {e.attribute: e.seconds for e in REGISTRY}
+    assert by_attr["PA_HANDSHAKE_TIMEOUT_S"] < by_attr["PA_HANDSHAKE_BUDGET_S"]
+    assert by_attr["PA_HANDSHAKE_BACKOFF_CAP_S"] < by_attr["PA_HANDSHAKE_BUDGET_S"]
+
+
+def test_handshake_schedule_sums_to_the_registered_budget():
+    # #808: the executable schedule (the thing check_pa_status actually runs
+    # and the TUI banner mirrors) must sum EXACTLY to the registered budget —
+    # otherwise the registry row is documentation-fiction (the C14 class).
+    from services.ui_gateway.src.constants import pa_handshake_backoff_schedule
+
+    by_attr = {e.attribute: e.seconds for e in REGISTRY}
+    schedule = pa_handshake_backoff_schedule()
+    assert sum(schedule) == by_attr["PA_HANDSHAKE_BUDGET_S"]
+    assert max(schedule) == by_attr["PA_HANDSHAKE_BACKOFF_CAP_S"]
+
+
+def test_session_ttl_family_reconciled():
+    # #801: the AO's [context].session_idle_ttl_s default and the gateway's
+    # SESSION_STATE_TTL_S constant are ONE knob (the launcher threads the AO
+    # value over the gateway default) — a drifted pair would silently give the
+    # two processes different idle semantics on direct construction.
+    by_attr = {e.attribute: e.seconds for e in REGISTRY}
+    assert (
+        by_attr["AssistantOrchestratorEntrypointConfig.session_idle_ttl_s"]
+        == by_attr["SESSION_STATE_TTL_S"]
     )
 
 

@@ -20,6 +20,12 @@ Commands:
                                   with the option number (also ``/dispatch use <n>``). A clear
                                   surface never asks — the flow is byte-identical to today.
   ``/dispatch approve``           EXECUTE the pending plan (the only path that fires work).
+  ``/dispatch revise <feedback>`` (#820) refine the PENDING plan from free-text feedback — the
+                                  14B revises the EXISTING breakdown (tasks added/removed/
+                                  reordered/re-scoped, every untouched task preserved byte-for-
+                                  byte), re-rendered with a CHANGED-vs-KEPT delta. Bounded (3
+                                  revisions); an incoherent revision re-renders the ORIGINAL
+                                  card untouched. Operator-only (a battery run never revises).
   ``/dispatch reject``            discard the PENDING plan or pending question (nothing fires).
   ``/dispatch stop``              abort an APPROVED, EXECUTING run — trips the driver's cancel
                                   sentinel so the coder halts and the 14B is restored cleanly
@@ -38,14 +44,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable
 
 from shared.fleet import acceptance as acc
+from shared.fleet import clarify as _clarify
 from shared.fleet import dispatch as fleet
+from shared.fleet import revise as _revise
 from shared.fleet.acceptance import AcceptanceSpec, PlanResult
+from shared.ttl_dict import TtlDict
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +70,13 @@ ExecuteFn = Callable[[str, str, str, list, AcceptanceSpec], Awaitable[fleet.Disp
 
 @dataclass(frozen=True)
 class DispatchCommand:
-    kind: str  # "run" | "create" | "approve" | "reject" | "status" | "stop" | "choose"
+    kind: str  # "run"|"create"|"approve"|"reject"|"status"|"stop"|"choose"|"answer"|"decide"|"revise"
     repo: str = ""
     goal: str = ""
     run_id: str = ""
     choice: str = ""  # the operator's answer to a clarifying question (a 1-based option number)
+    answer: str = ""  # #819: the operator's free-text answer to the requirements questions
+    feedback: str = ""  # #820: the operator's free-text plan-revision feedback
 
 
 @dataclass(frozen=True)
@@ -79,6 +90,11 @@ class PendingDispatch:
     spec: AcceptanceSpec = field(default_factory=lambda: AcceptanceSpec(goal=""))
     ecosystem: str = "unknown"
     submitted_at: str = ""
+    #: #820: how many times this pending plan has been REVISED by operator feedback. Each
+    #: successful revision REPLACES this slot (the old plan is tombstoned) with the count
+    #: incremented; at :data:`shared.fleet.revise.DEFAULT_MAX_REVISIONS` the ``revise`` verb is
+    #: refused honestly (accept or reject only). Carried through revisions with a stable run_id.
+    revision_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -107,6 +123,31 @@ class PendingClarification:
     question: dict = field(default_factory=dict)  # {question, options:[{label, surface}]}
     ecosystem: str = "unknown"
     fell_back: bool = False
+    submitted_at: str = ""
+
+
+@dataclass(frozen=True)
+class PendingRequirements:
+    """The session's single pending REQUIREMENTS-CLARIFICATION question set (#819).
+
+    A bounded interactive sub-state that sits BEFORE the PLAN preview (and before the Inc-4
+    platform question): when the 14B judged the raw goal underspecified, it proposed a FEW
+    targeted questions and the coordinator holds the dispatch here until the operator answers
+    in their own words (or replies "just decide for me", or rejects). On an answer the goal is
+    re-planned with the answers threaded through the requirements, and the flow proceeds to the
+    SAME approval preview it would have shown a fully-specified goal. At most ONE requirements
+    turn per dispatch — answering (or deciding) clears this slot and a PendingDispatch or a
+    PendingClarification takes over.
+
+    Carries ONLY what is needed to re-plan after the answer: the ``run_id`` (minted once,
+    carried through), the ``repo``, the raw ``goal``, and the ``questions`` shown (a list of
+    ``{axis, question}`` dicts). No spec/tasks yet — those come from the RE-PLAN with the
+    answers threaded in (the first pass returned questions, not a plan)."""
+
+    run_id: str
+    repo: str
+    goal: str
+    questions: list = field(default_factory=list)  # [{axis, question}]
     submitted_at: str = ""
 
 
@@ -144,6 +185,22 @@ def parse_dispatch_command(text: str) -> DispatchCommand | None:
             nm, gl = after.split("|", 1)
             return DispatchCommand(kind="create", repo=nm.strip(), goal=gl.strip())
         return DispatchCommand(kind="create", repo=after.strip(), goal="")
+    # #820 plan-revision feedback: "revise <free text>" refines a PENDING plan card. Parsed as a
+    # distinct verb (only ACTED ON when a plan awaits approval — handle_command); a bare
+    # "/dispatch revise ..." in any other state reports there's nothing to revise. Checked before
+    # the |-split / run fall-through so the whole feedback remainder is captured verbatim. A repo
+    # literally named "revise" is the one ambiguous case (rare — same tradeoff as "new").
+    if low == "revise" or low.startswith("revise "):
+        return DispatchCommand(kind="revise", feedback=rest[len("revise"):].strip())
+    # #819 requirements-clarification answer forms. "just decide for me" (and short variants)
+    # is the escape hatch -> kind="decide"; an explicit "answer <text>" captures the whole
+    # free-text remainder. Both are only ACTED ON when a requirements question is pending
+    # (handled in handle_command); otherwise they report there's nothing to answer. The
+    # decide-phrase check runs BEFORE "answer"/run so "decide" is never mistaken for a goal.
+    if _clarify.is_decide_for_me(rest):
+        return DispatchCommand(kind="decide")
+    if low == "answer" or low.startswith("answer "):
+        return DispatchCommand(kind="answer", answer=rest[len("answer"):].strip())
     # Clarifying-answer forms: "use 2" / "choose 2" / a bare "2".
     if low.startswith("use ") or low.startswith("choose "):
         return DispatchCommand(kind="choose", choice=rest.split(None, 1)[1].strip())
@@ -178,15 +235,26 @@ class DispatchCoordinator:
         self._execute_fn = execute_fn
         self._mint_run_id = mint_run_id
         # ONE pending dispatch per session (mirrors the ingest one-slot model).
-        self._pending: dict[str, PendingDispatch] = {}
+        # TtlDict (#801): a plan the operator never decides would otherwise sit
+        # until restart; reap_expired (called from the gateway's turn-start
+        # sweep) drops entries past the TTL — an implicit reject, nothing fires.
+        self._pending: TtlDict[PendingDispatch] = TtlDict()
         # ONE pending clarifying question per session (increment 4) — a session is in AT MOST
         # one of these two states at a time (clarification precedes approval; resolving it
         # clears this slot and populates _pending).
-        self._clarifying: dict[str, PendingClarification] = {}
+        self._clarifying: TtlDict[PendingClarification] = TtlDict()
+        # ONE pending REQUIREMENTS-clarification question set per session (#819) — sits BEFORE
+        # both the Inc-4 platform question and the approval preview. Answering (or deciding)
+        # clears this slot and re-plans; at most one of _requirements / _clarifying / _pending
+        # is populated at a time. TtlDict: an unanswered question set is reaped by the idle
+        # sweep (implicit reject — nothing fires), same as the other two.
+        self._requirements: TtlDict[PendingRequirements] = TtlDict()
         # One-shot per-session UI-action signal (#712): set to "dispatch_plan" when
         # a plan preview is rendered (the only reply that carries Approve/Reject
         # buttons), popped by the gateway to attach the buttons to that reply frame.
-        self._last_action: dict[str, str] = {}
+        # TtlDict (#801): pop-on-read normally clears it; the sweep bounds the
+        # orphans a never-rendered reply leaves behind.
+        self._last_action: TtlDict[str] = TtlDict()
 
     def pending_for(self, session_id: str) -> PendingDispatch | None:
         """The session's pending dispatch, or None (tests / inspection)."""
@@ -196,6 +264,10 @@ class DispatchCoordinator:
         """The session's pending clarifying question, or None (tests / inspection)."""
         return self._clarifying.get(session_id)
 
+    def pending_requirements_for(self, session_id: str) -> PendingRequirements | None:
+        """The session's pending requirements-clarification question set, or None (#819)."""
+        return self._requirements.get(session_id)
+
     def pop_action_kind(self, session_id: str) -> str:
         """Pop the one-shot UI-action kind for *session_id* (#712).
 
@@ -204,6 +276,41 @@ class DispatchCoordinator:
         else ``""``. One-shot, mirroring the imagine/ingest meta signals."""
         return self._last_action.pop(session_id, "")
 
+    def reap_expired(self, ttl_s: float) -> dict[str, list[str]]:
+        """Drop pending plans/clarifications/action-signals idle past *ttl_s*
+        (the #801 idle backstop; called from the gateway's turn-start sweep).
+
+        Dropping a pending plan or clarification is an implicit reject —
+        nothing was approved, so nothing ever fires; a later ``/dispatch
+        approve`` gets the standard "nothing pending" notice. Deliberately
+        NOT a freshness policy (a plan does not go un-approvable after N
+        hours by design — that would be an LA semantics decision); this only
+        bounds abandoned state. ``ttl_s <= 0`` disables the sweep.
+
+        Returns:
+            ``{dict_name: [session_ids dropped]}`` for observability/tests.
+        """
+        reaped: dict[str, list[str]] = {
+            "pending": self._pending.sweep(ttl_s),
+            "clarifying": self._clarifying.sweep(ttl_s),
+            "requirements": self._requirements.sweep(ttl_s),
+            "last_action": self._last_action.sweep(ttl_s),
+        }
+        for name, sessions in reaped.items():
+            if sessions:
+                # Eviction events are LOGGED (LA condition, #801 c.1666) —
+                # session ids only, never goals/plan content.
+                logger.info(
+                    "Dispatch reaper: dropped %d expired %s entry(ies) for "
+                    "session(s): %s (ttl=%.0fs; implicit reject — nothing "
+                    "fires).",
+                    len(sessions),
+                    name,
+                    ", ".join(sessions),
+                    ttl_s,
+                )
+        return reaped
+
     async def handle_command(self, session_id: str, command: DispatchCommand) -> str:
         if not self._enabled:
             return (
@@ -211,10 +318,35 @@ class DispatchCoordinator:
                 "[fleet_dispatch].enabled = true in the orchestrator config."
             )
         try:
+            # #819: while requirements-clarification questions are pending, the operator's
+            # reply ANSWERS them. reject/status/stop keep their normal meaning; a decide reply
+            # takes the defaults; any other text (an explicit "answer <text>", a bare
+            # "/dispatch <words>", or a stray option number) is the free-text answer. This is
+            # what makes the corridor a single interactive turn, mirroring the Inc-4 sub-state.
+            if self._requirements.get(session_id) is not None:
+                if command.kind == "reject":
+                    return self._reject(session_id)
+                if command.kind == "status":
+                    return await self._status(command.run_id)
+                if command.kind == "stop":
+                    return await asyncio.to_thread(self._stop, session_id)
+                if command.kind == "decide":
+                    return await self._decide_requirements(session_id)
+                # #820: a "revise …" while a question is pending is nonsensical (no plan yet) —
+                # treat its text as the free-text answer rather than dropping it silently.
+                text = command.answer or command.goal or command.choice or command.feedback
+                return await self._answer_requirements(session_id, text)
+            if command.kind in ("answer", "decide"):
+                return (
+                    "There's no question waiting. Start a dispatch with "
+                    "/dispatch <repo> | <goal>."
+                )
             if command.kind == "status":
                 return await self._status(command.run_id)
             if command.kind == "approve":
                 return await self._approve(session_id)
+            if command.kind == "revise":
+                return await self._revise(session_id, command.feedback)
             if command.kind == "reject":
                 return self._reject(session_id)
             if command.kind == "stop":
@@ -239,6 +371,15 @@ class DispatchCoordinator:
                 "Usage: /dispatch <repo> | <goal>  —  e.g. "
                 "/dispatch calc | a calculator an 8-year-old can use"
             )
+        # #819 requirements clarification is answered via handle_command's routing, so this
+        # nag is defensive (e.g. _create_and_plan reaching here): don't start a fresh plan on
+        # top of an unanswered question set.
+        req_pending = self._requirements.get(session_id)
+        if req_pending is not None:
+            return (
+                f"I'm still waiting on your answer for “{req_pending.goal}”. Reply in your own "
+                "words, or /dispatch just decide for me, or /dispatch reject to cancel."
+            )
         clarifying = self._clarifying.get(session_id)
         if clarifying is not None:
             return (
@@ -250,32 +391,137 @@ class DispatchCoordinator:
         if pending is not None:
             return (
                 f"A dispatch is already waiting for your approval: “{pending.goal}”. "
-                "Reply /dispatch approve or /dispatch reject before starting another."
+                "Reply /dispatch approve, /dispatch reject, or /dispatch revise <what to "
+                "change> before starting another."
             )
         if self._plan_fn is None:
             return self._wiring_notice()
 
+        # FIRST pass — the plain goal (no requirements yet). The AO may return requirements-
+        # clarification QUESTIONS (#819) instead of a plan when the goal is underspecified and
+        # the stage is enabled; a sufficient goal (or a battery card / clarify off) returns a
+        # plan directly and the flow is byte-identical to before.
         plan = await self._plan_fn(repo, goal)
         if not plan.ok:
             return plan.message
+        if plan.questions:
+            run_id = self._mint_run_id()
+            self._requirements[session_id] = PendingRequirements(
+                run_id=run_id,
+                repo=repo,
+                goal=goal,
+                questions=list(plan.questions),
+                submitted_at=datetime.now(timezone.utc).isoformat(),
+            )
+            return self._render_requirements_questions(goal, plan.questions)
 
+        return self._finalize_plan(session_id, repo=repo, goal=goal, plan=plan)
+
+    # ── the requirements-clarification answer (#819) ──────────────────────
+
+    async def _answer_requirements(self, session_id: str, text: str) -> str:
+        """Consume the operator's free-text answer to the requirements questions, then re-plan
+        with those answers threaded in. A "just decide for me" reply routes to the defaults; a
+        blank reply re-asks (never a silent proceed). Bounded — this slot clears before the
+        re-plan, so there is at most ONE requirements turn per dispatch."""
+        pending_req = self._requirements.get(session_id)
+        if pending_req is None:
+            return (
+                "There's no question waiting. Start a dispatch with "
+                "/dispatch <repo> | <goal>."
+            )
+        answer = (text or "").strip()
+        if not answer:
+            return (
+                "I didn't catch an answer — tell me in your own words with "
+                "/dispatch <your answer>, or reply /dispatch just decide for me."
+            )
+        if _clarify.is_decide_for_me(answer):
+            return await self._decide_requirements(session_id)
+        questions = _clarify.questions_from_dicts(pending_req.questions)
+        clarifications = _clarify.answered_from_free_text(questions, answer)
+        self._requirements.pop(session_id, None)  # leave the sub-state (bounded to one turn)
+        return await self._replan_with_requirements(session_id, pending_req, clarifications)
+
+    async def _decide_requirements(self, session_id: str) -> str:
+        """The "just decide for me" escape hatch: self-answer every asked question with its
+        per-axis default and re-plan. The defaults are RECORDED as assumptions on the plan card
+        (``assumed=True``), so the operator sees what was chosen and can reject a wrong one."""
+        pending_req = self._requirements.get(session_id)
+        if pending_req is None:
+            return (
+                "There's no question waiting. Start a dispatch with "
+                "/dispatch <repo> | <goal>."
+            )
+        questions = _clarify.questions_from_dicts(pending_req.questions)
+        clarifications = _clarify.decide_defaults(questions)
+        self._requirements.pop(session_id, None)
+        return await self._replan_with_requirements(session_id, pending_req, clarifications)
+
+    async def _replan_with_requirements(
+        self, session_id: str, pending_req: PendingRequirements, clarifications: list
+    ) -> str:
+        """Re-run PLAN with the clarified requirements threaded into the goal, then finalize the
+        approval preview (attaching the clarifications to the spec for the plan card + record).
+        The ``run_id`` minted for the question set is carried through so status/reports line up."""
+        if self._plan_fn is None:
+            return self._wiring_notice()
+        block = _clarify.compose_requirements_block(clarifications)
+        enriched_goal = _clarify.compose_planning_goal(pending_req.goal, block)
+        plan = await self._plan_fn(pending_req.repo, enriched_goal)
+        if not plan.ok:
+            return plan.message
+        # The re-plan carries requirements, so the AO suppresses clarify — but never loop even
+        # if it somehow returned questions again: _finalize_plan ignores them and proceeds.
+        return self._finalize_plan(
+            session_id, repo=pending_req.repo, goal=pending_req.goal, plan=plan,
+            clarifications=clarifications, run_id=pending_req.run_id,
+        )
+
+    def _render_requirements_questions(self, goal: str, questions: list) -> str:
+        """The operator-facing CLARIFY turn (#819): the goal + a short numbered list of the
+        plain-language questions + how to answer. Novice-friendly — one free-text reply, or the
+        one-tap "just decide for me" escape. The system asks; the operator answers in words."""
+        lines = [f"Before I build “{goal}”, a few quick questions so I get it right:", ""]
+        for i, q in enumerate(questions, start=1):
+            text = q.get("question", "") if isinstance(q, dict) else str(q)
+            lines.append(f"  {i}. {text}")
+        lines += [
+            "",
+            "Answer in your own words — reply `/dispatch <your answers>` (one message is fine).",
+            "Or reply `/dispatch just decide for me` and I'll choose sensible defaults.",
+            "Or `/dispatch reject` to cancel.",
+        ]
+        return "\n".join(lines)
+
+    def _finalize_plan(
+        self, session_id: str, *, repo: str, goal: str, plan: PlanResult,
+        clarifications: "list | tuple" = (), run_id: str | None = None,
+    ) -> str:
+        """Shared PLAN-to-preview tail: detect ecosystem, run the Inc-4 platform question if the
+        14B flagged an ambiguous fork, else render the approval preview. Attaches any #819
+        requirements clarifications to the spec first (display + record) — this is the single
+        place both the no-question path and the post-requirements re-plan converge."""
         repo_path = self._repo_path(repo)
         ecosystem = acc.detect_ecosystem(repo_path)
-        run_id = self._mint_run_id()
+        rid = run_id or self._mint_run_id()
+        spec = plan.spec
+        if clarifications:
+            spec = replace(spec, clarifications=tuple(clarifications))
 
         # Increment 4 — the confidence-gated clarifying question. If (and ONLY if) the 14B
         # flagged a genuinely ambiguous platform fork, the SYSTEM (never the model) asks ONE
         # curated question BEFORE the normal approval preview. resolve_clarifying_question is
         # the single gate: it returns None for a clear / unknown / absent surface (or an
         # unmapped fork), in which case the flow is EXACTLY today's — no extra turn.
-        question = acc.resolve_clarifying_question(plan.spec.build_plan)
+        question = acc.resolve_clarifying_question(spec.build_plan)
         if question is not None:
             self._clarifying[session_id] = PendingClarification(
-                run_id=run_id,
+                run_id=rid,
                 repo=repo,
                 goal=goal,
                 tasks=plan.tasks,
-                spec=plan.spec,
+                spec=spec,
                 question=question,
                 ecosystem=ecosystem,
                 fell_back=plan.fell_back,
@@ -284,8 +530,8 @@ class DispatchCoordinator:
             return self._render_clarifying_question(goal, question)
 
         return self._finalize_pending(
-            session_id, run_id=run_id, repo=repo, goal=goal,
-            tasks=plan.tasks, spec=plan.spec, ecosystem=ecosystem, fell_back=plan.fell_back,
+            session_id, run_id=rid, repo=repo, goal=goal,
+            tasks=plan.tasks, spec=spec, ecosystem=ecosystem, fell_back=plan.fell_back,
         )
 
     # ── CREATE + PLAN: /dispatch new <name> | <goal>  (#712) ──────────────
@@ -307,7 +553,8 @@ class DispatchCoordinator:
             )
         # Don't start a new project on top of an unresolved dispatch.
         if (
-            self._clarifying.get(session_id) is not None
+            self._requirements.get(session_id) is not None
+            or self._clarifying.get(session_id) is not None
             or self._pending.get(session_id) is not None
         ):
             return (
@@ -340,17 +587,30 @@ class DispatchCoordinator:
         ]
         return "\n".join(lines)
 
+    def _revise_hint(self, revision_count: int) -> str:
+        """The plan-card footer hint that offers the free-text revise verb (#820), honest about
+        the remaining count. Empty at :data:`shared.fleet.revise.DEFAULT_MAX_REVISIONS` (no
+        refine offered — only approve/reject), which also renders the pre-#820 footer."""
+        left = _revise.DEFAULT_MAX_REVISIONS - revision_count
+        if left <= 0:
+            return ""
+        if revision_count <= 0:
+            return "`/dispatch revise <what to change>` to change the plan."
+        return f"`/dispatch revise <what to change>` to refine it again ({left} more)."
+
     def _finalize_pending(
         self, session_id: str, *, run_id: str, repo: str, goal: str,
         tasks: list, spec: AcceptanceSpec, ecosystem: str, fell_back: bool,
-        clarified_note: str = "",
+        clarified_note: str = "", revision_count: int = 0,
     ) -> str:
         """Store the approval-pending dispatch + render the normal PLAN preview.
 
-        Shared by the no-question path (today's flow, unchanged) and the post-clarification
-        path (after the operator's answer threaded a real surface into the plan). The optional
-        ``clarified_note`` leads the preview when we got here via a clarifying answer (so the
-        operator sees what was resolved / that we fell back to an un-refined plan)."""
+        Shared by the no-question path (today's flow, unchanged), the post-clarification path
+        (after the operator's answer threaded a real surface into the plan), and the #820 revise
+        path. The optional ``clarified_note`` leads the preview when we got here via a clarifying
+        answer or a revision (so the operator sees what was resolved / the CHANGED-vs-KEPT delta).
+        ``revision_count`` (#820) rides onto the stored plan and drives the revise-hint footer;
+        a fresh plan is 0 (offers the verb) — a plan at the cap renders approve/reject only."""
         self._pending[session_id] = PendingDispatch(
             run_id=run_id,
             repo=repo,
@@ -359,10 +619,13 @@ class DispatchCoordinator:
             spec=spec,
             ecosystem=ecosystem,
             submitted_at=datetime.now(timezone.utc).isoformat(),
+            revision_count=revision_count,
         )
         # Signal the gateway to attach Approve/Reject buttons to this preview (#712).
         self._last_action[session_id] = "dispatch_plan"
-        preview = acc.render_criteria_preview(spec, ecosystem=ecosystem, tasks=tasks)
+        preview = acc.render_criteria_preview(
+            spec, ecosystem=ecosystem, tasks=tasks, revise_hint=self._revise_hint(revision_count)
+        )
         if fell_back:
             # Honesty: the 14B couldn't fully parse the goal, so the plan is a thin
             # fallback. Surface that plainly — silent degradation is the exact thing
@@ -437,12 +700,11 @@ class DispatchCoordinator:
         # is safe (unlike re-running compile_prompts). Passing ``refined_spec`` (not the bare
         # plan) carries the loop fields through clarification too.
         refined_plan = acc.apply_clarification(clarifying.spec.build_plan, chosen_surface)
-        refined_spec = AcceptanceSpec(
-            goal=clarifying.spec.goal,
-            criteria=clarifying.spec.criteria,
-            assumptions=clarifying.spec.assumptions,
-            build_plan=refined_plan,
-        )
+        # Only ``build_plan`` changes; ``replace`` carries every other spec field forward —
+        # assumptions AND the #819 clarifications AND the UC-010 asset_specs (a fresh
+        # AcceptanceSpec(...) here previously DROPPED asset_specs/clarifications when the Inc-4
+        # platform question followed a requirements clarification).
+        refined_spec = replace(clarifying.spec, build_plan=refined_plan)
         refined_tasks = acc._thread_build_fields(
             [dict(t) for t in clarifying.tasks], refined_spec
         )
@@ -492,16 +754,132 @@ class DispatchCoordinator:
         # On failure the slot is kept so the operator can retry /dispatch approve.
         return result.message
 
+    # ── REVISE: /dispatch revise <feedback>  (#820) ───────────────────────
+
+    async def _revise(self, session_id: str, feedback: str) -> str:
+        """Revise the PENDING plan from the operator's free-text *feedback* (#820).
+
+        Only a plan AWAITING APPROVAL can be revised — a pending question is ANSWERED (not
+        revised) and an executing run is STOPPED (not revised). The 14B proposes edit ops over
+        the current FEATURE tasks (the dedicated acceptance-tests task is preserved verbatim and
+        never offered for editing, so a revision can never drop the tests); the ruler + apply
+        preserve every untouched task BYTE-FOR-BYTE (never a fresh decompose). Bounded by
+        :data:`shared.fleet.revise.DEFAULT_MAX_REVISIONS`. Fail-soft: an empty/incoherent/no-op
+        revision re-renders the ORIGINAL card untouched — never a lost plan, never a silent
+        accept, and the revision count is NOT consumed."""
+        # A question in flight takes precedence — you answer it, you don't revise it.
+        if self._requirements.get(session_id) is not None:
+            return (
+                "Answer the question first (in your own words, or /dispatch just decide for "
+                "me), then you can refine the plan."
+            )
+        if self._clarifying.get(session_id) is not None:
+            return (
+                "Answer the one question first (reply with the option number), then you can "
+                "refine the plan."
+            )
+        pending = self._pending.get(session_id)
+        if pending is None:
+            return "Nothing to revise yet — start one with  /dispatch <repo> | <goal>."
+        feedback = (feedback or "").strip()
+        if not feedback:
+            return (
+                "Tell me what to change, e.g. /dispatch revise do the export first and skip "
+                "the login."
+            )
+        if pending.revision_count >= _revise.DEFAULT_MAX_REVISIONS:
+            return (
+                f"You've refined this plan {pending.revision_count} times already — reply "
+                "/dispatch approve to build it, or /dispatch reject to start over."
+            )
+        if self._plan_fn is None:
+            return self._wiring_notice()
+
+        # Split the current plan: the revise model only sees FEATURE tasks (numbered 1..N for the
+        # ops to reference); the dedicated acceptance-tests task is preserved verbatim + re-
+        # attached last, so a revision can never drop the tests.
+        feature_tasks = [t for t in pending.tasks if t.get("task") != acc.ACCEPTANCE_TASK_SLUG]
+        test_tasks = [t for t in pending.tasks if t.get("task") == acc.ACCEPTANCE_TASK_SLUG]
+        if not feature_tasks:
+            return self._revise_failed(session_id, pending, "there are no editable steps")
+        titles = [acc._humanize_task_name(t) for t in feature_tasks]
+
+        # The revise request rides the goal (feedback + current titles) over the SAME plan seam
+        # #819 uses; the AO runs the revise model call and returns edit ops in plan.revision.
+        revise_goal = _revise.compose_revision_goal(pending.goal, feedback, titles)
+        plan = await self._plan_fn(pending.repo, revise_goal)
+        if not plan.ok:
+            # Knob off (Fail-Closed) / transport error — surface the honest message; the pending
+            # plan is left completely intact (revise never mutates until it fully succeeds).
+            return plan.message
+        ops = _revise.ops_from_dicts(plan.revision)
+        outcome = _revise.apply_revision_ops(feature_tasks, ops, repo=pending.repo)
+        if outcome is None or not outcome.changed:
+            return self._revise_failed(session_id, pending, None)
+
+        # Thread build fields onto the revised feature tasks (idempotent for the kept ones — the
+        # spec is unchanged), then re-attach the preserved acceptance-tests task LAST.
+        revised_features = acc._thread_build_fields(
+            [dict(t) for t in outcome.tasks], pending.spec
+        )
+        revised_tasks = revised_features + [dict(t) for t in test_tasks]
+
+        # The feedback rides the spec block (#820 point 3): recorded as a clarification so it
+        # shows on the card + persists in the acceptance record (available to the report),
+        # assumed=False (the operator volunteered it). Cumulative across revisions.
+        fb_clar = {"question": "(your change request)", "answer": feedback, "assumed": False}
+        new_spec = replace(
+            pending.spec, clarifications=tuple(pending.spec.clarifications) + (fb_clar,)
+        )
+
+        # Each successful revision is a NEW pending plan (the old one tombstoned — _finalize_
+        # pending rewrites the single slot with a fresh TTL and the incremented count) with the
+        # SAME run_id so status/reports line up. The delta LEADS the re-rendered card.
+        delta = _revise.render_revision_delta(outcome, feedback)
+        return self._finalize_pending(
+            session_id, run_id=pending.run_id, repo=pending.repo, goal=pending.goal,
+            tasks=revised_tasks, spec=new_spec, ecosystem=pending.ecosystem, fell_back=False,
+            clarified_note=delta, revision_count=pending.revision_count + 1,
+        )
+
+    def _revise_failed(
+        self, session_id: str, pending: PendingDispatch, reason: "str | None"
+    ) -> str:
+        """Fail-soft (#820): re-render the ORIGINAL plan card with an honest "couldn't apply
+        that" note. The pending plan is UNCHANGED — not tombstoned, revision count not consumed —
+        so the operator can rephrase, approve, or reject. Touches the slot so an actively-engaged
+        plan isn't reaped mid-refine."""
+        self._pending.touch(session_id)
+        self._last_action[session_id] = "dispatch_plan"
+        note = (
+            "I couldn't turn that into a change to the plan"
+            + (f" ({reason})" if reason else "")
+            + " — the plan is unchanged. Try describing the change differently, or reply "
+            "/dispatch approve or /dispatch reject."
+        )
+        preview = acc.render_criteria_preview(
+            pending.spec, ecosystem=pending.ecosystem, tasks=pending.tasks,
+            revise_hint=self._revise_hint(pending.revision_count),
+        )
+        return note + "\n\n" + preview
+
     # ── /dispatch reject ──────────────────────────────────────────────────
 
     def _reject(self, session_id: str) -> str:
-        # Reject cancels the whole dispatch at EITHER pre-execute phase: an awaiting-answer
-        # clarification (increment 4) OR an awaiting-approval plan. Clear both slots.
+        # Reject cancels the whole dispatch at ANY pre-execute phase: an awaiting-answer
+        # requirements clarification (#819), an awaiting-answer platform clarification
+        # (increment 4), OR an awaiting-approval plan. Clear all three slots.
+        requirements = self._requirements.pop(session_id, None)
         clarifying = self._clarifying.pop(session_id, None)
         pending = self._pending.pop(session_id, None)
-        if pending is None and clarifying is None:
+        if pending is None and clarifying is None and requirements is None:
             return "Nothing to reject — there's no dispatch waiting."
-        goal = pending.goal if pending is not None else clarifying.goal
+        if pending is not None:
+            goal = pending.goal
+        elif clarifying is not None:
+            goal = clarifying.goal
+        else:
+            goal = requirements.goal
         return (
             f"Cancelled the pending dispatch (“{goal}”). Nothing was sent to "
             "the coder."

@@ -5,8 +5,8 @@
     "failed": 0,
     "pass_rate": 1.0,
     "passed": 23,
-    "skipped_hardware": 6,
-    "total": 29
+    "skipped_hardware": 8,
+    "total": 31
   },
   "cases": {
     "pm-abs-001": "skipped_hardware",
@@ -35,11 +35,13 @@
     "pm-poison-fama": "skipped_hardware",
     "pm-poison-forged": "pass",
     "pm-poison-hop": "pass",
+    "pm-prop-explicit-001": "skipped_hardware",
+    "pm-prop-implicit-001": "skipped_hardware",
     "pm-upd-001": "pass",
     "pm-upd-002": "pass",
     "pm-upd-003": "pass"
   },
-  "generated_at": "2026-07-10T21:31:39.533786+00:00",
-  "git_sha": "ab640988",
+  "generated_at": "2026-07-11T18:55:46.073255+00:00",
+  "git_sha": "706c6972",
   "suite": "preference_memory"
 }

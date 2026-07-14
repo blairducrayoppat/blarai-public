@@ -121,7 +121,7 @@ def test_n3_a_surviving_tamper_would_grade_pass(tmp_path, monkeypatch):
         scripts_dir=tmp_path / "scripts", queue_path=tmp_path / "q.json",
         runs_dir=tmp_path / "runs", projects_dir=tmp_path / "projects")
 
-    def _grade(cmd, timeout_s, cwd=None):
+    def _grade(cmd, timeout_s, cwd=None, env=None):
         graded = (Path(cwd) / JOB_ORACLE_PATH_PYTHON).read_text(encoding="utf-8")
         return (cap["marker"] not in graded, "graded", "")   # neutered -> ok=True (pass)
 

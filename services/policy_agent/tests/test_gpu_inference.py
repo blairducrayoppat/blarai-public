@@ -42,7 +42,6 @@ from services.policy_agent.src.gpu_inference import (
     GPUClassificationResult,
     PolicyGPUInference,
     _LABELS,
-    _softmax,
     MAX_CLASSIFICATION_TOKENS,
     QWEN3_IM_END_TOKEN_ID,
     QWEN3_THINK_START_TOKEN_ID,
@@ -338,14 +337,13 @@ class TestPolicyGPUInferenceFailClosed:
             os.unlink(manifest_path)
 
     def test_unload_resets_state(self) -> None:
-        """unload() clears compiled_model and loaded flag."""
+        """unload() clears the pipeline and loaded flag."""
         npu = PolicyGPUInference("dummy_dir")
         npu._loaded = True
         npu._pipeline = MagicMock()
         npu.unload()
         assert npu.loaded is False
         assert npu._pipeline is None
-        assert npu._compiled_model is None
         assert npu.integrity_result is None
 
 
@@ -464,41 +462,6 @@ class TestPolicyGPUInferenceWithMocks:
             )
         finally:
             os.unlink(manifest_path)
-
-
-# ---------------------------------------------------------------------------
-# Group E: Softmax
-# ---------------------------------------------------------------------------
-
-
-class TestSoftmax:
-    """Numerical correctness of the softmax helper."""
-
-    def test_uniform_distribution(self) -> None:
-        """Equal logits -> uniform probability distribution."""
-        import numpy as np
-
-        result = _softmax(np.array([1.0, 1.0, 1.0]))
-        assert len(result) == 3
-        for p in result:
-            assert abs(p - 1.0 / 3.0) < 1e-6
-
-    def test_dominant_class(self) -> None:
-        """Large logit difference -> near-1.0 for dominant class."""
-        import numpy as np
-
-        result = _softmax(np.array([100.0, 0.0, 0.0]))
-        assert result[0] > 0.99
-        assert result[1] < 0.01
-        assert result[2] < 0.01
-
-    def test_numerical_stability(self) -> None:
-        """Very large logits don't produce NaN/Inf (shifted softmax)."""
-        import numpy as np
-
-        result = _softmax(np.array([1e6, 1e6 - 1, 1e6 - 2]))
-        assert all(not math.isnan(p) and not math.isinf(p) for p in result)
-        assert abs(sum(result) - 1.0) < 1e-6
 
 
 # ---------------------------------------------------------------------------

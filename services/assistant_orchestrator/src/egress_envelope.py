@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -121,6 +122,29 @@ class EgressEnvelopeManager:
     def end_turn(self, session_id: str) -> None:
         """Drop the envelope for a session (explicit cleanup; idempotent)."""
         self._envelopes.pop(session_id, None)
+
+    def retain_only(self, active_session_ids: Iterable[str]) -> list[str]:
+        """Drop envelopes for every session NOT in *active_session_ids* (#801).
+
+        The session idle-reaper's companion: envelopes are per-session state
+        that outlives the turn (``begin_turn`` resets rather than removes), so
+        a destroyed session's envelope would otherwise sit until restart.
+        Called after ``ContextManager.reap_idle_sessions`` with the surviving
+        session ids; deterministic and clock-free — an envelope either belongs
+        to a live session or it goes.
+
+        Dropping an envelope is fail-closed by construction: if the session
+        somehow egresses again before a new turn, ``gate`` on a missing
+        envelope DENIES.
+
+        Returns:
+            The session ids whose envelopes were dropped.
+        """
+        active = set(active_session_ids)
+        dropped = [sid for sid in self._envelopes if sid not in active]
+        for sid in dropped:
+            del self._envelopes[sid]
+        return dropped
 
     def gate(
         self,

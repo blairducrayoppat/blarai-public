@@ -262,7 +262,7 @@ def _real_restore(
         log(f"probe restore: real_stop_ovms error (continuing): {exc}")
     try:
         log("probe restore: re-booting the AO (python -m launcher, production, detached) ...")
-        boot_launcher_detached(repo_root, reboot_log)
+        boot_launcher_detached(repo_root, reboot_log, port=ao_port, log=log)
     except Exception as exc:  # noqa: BLE001 — loud, still try the readiness wait
         log(f"probe restore: AO re-boot spawn error: {exc}")
     try:

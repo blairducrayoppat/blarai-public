@@ -1,0 +1,66 @@
+{
+  "ticket": "#775",
+  "experiment": "ACP-vs-stdin fleet coder-driver A/B (Decision-A / D-A bar)",
+  "date": "2026-07-11",
+  "purpose": "Finish the one measurement the #759 spike flagged unfinished: does the persistent-session ACP driver (agent-client-protocol) regress wall-clock/tokens vs the stdin driver (opencode run + transcript-regex) on a real multi-turn fleet task. Observability/cancel/stall superiority was already transport-attributed by the spike; this only tests wall-clock/token regression.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (Xe2)",
+    "ram": "32 GB LPDDR5X (31.323 GiB effective)",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "coder_model": "Qwen3-Coder-30B-A3B (coder-30b), INT4, served via OVMS on 127.0.0.1:8000, reached over the qwen tool-call proxy on :8099",
+    "coder_sampling": "temperature 0.7 (stochastic — the dominant confound)",
+    "opencode": "1.17.8",
+    "acp_client": "tools/dispatch_harness/acp_coder.py under agentic-setup/.venv314-acp (Python 3.14.3, agent-client-protocol==0.11.0)",
+    "runner": "agentic-setup/scripts/new-agent-task.ps1 (fleet-lib.ps1 driver seam Get-FleetDriverConfig/Invoke-CoderDriver)"
+  },
+  "methodology": {
+    "task": "Fixed representative single-file build+test: 'Create wordstats.py (word_stats(text)->dict of words/unique/longest, handling empty+punctuation) + test_wordstats.py; make the tests pass.'",
+    "flags": "-Complexity simple -LanguageHint python -MaxRunMinutes 20 -Concurrency 1 (note: 'simple' still drives best-of-2 candidates; -Concurrency 1 did NOT force a single candidate)",
+    "driver_selection": "process-scoped BLARAI_FLEET_DRIVER_CONFIG env override for the acp legs (production configs/fleet-driver.json left at driver=stdin during the A/B; the stdin legs used the production config with the override UNSET)",
+    "design": "3 rounds x 2 legs (acp + stdin), ALTERNATING leg order across rounds for thermal fairness (#778): R1 stdin-first, R2 acp-first, R3 stdin-first. Fresh throwaway git repo per leg. wall-clock = PowerShell Stopwatch around the dispatch.",
+    "void_leg_guard": "each acp leg verified [driver=acp] phase=run + fallback_to_stdin:false in the driver log; all 3 acp legs genuinely drove ACP (no silent stdin fallback)."
+  },
+  "results": {
+    "round1_stdin_first": {
+      "order": "stdin cool/1st, acp hot/2nd",
+      "stdin": {"wall_s": 360.9, "steps": 10, "merged": true, "note": "clean"},
+      "acp": {"wall_s": 911.6, "steps": 17, "merged": true, "note": "verbose run (17 tool-call steps); source: #775 c.1662 (predecessor round 1)"}
+    },
+    "round2_acp_first": {
+      "order": "acp cool/1st, stdin hot/2nd",
+      "acp": {"wall_s": 534.7, "driver_seconds": 522.7, "tool_call_events": 83, "merged": true, "box_cpu_pct": 44, "note": "capped by 10-turn no-edit spin AFTER finishing the work"},
+      "stdin": {"wall_s": 612.4, "step_finish": 13, "merged": true, "box_cpu_pct": 33, "note": "completed clean (no spin)"}
+    },
+    "round3_stdin_first": {
+      "order": "stdin cool/1st, acp hot/2nd",
+      "stdin": {"wall_s": 413.9, "merged": true, "note": "clean"},
+      "acp": {"wall_s": 394.5, "merged": true, "note": "BOTH best-of-2 candidates went idle-stuck (240s no-edit); the ACP typed-event stall-detector bounded each cleanly (candidate driver_seconds 124.1 + 258.3), merged partial work passed tests+verify"}
+    }
+  },
+  "aggregate": {
+    "acp_wall_s": [911.6, 534.7, 394.5],
+    "stdin_wall_s": [360.9, 612.4, 413.9],
+    "acp_mean_s": 613.6,
+    "stdin_mean_s": 462.4,
+    "acp_median_s": 534.7,
+    "stdin_median_s": 413.9,
+    "per_run_range_s": "360.9 - 911.6"
+  },
+  "headline": "WALL-CLOCK INCONCLUSIVE, coder-stochasticity-dominated (as ACP-01 §6 predicted). Per-run swing (360-912s) dwarfs any driver signal at N=3; each acp leg's excess is a distinct transport-INDEPENDENT coder event (R1 verbose 17-step / R2 10-turn spin / R3 both candidates idle-stuck). The two drivers' different stop-mechanisms shaped wall-clock more than transport did (R3: acp ran 2nd/hot AND both candidates froze, yet came in fastest-of-round because its stall-detector cut the stuck candidates off cleanly). acp mean ~30% higher than stdin but NOT attributable to the transport.",
+  "observability_finding": "The proven-by-spike ACP observability win showed up live: across these legs the typed-event stall-detector cleanly caught 3 wedged-coder phases (the #779 idle-breaker blind spot the stdin CPU-probe heuristic historically false-doomed/#687 or missed). 2 of 3 acp legs hit idle/stuck events vs 0/3 stdin — most plausibly acp's MORE SENSITIVE detection firing (a feature), not acp inducing more wedges; N=3 cannot prove which.",
+  "disposition": {
+    "d_a_bar": "no wall-clock/token regression",
+    "verdict": "wall-clock: no ATTRIBUTABLE regression (inconclusive/noise-dominated). tokens: UNMEASURABLE this pipeline (see not_measured) but a-priori driver-independent. observability/stall/cancel: decisively better (spike-proven + demonstrated live).",
+    "decision": "FLIP APPROVED to driver=acp (LA, 2026-07-11) on the ACP-01 §6 basis: cut over on the proven observability merits, not a wall-clock win the confound cannot deliver. First flipped production dispatch run watched. #779 closed by construction.",
+    "escalation": "The ambiguous D-A was escalated to the LA (recommendation: flip; alternatives: low-variance confirmation, or hold). LA chose flip."
+  },
+  "not_measured": [
+    "TOKENS — the local-model proxy reported usage_update used:0 for acp and the stdin transcript carried no token lines; the token dimension could not be measured via this dispatch pipeline (a-priori driver-independent: the transport changes how the coder is watched, not what the model generates)",
+    "per-leg box CPU load for R1 (predecessor run) and R3 (not sampled); R2 sampled at acp ~44% / stdin ~33% — acp ran under slightly HEAVIER background load (a mild disadvantage that only strengthens no-regression)",
+    "a low-variance controlled comparison (temperature-0 coder to kill the stochasticity, or N>3) that would firm up the raw-mean gap and the 2/3-acp-idle-events question",
+    "cross-run thermal state (single evening; alternating leg order is the primary thermal control, not per-leg temperature capture)"
+  ]
+}

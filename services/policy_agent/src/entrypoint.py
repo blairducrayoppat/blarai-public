@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 import tomllib
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,7 @@ from shared.ipc.protocol import AdjudicationResponse
 from shared.ipc.vsock import VsockAddress, VsockConfig
 from shared.models.weight_integrity import load_manifest, load_manifest_verified
 from shared.schemas.car import CanonicalActionRepresentation
+from shared.service_signals import install_graceful_shutdown
 from services.policy_agent.src.adjudicator import HybridAdjudicator
 from services.policy_agent.src.boot import (
     BootState,
@@ -67,6 +69,7 @@ from shared.runtime_config import (
     resolve_service_config_path,
     resolve_service_root,
 )
+from shared import config_validation
 from shared.constants import (
     DRAFT_MODEL_OV_PATH,
     SPECULATIVE_DECODING_ENABLED,
@@ -586,6 +589,25 @@ class PolicyAgentService:
         self._running = False
         logger.info("Policy Agent entrypoint stopped.")
 
+    def install_signal_handlers(
+        self, signals: Iterable[int] | None = None
+    ) -> tuple[int, ...]:
+        """Arm SIGTERM/SIGINT → graceful :meth:`stop` for this PA (AUDIT-13 / #812).
+
+        Gives the Policy Agent its OWN disposability drain, independent of the
+        launcher: on a termination signal the listener is stopped, the IPC loop
+        joined, and the model unloaded via :meth:`stop`. Opt-in and fail-safe —
+        see :func:`shared.service_signals.install_graceful_shutdown`. In the
+        default host topology the launcher owns process signal disposition (and
+        already drains the PA via ``stop()``); this method is for the
+        process-leader topology where the PA runs as its own process (the VM
+        guest). Returns the signals actually armed (``()`` if none — e.g. called
+        off the main thread).
+        """
+        return install_graceful_shutdown(
+            self.stop, service_name="PolicyAgent", signals=signals
+        )
+
     def _load_entrypoint_config(self) -> PolicyAgentEntrypointConfig:
         config_path = self._resolve_config_path()
 
@@ -722,8 +744,8 @@ class PolicyAgentService:
         )
 
     def _validate_config_data(self, config_data: dict[str, object], config_path: Path) -> None:
-        runtime = self._require_section_dict(config_data, "runtime", code="PA_CFG_RUNTIME_SECTION_MISSING")
-        runtime_mode_raw = self._require_non_empty_str(
+        runtime = config_validation.require_section_dict(config_data, "runtime", code="PA_CFG_RUNTIME_SECTION_MISSING")
+        runtime_mode_raw = config_validation.require_non_empty_str(
             runtime,
             "deployment_mode",
             code="PA_CFG_RUNTIME_MODE_MISSING",
@@ -738,14 +760,14 @@ class PolicyAgentService:
                 ),
             )
 
-        inference = self._require_section_dict(config_data, "inference", code="PA_CFG_INFERENCE_SECTION_MISSING")
-        device = self._require_non_empty_str(inference, "device", code="PA_CFG_INFERENCE_DEVICE_MISSING")
+        inference = config_validation.require_section_dict(config_data, "inference", code="PA_CFG_INFERENCE_SECTION_MISSING")
+        device = config_validation.require_non_empty_str(inference, "device", code="PA_CFG_INFERENCE_DEVICE_MISSING")
         if device.upper() != "GPU":
             raise ConfigResolutionError(
                 code="PA_CFG_DEVICE_INVALID",
                 message=f"Policy Agent device must be GPU per ADR-010, got '{device}'.",
             )
-        self._require_non_empty_str(inference, "model_dir", code="PA_CFG_MODEL_DIR_MISSING")
+        config_validation.require_non_empty_str(inference, "model_dir", code="PA_CFG_MODEL_DIR_MISSING")
 
         spec_decode = inference.get("speculative_decoding_enabled")
         if spec_decode is not None and not isinstance(spec_decode, bool):
@@ -762,8 +784,8 @@ class PolicyAgentService:
                     message="'inference.draft_model_dir' must be a non-empty string when specified.",
                 )
 
-        security = self._require_section_dict(config_data, "security", code="PA_CFG_SECURITY_SECTION_MISSING")
-        dev_mode = self._require_bool(security, "dev_mode", code="PA_CFG_DEV_MODE_INVALID")
+        security = config_validation.require_section_dict(config_data, "security", code="PA_CFG_SECURITY_SECTION_MISSING")
+        dev_mode = config_validation.require_bool(security, "dev_mode", code="PA_CFG_DEV_MODE_INVALID")
 
         if not dev_mode:
             weight_manifest = inference.get("weight_manifest")
@@ -773,9 +795,9 @@ class PolicyAgentService:
                     message="'inference.weight_manifest' is required when dev_mode=false.",
                 )
 
-        jwt = self._require_section_dict(config_data, "jwt", code="PA_CFG_JWT_SECTION_MISSING")
-        self._require_non_empty_str(jwt, "issuer", code="PA_CFG_JWT_ISSUER_MISSING")
-        self._require_int_range(
+        jwt = config_validation.require_section_dict(config_data, "jwt", code="PA_CFG_JWT_SECTION_MISSING")
+        config_validation.require_non_empty_str(jwt, "issuer", code="PA_CFG_JWT_ISSUER_MISSING")
+        config_validation.require_int_range(
             jwt,
             "validity_seconds",
             minimum=1,
@@ -796,11 +818,11 @@ class PolicyAgentService:
                     message="'jwt.ca_cert_path' is required when dev_mode=false.",
                 )
 
-        ipc = self._require_section_dict(config_data, "ipc", code="PA_CFG_IPC_SECTION_MISSING")
-        self._require_int_range(ipc, "vsock_cid", minimum=0, maximum=2**32 - 1, code="PA_CFG_VSOCK_CID_INVALID")
-        self._require_int_range(ipc, "vsock_port", minimum=1, maximum=65535, code="PA_CFG_VSOCK_PORT_INVALID")
-        self._require_int_range(ipc, "timeout_ms", minimum=1, maximum=120000, code="PA_CFG_TIMEOUT_INVALID")
-        self._require_int_range(
+        ipc = config_validation.require_section_dict(config_data, "ipc", code="PA_CFG_IPC_SECTION_MISSING")
+        config_validation.require_int_range(ipc, "vsock_cid", minimum=0, maximum=2**32 - 1, code="PA_CFG_VSOCK_CID_INVALID")
+        config_validation.require_int_range(ipc, "vsock_port", minimum=1, maximum=65535, code="PA_CFG_VSOCK_PORT_INVALID")
+        config_validation.require_int_range(ipc, "timeout_ms", minimum=1, maximum=120000, code="PA_CFG_TIMEOUT_INVALID")
+        config_validation.require_int_range(
             ipc,
             "max_message_bytes",
             minimum=1024,
@@ -914,48 +936,6 @@ class PolicyAgentService:
         if expected_digest is None:
             return False
         return re.fullmatch(r"[0-9a-f]{64}", expected_digest) is not None
-
-    @staticmethod
-    def _require_section_dict(config_data: dict[str, object], key: str, *, code: str) -> dict[str, object]:
-        value = config_data.get(key)
-        if not isinstance(value, dict):
-            raise ConfigResolutionError(code=code, message=f"Missing or invalid section [{key}].")
-        return value
-
-    @staticmethod
-    def _require_non_empty_str(section: dict[str, object], key: str, *, code: str) -> str:
-        value = section.get(key)
-        if not isinstance(value, str) or not value.strip():
-            raise ConfigResolutionError(code=code, message=f"Missing or invalid '{key}' value.")
-        return value.strip()
-
-    @staticmethod
-    def _require_bool(section: dict[str, object], key: str, *, code: str) -> bool:
-        value = section.get(key)
-        if not isinstance(value, bool):
-            raise ConfigResolutionError(code=code, message=f"'{key}' must be a boolean.")
-        return value
-
-    @staticmethod
-    def _require_int_range(
-        section: dict[str, object],
-        key: str,
-        *,
-        minimum: int,
-        maximum: int,
-        code: str,
-    ) -> int:
-        value = section.get(key)
-        if not isinstance(value, int):
-            raise ConfigResolutionError(code=code, message=f"'{key}' must be an integer.")
-        if value < minimum or value > maximum:
-            raise ConfigResolutionError(
-                code=code,
-                message=(
-                    f"'{key}' out of range: {value}. Expected {minimum}..{maximum}."
-                ),
-            )
-        return value
 
     @staticmethod
     def _resolve_path(repo_root: Path, service_root: Path, raw_path: str) -> Path:

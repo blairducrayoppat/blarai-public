@@ -931,3 +931,142 @@ def test_bridge_import_discipline_no_launcher_no_network_clients():
         )
         for line in shared_imports
     ), shared_imports
+
+
+# =============================================================================
+# 6. Service-readiness probe factory (#744 night-20260711) — the cheapest
+#    reachability primitive, factored for the swap teardown's bounded boot
+#    wait. Same posture as the transport factory: loud at build, the returned
+#    zero-arg probe NEVER raises. No VM, no live AF_HYPERV — every check is
+#    seam-injected.
+# =============================================================================
+
+
+def test_reachable_probe_factory_rejects_out_of_range_port():
+    with pytest.raises(got.GuestOracleTransportError) as exc_info:
+        got.make_oracle_reachable_probe(vsock_port=0, _reachable=lambda e: True)
+    assert exc_info.value.code == "GO_CONFIG_PORT_INVALID"
+
+
+def test_reachable_probe_factory_rejects_mismatched_explicit_guid():
+    # The same #615 silent-divergence lock as the transport factory: the probe
+    # must never poll a DIFFERENT address than the transport would ship to.
+    with pytest.raises(got.GuestOracleTransportError) as exc_info:
+        got.make_oracle_reachable_probe(
+            service_guid="0000c350-facb-11e6-bd58-64006a7986d3",  # port 50000's
+            vsock_port=50001,
+            _reachable=lambda e: True,
+        )
+    assert exc_info.value.code == "GO_CONFIG_GUID_MISMATCH"
+
+
+def test_reachable_probe_factory_rejects_non_positive_timeout():
+    with pytest.raises(got.GuestOracleTransportError) as exc_info:
+        got.make_oracle_reachable_probe(timeout_s=0, _reachable=lambda e: True)
+    assert exc_info.value.code == "GO_CONFIG_TIMEOUT_INVALID"
+
+
+def test_reachable_probe_factory_raises_loud_when_no_bridge_interpreter(monkeypatch):
+    # The invoker precedent, inherited: a missing 3.12+ interpreter is caught
+    # when the probe is BUILT (the wait's own build guard maps it to "proceed"),
+    # never as a surprise mid-poll.
+    monkeypatch.setattr(got, "bridge_required", lambda: True)
+
+    def _no_bridge(bridge_python=""):
+        raise got.BridgeUnavailableError("none found")
+
+    monkeypatch.setattr(got, "discover_bridge_command", _no_bridge)
+    with pytest.raises(got.BridgeUnavailableError):
+        got.make_oracle_reachable_probe()
+
+
+def test_reachable_probe_endpoint_carries_the_factory_addressing():
+    seen: dict[str, object] = {}
+
+    def recording(endpoint):
+        seen["endpoint"] = endpoint
+        return True
+
+    probe = got.make_oracle_reachable_probe(
+        vm_id="11111111-2222-3333-4444-555555555555",
+        vsock_port=50002,
+        timeout_s=4.0,
+        _reachable=recording,
+    )
+    assert probe() is True
+    endpoint = seen["endpoint"]
+    assert endpoint.vm_id == "11111111-2222-3333-4444-555555555555"
+    assert endpoint.vsock_port == 50002
+    assert endpoint.service_guid == got.hv_service_guid_for_port(50002)
+    assert endpoint.timeout_s == 4.0
+
+
+def test_reachable_probe_default_endpoint_is_the_orchestrator_guest():
+    seen: dict[str, object] = {}
+
+    def recording(endpoint):
+        seen["endpoint"] = endpoint
+        return False
+
+    got.make_oracle_reachable_probe(_reachable=recording)()
+    endpoint = seen["endpoint"]
+    assert endpoint.vm_id == ORCHESTRATOR_VM_ID
+    assert endpoint.vsock_port == got.ORACLE_VSOCK_PORT_DEFAULT
+    assert endpoint.timeout_s == got.ORACLE_REACHABLE_TIMEOUT_S_DEFAULT == 5.0
+
+
+def test_reachable_probe_maps_seam_verdicts_and_never_raises():
+    assert got.make_oracle_reachable_probe(_reachable=lambda e: True)() is True
+    assert got.make_oracle_reachable_probe(_reachable=lambda e: False)() is False
+
+    def boom(endpoint):
+        raise OSError("connection refused — guest still booting")
+
+    # A raising attempt is an unreachable attempt (False), never a raise: the
+    # readiness wait polls this inside the swap teardown, which must never see
+    # an exception from a probe.
+    assert got.make_oracle_reachable_probe(_reachable=boom)() is False
+
+
+def test_reachable_probe_routes_through_the_bridge_on_311(monkeypatch):
+    # On the 3.11 runtime the probe REUSES GuestOracleBridge.reachable — the
+    # SAME op the go-live ceremony live-proved — with the bridge resolved ONCE
+    # at build time (per-attempt cost is one subprocess, never a re-discovery).
+    calls: list[object] = []
+
+    class FakeBridge:
+        def __init__(self, **kwargs):
+            calls.append(("built", kwargs.get("bridge_python", "")))
+
+        def reachable(self, endpoint):
+            calls.append(("reachable", endpoint.vsock_port))
+            return True
+
+    monkeypatch.setattr(got, "bridge_required", lambda: True)
+    monkeypatch.setattr(got, "GuestOracleBridge", FakeBridge)
+    probe = got.make_oracle_reachable_probe(vsock_port=50002)
+    assert [c[0] for c in calls] == ["built"]      # resolved at BUILD time
+    assert probe() is True
+    assert probe() is True
+    assert calls == [("built", ""), ("reachable", 50002), ("reachable", 50002)]
+
+
+def test_reachable_probe_routes_in_process_on_312_plus(monkeypatch):
+    # A 3.12+ runtime probes in-process (no subprocess), mirroring the parser's
+    # _default_transport_reachable fast path.
+    seen: list[object] = []
+    monkeypatch.setattr(got, "bridge_required", lambda: False)
+    monkeypatch.setattr(
+        got, "_in_process_reachable", lambda endpoint: seen.append(endpoint) or True
+    )
+    probe = got.make_oracle_reachable_probe(vsock_port=50002)
+    assert probe() is True
+    assert seen and seen[0].vsock_port == 50002
+
+
+def test_in_process_reachable_refuses_off_windows_or_without_af_hyperv():
+    # Fail-closed platform guard (parser parity): no AF_HYPERV in this
+    # interpreter (3.11) or a non-win32 platform -> False, never a raise.
+    if hasattr(socket, "AF_HYPERV") and sys.platform == "win32":
+        pytest.skip("this interpreter can open AF_HYPERV in-process")
+    assert got._in_process_reachable(_ENDPOINT) is False

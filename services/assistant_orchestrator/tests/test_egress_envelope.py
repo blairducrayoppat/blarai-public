@@ -130,6 +130,45 @@ class TestEgressEnvelopeManager:
         assert d.fingerprinted is True
 
 
+class TestRetainOnly:
+    """#801: the session idle-reaper's envelope companion."""
+
+    def test_drops_envelopes_for_dead_sessions(self) -> None:
+        mgr = EgressEnvelopeManager()
+        mgr.begin_turn("live", 3)
+        mgr.begin_turn("dead", 3)
+        dropped = mgr.retain_only(["live"])
+        assert dropped == ["dead"]
+
+    def test_survivor_window_state_is_untouched(self) -> None:
+        # retain_only must not reset a live session's open window.
+        mgr = EgressEnvelopeManager()
+        consent = _ConsentRecorder(True)
+        mgr.begin_turn("live", 3)
+        mgr.gate("live", "q1", consent_fn=consent)  # window open (1 of 3)
+        mgr.begin_turn("dead", 3)
+        mgr.retain_only(["live"])
+        d = mgr.gate("live", "q2", consent_fn=consent)
+        assert d.allowed is True
+        assert d.fingerprinted is False  # still within the open window
+        assert consent.calls == [("q1", 3)]
+
+    def test_dropped_session_gates_fail_closed(self) -> None:
+        # After the drop, an egress on the dead session DENIES (no envelope).
+        mgr = EgressEnvelopeManager()
+        mgr.begin_turn("dead", 3)
+        mgr.retain_only([])
+        d = mgr.gate("dead", "q", consent_fn=_ConsentRecorder(True))
+        assert d.allowed is False
+
+    def test_empty_manager_and_idempotency(self) -> None:
+        mgr = EgressEnvelopeManager()
+        assert mgr.retain_only(["anything"]) == []
+        mgr.begin_turn("s1", 3)
+        assert mgr.retain_only(["s1"]) == []
+        assert mgr.retain_only(["s1"]) == []
+
+
 class TestExtractQuery:
     def test_valid_query(self) -> None:
         assert extract_query('{"query":"bitcoin price"}') == "bitcoin price"

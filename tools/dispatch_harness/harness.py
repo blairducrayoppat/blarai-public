@@ -51,6 +51,9 @@ from tools.dispatch_harness.report import JobReport, SweepReport
 
 # A reply that contains this marker is a clarifying question awaiting an option number.
 _CLARIFY_MARKER = "Reply with the number"
+# A reply that contains this marker is a #819 requirements-clarification question set
+# (answered free-text or with "just decide for me"). Distinct from the Inc-4 marker above.
+_REQUIREMENTS_MARKER = "/dispatch just decide for me"
 # A successful PLAN preview always offers approve/reject.
 _APPROVE_MARKER = "/dispatch approve"
 # The EXECUTE reply leads with "Dispatching <run_id> — N task(s)".
@@ -328,6 +331,18 @@ class DispatchHarness:
         plan_reply = await self._send(job.command)
         report.plan_preview = _first_lines(plan_reply, 3)
 
+        # 1b) #819 requirements-clarification questions (only if asked). A battery/headless
+        # dispatch normally never sees these — a battery card carries its spec, so the AO
+        # skips CLARIFY (decomposition_override present). But the harness is operator-LESS and
+        # must never hang on a free-text question, so if one appears it auto-answers "just
+        # decide for me" (the AO then records the defaults as assumptions and re-plans). This
+        # is the load-bearing headless no-op belt-and-suspenders (#819).
+        if _is_requirements_question(plan_reply):
+            report.asked_requirements = True
+            self.log(f"[{job.repo}] requirements questions asked -> /dispatch just decide for me")
+            plan_reply = await self._send("/dispatch just decide for me")
+            report.plan_preview = _first_lines(plan_reply, 3)
+
         # 2) Inc-4 clarifying question (only if asked).
         if _is_clarifying_question(plan_reply):
             report.asked_clarifying = True
@@ -452,6 +467,13 @@ def _is_clarifying_question(reply: str) -> bool:
     """True when a PLAN reply is an Inc-4 clarifying question (awaiting an option number)."""
     r = reply or ""
     return _CLARIFY_MARKER in r and _APPROVE_MARKER not in r
+
+
+def _is_requirements_question(reply: str) -> bool:
+    """True when a PLAN reply is a #819 requirements-clarification question set (the operator
+    would answer free-text). The harness auto-answers "just decide for me" so it never hangs."""
+    r = reply or ""
+    return _REQUIREMENTS_MARKER in r and _APPROVE_MARKER not in r
 
 
 def _approve_succeeded(reply: str) -> bool:

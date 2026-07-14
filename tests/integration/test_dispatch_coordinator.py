@@ -769,3 +769,389 @@ async def test_create_blocked_while_a_dispatch_is_pending(tmp_path):
     )
     assert "Finish the dispatch that's already waiting" in reply
     assert not (_cfg(tmp_path).projects_dir / "two").exists()
+
+
+# ---- #819 requirements clarification --------------------------------------
+
+from shared.fleet import clarify as _clarify  # noqa: E402
+
+
+def _questioning_plan(*, calls=None):
+    """A plan_fn that returns CLARIFY questions on the FIRST pass (plain goal) and a real
+    plan on the RE-PLAN (the goal now carries the requirements sentinel)."""
+    async def plan_fn(repo, goal):
+        if calls is not None:
+            calls.append((repo, goal))
+        if _clarify.REQUIREMENTS_SENTINEL not in goal:
+            return PlanResult(ok=True, questions=[
+                {"axis": "surface", "question": "Where will you use this?"},
+                {"axis": "persistence", "question": "Should it save your data?"},
+            ])
+        return PlanResult(
+            ok=True,
+            tasks=[{"repo": repo, "task": "t", "prompt": "p"}],
+            spec=_spec(),
+            message="planned",
+        )
+    return plan_fn
+
+
+async def _send(coord, sess, text):
+    cmd = parse_dispatch_command(text)
+    return await coord.handle_command(sess, cmd)
+
+
+@pytest.mark.asyncio
+async def test_clarify_questions_rendered_and_held(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    reply = await _send(coord, "s", "/dispatch todo | a todo app")
+    assert "a few quick questions" in reply
+    assert "/dispatch just decide for me" in reply  # the harness/UX marker
+    assert "1. Where will you use this?" in reply
+    # Held in the requirements sub-state — NOT yet approvable, nothing pending for approval.
+    assert coord.pending_requirements_for("s") is not None
+    assert coord.pending_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_free_text_answer_replans_and_shapes_the_card(tmp_path):
+    calls: list = []
+    coord = _coord(tmp_path, plan_fn=_questioning_plan(calls=calls))
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch on my laptop, and yes save my todos")
+    # Re-planned with the answer threaded into an ENRICHED goal.
+    assert any(_clarify.REQUIREMENTS_SENTINEL in g and "on my laptop" in g for _, g in calls)
+    # Now approvable; the requirements slot cleared; the answer shows on the plan card.
+    assert "/dispatch approve" in reply
+    assert coord.pending_requirements_for("s") is None
+    assert coord.pending_for("s") is not None
+    assert "what you told me" in reply.lower() and "on my laptop" in reply
+
+
+@pytest.mark.asyncio
+async def test_just_decide_records_assumptions(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch just decide for me")
+    assert "/dispatch approve" in reply and "asked me to decide" in reply.lower()
+    spec = coord.pending_for("s").spec
+    assert spec.clarifications and all(c["assumed"] for c in spec.clarifications)
+    # the per-axis defaults were recorded (surface + persistence were asked).
+    answers = {c["answer"] for c in spec.clarifications}
+    assert _clarify.DEFAULT_AXIS_ANSWERS["surface"] in answers
+
+
+@pytest.mark.asyncio
+async def test_answer_verb_also_works(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch answer on my computer please")
+    assert "/dispatch approve" in reply
+    assert "on my computer please" in reply
+
+
+@pytest.mark.asyncio
+async def test_blank_answer_reasks_never_silently_proceeds(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch answer   ")
+    assert "didn't catch an answer" in reply.lower()
+    assert coord.pending_requirements_for("s") is not None  # still held
+
+
+@pytest.mark.asyncio
+async def test_reject_clears_requirements(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch reject")
+    assert "Cancelled" in reply
+    assert coord.pending_requirements_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_sufficient_goal_no_questions_is_todays_flow(tmp_path):
+    # A plan_fn that never returns questions -> straight to the approval preview, no sub-state.
+    coord = _coord(tmp_path, plan_fn=_fake_plan())
+    reply = await _send(coord, "s", "/dispatch todo | a fully specified app")
+    assert "/dispatch approve" in reply
+    assert coord.pending_requirements_for("s") is None
+    assert coord.pending_for("s") is not None
+
+
+@pytest.mark.asyncio
+async def test_decide_or_answer_with_nothing_pending(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_fake_plan())
+    r1 = await _send(coord, "s", "/dispatch just decide for me")
+    r2 = await _send(coord, "s", "/dispatch answer whatever")
+    assert "no question waiting" in r1.lower() and "no question waiting" in r2.lower()
+
+
+@pytest.mark.asyncio
+async def test_requirements_slot_is_a_tracked_sweep_target(tmp_path):
+    # The idle backstop (#801) must cover the new slot so an unanswered question set can't sit
+    # until restart. A fresh entry isn't reaped (idle ~0 < ttl); assert the sweep TRACKS it
+    # (the clock-driven reaping mechanics are covered by test_session_state_reaper.py).
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    assert coord.pending_requirements_for("s") is not None
+    reaped = coord.reap_expired(1800.0)
+    assert "requirements" in reaped
+
+
+# ── #820 plan-feedback revision loop ─────────────────────────────────────
+
+from shared.fleet import acceptance as _acc  # noqa: E402
+from shared.fleet import revise as _revise  # noqa: E402
+
+
+def _revising_plan(*, revision=None, calls=None):
+    """plan_fn: a real 2-FEATURE plan on the FIRST pass; REVISION edit ops on a revise goal.
+
+    The plan tasks are pre-threaded with build fields (as production's compile does) so the
+    coordinator's re-thread on the kept tasks is idempotent — the byte-stable lock then holds
+    at the FULL dict level, not just the title."""
+    default_rev = [
+        {"op": "add", "task": "csv-export", "prompt": "add a CSV export button"},
+        {"op": "keep", "ref": 2},
+    ]
+    rev = default_rev if revision is None else revision
+    spec = _spec()
+    base = [
+        {"repo": "todo", "task": "build-login", "prompt": "P1"},
+        {"repo": "todo", "task": "build-tracker", "prompt": "P2"},
+    ]
+
+    async def plan_fn(repo, goal):
+        if calls is not None:
+            calls.append((repo, goal))
+        if _revise.REVISE_SENTINEL in goal:
+            return PlanResult(ok=True, revision=[dict(o) for o in rev])
+        return PlanResult(
+            ok=True,
+            tasks=_acc._thread_build_fields([dict(t) for t in base], spec),
+            spec=spec,
+            message="planned",
+        )
+
+    return plan_fn
+
+
+async def _plan_todo(coord, sess="s"):
+    return await _send(coord, sess, "/dispatch todo | a todo app")
+
+
+def test_parse_revise_command():
+    c = parse_dispatch_command("/dispatch revise do the export first and skip login")
+    assert c.kind == "revise" and c.feedback == "do the export first and skip login"
+    assert parse_dispatch_command("/dispatch revise").kind == "revise"
+
+
+@pytest.mark.asyncio
+async def test_plan_card_offers_revise(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    reply = await _plan_todo(coord)
+    # The revise verb is offered on the plan card (alongside approve/reject).
+    assert "/dispatch revise" in reply and "/dispatch approve" in reply
+
+
+@pytest.mark.asyncio
+async def test_revise_renders_delta_and_stays_approvable(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    await _plan_todo(coord)
+    reply = await _send(coord, "s", "/dispatch revise add a csv export and skip the login")
+    assert "I revised the plan" in reply
+    assert "Added:" in reply and "Csv export" in reply
+    assert "Removed:" in reply and "Build login" in reply
+    assert "/dispatch approve" in reply  # still approvable after a revision
+
+
+@pytest.mark.asyncio
+async def test_revise_keeps_untouched_task_byte_stable(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    await _plan_todo(coord)
+    orig = [dict(t) for t in coord.pending_for("s").tasks]
+    await _send(coord, "s", "/dispatch revise add a csv export")
+    revised = coord.pending_for("s").tasks
+    slugs = [t["task"] for t in revised]
+    assert "csv-export" in slugs and "build-tracker" in slugs and "build-login" not in slugs
+    # The kept task is BYTE-IDENTICAL to the original (never a fresh decompose).
+    kept = next(t for t in revised if t["task"] == "build-tracker")
+    orig_tracker = next(t for t in orig if t["task"] == "build-tracker")
+    assert kept == orig_tracker
+
+
+@pytest.mark.asyncio
+async def test_revise_records_feedback_on_spec(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    await _plan_todo(coord)
+    await _send(coord, "s", "/dispatch revise add a csv export")
+    spec = coord.pending_for("s").spec
+    # The feedback rides the spec block (recorded, not-assumed) so the report/oracle see WHY.
+    assert any("csv export" in c["answer"].lower() and not c["assumed"] for c in spec.clarifications)
+
+
+@pytest.mark.asyncio
+async def test_revise_increments_count_stable_run_id_tombstones(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    await _plan_todo(coord)
+    p0 = coord.pending_for("s")
+    assert p0.revision_count == 0
+    await _send(coord, "s", "/dispatch revise add export")
+    p1 = coord.pending_for("s")
+    assert p1.revision_count == 1  # counted
+    assert p1.run_id == p0.run_id  # stable run_id across revisions (status/reports line up)
+    assert p1 is not p0  # the old pending is tombstoned (single slot replaced)
+
+
+@pytest.mark.asyncio
+async def test_revise_cap_honored(tmp_path):
+    # A revision that always changes something (adds a task) so each attempt counts.
+    coord = _coord(
+        tmp_path,
+        plan_fn=_revising_plan(revision=[{"op": "add", "task": "extra", "prompt": "one more feature here"}]),
+    )
+    await _plan_todo(coord)
+    for i in range(_revise.DEFAULT_MAX_REVISIONS):
+        await _send(coord, "s", f"/dispatch revise change number {i}")
+        assert coord.pending_for("s").revision_count == i + 1
+    # At the cap the verb is refused honestly; the plan is intact.
+    reply = await _send(coord, "s", "/dispatch revise one more change")
+    assert "already" in reply.lower() and "/dispatch approve" in reply
+    assert coord.pending_for("s").revision_count == _revise.DEFAULT_MAX_REVISIONS
+
+
+@pytest.mark.asyncio
+async def test_revise_failsoft_empty_revision_preserves_plan(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan(revision=[]))  # AO produced no usable ops
+    await _plan_todo(coord)
+    before = [t["task"] for t in coord.pending_for("s").tasks]
+    reply = await _send(coord, "s", "/dispatch revise do something incoherent")
+    assert "couldn't" in reply.lower() and "unchanged" in reply.lower()
+    p = coord.pending_for("s")
+    assert p.revision_count == 0  # a failed revision is NOT consumed
+    assert [t["task"] for t in p.tasks] == before  # the plan is intact
+    assert "/dispatch approve" in reply  # still approvable (never a lost plan)
+
+
+@pytest.mark.asyncio
+async def test_revise_failsoft_noop_all_keep(tmp_path):
+    coord = _coord(
+        tmp_path,
+        plan_fn=_revising_plan(revision=[{"op": "keep", "ref": 1}, {"op": "keep", "ref": 2}]),
+    )
+    await _plan_todo(coord)
+    reply = await _send(coord, "s", "/dispatch revise keep it exactly the same")
+    assert "couldn't" in reply.lower()  # an identical (no-op) revision fails soft
+    assert coord.pending_for("s").revision_count == 0
+
+
+@pytest.mark.asyncio
+async def test_revise_disabled_surfaces_message_plan_intact(tmp_path):
+    async def off_plan(repo, goal):
+        if _revise.REVISE_SENTINEL in goal:
+            return PlanResult(ok=False, message="Plan revision is turned off (Fail-Closed).")
+        return PlanResult(
+            ok=True, tasks=[{"repo": repo, "task": "t", "prompt": "p"}], spec=_spec(), message="ok"
+        )
+
+    coord = _coord(tmp_path, plan_fn=off_plan)
+    await _plan_todo(coord)
+    reply = await _send(coord, "s", "/dispatch revise change it")
+    assert "turned off" in reply
+    assert coord.pending_for("s") is not None  # the plan is left intact
+
+
+@pytest.mark.asyncio
+async def test_revise_nothing_pending(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    reply = await _send(coord, "s", "/dispatch revise change it")
+    assert "nothing to revise" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_revise_blank_feedback_reasks(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    await _plan_todo(coord)
+    reply = await _send(coord, "s", "/dispatch revise    ")
+    assert "what to change" in reply.lower()
+    assert coord.pending_for("s").revision_count == 0
+
+
+@pytest.mark.asyncio
+async def test_revise_while_clarifying_pending_answers_first(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_ambiguous_plan())
+    await _send(coord, "s", "/dispatch app | an app with buttons")  # -> platform question
+    assert coord.pending_clarification_for("s") is not None
+    reply = await _send(coord, "s", "/dispatch revise change something")
+    assert "answer the one question first" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_revise_preserves_acceptance_tests_task(tmp_path):
+    # A multi-task plan carries a dedicated acceptance-tests task; a revision must never drop it.
+    spec = _spec()
+    base = _acc._thread_build_fields(
+        [
+            {"repo": "todo", "task": "build-login", "prompt": "P1"},
+            {"repo": "todo", "task": "build-tracker", "prompt": "P2"},
+            {"repo": "todo", "task": _acc.ACCEPTANCE_TASK_SLUG, "prompt": "write the tests"},
+        ],
+        spec,
+    )
+
+    async def plan_fn(repo, goal):
+        if _revise.REVISE_SENTINEL in goal:
+            # Only the 2 FEATURE tasks are offered (the test task is never shown); drop login.
+            return PlanResult(ok=True, revision=[{"op": "keep", "ref": 2}])
+        return PlanResult(ok=True, tasks=[dict(t) for t in base], spec=spec, message="planned")
+
+    coord = _coord(tmp_path, plan_fn=plan_fn)
+    await _plan_todo(coord)
+    await _send(coord, "s", "/dispatch revise just the tracker")
+    slugs = [t["task"] for t in coord.pending_for("s").tasks]
+    assert slugs == ["build-tracker", _acc.ACCEPTANCE_TASK_SLUG]  # test task preserved, LAST
+
+
+@pytest.mark.asyncio
+async def test_reject_after_revise_still_cancels(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_revising_plan())
+    await _plan_todo(coord)
+    await _send(coord, "s", "/dispatch revise add export")
+    reply = await _send(coord, "s", "/dispatch reject")
+    assert "Cancelled" in reply and coord.pending_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_approve_after_revise_fires_revised_tasks(tmp_path):
+    exec_calls: list = []
+    coord = _coord(
+        tmp_path, plan_fn=_revising_plan(), execute_fn=_fake_execute(calls=exec_calls)
+    )
+    await _plan_todo(coord)
+    await _send(coord, "s", "/dispatch revise add a csv export")
+    await _send(coord, "s", "/dispatch approve")
+    assert len(exec_calls) == 1
+    fired = [t["task"] for t in exec_calls[0]["tasks"]]
+    assert "csv-export" in fired and "build-login" not in fired  # the REVISED plan fired
+
+
+@pytest.mark.asyncio
+async def test_battery_flow_never_revises_auto_accept_unchanged(tmp_path):
+    # BATTERY/HEADLESS NO-OP LOCK (#820): revision is OPERATOR-INITIATED only. The harness/
+    # battery drives plan -> approve and NEVER sends a revise verb, so the auto-accept path is
+    # byte-identical with the revise feature present: exactly ONE plan_fn call (no revise round-
+    # trip), the ORIGINAL tasks fire, and the revision count is never touched.
+    plan_calls: list = []
+    exec_calls: list = []
+    coord = _coord(
+        tmp_path,
+        plan_fn=_revising_plan(calls=plan_calls),
+        execute_fn=_fake_execute(calls=exec_calls),
+    )
+    await _plan_todo(coord)
+    assert coord.pending_for("s").revision_count == 0
+    await _send(coord, "s", "/dispatch approve")
+    # Exactly one plan_fn call (the PLAN — no revise round-trip was made).
+    assert len(plan_calls) == 1 and _revise.REVISE_SENTINEL not in plan_calls[0][1]
+    fired = [t["task"] for t in exec_calls[0]["tasks"]]
+    assert fired == ["build-login", "build-tracker"]  # the ORIGINAL plan fired, unrevised

@@ -35,11 +35,10 @@ from __future__ import annotations
 
 import logging
 import re
-import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dataclass_replace
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, NamedTuple
 
 from services.assistant_orchestrator.src.constants import (
     FIRST_TOKEN_COLD_MS,
@@ -50,7 +49,18 @@ from services.assistant_orchestrator.src.constants import (
     RESUME_BUDGET_MS,
     SECURITY_POSTURE_FAIL_CLOSED,
 )
-from shared.inference.shared_pipeline import SharedInferencePipeline
+from shared.inference.shared_pipeline import (
+    TRY_RUN_BUSY,
+    TRY_RUN_NOT_RESIDENT,
+    TRY_RUN_RAN,
+    SharedInferencePipeline,
+)
+from shared.fleet.model_profiles import (
+    AO_BRAIN_MODEL_ID,
+    hidden_block_open_tags,
+    hidden_block_re,
+    resolve_hidden_block_tags,
+)
 from shared.models.weight_integrity import (
     IntegrityCheckResult,
     ManifestSweepResult,
@@ -223,45 +233,11 @@ class GenerationResult:
     latency_total_ms: float
     """Total generation time in milliseconds."""
 
-    was_preempted: bool
-    """True if a timing anomaly suggested preemption during generation.
-    NOTE: ADR-010 — PA moved to GPU, so NPU preemption from PA no longer occurs.
-    Retained for external NPU contention detection."""
-
-    resume_latency_ms: float
-    """Estimated max resume latency after preemption (0.0 if not preempted)."""
-
     truncated: bool
     """True if output was truncated by the circuit breaker token cap."""
 
     error: str | None = None
     """Error message if generation failed (``None`` on success)."""
-
-
-@dataclass(frozen=True)
-class PreemptionEvent:
-    """Records a detected timing anomaly during generation.
-
-    Preemption is inferred via timing anomaly: if a single token step
-    takes significantly longer than the running median, an external
-    preemption event may have occurred. ADR-011: all inference on GPU;
-    timing anomaly detector retained for GPU scheduling diagnostics.
-    """
-
-    step_index: int
-    """Token generation step where the anomaly was detected."""
-
-    step_latency_ms: float
-    """Observed latency of the anomalous step (milliseconds)."""
-
-    median_latency_ms: float
-    """Running median of previous step latencies (milliseconds)."""
-
-    ratio: float
-    """``step_latency_ms / median_latency_ms`` — how many multiples of median."""
-
-    timestamp: float
-    """Wall-clock time of the event (``time.time()``)."""
 
 
 @dataclass
@@ -325,6 +301,43 @@ class GenerationConfig:
     and silently degraded every multi-task plan to the single-task fallback
     (the M2 live-verify blocker, #748). A crash-prone constraint must never
     be armed by accident of a default."""
+
+    json_schema: str | None = None
+    """#845 C3 (drafting seam) — OPTIONAL whole-response JSON-schema
+    constraint: the ``StructuredOutputConfig.json_schema`` face the #743
+    grammar work names (``shared.fleet.decompose.plan_emission_json_schema``
+    docstring), as opposed to #718's TRIGGERED ``structural_tags_config``
+    face above — here the constrained emission IS the whole response, not a
+    tag body. Value is the schema's JSON text (already serialized).
+
+    Fail-soft with the same absolute #743 contract as ``tool_call_grammar``:
+    an older GenAI build without the API, or a construction/set failure, logs
+    once and generates unconstrained — the constraint may never introduce a
+    new failure mode, and it is never retried. When both this and
+    ``tool_call_grammar`` are set, this whole-response constraint wins (they
+    are mutually exclusive by construction — the only consumer, the DORMANT
+    coordinator drafting seam, always sets ``tool_call_grammar=False`` per
+    the #748 lesson: structural emissions never ride the armed tool grammar).
+    Default ``None``: byte-identical generation for every existing caller."""
+
+
+class TryGenerateOutcome(NamedTuple):
+    """Outcome of :meth:`OrchestratorGPUInference.try_generate_text_exclusive`
+    (#845 C3 drafting seam).
+
+    ``status`` is one of the ``shared.inference.shared_pipeline`` seam
+    statuses: ``TRY_RUN_BUSY`` (the single-flight lock was held — no model
+    call was made), ``TRY_RUN_NOT_RESIDENT`` (the 14B could not be positively
+    reported resident — no model call, no load, no reload), or
+    ``TRY_RUN_RAN`` (exactly one bounded generation ran; ``result`` carries
+    its fail-closed :class:`GenerationResult`). ``note`` is an
+    operator-legible degradation note ('' when none) — e.g. the #743
+    fail-soft when a requested JSON-schema constraint was unavailable and the
+    generation ran plain."""
+
+    status: str
+    result: "GenerationResult | None"
+    note: str
 
 
 # ---------------------------------------------------------------------------
@@ -395,10 +408,69 @@ def _build_tool_call_structured_output() -> Any | None:
 
 
 # ---------------------------------------------------------------------------
+# Whole-response JSON-schema constraint (#845 C3 drafting seam — the #743 face)
+# ---------------------------------------------------------------------------
+
+_json_schema_grammar_unavailable_logged: bool = False
+
+
+def _build_json_schema_structured_output(schema_text: str) -> Any | None:
+    """Build a WHOLE-RESPONSE ``StructuredOutputConfig`` for *schema_text*.
+
+    The ``json_schema`` face of the same #718-proven xgrammar machinery
+    (:func:`_build_tool_call_structured_output` uses its triggered
+    ``structural_tags_config`` face): the entire emission is constrained to
+    the schema, since a schema-constrained draft IS the response, not a tag
+    body.
+
+    Fail-soft by the absolute #743 contract: returns ``None`` (logged once)
+    when the installed GenAI build lacks the API/attribute or construction
+    fails — the caller then generates unconstrained. The constraint may never
+    introduce a new failure mode, and there is never a retry.
+    """
+    global _json_schema_grammar_unavailable_logged
+    if not _OV_GENAI_AVAILABLE or not hasattr(ov_genai, "StructuredOutputConfig"):
+        if not _json_schema_grammar_unavailable_logged:
+            logger.warning(
+                "JSON-schema grammar requested but this OpenVINO GenAI build "
+                "lacks StructuredOutputConfig — generating unconstrained "
+                "(#743 fail-soft).",
+            )
+            _json_schema_grammar_unavailable_logged = True
+        return None
+    try:
+        structured = ov_genai.StructuredOutputConfig()
+        if not hasattr(structured, "json_schema"):
+            raise AttributeError(
+                "StructuredOutputConfig has no json_schema face on this build"
+            )
+        structured.json_schema = schema_text
+        return structured
+    except Exception as exc:  # noqa: BLE001 — fail-soft: unconstrained generation
+        if not _json_schema_grammar_unavailable_logged:
+            logger.warning(
+                "JSON-schema grammar construction failed (%s) — generating "
+                "unconstrained (#743 fail-soft).",
+                exc,
+            )
+            _json_schema_grammar_unavailable_logged = True
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Streaming visibility filter (ADR-012 §2.4)
 # ---------------------------------------------------------------------------
 
-_HIDDEN_BLOCK_RE = re.compile(r"<think>.*?</think>|<tool_call>.*?</tool_call>", re.DOTALL)
+# #834: the AO brain's hidden-block strip is resolved ONCE at import from the
+# model-profiles manifest (agentic-setup/configs/model-profiles.json). FAIL-SOFT +
+# byte-identical: an absent/unreadable/malformed manifest (the normal state off the
+# dev box) rebuilds exactly the historical DOTALL regex
+# <think>.*?</think>|<tool_call>.*?</tool_call> and the ("<think>","<tool_call>")
+# open-tag tuple. This is the SAME binding that backs entrypoint._strip_hidden_blocks —
+# one canonical source, so the twin can never drift from it (dossier sec 6.2).
+_HIDDEN_BLOCK_TAGS = resolve_hidden_block_tags(AO_BRAIN_MODEL_ID)
+_HIDDEN_BLOCK_RE = hidden_block_re(_HIDDEN_BLOCK_TAGS)
+_HIDDEN_BLOCK_OPEN_TAGS = hidden_block_open_tags(_HIDDEN_BLOCK_TAGS)
 
 
 def _visible_text(raw: str) -> str:
@@ -418,7 +490,7 @@ def _visible_text(raw: str) -> str:
     # Drop complete hidden blocks.
     s = _HIDDEN_BLOCK_RE.sub("", raw)
     # Withhold everything from an as-yet-unclosed hidden block.
-    for tag in ("<think>", "<tool_call>"):
+    for tag in _HIDDEN_BLOCK_OPEN_TAGS:
         idx = s.find(tag)
         if idx != -1:
             s = s[:idx]
@@ -427,6 +499,93 @@ def _visible_text(raw: str) -> str:
     if lt != -1 and ">" not in s[lt:]:
         s = s[:lt]
     return s
+
+
+class _IncrementalVisibleText:
+    """Streaming wrapper over :func:`_visible_text` that avoids its O(M^2) rescan.
+
+    #806: the streamer called ``_visible_text("".join(streamed_chunks))`` on
+    EVERY chunk, re-joining and re-scanning the whole accumulation each time —
+    O(M^2) over an M-chunk response, on the stream-drain thread.
+
+    This wrapper emits the byte-identical delta sequence the reference streamer
+    produced (accumulate → ``_visible_text`` → emit only the growing visible
+    delta) while doing O(1) amortized work on the two hot paths, and falling
+    back to the EXACT ``_visible_text`` oracle whenever a chunk could change the
+    hidden-tag structure.  Because the fallback is the same security-critical
+    function, the reasoning-leak guard (ISS-2) is preserved exactly — only
+    redundant work is removed, never a scan that could matter.
+
+    The two provably-identical fast paths:
+
+    * **plain-text growth** — when everything so far is visible (``_visible_text
+      (raw) == raw``) and the new chunk contains no ``"<"``, no hidden tag can
+      form or complete, so the visible text grows by exactly the chunk.
+    * **draining an open hidden block** — when an unclosed ``<think>`` /
+      ``<tool_call>`` is open (visible frozen at its start) and the new chunk
+      contains no ``">"``, the block cannot close and the frozen prefix cannot
+      change, so nothing new is emitted.
+
+    Every other chunk (any ``"<"`` while clean, any ``">"`` while blocked, or a
+    trailing-partial ``"<"`` state where the reference's last-``"<"`` rule makes
+    growth non-local) recomputes via ``_visible_text`` — identical output, at
+    a frequency bounded by the number of tag-related characters, not M.
+    """
+
+    __slots__ = ("_raw", "_emitted_len", "_state")
+
+    _CLEAN = 0  # _visible_text(raw) == raw (nothing withheld)
+    _BLOCK = 1  # an unclosed hidden block is open (visible frozen at its start)
+    _OTHER = 2  # withheld for another reason (trailing partial "<") — recompute
+
+    def __init__(self) -> None:
+        self._raw: str = ""
+        self._emitted_len: int = 0
+        self._state: int = self._CLEAN
+
+    def feed(self, chunk: str) -> str:
+        """Append *chunk*; return the newly-visible delta to stream (may be "")."""
+        if not chunk:
+            return ""
+        # Fast path A: fully visible so far AND the chunk introduces no "<" —
+        # no tag can begin or complete, so visible grows by exactly the chunk.
+        if (
+            self._state == self._CLEAN
+            and self._emitted_len == len(self._raw)
+            and "<" not in chunk
+        ):
+            self._raw += chunk
+            self._emitted_len += len(chunk)
+            return chunk
+        # Fast path B: inside an unclosed hidden block AND the chunk has no ">" —
+        # the block cannot close and the frozen visible prefix cannot change.
+        if self._state == self._BLOCK and ">" not in chunk:
+            self._raw += chunk
+            return ""
+        # Fallback: exact recompute via the reference oracle (identical output).
+        self._raw += chunk
+        visible = _visible_text(self._raw)
+        self._recompute_state(visible)
+        # Match the reference streamer exactly: emit only growth; never shrink
+        # the emitted length (the filter is prefix-stable, so it never regresses).
+        if len(visible) > self._emitted_len:
+            delta = visible[self._emitted_len:]
+            self._emitted_len = len(visible)
+            return delta
+        return ""
+
+    def _recompute_state(self, visible: str) -> None:
+        if len(visible) == len(self._raw):
+            self._state = self._CLEAN
+            return
+        # Something is withheld. It is an OPEN hidden block iff, after removing
+        # complete blocks, a hidden open tag survives (mirrors _visible_text's
+        # own step-2 test); otherwise it is a trailing partial "<".
+        stripped = _HIDDEN_BLOCK_RE.sub("", self._raw)
+        if any(tag in stripped for tag in _HIDDEN_BLOCK_OPEN_TAGS):
+            self._state = self._BLOCK
+        else:
+            self._state = self._OTHER
 
 
 # ---------------------------------------------------------------------------
@@ -451,13 +610,6 @@ class OrchestratorGPUInference:
       6. ``invalidate_kv()``: Flush KV-cache (Code Agent degradation posture).
       7. ``unload()``: Release all GPU resources.
     """
-
-    # Preemption detection: if a token step takes >PREEMPTION_MULTIPLIER×
-    # the running median, flag it as a timing anomaly (ADR-010: PA on GPU).
-    PREEMPTION_MULTIPLIER: float = 5.0
-
-    # Minimum completed steps before preemption detection activates.
-    MIN_SAMPLES_FOR_DETECTION: int = 3
 
     def __init__(
         self,
@@ -492,10 +644,7 @@ class OrchestratorGPUInference:
         # SharedInferencePipeline instead.
         self._shared_pipeline = shared_pipeline
 
-        # Runtime objects (legacy fields retained for compatibility)
-        self._core: Any = None
-        self._compiled_model: Any = None
-        self._infer_request: Any = None
+        # Runtime pipeline (OpenVINO GenAI LLMPipeline)
         self._pipeline: Any = None
         self._loaded: bool = False
         self._integrity_result: IntegrityCheckResult | None = None
@@ -512,7 +661,6 @@ class OrchestratorGPUInference:
         # Generation statistics
         self._total_tokens_generated: int = 0
         self._total_requests: int = 0
-        self._preemption_events: list[PreemptionEvent] = []
 
     # -- Properties ---------------------------------------------------------
 
@@ -545,11 +693,6 @@ class OrchestratorGPUInference:
     def total_requests(self) -> int:
         """Cumulative generation requests since last reset."""
         return self._total_requests
-
-    @property
-    def preemption_events(self) -> list[PreemptionEvent]:
-        """Copy of all recorded preemption events since last reset."""
-        return list(self._preemption_events)
 
     @property
     def speculative_decoding_active(self) -> bool:
@@ -919,6 +1062,101 @@ class OrchestratorGPUInference:
 
         return result
 
+    def try_generate_text_exclusive(
+        self,
+        prompt: str,
+        max_new_tokens: int | None = None,
+        config: GenerationConfig | None = None,
+        system_prompt: str | None = None,
+    ) -> TryGenerateOutcome:
+        """NON-BLOCKING, residency-gated text generation — the coordinator
+        drafting seam's inference leg (#845 C3, design §3.3 wall 4 / §3.4).
+
+        The same compose → generate → decode path as :meth:`generate_text`
+        (chat template, deterministic gen-config build, hidden-block strip,
+        fail-closed result conversion) with three seam differences, all
+        delegated to ``SharedInferencePipeline.try_run_exclusive`` — the lock
+        owner's sanctioned non-blocking entry:
+
+          * the single-flight inference lock is TRY-ACQUIRED, never waited on
+            (lock held ⇒ ``TRY_RUN_BUSY``, zero model calls);
+          * the 14B must be POSITIVELY resident under the held lock — the
+            wrapper's eviction bookkeeping (``is_loaded``; what the UC-010
+            image-gen ``unload()`` clears), never the lock itself, is the
+            evidence (absent ⇒ ``TRY_RUN_NOT_RESIDENT``, zero model calls,
+            and NO load/reload is ever initiated — the wrapper's lazy-reload
+            path is structurally bypassed);
+          * ``config.json_schema`` (when set) is pre-checked here so a #743
+            fail-soft degradation to a plain bounded generation is NAMED in
+            the outcome's ``note`` instead of silently swallowed.
+
+        Requires the launcher's shared-pipeline topology: with no
+        ``SharedInferencePipeline`` wrapper (standalone/test construction)
+        there is no single-flight seam to try-acquire, so the outcome is a
+        ``TRY_RUN_NOT_RESIDENT`` defer — the drafting path never generates
+        outside the sanctioned seam. Exactly ONE bounded model call happens
+        on the ``TRY_RUN_RAN`` path; there is no retry on any failure (a
+        generation-layer error is a fail-closed ``GenerationResult.error``,
+        exactly like :meth:`generate_text`).
+
+        DORMANT: the only intended caller is the AO service object's
+        ``coordinator_draft()`` adapter, itself uncalled in production until
+        the heartbeat cycle limb lands.
+        """
+        if self._shared_pipeline is None:
+            return TryGenerateOutcome(
+                TRY_RUN_NOT_RESIDENT,
+                None,
+                "no shared inference pipeline — the single-flight drafting "
+                "seam requires the launcher's shared 14B topology",
+            )
+        if not self._loaded:
+            return TryGenerateOutcome(
+                TRY_RUN_NOT_RESIDENT,
+                None,
+                "inference engine not loaded",
+            )
+
+        gen_config = config or GenerationConfig()
+        note = ""
+        if gen_config.json_schema:
+            # #743 fail-soft, pre-checked so the degradation is nameable: an
+            # unavailable/failed constraint means a PLAIN bounded generation
+            # (never a second, retried call — the lock is held once, briefly).
+            if _build_json_schema_structured_output(gen_config.json_schema) is None:
+                note = (
+                    "json-schema constraint unavailable — plain bounded "
+                    "generation (#743 fail-soft)"
+                )
+                gen_config = dataclass_replace(gen_config, json_schema=None)
+
+        effective_max = min(
+            max_new_tokens if max_new_tokens is not None else gen_config.max_new_tokens,
+            self._max_tokens,
+        )
+        formatted_prompt = self._format_chat_prompt(
+            prompt,
+            system_prompt=system_prompt,
+        )
+
+        def _run_locked(raw_pipeline: Any) -> GenerationResult:
+            # Runs with the wrapper's lock HELD and residency PINNED; the raw
+            # pipeline handle keeps the call off the wrapper's re-entrant
+            # (deadlock) and lazy-reload (never-load) paths.
+            return self._generate_from_prompt(
+                prompt=formatted_prompt,
+                max_new_tokens=effective_max,
+                config=gen_config,
+                pipeline_override=raw_pipeline,
+            )
+
+        status, result = self._shared_pipeline.try_run_exclusive(_run_locked)
+        if status == TRY_RUN_RAN:
+            return TryGenerateOutcome(TRY_RUN_RAN, result, note)
+        if status == TRY_RUN_BUSY:
+            return TryGenerateOutcome(TRY_RUN_BUSY, None, note)
+        return TryGenerateOutcome(TRY_RUN_NOT_RESIDENT, None, note)
+
     def _format_chat_prompt(
         self,
         user_prompt: str,
@@ -1101,27 +1339,15 @@ class OrchestratorGPUInference:
                         logger.warning("Failed to reset LLMPipeline state: %s", e)
                     break
 
-    # -- Statistics ---------------------------------------------------------
-
-    def reset_statistics(self) -> None:
-        """Reset generation statistics and preemption event log."""
-        self._total_tokens_generated = 0
-        self._total_requests = 0
-        self._preemption_events.clear()
-
     # -- Lifecycle ----------------------------------------------------------
 
     def unload(self) -> None:
         """Release GPU resources, compiled model, and tokenizer."""
         self._pipeline = None
-        self._infer_request = None
-        self._compiled_model = None
-        self._core = None
         self._tokenizer = None
         self._loaded = False
         self._integrity_result = None
         self._kv_warm_sessions.clear()
-        self._preemption_events.clear()
         self._total_tokens_generated = 0
         self._total_requests = 0
         logger.info("Orchestrator GPU model unloaded.")
@@ -1179,6 +1405,19 @@ class OrchestratorGPUInference:
                 except Exception:  # noqa: BLE001 — fail-soft, unconstrained
                     pass
 
+        # #845 C3: whole-response JSON-schema constraint (the #743 face).
+        # Checked AFTER the tool grammar deliberately — when both are set the
+        # whole-response constraint wins (see the GenerationConfig.json_schema
+        # docstring; the two are mutually exclusive by construction). Same
+        # fail-soft posture: unavailable/failed ⇒ unconstrained, logged once.
+        if config.json_schema and hasattr(gen_config, "structured_output_config"):
+            structured = _build_json_schema_structured_output(config.json_schema)
+            if structured is not None:
+                try:
+                    gen_config.structured_output_config = structured
+                except Exception:  # noqa: BLE001 — fail-soft, unconstrained
+                    pass
+
         return gen_config
 
     def _generate_from_prompt(
@@ -1187,9 +1426,22 @@ class OrchestratorGPUInference:
         max_new_tokens: int,
         config: GenerationConfig,
         stream_callback: Callable[[str], bool] | None = None,
+        pipeline_override: Any | None = None,
     ) -> GenerationResult:
-        """Generate text using LLMPipeline with fail-closed semantics."""
-        if self._pipeline is None:
+        """Generate text using LLMPipeline with fail-closed semantics.
+
+        ``pipeline_override`` (#845 C3): the coordinator drafting seam passes
+        the RAW resident pipeline it received inside
+        ``SharedInferencePipeline.try_run_exclusive`` — while that lock is
+        held, calling ``self._pipeline`` (the wrapper) would re-acquire the
+        non-reentrant lock and deadlock, and the wrapper's lazy reload must
+        never fire from the drafting path. Default ``None`` uses
+        ``self._pipeline``: byte-identical for every existing caller.
+        """
+        pipeline = (
+            pipeline_override if pipeline_override is not None else self._pipeline
+        )
+        if pipeline is None:
             return self._fail_closed("Model not loaded — Fail-Closed.")
 
         t_start = time.perf_counter()
@@ -1200,7 +1452,10 @@ class OrchestratorGPUInference:
         )
 
         streamed_chunks: list[str] = []
-        _emitted_len = 0  # chars of visible text already passed to the callback
+        # #806: incremental visibility filter — same byte-identical delta stream
+        # as _visible_text over the full accumulation, without its O(M^2) rescan
+        # (it re-joined + re-scanned every chunk on the stream-drain thread).
+        _vis = _IncrementalVisibleText()
 
         def _streamer(chunk: str) -> Any:
             # ADR-012 §2.4: stream only text OUTSIDE <think>/<tool_call>. Detection
@@ -1209,27 +1464,24 @@ class OrchestratorGPUInference:
             # miss them, leaking reasoning live). ALL raw text is retained in
             # streamed_chunks/output so the entrypoint tool-call loop still sees
             # <tool_call>…</tool_call> — only the live callback is filtered.
-            nonlocal _emitted_len
             text_chunk = str(chunk)
             if text_chunk:
                 streamed_chunks.append(text_chunk)
                 if stream_callback is not None:
-                    visible = _visible_text("".join(streamed_chunks))
-                    if len(visible) > _emitted_len:
-                        delta = visible[_emitted_len:]
-                        _emitted_len = len(visible)
+                    delta = _vis.feed(text_chunk)
+                    if delta:
                         if not stream_callback(delta):
                             return ov_genai.StreamingStatus.STOP
             return ov_genai.StreamingStatus.RUNNING
 
         try:
             if stream_callback is None:
-                output = self._pipeline.generate(prompt, gen_config)
+                output = pipeline.generate(prompt, gen_config)
             else:
                 try:
-                    output = self._pipeline.generate(prompt, gen_config, _streamer)
+                    output = pipeline.generate(prompt, gen_config, _streamer)
                 except TypeError:
-                    output = self._pipeline.generate(prompt, gen_config)
+                    output = pipeline.generate(prompt, gen_config)
             output_text = str(output).strip()
             if not output_text and streamed_chunks:
                 output_text = "".join(streamed_chunks)
@@ -1309,186 +1561,10 @@ class OrchestratorGPUInference:
             token_count=len(output_tokens),
             latency_first_token_ms=min(total_ms, FIRST_TOKEN_COLD_MS),
             latency_total_ms=total_ms,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=truncated,
         )
 
-    # -- Internal: autoregressive loop --------------------------------------
-
-    def _autoregressive_loop(
-        self,
-        input_ids: list[int],
-        attention_mask: list[int] | None,
-        max_new_tokens: int,
-        config: GenerationConfig,
-    ) -> GenerationResult:
-        """Core autoregressive generation loop.
-
-        Token-by-token generation with stateful KV-cache (managed by the
-        OpenVINO ``InferRequest``), preemption detection via step-timing
-        anomaly, and circuit breaker token cap enforcement.
-        """
-        t_start = time.perf_counter()
-        t_first_token: float | None = None
-        generated: list[int] = []
-        step_times: list[float] = []
-        preempted = False
-        max_resume_ms = 0.0
-
-        # Prepare initial prefill input
-        seq_len = len(input_ids)
-        cur_ids = np.array([input_ids], dtype=np.int64)
-        cur_mask = np.array(
-            [attention_mask or [1] * seq_len],
-            dtype=np.int64,
-        )
-        cur_pos = np.arange(seq_len, dtype=np.int64).reshape(1, -1)
-
-        # Reset stateful model state for fresh generation
-        self._infer_request.reset_state()
-
-        for step in range(max_new_tokens):
-            t_step = time.perf_counter()
-
-            # Forward pass
-            try:
-                output = self._infer_request.infer({
-                    "input_ids": cur_ids,
-                    "attention_mask": cur_mask,
-                    "position_ids": cur_pos,
-                })
-            except Exception as e:  # noqa: BLE001
-                logger.error("Inference step %d: %s", step, e)
-                return self._fail_closed(
-                    f"Inference error at step {step} — Fail-Closed: {e}"
-                )
-
-            t_step_end = time.perf_counter()
-            step_ms = (t_step_end - t_step) * 1000.0
-            step_times.append(step_ms)
-
-            # First-token timing
-            if t_first_token is None:
-                t_first_token = t_step_end
-
-            # Preemption detection via timing anomaly
-            preempted, max_resume_ms = self._check_preemption(
-                step, step_ms, step_times, preempted, max_resume_ms,
-            )
-
-            # Extract logits for last position → sample next token
-            logits_out = output[self._compiled_model.output(0)]
-            last_logits = (
-                logits_out[0, -1, :]
-                if len(logits_out.shape) == 3
-                else logits_out[0, :]
-            )
-            next_token = _sample_token(last_logits, config)
-
-            # EOS check
-            if next_token == self._eos_token_id:
-                break
-
-            generated.append(next_token)
-
-            # Prepare single-token input for next decode step
-            cur_ids = np.array([[next_token]], dtype=np.int64)
-            total_len = seq_len + step + 1
-            cur_mask = np.ones((1, total_len), dtype=np.int64)
-            cur_pos = np.array([[seq_len + step]], dtype=np.int64)
-
-        t_end = time.perf_counter()
-
-        # Decode tokens to text
-        text = self._decode_tokens(generated)
-
-        truncated = len(generated) >= max_new_tokens
-
-        # Update cumulative statistics
-        self._total_tokens_generated += len(generated)
-        self._total_requests += 1
-
-        return GenerationResult(
-            tokens=generated,
-            text=text,
-            token_count=len(generated),
-            latency_first_token_ms=(
-                (t_first_token - t_start) * 1000.0
-                if t_first_token is not None
-                else 0.0
-            ),
-            latency_total_ms=(t_end - t_start) * 1000.0,
-            was_preempted=preempted,
-            resume_latency_ms=max_resume_ms,
-            truncated=truncated,
-        )
-
-    # -- Internal: preemption detection -------------------------------------
-
-    def _check_preemption(
-        self,
-        step: int,
-        step_ms: float,
-        step_times: list[float],
-        already_preempted: bool,
-        max_resume_ms: float,
-    ) -> tuple[bool, float]:
-        """Detect timing anomaly (potential preemption) via step-timing.
-
-        ADR-011: all inference on GPU; timing anomaly detector retained
-        for GPU scheduling diagnostics under multi-process contention.
-
-        Args:
-            step: Current generation step index.
-            step_ms: Current step latency in ms.
-            step_times: All step latencies so far (including current).
-            already_preempted: Whether preemption was already detected.
-            max_resume_ms: Maximum resume latency so far.
-
-        Returns:
-            Tuple of (preempted_flag, max_resume_latency_ms).
-        """
-        if len(step_times) < self.MIN_SAMPLES_FOR_DETECTION + 1:
-            return already_preempted, max_resume_ms
-
-        median_ms = statistics.median(step_times[:-1])
-        if median_ms <= 0:
-            return already_preempted, max_resume_ms
-
-        ratio = step_ms / median_ms
-        if ratio > self.PREEMPTION_MULTIPLIER:
-            resume_est = step_ms - median_ms
-            self._preemption_events.append(
-                PreemptionEvent(
-                    step_index=step,
-                    step_latency_ms=step_ms,
-                    median_latency_ms=median_ms,
-                    ratio=ratio,
-                    timestamp=time.time(),
-                )
-            )
-            logger.info(
-                "Preemption at step %d: %.2fms (%.1f× median)",
-                step,
-                step_ms,
-                ratio,
-            )
-            return True, max(max_resume_ms, resume_est)
-
-        return already_preempted, max_resume_ms
-
-    # -- Internal: decode / fail-closed -------------------------------------
-
-    def _decode_tokens(self, tokens: list[int]) -> str:
-        """Decode token IDs to text. Returns empty string on failure."""
-        if not tokens or self._tokenizer is None:
-            return ""
-        try:
-            return self._tokenizer.decode(tokens, skip_special_tokens=True)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("Token decode failed: %s", e)
-            return ""
+    # -- Internal: fail-closed ----------------------------------------------
 
     def _fail_closed(self, error: str) -> GenerationResult:
         """Produce a Fail-Closed empty ``GenerationResult``."""
@@ -1498,87 +1574,6 @@ class OrchestratorGPUInference:
             token_count=0,
             latency_first_token_ms=0.0,
             latency_total_ms=0.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
             error=error,
         )
-
-
-# ---------------------------------------------------------------------------
-# Module-level helpers
-# ---------------------------------------------------------------------------
-
-
-def _softmax(logits: Any) -> Any:
-    """Numerically-stable softmax over a 1-D array.
-
-    Args:
-        logits: Raw model output (numpy array or array-like).
-
-    Returns:
-        Probability distribution (numpy array, sums to ~1.0).
-
-    Raises:
-        RuntimeError: If NumPy is not available.
-    """
-    if np is None:
-        raise RuntimeError("NumPy not available — cannot compute softmax.")
-    x = np.asarray(logits, dtype=np.float64)
-    x_shifted = x - x.max()
-    e_x = np.exp(x_shifted)
-    return e_x / e_x.sum()
-
-
-def _sample_token(logits: Any, config: GenerationConfig) -> int:
-    """Sample next token from logits via greedy or nucleus sampling.
-
-    Args:
-        logits: Raw ``[vocab_size]`` logit vector (numpy array).
-        config: Generation parameters (temperature, top_k, top_p, do_sample).
-
-    Returns:
-        Sampled token ID (int).
-    """
-    if not config.do_sample:
-        # Greedy: argmax
-        return int(np.argmax(logits))
-
-    scaled = np.asarray(logits, dtype=np.float64)
-
-    # Temperature scaling
-    if config.temperature > 0:
-        scaled = scaled / config.temperature
-
-    probs = _softmax(scaled)
-
-    # Top-k filtering
-    if config.top_k > 0 and config.top_k < len(probs):
-        top_k_idx = np.argsort(probs)[::-1][: config.top_k]
-        mask = np.zeros_like(probs)
-        mask[top_k_idx] = 1.0
-        probs = probs * mask
-        total = probs.sum()
-        if total > 0:
-            probs = probs / total
-
-    # Top-p (nucleus) filtering
-    if 0.0 < config.top_p < 1.0:
-        sorted_idx = np.argsort(probs)[::-1]
-        cumulative = np.cumsum(probs[sorted_idx])
-        cutoff = int(np.searchsorted(cumulative, config.top_p)) + 1
-        mask = np.zeros_like(probs)
-        mask[sorted_idx[:cutoff]] = 1.0
-        probs = probs * mask
-        total = probs.sum()
-        if total > 0:
-            probs = probs / total
-
-    # Stochastic sample from filtered distribution
-    try:
-        return int(np.random.choice(len(probs), p=probs))
-    except ValueError:
-        # Fallback to greedy if sampling fails (e.g., all-zero probs)
-        return int(np.argmax(logits))
-
-

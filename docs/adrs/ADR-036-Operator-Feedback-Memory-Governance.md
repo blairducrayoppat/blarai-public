@@ -3,6 +3,11 @@
 **Status:** ACCEPTED 2026-07-10 (Lead-Architect-ratified; decisions D-0..D-4 + the §2.2a removal-semantics
 position settled in-chat 2026-07-10, recorded on Vikunja #770/#792 and in the committed iteration plan).
 M1 shipped 2026-07-09; M2 (this ADR's subject) shipped 2026-07-10.
+**Amendment 1 (2026-07-11, #792):** Decision 8 — the confirm card's provenance NOTICE is now sized to the
+untrusted grain (a proportionate notice for the operator's own knowledge-bank recall vs the strong warning
+for a document/web result). Fixes the live mislabel where an auto-recalled `UNTRUSTED_KNOWLEDGE` fresh
+session read as "a document or web result." Presentation-only; the Layer-3 gating and D-1(a) allow-with-notice
+posture are unchanged.
 **Deciders:** Lead Architect (blarai); Orchestrator (facilitation).
 **Builds on:** ADR-023 (Provenance-Based Trust Model — the GUARDED tier + #570 per-dispatch PA mediation
 the propose tool rides; the `UNTRUSTED_*` provenance the untrusted-context card flag reads),
@@ -110,11 +115,19 @@ citable, and it formalizes the LA's D-0..D-4 + §2.2a decisions.
 
 8. **Card surface — built once in the shared backend (D-2(a)).** The confirm card is rendered by one
    shared builder (`shared/ipc/preference_proposal.py`): verbatim proposed text (display-sanitized so a
-   body cannot break the card frame or forge a datamark) + type tag + **provenance** ("your last message"
-   vs "a document you loaded" vs "content from a document or web result") + a visible **untrusted-context
-   flag** when untrusted content was in the turn. The WinUI renders it as a Save/Dismiss card; every
-   text-only surface shows the same readable text (which names the exact commands). Both emit the identical
-   operator-typed `/remember-confirm`/`/remember-dismiss` — the operator's action is the write authority.
+   body cannot break the card frame or forge a datamark) + type tag + **provenance sized to the source**
+   ("your last message" vs "a document you loaded" vs "content recalled from your knowledge bank" vs
+   "content from a document or web result") + a **grain-sized untrusted-context notice** when untrusted
+   content was in the turn (Am.1, #792): a PROPORTIONATE notice when the operator's OWN curated
+   knowledge-bank recall (`UNTRUSTED_KNOWLEDGE`) was the SOLE untrusted tier — his own content, so no
+   alarm — versus the STRONG warning for a document / pasted-external / web-search result, where a hostile
+   instruction could be hiding (the weak-signal defense). Any mixed or unrecognized untrusted tier fails
+   **safe to the strong warning**. The GATING is unchanged — knowledge recall still trips the Layer-3
+   action-lock exactly like a document (ADR-023 Am.2); only the disclosure grain differs, so an
+   auto-recalled knowledge bank in a fresh session no longer mis-reads as "a document or web result." The
+   WinUI renders it as a Save/Dismiss card; every text-only surface shows the same readable text (which
+   names the exact commands). Both emit the identical operator-typed
+   `/remember-confirm`/`/remember-dismiss` — the operator's action is the write authority.
 
 9. **Dormant implicit-extraction lane (recorded, not built).** Program P1's implicit half stays dormant.
    If ever revisited, the governance shape is fixed here: a separately-privileged background job whose

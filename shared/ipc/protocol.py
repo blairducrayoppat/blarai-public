@@ -29,6 +29,7 @@ Security:
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -36,6 +37,140 @@ from typing import Any
 
 # Default max: 64 KB (matches VsockConfig.max_message_bytes).
 DEFAULT_MAX_MESSAGE_BYTES: int = 65_536
+
+
+# ---------------------------------------------------------------------------
+# Typed payload guards (#803) — the IPC trust boundary
+# ---------------------------------------------------------------------------
+# A decoded IPC payload is UNTRUSTED input: ``json.loads`` hands back whatever
+# the peer framed, so a field declared int can arrive as a list, a str as a
+# dict.  The historical bare ``int()``/``str()``/``bool()`` coercions either
+# swallowed such values (``str(["x"])`` → ``"['x']"`` flowing on as "valid")
+# or raised ``TypeError`` where every decoder documents ``ValueError`` — a
+# contract lie any ``except ValueError``-only caller would crash on.
+#
+# These guards make the documented contract true (Fail-Closed):
+#   - absent key            → the decoder's documented default (missing-key
+#     tolerance is a locked contract — see test_decode_coerces_missing_fields);
+#   - present, declared type → the value, unchanged;
+#   - present, ANY other type (containers, None, numeric strings, bool-where-
+#     int) → ``ValueError`` with a deterministic, content-free fingerprint:
+#     field name + expected type + received TYPE NAME.  Never the value —
+#     malformed fields may carry operator content and the message flows into
+#     logs/error labels (privacy mandate).
+#
+# Mirrors ``ChunkAssembler._require_int`` (shared/ipc/parse_channel.py) —
+# the pattern this module lacked.  Public (no underscore) because the
+# gateway's dataclass decoders (services/ui_gateway/src/transport.py) guard
+# the same trust boundary and import them.
+
+_MISSING: Any = object()
+
+
+def _mistyped(field: str, expected: str, value: Any) -> ValueError:
+    """Build the deterministic mistyped-field error (type name, NEVER the value)."""
+    return ValueError(
+        f"IPC field {field!r} must be {expected}, got {type(value).__name__}"
+    )
+
+
+def ensure_int(value: Any, field: str) -> int:
+    """Return *value* iff it is a true int (bool rejected).
+
+    Raises:
+        ValueError: If *value* is not an int (deterministic content-free
+            fingerprint; ``bool`` is rejected — JSON ``true`` is not a count).
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _mistyped(field, "int", value)
+    return value
+
+
+def require_int(payload: Mapping[str, Any], key: str, default: int = 0) -> int:
+    """Read an int field from an untrusted payload; absent → *default*.
+
+    Raises:
+        ValueError: If the field is present but not an int (bool rejected).
+    """
+    value = payload.get(key, _MISSING)
+    if value is _MISSING:
+        return default
+    return ensure_int(value, key)
+
+
+def require_str(payload: Mapping[str, Any], key: str, default: str = "") -> str:
+    """Read a str field from an untrusted payload; absent → *default*.
+
+    Raises:
+        ValueError: If the field is present but not a str (a container is
+            REJECTED, never ``str()``-coerced into a "valid" value).
+    """
+    value = payload.get(key, _MISSING)
+    if value is _MISSING:
+        return default
+    if not isinstance(value, str):
+        raise _mistyped(key, "str", value)
+    return value
+
+
+def require_bool(
+    payload: Mapping[str, Any], key: str, default: bool = False
+) -> bool:
+    """Read a bool field from an untrusted payload; absent → *default*.
+
+    Raises:
+        ValueError: If the field is present but not a bool (a truthy
+            container must FAIL the decode, not flow on as ``True``).
+    """
+    value = payload.get(key, _MISSING)
+    if value is _MISSING:
+        return default
+    if not isinstance(value, bool):
+        raise _mistyped(key, "bool", value)
+    return value
+
+
+def require_list(payload: Mapping[str, Any], key: str) -> list[Any]:
+    """Read a list field from an untrusted payload; absent → a fresh ``[]``.
+
+    Raises:
+        ValueError: If the field is present but not a list (a str must not
+            ``list()``-explode into characters).
+    """
+    value = payload.get(key, _MISSING)
+    if value is _MISSING:
+        return []
+    if not isinstance(value, list):
+        raise _mistyped(key, "list", value)
+    return value
+
+
+def require_dict(payload: Mapping[str, Any], key: str) -> dict[str, Any]:
+    """Read a dict field from an untrusted payload; absent → a fresh ``{}``.
+
+    Raises:
+        ValueError: If the field is present but not a dict.
+    """
+    value = payload.get(key, _MISSING)
+    if value is _MISSING:
+        return {}
+    if not isinstance(value, dict):
+        raise _mistyped(key, "dict", value)
+    return value
+
+
+def require_str_list(payload: Mapping[str, Any], key: str) -> list[str]:
+    """Read a list-of-str field from an untrusted payload; absent → ``[]``.
+
+    Raises:
+        ValueError: If the field is present but not a list, or any element
+            is not a str (the element index rides the fingerprint).
+    """
+    values = require_list(payload, key)
+    for i, item in enumerate(values):
+        if not isinstance(item, str):
+            raise _mistyped(f"{key}[{i}]", "str", item)
+    return values
 
 
 class MessageType(str, Enum):
@@ -801,19 +936,24 @@ class MessageFramer:
     def decode_ingest_result(self, data: bytes) -> dict[str, Any]:
         """Decode JSON bytes into an INGEST_RESULT payload dict.
 
+        Absent fields keep their documented defaults; present fields must
+        carry their declared type (#803 — a mistyped field fails the decode,
+        it never flows on coerced).
+
         Raises:
-            ValueError: If the message is not an INGEST_RESULT.
+            ValueError: If the message is not an INGEST_RESULT, or a payload
+                field is present but not its declared type (Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.INGEST_RESULT:
             raise ValueError(f"Expected INGEST_RESULT, got {msg_type.value}")
         return {
-            "ok": bool(payload.get("ok", False)),
-            "doc_uuid": str(payload.get("doc_uuid", "")),
-            "state": str(payload.get("state", "error")),
-            "chunk_count": int(payload.get("chunk_count", 0)),
-            "error_code": str(payload.get("error_code", "")),
-            "message": str(payload.get("message", "")),
+            "ok": require_bool(payload, "ok"),
+            "doc_uuid": require_str(payload, "doc_uuid"),
+            "state": require_str(payload, "state", "error"),
+            "chunk_count": require_int(payload, "chunk_count"),
+            "error_code": require_str(payload, "error_code"),
+            "message": require_str(payload, "message"),
         }
 
     # ------------------------------------------------------------------
@@ -832,14 +972,15 @@ class MessageFramer:
         """Decode JSON bytes into a PLAN_REQUEST payload dict.
 
         Raises:
-            ValueError: If the message is not a PLAN_REQUEST.
+            ValueError: If the message is not a PLAN_REQUEST, or a payload
+                field is present but not its declared type (#803, Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.PLAN_REQUEST:
             raise ValueError(f"Expected PLAN_REQUEST, got {msg_type.value}")
         return {
-            "repo": str(payload.get("repo", "")),
-            "goal": str(payload.get("goal", "")),
+            "repo": require_str(payload, "repo"),
+            "goal": require_str(payload, "goal"),
         }
 
     def encode_plan_result(
@@ -850,6 +991,8 @@ class MessageFramer:
         fell_back: bool = False,
         tasks: "list[dict] | None" = None,
         criteria: "dict[str, Any] | None" = None,
+        questions: "list[dict] | None" = None,
+        revision: "list[dict] | None" = None,
         request_id: str = "",
     ) -> bytes:
         """Encode a PLAN result (AO → gateway): tasks + the validated AcceptanceSpec.
@@ -858,6 +1001,15 @@ class MessageFramer:
         (``{goal, criteria:[...]}``).  The 64 KB frame cap holds easily (a handful of
         short task prompts + plain-English criteria); an over-cap payload raises at
         ``encode`` (Fail-Closed), never a silent truncation.
+
+        ``questions`` (#819) is the CLARIFY early-return payload — a list of
+        ``{axis, question}`` dicts, NON-EMPTY only when the AO asked requirements-
+        clarification questions BEFORE decompose (then ``tasks``/``criteria`` are empty).
+        ``revision`` (#820) is the REVISE early-return payload — a list of
+        ``{op, ref, task, prompt}`` edit ops, NON-EMPTY only when the operator gave feedback
+        on a pending plan (then ``tasks``/``criteria`` are empty; the coordinator applies the
+        ops to the existing plan). Both are additive + optional: an older receiver ignores the
+        key; ``decode_plan_result`` tolerates their absence.
         """
         return self.encode(
             MessageType.PLAN_RESULT,
@@ -867,6 +1019,8 @@ class MessageFramer:
                 "fell_back": fell_back,
                 "tasks": list(tasks or []),
                 "criteria": dict(criteria or {}),
+                "questions": list(questions or []),
+                "revision": list(revision or []),
             },
             request_id,
         )
@@ -875,17 +1029,25 @@ class MessageFramer:
         """Decode JSON bytes into a PLAN_RESULT payload dict.
 
         Raises:
-            ValueError: If the message is not a PLAN_RESULT.
+            ValueError: If the message is not a PLAN_RESULT, or a payload
+                field is present but not its declared type (#803, Fail-Closed
+                — a str ``tasks`` must fail the decode, not ``list()``-explode
+                into characters).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.PLAN_RESULT:
             raise ValueError(f"Expected PLAN_RESULT, got {msg_type.value}")
         return {
-            "ok": bool(payload.get("ok", False)),
-            "message": str(payload.get("message", "")),
-            "fell_back": bool(payload.get("fell_back", False)),
-            "tasks": list(payload.get("tasks", [])),
-            "criteria": dict(payload.get("criteria", {})),
+            "ok": require_bool(payload, "ok"),
+            "message": require_str(payload, "message"),
+            "fell_back": require_bool(payload, "fell_back"),
+            "tasks": list(require_list(payload, "tasks")),
+            "criteria": dict(require_dict(payload, "criteria")),
+            # #819 additive: absent (older frames) -> [] via require_list; a present
+            # non-list still fails the decode (#803 typed-guard, Fail-Closed).
+            "questions": list(require_list(payload, "questions")),
+            # #820 additive: the REVISE edit-ops payload, same typed-guard discipline.
+            "revision": list(require_list(payload, "revision")),
         }
 
     def encode_execute_request(
@@ -907,15 +1069,16 @@ class MessageFramer:
         """Decode JSON bytes into an EXECUTE_REQUEST payload dict.
 
         Raises:
-            ValueError: If the message is not an EXECUTE_REQUEST.
+            ValueError: If the message is not an EXECUTE_REQUEST, or a payload
+                field is present but not its declared type (#803, Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.EXECUTE_REQUEST:
             raise ValueError(f"Expected EXECUTE_REQUEST, got {msg_type.value}")
         return {
-            "session_id": str(payload.get("session_id", "")),
-            "run_id": str(payload.get("run_id", "")),
-            "tasks": list(payload.get("tasks", [])),
+            "session_id": require_str(payload, "session_id"),
+            "run_id": require_str(payload, "run_id"),
+            "tasks": list(require_list(payload, "tasks")),
         }
 
     def encode_execute_result(
@@ -932,15 +1095,16 @@ class MessageFramer:
         """Decode JSON bytes into an EXECUTE_RESULT payload dict.
 
         Raises:
-            ValueError: If the message is not an EXECUTE_RESULT.
+            ValueError: If the message is not an EXECUTE_RESULT, or a payload
+                field is present but not its declared type (#803, Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.EXECUTE_RESULT:
             raise ValueError(f"Expected EXECUTE_RESULT, got {msg_type.value}")
         return {
-            "ok": bool(payload.get("ok", False)),
-            "run_id": str(payload.get("run_id", "")),
-            "message": str(payload.get("message", "")),
+            "ok": require_bool(payload, "ok"),
+            "run_id": require_str(payload, "run_id"),
+            "message": require_str(payload, "message"),
         }
 
     # ------------------------------------------------------------------
@@ -1056,17 +1220,18 @@ class MessageFramer:
         """Decode JSON bytes into an IMAGE_GEN_RESULT payload dict.
 
         Raises:
-            ValueError: If the message is not an IMAGE_GEN_RESULT.
+            ValueError: If the message is not an IMAGE_GEN_RESULT, or a payload
+                field is present but not its declared type (#803, Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.IMAGE_GEN_RESULT:
             raise ValueError(f"Expected IMAGE_GEN_RESULT, got {msg_type.value}")
         return {
-            "ok": bool(payload.get("ok", False)),
-            "image_ref": str(payload.get("image_ref", "")),
-            "mime": str(payload.get("mime", "")),
-            "error_code": str(payload.get("error_code", "")),
-            "message": str(payload.get("message", "")),
+            "ok": require_bool(payload, "ok"),
+            "image_ref": require_str(payload, "image_ref"),
+            "mime": require_str(payload, "mime"),
+            "error_code": require_str(payload, "error_code"),
+            "message": require_str(payload, "message"),
         }
 
     # ------------------------------------------------------------------
@@ -1120,10 +1285,18 @@ class MessageFramer:
         """Encode a generated-image metadata listing (AO → gateway).
 
         METADATA ONLY: each record is projected onto the pinned
-        :attr:`IMAGE_LIST_KEYS` and coerced (``byte_size`` int, ``saved`` bool,
-        the rest str) so a malformed/oversized record — or an accidental
-        bytes/prompt field — can NEVER ride the frame.  ``total`` is the full
-        stored count; ``truncated`` signals images exist beyond the per-frame cap.
+        :attr:`IMAGE_LIST_KEYS` (``saved`` bool-coerced, text fields
+        str-coerced) so a malformed/oversized record — or an accidental
+        bytes/prompt field — can NEVER ride the frame.  ``byte_size`` and
+        ``total`` must BE ints (#803 — Fail-Closed at encode with a
+        deterministic ``ValueError``, never a raw ``TypeError`` and never a
+        silently minted number; the store already types them).  ``total`` is
+        the full stored count; ``truncated`` signals images exist beyond the
+        per-frame cap.
+
+        Raises:
+            ValueError: If a record's ``byte_size`` — or *total* — is present
+                but not an int.
         """
         norm: list[dict[str, Any]] = []
         for record in images:
@@ -1132,14 +1305,18 @@ class MessageFramer:
                     "image_id": str(record.get("image_id", "")),
                     "session_id": str(record.get("session_id", "")),
                     "mime": str(record.get("mime", "")),
-                    "byte_size": int(record.get("byte_size", 0) or 0),
+                    "byte_size": require_int(record, "byte_size"),
                     "saved": bool(record.get("saved", False)),
                     "created_at": str(record.get("created_at", "")),
                 }
             )
         return self.encode(
             MessageType.IMAGE_LIST_RESPONSE,
-            {"images": norm, "total": int(total), "truncated": bool(truncated)},
+            {
+                "images": norm,
+                "total": ensure_int(total, "total"),
+                "truncated": bool(truncated),
+            },
             request_id,
         )
 
@@ -1149,34 +1326,37 @@ class MessageFramer:
         Returns ``{"images": [<normalised record>...], "total": int,
         "truncated": bool}``.  Each record is re-normalised to the pinned key
         set on decode too (defence in depth — a hostile AO cannot inject extra
-        keys into the gateway-side structure).
+        keys into the gateway-side structure), and every field must carry its
+        declared type (#803 — a mistyped field or a non-dict record FAILS the
+        decode; it is never coerced or silently dropped).
 
         Raises:
-            ValueError: If the message is not an IMAGE_LIST_RESPONSE.
+            ValueError: If the message is not an IMAGE_LIST_RESPONSE, or a
+                payload field / record field is present but not its declared
+                type (Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.IMAGE_LIST_RESPONSE:
             raise ValueError(f"Expected IMAGE_LIST_RESPONSE, got {msg_type.value}")
-        raw_images = payload.get("images", [])
+        raw_images = require_list(payload, "images")
         images: list[dict[str, Any]] = []
-        if isinstance(raw_images, list):
-            for record in raw_images:
-                if not isinstance(record, dict):
-                    continue
-                images.append(
-                    {
-                        "image_id": str(record.get("image_id", "")),
-                        "session_id": str(record.get("session_id", "")),
-                        "mime": str(record.get("mime", "")),
-                        "byte_size": int(record.get("byte_size", 0) or 0),
-                        "saved": bool(record.get("saved", False)),
-                        "created_at": str(record.get("created_at", "")),
-                    }
-                )
+        for i, record in enumerate(raw_images):
+            if not isinstance(record, dict):
+                raise _mistyped(f"images[{i}]", "dict", record)
+            images.append(
+                {
+                    "image_id": require_str(record, "image_id"),
+                    "session_id": require_str(record, "session_id"),
+                    "mime": require_str(record, "mime"),
+                    "byte_size": require_int(record, "byte_size"),
+                    "saved": require_bool(record, "saved"),
+                    "created_at": require_str(record, "created_at"),
+                }
+            )
         return {
             "images": images,
-            "total": int(payload.get("total", len(images))),
-            "truncated": bool(payload.get("truncated", False)),
+            "total": require_int(payload, "total", len(images)),
+            "truncated": require_bool(payload, "truncated"),
         }
 
     def encode_image_manage_request(
@@ -1233,18 +1413,20 @@ class MessageFramer:
         """Decode JSON bytes into an IMAGE_MANAGE_RESULT payload dict.
 
         Raises:
-            ValueError: If the message is not an IMAGE_MANAGE_RESULT.
+            ValueError: If the message is not an IMAGE_MANAGE_RESULT, or a
+                payload field is present but not its declared type (#803,
+                Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.IMAGE_MANAGE_RESULT:
             raise ValueError(f"Expected IMAGE_MANAGE_RESULT, got {msg_type.value}")
         return {
-            "ok": bool(payload.get("ok", False)),
-            "action": str(payload.get("action", "")),
-            "image_id": str(payload.get("image_id", "")),
-            "found": bool(payload.get("found", False)),
-            "error_code": str(payload.get("error_code", "")),
-            "message": str(payload.get("message", "")),
+            "ok": require_bool(payload, "ok"),
+            "action": require_str(payload, "action"),
+            "image_id": require_str(payload, "image_id"),
+            "found": require_bool(payload, "found"),
+            "error_code": require_str(payload, "error_code"),
+            "message": require_str(payload, "message"),
         }
 
     # ── Operator preferences (Learning Loops Loop 1, #770 M1) ───────────
@@ -1376,8 +1558,14 @@ class MessageFramer:
     def decode_preference_write_result(self, data: bytes) -> dict[str, Any]:
         """Decode JSON bytes into a PREFERENCE_WRITE_RESULT payload dict.
 
+        ``conflict`` is optional by design: absent or JSON ``null`` decodes to
+        ``None``; a dict is field-validated; anything else fails the decode
+        (#803 — never silently read as "no conflict").
+
         Raises:
-            ValueError: If the message is not a PREFERENCE_WRITE_RESULT.
+            ValueError: If the message is not a PREFERENCE_WRITE_RESULT, or a
+                payload field is present but not its declared type
+                (Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.PREFERENCE_WRITE_RESULT:
@@ -1385,23 +1573,25 @@ class MessageFramer:
                 f"Expected PREFERENCE_WRITE_RESULT, got {msg_type.value}"
             )
         raw_conflict = payload.get("conflict")
-        conflict = (
-            {
-                "pref_id": str(raw_conflict.get("pref_id", "")),
-                "body": str(raw_conflict.get("body", "")),
+        conflict: dict[str, str] | None
+        if raw_conflict is None:
+            conflict = None
+        elif isinstance(raw_conflict, dict):
+            conflict = {
+                "pref_id": require_str(raw_conflict, "pref_id"),
+                "body": require_str(raw_conflict, "body"),
             }
-            if isinstance(raw_conflict, dict)
-            else None
-        )
+        else:
+            raise _mistyped("conflict", "dict or null", raw_conflict)
         return {
-            "ok": bool(payload.get("ok", False)),
-            "op": str(payload.get("op", "")),
-            "status": str(payload.get("status", "")),
-            "pref_id": str(payload.get("pref_id", "")),
+            "ok": require_bool(payload, "ok"),
+            "op": require_str(payload, "op"),
+            "status": require_str(payload, "status"),
+            "pref_id": require_str(payload, "pref_id"),
             "conflict": conflict,
-            "token": str(payload.get("token", "")),
-            "error_code": str(payload.get("error_code", "")),
-            "message": str(payload.get("message", "")),
+            "token": require_str(payload, "token"),
+            "error_code": require_str(payload, "error_code"),
+            "message": require_str(payload, "message"),
         }
 
     def encode_preference_list_request(self, *, request_id: str = "") -> bytes:
@@ -1433,23 +1623,31 @@ class MessageFramer:
         """Decode JSON bytes into a PREFERENCE_LIST_RESPONSE payload dict.
 
         Records are re-normalised onto the pinned key set on decode too
-        (defence in depth — a hostile AO cannot inject extra keys).
+        (defence in depth — a hostile AO cannot inject extra keys), and every
+        record field must BE a str (#803 — a mistyped field or a non-dict
+        record FAILS the decode; it is never coerced or silently dropped;
+        the lenient str-projection stays encode-side only, where the input
+        is the AO's own store).
 
         Raises:
-            ValueError: If the message is not a PREFERENCE_LIST_RESPONSE.
+            ValueError: If the message is not a PREFERENCE_LIST_RESPONSE, or
+                a payload field / record field is present but not its
+                declared type (Fail-Closed).
         """
         msg_type, _rid, payload = self.decode(data)
         if msg_type != MessageType.PREFERENCE_LIST_RESPONSE:
             raise ValueError(
                 f"Expected PREFERENCE_LIST_RESPONSE, got {msg_type.value}"
             )
-        raw = payload.get("preferences", [])
+        raw = require_list(payload, "preferences")
         preferences: list[dict[str, str]] = []
-        if isinstance(raw, list):
-            for record in raw:
-                if isinstance(record, dict):
-                    preferences.append(self._normalize_preference_record(record))
+        for i, record in enumerate(raw):
+            if not isinstance(record, dict):
+                raise _mistyped(f"preferences[{i}]", "dict", record)
+            preferences.append(
+                {key: require_str(record, key) for key in self.PREFERENCE_LIST_KEYS}
+            )
         return {
             "preferences": preferences,
-            "total": int(payload.get("total", len(preferences))),
+            "total": require_int(payload, "total", len(preferences)),
         }

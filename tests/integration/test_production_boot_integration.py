@@ -186,8 +186,6 @@ class _StubInference:
             token_count=max(1, len(_STUB_REPLY) // 4),
             latency_first_token_ms=0.0,
             latency_total_ms=0.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
             error=None,
         )

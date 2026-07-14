@@ -1,6 +1,6 @@
 # ADR-026: Per-Boot Ephemeral mTLS Certificates for the Host↔VM vsock Channel
 
-**Status:** ACCEPTED — 2026-06-06 (Sprint 15 / Tier-2 production-posture; EA-1)
+**Status:** ACCEPTED — 2026-06-06 (Sprint 15 / Tier-2 production-posture; EA-1); **Amendment 1 (2026-07-12) — cert reuse-window for dispatch/battery AO reboots, LA-ratified**
 **Author:** code-specialist subagent (Claude Sonnet 4.6) for Lead Architect (Blair) review
 **Related:** ADR-018 (TPM 2.0 trust root — foundational hardware trust),
 ADR-021 (TPM-sealed PA JWT signing key — the per-chip ceremony pattern this mirrors),
@@ -213,6 +213,33 @@ The nine per-boot cert artifacts are added to `.gitignore`:
 The sole exception to this pattern remains `certs/pa_public.pem` (the TPM JWT
 public key from the ADR-021 ceremony), which is intentionally tracked as the
 documented trust anchor.
+
+---
+
+## Amendment 1 (2026-07-12) — Cert Reuse-Window for Dispatch/Battery AO Reboots
+
+**Status:** RATIFIED 2026-07-12 by the Lead Architect (plain-language governance call: comfortable letting the battery reuse its certificates within a single night rather than re-minting them every reboot — a slightly longer-lived key in exchange for a stable battery). Implemented + merged ahead of ratification (Vikunja #863, `047d5dfc` merging fix `5168c8cb`) under the LA's "fix it ASAP" directive for a defect that was deterministically STALLing every overnight dispatch job (per `CLAUDE.md` §Proactive Defect-Fixing). Refines §2 (per-boot mint) with one narrowly-scoped, opt-in exception; the base decision — every production boot mints a fresh CA + fresh leaves — is **unchanged** and remains the default on every path except the one named in A1.4.
+
+### A1.1 The defect
+The overnight dispatch "battery" (`tools/dispatch_harness/battery.py`) re-boots the Assistant Orchestrator mid-run — a preflight boot and, via `AoReensurer`, a re-boot **before each job** (the #750 fix-2 mitigation). Both go through `boot_launcher_detached()` → a fresh `python -m launcher` in production mode → the §2 cert-mint site (`launcher/__main__.py:~1510-1525`), which unconditionally minted a NEW in-memory CA + new leaves every boot. When a prior AO is still alive/leaked at the next reboot, the new on-disk CA cannot verify the stale AO's in-memory leaf (signed by the now-overwritten CA) → `certificate signature failure`, fail-closed (§2.4 — correct in isolation) → every affected job STALLED. This was the night-20260711 incident.
+
+### A1.2 Decision — opt-in, verify-before-reuse
+A `reuse_if_consistent: bool = False` keyword on `provision_per_boot_certs()` (`shared/security/cert_provisioning.py`). When `True` AND an existing on-disk set passes the A1.3 consistency check, it is reused in place of minting a new CA. Every call that leaves the default is byte-for-byte the pre-amendment behavior. Activation is env-gated (`BLARAI_REUSE_CERTS`, read at `launcher/__main__.py:1521`), never a config default; the launcher only reads it, and the only setter is `boot_launcher_detached()` (A1.4).
+
+### A1.3 Trust boundary — why it is safe
+`_load_consistent_certs()` reuses a set only when it is CRYPTOGRAPHICALLY PROVEN self-consistent: all nine PEMs present + non-empty; the CA and all four leaves unexpired (a reused set cannot outlive §2.1's 24-hour lifetime); and for each leaf, the ACTUAL ECDSA verification `ca_pub.verify(leaf.signature, leaf.tbs_certificate_bytes, ec.ECDSA(...))` — the same operation the TLS handshake performs, not an approximation. Any failure (missing file, malformed PEM, `InvalidSignature` from a mismatched CA) → not reusable → fall through to a fresh mint. A cross-generation set (a new CA beside old leaves) fails by construction. Regression-locked (`shared/tests/test_cert_provisioning.py`, 4 tests incl. the load-bearing `..._rejects_an_inconsistent_set`).
+
+### A1.4 Scope — three dispatch/swap-harness call sites only
+Reachable exclusively through `boot_launcher_detached()`, which sets `BLARAI_REUSE_CERTS=1` unconditionally on the child environment, so all THREE of its callers pick up reuse: the battery preflight boot; `AoReensurer.real()`'s per-job re-ensure; and `tools/dispatch_harness/probe.py:265` `_real_restore()` (the swap-driver probe's restore, ADR-034/035 territory). All three are local, unattended, single-operator dispatch/swap tooling — never a human-facing launch. A normal interactive/production `python -m launcher` never passes through `boot_launcher_detached()`, never sees the env var, and always mints fresh. No egress or air-gap change; `certs/pa_public.pem` (the ADR-021 trust anchor) untouched; the CA-private-key-in-memory-only invariant (§2.1) untouched.
+
+### A1.5 Residual risk — mitigated, not eliminated
+This removes the CONSEQUENCE (a torn trust chain) of an AO-lifecycle overlap, not the overlap itself (a prior AO still alive when the next reboot fires). The durable fix — a teardown barrier that proves the prior AO dead before the next boot — is tracked follow-up. NB: reuse **re-shapes** a still-live-prior-AO failure from a cert mismatch into a `:5001` port collision (the same overlap, a different symptom), which the teardown barrier also closes. The incident class reached its **third instance** (a 2026-07-06 discovery in `ao_mtls_healthy`'s docstring + #805 + #863); the teardown barrier is its mandated structural control.
+
+### A1.6 Alternatives rejected
+(i) Serialize/mutex the mint — rejected: guards writer-vs-writer racing, not the actual failure (a leaked READER AO outliving the CA it trusts). (ii) Fully persistent certs — rejected: discards §2.1 freshness (a longer key-exposure/replay window); §4.1 already rejected the long-lived ceremony model, and persistent certs would leave the port-collision symptom fully live (they only retire the cert-mismatch costume). (iii) The chosen opt-in verify-before-reuse — accepted.
+
+### A1.7 Relationship to #805
+The same night's #805 (`92958ab9`) is an adjacent-LAYER fix — a `ui_gateway` transport-client efficiency change (cache the client `SSLContext` once at first connect instead of rebuilding it per message; cache-miss stays fail-closed). Different layer, different failure shape from #863 (launcher-side cross-boot CA re-mint); both sit on the §2 per-boot design but neither subsumes the other.
 
 ---
 

@@ -386,3 +386,199 @@ def test_decompose_templates_carry_distinct_output_pipeline_guidance():
     assert "tokenize-text" in dc._DECOMPOSE_TEMPLATE    # the pipeline few-shot survives edits
     st = dc._SPLIT_TEMPLATE.lower()
     assert "distinct" in st and "adjectives" in st      # the split backstop carries it too
+
+
+# ---------------------------------------------------------------------------
+# #824 — duplicate-``task``-key collapse recovery + retry-with-guidance + diagnostics
+# ---------------------------------------------------------------------------
+# The live root cause of B1/B5 going FLAT (state/decompose-debug-20260710.log:5947, :6342): the
+# 14B emitted a well-formed MULTI-task plan but OMITTED the ``},{`` object separators, so every
+# task's key-group landed in ONE object with a repeated ``"task"`` key -> json.loads keeps only
+# the last -> cands=1 -> flat mode. It is VALID json, so ``_repair_json_array`` never fires.
+
+
+def _collapsed_raw(tasks: list[dict]) -> str:
+    """Reproduce the #824 malformation: N task objects MERGED into one (missing ``},{``
+    separators), exactly the shape the live 14B emitted for B1/B5. ``json.loads`` keeps only
+    the LAST ``"task"`` — so the array parses to a single candidate."""
+    inner = ", ".join(
+        ", ".join(f"{json.dumps(k)}: {json.dumps(v)}" for k, v in t.items())
+        for t in tasks
+    )
+    return "[{" + inner + "}]"
+
+
+# B1 (expense-cli) and B5 (habit-web) goal cards — evals/battery/B{1,5}.json — with the REAL
+# collapsed decompose shape the log captured. These are the offline decompose golden cases.
+_B1_GOAL = ("I want a little program I can run from a command window to keep track of what I "
+            "spend. First it needs somewhere to save my expenses. Then I want to type in an "
+            "expense — amount, category, and date. And I want a list of everything I have spent, "
+            "newest first.")
+_B1_TASKS = [
+    {"task": "setup-data-storage", "prompt": "Persist expenses between runs.", "depends_on": [],
+     "contract": {"creates": ["storage.py"], "exports": ["save_expense", "load_expenses"],
+                  "notes": "list of dicts"}},
+    {"task": "input-expense-data", "prompt": "Capture amount, category, and date from the CLI.",
+     "depends_on": ["setup-data-storage"],
+     "contract": {"creates": ["main.py"], "exports": ["capture_expense"], "notes": "prompts"}},
+    {"task": "retrieve-expense-list", "prompt": "List all expenses sorted by date, newest first.",
+     "depends_on": ["setup-data-storage"],
+     "contract": {"creates": ["main.py"], "exports": ["list_expenses"], "notes": "descending"}},
+]
+_B5_GOAL = ("I want a page in my web browser to track daily habits — set them up, tick each one "
+            "off with everything remembered between visits, work out streaks and success rates, "
+            "a chart over time, and one main page bringing the tick-list and the chart together.")
+_B5_TASKS = [
+    {"task": "create-habit-tracking-ui", "prompt": "UI to set up and tick daily habits."},
+    {"task": "implement-habit-storage", "prompt": "Persist habit ticks between visits."},
+    {"task": "calculate-habit-stats", "prompt": "Compute streaks and success rates."},
+    {"task": "generate-visual-chart", "prompt": "Render a chart of habit progress over time."},
+    {"task": "combine-ui-and-chart", "prompt": "Bring the tick-list and chart onto one page."},
+]
+
+
+def test_collapsed_raw_helper_reproduces_the_live_bug():
+    # Documents the failure the recovery targets: a merged multi-task object parses to ONE task.
+    raw = _collapsed_raw(_B1_TASKS)
+    assert len(json.loads(raw)) == 1                    # the silent duplicate-key collapse
+    assert len(dc._TASK_KEY_RE.findall(raw)) == 3       # ...but the INTENT was 3 tasks
+
+
+def test_b1_expense_card_recovers_to_plan_graph(tmp_path):
+    proj = _projects(tmp_path)
+    res = dc.decompose_request(_B1_GOAL, "myapp",
+                               generate_fn=_gen(_collapsed_raw(_B1_TASKS)), projects_dir=proj)
+    assert res.ok and not res.fell_back and len(res.tasks) >= 2     # graphs instead of flat
+    assert res.diagnostics["repair"] == "duplicate-key-split"
+    assert res.diagnostics["outcome"] == "plan-graph"
+    assert res.diagnostics["task_key_occurrences"] == 3
+
+
+def test_b5_habit_card_recovers_to_plan_graph(tmp_path):
+    proj = _projects(tmp_path)
+    res = dc.decompose_request(_B5_GOAL, "myapp",
+                               generate_fn=_gen(_collapsed_raw(_B5_TASKS)), projects_dir=proj)
+    assert res.ok and not res.fell_back and len(res.tasks) >= 2
+    assert res.diagnostics["repair"] == "duplicate-key-split"
+    assert res.diagnostics["outcome"] == "plan-graph"
+    slugs = [t["task"] for t in res.tasks]
+    assert "combine-ui-and-chart" in slugs and "calculate-habit-stats" in slugs
+
+
+def test_recovery_preserves_graph_fields_at_parse(tmp_path):
+    # Recovery carries depends_on + contract through the parse (not just task/prompt). Asserted at
+    # the parse level: the downstream ruler legitimately strips a depends_on ref to a task the
+    # right-sizing collapse removed, so this locks the RECOVERY, not the (separate) ruler re-map.
+    cands = dc._parse_candidates(_collapsed_raw(_B1_TASKS), max_tasks=32)
+    assert [c["task"] for c in cands] == [
+        "setup-data-storage", "input-expense-data", "retrieve-expense-list"]
+    retr = cands[2]
+    assert retr["depends_on"] == ["setup-data-storage"]
+    assert retr["contract"]["exports"] == ["list_expenses"]
+
+
+def test_healthy_multitask_array_untouched_by_recovery(tmp_path):
+    # A well-formed [{},{},{}] must be byte-identical to today — recovery NEVER fires (repair="").
+    proj = _projects(tmp_path)
+    payload = json.dumps([
+        {"task": "tokenize-text", "prompt": "Break text into words."},
+        {"task": "count-word-frequencies", "prompt": "Count each word."},
+        {"task": "compose-report", "prompt": "Combine into one report."},
+    ])
+    res = dc.decompose_request("a text toolkit: tokenize, count, and report", "myapp",
+                               generate_fn=_gen(payload), projects_dir=proj)
+    assert len(res.tasks) == 3 and res.diagnostics["repair"] == ""
+
+
+def test_single_task_goal_not_recovered_or_retried(tmp_path):
+    # One legitimately-single task (task_key_hits==1) is NOT a collapse — no recovery, no retry.
+    proj = _projects(tmp_path)
+    calls = {"n": 0}
+
+    def gen(_p):
+        calls["n"] += 1
+        return json.dumps([{"task": "add-endpoint", "prompt": "Add a /health endpoint."}])
+
+    res = dc.decompose_request("add a /health endpoint", "myapp", generate_fn=gen, projects_dir=proj)
+    assert len(res.tasks) == 1 and res.diagnostics["repair"] == ""
+    assert res.diagnostics["retry_attempted"] is False and calls["n"] == 1   # no second call
+    assert res.diagnostics["flat_reason"] in ("leaf-goal", "single-task")
+
+
+def test_retry_with_guidance_lifts_unrecoverable_collapse(tmp_path):
+    # A malformed multi-INTENT output the deterministic recovery cannot salvage (duplicate task
+    # keys but NO prompts -> every recovered object dropped) triggers ONE guided retry; the
+    # corrected array is adopted -> plan-graph.
+    proj = _projects(tmp_path)
+    bad = '[{"task": "one", "task": "two", "task": "three"}]'          # 3 task keys, no prompts
+    good = json.dumps([
+        {"task": "storage", "prompt": "Persist the data."},
+        {"task": "add-command", "prompt": "Add an item from the CLI."},
+    ])
+
+    def gen(prompt):
+        return good if "collapsed into a SINGLE task" in prompt else bad
+
+    res = dc.decompose_request("save, add, and list items from a command line", "myapp",
+                               generate_fn=gen, projects_dir=proj)
+    assert res.ok and not res.fell_back and len(res.tasks) >= 2
+    assert res.diagnostics["retry_attempted"] is True and res.diagnostics["retry_used"] is True
+
+
+def test_retry_is_fail_soft_and_never_blocks_dispatch(tmp_path):
+    # A retry that RAISES must not crash the dispatch — attempt 1 stands (single-task fallback),
+    # ok=True. A failed retry NEVER blocks a dispatch (the honest floor is unchanged).
+    proj = _projects(tmp_path)
+    bad = '[{"task": "one", "task": "two"}]'
+
+    def gen(prompt):
+        if "collapsed into a SINGLE task" in prompt:
+            raise RuntimeError("gpu oom on retry")
+        return bad
+
+    res = dc.decompose_request("save and list items from a command line", "myapp",
+                               generate_fn=gen, projects_dir=proj)
+    assert res.ok and res.diagnostics["retry_attempted"] is True
+    assert res.diagnostics["retry_used"] is False
+
+
+def test_grammar_usable_emission_does_not_retry(tmp_path):
+    # A grammar-produced emission is well-formed by construction — it must never trigger the
+    # malformed-collapse retry, and the free-text path must not be consulted at all.
+    proj = _projects(tmp_path)
+    calls = {"free": 0}
+
+    def free(_p):
+        calls["free"] += 1
+        return "lol no json"
+
+    def structured(_p, _schema):
+        return json.dumps([{"task": "add-endpoint", "prompt": "Add a /health endpoint."}])
+
+    res = dc.decompose_request("add a /health endpoint", "myapp", generate_fn=free,
+                               structured_generate_fn=structured, projects_dir=proj)
+    assert res.ok and res.used_grammar is True
+    assert res.diagnostics["retry_attempted"] is False and calls["free"] == 0
+
+
+def test_fallback_carries_diagnostics(tmp_path):
+    proj = _projects(tmp_path)
+    res = dc.decompose_request("make it faster", "myapp", generate_fn=_gen("lol no json"),
+                               projects_dir=proj)
+    assert res.fell_back and res.diagnostics["outcome"] == "fallback"
+    assert res.diagnostics["flat_reason"] in ("no-array", "empty-or-unparseable")
+
+
+def test_debug_dump_writes_structured_diagnostics(tmp_path, monkeypatch):
+    # BLARAI_DECOMPOSE_DEBUG capture is now classifier-ready: a JSON diagnostics record per call.
+    proj = _projects(tmp_path)
+    dump = tmp_path / "decompose.jsonl"
+    monkeypatch.setenv("BLARAI_DECOMPOSE_DEBUG", str(dump))
+    dc.decompose_request(_B5_GOAL, "myapp",
+                         generate_fn=_gen(_collapsed_raw(_B5_TASKS)), projects_dir=proj)
+    text = dump.read_text(encoding="utf-8")
+    assert "=== decompose diagnostics ===" in text
+    line = next(ln for ln in text.splitlines() if ln.startswith("=== decompose diagnostics ==="))
+    payload = json.loads(line.split("=== decompose diagnostics ===", 1)[1])
+    assert payload["schema"] == "decompose-diagnostics/v1"
+    assert payload["repair"] == "duplicate-key-split" and payload["outcome"] == "plan-graph"

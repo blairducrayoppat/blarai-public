@@ -637,6 +637,54 @@ async def test_dry_run_default_clarify_answer_used_when_job_omits(tmp_path):
     assert calls[0]["surface"] == "mobile"       # option 3 == mobile
 
 
+def _questioning_plan_fn(spec_factory):
+    """A plan_fn that returns #819 CLARIFY questions on the FIRST pass (plain goal) and a real
+    plan on the RE-PLAN (the goal now carries the requirements sentinel). Simulates the AO's
+    clarify path so the harness's headless no-hang belt-and-suspenders can be exercised."""
+    from shared.fleet import clarify as _clarify
+
+    async def plan_fn(repo, goal):
+        if _clarify.REQUIREMENTS_SENTINEL not in goal:
+            return PlanResult(ok=True, questions=[
+                {"axis": "surface", "question": "Where will you use this?"},
+                {"axis": "persistence", "question": "Should it save your data?"},
+            ])
+        spec = spec_factory(goal)
+        return PlanResult(
+            ok=True,
+            tasks=[{"repo": repo, "task": "build-it", "prompt": "build it",
+                    "surface": spec.build_plan.get("surface", "unknown")}],
+            spec=spec, message="planned",
+        )
+
+    return plan_fn
+
+
+async def test_dry_run_requirements_questions_auto_answered_no_hang(tmp_path):
+    # The LOAD-BEARING headless no-op (#819): if the coordinator ever asks free-text
+    # requirements questions, the operator-LESS harness must NOT hang — it auto-answers
+    # "just decide for me" and drives the dispatch to completion. (In the LIVE battery the AO
+    # skips CLARIFY for card dispatches; this is the belt-and-suspenders that guarantees no
+    # hang even if a question ever reached the harness.)
+    cfg = _fake_config(tmp_path)
+    calls: list = []
+    h = _harness(cfg, _questioning_plan_fn(_clear_spec), _execute_fn(cfg, calls=calls))
+    report = await h.run_job(JobSpec(repo="calc", goal="a calc", expected="MERGED"))
+    assert report.asked_requirements is True     # the question was seen...
+    assert report.plan_ok is True                # ...auto-answered, then a real plan came back
+    assert report.approved is True and report.verdict == "COMPLETE"
+    assert len(calls) == 1                        # execute still fired exactly once
+
+
+async def test_dry_run_no_questions_is_todays_flow_unaffected(tmp_path):
+    # A card-carried (no-questions) dispatch is byte-identical: no requirements turn.
+    cfg = _fake_config(tmp_path)
+    calls: list = []
+    h = _harness(cfg, _plan_fn(_clear_spec), _execute_fn(cfg, calls=calls))
+    report = await h.run_job(JobSpec(repo="calc", goal="a calc"))
+    assert report.asked_requirements is False and report.approved is True
+
+
 async def test_dry_run_parked_outcome_is_complete_not_doomed(tmp_path):
     # A PARKED run is a real COMPLETE result (the pipeline ran), not a doom.
     cfg = _fake_config(tmp_path)

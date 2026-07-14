@@ -1,5 +1,6 @@
 {
   "schema": "battery-card/v1",
+  "card_class": "frozen",
   "id": "B1",
   "title": "expense tracker (python-cli, 3-unit chain) — Stage-1 shakedown",
   "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B1",

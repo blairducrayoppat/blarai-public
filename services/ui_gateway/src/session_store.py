@@ -1290,6 +1290,11 @@ class StoreProvisioningError(RuntimeError):
     to start rather than silently falling back to the public ``SoftwareSealer``
     key (which is not a security boundary).  Fail-closed: no plaintext
     fallback, no SoftwareSealer in production.
+
+    Also raised when a factory's post-construction encryption-wiring
+    invariant fails (``has_encryption is not True``) -- the explicit
+    tripwire that replaced the ``assert`` form so it survives a future
+    ``python -O`` invocation (#804, CWE-617).
     """
 
 
@@ -1335,7 +1340,9 @@ def build_session_store(
     Raises:
         StoreProvisioningError: if ``dev_mode=False`` and
             ``BLARAI_DEK_KEYSTORE`` is not set (and ``db_path != ':memory:'``).
-            Production refuses to construct with a SoftwareSealer.
+            Production refuses to construct with a SoftwareSealer.  Also if
+            the constructed store fails the ``has_encryption`` production-
+            wiring invariant (#804 tripwire -- survives ``python -O``).
         DekEnvelopeError:   if the DEK cannot be unsealed (fail-closed).
         DevModeSealerError: if a SoftwareSealer is used without dev_mode=True.
     """
@@ -1408,8 +1415,14 @@ def build_session_store(
 
     store = EncryptedSessionStore(db_path=db_path, cipher=cipher)
     # Production-wiring regression lock: has_encryption MUST be True.
-    assert store.has_encryption is True, (
-        "REGRESSION: EncryptedSessionStore.has_encryption is not True -- "
-        "encryption wiring silently disabled"
-    )
+    # Explicit raise, not assert, so the tripwire survives a future
+    # `python -O` invocation (#804, CWE-617); propagates to the launcher's
+    # fail-closed session_store_init handler (no plaintext fallback).
+    if store.has_encryption is not True:
+        raise StoreProvisioningError(
+            "SESSION_STORE_ENCRYPTION_WIRING_FAILED: "
+            "EncryptedSessionStore.has_encryption is not True -- "
+            "encryption wiring silently disabled "
+            "(production-wiring regression)"
+        )
     return store

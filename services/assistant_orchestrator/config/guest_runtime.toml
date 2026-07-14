@@ -58,6 +58,12 @@ block_tools_on_untrusted_content = true
 spotlighting_enabled = true
 max_history_turns = 20
 max_context_tokens = 4096
+# Session idle-reap TTL in seconds (Vikunja #801). See default.toml for the
+# full rationale. Destroys the AO's in-RAM per-session state after this much
+# turn inactivity (durable transcript survives in the gateway session store;
+# reaped sessions re-create + reseed lazily). 1800 s (30 min) is LA-DECIDED
+# (2026-07-11, #801 c.1713). 0 or negative disables reaping.
+session_idle_ttl_s = 1800
 
 [substrate]
 # Embedding-cache idle-unload window in seconds (Vikunja #611). See default.toml

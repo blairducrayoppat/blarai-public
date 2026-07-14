@@ -62,6 +62,135 @@ def test_b8_carries_the_negative_rigs():
 
 
 # ===========================================================================
+# ADR-038 — frozen/dev card-class split marker + contamination tripwire (#838)
+# ===========================================================================
+
+
+def _card(cid="B5", repo="battery-x", **over):
+    """A minimal valid battery card for the card-class tests."""
+    card = {
+        "schema": "battery-card/v1",
+        "id": cid,
+        "repo": repo,
+        "goal": "g",
+        "units": 3,
+        "stack": "python-cli",
+        "shape": "chain",
+        "title": "t",
+        "rigs": [],
+        "expected_outcome": {
+            "allowed_terminal_verdicts": ["GREEN"],
+            "target_verdict": "GREEN",
+            "oracle": {"expected": True},
+            "must_verify_tiers": [],
+        },
+    }
+    card.update(over)
+    return card
+
+
+def test_existing_battery_cards_are_all_frozen():
+    # The seed FROZEN eval set: every shipped card loads, validates, and resolves to
+    # card_class 'frozen' — byte-behavior-identical to before the split (#838 D4).
+    cards = bat.load_cards(_SPEC_DIR)
+    assert set(cards) == {f"B{i}" for i in range(1, 9)}
+    for cid, card in cards.items():
+        assert card["card_class"] == bat.CARD_CLASS_FROZEN, f"{cid} not frozen"
+        assert bat.resolve_card_class(card) == "frozen"
+
+
+def test_frozen_battery_cards_carry_the_explicit_frozen_stamp():
+    # The born-frozen attestation is ON DISK, not merely defaulted (#838 D4).
+    for i in range(1, 9):
+        raw = json.loads((_SPEC_DIR / f"B{i}.json").read_text(encoding="utf-8"))
+        assert raw.get("card_class") == "frozen", f"B{i}.json is missing the frozen stamp"
+
+
+def test_card_class_absent_defaults_to_frozen():
+    # Fail-safe: an unstamped card is measurement-only (frozen), never a tuning card.
+    card = _card()
+    card.pop("card_class", None)
+    assert bat.validate_card(card) == []            # absent is valid
+    assert bat.resolve_card_class(card) == "frozen"
+
+
+def test_a_dev_card_is_distinguishable_and_validates():
+    dev = _card(cid="D1", card_class="dev")
+    assert bat.validate_card(dev) == []
+    assert bat.resolve_card_class(dev) == "dev"
+
+
+def test_born_frozen_xor_born_dev_never_crosses():
+    # A frozen (B<n>) id cannot be class 'dev'.
+    assert any("never crossing" in e for e in bat.validate_card(_card(cid="B5", card_class="dev")))
+    # A dev (D<n>) id MUST self-declare card_class='dev' — a frozen stamp or an absent
+    # field on a D-id is rejected (dev cards never inherit frozen).
+    assert any("MUST set card_class='dev'" in e
+               for e in bat.validate_card(_card(cid="D2", card_class="frozen")))
+    d_absent = _card(cid="D3")
+    d_absent.pop("card_class", None)
+    assert any("MUST set card_class='dev'" in e for e in bat.validate_card(d_absent))
+    # An unrecognized class value is rejected outright.
+    assert any("card_class 'tuning'" in e for e in bat.validate_card(_card(card_class="tuning")))
+
+
+def test_load_dev_cards_reads_the_dev_namespace(tmp_path):
+    dev_dir = tmp_path / "dev"
+    dev_dir.mkdir()
+    (dev_dir / "D1.json").write_text(
+        json.dumps(_card(cid="D1", repo="battery-dev-probe", card_class="dev")),
+        encoding="utf-8",
+    )
+    cards = bat.load_dev_cards(dev_dir)
+    assert set(cards) == {"D1"}
+    assert cards["D1"]["card_class"] == "dev"
+
+
+def test_load_dev_cards_empty_or_absent_is_ok(tmp_path):
+    # No dev cards yet is the birth state — {}, never a raise (unlike load_cards).
+    assert bat.load_dev_cards(tmp_path / "nonexistent") == {}
+    (tmp_path / "dev").mkdir()
+    assert bat.load_dev_cards(tmp_path / "dev") == {}
+
+
+def test_load_dev_cards_fails_closed_on_a_misclassed_dev_file(tmp_path):
+    dev_dir = tmp_path / "dev"
+    dev_dir.mkdir()
+    # A D-named file that is not born-dev must fail loudly, never load as a tuning card.
+    (dev_dir / "D9.json").write_text(
+        json.dumps(_card(cid="D9", card_class="frozen", repo="battery-x")),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        bat.load_dev_cards(dev_dir)
+
+
+def test_contamination_tripwire_fires_on_a_frozen_id_in_a_tuning_manifest():
+    # A tuning/dev-run manifest that references a frozen card's id trips the fail-loud
+    # gate (#838 D4) — the enforcement of "MEASUREMENT-ONLY on frozen cards."
+    with pytest.raises(bat.FrozenContaminationError) as exc:
+        bat.assert_no_frozen_in_tuning(["D1", "B2", "battery-dev-probe"], spec_dir=_SPEC_DIR)
+    assert "B2" in str(exc.value)
+    # The sandbox-repo fingerprint fires too (a manifest may record repos, not ids).
+    b1_repo = bat.load_cards(_SPEC_DIR)["B1"]["repo"]
+    with pytest.raises(bat.FrozenContaminationError):
+        bat.assert_no_frozen_in_tuning([b1_repo], spec_dir=_SPEC_DIR)
+
+
+def test_contamination_tripwire_passes_a_clean_dev_only_manifest():
+    # A manifest of only dev ids/repos is clean — no raise; the pure form returns [].
+    bat.assert_no_frozen_in_tuning(["D1", "D2", "battery-dev-probe"], spec_dir=_SPEC_DIR)
+    prints = bat.frozen_fingerprints(_SPEC_DIR)
+    assert bat.frozen_ids_in_manifest(["D1", "battery-dev-probe"], prints) == []
+
+
+def test_frozen_fingerprints_cover_both_id_and_repo():
+    prints = bat.frozen_fingerprints(_SPEC_DIR)
+    assert "B1" in prints and "B8" in prints
+    assert bat.load_cards(_SPEC_DIR)["B1"]["repo"] in prints
+
+
+# ===========================================================================
 # Gold JobPlans
 # ===========================================================================
 
@@ -761,6 +890,234 @@ def test_boot_launcher_detached_falls_back_without_pythonw(tmp_path, monkeypatch
     bat.boot_launcher_detached(tmp_path, tmp_path / "logs" / "boot.log")
     assert captured["cmd"] == [str(py), "-m", "launcher"]
     assert captured["kw"]["creationflags"] & _CREATE_NO_WINDOW == 0
+
+
+# ===========================================================================
+# #863 Option A — the teardown barrier: run_teardown_barrier (pure policy) +
+# build_real_teardown_ops (the live wiring) + boot_launcher_detached integration.
+# ===========================================================================
+#
+# run_teardown_barrier is pure over an injected TeardownBarrierOps (the AoReensurer /
+# ProbeOps DI pattern) -- alive -> terminate -> dead -> port-free, and the never-frees
+# -> fail-closed path, all driven here with fake callables: no socket, no process, no
+# GPU. build_real_teardown_ops is thin wiring, checked by IDENTITY (the real functions,
+# never a reimplementation) -- instance_lock's and procspawn's own suites already cover
+# behavior. The two tests above (tmp_path, no lock file) already prove the barrier's
+# no-holder short-circuit never touches a real port -- load-bearing on a box that may
+# have a REAL AO listening on the production port while this suite runs.
+
+
+def _teardown_ops(*, holder_pid, live, frees_after_polls: float = 0):
+    """A fast, effect-free TeardownBarrierOps for policy tests (mirrors _reensurer /
+    probe's _ops helper) -- no real socket/process. The port reads OCCUPIED for the
+    first *frees_after_polls* polls, then quiet; pass float('inf') to model "never
+    frees" (the fail-closed path)."""
+    calls = {"terminate": [], "sleeps": [], "polls": 0}
+
+    def _terminate(pid):
+        calls["terminate"].append(pid)
+        return [pid]
+
+    def _port_occupied():
+        occupied = calls["polls"] < frees_after_polls
+        calls["polls"] += 1
+        return occupied
+
+    ops = bat.TeardownBarrierOps(
+        read_holder_pid=lambda: holder_pid,
+        is_live_launcher=lambda pid: live,
+        terminate=_terminate,
+        port_occupied=_port_occupied,
+        sleep=lambda s: calls["sleeps"].append(s),
+        log=lambda *_: None,
+    )
+    return ops, calls
+
+
+def test_teardown_barrier_noop_when_no_lock_holder():
+    # A fresh certs/ dir (no lock file) -- the common preflight case -- must never
+    # probe the port at all (the module docstring's short-circuit: this is what keeps
+    # an isolated repo_root, e.g. THIS test's, from ever waiting on an unrelated
+    # process holding the same port number elsewhere on the box).
+    ops, calls = _teardown_ops(holder_pid=None, live=False)
+    bat.run_teardown_barrier(ops, port=5001)
+    assert calls["terminate"] == []
+    assert calls["polls"] == 0
+
+
+def test_teardown_barrier_noop_when_holder_is_not_a_live_launcher():
+    # A stale/recycled pid -- the SAME "not our launcher" outcome the instance lock
+    # itself already treats as reclaimable, never a peer to act on.
+    ops, calls = _teardown_ops(holder_pid=4242, live=False)
+    bat.run_teardown_barrier(ops, port=5001)
+    assert calls["terminate"] == []
+    assert calls["polls"] == 0
+
+
+def test_teardown_barrier_kills_live_holder_and_proceeds_once_port_frees():
+    # alive -> terminate -> dead -> port-free (the ADR's worked example, #863's own
+    # PID 3128 shape): the port reads occupied for two polls, then quiet.
+    ops, calls = _teardown_ops(holder_pid=3128, live=True, frees_after_polls=2)
+    bat.run_teardown_barrier(ops, port=5001, port_free_timeout_s=10.0, poll_s=0.01)
+    assert calls["terminate"] == [3128]
+    assert len(calls["sleeps"]) == 2
+    assert all(s == 0.01 for s in calls["sleeps"])
+
+
+def test_teardown_barrier_kills_and_proceeds_immediately_when_port_already_quiet():
+    # The kill was fast enough that the port is already free on the FIRST check --
+    # never sleeps (no wasted wall-clock on the common case).
+    ops, calls = _teardown_ops(holder_pid=3128, live=True, frees_after_polls=0)
+    bat.run_teardown_barrier(ops, port=5001, port_free_timeout_s=10.0, poll_s=0.01)
+    assert calls["terminate"] == [3128]
+    assert calls["sleeps"] == []
+
+
+def test_teardown_barrier_fail_closed_when_port_never_frees():
+    # The never-frees path: the kill WAS attempted (a wedged process that somehow
+    # survived the tree-kill, or something else re-bound the port) but the barrier
+    # REFUSES to proceed -- fail-closed, naming the pid and port.
+    ops, calls = _teardown_ops(holder_pid=3128, live=True, frees_after_polls=float("inf"))
+    with pytest.raises(bat.TeardownBarrierError, match=r"3128.*:5001"):
+        bat.run_teardown_barrier(ops, port=5001, port_free_timeout_s=0.05, poll_s=0.01)
+    assert calls["terminate"] == [3128]  # the kill WAS attempted; only the wait failed
+
+
+def test_teardown_barrier_zero_timeout_still_checks_once_before_failing():
+    # A degenerate bound (0s) must still perform the FINAL check -- never raise on a
+    # port that is ALREADY quiet just because the poll loop body never ran once.
+    ops, calls = _teardown_ops(holder_pid=3128, live=True, frees_after_polls=0)
+    bat.run_teardown_barrier(ops, port=5001, port_free_timeout_s=0.0, poll_s=0.01)
+    assert calls["terminate"] == [3128]
+    assert calls["sleeps"] == []
+
+
+# ---------------------------------------------------------------------------
+# build_real_teardown_ops -- the live wiring is composed from EXISTING primitives,
+# never a reimplementation. Identity-checked (``is``); instance_lock's and
+# procspawn's own suites already cover the checks' behavior.
+# ---------------------------------------------------------------------------
+
+
+def test_build_real_teardown_ops_wires_the_blessed_primitives(tmp_path):
+    from launcher.instance_lock import _is_live_launcher
+    from shared.procspawn import terminate_process_tree
+
+    ops = bat.build_real_teardown_ops(tmp_path, 5099, log=lambda *_: None)
+    assert ops.is_live_launcher is _is_live_launcher
+    assert ops.terminate is terminate_process_tree
+
+
+def test_build_real_teardown_ops_port_occupied_calls_ao_socket_ready(monkeypatch):
+    seen = {}
+
+    def _fake_ready(p, **kw):
+        seen["port"] = p
+        return True
+
+    monkeypatch.setattr(bat, "ao_socket_ready", _fake_ready)
+    ops = bat.build_real_teardown_ops(Path("."), 5099, log=lambda *_: None)
+    assert ops.port_occupied() is True
+    assert seen["port"] == 5099
+
+
+def test_build_real_teardown_ops_reads_the_repo_scoped_lock(tmp_path):
+    from launcher.instance_lock import lock_path_for_repo
+
+    lock = lock_path_for_repo(tmp_path)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text("4242", encoding="utf-8")
+    ops = bat.build_real_teardown_ops(tmp_path, 5099, log=lambda *_: None)
+    assert ops.read_holder_pid() == 4242
+
+
+def test_build_real_teardown_ops_absent_lock_reads_as_no_holder(tmp_path):
+    # No certs/launcher.lock at all -- the normal fresh-checkout / fresh-battery-night
+    # state -- must read as "no holder", never raise.
+    ops = bat.build_real_teardown_ops(tmp_path, 5099, log=lambda *_: None)
+    assert ops.read_holder_pid() is None
+
+
+def test_build_real_teardown_ops_never_treats_its_own_pid_as_a_peer(tmp_path):
+    # Defense-in-depth mirroring acquire_instance_lock's own holder != me guard.
+    # boot_launcher_detached never runs INSIDE a launcher process, so this is
+    # unreachable in production -- but never treat our OWN pid as a peer to kill.
+    import os as _os
+    from launcher.instance_lock import lock_path_for_repo
+
+    lock = lock_path_for_repo(tmp_path)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(str(_os.getpid()), encoding="utf-8")
+    ops = bat.build_real_teardown_ops(tmp_path, 5099, log=lambda *_: None)
+    assert ops.read_holder_pid() is None
+
+
+# ---------------------------------------------------------------------------
+# boot_launcher_detached integration: the barrier runs BEFORE the replacement is
+# spawned, and a fail-closed barrier PREVENTS the spawn entirely.
+# ---------------------------------------------------------------------------
+
+
+def test_boot_launcher_detached_runs_teardown_barrier_before_popen(tmp_path, monkeypatch):
+    import subprocess as sp
+
+    order: list[str] = []
+    monkeypatch.setattr(
+        bat, "run_teardown_barrier",
+        lambda ops, *, port, **kw: order.append(f"barrier:{port}"),
+    )
+    monkeypatch.setattr(sp, "Popen", lambda *a, **k: order.append("popen"))
+    bat.boot_launcher_detached(tmp_path, tmp_path / "logs" / "boot.log", port=5099)
+    assert order == ["barrier:5099", "popen"]
+
+
+def test_boot_launcher_detached_defaults_to_the_production_ao_port(tmp_path, monkeypatch):
+    import subprocess as sp
+
+    seen = {}
+    monkeypatch.setattr(
+        bat, "run_teardown_barrier",
+        lambda ops, *, port, **kw: seen.setdefault("port", port),
+    )
+    monkeypatch.setattr(sp, "Popen", lambda *a, **k: None)
+    bat.boot_launcher_detached(tmp_path, tmp_path / "logs" / "boot.log")
+    assert seen["port"] == bat._AO_PORT == 5001
+
+
+def test_boot_launcher_detached_never_boots_when_barrier_fails_closed(tmp_path, monkeypatch):
+    # A barrier that cannot prove the port is free must PREVENT the boot entirely.
+    # Every current caller (AoReensurer.ensure / probe._real_restore) already wraps
+    # boot_launcher_detached in a broad except Exception, so this propagates as an
+    # honest failure -- the job/probe STALLs rather than racing a port collision.
+    import subprocess as sp
+
+    popped = {"called": False}
+
+    def _boom(ops, *, port, **kw):
+        raise bat.TeardownBarrierError("port never freed")
+
+    monkeypatch.setattr(bat, "run_teardown_barrier", _boom)
+    monkeypatch.setattr(sp, "Popen", lambda *a, **k: popped.__setitem__("called", True))
+    with pytest.raises(bat.TeardownBarrierError):
+        bat.boot_launcher_detached(tmp_path, tmp_path / "logs" / "boot.log")
+    assert popped["called"] is False
+
+
+def test_ao_reensurer_real_boot_threads_port_and_log_into_boot_launcher_detached(tmp_path, monkeypatch):
+    # AoReensurer.real's boot lambda must pass ITS OWN port (not the module default)
+    # so the barrier checks the SAME port readiness is being probed against.
+    seen = {}
+
+    def _fake_boot_launcher_detached(repo_root, log_path, *, port, log):
+        seen["port"] = port
+        seen["log"] = log
+
+    monkeypatch.setattr(bat, "boot_launcher_detached", _fake_boot_launcher_detached)
+    r = bat.AoReensurer.real(port=6161, repo_root=tmp_path, reboot_log_dir=tmp_path,
+                             log=lambda *_: None)
+    r.boot()
+    assert seen["port"] == 6161
+    assert callable(seen["log"])
 
 
 # ---------------------------------------------------------------------------

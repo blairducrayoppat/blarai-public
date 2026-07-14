@@ -126,6 +126,118 @@ class TestDestroySession:
         assert cm.destroy_session("nope") is False
 
 
+class TestIdleSessionReaping:
+    """The #801 idle-session reaper — destroy_session's production caller.
+
+    Every test injects ``now`` (monotonic seconds) — no sleeps, deterministic.
+    """
+
+    def test_idle_session_is_reaped(self) -> None:
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.touch("s1", now=1_000.0)
+        reaped = cm.reap_idle_sessions(60.0, now=1_061.0)
+        assert reaped == ["s1"]
+        assert cm.build_context("s1") is None
+
+    def test_active_session_survives(self) -> None:
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.touch("s1", now=1_000.0)
+        assert cm.reap_idle_sessions(60.0, now=1_030.0) == []
+        assert cm.build_context("s1") is not None
+
+    def test_exactly_ttl_idle_survives(self) -> None:
+        # Strictly-older-than semantics, matching TtlDict.
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.touch("s1", now=1_000.0)
+        assert cm.reap_idle_sessions(60.0, now=1_060.0) == []
+
+    def test_add_turn_refreshes_idleness(self) -> None:
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.touch("s1", now=1_000.0)
+        cm.add_turn("s1", "user", "hello", token_count=2)  # restamps (real now)
+        assert cm._last_activity["s1"] != 1_000.0
+        # Anchor the reap window to the REAL turn stamp so the test is
+        # independent of the machine's monotonic epoch (boot age).
+        stamp = cm._last_activity["s1"]
+        assert cm.reap_idle_sessions(60.0, now=stamp + 59.0) == []
+        assert cm.reap_idle_sessions(60.0, now=stamp + 61.0) == ["s1"]
+
+    def test_reap_clears_all_parallel_state(self) -> None:
+        # destroy_session semantics ride the reap: KV-warm, /trust, and the
+        # user-documents flag all clear with the session.
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.mark_kv_warm("s1")
+        cm.trust_documents_for_tools("s1")
+        cm.add_grounded_context("s1", ["doc text"], source="document")
+        cm.touch("s1", now=1_000.0)
+        assert cm.reap_idle_sessions(60.0, now=1_061.0) == ["s1"]
+        assert not cm.is_kv_warm("s1")
+        assert not cm.has_trusted_documents_for_tools("s1")
+        assert not cm.has_user_loaded_documents("s1")
+
+    def test_only_idle_sessions_reaped(self) -> None:
+        cm = ContextManager()
+        cm.create_session("old")
+        cm.create_session("fresh")
+        cm.touch("old", now=1_000.0)
+        cm.touch("fresh", now=1_050.0)
+        assert cm.reap_idle_sessions(60.0, now=1_061.0) == ["old"]
+        assert cm.active_sessions == ["fresh"]
+
+    def test_non_positive_ttl_disables_reaping(self) -> None:
+        # The knob convention (#611/#801): <= 0 means "never reap".
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.touch("s1", now=0.0)
+        assert cm.reap_idle_sessions(0.0, now=10_000_000.0) == []
+        assert cm.reap_idle_sessions(-1.0, now=10_000_000.0) == []
+        assert cm.build_context("s1") is not None
+
+    def test_unstamped_session_gets_grace_not_reaped(self) -> None:
+        # Fail-safe: a session with no provable idleness is stamped NOW and
+        # given a full TTL window, never reaped on a guess.
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm._last_activity.pop("s1")  # simulate a stamp lost/never made
+        assert cm.reap_idle_sessions(60.0, now=1_000.0) == []
+        assert cm.build_context("s1") is not None
+        # ...and the grace stamp works: idle past TTL from that point reaps.
+        assert cm.reap_idle_sessions(60.0, now=1_061.0) == ["s1"]
+
+    def test_touch_unknown_session_is_noop(self) -> None:
+        cm = ContextManager()
+        cm.touch("ghost", now=1_000.0)  # must not create phantom state
+        assert cm.reap_idle_sessions(60.0, now=2_000.0) == []
+
+    def test_destroy_session_drops_activity_stamp(self) -> None:
+        cm = ContextManager()
+        cm.create_session("s1")
+        cm.destroy_session("s1")
+        assert "s1" not in cm._last_activity
+
+    def test_session_count_bounded_across_churn(self) -> None:
+        # The audit's growth shape (one entry per session, forever) is gone:
+        # cycling many sessions through create→idle→reap leaves the dicts
+        # bounded by the ACTIVE set, not the historical total.
+        cm = ContextManager()
+        for i in range(200):
+            now = float(i)
+            cm.reap_idle_sessions(10.0, now=now)
+            sid = f"s{i}"
+            cm.create_session(sid)
+            cm.touch(sid, now=now)
+            cm.mark_kv_warm(sid)
+        cm.reap_idle_sessions(10.0, now=500.0)
+        assert len(cm.active_sessions) == 0
+        assert len(cm._kv_warm) == 0
+        assert len(cm._last_activity) == 0
+
+
 class TestClearGroundedContext:
     """Clear RAG chunks between turns (P1.8)."""
 

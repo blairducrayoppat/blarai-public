@@ -662,6 +662,69 @@ class TestProductionWiringLock:
             "SubstrateStore.has_encryption is True — this would fool the regression lock"
         )
 
+    def test_wiring_violation_raises_specific_error_not_assert(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """#804: has_encryption is not True on the constructed store MUST fire
+        the EXPLICIT StoreProvisioningError tripwire (deterministic code
+        AO_SUBSTRATE_ENCRYPTION_WIRING_FAILED), never a bare AssertionError.
+
+        An ``assert`` is compiled out under ``python -O``, silently waving the
+        unencrypted store through; the explicit raise survives ``-O``
+        (CWE-617).  The factory's outer except contains it: substrate memory
+        loud-disabled (None), AO boot unaffected.
+        """
+        import types
+        from unittest.mock import patch
+
+        from services.assistant_orchestrator.src import pgov as pgov_mod
+        from services.assistant_orchestrator.src.entrypoint import (
+            AssistantOrchestratorService,
+        )
+        from services.ui_gateway.src.session_store import StoreProvisioningError
+
+        fake_detector = types.SimpleNamespace(
+            loaded=True,
+            _embed=fake_embed,
+            embed_documents=lambda texts, max_length=128: fake_embed(texts),
+        )
+
+        with patch.object(pgov_mod, "_get_detector", return_value=fake_detector):
+            with patch.dict(
+                "os.environ",
+                {"LOCALAPPDATA": "", "BLARAI_DEK_KEYSTORE": ""},
+                clear=False,
+            ):
+                # Violate the invariant: the class-level regression-lock
+                # attribute reads False, as if a refactor silently unwired
+                # the encryption.
+                with patch.object(
+                    EncryptedSubstrateStore, "has_encryption", False
+                ):
+                    orch = AssistantOrchestratorService.__new__(
+                        AssistantOrchestratorService
+                    )
+                    with caplog.at_level("ERROR"):
+                        store = orch._build_substrate()
+
+        assert store is None, (
+            "_build_substrate returned a store despite has_encryption=False — "
+            "the wiring tripwire did not fire"
+        )
+        assert "AO_SUBSTRATE_ENCRYPTION_WIRING_FAILED" in caplog.text
+        # Pin the TYPE of the tripwire: the loud-disable record logs the
+        # exception object itself ("%s", exc) — it must be the explicit
+        # StoreProvisioningError, not an AssertionError (which would mean
+        # the assert form is back and would vanish under python -O).
+        logged = [
+            r.args[0]
+            for r in caplog.records
+            if r.args and isinstance(r.args[0], BaseException)
+        ]
+        assert logged, "loud-disable log record carrying the exception not found"
+        assert isinstance(logged[0], StoreProvisioningError)
+        assert not isinstance(logged[0], AssertionError)
+
 
 # ---------------------------------------------------------------------------
 # 8. Additional coverage: count(), next_turn_index(), multi-chunk doc

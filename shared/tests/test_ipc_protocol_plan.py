@@ -46,6 +46,54 @@ def test_plan_result_failure_shape():
     assert got["tasks"] == [] and got["criteria"] == {}  # empty defaults on failure
 
 
+def test_plan_result_questions_roundtrip():
+    # #819: the CLARIFY early-return payload rides PLAN_RESULT (additive; empty on a normal plan).
+    f = MessageFramer()
+    questions = [{"axis": "surface", "question": "Where will you use this?"}]
+    got = f.decode_plan_result(f.encode_plan_result(ok=True, questions=questions))
+    assert got["questions"] == questions
+    # absent (a normal plan / older frame) -> [] via the typed guard, never a KeyError.
+    assert f.decode_plan_result(f.encode_plan_result(ok=True))["questions"] == []
+
+
+def test_plan_result_revision_roundtrip():
+    # #820: the REVISE early-return payload rides PLAN_RESULT (additive; empty on a normal plan).
+    f = MessageFramer()
+    revision = [
+        {"op": "keep", "ref": 1, "task": "", "prompt": ""},
+        {"op": "add", "ref": 0, "task": "export", "prompt": "export to CSV"},
+    ]
+    got = f.decode_plan_result(f.encode_plan_result(ok=True, revision=revision))
+    assert got["revision"] == revision
+    # absent (a normal plan / older frame) -> [] via the typed guard, never a KeyError.
+    assert f.decode_plan_result(f.encode_plan_result(ok=True))["revision"] == []
+
+
+def test_plan_result_revision_wrong_type_fails_closed():
+    # A present-but-mistyped revision field must fail the decode (#803), never list()-explode.
+    f = MessageFramer()
+    frame = f.encode(
+        MessageType.PLAN_RESULT,
+        {"ok": True, "message": "", "fell_back": False, "tasks": [], "criteria": {},
+         "revision": "not a list"},
+    )
+    with pytest.raises(ValueError):
+        f.decode_plan_result(frame)
+
+
+def test_plan_result_questions_wrong_type_fails_closed():
+    # A present-but-mistyped questions field must fail the decode (#803), never list()-explode.
+    f = MessageFramer()
+    frame = f.encode(
+        MessageType.PLAN_RESULT,
+        {"ok": True, "message": "", "fell_back": False, "tasks": [], "criteria": {},
+         "questions": "not a list"},
+        "",
+    )
+    with pytest.raises(ValueError):
+        f.decode_plan_result(frame)
+
+
 def test_decode_plan_result_rejects_wrong_type():
     f = MessageFramer()
     with pytest.raises(ValueError):

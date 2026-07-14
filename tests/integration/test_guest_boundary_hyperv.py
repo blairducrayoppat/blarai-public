@@ -123,8 +123,18 @@ def _vm_running(vm_name: str) -> bool:
 
 
 @pytest.mark.hardware
+@pytest.mark.real_vm  # #817: legitimately queries the REAL VM state (see _vm_running)
 class TestGuestBoundaryHyperv:
-    """Real-Hyper-V guest↔host AF_HYPERV round-trip (#615 C1 — hardware tier)."""
+    """Real-Hyper-V guest↔host AF_HYPERV round-trip (#615 C1 — hardware tier).
+
+    ``@pytest.mark.real_vm`` (#817): this tier legitimately reaches the real
+    Hyper-V boundary — ``_vm_running`` calls the genuine
+    ``launcher.vm_manager.get_vm_state`` to decide skip-vs-run — so it opts
+    out of the root-conftest fail-loud tripwire.  Without the marker the
+    tripwire's ``pytest.fail`` (BaseException-derived, deliberately
+    unswallowable by ``_vm_running``'s ``except Exception``) would fail this
+    tier at the next hardware ceremony.
+    """
 
     def test_hyperv_address_is_validated_guid_pair(self) -> None:
         """The host-side sockaddr is the validated (VmId, ServiceId) GUID pair.

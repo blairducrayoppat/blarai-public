@@ -22,6 +22,10 @@ import numpy as np
 
 from shared.ipc.preference_proposal import ProposalAction, extract_proposal_block
 
+from services.assistant_orchestrator.src.context_manager import (
+    ContextManager,
+    Provenance,
+)
 from services.assistant_orchestrator.src.entrypoint import (
     AssistantOrchestratorService,
 )
@@ -47,17 +51,34 @@ class _FakeTransport:
 
 
 class _FakeCM:
-    """Minimal context-manager stand-in for the propose provenance signals."""
+    """Minimal context-manager stand-in for the propose provenance signals.
 
-    def __init__(self, untrusted: bool = False, docs: bool = False) -> None:
+    ``untrusted=True`` reports the document/web grain by default (#792) — the
+    strong-warning bucket — unless an explicit ``tiers`` set is supplied.
+    """
+
+    def __init__(
+        self,
+        untrusted: bool = False,
+        docs: bool = False,
+        tiers: object | None = None,
+    ) -> None:
         self._u = untrusted
         self._d = docs
+        self._tiers = tiers
 
     def has_untrusted_content(self, _sid: str) -> bool:
         return self._u
 
     def has_user_loaded_documents(self, _sid: str) -> bool:
         return self._d
+
+    def untrusted_provenance_tiers(self, _sid: str):
+        from services.assistant_orchestrator.src.context_manager import Provenance
+
+        if self._tiers is not None:
+            return frozenset(self._tiers)  # type: ignore[arg-type]
+        return frozenset({Provenance.UNTRUSTED_EXTERNAL}) if self._u else frozenset()
 
 
 def _fake_embed(texts: list[str]) -> np.ndarray:
@@ -170,6 +191,183 @@ class TestProposeNeverWrites:
             assert "a document you loaded" in outcome.card_block
         finally:
             svc._knowledge.close()
+
+
+# ---------------------------------------------------------------------------
+# #792 — the card's provenance NOTICE is sized to the untrusted grain
+# ---------------------------------------------------------------------------
+
+
+_KNOWLEDGE_NOTICE = "your own curated knowledge bank"
+_KNOWLEDGE_LABEL = "content recalled from your knowledge bank"
+_STRONG_WARNING = "untrusted content"  # the "(a document or web result)" alarm
+_DOC_WEB_LABEL = "content from a document or web result"
+
+
+def _real_cm(session: str, *provenances: Provenance) -> ContextManager:
+    """A REAL ContextManager with one grounded chunk per provenance tier — the
+    production add_grounded_context path (datamark + spotlight + provenance)."""
+    cm = ContextManager()
+    cm.create_session(session)
+    for prov in provenances:
+        cm.add_grounded_context(
+            session,
+            ["[From your knowledge bank: 'notes']\nsome recalled text"],
+            provenance=prov,
+        )
+    return cm
+
+
+class TestProvenanceGrain:
+    """The card must name WHERE the idea came from at the right grain (#792):
+    operator-curated knowledge recall gets a proportionate notice; a document /
+    web / pasted-external result keeps the strong warning. Driven end-to-end
+    through the REAL ContextManager + real handler + real card renderer."""
+
+    def test_recalled_knowledge_gets_the_knowledge_label_not_document_or_web(
+        self,
+    ) -> None:
+        # The LA's EXACT live shape (c.1688): a fresh session whose only grounded
+        # content is auto-recalled UNTRUSTED_KNOWLEDGE (his own bank), proposing
+        # the English rule. It must read as knowledge recall, never document/web.
+        svc = _svc(cm=_real_cm("s-know", Provenance.UNTRUSTED_KNOWLEDGE))
+        try:
+            outcome = _propose(
+                svc,
+                "always respond in English unless I ask otherwise",
+                session="s-know",
+            )
+            card = outcome.card_block
+            assert _KNOWLEDGE_LABEL in card          # the corrected label
+            assert _KNOWLEDGE_NOTICE in card          # the proportionate notice
+            assert _DOC_WEB_LABEL not in card         # NOT the mislabel
+            assert _STRONG_WARNING not in card        # NOT the document/web alarm
+            assert "read it carefully" not in card
+        finally:
+            svc._knowledge.close()
+
+    def test_web_result_keeps_the_strong_warning(self) -> None:
+        svc = _svc(cm=_real_cm("s-web", Provenance.UNTRUSTED_WEB))
+        try:
+            card = _propose(svc, "no source citations", session="s-web").card_block
+            assert _DOC_WEB_LABEL in card
+            assert _STRONG_WARNING in card
+            assert _KNOWLEDGE_NOTICE not in card
+        finally:
+            svc._knowledge.close()
+
+    def test_pasted_external_keeps_the_strong_warning(self) -> None:
+        svc = _svc(cm=_real_cm("s-ext", Provenance.UNTRUSTED_EXTERNAL))
+        try:
+            card = _propose(svc, "no source citations", session="s-ext").card_block
+            assert _DOC_WEB_LABEL in card
+            assert _STRONG_WARNING in card
+            assert _KNOWLEDGE_NOTICE not in card
+        finally:
+            svc._knowledge.close()
+
+    def test_knowledge_plus_web_fails_safe_to_the_strong_warning(self) -> None:
+        # Mixed untrusted tiers: knowledge recall is NOT the sole source, so a
+        # hostile web instruction could be hiding — the card must keep the
+        # strong warning, never the knowledge reassurance (fail-safe).
+        svc = _svc(
+            cm=_real_cm(
+                "s-mix",
+                Provenance.UNTRUSTED_KNOWLEDGE,
+                Provenance.UNTRUSTED_WEB,
+            )
+        )
+        try:
+            card = _propose(svc, "no source citations", session="s-mix").card_block
+            assert _DOC_WEB_LABEL in card
+            assert _STRONG_WARNING in card
+            assert _KNOWLEDGE_NOTICE not in card
+        finally:
+            svc._knowledge.close()
+
+    def test_trusted_memory_recall_is_not_flagged_at_all(self) -> None:
+        # Substrate memory recall is a trusted tier — no untrusted notice, and
+        # certainly not the knowledge-bank one.
+        svc = _svc(cm=_real_cm("s-mem", Provenance.TRUSTED_MEMORY))
+        try:
+            card = _propose(svc, "no source citations", session="s-mem").card_block
+            assert _STRONG_WARNING not in card
+            assert _KNOWLEDGE_NOTICE not in card
+            assert "your last message" in card
+        finally:
+            svc._knowledge.close()
+
+    def test_gating_unchanged_recalled_knowledge_still_only_a_card(self) -> None:
+        # D-1(a): propose-under-untrusted stays ALLOWED (a card), and P8 holds —
+        # the proportionate notice is a wording change, not a gate change.
+        svc = _svc(cm=_real_cm("s-know2", Provenance.UNTRUSTED_KNOWLEDGE))
+        try:
+            outcome = _propose(svc, "always be concise", session="s-know2")
+            assert outcome.card_block                       # a card WAS shown
+            assert _bodies(svc) == []                        # P8: nothing written
+            assert svc._proposal_staging.count() == 1        # only staged
+        finally:
+            svc._knowledge.close()
+
+
+# ---------------------------------------------------------------------------
+# #792 residual closure — auto-recall is threshold-free (the root cause)
+# ---------------------------------------------------------------------------
+
+
+def _bow_embed(texts: list[str]) -> np.ndarray:
+    """Bag-of-words unit vectors: disjoint vocab -> orthogonal (cosine 0)."""
+    import zlib
+
+    out = np.zeros((len(texts), EMBED_DIM), dtype=np.float32)
+    for i, text in enumerate(texts):
+        for word in text.lower().split():
+            out[i, zlib.crc32(word.encode()) % EMBED_DIM] += 1.0
+    norms = np.linalg.norm(out, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    return (out / norms).astype(np.float32)
+
+
+class TestRecallIsThresholdFree:
+    """#792 root-cause lock (closes the recall-replay residual offline). The
+    live mislabel needed the LA's fresh session to hold UNTRUSTED_KNOWLEDGE.
+    It did — because EncryptedKnowledgeBank.retrieve is threshold-free: the
+    vector limb argsorts EVERY approved chunk and RRF returns top-k regardless
+    of relevance. So once the bank holds any approved chunk, ANY non-empty
+    prompt recalls knowledge. (The live bank has 14 approved chunks; verified
+    read-only against the sqlite metadata, no decryption. The seeded proof here
+    uses a topically-orthogonal doc so only the threshold-free vector limb can
+    surface it.)"""
+
+    def test_orthogonal_prompt_still_recalls_an_approved_chunk(self) -> None:
+        import uuid
+
+        bank = EncryptedKnowledgeBank(
+            db_path=":memory:", embed_fn=_bow_embed, cipher=_make_cipher()
+        )
+        try:
+            result = bank.submit_pending(
+                doc_uuid=str(uuid.uuid4()),
+                source_type="url",
+                source_ref="https://example.org/botany",
+                content="Photosynthesis converts sunlight glucose chloroplasts.",
+                title="Botany notes",
+                byline="",
+                published_date="2026-06-01",
+                cleaner_version="cleaner-v1",
+                word_count=5,
+            )
+            bank.approve(result.doc_uuid)
+            # The LA's exact implicit-directive message — zero vocabulary overlap
+            # with the botanical doc (lexical limb contributes nothing), yet the
+            # threshold-free vector limb still surfaces the chunk.
+            hits = bank.retrieve(
+                "Respond in English unless I explicitly ask for another language."
+            )
+            assert hits, "recall returned nothing — retrieve is not threshold-free?"
+            assert hits[0].doc_uuid == result.doc_uuid
+        finally:
+            bank.close()
 
 
 # ---------------------------------------------------------------------------

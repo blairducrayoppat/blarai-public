@@ -254,8 +254,6 @@ class TestEndToEndPipeline:
             token_count=12,
             latency_first_token_ms=50.0,
             latency_total_ms=200.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
         )
 
@@ -390,8 +388,6 @@ class TestEndToEndPipeline:
             token_count=4,
             latency_first_token_ms=45.0,
             latency_total_ms=180.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
         )
 
@@ -807,22 +803,6 @@ class TestPreemptionSignalPropagation:
     and that the GenerationResult correctly records them.
     """
 
-    def test_generation_result_records_preemption(self) -> None:
-        """GenerationResult with was_preempted=True carries the flag."""
-        gen_result = GenerationResult(
-            tokens=[1, 2, 3],
-            text="Partial respon",
-            token_count=3,
-            latency_first_token_ms=80.0,
-            latency_total_ms=500.0,
-            was_preempted=True,
-            resume_latency_ms=2.5,
-            truncated=True,
-        )
-        assert gen_result.was_preempted is True
-        assert gen_result.resume_latency_ms > 0.0
-        assert gen_result.truncated is True
-
     def test_preempted_output_still_pgov_validated(self) -> None:
         """Even preempted (truncated) output must pass PGOV before delivery."""
         gen_result = GenerationResult(
@@ -831,8 +811,6 @@ class TestPreemptionSignalPropagation:
             token_count=2,
             latency_first_token_ms=90.0,
             latency_total_ms=300.0,
-            was_preempted=True,
-            resume_latency_ms=1.8,
             truncated=True,
         )
         pgov_result = validate_output(
@@ -851,8 +829,6 @@ class TestPreemptionSignalPropagation:
             token_count=3,
             latency_first_token_ms=90.0,
             latency_total_ms=200.0,
-            was_preempted=True,
-            resume_latency_ms=1.5,
             truncated=True,
         )
         pgov_result = validate_output(
@@ -1188,8 +1164,6 @@ class TestLatencyBudgetStructure:
             token_count=1,
             latency_first_token_ms=50.0,
             latency_total_ms=200.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
         )
         assert result.latency_first_token_ms >= 0.0

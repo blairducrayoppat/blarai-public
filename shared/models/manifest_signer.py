@@ -124,6 +124,7 @@ def verify_manifest_signature(
     *,
     require_signed: bool,
     key_name: str = MANIFEST_SIGNING_KEY_NAME,
+    manifest_bytes: bytes | None = None,
 ) -> bool:
     """Verify the TPM signature over ``manifest_path``.
 
@@ -134,6 +135,16 @@ def verify_manifest_signature(
             ``.sig`` file is permitted (returns ``True``) — the manifest loads
             but a WARNING is emitted so the unsigned state is never silent.
         key_name: Persisted TPM key name (default: ``MANIFEST_SIGNING_KEY_NAME``).
+        manifest_bytes: When provided, the signature is verified over THESE
+            caller-supplied bytes instead of re-reading ``manifest_path`` from
+            disk; the path is then used only to LOCATE the detached ``.sig``.
+            This is the single-read-safe entry point (SG-review F5): a caller
+            that must both verify AND parse an artifact reads it ONCE and passes
+            those exact bytes here, so a file swapped between a verify-read and a
+            parse-read cannot load malicious content under a signature that was
+            valid over benign content.  ``None`` (default) preserves the original
+            behavior — the bytes are read from disk — so every existing caller is
+            byte-identical.
 
     Returns:
         ``True`` if the signature is valid, or if ``require_signed=False`` and
@@ -185,15 +196,16 @@ def verify_manifest_signature(
         )
         return False
 
-    try:
-        manifest_bytes = manifest_path.read_bytes()
-    except OSError as exc:
-        logger.error(
-            "FAIL-CLOSED: cannot read manifest file for signature verification %s: %s",
-            manifest_path,
-            exc,
-        )
-        return False
+    if manifest_bytes is None:
+        try:
+            manifest_bytes = manifest_path.read_bytes()
+        except OSError as exc:
+            logger.error(
+                "FAIL-CLOSED: cannot read manifest file for signature verification %s: %s",
+                manifest_path,
+                exc,
+            )
+            return False
 
     try:
         valid = tpm_signer.verify(key_name, manifest_bytes, sig_bytes)

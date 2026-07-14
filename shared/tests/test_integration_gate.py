@@ -361,6 +361,664 @@ def test_oracle_path_comes_from_plan(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# #822 layout gate: import-contract enforcement on the final integrated tree
+# ---------------------------------------------------------------------------
+
+
+def _layout_tasks(repo: Path) -> list[dict]:
+    """2-task chain: core (wave 1) then cli (wave 2) — the cli task's contract CREATES
+    cli_interface, so an unresolved `cli_interface` import maps to it (the fix target)."""
+    return [
+        {"repo": str(repo), "task": "core", "prompt": "build core", "depends_on": [],
+         "contract": {"creates": ["core.py"], "exports": ["helper()"]}},
+        {"repo": str(repo), "task": "cli", "prompt": "build cli", "depends_on": ["core"],
+         "contract": {"creates": ["cli_interface.py"], "exports": ["run_cli()"]}},
+    ]
+
+
+_LAYOUT_CONTRACT = ["from cli_interface import run_cli"]
+_UNRESOLVED = [{"raw": "from cli_interface import run_cli", "module": "cli_interface",
+                "reason": "module 'cli_interface' does not resolve from the repo root"}]
+
+
+def test_layout_gate_noop_seam_is_byte_identical(tmp_path):
+    """The default (noop) probe seam returns ok=None → inert: the job grades + completes
+    exactly as before the feature, even with a contract present (byte-identical)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, job_oracle_contract=lambda: _LAYOUT_CONTRACT)  # noop probe default
+    result = _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert result.outcome == "complete"
+    assert not any(w["status"] == "failed" for w in sc["waves"])
+
+
+def test_layout_gate_pass_lets_job_grade(tmp_path):
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, job_oracle_contract=lambda: _LAYOUT_CONTRACT,
+               run_import_probe=lambda r, p: {"ok": True, "unresolved": [],
+                                              "evidence": "all resolved"})
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "job_oracle"]  # graded
+
+
+def test_layout_gate_unresolved_after_fix_cycle_parks_honest(tmp_path):
+    """Probe fails, the fix cycle re-runs the offending task but it STILL fails → a
+    FAILED integration gate → PARKED-HONEST [BUILD]; the oracle never grades and the
+    exact unresolved entry is NAMED (the B6n2 shape, pre-empted before the oracle)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, job_oracle_contract=lambda: _LAYOUT_CONTRACT,
+               run_import_probe=lambda r, p: {"ok": False, "unresolved": _UNRESOLVED,
+                                              "evidence": "unresolved"})
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["verdict"] == "PARKED-HONEST" and sc["attribution"] == "BUILD"
+    assert sc["job_acceptance"]["status"] == "not-run"  # never graded on an unmet contract
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "job_oracle"] == []
+    assert any(w["status"] == "failed" for w in sc["waves"])
+    # the ONE fix cycle re-ran the OFFENDING task (cli — its contract creates cli_interface)
+    fix_prompts = [c[2] for c in calls
+                   if isinstance(c, tuple) and c[0] == "task" and c[1] == "cli"
+                   and "LAYOUT FIX" in c[2]]
+    assert fix_prompts and "cli_interface" in fix_prompts[0]
+
+
+def test_layout_gate_fix_cycle_resolves_then_grades(tmp_path):
+    """Probe fails once; the fix cycle re-runs the offending task (MERGED); the re-probe
+    RESOLVES → the job grades normally, no failed gate."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    seq = iter([{"ok": False, "unresolved": _UNRESOLVED, "evidence": "x"},
+                {"ok": True, "unresolved": [], "evidence": "resolved"}])
+    ops = _ops(calls, job_oracle_contract=lambda: _LAYOUT_CONTRACT,
+               run_import_probe=lambda r, p: next(seq))
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert not any(w["status"] == "failed" for w in sc["waves"])
+    fix_runs = [c for c in calls if isinstance(c, tuple) and c[0] == "task"
+                and c[1] == "cli" and "LAYOUT FIX" in c[2]]
+    assert len(fix_runs) == 1
+
+
+def test_layout_gate_fix_budget_is_one(tmp_path):
+    """The fix cycle runs at most ONCE per job even if the probe keeps failing (initial
+    probe + exactly one re-probe after the single fix cycle)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    probes: list[int] = []
+
+    def probe(_r, _p):
+        probes.append(1)
+        return {"ok": False, "unresolved": _UNRESOLVED, "evidence": "x"}
+
+    ops = _ops(calls, job_oracle_contract=lambda: _LAYOUT_CONTRACT, run_import_probe=probe)
+    _driver(tmp_path, ops, tasks, plan).run()
+    assert len(probes) == 2  # initial + one re-probe; the fix budget caps at 1
+    fix_runs = [c for c in calls if isinstance(c, tuple) and c[0] == "task"
+                and c[1] == "cli" and "LAYOUT FIX" in c[2]]
+    assert len(fix_runs) == 1
+
+
+def test_layout_gate_could_not_run_is_non_blocking(tmp_path):
+    """A probe that could not run (ok=None) is honest + non-blocking — the job grades."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, job_oracle_contract=lambda: _LAYOUT_CONTRACT,
+               run_import_probe=lambda r, p: {"ok": None, "unresolved": [],
+                                              "evidence": "uv unavailable"})
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+
+
+# ---------------------------------------------------------------------------
+# #830 G6 executability floor (driver wiring — sibling of the layout gate)
+# ---------------------------------------------------------------------------
+
+#: A node boot failure whose unresolved module (cli_interface) maps to the `cli` task in
+#: _layout_tasks (its contract creates cli_interface) — the fix target.
+_EXEC_BOOT_FAIL = {
+    "ok": False, "language": "node",
+    "evidence": "booting node main.js failed: ERR_MODULE_NOT_FOUND cli_interface",
+    "fingerprint": "ERR_MODULE_NOT_FOUND:cli_interface",
+    "unresolved": [{"module": "cli_interface", "raw": "node main.js --help",
+                    "reason": "Cannot find module cli_interface"}],
+}
+
+
+def test_exec_smoke_noop_seam_is_byte_identical(tmp_path):
+    """The default (noop) smoke seam returns ok=None → inert: the job grades + completes
+    exactly as before the feature (byte-identical)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    result = _driver(tmp_path, _ops(calls), tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert result.outcome == "complete"
+
+
+def test_exec_smoke_pass_lets_job_grade(tmp_path):
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, run_exec_smoke=lambda r, p: (
+        calls.append(("exec_smoke", r, p)),
+        {"ok": True, "language": "python", "evidence": "main.py imports and starts",
+         "fingerprint": "", "unresolved": []})[1])
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "exec_smoke"]  # ran
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "job_oracle"]  # graded
+
+
+def test_exec_smoke_boot_fail_after_fix_cycle_parks_honest(tmp_path):
+    """Boot fails, the fix cycle re-runs the boot-error-owning task but it STILL fails to
+    boot → a FAILED integration gate → PARKED-HONEST [BUILD]; the oracle never grades and
+    the boot error is NAMED verbatim in the fix prompt (the B7 shape pre-empted before the
+    oracle)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, run_exec_smoke=lambda r, p: dict(_EXEC_BOOT_FAIL))
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["verdict"] == "PARKED-HONEST" and sc["attribution"] == "BUILD"
+    assert sc["job_acceptance"]["status"] == "not-run"  # never graded on a non-booting app
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "job_oracle"] == []
+    assert any(w["status"] == "failed" for w in sc["waves"])
+    fix_prompts = [c[2] for c in calls
+                   if isinstance(c, tuple) and c[0] == "task" and c[1] == "cli"
+                   and "EXECUTABILITY FIX" in c[2]]
+    assert fix_prompts and "ERR_MODULE_NOT_FOUND" in fix_prompts[0]
+
+
+def test_exec_smoke_fix_cycle_resolves_then_grades(tmp_path):
+    """Boot fails once; the fix cycle re-runs the owning task (MERGED); the re-smoke BOOTS
+    → the job grades normally, no failed gate."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    seq = iter([dict(_EXEC_BOOT_FAIL),
+                {"ok": True, "language": "node", "evidence": "boots", "fingerprint": "",
+                 "unresolved": []}])
+    ops = _ops(calls, run_exec_smoke=lambda r, p: next(seq))
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert not any(w["status"] == "failed" for w in sc["waves"])
+    fix_runs = [c for c in calls if isinstance(c, tuple) and c[0] == "task"
+                and c[1] == "cli" and "EXECUTABILITY FIX" in c[2]]
+    assert len(fix_runs) == 1
+
+
+def test_exec_smoke_fix_budget_is_one(tmp_path):
+    """The boot fix cycle runs at most ONCE per job even if the smoke keeps failing (initial
+    smoke + exactly one re-smoke after the single fix cycle)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    smokes: list[int] = []
+
+    def smoke(_r, _p):
+        smokes.append(1)
+        return dict(_EXEC_BOOT_FAIL)
+
+    ops = _ops(calls, run_exec_smoke=smoke)
+    _driver(tmp_path, ops, tasks, plan).run()
+    assert len(smokes) == 2  # initial + one re-smoke; the fix budget caps at 1
+    fix_runs = [c for c in calls if isinstance(c, tuple) and c[0] == "task"
+                and c[1] == "cli" and "EXECUTABILITY FIX" in c[2]]
+    assert len(fix_runs) == 1
+
+
+def test_exec_smoke_could_not_run_is_non_blocking(tmp_path):
+    """A smoke that could not run (ok=None) is honest + non-blocking — the job grades (the
+    python/green path is unchanged when no floor applies)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, run_exec_smoke=lambda r, p: {
+        "ok": None, "language": "python", "evidence": "uv unavailable",
+        "fingerprint": "", "unresolved": []})
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+
+
+def test_exec_smoke_skipped_when_layout_gate_already_failed(tmp_path):
+    """Ordering lock: the exec floor runs AFTER the layout gate — when the layout gate has
+    already failed the wave, the exec smoke seam is never even consulted (and the oracle
+    stays not-run). Runs BEFORE the oracle: the two tests above prove the oracle skips on a
+    boot fail."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(
+        calls,
+        job_oracle_contract=lambda: _LAYOUT_CONTRACT,
+        run_import_probe=lambda r, p: {"ok": False, "unresolved": _UNRESOLVED,
+                                       "evidence": "unresolved"},
+        run_exec_smoke=lambda r, p: (calls.append(("exec_smoke", r, p)), {"ok": True})[1])
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert any(w["status"] == "failed" for w in sc["waves"])  # layout failed the wave
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "exec_smoke"] == []
+    assert sc["job_acceptance"]["status"] == "not-run"
+
+
+# ---------------------------------------------------------------------------
+# #790 defect #2: the layout / exec-smoke fix cycle must re-run the OWNER of the
+# unresolved module (parked or merged), NEVER a merged SIBLING. The pre-#790
+# _owning_task scanned ONLY merged tasks and matched by a coarse `app`-substring, so
+# it re-ran a sibling right past the parked owner — resolving 0/3 on the 2026-07-12
+# battery (B2 re-ran `tokenize`; B7 `password-generator-helper`; B4 `implement-data-
+# storage`). These lock the precise owner selection at the pure-helper, white-box
+# (_owning_task), and end-to-end (fix-cycle) levels.
+# ---------------------------------------------------------------------------
+
+
+def _b7_tasks(repo: Path) -> list[dict]:
+    """The B7 live shape: three INDEPENDENT node helpers (zero dependency edges). The job
+    oracle imports convertUnit from ../src/unit-converter-helper.js — owned solely by
+    unit-converter-helper."""
+    return [
+        {"repo": str(repo), "task": "slugify-phrase-helper", "prompt": "build slugify",
+         "depends_on": [], "contract": {"creates": ["src/slugify-phrase-helper.js"],
+                                        "exports": ["slugify(phrase)"]}},
+        {"repo": str(repo), "task": "unit-converter-helper", "prompt": "build converter",
+         "depends_on": [], "contract": {"creates": ["src/unit-converter-helper.js"],
+                                        "exports": ["convertUnit(value, from, to)"]}},
+        {"repo": str(repo), "task": "password-generator-helper", "prompt": "build password",
+         "depends_on": [], "contract": {"creates": ["src/password-generator-helper.js"],
+                                        "exports": ["generatePassword(length)"]}},
+    ]
+
+
+_B7_CONTRACT = ["import { convertUnit } from '../src/unit-converter-helper.js'"]
+_B7_UNRESOLVED = [{
+    "raw": "import { convertUnit } from '../src/unit-converter-helper.js'",
+    "spec": "../src/unit-converter-helper.js",
+    "reason": "specifier '../src/unit-converter-helper.js' does not resolve (ERR_MODULE_NOT_FOUND)",
+}]
+
+
+def _park_owner_merge_siblings(plan, *, owner: str, siblings: list[str], evidence="RESULT: Nothing to merge"):
+    """Independent tasks: merge every *sibling*, park the *owner* — the B7/B2 live shape."""
+    for tid in siblings:
+        plan = pg.mark_ready(plan, tid)
+        plan = pg.mark_building(plan, tid)
+        plan = pg.mark_merged(plan, tid, "ev")
+    return pg.mark_parked(plan, owner, evidence)
+
+
+# ---- pure helpers: PRECISE module -> owner keys (never the `app`-substring) ----------
+
+
+def test_module_forms_python_dotted_module_never_bare_package():
+    forms = sd._module_forms("app.word_frequencies")
+    assert "app/word_frequencies" in forms and "word_frequencies" in forms
+    assert "app" not in forms  # the bare token that substring-matched every app/ sibling
+
+
+def test_module_forms_node_spec_strips_relative_prefix_and_ext():
+    assert sd._module_forms("../src/unit-converter-helper.js") == {
+        "src/unit-converter-helper", "unit-converter-helper"}
+
+
+def test_create_forms_owner_matches_but_sibling_does_not():
+    keys = sd._module_forms("../src/unit-converter-helper.js")
+    assert sd._create_forms("src/unit-converter-helper.js") & keys          # owner
+    assert not (sd._create_forms("src/password-generator-helper.js") & keys)  # sibling (old sink[-1])
+
+
+def test_create_forms_app_package_no_substring_false_match():
+    keys = sd._module_forms("app.word_frequencies")
+    tok = sd._create_forms("app/tokenize.py") | sd._create_forms("app/__init__.py")
+    assert not (tok & keys)                                   # the `app`-substring match is gone
+    assert sd._create_forms("app/word_frequencies.py") & keys  # the real owner still matches
+
+
+def test_create_forms_package_prefix_maps_bare_package_import():
+    # B4: `import flashcard_app` (bare package) maps to the task creating a submodule.
+    keys = sd._module_forms("flashcard_app")
+    assert sd._create_forms("flashcard_app/card_manager.py") & keys
+
+
+def test_owner_match_keys_carries_named_export_symbol():
+    pk, sk = sd._owner_match_keys([{"spec": "../src/x.js", "name": "convertUnit"}])
+    assert "convertunit" in sk
+
+
+# ---- white-box _owning_task: the parked owner beats the merged sibling ----------------
+
+
+def test_owning_task_selects_parked_owner_over_merged_sibling_b7(tmp_path):
+    repo = _mk_repo(tmp_path)
+    tasks = _b7_tasks(repo)
+    plan = _park_owner_merge_siblings(
+        _build_plan(tmp_path, tasks), owner="unit-converter-helper",
+        siblings=["slugify-phrase-helper", "password-generator-helper"])
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    target = driver._owning_task(_B7_UNRESOLVED)
+    assert target is not None and target.id == "unit-converter-helper"  # NOT password-generator-helper
+
+
+def test_owning_task_b2_app_module_selects_parked_owner_not_tokenize(tmp_path):
+    """B2 live shape: `app.word_frequencies` unresolved. Pre-#790 reduced it to `app`,
+    which substring-matched tokenize's `app/tokenize.py` -> re-ran tokenize. Now it maps
+    to word-frequencies (creates app/word_frequencies.py), which parked."""
+    repo = _mk_repo(tmp_path)
+    tasks = [
+        {"repo": str(repo), "task": "tokenize", "prompt": "p", "depends_on": [],
+         "contract": {"creates": ["app/__init__.py", "app/tokenize.py"],
+                      "exports": ["tokenize(text)"]}},
+        {"repo": str(repo), "task": "word-frequencies", "prompt": "p",
+         "depends_on": ["tokenize"],
+         "contract": {"creates": ["app/word_frequencies.py"],
+                      "exports": ["word_frequencies(tokens)"]}},
+    ]
+    plan = _build_plan(tmp_path, tasks)
+    plan = pg.mark_ready(plan, "tokenize")
+    plan = pg.mark_building(plan, "tokenize")
+    plan = pg.mark_merged(plan, "tokenize", "ev")
+    plan = pg.mark_parked(plan, "word-frequencies", "RESULT: Nothing to merge")
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    unresolved = [{"raw": "from app.word_frequencies import word_frequencies",
+                   "module": "app.word_frequencies",
+                   "reason": "module 'app.word_frequencies' does not resolve"}]
+    target = driver._owning_task(unresolved)
+    assert target is not None and target.id == "word-frequencies"  # NOT tokenize
+
+
+def test_owning_task_prefers_parked_owner_when_two_owners_match(tmp_path):
+    """B2 with two owners in scope: `app.word_frequencies` (owner parked) AND `app.report`
+    (owner skipped after the park). The parked/failed owner is re-run first (rank), never
+    the skipped one whose own dependency is still missing."""
+    repo = _mk_repo(tmp_path)
+    tasks = [
+        {"repo": str(repo), "task": "tokenize", "prompt": "p", "depends_on": [],
+         "contract": {"creates": ["app/__init__.py", "app/tokenize.py"], "exports": ["tokenize(text)"]}},
+        {"repo": str(repo), "task": "word-frequencies", "prompt": "p", "depends_on": ["tokenize"],
+         "contract": {"creates": ["app/word_frequencies.py"], "exports": ["word_frequencies(tokens)"]}},
+        {"repo": str(repo), "task": "report", "prompt": "p", "depends_on": ["word-frequencies"],
+         "contract": {"creates": ["app/report.py"], "exports": ["combined_report(text)"]}},
+    ]
+    plan = _build_plan(tmp_path, tasks)
+    plan = pg.mark_ready(plan, "tokenize")
+    plan = pg.mark_building(plan, "tokenize")
+    plan = pg.mark_merged(plan, "tokenize", "ev")
+    plan = pg.mark_parked(plan, "word-frequencies", "ev")  # parks -> report SKIPPED transitively
+    assert plan.task("report").status == pg.STATUS_SKIPPED
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    unresolved = [
+        {"module": "app.word_frequencies", "raw": "x", "reason": "y"},
+        {"module": "app.report", "raw": "x", "reason": "y"},
+    ]
+    assert driver._owning_task(unresolved).id == "word-frequencies"  # parked beats skipped
+
+
+def test_owning_task_still_selects_merged_owner_b6n2(tmp_path):
+    """No parked owner: the MERGED owner that misplaced its module is still the target
+    (the B6n2 case this gate was first built for — preserved)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _layout_tasks(repo)  # core + cli; cli creates cli_interface
+    plan = _build_plan(tmp_path, tasks)
+    for tid in ("core", "cli"):
+        plan = pg.mark_ready(plan, tid)
+        plan = pg.mark_building(plan, tid)
+        plan = pg.mark_merged(plan, tid, "ev")
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    assert driver._owning_task(_UNRESOLVED).id == "cli"
+
+
+def test_owning_task_falls_back_to_sink_when_no_contract_owns(tmp_path):
+    """Fail-soft: when NO contract precisely owns the module, the pre-existing heuristic
+    (merged sink / last merged) is byte-identical — no regression."""
+    repo = _mk_repo(tmp_path)
+    tasks = _b7_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    for tid in ("slugify-phrase-helper", "unit-converter-helper", "password-generator-helper"):
+        plan = pg.mark_ready(plan, tid)
+        plan = pg.mark_building(plan, tid)
+        plan = pg.mark_merged(plan, tid, "ev")
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    unresolved = [{"module": "totally-unrelated-thing", "raw": "x", "reason": "y"}]
+    assert driver._owning_task(unresolved).id == "password-generator-helper"  # sinks[-1], unchanged
+
+
+# ---- end-to-end: the fix cycle re-runs the owner (the regression lock) ----------------
+
+
+def _b7_parking_run_task(calls, *, fix_marker: str):
+    """A run_task that PARKS unit-converter-helper on its FIRST (wave) run and merges every
+    other run — including the fix-cycle re-run (identified by *fix_marker* in the prompt)."""
+    def run_task(t):
+        calls.append(("task", t["task"], t["prompt"]))
+        if t["task"] == "unit-converter-helper" and fix_marker not in t["prompt"]:
+            return TaskOutcome(task=t["task"], outcome="errored", result="PARKED",
+                               detail="RESULT: Nothing to merge")
+        return _merged(t)
+    return run_task
+
+
+def test_layout_fix_cycle_reruns_parked_owner_not_sibling_b7(tmp_path):
+    """THE #790 regression lock (B7): unit-converter-helper PARKS while its two independent
+    siblings merge; the oracle imports convertUnit from the missing module. The ONE layout
+    fix cycle must re-run the PARKED OWNER, never the last merged sibling (password-
+    generator-helper — exactly what sinks[-1] re-ran before the fix, 0/3 on 2026-07-12)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _b7_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, run_task=_b7_parking_run_task(calls, fix_marker="LAYOUT FIX"),
+               job_oracle_contract=lambda: _B7_CONTRACT,
+               run_import_probe=lambda r, p: {"ok": False, "unresolved": _B7_UNRESOLVED,
+                                              "evidence": "unresolved"})
+    _driver(tmp_path, ops, tasks, plan).run()
+    fixed = [c[1] for c in calls if isinstance(c, tuple) and c[0] == "task"
+             and "LAYOUT FIX" in c[2]]
+    assert fixed == ["unit-converter-helper"]              # the owner, exactly once
+    assert "password-generator-helper" not in fixed         # never the sibling
+    # the fix prompt names the exact missing module (the coder's actionable signal)
+    fix_prompt = next(c[2] for c in calls if isinstance(c, tuple) and c[0] == "task"
+                      and c[1] == "unit-converter-helper" and "LAYOUT FIX" in c[2])
+    assert "unit-converter-helper.js" in fix_prompt
+
+
+def test_layout_fix_cycle_owner_rerun_resolves_import_b7(tmp_path):
+    """The payoff: with the OWNER re-run (not a sibling), the re-probe RESOLVES and the
+    layout gate does NOT fail the wave — the layout-fix-cycle now RESOLVES the import
+    (0/3 -> resolved), where re-running a sibling structurally never could."""
+    repo = _mk_repo(tmp_path)
+    tasks = _b7_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    seq = iter([{"ok": False, "unresolved": _B7_UNRESOLVED, "evidence": "x"},
+                {"ok": True, "unresolved": [], "evidence": "resolved"}])
+    ops = _ops(calls, run_task=_b7_parking_run_task(calls, fix_marker="LAYOUT FIX"),
+               job_oracle_contract=lambda: _B7_CONTRACT,
+               run_import_probe=lambda r, p: next(seq))
+    _driver(tmp_path, ops, tasks, plan).run()
+    fixed = [c[1] for c in calls if isinstance(c, tuple) and c[0] == "task"
+             and "LAYOUT FIX" in c[2]]
+    assert fixed == ["unit-converter-helper"]
+    sc = _scorecard(calls)
+    assert not any(w["status"] == "failed" for w in sc["waves"])  # layout gate passed post-fix
+    assert [c for c in calls if isinstance(c, tuple) and c[0] == "job_oracle"]  # oracle graded
+    # N1 lock (#790 review): the owner-selection fix ships WITHOUT any verdict-
+    # semantics change — the parked owner whose fix-cycle re-run MERGED stays
+    # PARKED in the persisted plan (promoting a recovered owner to merged/GREEN
+    # is an explicitly LA-held decision, deliberately not folded in here).
+    persisted = pg.PlanStore(tmp_path / "plan.json", projects_dir=tmp_path).load()
+    assert persisted.plan is not None
+    assert persisted.plan.task("unit-converter-helper").status == pg.STATUS_PARKED
+
+
+def test_exec_smoke_fix_cycle_reruns_parked_owner_not_sibling_b7(tmp_path):
+    """The exec-smoke boot-fix cycle shares _owning_task, so it inherits the fix: a boot
+    error naming the missing module re-runs the PARKED OWNER, not a merged sibling."""
+    repo = _mk_repo(tmp_path)
+    tasks = _b7_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    boot_fail = {
+        "ok": False, "language": "node",
+        "evidence": "booting node main.js failed: ERR_MODULE_NOT_FOUND ../src/unit-converter-helper.js",
+        "fingerprint": "ERR_MODULE_NOT_FOUND",
+        "unresolved": [{"spec": "../src/unit-converter-helper.js", "raw": "node main.js --help",
+                        "reason": "Cannot find module ../src/unit-converter-helper.js"}],
+    }
+    ops = _ops(calls, run_task=_b7_parking_run_task(calls, fix_marker="EXECUTABILITY FIX"),
+               run_exec_smoke=lambda r, p: dict(boot_fail))
+    _driver(tmp_path, ops, tasks, plan).run()
+    fixed = [c[1] for c in calls if isinstance(c, tuple) and c[0] == "task"
+             and "EXECUTABILITY FIX" in c[2]]
+    assert fixed == ["unit-converter-helper"]              # the owner, not password-generator-helper
+
+
+# ---------------------------------------------------------------------------
+# #831 per-task ERROR-level static pre-gate (the cheapest gate, FIRST)
+# ---------------------------------------------------------------------------
+
+_F821_ERR = {"summary": "storage.py:2 F821: Undefined name `convertUnits`",
+             "code": "F821", "line": 2, "path": "storage.py", "lang": "python"}
+_F821_FIX = ("STATIC PRE-GATE FIX (single focus — fix ONLY these exact error-level "
+             "defects): storage.py:2 F821: Undefined name `convertUnits`")
+
+
+def _pregate(ok, *, errors=None, fix_prompt=""):
+    return {"ok": ok, "errors": errors or [], "checked": 1, "skipped": [],
+            "stamp": ("clean" if ok else "fail" if ok is False else "skipped"),
+            "evidence": "e", "fix_prompt": fix_prompt}
+
+
+def test_static_pregate_noop_seam_is_byte_identical(tmp_path):
+    """The default (noop) static-pregate seam returns ok=None → inert: the job grades +
+    completes exactly as before the feature (byte-identical, no fix re-runs)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    result = _driver(tmp_path, _ops(calls), tasks, plan).run()  # noop default
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed" and result.outcome == "complete"
+    assert not any(isinstance(c, tuple) and c[0] == "task" and "STATIC PRE-GATE FIX" in c[2]
+                   for c in calls)
+
+
+def test_static_pregate_clean_no_fix_cycle(tmp_path):
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, run_static_pregate=lambda r, b, m: _pregate(True))
+    _driver(tmp_path, ops, tasks, plan).run()
+    assert not any(isinstance(c, tuple) and c[0] == "task" and "STATIC PRE-GATE FIX" in c[2]
+                   for c in calls)
+    assert _scorecard(calls)["job_acceptance"]["status"] == "passed"
+
+
+def test_static_pregate_fail_feeds_fix_cycle_with_exact_error(tmp_path):
+    """THE lock: an F821 defect is caught pre-suite and the fix cycle re-runs the
+    offending task with the EXACT error named (file:line, single-focus)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    seq = iter([_pregate(False, errors=[_F821_ERR], fix_prompt=_F821_FIX)])
+    ops = _ops(calls, run_static_pregate=lambda r, b, m: next(seq, _pregate(True)))
+    _driver(tmp_path, ops, tasks, plan).run()
+    fix_runs = [c for c in calls if isinstance(c, tuple) and c[0] == "task"
+                and "STATIC PRE-GATE FIX" in c[2]]
+    assert fix_runs, "the fix cycle must re-run the offending task"
+    assert "F821" in fix_runs[0][2] and "convertUnits" in fix_runs[0][2]
+    # the job still grades (the static pre-gate never blocks)
+    assert _scorecard(calls)["job_acceptance"]["status"] == "passed"
+
+
+def test_static_pregate_fix_resolves_then_job_grades(tmp_path):
+    """Fail once → fix cycle → re-probe clean → the job grades; NO wave gate is failed by
+    the static pre-gate (it is a fix-feed net, not an enforcer)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    seq = iter([_pregate(False, errors=[_F821_ERR], fix_prompt=_F821_FIX), _pregate(True)])
+    ops = _ops(calls, repo_head=lambda r: "deadbeef12",  # non-empty → the re-probe fires
+               run_static_pregate=lambda r, b, m: next(seq, _pregate(True)))
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["job_acceptance"]["status"] == "passed"
+    assert not any(w["status"] == "failed" for w in sc["waves"])
+
+
+def test_static_pregate_persistent_fail_is_non_blocking(tmp_path):
+    """Even if the static pre-gate NEVER resolves, it never blocks: the wave gate + the
+    finish-line oracle remain the enforcers, so an all-merged, wave-green, oracle-pass
+    run stays GREEN (the static pre-gate is a fix-feed net, never a new blocker — the
+    non-blocking design lock)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(calls, repo_head=lambda r: "deadbeef12",
+               run_static_pregate=lambda r, b, m: _pregate(
+                   False, errors=[_F821_ERR], fix_prompt=_F821_FIX))
+    _driver(tmp_path, ops, tasks, plan).run()
+    sc = _scorecard(calls)
+    assert sc["verdict"] == "GREEN"                        # never blocked
+    assert not any(w["status"] == "failed" for w in sc["waves"])
+    assert sc["job_acceptance"]["status"] == "passed"
+
+
+def test_static_pregate_runs_before_the_wave_gate(tmp_path):
+    """Composition: the per-task static pre-gate (cheapest) runs BEFORE the wave gate
+    (the suite) for that wave — the cheapest-first ordering the ticket requires."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    ops = _ops(
+        calls,
+        run_static_pregate=lambda r, b, m: (calls.append(("pregate", m)), _pregate(True))[1],
+        run_wave_gate=lambda r: (calls.append(("wave_gate", r)),
+                                 {"ok": True, "evidence": ""})[1],
+    )
+    _driver(tmp_path, ops, tasks, plan).run()
+    kinds = [c[0] for c in calls
+             if isinstance(c, tuple) and c[0] in ("pregate", "wave_gate")]
+    assert kinds[0] == "pregate"                            # a task pre-gate comes first
+    assert kinds.index("pregate") < kinds.index("wave_gate")  # before the wave suite
+
+
+# ---------------------------------------------------------------------------
 # Legacy byte-stability + cancel/stop verdicts
 # ---------------------------------------------------------------------------
 
@@ -448,7 +1106,16 @@ def test_scorecard_schema_shape(tmp_path):
     tasks = _plan_tasks(repo)
     plan = _build_plan(tmp_path, tasks)
     calls = []
-    _driver(tmp_path, _ops(calls), tasks, plan).run()
+    # #790: a representative per-task best-of-N log (new-agent-task.ps1's exact line
+    # shape) so samples_consumed recovers a REAL value via run_dir instead of the -1
+    # default — see the fallback/sum/parser-focused tests below for the rest of the
+    # honesty contract (absent signal, multi-task summing, the bare parse).
+    (tmp_path / "run-fleet-storage.log").write_text(
+        "  Best-of-N: 2 candidate(s) -> no candidate passed; kept the best of 2 by gate rank.\n"
+        "RESULT: MERGED to main\n",
+        encoding="utf-8",
+    )
+    _driver(tmp_path, _ops(calls), tasks, plan, run_dir=tmp_path).run()
     sc = _scorecard(calls)
     assert sc["schema"] == sd.SCORECARD_SCHEMA
     for key in ("run_id", "plan_id", "goal", "repo", "verdict", "attribution",
@@ -460,10 +1127,82 @@ def test_scorecard_schema_shape(tmp_path):
     assert sc["verdict"] == "GREEN" and sc["attribution"] == ""
     # The battery adoption conventions (tools/dispatch_harness/scorecard.py):
     # -1 == not instrumented; oracle_status is the FALSE-DONE cross-check hook.
-    assert sc["samples_consumed"] == -1
-    assert "samples_consumed" in sc["not_measured"]
+    # #790: samples_consumed is now RECOVERED (run_dir was supplied above) — it is
+    # measured this time, so it drops out of not_measured too.
+    assert sc["samples_consumed"] == 2
+    assert "samples_consumed" not in sc["not_measured"]
     assert sc["interventions"] == 0
     assert sc["evidence"]["oracle_status"] == "passed"
+
+
+def test_scorecard_samples_consumed_fallback_when_run_dir_absent(tmp_path):
+    """#790 honesty contract: no run_dir supplied (the byte-identical default for
+    every caller that predates this feature, e.g. the plan_graph.py simulation
+    harness) -> samples_consumed stays -1 ("not instrumented") and is named in
+    not_measured. This is the exact assertion test_scorecard_schema_shape carried
+    before run_dir existed, now isolated under its own name."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()  # no run_dir kwarg
+    sc = _scorecard(calls)
+    assert sc["samples_consumed"] == -1
+    assert "samples_consumed" in sc["not_measured"]
+
+
+def test_scorecard_samples_consumed_fallback_when_no_best_of_n_line(tmp_path):
+    """run_dir IS supplied but its log carries no Best-of-N line (every task resolved
+    on its first candidate, the common case — new-agent-task.ps1 only prints the line
+    when ``$bon.Count -gt 1``) -> still -1, NEVER a false '0 consumed' claim (0
+    candidates consumed is never literally true; -1 means honestly unknown)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    (tmp_path / "run-fleet-storage.log").write_text("RESULT: MERGED to main\n", encoding="utf-8")
+    _driver(tmp_path, _ops(calls), tasks, plan, run_dir=tmp_path).run()
+    sc = _scorecard(calls)
+    assert sc["samples_consumed"] == -1
+    assert "samples_consumed" in sc["not_measured"]
+
+
+def test_samples_consumed_from_run_dir_parses_best_of_n_line(tmp_path):
+    """#790 focused parser lock: a representative 'Best-of-N: N candidate(s) -> ...'
+    line — the exact shape new-agent-task.ps1 writes (#689) — is recovered."""
+    (tmp_path / "run-fleet-storage.log").write_text(
+        "[1/5] Building candidate 1 of 2 in isolated workspace (Model, max 30 min)...\n"
+        "  Candidate 1 did not pass the gate; trying a FRESH independent candidate (2/2)...\n"
+        "  Best-of-N: 2 candidate(s) -> no candidate passed; kept the best of 2 by gate rank.\n"
+        "RESULT: MERGED to main\n",
+        encoding="utf-8",
+    )
+    assert sd._samples_consumed_from_run_dir(tmp_path) == 2
+
+
+def test_samples_consumed_from_run_dir_sums_across_task_logs(tmp_path):
+    """Each task gets its own run-fleet-<slug>.log (#689/#695 concurrent candidates);
+    the job-level samples_consumed SUMS every task's recovered count. A task that
+    never sampled beyond its first candidate (util here) contributes nothing — the
+    documented lower-bound honesty, not a missing-file error."""
+    (tmp_path / "run-fleet-storage.log").write_text(
+        "  Best-of-N: 2 candidate(s) -> no candidate passed; kept the best of 2 by gate rank.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "run-fleet-util.log").write_text("RESULT: MERGED to main\n", encoding="utf-8")
+    (tmp_path / "run-fleet-report.log").write_text(
+        "  Best-of-N: 3 candidate(s) -> candidate 2 passed the gate.\n",
+        encoding="utf-8",
+    )
+    assert sd._samples_consumed_from_run_dir(tmp_path) == 5
+
+
+def test_samples_consumed_from_run_dir_none_or_missing_is_sentinel(tmp_path):
+    """None / '' / a directory that doesn't exist are all the same honest -1 —
+    never raises, never guesses 0."""
+    assert sd._samples_consumed_from_run_dir(None) == -1
+    assert sd._samples_consumed_from_run_dir("") == -1
+    assert sd._samples_consumed_from_run_dir(tmp_path / "does-not-exist") == -1
 
 
 def test_scorecard_is_adoptable_by_the_battery_runner(tmp_path):
@@ -551,6 +1290,71 @@ def test_verdict_stopped_is_stalled_harness(tmp_path):
     plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="passed")
     assert sd.compute_job_verdict(plan, cancelled=False, stopped=True,
                                   wave_gates=[]) == ("STALLED", "HARNESS")
+
+
+def test_verdict_flaky_oracle_reroutes_build_to_verify(tmp_path):
+    """#829: an all-merged tree whose JOB ORACLE failed then PASSED on a fresh hermetic
+    re-run is a nondeterministic GRADER, not a wrong coder — the park attribution moves
+    BUILD -> VERIFY. Without the flag the SAME failure stays BUILD (byte-stable)."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="failed")
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[], oracle_flaky=True) == (
+            "PARKED-HONEST", "VERIFY")
+    # The flag is opt-in: default False is byte-identical to before #829.
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[]) == ("PARKED-HONEST", "BUILD")
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[], oracle_flaky=False) == (
+            "PARKED-HONEST", "BUILD")
+
+
+def test_verdict_flaky_flag_never_reroutes_a_gate_failure(tmp_path):
+    """The reroute is narrow: a FAILED WAVE GATE is a build-integration instrument the
+    flake differential never re-ran, so it stays BUILD even if oracle_flaky is set (the
+    flag can only relabel a JOB-ORACLE park, never launder a gate failure)."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="passed")
+    verdict, attribution = sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False,
+        wave_gates=[{"wave": 1, "status": "failed", "evidence": "x"}], oracle_flaky=True)
+    assert verdict == "PARKED-HONEST" and attribution == "BUILD"
+
+
+def test_verdict_flaky_flag_never_mints_green_or_reroutes_a_real_park(tmp_path):
+    """oracle_flaky can never UPGRADE a verdict: a genuinely parked/blocked task stays a
+    BUILD park (a real build failure), and the flag never produces GREEN."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged", "b": "parked"})
+    verdict, attribution = sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[], oracle_flaky=True)
+    assert verdict == "PARKED-HONEST" and attribution == "BUILD"
+
+
+def test_flaky_oracle_scorecard_and_driver_attribute_verify(tmp_path):
+    """End-to-end through the driver seams: a job oracle that reports failed +
+    ``oracle_flaky`` (the wrapper's flip stamp) drives the scorecard to PARKED-HONEST
+    (VERIFY) with an ``oracle_flaky: true`` evidence stamp — the coder stops eating the
+    grader's flakiness. The default (no flag) attributes the same failure BUILD."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+
+    def _run(flaky: bool) -> dict:
+        plan = _build_plan(tmp_path, tasks)
+        calls = []
+        oracle = {"status": "failed", "evidence": "nonzero exit; assert 689 == 1"}
+        if flaky:
+            oracle["oracle_flaky"] = True
+        ops = _ops(calls, run_job_oracle=lambda r, rel: (
+            calls.append(("job_oracle", r, rel)), dict(oracle))[1])
+        _driver(tmp_path, ops, tasks, plan).run()
+        return _scorecard(calls)
+
+    flaky_sc = _run(True)
+    assert flaky_sc["verdict"] == "PARKED-HONEST" and flaky_sc["attribution"] == "VERIFY"
+    assert flaky_sc["evidence"]["oracle_flaky"] == "true"
+    assert flaky_sc["evidence"]["oracle_status"] == "failed"  # never mints a pass
+
+    plain_sc = _run(False)
+    assert plain_sc["verdict"] == "PARKED-HONEST" and plain_sc["attribution"] == "BUILD"
+    assert "oracle_flaky" not in plain_sc["evidence"]
 
 
 # ---------------------------------------------------------------------------
@@ -748,9 +1552,10 @@ def test_real_run_job_oracle_restore_before_grade(tmp_path, monkeypatch):
     monkeypatch.setattr(so.shutil, "which", lambda name: f"C:/fake/{name}.exe")
     graded = {}
 
-    def fake_run(cmd, timeout_s, cwd=None):
+    def fake_run(cmd, timeout_s, cwd=None, env=None):
         graded["cmd"] = cmd
         graded["cwd"] = cwd
+        graded["env"] = env
         graded["content_at_grade"] = target.read_text(encoding="utf-8")
         return (True, "1 passed", "")
 
@@ -772,7 +1577,7 @@ def test_real_run_job_oracle_removes_file_when_absent_before(tmp_path, monkeypat
     repo = _mk_repo(tmp_path, "target2")
     monkeypatch.setattr(so.shutil, "which", lambda name: f"C:/fake/{name}.exe")
     res = so.real_run_job_oracle(config, "R1", str(repo), JOB_ORACLE_PATH_PYTHON,
-                                 _PY_ORACLE, run=lambda c, t, cwd=None: (False, "", "1 failed"))
+                                 _PY_ORACLE, run=lambda c, t, cwd=None, env=None: (False, "", "1 failed"))
     assert res["status"] == "failed"
     assert not (repo / JOB_ORACLE_PATH_PYTHON).exists()
 
@@ -956,6 +1761,59 @@ def test_build_job_plan_single_task_degrades_to_flat_queue(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# #824 — always-on per-run decompose-downgrade evidence (decompose-diagnostics.json)
+# ---------------------------------------------------------------------------
+
+
+def _read_decompose_decision(config, run_id) -> dict:
+    return json.loads(so.decompose_diagnostics_path(config, run_id).read_text(encoding="utf-8"))
+
+
+def test_build_job_plan_writes_plan_graph_decision_evidence(tmp_path):
+    """A plan-graph dispatch records mode=plan-graph + the task slugs — the #827 classifier
+    reads this per-run instead of inferring the mode from a prose swap-progress line."""
+    config = _swap_config(tmp_path)
+    repo = _mk_repo(tmp_path, "budget5")
+    plan, _store, _deg, _cleaned = so.build_job_plan(config, "R9", _plan_tasks(repo))
+    assert plan is not None
+    decision = _read_decompose_decision(config, "R9")
+    assert decision["schema"] == "decompose-decision/v1"
+    assert decision["mode"] == "plan-graph"
+    assert decision["flat_reason"] == "" and decision["degraded"] is False
+    assert decision["cleaned_task_count"] == 3
+    assert set(decision["task_slugs"]) == {"storage", "report", "util"}
+
+
+def test_build_job_plan_single_task_writes_flat_decision_evidence(tmp_path):
+    """The B5/habit downgrade class: a <2-task plan records mode=flat + flat_reason=under-2-tasks
+    so the next battery night MEASURES the downgrade (with the surviving slug) not infers it."""
+    config = _swap_config(tmp_path)
+    repo = _mk_repo(tmp_path, "solo2")
+    tasks = [{"repo": str(repo), "task": "solo", "prompt": "build the whole toolkit",
+              "depends_on": []}]
+    plan, _store, _deg, _cleaned = so.build_job_plan(config, "R9", tasks)
+    assert plan is None
+    decision = _read_decompose_decision(config, "R9")
+    assert decision["mode"] == "flat" and decision["flat_reason"] == "under-2-tasks"
+    assert decision["cleaned_task_count"] == 1 and decision["task_slugs"] == ["solo"]
+
+
+def test_build_job_plan_refusal_writes_flat_decision_evidence(tmp_path):
+    """A validation refusal records mode=flat + flat_reason=validation-refused:<reason> so the
+    WHY is captured per-run (not just that it degraded)."""
+    config = _swap_config(tmp_path)
+    outside = tmp_path.parent / "outside-repo-824"
+    (outside / ".git").mkdir(parents=True, exist_ok=True)
+    tasks = [{"repo": str(outside), "task": "a", "prompt": "pa", "depends_on": []},
+             {"repo": str(outside), "task": "b", "prompt": "pb", "depends_on": []}]
+    plan, _store, _deg, _cleaned = so.build_job_plan(config, "R9", tasks)
+    assert plan is None
+    decision = _read_decompose_decision(config, "R9")
+    assert decision["mode"] == "flat"
+    assert decision["flat_reason"].startswith("validation-refused:")
+
+
+# ---------------------------------------------------------------------------
 # #748 — job-oracle SEEDING (the coder codes toward the job spec, plan §4.5)
 # ---------------------------------------------------------------------------
 
@@ -1092,7 +1950,7 @@ def test_grade_overwrites_seeded_guard_and_restores_it(tmp_path, monkeypatch):
     seeded = (repo / JOB_ORACLE_PATH_PYTHON).read_text(encoding="utf-8")
     graded = {}
 
-    def fake_run(cmd, timeout_s, cwd=None):
+    def fake_run(cmd, timeout_s, cwd=None, env=None):
         graded["content"] = (repo / JOB_ORACLE_PATH_PYTHON).read_text(encoding="utf-8")
         return (True, "1 passed", "")
 

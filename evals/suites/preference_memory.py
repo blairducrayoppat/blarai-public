@@ -15,6 +15,14 @@ Case kinds (the ``kind`` field selects the handler):
                           fresh session with the block in the system prompt —
                           the model USES the preference.  The real success
                           metric.
+  proposes_preference   — #792 (model-mode, hardware): given the operator's
+                          message, does the 14B EMIT a ``propose_preference``
+                          tool call?  The c.1687/c.1688 golden PAIR — an
+                          explicit "remember this" cue (must-propose, PASS) and
+                          an implicit standing directive (the tracked known-miss
+                          — same aspiration, currently no call).  Detected by
+                          the REAL ``tools.parse_tool_call`` over the raw output
+                          (format-agnostic), not a rubric over display text.
   update_contradiction  — §6.3 last-writer-wins; the old form ABSENT from the
                           rendered block; near-duplicate flags confirmation (P5).
   abstention            — §6.4 (``mode: model``, hardware): a never-stated
@@ -53,6 +61,7 @@ _VALID_KINDS: frozenset[str] = frozenset(
         "capture_fidelity",
         "pinned_injection",
         "model_applies",
+        "proposes_preference",
         "update_contradiction",
         "abstention",
         "non_decay",
@@ -356,7 +365,13 @@ def _run_budget_lock(case: dict[str, Any]) -> tuple[bool, Any, Any, str]:
 
 
 class _EvalCM:
-    """Context-manager stand-in for the propose provenance signals (offline)."""
+    """Context-manager stand-in for the propose provenance signals (offline).
+
+    The poisoning cases model a hostile DOCUMENT nudging a proposal, so
+    ``untrusted=True`` reports the document/web grain (#792): the card keeps the
+    strong untrusted-context warning, which the ``card_flagged`` assertion below
+    depends on.
+    """
 
     def __init__(self, untrusted: bool) -> None:
         self._untrusted = untrusted
@@ -366,6 +381,15 @@ class _EvalCM:
 
     def has_user_loaded_documents(self, _sid: str) -> bool:
         return False
+
+    def untrusted_provenance_tiers(self, _sid: str):
+        from services.assistant_orchestrator.src.context_manager import Provenance
+
+        return (
+            frozenset({Provenance.UNTRUSTED_EXTERNAL})
+            if self._untrusted
+            else frozenset()
+        )
 
 
 class _RecordingTransport:
@@ -597,7 +621,9 @@ _OFFLINE_HANDLERS: dict[str, Callable[[dict[str, Any]], tuple[bool, Any, Any, st
     "poisoning_redteam": _run_poisoning_redteam,
 }
 
-_MODEL_KINDS: frozenset[str] = frozenset({"model_applies", "abstention"})
+_MODEL_KINDS: frozenset[str] = frozenset(
+    {"model_applies", "abstention", "proposes_preference"}
+)
 
 #: Offline poisoning classes whose case carries an ``injected_text``.
 _POISON_NEEDS_INJECTED: frozenset[str] = frozenset(
@@ -626,6 +652,13 @@ def _validate_case(case: dict[str, Any]) -> str | None:
             return "model case requires a non-empty 'prompt'"
         if not isinstance(case.get("preferences"), list):
             return "model case requires a 'preferences' list (may be empty)"
+        if kind == "proposes_preference":
+            # #792 — a propose/no-propose case scores a tool-call emission, not
+            # a display-text rubric, so it carries a boolean expectation instead
+            # of ``checks``.
+            if not isinstance(case.get("expect_propose"), bool):
+                return "proposes_preference requires a boolean 'expect_propose'"
+            return None
         return validate_checks(case.get("checks"))
     if kind == "capture_fidelity" and not case.get("body"):
         return "capture_fidelity requires 'body'"
@@ -708,6 +741,21 @@ def run_suite(
             try:
                 if generator is None:
                     generator = make_preference_model_generator()
+                if kind == "proposes_preference":
+                    passed, expected, actual, detail = _run_proposes_case(
+                        case, generator
+                    )
+                    report.results.append(
+                        CaseResult(
+                            case_id=case_id,
+                            status=CaseStatus.PASS if passed else CaseStatus.FAIL,
+                            description=description,
+                            expected=expected,
+                            actual=actual,
+                            detail=detail,
+                        )
+                    )
+                    continue
                 answer = _run_model_case(case, generator)
                 verdict = score_answer(answer, case["checks"])
                 report.results.append(
@@ -780,3 +828,64 @@ def _run_model_case(
     system_prompt = compose_system_prompt(_DEFAULT_SYSTEM_PROMPT, block)
     raw = generator(str(case["prompt"]), system_prompt)
     return strip_for_display(raw)
+
+
+def _run_proposes_case(
+    case: dict[str, Any], generator: Callable[[str, str], str]
+) -> tuple[bool, Any, Any, str]:
+    """#792 propose/no-propose case: does the 14B EMIT a ``propose_preference``
+    tool call for the operator's message?
+
+    Composes the SAME production system prompt every model case uses
+    (``_DEFAULT_SYSTEM_PROMPT`` already embeds the tool-schema block, so
+    ``propose_preference`` is on offer) with the case's preference tier, then
+    runs the REAL parser (``tools.parse_tool_call``) over the RAW output — the
+    same format-agnostic public abstraction the tool_calling suite scores.  The
+    raw output is NOT display-stripped: a tool call is not display text, and
+    stripping would erase exactly the signal under test.
+
+    ``expect_propose`` now encodes the LA's DECIDED posture (#792 c.1763,
+    2026-07-11 — conservative, explicit-cue-only), not an open aspiration:
+    the explicit "remember this" cue MUST propose (the positive control,
+    verified live c.1688, ``expect_propose=True``); the implicit directive
+    MUST NOT (``expect_propose=False``) — staying quiet without an explicit
+    cue is the correct behavior, so the pair now locks both sides of a
+    settled decision rather than measuring a gap (reviewed re-baseline of the
+    implicit case True→False, lesson 186).
+    """
+    from services.assistant_orchestrator.src import tools
+    from services.assistant_orchestrator.src.gpu_inference import (
+        _DEFAULT_SYSTEM_PROMPT,
+    )
+    from services.assistant_orchestrator.src.preference_block import (
+        compose_system_prompt,
+    )
+
+    bank = _make_bank()
+    try:
+        _seed_bank(bank, case.get("preferences", []))
+        block = _render(bank.list_preferences())
+    finally:
+        bank.close()
+    system_prompt = compose_system_prompt(_DEFAULT_SYSTEM_PROMPT, block)
+    raw = generator(str(case["prompt"]), system_prompt)
+
+    parsed = tools.parse_tool_call(raw)
+    tool_name = parsed[0] if parsed is not None else None
+    proposed = tool_name == "propose_preference"
+    expect = bool(case["expect_propose"])
+    passed = proposed == expect
+    detail = "" if passed else (
+        f"expected propose_preference emission={expect}, observed={proposed}"
+        + (
+            f" (parsed tool {tool_name!r})"
+            if parsed is not None
+            else " (no tool call in the output)"
+        )
+    )
+    return (
+        passed,
+        {"proposes_preference": expect},
+        {"proposes_preference": proposed, "tool": tool_name},
+        detail,
+    )

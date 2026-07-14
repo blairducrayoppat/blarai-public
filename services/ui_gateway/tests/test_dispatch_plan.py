@@ -198,3 +198,32 @@ async def test_plan_transport_opens_with_the_plan_budget_not_the_prompt_budget()
     # per-prompt budget (a PLAN is ~6 chained calls), and must stay finite.
     assert PLAN_RESPONSE_TIMEOUT_S > PROMPT_RESPONSE_TIMEOUT_S
     assert PLAN_RESPONSE_TIMEOUT_S <= 900.0
+
+
+@pytest.mark.asyncio
+async def test_dispatch_plan_fn_carries_revision_ops():
+    # #820: the REVISE early-return payload rides INSIDE PLAN_RESULT (no new IPC verb). The
+    # gateway reconstructs PlanResult.revision so the coordinator can apply the edit ops.
+    h = _PlanGwHarness({
+        "ok": True, "message": "proposed 2 step(s)", "fell_back": False,
+        "tasks": [], "criteria": {},
+        "revision": [
+            {"op": "keep", "ref": 1, "task": "", "prompt": ""},
+            {"op": "add", "ref": 0, "task": "export", "prompt": "export to CSV"},
+        ],
+    })
+    res = await h._dispatch_plan_fn("r", "a goal")
+    assert res.ok and res.tasks == []
+    assert [o["op"] for o in res.revision] == ["keep", "add"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_plan_fn_normal_plan_has_empty_revision():
+    # A normal plan reply carries no revision ops (absent key -> [] via .get default).
+    h = _PlanGwHarness({
+        "ok": True, "message": "planned", "fell_back": False,
+        "tasks": [{"repo": "r", "task": "t", "prompt": "p"}],
+        "criteria": {"goal": "g", "criteria": []},
+    })
+    res = await h._dispatch_plan_fn("r", "g")
+    assert res.ok and res.revision == []

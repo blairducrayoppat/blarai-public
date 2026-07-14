@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import platform
 import re
 import socket
@@ -52,12 +53,13 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 
+from tools.dispatch_harness import green_audit
 from tools.dispatch_harness.config import load_harness_config
 from tools.dispatch_harness.harness import DispatchHarness
 from tools.dispatch_harness.jobs import JobSpec
@@ -78,9 +80,23 @@ from tools.dispatch_harness.scorecard import (
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SPEC_DIR = _REPO_ROOT / "evals" / "battery"
+#: Dev/tuning cards live in a SEPARATE namespace so the frozen battery's B*.json
+#: glob (and the production plan-override resolver) never see them (#838 D4).
+DEV_SPEC_DIR = DEFAULT_SPEC_DIR / "dev"
 
 CARD_SCHEMA = "battery-card/v1"
 JOBPLAN_SCHEMA = "jobplan/v1"
+
+#: ADR-038 D4 — the born-frozen-XOR-born-dev marker. A FROZEN card is model-neutral
+#: and MEASUREMENT-ONLY (the battery judges against it; it is never tuned against); a
+#: DEV card is the tuning surface model-specific refinement iterates on. A card is one
+#: class or the other and NEVER crosses — enforced structurally by the id/class
+#: biconditional in :func:`validate_card`. Absent ⇒ frozen (fail-safe: an unstamped
+#: card can never be accidentally usable for tuning).
+CARD_CLASS_FROZEN = "frozen"
+CARD_CLASS_DEV = "dev"
+CARD_CLASSES: frozenset[str] = frozenset({CARD_CLASS_FROZEN, CARD_CLASS_DEV})
+DEFAULT_CARD_CLASS = CARD_CLASS_FROZEN
 
 #: The pinned JobPlan v1 status vocabularies (#740 contract — Lane A implements the
 #: same text; a mismatch here is a contract defect, not a local choice).
@@ -94,7 +110,8 @@ JOB_ACCEPTANCE_STATUSES: frozenset[str] = frozenset({"pending", "passed", "faile
 #: operator repo. (validate_repo's projects-dir containment still applies below.)
 _SANDBOX_REPO_RE = re.compile(r"^battery-[a-z0-9][a-z0-9-]{0,40}$")
 
-_CARD_ID_RE = re.compile(r"^B[1-9][0-9]?$")
+_CARD_ID_RE = re.compile(r"^B[1-9][0-9]?$")       # frozen battery ids (B1..B99)
+_DEV_CARD_ID_RE = re.compile(r"^D[1-9][0-9]?$")   # dev/tuning ids (D1..D99) — #838 D4
 _KEBAB_SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 #: Where the driver's REPORT phase emits its per-run scorecard (the W6 seam).
@@ -186,12 +203,168 @@ def ao_mtls_healthy(
         return False
 
 
-def boot_launcher_detached(repo_root: Path, log_path: Path) -> None:
+# ---------------------------------------------------------------------------
+# #863 Option A — the teardown barrier (DRAFT_cert_remint_race_durable_fix.md §2):
+# PROVE any prior AO is dead before boot_launcher_detached mints/boots a replacement.
+# ---------------------------------------------------------------------------
+#
+# The #863 reuse-window (BLARAI_REUSE_CERTS below) fixed CERT agreement between
+# successive battery boots but left the OTHER failure shape the same AO-lifecycle
+# overlap produces open: a still-live prior AO still holds :port when the new
+# launcher tries to bind it — a port-bind collision (or an instance-lock refusal)
+# instead of a cert error. Evidence this is not hypothetical: #863's own run log
+# recorded its third launcher boot (PID 3128, 23:06:32) "LEAKED on :5001 post-run"
+# — a launcher process still bound to the AO's port when the run gave up.
+#
+# This barrier composes ONLY already-audited primitives — no new trust boundary,
+# no new cross-process shutdown signal: the instance lock's OWN liveness check
+# (launcher.instance_lock._is_live_launcher — the exact test the lock itself
+# already trusts for a reclaim decision), the tree-kill escalation probe.py's
+# _real_stop_ao already uses (shared.procspawn.terminate_process_tree —
+# terminate() leaves-first then root, a bounded ~3s grace, then kill() on
+# anything still alive), and this module's own ao_socket_ready.
+
+#: Bounded wait for a tree-killed prior AO's port to actually go quiet (a SEPARATE
+#: check from "the pid is gone" — process death and socket closure are not the same
+#: instant). terminate_process_tree's own escalation already bounds the KILL at
+#: ~3s; this covers the REMAINING OS-level socket-teardown lag. Registered in
+#: shared/timeout_registry.py.
+TEARDOWN_BARRIER_PORT_FREE_TIMEOUT_S: float = 15.0
+#: Poll cadence while waiting for the port to go quiet (grain, not separately
+#: registered — mirrors the AoReensurer.poll_s BACKLOG convention).
+TEARDOWN_BARRIER_POLL_S: float = 0.5
+
+#: The production AO's fixed port (mirrors tools.dispatch_harness.probe._AO_PORT;
+#: duplicated rather than imported so this module's own default stays self-contained).
+_AO_PORT: int = 5001
+
+
+class TeardownBarrierError(RuntimeError):
+    """Option A fail-closed (#863): a prior AO was tree-killed but its port never went
+    quiet within the bounded wait. Raised INSTEAD of proceeding to boot a replacement
+    onto a port a live process may still hold — every current caller already wraps
+    ``boot_launcher_detached`` in a broad ``except Exception`` (``AoReensurer.ensure``,
+    ``probe._real_restore``), so this surfaces as an honest failure and the job/probe
+    STALLs rather than racing a cert/port collision."""
+
+
+@dataclass
+class TeardownBarrierOps:
+    """Injected seams for :func:`run_teardown_barrier` — mirrors the AoReensurer /
+    ProbeOps DI pattern already used in this module/package, so the prove-dead policy
+    is unit-testable with no real process, socket, or GPU."""
+
+    read_holder_pid: Callable[[], "int | None"]
+    is_live_launcher: Callable[[int], bool]
+    terminate: Callable[[int], "list[int]"]
+    port_occupied: Callable[[], bool]  # True iff something still accepts on the port
+    sleep: Callable[[float], None] = time.sleep
+    log: Callable[[str], None] = print
+
+
+def run_teardown_barrier(
+    ops: TeardownBarrierOps,
+    *,
+    port: int,
+    port_free_timeout_s: float = TEARDOWN_BARRIER_PORT_FREE_TIMEOUT_S,
+    poll_s: float = TEARDOWN_BARRIER_POLL_S,
+) -> None:
+    """PROVE any prior AO holding this checkout's instance lock is dead before the
+    caller mints/boots a replacement (#863 Option A).
+
+    1. Identify the current lock holder and confirm it is a LIVE launcher (not a
+       stale or recycled pid) — the SAME two checks the instance lock itself already
+       trusts for its own reclaim decision (no new trust boundary; see
+       ``launcher.instance_lock``).
+    2. If live: tree-kill it (``ops.terminate`` — ``terminate_process_tree`` in the
+       real wiring: leaves-first ``terminate()``, a bounded ~3s grace, then
+       ``kill()`` on anything still alive).
+    3. Poll until the port is ACTUALLY quiet, bounded by *port_free_timeout_s*.
+       FAIL-CLOSED: raises :class:`TeardownBarrierError` naming the pid and port if
+       it never frees.
+
+    No lock holder, or the holder is not a live launcher (absent/corrupt lock, a
+    dead pid, or a recycled pid now owned by an unrelated process) -> nothing to
+    tear down; returns immediately WITHOUT EVER calling ``ops.port_occupied()``.
+    This short-circuit matters beyond tidiness: it means a caller whose lock file is
+    provably absent (a fresh ``certs/`` dir, or an isolated repo_root that shares no
+    lock file with anything real — this module's own OFFLINE tests) can never be
+    made to wait on, or misidentify, an unrelated process that happens to hold the
+    same port number elsewhere on the box.
+    """
+    pid = ops.read_holder_pid()
+    if not pid or pid <= 0 or not ops.is_live_launcher(pid):
+        return
+
+    ops.log(f"[teardown-barrier] lock holder pid {pid} is a LIVE launcher — tearing "
+            f"it down before minting a replacement on :{port} (#863 Option A).")
+    targeted = ops.terminate(pid)
+    ops.log(f"[teardown-barrier] tree-kill targeted {targeted} — waiting up to "
+            f"{port_free_timeout_s:.0f}s for :{port} to go quiet.")
+
+    waited = 0.0
+    while waited < port_free_timeout_s:
+        if not ops.port_occupied():
+            ops.log(f"[teardown-barrier] :{port} is quiet — safe to boot the replacement.")
+            return
+        ops.sleep(poll_s)
+        waited += poll_s
+    if not ops.port_occupied():
+        ops.log(f"[teardown-barrier] :{port} is quiet — safe to boot the replacement.")
+        return
+    raise TeardownBarrierError(
+        f"prior AO (pid {pid}) was tree-killed but :{port} is STILL accepting connections "
+        f"after {port_free_timeout_s:.0f}s — refusing to boot a replacement onto a port a "
+        "prior instance may still hold (fail-closed; the #863 port-collision this barrier "
+        "exists to prevent)."
+    )
+
+
+def build_real_teardown_ops(
+    repo_root: Path, port: int, log: Callable[[str], None] = print,
+) -> TeardownBarrierOps:
+    """Wire the REAL legs for :func:`run_teardown_barrier`: the SAME instance-lock
+    liveness check the launcher's own single-instance guard trusts, the SAME
+    tree-kill escalation ``probe.py``'s ``_real_stop_ao`` uses, and this module's own
+    :func:`ao_socket_ready`. Composition only — no new primitive."""
+    from launcher.instance_lock import _is_live_launcher, _read_holder_pid, lock_path_for_repo
+    from shared.procspawn import terminate_process_tree
+
+    lock = lock_path_for_repo(repo_root)
+    my_pid = os.getpid()
+
+    def _holder() -> "int | None":
+        pid = _read_holder_pid(lock)
+        # Defense-in-depth (mirrors acquire_instance_lock's own holder != me guard):
+        # boot_launcher_detached never runs INSIDE a launcher process, so this is
+        # unreachable in practice — but never treat our OWN pid as a peer to kill.
+        return None if pid == my_pid else pid
+
+    return TeardownBarrierOps(
+        read_holder_pid=_holder,
+        is_live_launcher=_is_live_launcher,
+        terminate=terminate_process_tree,
+        port_occupied=lambda: ao_socket_ready(port),
+        log=log,
+    )
+
+
+def boot_launcher_detached(
+    repo_root: Path, log_path: Path, *,
+    port: int = _AO_PORT, log: Callable[[str], None] = print,
+) -> None:
     """Boot the AO headless the SAME way run-battery-night.ps1 does — ``python -m
     launcher`` (PRODUCTION mode; no --dev-mode) from the blarai repo root, DETACHED
     so it outlives this runner, stdout+stderr -> *log_path*. Production is mandatory:
     the harness connects over the per-boot mTLS certs the launcher mints (ADR-026),
     so a dev-mode boot would leave the harness unable to reach it.
+
+    #863 Option A: BEFORE spawning the replacement, :func:`run_teardown_barrier`
+    PROVES any prior AO still holding this checkout's instance lock is dead —
+    closing the port-collision failure shape the #863 reuse-window (below) leaves
+    open on its own (a still-live prior AO surviving the reboot meant to replace
+    it). *port* defaults to the production AO port; every current caller
+    (``AoReensurer.real`` / ``probe._real_restore``) threads its own live port value.
 
     #761: spawned via the interpreter's ``pythonw.exe`` sibling when one exists —
     ``sys.executable`` through the venv ``python.exe`` shim re-spawns a
@@ -203,8 +376,19 @@ def boot_launcher_detached(repo_root: Path, log_path: Path) -> None:
     mode"). Fallback: no sibling -> ``sys.executable`` unchanged."""
     from shared.fleet.swap_ops import pythonw_sibling
 
+    run_teardown_barrier(build_real_teardown_ops(repo_root, port, log), port=port)
+
     exe = pythonw_sibling(sys.executable)
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    # #863: every battery AO boot (this preflight + the per-job AoReensurer reboots)
+    # tells the launcher to REUSE an existing consistent per-boot cert set rather
+    # than re-mint a fresh CA. Re-minting under a still-running/leaked prior AO
+    # rotates the CA out from under its in-memory leaf -> the handshake fails
+    # CERTIFICATE_VERIFY_FAILED (the deterministic per-job STALL, night-20260711);
+    # all boots in a run then share ONE trust chain. Production boots the launcher
+    # directly (no env var) -> per-boot minting (ADR-026) is unchanged.
+    _child_env = dict(os.environ)
+    _child_env["BLARAI_REUSE_CERTS"] = "1"
     fh = open(log_path, "a", encoding="utf-8", errors="replace")  # noqa: SIM115 — handed to the child
     try:
         try:
@@ -213,6 +397,7 @@ def boot_launcher_detached(repo_root: Path, log_path: Path) -> None:
                 cwd=str(repo_root), stdin=subprocess.DEVNULL,
                 stdout=fh, stderr=subprocess.STDOUT,
                 creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY, close_fds=True,
+                env=_child_env,
             )
         except OSError:
             # Not inside a Windows job object -> BREAKAWAY is invalid; retry without it.
@@ -221,6 +406,7 @@ def boot_launcher_detached(repo_root: Path, log_path: Path) -> None:
                 cwd=str(repo_root), stdin=subprocess.DEVNULL,
                 stdout=fh, stderr=subprocess.STDOUT,
                 creationflags=_DETACHED | _NEW_GROUP, close_fds=True,
+                env=_child_env,
             )
     finally:
         fh.close()  # the child inherited the fd; our handle is free to close
@@ -322,7 +508,9 @@ class AoReensurer:
             port=port,
             repo_root=repo_root,
             ready=_ready,
-            boot=lambda: boot_launcher_detached(repo_root, Path(reboot_log_dir) / "ao-reboot.log"),
+            boot=lambda: boot_launcher_detached(
+                repo_root, Path(reboot_log_dir) / "ao-reboot.log", port=port, log=log,
+            ),
             sleep=time.sleep,
             log=log,
         )
@@ -571,6 +759,16 @@ def load_gold_plan(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def resolve_card_class(card: dict) -> str:
+    """The card's ADR-038 class as a concrete value: ``card_class`` when it is a
+    recognized class (frozen|dev), else :data:`DEFAULT_CARD_CLASS` (frozen). Total +
+    pure — an unstamped or malformed class resolves to frozen (fail-safe:
+    measurement-only, never a tuning card). Consumers that must branch on the class
+    call this rather than reading the raw field."""
+    cc = card.get("card_class")
+    return cc if cc in CARD_CLASSES else DEFAULT_CARD_CLASS
+
+
 def validate_card(card: dict) -> list[str]:
     """Every structural problem with a battery card ([] == valid)."""
     if not isinstance(card, dict):
@@ -579,8 +777,31 @@ def validate_card(card: dict) -> list[str]:
     if card.get("schema") != CARD_SCHEMA:
         errors.append(f"schema must be '{CARD_SCHEMA}', got {card.get('schema')!r}")
     cid = str(card.get("id", ""))
-    if not _CARD_ID_RE.match(cid):
-        errors.append(f"id '{cid}' must match B<n>")
+    is_frozen_id = bool(_CARD_ID_RE.match(cid))
+    is_dev_id = bool(_DEV_CARD_ID_RE.match(cid))
+    if not (is_frozen_id or is_dev_id):
+        errors.append(f"id '{cid}' must match B<n> (frozen) or D<n> (dev)")
+    # ADR-038 D4 — the born-frozen-XOR-born-dev lock. card_class, if present, must be
+    # frozen|dev; absent ⇒ frozen (fail-safe). The class and the id NAMESPACE must
+    # AGREE — a B<n> id is a frozen eval card, a D<n> id is a dev/tuning card — so a
+    # card can never cross classes (the "never crossing" enforcement, structural).
+    cc = card.get("card_class", None)
+    if cc is not None and cc not in CARD_CLASSES:
+        errors.append(
+            f"card_class {cc!r} must be one of {sorted(CARD_CLASSES)} (or absent ⇒ frozen)"
+        )
+    else:
+        resolved_class = cc if cc in CARD_CLASSES else DEFAULT_CARD_CLASS
+        if is_dev_id and resolved_class != CARD_CLASS_DEV:
+            errors.append(
+                f"a D<n> id ('{cid}') is a dev card and MUST set card_class='dev' "
+                "(born-dev; #838 D4 — dev cards self-declare, they never inherit frozen)"
+            )
+        if is_frozen_id and resolved_class != CARD_CLASS_FROZEN:
+            errors.append(
+                f"a B<n> id ('{cid}') is a frozen eval card and cannot be card_class='dev' "
+                "(born-frozen-XOR-born-dev never crossing; #838 D4)"
+            )
     repo = str(card.get("repo", ""))
     if not _SANDBOX_REPO_RE.match(repo):
         errors.append(
@@ -678,12 +899,110 @@ def load_cards(spec_dir: Path | None = None) -> dict[str, dict]:
             problems.append(f"{path.name}: " + "; ".join(errors))
             continue
         card["_path"] = str(path)
+        # Stamp the resolved class so every consumer sees a concrete value (idempotent
+        # for the stamped seed cards; #838). load_cards globs ``B*.json`` only, so this
+        # is the FROZEN battery loader — a dev card (D*.json under dev/) is never seen.
+        card["card_class"] = resolve_card_class(card)
         cards[str(card["id"])] = card
     if problems:
         raise ValueError("battery spec is invalid — " + " | ".join(problems))
     if not cards:
         raise ValueError(f"no battery cards found under {root}")
     return cards
+
+
+def load_dev_cards(spec_dir: Path | None = None) -> dict[str, dict]:
+    """Load every dev/tuning card (``D*.json``) under *spec_dir* (default
+    :data:`DEV_SPEC_DIR` = ``evals/battery/dev``), validated + stamped. Dev cards are
+    the ONLY cards model-specific tuning may iterate against (#838 D4); the frozen
+    battery (``B*.json``, :func:`load_cards`) stays measurement-only.
+
+    An ABSENT or EMPTY dev dir returns ``{}`` (dev cards are born as tuning demands
+    them — the split ships with zero dev cards). A malformed dev card is fail-closed:
+    :class:`ValueError` naming every problem, exactly like :func:`load_cards`."""
+    root = Path(spec_dir) if spec_dir else DEV_SPEC_DIR
+    cards: dict[str, dict] = {}
+    if not root.exists():
+        return cards
+    problems: list[str] = []
+    for path in sorted(root.glob("D*.json")):
+        try:
+            card = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            problems.append(f"{path.name}: unreadable ({exc})")
+            continue
+        errors = validate_card(card)
+        if errors:
+            problems.append(f"{path.name}: " + "; ".join(errors))
+            continue
+        if resolve_card_class(card) != CARD_CLASS_DEV:
+            # Defence-in-depth beyond validate_card's id/class lock: the dev dir holds
+            # dev cards ONLY, so a frozen card here is a mis-file, not a tuning card.
+            problems.append(f"{path.name}: a card under {root.name}/ must be card_class='dev'")
+            continue
+        card["_path"] = str(path)
+        card["card_class"] = CARD_CLASS_DEV
+        cards[str(card["id"])] = card
+    if problems:
+        raise ValueError("dev battery spec is invalid — " + " | ".join(problems))
+    return cards
+
+
+# ---------------------------------------------------------------------------
+# Frozen/dev contamination tripwire (ADR-038 D4 — "a rule without a gate is a defect")
+# ---------------------------------------------------------------------------
+
+
+class FrozenContaminationError(RuntimeError):
+    """A frozen eval card's identity appeared in a tuning/dev-run manifest — the #838
+    contamination tripwire fired. A frozen card is MEASUREMENT-ONLY (ADR-038 §2/D4);
+    tuning against it silently overfits the harness to the incumbent model and
+    destroys every future apples-to-apples candidate comparison. Fail-loud by design."""
+
+
+def frozen_fingerprints(spec_dir: Path | None = None) -> frozenset[str]:
+    """The identity surface of the FROZEN eval set: every frozen card's id AND its
+    sandbox repo. A tuning/dev run must reference NONE of these (#838 D4). Reads the
+    frozen battery via :func:`load_cards`, so it reflects exactly what would be
+    measured against."""
+    prints: set[str] = set()
+    for cid, card in load_cards(spec_dir).items():
+        prints.add(cid)
+        repo = str(card.get("repo", "")).strip()
+        if repo:
+            prints.add(repo)
+    return frozenset(prints)
+
+
+def frozen_ids_in_manifest(
+    manifest_tokens: Iterable[str], frozen_prints: Iterable[str]
+) -> list[str]:
+    """Pure: every manifest token that matches a frozen fingerprint (sorted, deduped).
+    A ``manifest_token`` is whatever a tuning run records as touched — a card id
+    (``B2``) or a sandbox repo (``battery-b2-text-stats``). ``[]`` == clean."""
+    fp = {str(p).strip() for p in frozen_prints}
+    hits = {str(t).strip() for t in manifest_tokens} & fp
+    return sorted(hits)
+
+
+def assert_no_frozen_in_tuning(
+    manifest_tokens: Iterable[str], *, spec_dir: Path | None = None
+) -> None:
+    """The contamination TRIPWIRE (#838 D4): raise :class:`FrozenContaminationError`,
+    naming every offender, if any FROZEN eval card's id or sandbox repo appears in a
+    tuning/dev-run manifest. Deterministic + fail-loud — the gate that makes
+    "MEASUREMENT-ONLY on frozen cards; tuning happens on dev" real (a rule without a
+    gate is a defect). Call this at the head of any model-specific tuning run over the
+    battery (e.g. the #835 A/B harness); it is DORMANT until something calls it, so it
+    changes nothing about tonight's measurement battery."""
+    hits = frozen_ids_in_manifest(manifest_tokens, frozen_fingerprints(spec_dir))
+    if hits:
+        raise FrozenContaminationError(
+            "frozen eval card(s) appeared in a tuning/dev-run manifest — the frozen "
+            "battery is MEASUREMENT-ONLY, never tuned against (ADR-038 D4): "
+            + ", ".join(hits)
+            + ". Route model-specific tuning to a dev card (evals/battery/dev/D*.json)."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -766,6 +1085,135 @@ def cross_check(sc: Scorecard, card: dict) -> Scorecard:
         verdict=VERDICT_FALSE_DONE,
         attribution=ATTRIBUTION_VERIFY,
         notes=_note("FALSE-DONE (runner cross-check): " + "; ".join(reasons)
+                    + (f" [emitter note: {sc.notes}]" if sc.notes else "")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# #832 QUALITY-14 — the earned-GREEN integrity audit (peer of cross_check). A
+# grader-tampering fingerprint in the merged tree DOWNGRADES GREEN -> PARKED-HONEST.
+# The ONE sanctioned verdict-authority extension (LA-ratified, #832 c.1733; ADR-037).
+# ---------------------------------------------------------------------------
+
+#: The green-audit sidecar, written beside the driver scorecard on a downgrade — the shape
+#: #827's classifier consumes (``gamed`` / ``gaming_reason`` / ``class_counts``) so a
+#: downgraded card is counted GREEN-GAMED in the nightly trend (the c.1735 convergence).
+GREEN_AUDIT_SIDECAR_NAME = "green-audit.json"
+
+#: The conventional seeded job-oracle basename (#748) — the source of the visible expected
+#: values the hardcode-the-answer class matches against. Auto-discovered under the tree.
+_SEEDED_ORACLE_BASENAMES: tuple[str, ...] = ("test_job_acceptance.py",)
+
+
+def _resolve_integrated_tree(projects_dir, card: dict) -> "Path | None":
+    """The merged candidate tree for a battery card — ``<projects_dir>/<repo>`` — or ``None``
+    when it cannot be located (dry-run / pre-merge / a synthesized card). Never raises."""
+    repo = str(card.get("repo", "")).strip()
+    if not projects_dir or not repo:
+        return None
+    try:
+        tree = Path(projects_dir) / repo
+        return tree if tree.is_dir() else None
+    except (OSError, ValueError):
+        return None
+
+
+def _oracle_hints(tree: Path, card: dict) -> "tuple[set, set[str]]":
+    """``(distinctive oracle literals, oracle repo-relative paths)`` for the hardcode class.
+    Reads the seeded job-oracle file(s) discovered under *tree*. Fail-soft: any read/parse
+    failure yields empty hints, so the hardcode class simply does not fire (never a crash)."""
+    literals: set = set()
+    oracle_paths: set[str] = set()
+    try:
+        candidates: list[Path] = []
+        for base in _SEEDED_ORACLE_BASENAMES:
+            candidates.extend(sorted(tree.rglob(base)))
+        for path in candidates[:8]:
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            literals |= green_audit.extract_oracle_literals(text)
+            try:
+                oracle_paths.add(path.relative_to(tree).as_posix())
+            except ValueError:
+                pass
+    except Exception:  # noqa: BLE001 — oracle-hint discovery is best-effort
+        return set(), set()
+    return literals, oracle_paths
+
+
+def _write_green_audit_sidecar(runs_dir, run_id: str, result, log) -> None:
+    """Persist the green-audit result beside the run's driver scorecard (fail-soft)."""
+    if not runs_dir or not run_id:
+        return
+    try:
+        path = Path(runs_dir) / run_id / GREEN_AUDIT_SIDECAR_NAME
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(result.to_sidecar_dict(), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except Exception as exc:  # noqa: BLE001 — the sidecar is evidence; never sink the night
+        log(f"[green-audit {run_id}] sidecar write skipped (fail-soft): {exc}")
+
+
+def green_integrity_audit(
+    sc: Scorecard,
+    *,
+    card: dict,
+    projects_dir=None,
+    runs_dir=None,
+    run_id: str = "",
+    allowlist=None,
+    log=print,
+) -> Scorecard:
+    """The earned-GREEN integrity gate (#832) — a peer of :func:`cross_check` in the GREEN
+    acceptance path. ONLY a GREEN is audited. A DETERMINISTIC AST/regex scan of the merged
+    candidate tree for grader-tampering fingerprints; a LIVE hit DOWNGRADES the GREEN to
+    PARKED-HONEST [VERIFY], names the fingerprint (``file:line``) in the note + evidence, and
+    writes ``green-audit.json`` so #827 counts it GREEN-GAMED. This is INTEGRITY evidence (it
+    may move a verdict) — the ONE sanctioned verdict-authority extension, LA-ratified (#832
+    c.1733). It is NOT a quality opinion: a QUALITY band never downgrades (#837 is advisory).
+
+    Fail-CONSERVATIVE + fail-SOFT: a CLEAN tree returns ``sc`` byte-identical (the clean-tree
+    lock); an UNAVAILABLE or UNSCANNABLE tree ALSO returns ``sc`` byte-identical (absence of
+    evidence never downgrades — only a positive fingerprint does), logging an honest not-run.
+    The ``allowlist`` (a TRUSTED-side input; :func:`green_audit.default_allowlist` reads a
+    committed file, never the scanned tree) suppresses a known-legit surface."""
+    if sc.verdict != VERDICT_GREEN:
+        return sc
+    tree = _resolve_integrated_tree(projects_dir, card)
+    if tree is None:
+        log(f"[green-audit {sc.job_id}] tree unavailable (dry-run/pre-merge) — GREEN not "
+            "integrity-audited (honest not-run; GREEN stands).")
+        return sc
+    literals, oracle_paths = _oracle_hints(tree, card)
+    try:
+        result = green_audit.scan_tree(
+            tree, oracle_literals=literals, oracle_paths=oracle_paths,
+            allowlist=allowlist if allowlist is not None else green_audit.default_allowlist(),
+        )
+    except Exception as exc:  # noqa: BLE001 — a scan fault never sinks a night, and never downgrades
+        log(f"[green-audit {sc.job_id}] scan error (fail-soft; GREEN stands, not downgraded): {exc}")
+        return sc
+    if not result.audited or not result.gamed:
+        return sc  # clean (or unscannable) — GREEN byte-identical
+
+    _write_green_audit_sidecar(runs_dir, run_id, result, log)
+    summary = result.summary_line()
+    evidence = dict(sc.evidence or {})
+    evidence["green_audit"] = "gamed"                          # #827 _gaming_signal reads this
+    evidence["gaming_reason"] = summary[:1000]                 # …and this
+    evidence["green_audit_classes"] = ",".join(c for c, n in result.class_counts().items() if n)
+    log(f"[green-audit {sc.job_id}] GREEN DOWNGRADED -> PARKED-HONEST [VERIFY] "
+        f"(grader-tampering fingerprint): {summary}")
+    return replace(
+        sc,
+        verdict=VERDICT_PARKED_HONEST,
+        attribution=ATTRIBUTION_VERIFY,
+        evidence=evidence,
+        notes=_note("GREEN downgraded (integrity #832 grader-tampering): " + summary
                     + (f" [emitter note: {sc.notes}]" if sc.notes else "")),
     )
 
@@ -860,6 +1308,15 @@ class BatterySummary:
     scorecards: list[Scorecard] = field(default_factory=list)
     out_dir: str = ""
     dry_run: bool = False
+    #: #827 the standing failure-taxonomy block (per-class counts + the night-over-night
+    #: trend — the program KPI line). Populated by :meth:`classify` at battery close; ``{}``
+    #: until then. ADVISORY: the classifier annotates evidence, never a verdict/attribution.
+    failure_taxonomy: dict = field(default_factory=dict)
+    #: #837 the standing GREEN-audit block (band counts + regressed/craft-residue tallies —
+    #: the GREEN-side quality KPI). Populated by :meth:`green_quality` at battery close, BEFORE
+    #: :meth:`classify` so #827 reads the fresh green-quality.json sidecars. ``{}`` until then.
+    #: ADVISORY: the audit annotates evidence + writes a sidecar, never a verdict/attribution.
+    green_quality_block: dict = field(default_factory=dict)
 
     @property
     def false_done(self) -> int:
@@ -911,6 +1368,93 @@ class BatterySummary:
             return 1
         return 0
 
+    def green_quality(self, *, runs_dir=None, out_dir=None, projects_dir=None,
+                    job_surfaces=None, jurors=None, log=None) -> dict:
+        """#837 QUALITY-17 — run the ADVISORY GREEN-audit over every GREEN scorecard at
+        battery close. For each GREEN it runs the deterministic Layer-1 floor (archetype-
+        regression probe + craft lints + advisory ruff), optionally the Layer-2 14B jury
+        (``jurors`` — a supervised GPU slot, ``None`` == det-only), computes the A/B/C band by
+        a deterministic FORMULA (never the model), writes the ``green-quality.json`` sidecar into
+        the run dir, and stamps the scorecard's evidence with the reserved ``green_quality_*``
+        keys (verdict/attribution NEVER touched — a band that fed banking would be a new
+        FALSE-DONE vector). Runs BEFORE :meth:`classify` so #827's failure-taxonomy reads the
+        fresh sidecars. Wholly fail-soft: an audit fault leaves an empty block."""
+        from tools.dispatch_harness import green_quality as _ga
+
+        try:
+            self.green_quality_block = _ga.audit_greens(
+                self.scorecards, runs_dir=runs_dir, out_dir=out_dir or (self.out_dir or None),
+                projects_dir=projects_dir, job_surfaces=job_surfaces, jurors=jurors, log=log,
+            )
+        except Exception as exc:  # noqa: BLE001 — the audit is advisory; never sink the night
+            if log:
+                log(f"[battery] green-quality failed ({exc}); summary written without the block.")
+            self.green_quality_block = {}
+        return self.green_quality_block
+
+    def classify(self, *, runs_dir=None, out_dir=None, log=None) -> dict:
+        """#827 QUALITY-9 — run the ADVISORY failure-taxonomy classifier over every
+        scorecard at battery close. Stamps each card's evidence with its
+        ``failure_class`` / ``green_class`` + the matched fingerprint (the verdict and
+        attribution are NEVER touched — a classifier that fed banking would be a new
+        FALSE-DONE vector), stores the per-class-count + night-over-night-trend block on
+        ``self.failure_taxonomy``, and best-effort re-writes each ``<id>.scorecard.json``
+        so the durable per-job artifact carries the stamp too. Wholly fail-soft: a
+        classifier fault leaves an empty block and never sinks the summary write.
+        Idempotent — a second call re-stamps to the same class."""
+        from tools.dispatch_harness import failure_taxonomy as _ftax
+
+        try:
+            self.failure_taxonomy = _ftax.classify_and_stamp(
+                self.scorecards, runs_dir=runs_dir, out_dir=out_dir or (self.out_dir or None),
+            )
+        except Exception as exc:  # noqa: BLE001 — the taxonomy is advisory; never sink the night
+            if log:
+                log(f"[battery] failure-taxonomy classify failed ({exc}); "
+                    "summary written without the taxonomy block.")
+            self.failure_taxonomy = {}
+            return self.failure_taxonomy
+        # Re-write each per-job scorecard so the durable artifact carries the advisory
+        # stamp (the aggregate battery-summary already carries the stamped evidence via
+        # to_dict). Silent + best-effort — a re-write miss never sinks the summary.
+        target = Path(out_dir) if out_dir is not None else (Path(self.out_dir) if self.out_dir else None)
+        if target is not None:
+            for s in self.scorecards:
+                try:
+                    write_scorecard(s, target / f"{s.job_id or 'UNKNOWN'}.scorecard.json")
+                except Exception:  # noqa: BLE001 — advisory re-write; never fatal
+                    pass
+        return self.failure_taxonomy
+
+    @property
+    def green_integrity_downgrades(self) -> int:
+        """GREENs the #832 integrity audit downgraded to PARKED-HONEST this night."""
+        return sum(1 for s in self.scorecards
+                   if (s.evidence or {}).get("green_audit") == "gamed")
+
+    def green_integrity_block(self) -> dict:
+        """#832: the night's grader-tampering downgrades, counted BY FINGERPRINT CLASS (the
+        c.1735 coordination surface). Derived from the scorecard evidence the audit stamped
+        (``green_audit`` / ``green_audit_classes``); a downgraded card is a PARKED-HONEST
+        verdict here AND a GREEN-GAMED count in #827's failure-taxonomy block."""
+        counts = {c: 0 for c in green_audit.FINGERPRINT_CLASSES}
+        downgraded = 0
+        for s in self.scorecards:
+            ev = s.evidence or {}
+            if ev.get("green_audit") != "gamed":
+                continue
+            downgraded += 1
+            for c in str(ev.get("green_audit_classes", "")).split(","):
+                c = c.strip()
+                if c in counts:
+                    counts[c] += 1
+        return {
+            "schema": "green-integrity/v1",
+            "authority": "integrity-downgrade GREEN->PARKED-HONEST (LA-ratified #832 c.1733)",
+            "downgraded": downgraded,
+            "class_counts": counts,
+        }
+
     def to_dict(self) -> dict:
         return {
             "schema": "battery-summary/v1",
@@ -947,6 +1491,21 @@ class BatterySummary:
                 )
                 for key in ("agree", "DIVERGENCE", "guest-not-run", "no-certificate")
             },
+            # #827: the standing failure-taxonomy — per-class counts + the night-over-night
+            # trend (the program KPI line: "oracle-defect parks: n2=3 -> n3=?"). ADVISORY —
+            # the classifier annotates evidence and never alters a verdict/attribution;
+            # ``{}`` until classify() runs at battery close.
+            "failure_taxonomy": self.failure_taxonomy,
+            # #832: the earned-GREEN INTEGRITY audit's night tally — grader-tampering
+            # downgrades counted by fingerprint class (the c.1735 coverage-disclosure
+            # surface, jointly owned with #827's GREEN-GAMED trend).
+            "green_integrity": self.green_integrity_block(),
+            # #837: the standing GREEN-QUALITY audit — A/B/C band counts + regressed/craft-
+            # residue tallies over every GREEN that survived #832's integrity gate (the
+            # GREEN-side quality KPI, DISTINCT from #832's integrity axis). ADVISORY — the
+            # audit annotates evidence + writes a per-run sidecar, never a verdict; ``{}``
+            # until green_quality() runs at battery close.
+            "green_quality": self.green_quality_block,
             "jobs": [s.to_dict() for s in self.scorecards],
         }
 
@@ -978,6 +1537,19 @@ class BatterySummary:
             f"[{'OK' if not self.interventions_total else 'VIOLATED'}]  "
             f"stalled={self.stalled}"
         )
+        # #827: the advisory failure-taxonomy KPI line(s) — per-class trend + the
+        # unclassified rate (the instrument's own health metric). Present only after
+        # classify() has run; a fail-soft empty block renders nothing.
+        if self.failure_taxonomy:
+            from tools.dispatch_harness import failure_taxonomy as _ftax
+
+            lines.extend(_ftax.render_kpi(self.failure_taxonomy))
+        # #837: the advisory GREEN-audit KPI line (band counts + regressed/craft-residue).
+        # Present only after green_quality() has run; a fail-soft empty block renders nothing.
+        if self.green_quality_block:
+            from tools.dispatch_harness import green_quality as _ga
+
+            lines.extend(_ga.render_kpi(self.green_quality_block))
         return "\n".join(lines)
 
 
@@ -1088,6 +1660,10 @@ async def run_battery(
     summary = BatterySummary(out_dir=str(out_dir), dry_run=dry_run)
     out_dir.mkdir(parents=True, exist_ok=True)
     runs_dir = getattr(harness.config, "runs_dir", None)
+    # #832: the merged-tree root for the earned-GREEN integrity audit + its trusted-side
+    # allowlist (loaded ONCE from the committed file, never from a scanned candidate tree).
+    projects_dir = getattr(harness.config, "projects_dir", None)
+    green_allowlist = green_audit.default_allowlist()
     # The base (campaign-default) monitor budget — restored for every card that
     # does not declare its own envelope (#740 B3 re-grain).
     _base_monitor_budget_s = getattr(harness, "overall_timeout_s", 0.0)
@@ -1136,6 +1712,14 @@ async def run_battery(
             sc = replace(sc, evidence=evidence)
         else:
             sc = synthesize_scorecard(report, card, runs_dir=runs_dir, dry_run=dry_run)
+        # #832: earned-GREEN integrity audit — a grader-tampering fingerprint in the merged
+        # tree downgrades the GREEN to PARKED-HONEST [VERIFY] BEFORE it banks (the one
+        # verdict-authority extension, LA-ratified). No-op for non-GREEN; byte-identical on a
+        # clean tree; fail-soft (never downgrades on a scan fault or an unavailable tree).
+        sc = green_integrity_audit(
+            sc, card=card, projects_dir=projects_dir, runs_dir=runs_dir,
+            run_id=report.run_id, allowlist=green_allowlist, log=log,
+        )
         sc = replace(sc, started_utc=started)
         try:
             _write(sc, out_dir, log)
@@ -1157,6 +1741,18 @@ async def run_battery(
         # #749: fail-soft, knob-gated durable-ticket post — the single per-job
         # outcome comment (after the FALSE-DONE cross-check above; never a heartbeat).
         _post_job_ticket(getattr(harness, "config", None), card, report, sc, log)
+    # #837: at battery close (AFTER #832's per-job integrity gate above), run the advisory
+    # GREEN-QUALITY audit over every job that REMAINS GREEN (a #832 downgrade is now PARKED, so
+    # it is skipped — integrity first, quality second). Layer-1 deterministic floor now; the 14B
+    # jury is a supervised GPU slot (jurors=None). Writes each GREEN's green-quality.json sidecar
+    # + stamps green_quality_* evidence BEFORE #827's classify below. Surfaces come from the
+    # cards; projects_dir is the same one #832's per-job audit used (defined above).
+    job_surfaces = {str(c.get("id")): str(c.get("stack", "")) for c in cards}
+    summary.green_quality(runs_dir=runs_dir, out_dir=out_dir, projects_dir=projects_dir,
+                        job_surfaces=job_surfaces, log=log)
+    # #827: stamp every scorecard with its advisory failure/green class + the taxonomy block,
+    # BEFORE the summary write so battery-summary.json carries it.
+    summary.classify(runs_dir=runs_dir, out_dir=out_dir, log=log)
     (out_dir / "battery-summary.json").write_text(
         json.dumps(summary.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -1440,6 +2036,8 @@ def main(argv: list[str] | None = None) -> int:
                                        card=card, dry_run=args.dry_run)
                 summary.scorecards.append(sc)
                 _write(sc, out_dir, print)
+            # #827: classify the STALLED/HARNESS cards (no run dirs → attribution-only).
+            summary.classify(runs_dir=None, out_dir=out_dir, log=print)
             (out_dir / "battery-summary.json").write_text(
                 json.dumps(summary.to_dict(), indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",
@@ -1453,6 +2051,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         summary.scorecards.extend(run_summary.scorecards)
         # re-write the combined summary (includes any unknown-id STALLED cards)
+        # #837: re-run the GREEN-audit over the COMBINED set (idempotent — run_battery already
+        # wrote each GREEN's sidecar; the appended unknown-id cards are STALLED, so this is a
+        # no-op for them) BEFORE the combined classify, so #827 reads the band.
+        _runs_dir = getattr(getattr(harness, "config", None), "runs_dir", None)
+        _projects_dir = getattr(getattr(harness, "config", None), "projects_dir", None)
+        _job_surfaces = {str(c.get("id")): str(c.get("stack", "")) for c in selected}
+        summary.green_quality(runs_dir=_runs_dir, out_dir=out_dir, projects_dir=_projects_dir,
+                            job_surfaces=_job_surfaces, log=print)
+        # #827: re-classify over the COMBINED set (run_battery's stamped cards re-read
+        # their sidecars idempotently; the appended unknown-id STALLED cards get stamped).
+        summary.classify(runs_dir=_runs_dir, out_dir=out_dir, log=print)
         (out_dir / "battery-summary.json").write_text(
             json.dumps(summary.to_dict(), indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",

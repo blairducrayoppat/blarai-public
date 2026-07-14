@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import re
 import secrets
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -224,6 +225,12 @@ class ContextManager:
         # substrate-retrieved memory (always-on, benign). Cleared on
         # clear_grounded_context or destroy_session. See ADR-013 + ticket #543.
         self._user_documents_loaded: set[str] = set()
+        # Last-activity stamp per session (time.monotonic), refreshed on
+        # create_session/add_turn (the two mutation funnels every real turn
+        # crosses) and by touch(). Feeds reap_idle_sessions (#801): sessions
+        # idle past the TTL are destroyed so the per-session dicts above are
+        # bounded by ACTIVE sessions, not by every session since boot.
+        self._last_activity: dict[str, float] = {}
 
     def create_session(self, session_id: str, system_prompt: str = "") -> None:
         """Create a new conversation session.
@@ -235,6 +242,7 @@ class ContextManager:
         self._sessions[session_id] = ConversationContext(
             system_prompt=f"{SYSTEM_BEGIN}{system_prompt}{SYSTEM_END}",
         )
+        self._last_activity[session_id] = time.monotonic()
 
     def add_turn(
         self,
@@ -259,6 +267,7 @@ class ContextManager:
             )
         )
         ctx.total_tokens += token_count
+        self._last_activity[session_id] = time.monotonic()
         return True
 
     def add_grounded_context(
@@ -427,6 +436,37 @@ class ContextManager:
             for prov in ctx.grounded_provenance
         )
 
+    def untrusted_provenance_tiers(self, session_id: str) -> frozenset[Provenance]:
+        """Return the DISTINCT untrusted provenance tiers in the session's
+        grounded context — the finer-grained companion to
+        ``has_untrusted_content`` (#792 card-provenance grain).
+
+        ``has_untrusted_content`` answers the yes/no Layer-3 gate question and is
+        unchanged.  This answers "*which* untrusted grain(s) are present" so a
+        caller can size its disclosure to the source — e.g. the preference
+        confirm card shows a proportionate notice for operator-curated
+        ``UNTRUSTED_KNOWLEDGE`` recall (his own bank) versus the strong warning
+        for a document / pasted-external / web-search result.  It NEVER changes
+        the gate: knowledge and web still trip the action-lock exactly like a
+        document (ADR-023 Am.2/Am.3); this is a presentation refinement only.
+
+        A tier is "untrusted" here by the SAME predicate ``has_untrusted_content``
+        uses — anything that is not ``TRUSTED_LOCAL`` or ``TRUSTED_MEMORY``.
+        Returns an EMPTY set for an unknown session or a session with no
+        untrusted grounded chunk (so ``bool(...)`` mirrors
+        ``has_untrusted_content`` for a well-formed provenance list).  A caller
+        deciding a label must fail safe: treat "untrusted present but not the
+        exact tier I recognize" as the stronger disclosure, never the weaker.
+        """
+        ctx = self._sessions.get(session_id)
+        if ctx is None:
+            return frozenset()
+        return frozenset(
+            prov
+            for prov in ctx.grounded_provenance
+            if prov not in (Provenance.TRUSTED_LOCAL, Provenance.TRUSTED_MEMORY)
+        )
+
     def trust_documents_for_tools(self, session_id: str) -> None:
         """Mark this session as allowing tool calls while documents are loaded.
 
@@ -539,7 +579,62 @@ class ContextManager:
         self._kv_warm.discard(session_id)
         self._documents_trusted_for_tools.discard(session_id)
         self._user_documents_loaded.discard(session_id)
+        self._last_activity.pop(session_id, None)
         return True
+
+    def touch(self, session_id: str, now: float | None = None) -> None:
+        """Refresh a session's last-activity stamp (no-op for an unknown id).
+
+        ``create_session`` and ``add_turn`` stamp implicitly — every real turn
+        crosses one of them — so this exists for callers that service a session
+        without adding a turn and want its idleness clock reset (#801).
+        """
+        if session_id in self._sessions:
+            self._last_activity[session_id] = (
+                time.monotonic() if now is None else now
+            )
+
+    def reap_idle_sessions(
+        self, idle_ttl_s: float, now: float | None = None
+    ) -> list[str]:
+        """Destroy every session idle longer than ``idle_ttl_s`` (#801).
+
+        The backstop that finally gives ``destroy_session`` a production
+        caller: sessions whose last activity (create/turn/touch) is older
+        than the TTL are destroyed — clearing the context, KV-warm flag,
+        trust flag, and user-documents flag in one motion. Correctness-safe
+        by design: the durable conversation lives in the gateway's session
+        store, and the AO re-creates a reaped session lazily on its next
+        PROMPT_REQUEST, re-seeded from gateway-supplied history (FUT-07) with
+        the /trust flag re-derived from the request payload. The cost of a
+        reap is one cold KV prefill plus substrate-recoverable grounding —
+        never data loss.
+
+        Args:
+            idle_ttl_s: Idle threshold in seconds. ``<= 0`` disables reaping
+                (returns ``[]``) — mirrors the ``embed_cache_idle_unload_s``
+                knob convention (#611).
+            now: Injected monotonic timestamp for deterministic tests;
+                defaults to ``time.monotonic()``.
+
+        Returns:
+            The session ids destroyed (empty when nothing was idle enough).
+        """
+        if idle_ttl_s <= 0:
+            return []
+        current = time.monotonic() if now is None else now
+        reaped: list[str] = []
+        for session_id in list(self._sessions.keys()):
+            stamp = self._last_activity.get(session_id)
+            if stamp is None:
+                # Fail-safe: a session we cannot prove idle is stamped now and
+                # given a full TTL window rather than reaped on a guess.
+                self._last_activity[session_id] = current
+                continue
+            if current - stamp > idle_ttl_s:
+                self.destroy_session(session_id)
+                reaped.append(session_id)
+        return reaped
 
     def clear_grounded_context(self, session_id: str) -> bool:
         """Clear RAG-retrieved chunks for a session.

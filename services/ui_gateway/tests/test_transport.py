@@ -319,7 +319,7 @@ class TestCheckPaStatus:
 
     @pytest.mark.asyncio
     async def test_handshake_fails_with_no_port(self) -> None:
-        """Port=0 → ConnectionError → all retries fail → FAILED state."""
+        """Port=0 → configuration absence → IMMEDIATE FAILED (#808 carve-out)."""
         gw = TransportGateway(dev_mode=True, port=0)
         result = await gw.check_pa_status()
         assert result is False
@@ -327,8 +327,22 @@ class TestCheckPaStatus:
         assert gw.connected is False
 
     @pytest.mark.asyncio
-    async def test_handshake_fails_with_unreachable_port(self) -> None:
-        """Unreachable port → ConnectionError → FAILED after max retries."""
+    async def test_handshake_fails_with_unreachable_port(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Unreachable port → ConnectionError → FAILED after budget exhaustion.
+
+        Drives the REAL connect path (refused instantly — the exact shape of
+        a not-yet-listening PA); the 180 s backoff schedule is stubbed to a
+        two-sleep schedule so the test proves exhaustion without real sleeps.
+        """
+        import services.ui_gateway.src.transport as transport_module
+
+        monkeypatch.setattr(
+            transport_module,
+            "pa_handshake_backoff_schedule",
+            lambda: (0.0, 0.0),
+        )
         gw = TransportGateway(dev_mode=True, port=1)
         result = await gw.check_pa_status()
         assert result is False
@@ -661,6 +675,444 @@ class TestPaHandshakeRetry:
         assert result is False
         assert gw.state == StartupState.FAILED
         assert len(recorded_sleeps) == PA_HANDSHAKE_MAX_RETRIES - 1
+
+
+# ─────────────────────────────────────────────────────────────────
+# #808: budgeted handshake — the widened cold-load window
+# ─────────────────────────────────────────────────────────────────
+
+from services.ui_gateway.src.constants import (  # noqa: E402
+    PA_HANDSHAKE_BUDGET_S,
+    PA_HANDSHAKE_TIMEOUT_S,
+    pa_handshake_backoff_schedule,
+)
+from services.ui_gateway.src.transport import (  # noqa: E402
+    HandshakeConfigurationError,
+)
+
+
+class TestHandshakeBudget808:
+    """#808 regression locks: the aggregate handshake budget is the documented
+    cold-14B-load ceiling (180 s), the healthy path is unchanged, exhaustion
+    still fails closed, and configuration absence still fails FAST."""
+
+    @pytest.mark.asyncio
+    async def test_cold_pa_recovers_within_budget(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A PA that becomes ready long AFTER the old ~15-18 s budget now connects.
+
+        Simulates a cold 14B load: every attempt is refused until the planned
+        elapsed backoff exceeds 60 s (deep past the old ceiling), then the
+        handshake succeeds. Sleeps are recorded, not slept.
+        """
+        schedule = pa_handshake_backoff_schedule()
+        # Succeed on the first attempt whose planned start offset is > 60 s.
+        elapsed = 0.0
+        ready_attempt = None
+        for idx, delay in enumerate(schedule):
+            elapsed += delay
+            if elapsed > 60.0:
+                ready_attempt = idx + 2  # attempt AFTER the idx-th sleep
+                break
+        assert ready_attempt is not None
+        planned_backoff_before_success = sum(schedule[: ready_attempt - 1])
+        assert planned_backoff_before_success > 18.0, (
+            "the simulated readiness must land beyond the OLD worst-case "
+            "budget, or this lock proves nothing"
+        )
+
+        gw = TransportGateway(dev_mode=True, port=0)
+        # port=0 would config-fail; bypass by stubbing the attempt itself.
+        attempt_count = 0
+
+        async def _cold_then_ready() -> bool:
+            nonlocal attempt_count
+            attempt_count += 1
+            if attempt_count < ready_attempt:
+                raise ConnectionError("refused — model still loading")
+            return True
+
+        gw._attempt_pa_handshake = _cold_then_ready  # type: ignore[method-assign]
+
+        recorded: list[float] = []
+
+        async def fake_sleep(duration: float) -> None:
+            recorded.append(duration)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await gw.check_pa_status()
+        assert result is True
+        assert gw.state == StartupState.OPERATIONAL
+        assert gw.connected is True
+        # The loop executed exactly the planned schedule prefix.
+        assert recorded == list(schedule[: ready_attempt - 1])
+        assert sum(recorded) == planned_backoff_before_success
+
+    @pytest.mark.asyncio
+    async def test_healthy_path_latency_unchanged(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """First-attempt success sleeps ZERO seconds — the widen adds no
+        latency to a healthy boot."""
+        gw = TransportGateway(dev_mode=True, port=0)
+
+        async def _immediate() -> bool:
+            return True
+
+        gw._attempt_pa_handshake = _immediate  # type: ignore[method-assign]
+
+        recorded: list[float] = []
+
+        async def fake_sleep(duration: float) -> None:
+            recorded.append(duration)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await gw.check_pa_status()
+        assert result is True
+        assert gw.state == StartupState.OPERATIONAL
+        assert recorded == []
+
+    @pytest.mark.asyncio
+    async def test_budget_exhausted_still_fails_closed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Exhausting the FULL 180 s schedule still lands FAILED + not
+        connected (bounded retry, not abandoned fail-closed)."""
+        gw = TransportGateway(dev_mode=True, port=0)
+
+        async def _never_ready() -> bool:
+            raise ConnectionError("refused forever")
+
+        gw._attempt_pa_handshake = _never_ready  # type: ignore[method-assign]
+
+        recorded: list[float] = []
+
+        async def fake_sleep(duration: float) -> None:
+            recorded.append(duration)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await gw.check_pa_status()
+        assert result is False
+        assert gw.state == StartupState.FAILED
+        assert gw.connected is False
+        # The whole planned schedule was consumed — and it IS the budget.
+        assert recorded == list(pa_handshake_backoff_schedule())
+        assert sum(recorded) == PA_HANDSHAKE_BUDGET_S
+
+    @pytest.mark.asyncio
+    async def test_config_absence_fails_immediately_no_retry(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """port=0 (dev) is a configuration absence: FAILED with ZERO sleeps —
+        the 180 s patience must never apply to a misconfiguration (#808)."""
+        gw = TransportGateway(dev_mode=True, port=0)
+
+        recorded: list[float] = []
+
+        async def fake_sleep(duration: float) -> None:
+            recorded.append(duration)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await gw.check_pa_status()
+        assert result is False
+        assert gw.state == StartupState.FAILED
+        assert recorded == []
+
+    @pytest.mark.asyncio
+    async def test_production_missing_certs_fails_immediately(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Production (dev_mode=False) without mTLS cert paths: configuration
+        absence → immediate FAILED, zero sleeps, no socket ever opened."""
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path="", mtls_key_path="", ca_cert_path="",
+        )
+
+        recorded: list[float] = []
+
+        async def fake_sleep(duration: float) -> None:
+            recorded.append(duration)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await gw.check_pa_status()
+        assert result is False
+        assert gw.state == StartupState.FAILED
+        assert recorded == []
+
+    @pytest.mark.asyncio
+    async def test_production_host_mode_port_zero_fails_immediately(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Production host-mode with port=0: configuration absence → immediate
+        FAILED (the helper's own port check is now defense-in-depth)."""
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=0,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+
+        recorded: list[float] = []
+
+        async def fake_sleep(duration: float) -> None:
+            recorded.append(duration)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await gw.check_pa_status()
+        assert result is False
+        assert gw.state == StartupState.FAILED
+        assert recorded == []
+
+    @pytest.mark.asyncio
+    async def test_production_handshake_attempt_bounded_by_handshake_timeout(
+        self,
+    ) -> None:
+        """The host-mode handshake attempt passes PA_HANDSHAKE_TIMEOUT_S to the
+        connector — NOT the 180 s PROMPT_RESPONSE_TIMEOUT_S default it rode
+        before #808 (one mute server must not eat the whole budget)."""
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+        captured: list[float] = []
+
+        def _capture(timeout_s: float = -1.0):  # noqa: ANN202 — test double
+            captured.append(timeout_s)
+            return None  # → ConnectionError → retryable failure
+
+        gw._connect_host_loopback_mtls = _capture  # type: ignore[method-assign]
+
+        with pytest.raises(ConnectionError):
+            await gw._attempt_pa_handshake()
+        assert captured == [PA_HANDSHAKE_TIMEOUT_S]
+
+    @pytest.mark.asyncio
+    async def test_guest_handshake_attempt_bounded_by_handshake_timeout(
+        self,
+    ) -> None:
+        """Same bound for the guest-mode (AF_HYPERV) handshake attempt."""
+        gw = TransportGateway(
+            dev_mode=False, host_mode=False, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+        captured: list[float] = []
+
+        def _capture(timeout_s: float = -1.0):  # noqa: ANN202 — test double
+            captured.append(timeout_s)
+            return None
+
+        gw._connect_hyperv = _capture  # type: ignore[method-assign]
+
+        with pytest.raises(ConnectionError):
+            await gw._attempt_pa_handshake()
+        assert captured == [PA_HANDSHAKE_TIMEOUT_S]
+
+    def test_hyperv_raw_socket_honors_caller_timeout(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_connect_hyperv must settimeout(timeout_s) on the raw socket — it
+        previously HARDCODED PROMPT_RESPONSE_TIMEOUT_S, silently ignoring its
+        own parameter (#808 latent-defect fix lock)."""
+        import services.ui_gateway.src.transport as transport_module
+
+        recorded_timeouts: list[float] = []
+
+        class _FakeRawSocket:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                pass
+
+            def settimeout(self, value: float) -> None:
+                recorded_timeouts.append(value)
+
+            def connect(self, address: object) -> None:
+                raise OSError("no AF_HYPERV endpoint in tests")
+
+            def close(self) -> None:
+                pass
+
+        monkeypatch.setattr(
+            transport_module._socket_mod, "socket", _FakeRawSocket
+        )
+        gw = TransportGateway(
+            dev_mode=False, host_mode=False, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+        result = gw._connect_hyperv(timeout_s=3.25)
+        assert result is None  # connect refused → fail-closed None
+        assert recorded_timeouts == [3.25]
+
+    def test_handshake_configuration_error_is_a_connection_error(self) -> None:
+        """The carve-out subclasses ConnectionError so any existing caller
+        catching ConnectionError keeps working."""
+        assert issubclass(HandshakeConfigurationError, ConnectionError)
+
+
+# ─────────────────────────────────────────────────────────────────
+# #805: mTLS client SSLContext reuse across per-message connections
+# ─────────────────────────────────────────────────────────────────
+
+
+class _FakeRawSocket805:
+    """Minimal raw-socket stand-in for the connect helpers."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    def settimeout(self, value: float) -> None:
+        pass
+
+    def connect(self, address: object) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+class _FakeSSLContext805:
+    """Stand-in mTLS context; records how many sockets it wrapped."""
+
+    def __init__(self) -> None:
+        self.wrap_calls = 0
+
+    def wrap_socket(self, sock: object, server_side: bool = False) -> object:
+        self.wrap_calls += 1
+        return ("wrapped", sock)
+
+
+class _FakeSSLContextWrapFails805:
+    """Stand-in mTLS context that BUILDS fine but whose handshake (wrap_socket)
+    FAILS with SSLError — mimics the cert-signature-mismatch a mid-re-mint
+    per-boot cert set produces during the battery's early boot (night-20260711)."""
+
+    def __init__(self) -> None:
+        self.wrap_calls = 0
+
+    def wrap_socket(self, sock: object, server_side: bool = False) -> object:
+        import ssl
+
+        self.wrap_calls += 1
+        raise ssl.SSLError("certificate verify failed: signature failure (test)")
+
+
+class _FakeTransport805:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.args = args
+        self.kwargs = kwargs
+
+
+class TestClientSSLContextReuse:
+    """#805: the immutable mTLS client context is built ONCE and reused across
+    the connection-per-message calls — not rebuilt (disk PEM reads + context
+    construction) on every send_prompt / tool round-trip / ingest / imagine."""
+
+    def _patch_connect_env(
+        self, monkeypatch: pytest.MonkeyPatch, factory_result: object
+    ) -> dict[str, int]:
+        """Patch the SSL factory + socket + transport; return a call counter."""
+        import services.ui_gateway.src.transport as transport_module
+
+        counter = {"factory": 0}
+
+        def _fake_factory(cert: str, key: str, ca: str) -> object:
+            counter["factory"] += 1
+            return factory_result
+
+        monkeypatch.setattr(
+            "shared.ipc.vsock.create_client_ssl_context", _fake_factory
+        )
+        monkeypatch.setattr(
+            transport_module._socket_mod, "socket", _FakeRawSocket805
+        )
+        monkeypatch.setattr(transport_module, "VsockTransport", _FakeTransport805)
+        return counter
+
+    def test_host_loopback_builds_context_once_across_connections(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Two host-mode (loopback+mTLS) connections build the SSLContext once."""
+        fake_ctx = _FakeSSLContext805()
+        counter = self._patch_connect_env(monkeypatch, fake_ctx)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+
+        t1 = gw._connect_host_loopback_mtls()
+        t2 = gw._connect_host_loopback_mtls()
+
+        # The OLD code called the factory once PER connection (== 2 here);
+        # the fix builds it once and reuses the cached context.
+        assert counter["factory"] == 1
+        assert isinstance(t1, _FakeTransport805)
+        assert isinstance(t2, _FakeTransport805)
+        assert gw._client_ssl_ctx is fake_ctx
+        # Both connections actually used the SAME context object (2 wraps).
+        assert fake_ctx.wrap_calls == 2
+
+    def test_hyperv_reuses_the_same_context(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The AF_HYPERV (guest-mode) connect path reuses the cached context too."""
+        fake_ctx = _FakeSSLContext805()
+        counter = self._patch_connect_env(monkeypatch, fake_ctx)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=False, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+
+        t1 = gw._connect_hyperv()
+        t2 = gw._connect_hyperv()
+
+        assert counter["factory"] == 1
+        assert isinstance(t1, _FakeTransport805)
+        assert isinstance(t2, _FakeTransport805)
+        assert gw._client_ssl_ctx is fake_ctx
+        assert fake_ctx.wrap_calls == 2
+
+    def test_build_failure_is_not_cached_fail_closed_retries(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A context-build failure returns None (connection refused, fail-closed)
+        and is NOT cached — the next connect retries the build rather than being
+        permanently poisoned by one transient failure."""
+        counter = self._patch_connect_env(monkeypatch, None)  # factory → None
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+
+        assert gw._connect_host_loopback_mtls() is None  # fail-closed
+        assert gw._connect_host_loopback_mtls() is None
+        assert gw._client_ssl_ctx is None  # nothing cached
+        assert counter["factory"] == 2  # retried, not poisoned
+
+    def test_host_failed_handshake_drops_cache_so_retry_rebuilds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """#805 regression fix (night-20260711 battery): a context that BUILDS
+        successfully but whose HANDSHAKE fails (wrap_socket raises — the
+        mid-re-mint cert signature mismatch) must be DROPPED from the cache, so
+        the next connect rebuilds from the settled certs. WITHOUT this fix the
+        poisoned context is reused and fails all 16 boot handshake retries, and
+        the AO dies fail-closed (every battery job then STALLs)."""
+        failing = _FakeSSLContextWrapFails805()
+        counter = self._patch_connect_env(monkeypatch, failing)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path="c.pem", mtls_key_path="k.pem", ca_cert_path="ca.pem",
+        )
+
+        assert gw._connect_host_loopback_mtls() is None  # handshake fails, fail-closed
+        assert gw._client_ssl_ctx is None  # cache DROPPED — restores self-healing
+        assert gw._connect_host_loopback_mtls() is None
+        assert counter["factory"] == 2  # rebuilt on the retry, NOT poisoned once
+        assert failing.wrap_calls == 2  # both attempts actually tried the handshake
 
 
 # ─────────────────────────────────────────────────────────────────

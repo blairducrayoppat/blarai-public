@@ -861,6 +861,31 @@ class TestProductionWiringRegressionLock:
             "a SoftwareSealer store may have been partially constructed"
         )
 
+    def test_wiring_violation_raises_specific_error_not_assert(self) -> None:
+        """#804: has_encryption is not True on the constructed store MUST raise
+        the EXPLICIT StoreProvisioningError tripwire (deterministic code
+        SESSION_STORE_ENCRYPTION_WIRING_FAILED), never a bare AssertionError.
+
+        An ``assert`` is compiled out under ``python -O``, silently handing an
+        unencrypted store to the launcher; the explicit raise survives ``-O``
+        and propagates to the launcher's fail-closed session_store_init
+        handler (CWE-617).
+        """
+        from unittest.mock import patch
+
+        # Violate the invariant: the class-level regression-lock attribute
+        # reads False, as if a refactor silently unwired the encryption.
+        with patch.object(EncryptedSessionStore, "has_encryption", False):
+            with pytest.raises(
+                StoreProvisioningError,
+                match="SESSION_STORE_ENCRYPTION_WIRING_FAILED",
+            ) as excinfo:
+                build_session_store(":memory:")
+        assert not isinstance(excinfo.value, AssertionError), (
+            "the wiring tripwire fired as an AssertionError -- the assert "
+            "form is back and would vanish under python -O"
+        )
+
 
 # ---------------------------------------------------------------------------
 # 9. secure_delete=ON (FULL) + SE-1 free-page residual probes (WS2)

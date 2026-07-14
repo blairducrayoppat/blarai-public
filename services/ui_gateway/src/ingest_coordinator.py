@@ -125,6 +125,7 @@ from shared.security.ingest_staging import (
     delete_staged,
     write_staged,
 )
+from shared.ttl_dict import TtlDict
 
 logger = logging.getLogger(__name__)
 
@@ -585,7 +586,10 @@ class IngestCoordinator:
         )
         self._framer = MessageFramer()
         # ONE outstanding pending ingest per session (v1) — see module docstring.
-        self._pending: dict[str, PendingIngest] = {}
+        # TtlDict (#801): a preview the operator never decides would otherwise
+        # hold the cleaned text until restart; reap_expired (called from the
+        # gateway's turn-start sweep) REJECTS + drops entries past the TTL.
+        self._pending: TtlDict[PendingIngest] = TtlDict()
 
     # ── Public state inspection (tests / future /pending command) ────────
 
@@ -611,6 +615,51 @@ class IngestCoordinator:
             "source_type": pending.source_type,
             "editable_body": pending.cleaned_text,
         }
+
+    # ── Idle backstop (#801) ──────────────────────────────────────────────
+
+    async def reap_expired(self, ttl_s: float) -> list[str]:
+        """Drop pending ingests idle past *ttl_s* (the #801 idle backstop).
+
+        Each expired slot is REJECTED through the SAME AO decision path the
+        operator's ``/reject`` uses, so the AO's pending row and the encrypted
+        staging blob clean up too (the AO deletes the blob at decision time).
+        Best-effort and fail-soft: a transport failure (AO down) still drops
+        the RAM entry — the memory bound is this backstop's contract; the AO
+        row is DB-backed, visible via ``list_pending``, and a later /ingest
+        of the same source is unaffected (fresh doc_uuid). ``ttl_s <= 0``
+        disables the sweep.
+
+        Returns:
+            The session ids whose pending slots were reaped.
+        """
+        reaped: list[str] = []
+        for session_id in self._pending.expired_keys(ttl_s):
+            pending = self._pending.get(session_id)
+            if pending is None:  # pragma: no cover — raced by a decision
+                continue
+            try:
+                await self._dispatch_decision(pending, "reject")
+            except Exception as exc:  # noqa: BLE001 — reap must not raise
+                logger.error(
+                    "Ingest reaper: best-effort reject failed for doc %s "
+                    "(RAM entry dropped anyway): %s",
+                    pending.doc_uuid,
+                    exc,
+                )
+            self._pending.pop(session_id, None)
+            reaped.append(session_id)
+            # Eviction events are LOGGED (LA condition, #801 c.1666) —
+            # labels/ids only, never the cleaned content.
+            logger.info(
+                "Ingest reaper: expired pending ingest %s (doc %s) for "
+                "session %s rejected + dropped (ttl=%.0fs).",
+                pending.label,
+                pending.doc_uuid,
+                session_id,
+                ttl_s,
+            )
+        return reaped
 
     # ── Entry point ───────────────────────────────────────────────────────
 

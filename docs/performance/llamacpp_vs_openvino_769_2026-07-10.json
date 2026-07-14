@@ -1,0 +1,79 @@
+{
+  "ticket": "#769",
+  "date": "2026-07-10",
+  "purpose": "llama.cpp (Vulkan + SYCL) vs OpenVINO GenAI on the SAME box \u2014 the scenario openvino#36270 has not measured: dense-hybrid Qwen3.6-27B on Lunar Lake / Arc 140V / Windows 11; plus the 35B-A3B MoE scope-add (the thread's model class).",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (16GB visible, uma:1, fp16:1, warp 32, KHR_coopmat detected, subgroup 16 -> INTEL_XE2 path)",
+    "ram": "32 GB LPDDR5X (31.323 GiB effective)",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "llamacpp": "b9957 (commit c4ae9a88f), official win-vulkan-x64 + win-sycl-x64 release binaries (SYCL zip bundles the oneAPI runtime)",
+    "openvino_baseline": "OpenVINO GenAI 2026.2.1, official Qwen3.6-27B INT4 IR, measured 2026-07-08 same box/driver (docs/performance/benchmark_vlm_text_qwen3.6-27b-int4-ov_2026-07-08_16-21-18.json)"
+  },
+  "models": {
+    "dense": "unsloth/Qwen3.6-27B-GGUF IQ4_NL (4.5 bpw, 16.06 GB) \u2014 closest analog to the OV INT4 IR (quantizations differ; named caveat)",
+    "moe": "unsloth/Qwen3.6-35B-A3B-GGUF UD-IQ4_XS (17.7 GB decimal)"
+  },
+  "methodology": "llama-bench -ngl 99 -p 512 -n 128 -r 3 -o json; box lean (AO + OVMS down); models loaded fresh per run; validity checks: (1) layer placement verified via verbose llama-completion load log 'offloaded 65/65 layers to GPU' on the dense 27B Vulkan path \u2014 NO CPU fallback on the Gated-DeltaNet ops (the qwen3_5moe #19957 class); (2) coherence spot-check greedy completion produced clean English; (3) live generation rate during the coherence probe (1.7 t/s) consistent with the bench median.",
+  "results": {
+    "dense_27b": {
+      "openvino_int4_ir": {
+        "prefill_pp_toks": 219,
+        "decode_tg_toks": 3.59,
+        "note": "2026-07-08 baseline, median sustained; not re-measured tonight (same box/driver, 2 days old \u2014 named caveat)"
+      },
+      "llamacpp_vulkan_iq4nl": {
+        "prefill_pp512_toks": 50.78,
+        "prefill_stddev": 1.04,
+        "decode_tg128_toks": 1.49,
+        "decode_stddev": 0.037
+      },
+      "llamacpp_sycl_iq4nl": {
+        "prefill_pp512_toks": 25.15,
+        "prefill_stddev": 0.16,
+        "decode_tg128_toks": 0.71,
+        "decode_stddev": 0.04
+      }
+    },
+    "moe_35b_a3b": {
+      "llamacpp_vulkan_ud_iq4xs": {
+        "prefill_pp512_toks": 245.77,
+        "prefill_stddev": 16.5,
+        "decode_tg128_toks": 7.37,
+        "decode_stddev": 0.31
+      },
+      "llamacpp_sycl_ud_iq4xs": {
+        "prefill_pp512_toks": 156.5,
+        "prefill_stddev": 12.92,
+        "decode_tg128_toks": 8.14,
+        "decode_stddev": 0.57
+      },
+      "openvino_unofficial_int4_ir": {
+        "prefill_pp_toks": 4.0,
+        "decode_tg_toks_median": 1.59,
+        "decode_mean": 1.7,
+        "decode_p95": 2.26,
+        "ttft_median_ms": 2448.0,
+        "load_seconds": 53.5,
+        "runs": 5,
+        "warmup": 2,
+        "ir_source": "Morteza89/qwen3.6-35b-a3b-int4-ov (UNOFFICIAL community conversion \u2014 the official optimum-cli export re-test is the confirmation step)",
+        "coherence": "CLEAN \u2014 correct English answers across captured outputs; minor stray think-tag template artifacts; NOT the genai#3870 incoherence class",
+        "evidence": "docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov_2026-07-10_22-11-10.json"
+      }
+    }
+  },
+  "headline": "SYMMETRIC ARCHITECTURE-DEPENDENT INVERSION: on the dense-hybrid 27B OpenVINO leads llama.cpp by 2.4-4.3x (Vulkan) and worse (SYCL); on the 35B-A3B MoE llama.cpp leads OpenVINO ~4.6-5.1x on decode and ~40-60x on prefill (OV unofficial IR: 4.0 pp / 1.59 tg vs Vulkan 245.8/7.37 and SYCL 156.5/8.14 \u2014 SYCL flips from worst-on-dense to best-decode-on-MoE). Every backend wins somewhere; no stack is uniformly faster on this silicon.",
+  "not_measured": [
+    "OpenVINO on the MoE via the OFFICIAL optimum-cli export (tonight's OV MoE number is the unofficial community IR \u2014 conversion pessimality cannot be excluded until the official artifact is re-tested)",
+    "the thinking-toggle probe under llama.cpp (this build's CLI tools are chat-first/interactive; a proper llama-server probe is the follow-up)",
+    "flash-attn ON variants (ran default per Intel-iGPU stability guidance)",
+    "quantization parity (IQ4_NL/IQ4_XS GGUF vs OV INT4 IR are closest analogs, not identical)",
+    "sustained-thermal envelope (single evening; r=3 per cell)",
+    "coder-30b class models under llama.cpp",
+    "tonight's numbers with the VM actually off (the guest was resident ~15:15 onward - see environment_correction)"
+  ],
+  "environment_correction_2026-07-10_2300": "HONESTY ADDENDUM: the sealed BlarAI-Orchestrator Hyper-V guest was RUNNING (started ~15:15, discovered ~22:45 by the overnight session) during ALL llama.cpp and OV-MoE measurements tonight - the box was NOT fully lean as originally stated. Internal comparisons unaffected (all tonight rows shared the environment); the dense-27B OV baseline (2026-07-08) was measured VM-Off, so those cross-day rows carry this environmental delta. Magnitude judged small vs the 2-60x effects measured (all loads fit; stddevs small); tomorrow production-model benches run VM-Off and can spot-check any close comparison."
+}

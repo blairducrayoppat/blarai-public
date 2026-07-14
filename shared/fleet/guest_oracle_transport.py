@@ -109,6 +109,14 @@ ORACLE_VSOCK_PORT_DEFAULT: int = 50001
 #: slack.  The bridge subprocess adds its own spawn margin on top.
 ORACLE_TRANSPORT_TIMEOUT_S_DEFAULT: float = 630.0
 
+#: Per-ATTEMPT reachability-probe bound (open + close the AF_HYPERV socket, no
+#: payload).  Deliberately short — the service-readiness WAIT in ``swap_ops``
+#: owns the patience; one attempt only needs to distinguish connect-accepted
+#: from connect-refused-while-booting.  Mirrors the parser's 5.0 s in-process
+#: probe cap (``launcher.guest_parser._default_transport_reachable``).  Poll /
+#: attempt grain below registry value — tracked on the timeout-registry BACKLOG.
+ORACLE_REACHABLE_TIMEOUT_S_DEFAULT: float = 5.0
+
 #: Stable machine reasons this transport adds to the closed not-run vocabulary
 #: (the pipeline passes any not-run reason through to the evidence block).
 REASON_GUEST_UNREACHABLE: str = "guest-unreachable"
@@ -722,3 +730,137 @@ def make_guest_oracle_transport(
             )
 
     return transport
+
+
+# ---------------------------------------------------------------------------
+# Service-readiness probe (#744 night-20260711) — the cheapest reachability
+# primitive, factored for the swap teardown's bounded boot wait.
+# ---------------------------------------------------------------------------
+
+
+def _in_process_reachable(endpoint: OracleEndpoint) -> bool:
+    """TRANSPORT-level reachability on a 3.12+ interpreter (open + close).
+
+    Mirror of ``launcher.guest_parser._default_transport_reachable``'s
+    in-process branch: proves ONLY that the guest-side listener accepts —
+    deliberately NOT a frame-level health check (the oracle round-trip itself
+    is the frame-level verdict).  Never raises; any failure → False.
+    """
+    if sys.platform != "win32" or not hasattr(socket, "AF_HYPERV"):
+        return False
+    from shared.ipc.vsock import AF_HYPERV, HV_PROTOCOL_RAW
+
+    probe: socket.socket | None = None
+    try:
+        probe = socket.socket(AF_HYPERV, socket.SOCK_STREAM, HV_PROTOCOL_RAW)
+        probe.settimeout(min(endpoint.timeout_s, 5.0))
+        probe.connect((endpoint.vm_id, endpoint.service_guid))
+        return True
+    except OSError as exc:
+        logger.debug("guest-oracle transport probe: %s", exc)
+        return False
+    finally:
+        if probe is not None:
+            try:
+                probe.close()
+            except OSError:
+                pass
+
+
+def make_oracle_reachable_probe(
+    *,
+    vm_id: str = "",
+    vsock_port: int = ORACLE_VSOCK_PORT_DEFAULT,
+    service_guid: str = "",
+    timeout_s: float = ORACLE_REACHABLE_TIMEOUT_S_DEFAULT,
+    bridge_python: str = "",
+    mtls_cert: str = "",
+    mtls_key: str = "",
+    mtls_ca: str = "",
+    _reachable: "Callable[[OracleEndpoint], bool] | None" = None,
+) -> Callable[[], bool]:
+    """Build a zero-arg reachability probe for the guest oracle service.
+
+    The #744 service-readiness seam (night-20260711): ``ensure_vm_running``
+    reports hypervisor-Running in seconds, but the ``blarai-oracle`` vsock
+    listener needs the Alpine guest to finish BOOTING — the swap teardown's
+    bounded wait polls this probe until the listener accepts.  REUSES the
+    corridor's existing reachability primitive (``GuestOracleBridge.reachable``
+    — the same op the go-live ceremony live-proved) rather than inventing a
+    new protocol; the ``make_health_probe`` (#655 guest_parser) sibling shape.
+
+    Same posture as :func:`make_guest_oracle_transport`: wiring-time
+    validation is LOUD (raises), the returned callable NEVER raises — every
+    failure is a False attempt (the caller's wait loop owns the deadline).
+    The bridge interpreter is resolved ONCE at build time so per-attempt cost
+    is one short-lived subprocess, never a re-discovery.
+
+    Args:
+        vm_id / vsock_port / service_guid: the guest service address (same
+            semantics + validation as the transport factory).
+        timeout_s: the PER-ATTEMPT connect bound (short; the wait's budget is
+            registered separately in ``shared.timeout_registry``).
+        bridge_python / mtls_*: bridge plumbing, mirroring the factory.
+        _reachable: TEST SEAM — replaces the per-attempt reachability check.
+
+    Raises:
+        GuestOracleTransportError: bad port / mismatched GUID / bad timeout.
+        BridgeUnavailableError: the runtime needs the version bridge and no
+            qualifying 3.12+ interpreter exists (loud at build, never inside
+            the swap teardown).
+    """
+    if not (0 < int(vsock_port) <= 0xFFFFFFFF):
+        raise GuestOracleTransportError(
+            "GO_CONFIG_PORT_INVALID", f"vsock_port out of range: {vsock_port}"
+        )
+    expected_guid = hv_service_guid_for_port(int(vsock_port))
+    resolved_guid = (service_guid or expected_guid).strip().lower()
+    if resolved_guid != expected_guid:
+        raise GuestOracleTransportError(
+            "GO_CONFIG_GUID_MISMATCH",
+            f"service_guid {service_guid!r} does not match the hv_sock "
+            f"template for port {vsock_port} ({expected_guid!r}); refusing "
+            "fail-closed so addressing can never silently diverge.",
+        )
+    if float(timeout_s) <= 0:
+        raise GuestOracleTransportError(
+            "GO_CONFIG_TIMEOUT_INVALID", "timeout_s must be positive"
+        )
+
+    endpoint = OracleEndpoint(
+        vm_id=(vm_id or ORCHESTRATOR_VM_ID),
+        service_guid=resolved_guid,
+        vsock_port=int(vsock_port),
+        timeout_s=float(timeout_s),
+    )
+
+    if _reachable is not None:
+        reachable_fn = _reachable
+    elif bridge_required():
+        bridge = GuestOracleBridge(
+            bridge_python=bridge_python,
+            mtls_cert=mtls_cert,
+            mtls_key=mtls_key,
+            mtls_ca=mtls_ca,
+        )
+        reachable_fn = bridge.reachable
+    else:
+        reachable_fn = _in_process_reachable
+
+    def probe() -> bool:
+        """One reachability attempt against the guest oracle service.
+
+        NEVER raises — a raising check is an unreachable attempt (False);
+        the readiness wait keeps polling until its own registered deadline.
+        """
+        try:
+            return bool(reachable_fn(endpoint))
+        except Exception as exc:  # noqa: BLE001 — fail-closed, never raise
+            logger.debug(
+                "guest-oracle reachability attempt raised (%s) — treated as "
+                "unreachable",
+                type(exc).__name__,
+            )
+            return False
+
+    return probe

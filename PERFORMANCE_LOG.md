@@ -2541,3 +2541,51 @@ re-appear as corpus size and near-duplicate density grow. Keep RRF (study row 4)
 single-chunk by design); MMR / min-score floor / recency boost (study row 5, episodic-tier tuning);
 the operator's real ingested corpus (synthetic labelled set); weighted-score fusion vs RRF (this measures
 limb CONTRIBUTION, not the fusion-rule choice); graded / multi-gold relevance (single-gold binary only).
+
+### 2026-07-10 — #769: llama.cpp (Vulkan + SYCL) vs OpenVINO — the ordering is architecture-dependent
+
+Hardware: Intel Core Ultra 7 258V / Arc 140V iGPU (KHR_coopmat, INTEL_XE2 path), 32 GB
+LPDDR5X, Windows 11 Pro. llama.cpp b9957 official release binaries; OpenVINO GenAI 2026.2.1
+baseline (official INT4 IR, measured 2026-07-08 same box/driver — cited, not re-run).
+Methodology: llama-bench -ngl 99 -p 512 -n 128 -r 3; box lean (AO + OVMS down); validity:
+verbose load log confirmed "offloaded 65/65 layers to GPU" on the Vulkan dense path (no
+CPU fallback on the Gated-DeltaNet ops — the llama.cpp #19957 class), greedy coherence clean.
+
+Results (tok/s): dense-hybrid Qwen3.6-27B — OpenVINO 219 pp / 3.59 tg; llama.cpp-Vulkan
+IQ4_NL 50.8 pp / 1.49 tg; llama.cpp-SYCL 25.2 pp / 0.71 tg. MoE Qwen3.6-35B-A3B UD-IQ4_XS —
+llama.cpp-Vulkan 245.8 pp / 7.37 tg.
+
+Read: on the dense hybrid OpenVINO leads llama.cpp-Vulkan ~4.3x prefill / ~2.4x decode (SYCL
+worse still); on the A3B MoE the same llama.cpp build does 5x its own dense decode and 2x
+OpenVINO's dense decode absolute. The openvino#36270 thread's llama.cpp advantage (MoE on
+Arrow Lake) is architecture-dependent, not general — it does not transfer to dense hybrids
+on Xe2/Windows.
+
+Not measured (named): OpenVINO on the 35B-A3B (no OV INT4 IR on this box — the MoE row has
+no OV comparator); the thinking-toggle probe under llama.cpp (b9957 CLI tools are chat-first;
+proper llama-server probe is the follow-up); SYCL on the MoE; flash-attn variants;
+quantization parity (closest analogs, not identical); sustained-thermal envelope (r=3, one
+evening). Machine-readable: docs/performance/llamacpp_vs_openvino_769_2026-07-10.json.
+
+## 2026-07-11 — #807 PGOV Stage-5 re-embed cost: measured, then removed (chunk-embedding reuse)
+
+**What / why.** AUDIT-8 (System Qualities Audit, Performance #5): `LeakageDetector.check_leakage` re-embedded the generated text + ALL N untrusted chunks on every grounded response although the chunk set (`get_untrusted_chunk_texts`) is session-stable; the module-level `_get_detector()` also hard-defaulted CPU past the #720 NPU offload. Ticket verdict: measure first. Before/after measured around the fix (per-detector LRU chunk-embedding cache; only the generated text embeds fresh per turn).
+
+**Hardware / substrate.** Intel Core Ultra 7 258V (Lunar Lake), CPU leg only — ONNX Runtime 1.24.2 CPUExecutionProvider with the production session options (intra_op=2/inter_op=1); GPU/NPU deliberately untouched (battery campaign owned the GPU; the NPU leg is a separate live-verify slot). Model: BAAI/bge-small-en-v1.5 ONNX fp16, 384-dim, 128-token calibrated Stage-5 window. Python 3.11.9, numpy 2.2.6, transformers 5.0.0, Windows 10.0.26200. Surface: `services.assistant_orchestrator.src.pgov.LeakageDetector.check_leakage` (the production Stage-5 control).
+
+**Methodology.** `scripts/measure_807_stage5_reembed.py`: simulated grounded sessions — session-stable chunk set (N in {1,2,4,8,16,32}, ~300-word chunks), fresh ~110-word generated text per turn, 12 turns (2 warmup excluded), seeded-deterministic corpus byte-identical across the before/after runs; fresh detector per scenario (cold cache honest). Evidence JSONs: `docs/performance/pgov_stage5_reembed_807_before_2026-07-11_08-23-26.json` + `..._after_2026-07-11_08-32-56.json`.
+
+**Numbers (warm per-turn mean, ms; cold = turn 1).**
+
+| N chunks | before warm | after warm | speedup | before cold | after cold |
+|---|---|---|---|---|---|
+| 1 | 226.5 | 113.3 | 2.0x | 229.9 | 220.6 |
+| 2 | 332.2 | 123.5 | 2.7x | 364.2 | 352.4 |
+| 4 | 555.8 | 118.3 | 4.7x | 560.0 | 552.4 |
+| 8 | 867.3 | 116.6 | 7.4x | 1097.0 | 918.5 |
+| 16 | 1367.6 | 112.2 | 12.2x | 1385.2 | 1829.0 |
+| 32 | 2822.4 | 112.6 | 25.1x | 2686.6 | 3504.3 |
+
+After-warm is flat ~112–124 ms — the irreducible per-turn generated-text embed. Component attribution (before): the chunks leg was 123/219/434/669/1231/2667 ms of each turn at N=1..32. Cold-turn cost is unchanged by design (turn 1 still embeds the full set, pre-fix batch composition) — the N=16/32 cold variance between runs (1385→1829, 2687→3504 ms) is run-to-run contention noise (the battery campaign was actively dispatching; before-run warm stdev at N=8/32 was 141/257 ms vs 5–9 ms after). **Semantics:** identical scores across all 72 (N, turn) pairs — max |delta| 0.0, zero verdict changes — plus real-model unit probes (cache-hit bit-identical; grown-set vs fresh-detector within 1e-5, same verdicts).
+
+**NOT measured (named per the data-capture rule):** the real-NPU leg (the #720 offload this fix un-bypasses for module-created singletons — its live verify on the Intel AI Boost NPU is a coordinator-run hardware slot; the 13.6x figure cited is the 2026-07-02 measurement, not re-measured here); GPU offload; co-resident 14B contention (isolation run); Stages 1-4/6 of `validate_output`; end-to-end grounded-turn latency on the Arc 140V.

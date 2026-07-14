@@ -197,6 +197,130 @@ class TestSharedInferencePipelineUnloadReload:
 
 
 # ---------------------------------------------------------------------------
+# Group A2 — try_run_exclusive (#845 C3 drafting seam, design §3.3 wall 4/§3.4)
+# ---------------------------------------------------------------------------
+
+
+def _lock_is_free(wrapper: SharedInferencePipeline) -> bool:
+    """True iff the wrapper's single-flight lock is currently free."""
+    got = wrapper._lock.acquire(blocking=False)
+    if got:
+        wrapper._lock.release()
+    return got
+
+
+class TestTryRunExclusive:
+    """The heartbeat drafting seam's acquire point: non-blocking, residency-
+    gated, never-reloading, lock-released-on-every-path."""
+
+    def test_busy_when_lock_held_and_fn_never_called(self) -> None:
+        """Lock held by anyone => ('busy', None) immediately; fn untouched
+        (the busy-defers lock: zero model calls)."""
+        fake = MagicMock()
+        wrapper = SharedInferencePipeline(fake, threading.Lock())
+        fn = MagicMock()
+
+        assert wrapper._lock.acquire(blocking=False)
+        try:
+            status, value = wrapper.try_run_exclusive(fn)
+        finally:
+            wrapper._lock.release()
+
+        assert status == "busy"
+        assert value is None
+        fn.assert_not_called()
+        fake.generate.assert_not_called()
+
+    def test_not_resident_after_real_eviction_and_never_reloads(self) -> None:
+        """After the REAL UC-010 eviction path (unload()), the seam reports
+        not_resident and — unlike generate() — NEVER consults the rebuild
+        closure (the not_resident-defers lock: zero load/reload calls)."""
+        rebuild = MagicMock()
+        fake = MagicMock()
+        wrapper = SharedInferencePipeline(fake, threading.Lock(), rebuild=rebuild)
+        wrapper.unload()  # the image-gen eviction bookkeeping: _pipeline -> None
+        assert not wrapper.is_loaded
+        fn = MagicMock()
+
+        status, value = wrapper.try_run_exclusive(fn)
+
+        assert status == "not_resident"
+        assert value is None
+        fn.assert_not_called()
+        rebuild.assert_not_called()  # the load path is never touched
+        assert not wrapper.is_loaded  # still evicted — no load was initiated
+        assert _lock_is_free(wrapper)
+
+    def test_ran_passes_raw_pipeline_with_residency_pinned(self) -> None:
+        """Resident + free => fn runs exactly once, receives the RAW handle,
+        and residency is pinned for the duration (unload serialises on the
+        same lock)."""
+        fake = MagicMock()
+        wrapper = SharedInferencePipeline(fake, threading.Lock())
+        seen: list[object] = []
+
+        def fn(raw: object) -> str:
+            seen.append(raw)
+            assert wrapper.is_loaded  # pinned: cannot be evicted under us
+            return "VALUE"
+
+        status, value = wrapper.try_run_exclusive(fn)
+
+        assert status == "ran"
+        assert value == "VALUE"
+        assert seen == [fake]  # the raw pipeline, not the wrapper
+        assert _lock_is_free(wrapper)
+
+    def test_exception_from_fn_propagates_and_releases_lock(self) -> None:
+        """fn raising must not leak the lock (the lock-always-released lock)."""
+        wrapper = SharedInferencePipeline(MagicMock(), threading.Lock())
+
+        with pytest.raises(RuntimeError, match="boom"):
+            wrapper.try_run_exclusive(MagicMock(side_effect=RuntimeError("boom")))
+
+        assert _lock_is_free(wrapper)
+
+    def test_lock_released_on_every_status_path(self) -> None:
+        """busy, not_resident and ran all leave the lock free afterwards."""
+        # ran
+        wrapper = SharedInferencePipeline(MagicMock(), threading.Lock())
+        wrapper.try_run_exclusive(lambda raw: None)
+        assert _lock_is_free(wrapper)
+        # not_resident
+        wrapper._pipeline = None
+        wrapper.try_run_exclusive(lambda raw: None)
+        assert _lock_is_free(wrapper)
+        # busy: the holder still holds it afterwards (the seam took nothing)
+        assert wrapper._lock.acquire(blocking=False)
+        try:
+            wrapper.try_run_exclusive(lambda raw: None)
+            assert not wrapper._lock.acquire(blocking=False)  # still held by us
+        finally:
+            wrapper._lock.release()
+        assert _lock_is_free(wrapper)
+
+    def test_generate_call_count_not_incremented(self) -> None:
+        """try_run_exclusive counts nothing — generate_call_count is the
+        wrapper.generate() counter and fn is opaque to the wrapper."""
+        wrapper = SharedInferencePipeline(MagicMock(), threading.Lock())
+        wrapper.try_run_exclusive(lambda raw: raw.generate("p"))
+        assert wrapper.generate_call_count == 0
+
+    def test_status_vocabulary_matches_module_constants(self) -> None:
+        """The seam's status strings are the module's exported constants —
+        the AO adapter maps them 1:1 onto the coordinator tri-state."""
+        from shared.inference.shared_pipeline import (
+            TRY_RUN_BUSY,
+            TRY_RUN_NOT_RESIDENT,
+            TRY_RUN_RAN,
+        )
+
+        assert TRY_RUN_BUSY == "busy"
+        assert TRY_RUN_NOT_RESIDENT == "not_resident"
+        assert TRY_RUN_RAN == "ran"
+
+
+# ---------------------------------------------------------------------------
 # Helpers for build_shared_pipeline error-path tests
 # ---------------------------------------------------------------------------
 

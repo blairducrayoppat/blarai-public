@@ -1,5 +1,6 @@
 {
   "schema": "battery-card/v1",
+  "card_class": "frozen",
   "id": "B5",
   "title": "habit tracker with chart (node-web, 6 units, two chains + join)",
   "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B5",

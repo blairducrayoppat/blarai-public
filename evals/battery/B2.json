@@ -1,5 +1,6 @@
 {
   "schema": "battery-card/v1",
+  "card_class": "frozen",
   "id": "B2",
   "title": "text-stats toolkit (python-lib, 4-unit diamond)",
   "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B2",

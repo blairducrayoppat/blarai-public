@@ -106,7 +106,7 @@ def build_n3_restore_before_grade_oracle():
     )
     capture: dict = {"marker": _N3_REAL_MARKER, "original": original, "tampered": tampered}
 
-    def _grade_by_on_disk_content(cmd, timeout_s, cwd=None):
+    def _grade_by_on_disk_content(cmd, timeout_s, cwd=None, env=None):
         # Stands in for `uv run pytest <oracle>`; reads the oracle file AT GRADE TIME.
         graded = (Path(cwd) / JOB_ORACLE_PATH_PYTHON).read_text(encoding="utf-8")
         capture["graded_bytes"] = graded

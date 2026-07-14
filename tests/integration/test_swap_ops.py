@@ -1292,14 +1292,17 @@ def test_real_run_design_loop_parses_and_maps_json(tmp_path, monkeypatch):
         log_path.write_text(
             "capture: web tier rendered\n"
             '{"ShouldIterate":true,"NeedsWork":true,"Feedback":"tighten the hero",'
-            '"LayoutHard":false,"CaptureTier":"web"}\n',
+            '"LayoutHard":false,"CaptureTier":"web","Ok":true,'
+            '"RuntimeHard":true,"RuntimeCaptured":true}\n',
             encoding="utf-8")
         return True
 
     monkeypatch.setattr(so, "_run_to_logfile", fake_logfile)
     out = so.real_run_design_loop(cfg, "RID-9", "C:/proj/app", "a landing page", '["hero"]')
+    # #823: the browser-runtime channel round-trips through the coercion (a captured hard hit).
     assert out == {"should_iterate": True, "needs_work": True, "feedback": "tighten the hero",
-                   "layout_hard": False, "capture_tier": "web"}
+                   "layout_hard": False, "capture_tier": "web", "ok": True,
+                   "runtime_hard": True, "runtime_captured": True}
     # logfile lands under the per-run dir; the bounded subprocess uses the ~180s design timeout.
     assert seen["log_path"] == cfg.runs_dir / "RID-9" / "design-critique.log"
     assert seen["timeout_s"] == 180.0
@@ -1332,9 +1335,13 @@ def test_real_run_design_loop_fail_soft_on_nonzero_exit(tmp_path, monkeypatch):
     cfg = so.build_default_config(str(tmp_path / "agentic"), str(tmp_path / "projects"))
     monkeypatch.setattr(so, "_run_to_logfile", lambda *a, **k: False)   # non-zero exit / timeout
     out = so.real_run_design_loop(cfg, "R", "C:/proj/app", "g", "[]")
+    # ok=False (#740 c.1717): an unavailable critique must never read as a real,
+    # satisfied review — the driver's clean-ending verdict reclass keys on ok.
+    # #823: a fail-soft path is also runtime-blind — both runtime flags False (honest degraded).
     assert out == {"should_iterate": False, "needs_work": False,
                    "feedback": "design critique unavailable", "layout_hard": False,
-                   "capture_tier": ""}
+                   "capture_tier": "", "ok": False,
+                   "runtime_hard": False, "runtime_captured": False}
 
 
 def test_real_run_design_loop_fail_soft_on_unparseable(tmp_path, monkeypatch):
@@ -1352,9 +1359,24 @@ def test_real_run_design_loop_fail_soft_on_unparseable(tmp_path, monkeypatch):
 
 
 def test_coerce_design_loop_result_tolerates_snake_case_and_missing():
+    # A missing Ok/ok key defaults to False (#740 c.1717 fail-conservative): a
+    # producer that never claims a real review can never trigger the clean reclass.
+    # #823: missing RuntimeHard/RuntimeCaptured also default False — a legacy producer
+    # that never emits the runtime channel reads as console-blind (no runtime verdict).
     out = so._coerce_design_loop_result({"should_iterate": 1, "feedback": "x"})
     assert out == {"should_iterate": True, "needs_work": False, "feedback": "x",
-                   "layout_hard": False, "capture_tier": ""}
+                   "layout_hard": False, "capture_tier": "", "ok": False,
+                   "runtime_hard": False, "runtime_captured": False}
+
+
+def test_coerce_design_loop_result_maps_runtime_channel_pascalcase():
+    # #823: the PowerShell PascalCase RuntimeHard/RuntimeCaptured map onto the driver's
+    # snake_case runtime signal; both coerce via bool.
+    out = so._coerce_design_loop_result(
+        {"ShouldIterate": False, "Ok": True, "Feedback": "Uncaught exception: sum is not defined",
+         "RuntimeHard": True, "RuntimeCaptured": True})
+    assert out["runtime_hard"] is True and out["runtime_captured"] is True
+    assert out["ok"] is True and out["should_iterate"] is False
 
 
 def test_parse_design_loop_json_takes_last_object_with_key():
@@ -1620,14 +1642,16 @@ def test_real_run_guest_oracle_uses_the_registered_transport(tmp_path, monkeypat
     (repo / "calc.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
     # #744 c.1565: inject the ensure-start/stop VM seam so the test NEVER touches the
     # real Hyper-V guest — the guest is DOWN, ensure-start brings it up, and it is
-    # STOPPED again after the probe (LESSON 224 side-effect scoping).
+    # STOPPED again after the probe (LESSON 224 side-effect scoping). The c.1689
+    # readiness wait is injected too (immediate success — no real probe, no sleep).
     calls["stopped"] = 0
     res = so.real_run_guest_oracle(
         cfg, "R1", str(repo), "tests/test_job_acceptance.py",
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: True,
-        stop_guest=lambda: calls.__setitem__("stopped", calls["stopped"] + 1) or True)
+        stop_guest=lambda: calls.__setitem__("stopped", calls["stopped"] + 1) or True,
+        wait_for_service=lambda was_running: True)
     assert calls["port"] == so.GUEST_ORACLE_VSOCK_PORT == 50002
     assert calls["shipped"][1] == "tests/test_job_acceptance.py"
     assert res["status"] == "passed"
@@ -1655,7 +1679,8 @@ def test_real_run_guest_oracle_degrades_honestly_when_factory_fails(tmp_path, mo
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: True,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: True)
     assert res["status"] == "not-run"
     assert res["reason"] == "guest-transport-unregistered"
     assert stopped == [1]  # the guest is still stopped after a transport-fail probe
@@ -1688,9 +1713,11 @@ def _oracle_repo(tmp_path):
     return repo
 
 
-def test_real_run_guest_oracle_ensure_starts_then_probes_then_stops_in_order(
+def test_real_run_guest_oracle_ensure_starts_then_waits_then_probes_then_stops_in_order(
         tmp_path, monkeypatch):
-    # The load-bearing sequence: ensure-start BEFORE the probe ships, STOP AFTER.
+    # The load-bearing sequence (#744 c.1689): ensure-start, THEN the service-
+    # readiness wait, THEN the probe ships, STOP after — the wait sits exactly
+    # between hypervisor-Running and the first frame on the wire.
     import shared.fleet.guest_oracle_transport as got
 
     events = []
@@ -1710,19 +1737,22 @@ def test_real_run_guest_oracle_ensure_starts_then_probes_then_stops_in_order(
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: events.append("ensure") or True,
-        stop_guest=lambda: events.append("stop") or True)
+        stop_guest=lambda: events.append("stop") or True,
+        wait_for_service=lambda was_running: events.append("wait") or True)
     assert res["status"] == "passed"
-    # ensure-start happens before the probe ships; the guest is stopped after.
-    assert events == ["ensure", "probe", "stop"]
+    # ensure-start, readiness wait, probe ship, stop — in that order.
+    assert events == ["ensure", "wait", "probe", "stop"]
 
 
 def test_real_run_guest_oracle_guest_unreachable_when_ensure_start_fails(
         tmp_path, monkeypatch):
-    # ensure-start FAILS -> honest not-run(guest-unreachable); the transport factory
-    # is NEVER built/probed, the guest-stop is still attempted, verdict untouched.
+    # ensure-start FAILS -> honest not-run(guest-unreachable); the readiness wait
+    # and the transport factory are NEVER invoked, the guest-stop is still
+    # attempted, verdict untouched.
     import shared.fleet.guest_oracle_transport as got
 
     factory_calls = []
+    wait_calls = []
 
     def spy_factory(*, vsock_port):
         factory_calls.append(vsock_port)
@@ -1737,10 +1767,12 @@ def test_real_run_guest_oracle_guest_unreachable_when_ensure_start_fails(
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: False,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: wait_calls.append(was_running) or True)
     assert res == {"status": "not-run", "reason": "guest-unreachable",
                    "evidence": "the guest VM could not be started for the oracle probe"}
     assert factory_calls == []          # no probe when the guest never came up
+    assert wait_calls == []             # no readiness wait on a guest that never started
     assert stopped == [1]               # stop still attempted (may have half-started)
     assert "could not be started" in so.read_swap_progress(cfg, "R1")
 
@@ -1755,6 +1787,7 @@ def test_real_run_guest_oracle_ensure_start_raise_is_guest_unreachable(
     cfg = _cfg(tmp_path)
     repo = _oracle_repo(tmp_path)
     stopped = []
+    wait_calls = []
 
     def boom():
         raise OSError("hyper-v RPC down")
@@ -1764,8 +1797,10 @@ def test_real_run_guest_oracle_ensure_start_raise_is_guest_unreachable(
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=boom,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: wait_calls.append(was_running) or True)
     assert res["status"] == "not-run" and res["reason"] == "guest-unreachable"
+    assert wait_calls == []             # no readiness wait after a raising ensure-start
     assert stopped == [1]
 
 
@@ -1788,7 +1823,8 @@ def test_real_run_guest_oracle_probe_not_run_after_ensure_start_still_stops(
         cfg, "R1", str(repo), "tests/test_job_acceptance.py", "x = 1\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: True,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: True)
     assert res["status"] == "not-run" and res["reason"] == "deps-unavailable"
     assert stopped == [1]
 
@@ -1807,7 +1843,8 @@ def test_real_run_guest_oracle_guest_failure_preserved_and_stops(tmp_path, monke
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 3\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: True,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: True)
     assert res["status"] == "failed"    # preserved, NOT converted to not-run
     assert stopped == [1]
 
@@ -1815,21 +1852,26 @@ def test_real_run_guest_oracle_guest_failure_preserved_and_stops(tmp_path, monke
 def test_real_run_guest_oracle_already_running_guest_is_left_running(
         tmp_path, monkeypatch):
     # LESSON 224 side-effect scoping: a guest that was ALREADY running is left
-    # running — only a guest WE started is stopped again.
+    # running — only a guest WE started is stopped again. The readiness wait is
+    # TOLD the guest was already up (was_running=True) so it uses the short
+    # grace, never the full cold-boot budget.
     import shared.fleet.guest_oracle_transport as got
 
     monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
     cfg = _cfg(tmp_path)
     repo = _oracle_repo(tmp_path)
     stopped = []
+    wait_calls = []
     res = so.real_run_guest_oracle(
         cfg, "R1", str(repo), "tests/test_job_acceptance.py",
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: True,          # already up (some other path owns it)
         ensure_guest_running=lambda: True,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: wait_calls.append(was_running) or True)
     assert res["status"] == "passed"
     assert stopped == []                        # never stop a guest we did not start
+    assert wait_calls == [True]                 # the wait KNOWS the guest was already up
 
 
 def test_real_run_guest_oracle_stop_failure_never_raises(tmp_path, monkeypatch):
@@ -1848,7 +1890,8 @@ def test_real_run_guest_oracle_stop_failure_never_raises(tmp_path, monkeypatch):
         "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
         guest_vm_running=lambda: False,
         ensure_guest_running=lambda: True,
-        stop_guest=stop_boom)
+        stop_guest=stop_boom,
+        wait_for_service=lambda was_running: True)
     assert res["status"] == "passed"            # probe result survives the stop failure
 
 
@@ -1866,13 +1909,261 @@ def test_real_run_guest_oracle_state_probe_failure_defaults_to_stop(
     def state_boom():
         raise OSError("get-vm RPC failed")
 
+    wait_calls = []
     res = so.real_run_guest_oracle(
         cfg, "R1", str(repo), "tests/test_job_acceptance.py", "x = 1\n",
         guest_vm_running=state_boom,
         ensure_guest_running=lambda: True,
-        stop_guest=lambda: stopped.append(1) or True)
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: wait_calls.append(was_running) or True)
     assert res["status"] == "passed"
     assert stopped == [1]
+    # An unreadable prior state is treated as "not running" — the wait gets the
+    # COLD budget (was_running=False), the safe direction for a maybe-booting guest.
+    assert wait_calls == [False]
+
+
+# ---------------------------------------------------------------------------
+# #744 c.1689 — the SERVICE-READINESS wait: ensure-start reaches hypervisor-
+# Running in seconds, but the blarai-oracle listener needs the Alpine guest to
+# BOOT (~30-60s+); the first live night probed a still-booting guest, got
+# connection-refused, and stopped the VM at ~40s — so a certificate could never
+# mint on a cold guest. The bounded wait below sits between ensure-start and
+# the probe. EVERY test injects the probe/clock/sleep (or the whole wait seam):
+# no real VM, no real seconds slept.
+# ---------------------------------------------------------------------------
+
+
+class _FakeTime:
+    """A fake monotonic clock whose sleep() advances it — zero real seconds."""
+
+    def __init__(self):
+        self.now = 0.0
+        self.sleeps = []
+
+    def clock(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+def test_wait_for_guest_oracle_service_cold_polls_until_reachable():
+    # COLD start: the listener accepts on the 4th attempt — True, three polls slept.
+    ft = _FakeTime()
+    attempts = []
+
+    def probe():
+        attempts.append(ft.now)
+        return len(attempts) >= 4
+
+    assert so.wait_for_guest_oracle_service(
+        False, reachable=probe, budget_s=90.0, grace_s=15.0, poll_s=3.0,
+        clock=ft.clock, sleep=ft.sleep) is True
+    assert len(attempts) == 4
+    assert ft.sleeps == [3.0, 3.0, 3.0]
+
+
+def test_wait_for_guest_oracle_service_first_probe_success_costs_zero_sleeps():
+    # An already-booted guest costs exactly ONE probe and ZERO sleeps — the wait
+    # never adds teardown-window time when the service is up.
+    ft = _FakeTime()
+    assert so.wait_for_guest_oracle_service(
+        False, reachable=lambda: True,
+        clock=ft.clock, sleep=ft.sleep) is True
+    assert ft.sleeps == []
+
+
+def test_wait_for_guest_oracle_service_cold_budget_exhaustion_returns_false():
+    # Never-reachable + cold budget: exhausts at the 90s deadline (fake time),
+    # returns False — the caller's honest not-run path, never a raise.
+    ft = _FakeTime()
+    attempts = []
+
+    def probe():
+        attempts.append(ft.now)
+        return False
+
+    assert so.wait_for_guest_oracle_service(
+        False, reachable=probe, budget_s=90.0, grace_s=15.0, poll_s=3.0,
+        clock=ft.clock, sleep=ft.sleep) is False
+    # Attempts at t=0,3,...,90 — the deadline check runs AFTER each probe, so
+    # the last attempt fires AT the deadline, then the wait gives up.
+    assert attempts[0] == 0.0 and attempts[-1] == 90.0
+    assert ft.now == 90.0               # fake elapsed == the budget, not a second more
+
+
+def test_wait_for_guest_oracle_service_already_running_uses_grace_not_budget():
+    # was_running=True: the SHORT grace bounds the wait (a presumed-ready guest
+    # must not spend the full cold budget inside the teardown window) — but the
+    # fast first check + a few polls still cover a half-booted external start.
+    ft = _FakeTime()
+    attempts = []
+
+    def probe():
+        attempts.append(ft.now)
+        return False
+
+    assert so.wait_for_guest_oracle_service(
+        True, reachable=probe, budget_s=90.0, grace_s=15.0, poll_s=3.0,
+        clock=ft.clock, sleep=ft.sleep) is False
+    assert ft.now == 15.0               # exhausted at the GRACE, not the 90s budget
+    assert attempts[0] == 0.0           # the fast first check fired immediately
+
+
+def test_wait_for_guest_oracle_service_already_running_fast_first_check_short_circuits():
+    ft = _FakeTime()
+    assert so.wait_for_guest_oracle_service(
+        True, reachable=lambda: True,
+        clock=ft.clock, sleep=ft.sleep) is True
+    assert ft.sleeps == []              # one probe, zero waiting
+
+
+def test_wait_for_guest_oracle_service_raising_probe_is_failed_attempt_never_raise():
+    # A raising attempt (bridge hiccup) is an unreachable attempt: the loop keeps
+    # polling to the deadline and NEVER raises; a later good attempt still wins.
+    ft = _FakeTime()
+    calls = []
+
+    def flaky():
+        calls.append(ft.now)
+        if len(calls) < 3:
+            raise OSError("bridge spawn hiccup")
+        return True
+
+    assert so.wait_for_guest_oracle_service(
+        False, reachable=flaky, budget_s=90.0, grace_s=15.0, poll_s=3.0,
+        clock=ft.clock, sleep=ft.sleep) is True
+    assert len(calls) == 3
+
+    ft2 = _FakeTime()
+
+    def always_boom():
+        raise OSError("down")
+
+    assert so.wait_for_guest_oracle_service(
+        False, reachable=always_boom, budget_s=9.0, grace_s=3.0, poll_s=3.0,
+        clock=ft2.clock, sleep=ft2.sleep) is False
+
+
+def test_wait_for_guest_oracle_service_defaults_are_the_registered_constants():
+    # The seam's defaults ARE the registered budgets (the registry gate locks the
+    # constants against the registry; this ties the SIGNATURE to the constants).
+    import inspect as _inspect
+
+    sig = _inspect.signature(so.wait_for_guest_oracle_service)
+    assert sig.parameters["budget_s"].default == so.GUEST_ORACLE_READY_TIMEOUT_S == 90.0
+    assert sig.parameters["grace_s"].default == so.GUEST_ORACLE_READY_GRACE_S == 15.0
+    assert sig.parameters["poll_s"].default == so.GUEST_ORACLE_READY_POLL_S == 3.0
+
+
+def test_real_run_guest_oracle_wait_exhaustion_is_honest_not_run_guest_unreachable(
+        tmp_path, monkeypatch):
+    # THE night-20260711 lock: the readiness wait exhausts -> the SAME honest
+    # not-run(guest-unreachable) path — the transport is never built (we already
+    # know the listener refuses), the guest WE started is still stopped, the
+    # verdict is untouched, and the trail names the readiness wait.
+    import shared.fleet.guest_oracle_transport as got
+
+    factory_calls = []
+
+    def spy_factory(*, vsock_port):
+        factory_calls.append(vsock_port)
+        raise AssertionError("transport must not be built after wait exhaustion")
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", spy_factory)
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=lambda was_running: False)
+    assert res["status"] == "not-run"
+    assert res["reason"] == "guest-unreachable"
+    assert "readiness wait" in res["evidence"]
+    assert str(so.GUEST_ORACLE_VSOCK_PORT) in res["evidence"]
+    assert factory_calls == []          # no snapshot ships at a refused listener
+    assert stopped == [1]               # the guest we started is STILL stopped
+    trail = so.read_swap_progress(cfg, "R1")
+    assert "waiting for the oracle service" in trail
+    assert "did not become reachable" in trail
+
+
+def test_real_run_guest_oracle_wait_raise_degrades_to_probe_attempt(
+        tmp_path, monkeypatch):
+    # A wait that RAISES must never subtract the attempt: degrade to the
+    # pre-wait behavior (probe anyway — the transport tells the truth either
+    # way), never a raise into the teardown, never a manufactured not-run.
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(got, "make_guest_oracle_transport", _ok_transport_factory())
+    cfg = _cfg(tmp_path)
+    repo = _oracle_repo(tmp_path)
+    stopped = []
+
+    def wait_boom(was_running):
+        raise RuntimeError("wait bug")
+
+    res = so.real_run_guest_oracle(
+        cfg, "R1", str(repo), "tests/test_job_acceptance.py",
+        "from calc import add\n\ndef test_a():\n    assert add(1, 1) == 2\n",
+        guest_vm_running=lambda: False,
+        ensure_guest_running=lambda: True,
+        stop_guest=lambda: stopped.append(1) or True,
+        wait_for_service=wait_boom)
+    assert res["status"] == "passed"    # the probe still shipped and its result stands
+    assert stopped == [1]
+
+
+def test_default_wait_seam_builds_the_corridor_probe_once_at_port_50002(monkeypatch):
+    # The production default REUSES the corridor's own reachability primitive
+    # (make_oracle_reachable_probe — the same bridge `reachable` op the go-live
+    # ceremony live-proved), built ONCE, at the guest service's port. The probe
+    # double answers immediately, so the real wait loop runs zero sleeps.
+    import shared.fleet.guest_oracle_transport as got
+
+    built = []
+
+    def fake_probe_factory(*, vsock_port):
+        built.append(vsock_port)
+        return lambda: True
+
+    monkeypatch.setattr(got, "make_oracle_reachable_probe", fake_probe_factory)
+    assert so._default_wait_for_oracle_service(False) is True
+    assert built == [so.GUEST_ORACLE_VSOCK_PORT] == [50002]
+
+
+def test_default_wait_seam_threads_was_running_into_the_wait(monkeypatch):
+    import shared.fleet.guest_oracle_transport as got
+
+    monkeypatch.setattr(
+        got, "make_oracle_reachable_probe", lambda *, vsock_port: (lambda: True))
+    seen = []
+    monkeypatch.setattr(
+        so, "wait_for_guest_oracle_service",
+        lambda was_running, *, reachable: seen.append(was_running) or True)
+    assert so._default_wait_for_oracle_service(True) is True
+    assert so._default_wait_for_oracle_service(False) is True
+    assert seen == [True, False]
+
+
+def test_default_wait_seam_probe_build_failure_proceeds_without_waiting(monkeypatch):
+    # A probe-BUILD failure (no 3.12+ bridge interpreter) is a HOST transport
+    # gap, not guest unreachability: the default seam must proceed (True) so the
+    # transport factory reports the precise guest-transport-unregistered
+    # degrade — never a manufactured guest-unreachable, never a raise.
+    import shared.fleet.guest_oracle_transport as got
+
+    def broken_factory(*, vsock_port):
+        raise got.BridgeUnavailableError("no 3.12+ interpreter")
+
+    monkeypatch.setattr(got, "make_oracle_reachable_probe", broken_factory)
+    assert so._default_wait_for_oracle_service(False) is True
 
 
 def test_default_vm_controls_reuse_launcher_primitives(monkeypatch):

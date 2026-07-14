@@ -1,0 +1,4 @@
+# Generated build artifact — regenerate with generate_dashboard.py (never committed;
+# it embeds machine-local battery-state paths and is derived from live history).
+grading_health_dashboard.html
+*.html

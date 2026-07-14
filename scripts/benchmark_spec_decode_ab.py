@@ -104,6 +104,10 @@ try:
 except Exception:  # noqa: BLE001
     psutil = None
 
+# #816 Part 2: box-state stamp for the result JSON (shape-locked by
+# tests/integration/test_perf_harness_env_capture.py).
+from shared.perf_env_capture import capture_box_state  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -583,6 +587,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
 
+    # #816 Part 2: stamp the box state AT RUN START — before even the
+    # refuse-to-start guard, so the evidence records exactly what was resident
+    # (VMs, AO, OVMS, RAM) the moment this run began (the 2026-07-10
+    # unnoticed-VM incident).  Fail-soft: a probe failure stamps "unknown",
+    # never breaks the run.
+    box_state_at_start = capture_box_state()
+
     reasons = gpu_hold_reasons()
     if reasons:
         print("FATAL: GPU appears held — refusing to start (do not queue behind a live app).")
@@ -683,7 +694,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                      "long answers on OpenVINO GenAI 2026.2.1? Reconcile #711 S5 vs "
                      "the ISS-1 ~2x closure."),
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "environment": env,
+        # #816 Part 2: static box facts + the box state this run was measured
+        # under (start stamp = the evidence anchor; end stamp = what changed
+        # under the run — battery jobs start/stop the AO/OVMS on this box).
+        "environment": {
+            **env,
+            "box_state_at_start": box_state_at_start,
+            "box_state_at_end": capture_box_state(),
+        },
         "methodology": {
             "spec_on": ("build_shared_pipeline production seam — INT4 14B + pruned-6L "
                         "INT8 draft wired, cache_size=3, prefix_caching=True; per-request "

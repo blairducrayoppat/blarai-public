@@ -1,0 +1,16 @@
+{
+  "schema": "green-audit-allowlist/v1",
+  "_doc": [
+    "#832 earned-GREEN fingerprint-audit allowlist (TRUSTED-SIDE ONLY).",
+    "This file is read from the blarai repo, NEVER from a scanned candidate tree, so a",
+    "coder can never ship a rule that suppresses its own tampering. Each entry suppresses a",
+    "green_audit finding whose fingerprint_class matches (or '*') AND whose repo-relative",
+    "path matches path_glob (fnmatch; matched against both the full path and the basename).",
+    "A suppressed match is still RECORDED in the sidecar's 'allowlisted' list for",
+    "transparency; it just does not trigger the GREEN->PARKED-HONEST downgrade. Ships EMPTY:",
+    "the default posture flags every fingerprint, and a human adjudicates a legitimate",
+    "surface here (the file:line quote makes that a seconds-long call).",
+    "Entry shape: {\"fingerprint_class\": \"CONFTEST_PRESENT\"|\"*\", \"path_glob\": \"tests/conftest.py\"|\"*\", \"reason\": \"...\"}"
+  ],
+  "entries": []
+}

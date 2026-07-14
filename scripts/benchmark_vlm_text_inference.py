@@ -45,6 +45,10 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+# #816 Part 2: box-state stamp for the result JSON (shape-locked by
+# tests/integration/test_perf_harness_env_capture.py).
+from shared.perf_env_capture import capture_box_state  # noqa: E402
+
 try:
     import openvino as ov  # type: ignore[import-untyped]
     _OV_VERSION: str = ov.__version__
@@ -290,6 +294,12 @@ def main() -> int:
                         help="Skip the pre-load memory headroom guard.")
     args = parser.parse_args()
 
+    # #816 Part 2: stamp the box state AT RUN START — before any guard or
+    # model load shifts it — so the evidence records exactly what was resident
+    # (VMs, AO, OVMS, RAM) the moment this run began.  Fail-soft: a probe
+    # failure stamps "unknown", never breaks the run.
+    box_state_at_start = capture_box_state()
+
     if ov_genai is None:
         print("FATAL: openvino_genai is not importable in this environment.")
         return 2
@@ -349,6 +359,14 @@ def main() -> int:
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "openvino_version": _OV_VERSION,
         "openvino_genai_version": _OV_GENAI_VERSION,
+        # #816 Part 2: the box state this run was measured under.  The start
+        # stamp is the evidence anchor (what was resident when the run began);
+        # the end stamp records what changed under the run (battery jobs start
+        # and stop the AO/OVMS around measurement windows on this box).
+        "environment": {
+            "box_state_at_start": box_state_at_start,
+            "box_state_at_end": capture_box_state(),
+        },
         "prompt_set_version": PROMPT_SET_VERSION,
         "prefill_probe_version": PREFILL_PROBE_VERSION,
         "runs": args.runs,

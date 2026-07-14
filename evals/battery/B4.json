@@ -1,5 +1,6 @@
 {
   "schema": "battery-card/v1",
+  "card_class": "frozen",
   "id": "B4",
   "title": "flashcards study CLI (python-cli, 5-unit mixed)",
   "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B4",

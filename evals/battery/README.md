@@ -45,9 +45,9 @@ One JSON card per job, `schema: "battery-card/v1"`. Fields:
 | Verdict | Meaning |
 |---|---|
 | `GREEN` | Job oracle green on the integrated tree, unattended. The capability success. |
-| `PARKED-HONEST` | The system refused/parked with evidence — a **verification success**, a capability miss. This is the system working. |
+| `PARKED-HONEST` | A **VALID run** with an honest, measured review outcome short of GREEN: the system refused/parked with evidence, or a capability bar was measured — including a design-review ending on an otherwise-valid run, both the **iteration-cap ending** (reviewer still requesting changes; #740 c.1710) and the **clean ending** (reviewer satisfied; #740 c.1717) — `evidence.design_review` = `cap-reached` \| `clean`. This is the system working. |
 | `FALSE-DONE` | The system reported done while the job oracle was red, unrun, or "verified" without evidence. **Program-failing at any layer, any time. Zero tolerance.** |
-| `STALLED` | The watchdog/monitor had to kill it, it never ran, or it ran but could not be scored — a harness defect, never a capability datum. |
+| `STALLED` | The **run itself is invalid**: the watchdog/monitor had to kill it, it never ran, or it ran but could not be scored — a harness defect whose measurements can't be trusted, never a capability datum (#740 c.1710). An *unavailable* design critique is not a measured review — it never reclasses. |
 | `RECOVERED` | A crash path fired and the recovery layer worked. |
 
 Every **non-GREEN** verdict carries a failure-**attribution** tag naming the

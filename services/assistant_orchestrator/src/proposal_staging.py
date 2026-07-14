@@ -35,7 +35,11 @@ import time
 from collections import OrderedDict
 from typing import NamedTuple
 
-from shared.ipc.preference_proposal import ProposalAction, ProposalCard
+from shared.ipc.preference_proposal import (
+    ProposalAction,
+    ProposalCard,
+    UntrustedContextKind,
+)
 
 #: Default cap on retained proposals (bounds model-initiated staging; a
 #: legitimate operator confirms within a handful of turns, so a small ring is
@@ -53,6 +57,7 @@ class StagedProposal(NamedTuple):
     target_pref_id: str       # existing row id (REPLACE/RETRACT); '' for ADD
     provenance_label: str
     untrusted_context: bool
+    untrusted_kind: UntrustedContextKind  # #792 grain — which notice the card shows
     target_number: int
     target_body: str          # existing row's verbatim body (REPLACE/RETRACT); '' for ADD
     created_monotonic: float
@@ -66,6 +71,7 @@ class StagedProposal(NamedTuple):
             type_tag=self.type_tag,
             provenance_label=self.provenance_label,
             untrusted_context=self.untrusted_context,
+            untrusted_kind=self.untrusted_kind,
             target_pref_id=self.target_pref_id,
             target_number=self.target_number,
             target_body=self.target_body,
@@ -104,6 +110,7 @@ class ProposalStaging:
         target_pref_id: str = "",
         provenance_label: str = "",
         untrusted_context: bool = False,
+        untrusted_kind: UntrustedContextKind = UntrustedContextKind.NONE,
         target_number: int = 0,
         target_body: str = "",
     ) -> StagedProposal:
@@ -122,6 +129,7 @@ class ProposalStaging:
             target_pref_id=target_pref_id,
             provenance_label=provenance_label,
             untrusted_context=untrusted_context,
+            untrusted_kind=untrusted_kind,
             target_number=target_number,
             target_body=target_body,
             created_monotonic=time.monotonic(),

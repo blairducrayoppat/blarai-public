@@ -5,6 +5,13 @@ from shared.ipc.protocol import (
     AdjudicationResponse,
     MessageFramer,
     MessageType,
+    ensure_int,
+    require_bool,
+    require_dict,
+    require_int,
+    require_list,
+    require_str,
+    require_str_list,
 )
 from shared.ipc.slash_commands import BACKEND_PASSTHROUGH_SLASH_COMMANDS
 from shared.ipc.vsock import (
@@ -28,4 +35,11 @@ __all__ = [
     "VsockTransport",
     "create_client_ssl_context",
     "create_server_ssl_context",
+    "ensure_int",
+    "require_bool",
+    "require_dict",
+    "require_int",
+    "require_list",
+    "require_str",
+    "require_str_list",
 ]

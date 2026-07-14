@@ -38,9 +38,11 @@ Security:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -672,6 +674,14 @@ class LeakageDetector:
     # (bge-small's native maximum).
     _OFFLOAD_WINDOWS: tuple[int, ...] = (128, 512)
 
+    # Chunk-embedding reuse bound (#807). Stage-5 chunk sets are
+    # session-stable between turns, so re-embedding them per grounded
+    # response was pure waste (measured 2026-07-11 on CPU: the chunks leg
+    # was ~54-95% of every check_leakage call — see docs/performance/
+    # pgov_stage5_reembed_807_*.json). 4096 cached vectors x 384 float32
+    # = ~6.3 MB ceiling; least-recently-used entries evict beyond it.
+    _CHUNK_CACHE_MAX: int = 4096
+
     def __init__(
         self,
         model_path: str | None = None,
@@ -693,6 +703,13 @@ class LeakageDetector:
         self._ov_input_names: list[str] = []
         self._active_device: str = "CPU"
         self._backend: str = "ort-cpu"
+        # Chunk-embedding reuse cache (#807): SHA-256(text) -> (384,) float32
+        # vector, LRU-bounded at ``_CHUNK_CACHE_MAX``. Valid for this
+        # instance only — the embed window (``_max_input_length``) and the
+        # device are both fixed at construction, so a cached vector can
+        # never be served across a window or device change. Cleared and
+        # zeroed on ``unload()`` (the vectors derive from session content).
+        self._chunk_embed_cache: OrderedDict[str, Any] = OrderedDict()
 
     @property
     def loaded(self) -> bool:
@@ -816,6 +833,16 @@ class LeakageDetector:
         self._active_device = "CPU"
         self._backend = "ort-cpu"
         self._loaded = False
+        # Zero the cached chunk embeddings before dropping them (#807) —
+        # they derive from session content, so they follow the substrate
+        # boot-cache posture (#611): overwrite the backing buffers, then
+        # release. Best-effort: a non-writable view is simply dropped.
+        for vec in self._chunk_embed_cache.values():
+            try:
+                vec[:] = 0
+            except (TypeError, ValueError):  # pragma: no cover — defensive
+                pass
+        self._chunk_embed_cache.clear()
 
     def _try_load_openvino(self, device: str) -> bool:
         """Compile the embedding model on *device* via OpenVINO (fail-soft).
@@ -1057,6 +1084,53 @@ class LeakageDetector:
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True).clip(min=1e-9)
         return (embeddings / norms).astype(np.float32)
 
+    def _chunk_embeddings(self, retrieved_chunks: list[str]) -> Any:
+        """Return (N, 384) embeddings for *retrieved_chunks*, reusing cache.
+
+        Stage-5 chunk sets are session-stable between grounded turns (the
+        ``get_untrusted_chunk_texts`` feed only grows when new untrusted
+        content is grounded), so each unique chunk text is embedded ONCE
+        per detector lifetime (#807) — only texts absent from the cache go
+        through ``_embed``, batched together exactly as ``check_leakage``
+        batched the full set before the cache existed (a cold cache
+        therefore reproduces the pre-#807 batch composition and numerics
+        bit-for-bit on the first turn).
+
+        Keyed by SHA-256 of the chunk text; the embed window and device are
+        fixed per instance, so the text alone identifies the vector. LRU
+        eviction beyond ``_CHUNK_CACHE_MAX`` (a hit refreshes recency).
+
+        Args:
+            retrieved_chunks: Chunk texts, order preserved in the output.
+
+        Returns:
+            numpy array of shape (len(retrieved_chunks), 384), float32.
+        """
+        import numpy as np
+
+        keys = [
+            hashlib.sha256(chunk.encode("utf-8")).hexdigest()
+            for chunk in retrieved_chunks
+        ]
+
+        missing_indices = [
+            i for i, key in enumerate(keys) if key not in self._chunk_embed_cache
+        ]
+        if missing_indices:
+            fresh = self._embed([retrieved_chunks[i] for i in missing_indices])
+            for row, i in enumerate(missing_indices):
+                self._chunk_embed_cache[keys[i]] = fresh[row]
+
+        rows = []
+        for key in keys:
+            self._chunk_embed_cache.move_to_end(key)  # refresh LRU recency
+            rows.append(self._chunk_embed_cache[key])
+
+        while len(self._chunk_embed_cache) > self._CHUNK_CACHE_MAX:
+            self._chunk_embed_cache.popitem(last=False)
+
+        return np.stack(rows)
+
     def check_leakage(
         self,
         generated_text: str,
@@ -1065,9 +1139,11 @@ class LeakageDetector:
     ) -> float:
         """Compute max cosine similarity between generated text and chunks.
 
-        Embeds the generated text and each retrieved chunk, then computes
-        pairwise cosine similarity (dot product of L2-normalized vectors).
-        Returns the maximum similarity score.
+        Embeds the generated text (fresh every call — it changes every
+        turn) and each retrieved chunk (cached per detector lifetime —
+        chunk sets are session-stable, #807), then computes pairwise cosine
+        similarity (dot product of L2-normalized vectors). Returns the
+        maximum similarity score.
 
         Fail-Closed: If the model is not loaded, returns 1.0 (maximum
         leakage) to prevent leakage bypass via model loading failure.
@@ -1093,7 +1169,7 @@ class LeakageDetector:
             import numpy as np
 
             gen_emb = self._embed([generated_text])  # (1, 384)
-            chunk_embs = self._embed(retrieved_chunks)  # (N, 384)
+            chunk_embs = self._chunk_embeddings(retrieved_chunks)  # (N, 384)
 
             # Cosine similarity via dot product (vectors are L2-normalized)
             similarities = (chunk_embs @ gen_emb.T).flatten()  # (N,)
@@ -1113,6 +1189,30 @@ class LeakageDetector:
 # Singleton detector — initialized lazily on first use.
 _detector: LeakageDetector | None = None
 
+# Module default for the embedding device (#807). The AO entrypoint stamps
+# the resolved ``[embeddings].device`` here at start(), so ANY path that
+# creates the singleton without an explicit device — the module-level
+# ``check_leakage()`` Stage-5 call being the load-bearing one — honours the
+# configured device instead of silently pinning CPU and bypassing the #720
+# NPU offload. ``None`` (never stamped: tests, standalone tools) keeps the
+# historical CPU default.
+_default_device: str | None = None
+
+
+def set_default_embedding_device(device: str | None) -> None:
+    """Stamp the configured ``[embeddings].device`` as the module default.
+
+    Called by the AO entrypoint once config is resolved (#807). Only
+    affects singletons CREATED afterwards — an existing singleton keeps
+    the device it was constructed with. ``None`` clears the stamp
+    (restores the CPU default; used by tests).
+    """
+    global _default_device  # noqa: PLW0603
+    if device is None:
+        _default_device = None
+    else:
+        _default_device = device.strip().upper() or None
+
 
 def _get_detector(device: str | None = None) -> LeakageDetector:
     """Get or lazily create the singleton LeakageDetector.
@@ -1121,11 +1221,14 @@ def _get_detector(device: str | None = None) -> LeakageDetector:
         device: Inference device for the embedding model (#720) — only
             honoured when the singleton is CREATED by this call; an existing
             singleton is returned unchanged (its device was fixed at
-            construction).  ``None`` keeps the CPU default.
+            construction).  ``None`` falls back to the module default
+            stamped by :func:`set_default_embedding_device` (#807), then to
+            CPU — so the Stage-5 module path can no longer silently bypass
+            a configured NPU/GPU offload.
     """
     global _detector  # noqa: PLW0603
     if _detector is None:
-        _detector = LeakageDetector(device=device or "CPU")
+        _detector = LeakageDetector(device=device or _default_device or "CPU")
     return _detector
 
 

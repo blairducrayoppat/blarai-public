@@ -1,5 +1,6 @@
 {
   "schema": "battery-card/v1",
+  "card_class": "frozen",
   "id": "B7",
   "title": "utility trio (node, 3 independent units — branch/skip isolation)",
   "provenance": "docs/research/fleet-maturation-program-plan-2026-07.md §9.4 row B7",

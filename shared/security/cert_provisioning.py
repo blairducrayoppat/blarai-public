@@ -240,10 +240,74 @@ def _write_key(path: Path, key: ec.EllipticCurvePrivateKey) -> None:
     )
 
 
+def _load_consistent_certs(certs_dir: Path) -> "PerBootCerts | None":
+    """Return a :class:`PerBootCerts` for an EXISTING, CONSISTENT cert set in
+    *certs_dir*, or ``None`` if any of the nine files is missing/empty, any cert
+    is expired, or the set is INCONSISTENT (a partial or cross-generation mint).
+
+    "Consistent" means the PA-server / gateway / orchestrator / router leaves all
+    verify against the on-disk CA — the exact chain the mTLS handshake checks — so
+    a PASS here proves a reused set will complete the handshake. Used by #863
+    reuse-if-consistent to avoid re-minting a fresh CA out from under a still-
+    running (or leaked) AO whose in-memory leaf then fails CERTIFICATE_VERIFY_FAILED.
+    """
+    paths = {
+        "ca": certs_dir / CA_CERT_NAME,
+        "pa_server": certs_dir / PA_SERVER_CERT_NAME,
+        "pa_server_key": certs_dir / PA_SERVER_KEY_NAME,
+        "gateway_client": certs_dir / GATEWAY_CLIENT_CERT_NAME,
+        "gateway_client_key": certs_dir / GATEWAY_CLIENT_KEY_NAME,
+        "orch_client": certs_dir / ORCH_CLIENT_CERT_NAME,
+        "orch_client_key": certs_dir / ORCH_CLIENT_KEY_NAME,
+        "router_client": certs_dir / ROUTER_CLIENT_CERT_NAME,
+        "router_client_key": certs_dir / ROUTER_CLIENT_KEY_NAME,
+    }
+    if not all(p.is_file() and p.stat().st_size > 0 for p in paths.values()):
+        return None
+    try:
+        now = _now_utc()
+
+        def _not_after(cert: x509.Certificate) -> datetime.datetime:
+            try:
+                return cert.not_valid_after_utc  # cryptography >= 42 (tz-aware)
+            except AttributeError:  # older cryptography: naive UTC
+                return cert.not_valid_after.replace(tzinfo=datetime.timezone.utc)
+
+        ca = x509.load_pem_x509_certificate(paths["ca"].read_bytes())
+        if _not_after(ca) <= now:
+            return None
+        ca_pub = ca.public_key()
+        for leaf_name in ("pa_server", "gateway_client", "orch_client", "router_client"):
+            leaf = x509.load_pem_x509_certificate(paths[leaf_name].read_bytes())
+            if _not_after(leaf) <= now:
+                return None
+            # ECDSA signature check: the on-disk CA actually signed this leaf. A
+            # cross-generation set (new CA, old leaf) raises InvalidSignature here.
+            ca_pub.verify(
+                leaf.signature,
+                leaf.tbs_certificate_bytes,
+                ec.ECDSA(leaf.signature_hash_algorithm),
+            )
+    except Exception:  # noqa: BLE001 — any load/verify failure -> not reusable -> mint fresh
+        return None
+    return PerBootCerts(
+        ca_cert_path=paths["ca"],
+        pa_server_cert_path=paths["pa_server"],
+        pa_server_key_path=paths["pa_server_key"],
+        gateway_client_cert_path=paths["gateway_client"],
+        gateway_client_key_path=paths["gateway_client_key"],
+        orch_client_cert_path=paths["orch_client"],
+        orch_client_key_path=paths["orch_client_key"],
+        router_client_cert_path=paths["router_client"],
+        router_client_key_path=paths["router_client_key"],
+    )
+
+
 def provision_per_boot_certs(
     certs_dir: Path | None = None,
     *,
     repo_root: Path | None = None,
+    reuse_if_consistent: bool = False,
 ) -> PerBootCerts:
     """Generate and write fresh per-boot mTLS certificates.
 
@@ -282,6 +346,33 @@ def provision_per_boot_certs(
             base = repo_root if repo_root is not None else Path.cwd()
             certs_dir = base / DEFAULT_CERTS_DIR
         certs_dir.mkdir(parents=True, exist_ok=True)
+
+        # #863: reuse an existing CONSISTENT set instead of re-minting a fresh CA.
+        # The battery's per-job AO reboots (boot_launcher_detached sets
+        # reuse_if_consistent) all go through here, so every boot in a run shares
+        # ONE trust chain; a re-mint under a still-running/leaked prior AO rotates
+        # the CA out from under its in-memory leaf -> CERTIFICATE_VERIFY_FAILED (the
+        # deterministic per-job STALL, night-20260711). Production leaves this False
+        # -> per-boot minting (ADR-026) unchanged; a single-boot app never drifts.
+        # An absent/inconsistent set -> fall through to a fresh mint.
+        if reuse_if_consistent:
+            existing = _load_consistent_certs(certs_dir)
+            if existing is not None:
+                logger.info(
+                    "per-boot certs: reusing the existing consistent set in %s "
+                    "(reuse_if_consistent; #863 — no CA re-mint under a running AO)",
+                    certs_dir,
+                )
+                try:
+                    from shared.security.file_dacl import strip_foreign_sids_from_dir
+
+                    strip_foreign_sids_from_dir(certs_dir)
+                except Exception as dacl_exc:  # noqa: BLE001 — never fail on DACL hygiene
+                    logger.warning(
+                        "certs dir DACL hygiene raised (%s); proceeding with %s",
+                        dacl_exc, certs_dir,
+                    )
+                return existing
 
         # --- Generate CA key pair (in-memory only) ---
         ca_key = _make_ec_key()

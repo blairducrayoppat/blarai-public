@@ -44,8 +44,10 @@ import json
 import logging
 import os
 import urllib.parse
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -285,6 +287,81 @@ class _VikunjaClient:
     def add_comment(self, task_id: int, comment: str) -> None:
         self._call("PUT", f"/tasks/{task_id}/comments", body={"comment": comment})
 
+    def move_task_to_bucket(
+        self, project_id: int, view_id: int, bucket_id: int, task_id: int
+    ) -> None:
+        """Move *task_id* into *bucket_id* of kanban *view_id* on *project_id*.
+
+        Vikunja v2.3.0 ``POST /projects/{project}/views/{view}/buckets/{bucket}/tasks``
+        ("Update a task bucket" — verified against the live OpenAPI spec). The
+        destination bucket rides BOTH the path and the ``models.TaskBucket`` body,
+        and ``project_view_id`` pins the view the move applies to."""
+        self._call(
+            "POST",
+            f"/projects/{project_id}/views/{view_id}/buckets/{bucket_id}/tasks",
+            body={
+                "task_id": task_id,
+                "bucket_id": bucket_id,
+                "project_view_id": view_id,
+            },
+        )
+
+    # -- C1 read-surface operations (#843, ADR-039 §2.10) --------------------
+    # Low-level, unconditional (no dormancy gate here — see the module-level
+    # docstring on the read section below for why): the caller composing a
+    # coordinator snapshot decides WHETHER to read; these methods only decide
+    # HOW. Every one returns ``[]`` for a non-list body rather than raising,
+    # so a malformed/empty page reads as "no more items" to the pagination
+    # loop, not a transport error (transport/HTTP errors still raise via
+    # ``_call``, exactly like every method above — fail-soft stays the
+    # PUBLIC function's job, mirroring the write side).
+
+    def list_tasks_page(self, project_id: int, params: Mapping[str, Any]) -> list:
+        """One page of ``GET /projects/{id}/tasks`` (v2.3.0). *params* carries
+        ``page``/``per_page`` (the pagination-aware read loop's contract)."""
+        result = self._call("GET", f"/projects/{project_id}/tasks", params=params)
+        return result if isinstance(result, list) else []
+
+    def list_views(self, project_id: int) -> list:
+        """``GET /projects/{id}/views`` (v2.3.0) — every view (List/Kanban/
+        Table) so the Kanban view is resolved by KIND, never a hardcoded id."""
+        result = self._call("GET", f"/projects/{project_id}/views")
+        return result if isinstance(result, list) else []
+
+    def list_buckets(self, project_id: int, view_id: int) -> list:
+        """``GET /projects/{id}/views/{view_id}/buckets`` (v2.3.0) — the
+        kanban board's buckets (id/title/position/limit)."""
+        result = self._call(
+            "GET", f"/projects/{project_id}/views/{view_id}/buckets"
+        )
+        return result if isinstance(result, list) else []
+
+    # -- setup-migration-ONLY write primitives (ADR-039 §2.12.11) -----------
+    # NOT part of the runtime read/write surface: these back
+    # ensure_bucket/ensure_label below, which are called ONLY by the
+    # operator-run substrate-setup migration script
+    # (tools/dispatch_harness/coordinator_setup.py) — never by the runtime
+    # coordinator, which has no write path to its own workflow structure.
+
+    def list_labels(self) -> list:
+        """``GET /labels`` (v2.3.0) — every label (global, not per-project)."""
+        result = self._call("GET", "/labels")
+        return result if isinstance(result, list) else []
+
+    def create_label(self, title: str, hex_color: str) -> dict:
+        result = self._call(
+            "PUT", "/labels", body={"title": title, "hex_color": hex_color}
+        )
+        return result if isinstance(result, dict) else {}
+
+    def create_bucket(self, project_id: int, view_id: int, title: str) -> dict:
+        result = self._call(
+            "PUT",
+            f"/projects/{project_id}/views/{view_id}/buckets",
+            body={"title": title},
+        )
+        return result if isinstance(result, dict) else {}
+
 
 # ---------------------------------------------------------------------------
 # Rendering (structural — pointers + short statuses, never raw logs)
@@ -470,4 +547,592 @@ def post_campaign_summary(
         return True
     except Exception as exc:  # noqa: BLE001 — fail-soft
         logger.warning("vikunja_bridge post_campaign_summary failed (fail-soft): %s", exc)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# C1 read surface (#843, ADR-039 §2.10) — coordinator READS.
+#
+# Everything below is READ-ONLY and extends the SAME loopback-pinned /
+# fail-soft / transport-split bridge above (ADR-039 §2.3: "the Coordinator's
+# read surface extends vikunja_bridge with more read operations over the
+# SAME loopback/fail-soft/transport-split pattern, not a second network
+# path"). No dormancy gate lives HERE: whether coordinator reads happen at
+# all is a [coordinator].enabled decision made by the CALLER (the work-state
+# snapshot composer / the /coord status gateway command) BEFORE it reaches
+# this module — mirroring how DispatchCoordinator checks its own `enabled`
+# flag before touching any collaborator, rather than threading a config
+# object through every leaf function. That separation matters here
+# specifically because a read's THREE tri-state outcomes (below) must stay
+# about "did Vikunja answer", never conflated with a fourth "reads are
+# turned off" case a leaf-level gate would invite.
+#
+# Two disciplines apply to every function below that the write-side above
+# did not need:
+#
+#   * PAGINATION-AWARE (ADR-039 §2.12.2, a verified defect class). Vikunja's
+#     server-side ``maxitemsperpage`` (default 50) silently CLAMPS even an
+#     explicit larger ``per_page`` request — so trusting a single page for a
+#     >50-item project silently under-reads it (the devplatform
+#     ``project_summary`` tool was confirmed doing exactly this). Every
+#     collection read here loops pages until a SHORT page
+#     (``len(page) < per_page``) via :func:`_paginate`, circuit-broken by
+#     ``_MAX_PAGES`` so a misbehaving server that never returns a short page
+#     cannot hang a heartbeat cycle forever.
+#   * TRI-STATE (ADR-039 §2.12.6 / §2.14.4). Every read returns a
+#     :class:`ReadResult` distinguishing OK (succeeded, data present) /
+#     EMPTY (succeeded, genuinely nothing there) / UNREACHABLE (the read
+#     failed — network error, auth failure, malformed body, loopback
+#     refusal, timeout; fail-soft, never raised). ``UNREACHABLE`` must NEVER
+#     be interpreted as ``EMPTY`` by a caller: a dead Vikunja must not look
+#     like a finished backlog, which is the exact silent-stall this whole
+#     program exists to prevent (ADR-039 §2.12.6).
+#
+# Vikunja IDs are resolved BY NAME/KIND at read time (``find_view_by_kind``)
+# rather than hardcoded — the project's own stale-label/bucket-id lesson
+# (ADR-039 §2.12.11) — so a fresh or re-migrated project needs no code change.
+# ---------------------------------------------------------------------------
+
+
+class ReadStatus(str, Enum):
+    """Tri-state discipline for coordinator reads (ADR-039 §2.12.6)."""
+
+    OK = "ok"
+    """The read succeeded and returned at least one item."""
+
+    EMPTY = "empty"
+    """The read succeeded and returned ZERO items — a real, known state (e.g.
+    a project genuinely has no open tasks right now). Distinct from
+    UNREACHABLE on purpose: an EMPTY board is quiet-queue-tripwire-eligible;
+    an UNREACHABLE one is neither — it is an UNKNOWN state that must be
+    surfaced honestly, never assumed empty."""
+
+    UNREACHABLE = "unreachable"
+    """The read failed (network error, auth failure, malformed response,
+    loopback refusal, timeout, or an unresolvable view/bucket lookup).
+    Fail-soft — never raised to the caller — but the caller MUST be able to
+    tell this apart from EMPTY. See ``test_unreachable_never_renders_as_empty``
+    for the regression lock."""
+
+
+@dataclass(frozen=True)
+class ReadResult:
+    """The tri-state result of every coordinator read in this section.
+
+    ``items`` is always a concrete tuple (never ``None``) so a caller can
+    iterate unconditionally without a None-check; ``error`` carries a short
+    fail-soft reason ONLY when ``status is UNREACHABLE``.
+    """
+
+    status: ReadStatus
+    items: tuple[dict[str, Any], ...] = ()
+    error: str = ""
+
+    @property
+    def ok(self) -> bool:
+        """True for OK or EMPTY (the read itself succeeded); False only for
+        UNREACHABLE. A caller that only needs "did this work" (not the
+        OK-vs-EMPTY distinction) should test THIS, never
+        ``status == ReadStatus.OK`` alone — that would wrongly treat a
+        successful-but-empty read as a failure."""
+        return self.status is not ReadStatus.UNREACHABLE
+
+
+def _read_result(items: Sequence[Mapping[str, Any]]) -> ReadResult:
+    """OK (non-empty) or EMPTY (empty) from a successfully-fetched list —
+    never UNREACHABLE (that path is constructed at the ``except`` site)."""
+    materialized = tuple(dict(i) for i in items if isinstance(i, Mapping))
+    return ReadResult(
+        status=ReadStatus.OK if materialized else ReadStatus.EMPTY,
+        items=materialized,
+    )
+
+
+def _unreachable(reason: str) -> ReadResult:
+    return ReadResult(status=ReadStatus.UNREACHABLE, items=(), error=_clip(reason, 500))
+
+
+#: Vikunja's server-side ``maxitemsperpage`` default (ADR-039 §2.12.2) — the
+#: page size every paginated read below requests. Requesting more is silently
+#: clamped by the server, so pagination-correctness depends on requesting
+#: exactly this and looping on a short page, never on a larger per_page being
+#: honored.
+DEFAULT_PAGE_SIZE: int = 50
+
+#: Circuit breaker for :func:`_paginate` — at the default page size this is
+#: 50,000 items. A misbehaving server that never returns a short page must
+#: not hang a coordinator read (and therefore a heartbeat cycle) forever.
+_MAX_PAGES: int = 1000
+
+
+def _paginate(
+    fetch_page: Callable[[int], list],
+    *,
+    per_page: int = DEFAULT_PAGE_SIZE,
+) -> list[dict]:
+    """Loop ``fetch_page(page_number)`` (1-based) until a SHORT page (fewer
+    than *per_page* items) or an empty page, bounded by ``_MAX_PAGES``.
+
+    This is the ONE pagination loop every collection read below shares.
+    Vikunja's ``maxitemsperpage`` silently clamps a too-large ``per_page``
+    request, so trusting a single page is a silent-truncation bug — this is
+    the fix (ADR-039 §2.12.2 / operational-maturity item 2)."""
+    items: list[dict] = []
+    page = 1
+    while page <= _MAX_PAGES:
+        batch = fetch_page(page)
+        if not batch:
+            break
+        items.extend(b for b in batch if isinstance(b, dict))
+        if len(batch) < per_page:
+            break
+        page += 1
+    return items
+
+
+def find_view_by_kind(views: Sequence[Mapping[str, Any]], kind: str) -> int | None:
+    """The id of the first view whose ``view_kind`` matches *kind*
+    (case-insensitive), or ``None`` if no view matches.
+
+    Name/kind-resolution helper — Vikunja view ids are NEVER hardcoded
+    (ADR-039 §2.12.11): the coordinator resolves the Kanban view for a
+    project at read time, the same way a human clicking "Kanban" would."""
+    kind_lower = kind.strip().lower()
+    for v in views:
+        if str(v.get("view_kind", "")).strip().lower() == kind_lower:
+            try:
+                return int(v["id"])  # type: ignore[index]
+            except (KeyError, TypeError, ValueError):
+                continue
+    return None
+
+
+def _read_all_tasks(client: "_VikunjaClient", project_id: int) -> list[dict]:
+    """The full (paginated) task list for *project_id* — done AND open. The
+    shared primitive :func:`list_open_tasks`/:func:`project_read_summary`/
+    :func:`board_state` all build on."""
+    return _paginate(
+        lambda page: client.list_tasks_page(
+            project_id, {"page": page, "per_page": DEFAULT_PAGE_SIZE}
+        )
+    )
+
+
+def list_open_tasks(
+    project_id: int, *, transport: Transport | None = None
+) -> ReadResult:
+    """Every NOT-done task in *project_id*, paginated to completeness.
+
+    Filters client-side on ``done`` deliberately rather than a server-side
+    filter query: Vikunja's filter-query syntax (``filter_by``/``filter``)
+    is a second API-contract surface this bridge does not otherwise depend
+    on, and every task page is already being read for pagination-correctness
+    regardless — so client-side filtering is both simpler and no less
+    correct. Each returned dict carries Vikunja's native fields verbatim
+    (including ``labels`` and ``due_date`` — the classes-of-service inputs
+    a later phase computes over; this read does not interpret them)."""
+    try:
+        client = _client(transport)
+        client.login()
+        open_tasks = [
+            t for t in _read_all_tasks(client, project_id)
+            if not bool(t.get("done", False))
+        ]
+        return _read_result(open_tasks)
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge list_open_tasks failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def list_all_tasks(
+    project_id: int, *, transport: Transport | None = None
+) -> ReadResult:
+    """Every task (done AND open) in *project_id*, paginated to
+    completeness — the population :mod:`shared.fleet.flow_metrics`'s cycle
+    time / throughput functions need (they read each task's own ``done`` /
+    ``done_at`` fields directly; unlike :func:`list_open_tasks` this does
+    NOT filter). Open tasks can be derived from this same read by filtering
+    client-side (``not t["done"]``) — the deliberate reason
+    :func:`shared.fleet.work_state.read_project_work_state` calls this
+    ONCE rather than this-and-list_open_tasks separately: two independent
+    paginated reads of the same project could observe different snapshots
+    of a board mutating between calls, silently double-counting or
+    under-counting a task that changed state mid-read."""
+    try:
+        client = _client(transport)
+        client.login()
+        return _read_result(_read_all_tasks(client, project_id))
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge list_all_tasks failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def project_read_summary(
+    project_id: int, *, transport: Transport | None = None
+) -> ReadResult:
+    """One rollup dict for *project_id*:
+    ``{"project_id", "total", "open", "done", "labels": {label_title: open_count}}``.
+
+    ``items`` carries exactly one dict on OK. ``EMPTY`` means the project has
+    ZERO tasks at all (not merely zero OPEN — a fully-done project is a
+    legitimate "nothing left open" state, still reported distinctly from
+    UNREACHABLE)."""
+    try:
+        client = _client(transport)
+        client.login()
+        all_tasks = _read_all_tasks(client, project_id)
+        if not all_tasks:
+            return ReadResult(status=ReadStatus.EMPTY)
+        open_tasks = [t for t in all_tasks if not bool(t.get("done", False))]
+        label_counts: dict[str, int] = {}
+        for t in open_tasks:
+            for label in t.get("labels") or []:
+                if isinstance(label, Mapping):
+                    name = str(label.get("title", "")).strip()
+                    if name:
+                        label_counts[name] = label_counts.get(name, 0) + 1
+        summary = {
+            "project_id": project_id,
+            "total": len(all_tasks),
+            "open": len(open_tasks),
+            "done": len(all_tasks) - len(open_tasks),
+            "labels": label_counts,
+        }
+        return ReadResult(status=ReadStatus.OK, items=(summary,))
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge project_read_summary failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def list_views(
+    project_id: int, *, transport: Transport | None = None
+) -> ReadResult:
+    """Every view (List/Kanban/Table/...) on *project_id* — the name/kind
+    resolution source for :func:`find_view_by_kind` (never a hardcoded view
+    id)."""
+    try:
+        client = _client(transport)
+        client.login()
+        return _read_result(client.list_views(project_id))
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge list_views failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def list_buckets(
+    project_id: int, view_id: int, *, transport: Transport | None = None
+) -> ReadResult:
+    """The buckets (id/title/position/limit) of *view_id* on *project_id* —
+    the raw board columns, WITHOUT the open-task grouping :func:`board_state`
+    adds. Exposed separately so a caller that already resolved a view id
+    (e.g. via :func:`list_views` + :func:`find_view_by_kind`, cached) can
+    skip the extra views round-trip :func:`board_state` performs."""
+    try:
+        client = _client(transport)
+        client.login()
+        return _read_result(client.list_buckets(project_id, view_id))
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge list_buckets failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def health_check(*, transport: Transport | None = None) -> ReadResult:
+    """A minimal Vikunja reachability probe (login only, no board data) — the
+    substrate-liveness leg the work-state snapshot composer reads.
+
+    ``OK`` with one ``{"reachable": True}`` item on a successful login;
+    ``UNREACHABLE`` otherwise. ``EMPTY`` is never returned — reachability is
+    binary, so this function's tri-state degenerates to the two outcomes
+    that actually apply (mirrors the loopback/credential/network failure
+    modes every other read in this section already handles)."""
+    try:
+        client = _client(transport)
+        client.login()
+        return ReadResult(status=ReadStatus.OK, items=({"reachable": True},))
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge health_check failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def board_state(
+    project_id: int, *, transport: Transport | None = None
+) -> ReadResult:
+    """The kanban board for *project_id*: every bucket (id/title/position/
+    limit) enriched with a ``"tasks"`` key holding its OPEN tasks.
+
+    Resolves the Kanban view by KIND (never a hardcoded id, ADR-039
+    §2.12.11) via :func:`find_view_by_kind`; ``UNREACHABLE`` (with a clear
+    ``error``) if the project has no Kanban view, the buckets call fails, or
+    the task read fails. ``EMPTY`` if the Kanban view genuinely has zero
+    buckets. A bucket with zero open tasks still appears with
+    ``"tasks": []`` — the bucket's PRESENCE (not its task count) is what
+    ``EMPTY``/``OK`` describes here; per-bucket emptiness is for the caller
+    to read off each bucket's own ``tasks`` list.
+
+    Grouping is done by cross-referencing the paginated open-task read on
+    each task's ``bucket_id`` — a task whose ``bucket_id`` is absent/None
+    (a project with a Kanban view but a task never dragged onto it) is
+    simply not attributed to any bucket, not dropped from the underlying
+    open-task count elsewhere."""
+    try:
+        client = _client(transport)
+        client.login()
+        views = client.list_views(project_id)
+        view_id = find_view_by_kind(views, "kanban")
+        if view_id is None:
+            return _unreachable(f"project {project_id} has no kanban view")
+        buckets = client.list_buckets(project_id, view_id)
+        open_tasks = [
+            t for t in _read_all_tasks(client, project_id)
+            if not bool(t.get("done", False))
+        ]
+        by_bucket: dict[int, list[dict]] = {}
+        for t in open_tasks:
+            bid = t.get("bucket_id")
+            if bid is None:
+                continue
+            try:
+                by_bucket.setdefault(int(bid), []).append(t)
+            except (TypeError, ValueError):
+                continue
+        enriched: list[dict] = []
+        for b in buckets:
+            if not isinstance(b, Mapping):
+                continue
+            b = dict(b)
+            try:
+                bid = int(b.get("id"))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                b["tasks"] = []
+            else:
+                b["tasks"] = by_bucket.get(bid, [])
+            enriched.append(b)
+        return _read_result(enriched)
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge board_state failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Substrate-setup migration primitives (ADR-039 §2.12.11) — OPERATOR-RUN ONLY
+#
+# These three functions are the ONLY write-shaped operations in the C1 read
+# surface, and they exist for exactly one caller:
+# ``tools/dispatch_harness/coordinator_setup.py``, the idempotent
+# discover-or-create Kanban substrate migration the OPERATOR runs via the
+# dev channel (never the runtime Coordinator, which the design deliberately
+# gives no write path to its own workflow structure — ADR-039 §2.12.11:
+# "the Coordinator never creates its own workflow structure"). They are
+# grouped here, not scattered into the read-surface section above, and each
+# is idempotent (find-by-NAME first, create only if genuinely missing) so a
+# re-run of the setup script is always safe.
+# ---------------------------------------------------------------------------
+
+
+def list_labels(*, transport: Transport | None = None) -> ReadResult:
+    """Every label (global, not per-project) — the discovery half of
+    :func:`ensure_label`, also useful standalone for the setup script's
+    orphan-flagging pass (ADR-039 §2.9's paired tenet)."""
+    try:
+        client = _client(transport)
+        client.login()
+        return _read_result(client.list_labels())
+    except Exception as exc:  # noqa: BLE001 — fail-soft, tri-state UNREACHABLE
+        logger.warning("vikunja_bridge list_labels failed (fail-soft): %s", exc)
+        return _unreachable(str(exc))
+
+
+def ensure_label(
+    title: str, hex_color: str, *, transport: Transport | None = None
+) -> int | None:
+    """Find-or-create a label by *title* (idempotent) and return its id, or
+    ``None`` on failure (fail-soft — the setup script surfaces this as a
+    migration-step failure to the OPERATOR running it; never silently
+    retried, never invoked by the runtime coordinator)."""
+    try:
+        client = _client(transport)
+        client.login()
+        for label in client.list_labels():
+            if isinstance(label, Mapping) and str(label.get("title", "")) == title:
+                try:
+                    return int(label["id"])  # type: ignore[index]
+                except (KeyError, TypeError, ValueError):
+                    continue
+        created = client.create_label(title, hex_color)
+        try:
+            return int(created["id"])
+        except (KeyError, TypeError, ValueError):
+            return None
+    except Exception as exc:  # noqa: BLE001 — fail-soft
+        logger.warning("vikunja_bridge ensure_label(%r) failed (fail-soft): %s", title, exc)
+        return None
+
+
+def ensure_bucket(
+    project_id: int, view_id: int, title: str, *, transport: Transport | None = None
+) -> int | None:
+    """Find-or-create a bucket by *title* on (*project_id*, *view_id*)
+    (idempotent) and return its id, or ``None`` on failure (fail-soft — see
+    :func:`ensure_label`)."""
+    try:
+        client = _client(transport)
+        client.login()
+        for bucket in client.list_buckets(project_id, view_id):
+            if isinstance(bucket, Mapping) and str(bucket.get("title", "")) == title:
+                try:
+                    return int(bucket["id"])  # type: ignore[index]
+                except (KeyError, TypeError, ValueError):
+                    continue
+        created = client.create_bucket(project_id, view_id, title)
+        try:
+            return int(created["id"])
+        except (KeyError, TypeError, ValueError):
+            return None
+    except Exception as exc:  # noqa: BLE001 — fail-soft
+        logger.warning(
+            "vikunja_bridge ensure_bucket(%r) failed (fail-soft): %s", title, exc
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
+# C2 lifecycle: board movement (#844, ADR-039 §2.8 / §2.13 item 5)
+#
+# The write-side sibling of the C1 read surface: a card moves to the bucket the
+# DETERMINISTIC ruler chose
+# (``shared.fleet.coord_lifecycle.resolve_board_transition``) on a real dispatch
+# event, never on model opinion. The forged-Done lock lives IN that ruler (a Done
+# transition needs ``oracle_passed AND merged``), so this layer only EXECUTES an
+# already-decided move — it makes no lifecycle judgment of its own.
+#
+# Extends the SAME loopback-pinned / fail-soft / transport-split bridge; the target
+# bucket is resolved BY TITLE and the kanban view BY KIND at write time (never a
+# hardcoded id — ADR-039 §2.12.11), exactly like the read surface.
+#
+# DORMANCY (as with the C1 read surface): NO ``[coordinator].enabled`` gate lives
+# HERE — the ENABLED decision belongs to the CALLER (the future C2 dispatch-event
+# hook, which gates on ``[coordinator].enabled`` before acting). This function has
+# NO live caller today: nothing in a dispatch/boot path invokes it, so importing
+# this module moves no card. It is the capability the dormant C2 hook will consult.
+# ---------------------------------------------------------------------------
+
+
+def find_bucket_by_title(
+    buckets: Sequence[Mapping[str, Any]], title: str
+) -> int | None:
+    """The id of the first bucket whose ``title`` matches *title*
+    (case-insensitive), or ``None``. The name-resolution sibling of
+    :func:`find_view_by_kind` — a kanban bucket is resolved by its board-legible
+    title (``"In Progress"``, ``"Done"``), never a hardcoded id, so a re-migrated
+    or per-install board needs no code change (ADR-039 §2.12.11)."""
+    title_lower = title.strip().lower()
+    for b in buckets:
+        if str(b.get("title", "")).strip().lower() == title_lower:
+            try:
+                return int(b["id"])  # type: ignore[index]
+            except (KeyError, TypeError, ValueError):
+                continue
+    return None
+
+
+@dataclass(frozen=True)
+class BoardMoveResult:
+    """The fail-soft outcome of a :func:`move_job_card` call.
+
+    ``moved`` is True ONLY when the card was actually relocated. ``reason`` is an
+    operator-legible explanation for every non-move (no kanban view, unknown
+    bucket title, no ticket for the run, or a transport failure) — a coordinator
+    that cannot move a card must say WHY, never fail silently."""
+
+    moved: bool
+    reason: str
+    bucket_id: int | None = None
+
+
+def move_job_card(
+    project_id: int,
+    run_id: str,
+    to_bucket_title: str,
+    *,
+    transport: Transport | None = None,
+) -> BoardMoveResult:
+    """Move the fleet-run *run_id*'s job ticket to the bucket titled
+    *to_bucket_title* on *project_id*'s kanban board — FAIL-SOFT.
+
+    Driven by the deterministic ruler: the caller passes
+    ``resolve_board_transition(...).to_bucket`` (In Progress / Ready / Done). The
+    forged-Done lock is UPSTREAM in that ruler, so a caller can never ask this to
+    move a card to Done without the oracle-green + merged facts having produced a
+    Done transition first.
+
+    Resolves the kanban view BY KIND and the destination bucket BY TITLE at write
+    time (never hardcoded ids), finds the ticket by its ``[fleet-job <run_id>]``
+    title marker, then issues the move. Every failure — no kanban view, unknown
+    bucket, no ticket, a Vikunja outage — returns ``BoardMoveResult(moved=False,
+    reason=...)`` and is logged; NOTHING raises (a ticket-board outage must never
+    affect a dispatch/battery run, exactly like the #749 write side)."""
+    try:
+        client = _client(transport)
+        client.login()
+
+        views = client.list_views(project_id)
+        view_id = find_view_by_kind(views, "kanban")
+        if view_id is None:
+            return BoardMoveResult(False, f"project {project_id} has no kanban view")
+
+        buckets = client.list_buckets(project_id, view_id)
+        bucket_id = find_bucket_by_title(buckets, to_bucket_title)
+        if bucket_id is None:
+            return BoardMoveResult(
+                False, f"no bucket titled {to_bucket_title!r} on the kanban board"
+            )
+
+        marker = _title_marker(run_id)
+        task_id = client.find_task_id(project_id, marker)
+        if task_id is None:
+            return BoardMoveResult(
+                False, f"no job ticket for run {run_id!r} (marker {marker!r})"
+            )
+
+        client.move_task_to_bucket(project_id, view_id, bucket_id, task_id)
+        logger.info(
+            "vikunja_bridge moved run %s card to %r (bucket %d)",
+            run_id,
+            to_bucket_title,
+            bucket_id,
+        )
+        return BoardMoveResult(
+            True, f"moved to {to_bucket_title!r}", bucket_id=bucket_id
+        )
+    except Exception as exc:  # noqa: BLE001 — fail-soft: board I/O never affects a run
+        logger.warning("vikunja_bridge move_job_card failed (fail-soft): %s", exc)
+        return BoardMoveResult(False, f"transport failure: {exc}")
+
+
+def post_task_comment(
+    task_id: int,
+    comment: str,
+    *,
+    transport: Transport | None = None,
+) -> bool:
+    """Post *comment* on Vikunja task *task_id* — FAIL-SOFT (the stall-comment sink).
+
+    The write-side wiring the C2 stall-comments limb
+    (:func:`shared.fleet.coord_stall_monitor.run_stall_cycle`) posts through: one
+    comment per stall EPISODE, outcomes-only (the anti-firehose invariant — NEVER a
+    per-heartbeat comment; the dedup lives in the caller's seen-set, not here).
+
+    Returns ``True`` iff the comment posted, ``False`` on ANY trouble (a comment
+    attaches to the task directly — no bucket/view resolution needed — so the only
+    failure modes are a bad id, a Vikunja outage, or a timeout). Nothing raises: a
+    ticket-board outage must never affect a dispatch/heartbeat run, exactly like
+    :func:`move_job_card` and the #749 write side."""
+    try:
+        client = _client(transport)
+        client.login()
+        client.add_comment(task_id, comment)
+        logger.info("vikunja_bridge posted stall comment on task %d", task_id)
+        return True
+    except Exception as exc:  # noqa: BLE001 — fail-soft: board I/O never affects a run
+        logger.warning("vikunja_bridge post_task_comment failed (fail-soft): %s", exc)
         return False

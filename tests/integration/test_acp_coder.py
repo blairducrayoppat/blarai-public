@@ -21,10 +21,12 @@ Covers, per ACP-01 §7.2 + the spike RESULTS.md integration requirements:
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from shared.fleet import acp_progress as ap
 from tools.dispatch_harness.acp_coder import (
     ACP_IDLE_TIMEOUT_S,
     ACP_MAX_STEPS,
@@ -152,24 +154,76 @@ def test_tracker_idle_after_silence():
 
 def test_779_long_single_artifact_write_is_not_idle():
     """#779 regression: a slow SINGLE-file render used to read as idle because no
-    NEW-file events fire during it. The ACP model retires that: tool_call_update
-    and agent_message_chunk heartbeats on the ONE in-flight write keep the
-    liveness clock fresh, so a long healthy single-artifact write is never
-    false-doomed. Closes #779 by construction."""
+    NEW-file events fire during it. IF tool_call_update / agent_message_chunk
+    heartbeats DO arrive on the one in-flight write, they keep the liveness clock
+    fresh, so a long healthy single-artifact write is never false-doomed. This
+    locks the reset-on-any-event contract.
+
+    NOTE (#790): the field caveat this test cannot see is that opencode-acp does
+    not reliably EMIT those heartbeats during a real generation window — the
+    2026-07-12 battery showed 120 s of total silence on every channel. That is an
+    upstream emission gap, addressed by the generous ACP_IDLE_TIMEOUT_S bound
+    (see test_790_* below), not by this reset logic, which is correct as-is."""
     clk = FakeClock()
     t = AcpEventTracker(clock=clk)
     # One long edit begins.
     t.on_session_update(tool_call("render-1", kind="edit", status="in_progress"))
     # Over the next 5 minutes, only heartbeats on that SAME call arrive — no new
-    # file, no new tool_call — every 30 s (well inside the 120 s idle window).
+    # file, no new tool_call — every 30 s (well inside the idle window).
     for _ in range(10):
         clk.advance(30.0)
         t.on_session_update(agent_chunk("...still rendering the frame..."))
         assert not t.is_idle(idle_timeout=ACP_IDLE_TIMEOUT_S), "heartbeats must keep it live"
     # And it never spuriously capped (one long edit, no spin).
     assert not t.step_cap().capped
-    # The old mtime/new-file heuristic would have doomed this after 240 s of "no
-    # new file"; the semantic stream did not.
+
+
+def test_790_token_activity_without_discrete_step_keeps_candidate_alive():
+    """#790 core lock: a candidate emitting TOKENS (agent_message_chunk) but
+    making NO new discrete step/edit is WORKING and must not be idle-cancelled.
+    This is the property the fix protects — 'emitting is working' — and it holds
+    at any bound as long as the chunks land within it."""
+    clk = FakeClock()
+    t = AcpEventTracker(clock=clk)
+    t.on_session_update(tool_call("read-1", kind="read", status="completed"))
+    steps_before = t.steps
+    # 8 minutes of pure message-chunk streaming, one chunk/minute — no new
+    # tool_call, no edit — comfortably inside the 600 s bound.
+    for _ in range(8):
+        clk.advance(60.0)
+        t.on_session_update(agent_chunk("...still generating the implementation..."))
+        assert not t.is_idle(idle_timeout=ACP_IDLE_TIMEOUT_S), "token activity must keep it live"
+    assert t.steps == steps_before  # chunks are liveness only — never counted as steps
+    assert not t.step_cap().capped
+
+
+def test_790_silent_generation_window_survives_new_bound_but_would_die_at_120s():
+    """#790 regression: the exact failure the battery hit. A candidate goes fully
+    silent (no session/update at all — opencode emits none during a long
+    generation) for 240 s, a window that is well within a healthy 30B's
+    first/next-response generation. At the OLD 120 s bound it was false-killed
+    (the 18/24 battery deaths); at the recalibrated 600 s bound it survives."""
+    clk = FakeClock()
+    t = AcpEventTracker(clock=clk)
+    t.on_session_update(tool_call("plan-1", kind="read", status="completed"))
+    clk.advance(240.0)  # 4 min of pure generation silence — the observed shape
+    assert t.is_idle(idle_timeout=120.0), "documents the OLD 120 s false-kill"
+    assert not t.is_idle(idle_timeout=ACP_IDLE_TIMEOUT_S), "the 600 s bound must NOT kill it"
+
+
+def test_790_truly_hung_candidate_still_idle_cancels_at_new_bound():
+    """The true-hang catch survives the recalibration: a candidate with NO event
+    of any kind for longer than the bound is still declared idle (TimedOut)."""
+    clk = FakeClock()
+    t = AcpEventTracker(clock=clk)
+    t.on_session_update(tool_call("a", kind="execute", status="in_progress"))
+    clk.advance(ACP_IDLE_TIMEOUT_S + 1)
+    assert t.is_idle(idle_timeout=ACP_IDLE_TIMEOUT_S)
+    # And it classifies as a TimedOut/'idle' cancel (never trusts StopReason).
+    c = CancelState()
+    c.mark("idle")
+    r = classify_result(tracker=t, cancel=c, elapsed_s=ACP_IDLE_TIMEOUT_S + 1, log_path="l")
+    assert r.timed_out and r.timeout_reason == "idle" and r.exit_code is None
 
 
 # ---------------------------------------------------------------------------
@@ -331,5 +385,50 @@ def test_normalize_model(raw, expected):
 
 def test_idle_constant_matches_registered_value():
     # The timeout registry cross-checks this same constant; keep them in lockstep.
-    assert ACP_IDLE_TIMEOUT_S == 120.0
+    # 600 s per the #790 recalibration (was 120 s — false-killed 18/24 candidates).
+    assert ACP_IDLE_TIMEOUT_S == 600.0
     assert ACP_MAX_STEPS == 45 and ACP_SPIN_STEPS == 10
+
+
+# ---------------------------------------------------------------------------
+# durable coordinator-facing progress artifact (#844 C2) — additive + fail-soft
+# ---------------------------------------------------------------------------
+
+
+def test_progress_artifact_written_per_event(tmp_path: Path):
+    prog = tmp_path / "acp-progress.json"
+    fixed_wall = 1_700_000_000.0  # a fixed wall-clock so the timestamp is deterministic
+    t = AcpEventTracker(run_id="R7", progress_path=prog, wall_clock=lambda: fixed_wall)
+    t.on_session_update(tool_call("c1", kind="edit", status="completed"))
+    snap = ap.read_acp_progress(prog)
+    assert snap is not None
+    assert snap.run_id == "R7"
+    assert snap.steps == 1 and snap.edits == 1 and snap.event_count == 1
+    # the durable stamp is WALL-CLOCK (not the monotonic idle clock)
+    assert snap.last_event_at == datetime.fromtimestamp(fixed_wall, tz=timezone.utc).isoformat()
+
+
+def test_progress_refreshed_each_event(tmp_path: Path):
+    prog = tmp_path / "acp-progress.json"
+    t = AcpEventTracker(run_id="R", progress_path=prog)
+    t.on_session_update(tool_call("a", kind="execute"))
+    t.on_session_update(tool_call("b", kind="edit"))
+    snap = ap.read_acp_progress(prog)
+    assert snap is not None
+    assert snap.event_count == 2 and snap.steps == 2 and snap.edits == 1
+
+
+def test_no_progress_path_writes_nothing(tmp_path: Path):
+    prog = tmp_path / "acp-progress.json"
+    t = AcpEventTracker()  # progress_path defaults None -> the write is a no-op
+    t.on_session_update(agent_chunk())
+    assert not prog.exists()
+
+
+def test_progress_write_is_fail_soft(tmp_path: Path):
+    # progress_path's parent is a FILE -> the write cannot mkdir -> fail-soft.
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x", encoding="utf-8")
+    t = AcpEventTracker(run_id="R", progress_path=blocker / "sub" / "acp-progress.json")
+    t.on_session_update(agent_chunk())  # must NOT raise despite the write failing
+    assert t.event_count == 1           # the event still folded

@@ -14,14 +14,27 @@ grade every dispatch — in the two directions an oracle can fail:
                  reference and must come back ``failed``. A pass here is
                  the silent direction — the oracle cannot catch the break.
 
-Plus two deterministic layers:
-  static       — structural trust findings over the oracle source (real
-                 tests, real assertions, no degenerate ``assert True``, no
-                 module-level skip) via evals/oracle_checks.py.
-  failure-mode — the executor's outcome VOCABULARY itself is pinned:
-                 ``collection-error`` (the #752-F3 plumbing class) must be
-                 distinguished from ``failed`` (real assertions) — the same
-                 vocabulary #765 Layer 2 adds to live scorecard evidence.
+Plus four deterministic layers:
+  static             — structural trust findings over the oracle source
+                        (real tests, real assertions, no degenerate
+                        ``assert True``, no module-level skip) via
+                        evals/oracle_checks.py.
+  contract           — the #752-F3 class: does the oracle import only
+                        first-party symbols the job's declared task
+                        contracts (``declared_exports``) actually export?
+                        Thin wrapper over the real #821 production check
+                        (``shared.fleet.oracle_qa.scan_invented_contracts``).
+  criteria-coverage   — does every ``[behavior]``/``[smoke]`` acceptance
+                        criterion (``criteria``) map to >=1 test? A
+                        self-contained keyword/structure-match heuristic
+                        (documented, with a pinned known limitation) — NOT
+                        the model-assisted #821 traceability matrix, which
+                        needs a live coverage-map call.
+  failure-mode        — the executor's outcome VOCABULARY itself is pinned:
+                        ``collection-error`` (the #752-F3 plumbing class)
+                        must be distinguished from ``failed`` (real
+                        assertions) — the same vocabulary #765 Layer 2 adds
+                        to live scorecard evidence.
 
 Two case modes (the ``mode`` field):
 
@@ -34,21 +47,29 @@ Two case modes (the ``mode`` field):
   model — the oracle is GENERATED live via the real production generator
       paths (per-task ``generate_acceptance_oracle`` / the W4 job-level
       generator) for the case's gold goal, then graded through the SAME
-      soundness/sensitivity/static machinery. Skipped unless
-      ``include_hardware=True``. The real-generator wiring lands at the
-      first live 14B slot (#765 sequencing); until then a hardware run
-      without an injected ``oracle_generator`` reports ERROR honestly
-      rather than faking a measurement.
+      soundness/sensitivity/static/contract/criteria-coverage machinery
+      (the dispatcher is category-generic — a future model-mode contract or
+      criteria-coverage case needs no engine change, only a golden case).
+      Skipped unless ``include_hardware=True``. The real-generator wiring
+      lands at the first live 14B slot (#765 sequencing); until then a
+      hardware run without an injected ``oracle_generator`` reports ERROR
+      honestly rather than faking a measurement.
 
 Golden case schema (evals/golden/oracle_quality.jsonl):
   {"id": "oq-sound-001", "description": "...",
-   "category": "static" | "soundness" | "sensitivity" | "failure-mode",
+   "category": "static" | "contract" | "criteria-coverage" | "soundness"
+             | "sensitivity" | "failure-mode",
    "mode": "offline" | "model",
    "goal_id": "b2",                            # model mode: which gold goal
    "oracle_fixture_file": "b2_job_oracle.py",  # offline: fixture source, or
    "oracle_inline": "...",                     #   inline source (small cases)
    "reference": "b2_reference",                # run categories: impl tree
    "mutations": [{"file": "app/x.py", "append": "..."}],   # sensitivity
+   "declared_exports": ["tokenize", "..."],    # contract: union of task
+                                                #   contract.exports
+   "criteria": [{"id": "c1", "tier": "behavior", "text": "...",
+                 "check": "..."}],             # criteria-coverage: the
+                                                #   AcceptanceCriterion dicts
    "expect": {"run_status": "passed"}          # or {"flags_include": [...]}
              }                                 # or {"flags_empty": true}
 """
@@ -60,6 +81,8 @@ from typing import Any, Callable
 
 from evals.loader import GoldenDataError, golden_path, load_golden
 from evals.oracle_checks import (
+    contract_import_findings,
+    criteria_coverage_findings,
     run_oracle_against,
     static_oracle_findings,
 )
@@ -71,7 +94,7 @@ _FIXTURES_DIR: Path = Path(__file__).resolve().parents[1] / "fixtures" / "oracle
 
 _VALID_MODES: frozenset[str] = frozenset({"offline", "model"})
 _VALID_CATEGORIES: frozenset[str] = frozenset(
-    {"static", "soundness", "sensitivity", "failure-mode"}
+    {"static", "contract", "criteria-coverage", "soundness", "sensitivity", "failure-mode"}
 )
 
 
@@ -97,7 +120,22 @@ def _validate_case(case: dict) -> "str | None":
         return f"{case['category']} case needs a reference"
     if case["category"] == "sensitivity" and not case.get("mutations"):
         return "sensitivity case needs mutations"
+    if case["category"] == "contract" and not case.get("declared_exports"):
+        return "contract case needs declared_exports"
+    if case["category"] == "criteria-coverage" and not case.get("criteria"):
+        return "criteria-coverage case needs criteria"
     return None
+
+
+def _flags_verdict(flags: "tuple[str, ...]", expect: dict) -> "tuple[bool, str]":
+    """Shared flags_empty / flags_include comparison for the three
+    flag-based categories (static, contract, criteria-coverage)."""
+    if "flags_empty" in expect:
+        ok = (len(flags) == 0) is bool(expect["flags_empty"])
+        return ok, f"flags={list(flags)}"
+    wanted = list(expect.get("flags_include", []))
+    ok = all(f in flags for f in wanted)
+    return ok, f"wanted {wanted} in flags={list(flags)}"
 
 
 def _oracle_source(case: dict) -> str:
@@ -114,16 +152,19 @@ def _evaluate(case: dict, oracle_code: str) -> CaseResult:
     description = str(case.get("description", ""))
     expect: dict = case["expect"]
 
-    if case["category"] == "static":
+    category = case["category"]
+    if category == "static":
         findings = static_oracle_findings(oracle_code)
         actual: Any = findings.to_dict()
-        if "flags_empty" in expect:
-            ok = (len(findings.flags) == 0) is bool(expect["flags_empty"])
-            why = f"flags={list(findings.flags)}"
-        else:
-            wanted = list(expect.get("flags_include", []))
-            ok = all(f in findings.flags for f in wanted)
-            why = f"wanted {wanted} in flags={list(findings.flags)}"
+        ok, why = _flags_verdict(findings.flags, expect)
+    elif category == "contract":
+        c_findings = contract_import_findings(oracle_code, case.get("declared_exports", []))
+        actual = c_findings.to_dict()
+        ok, why = _flags_verdict(c_findings.flags, expect)
+    elif category == "criteria-coverage":
+        cov_findings = criteria_coverage_findings(oracle_code, case.get("criteria", []))
+        actual = cov_findings.to_dict()
+        ok, why = _flags_verdict(cov_findings.flags, expect)
     else:
         reference = _FIXTURES_DIR / str(case["reference"])
         result = run_oracle_against(

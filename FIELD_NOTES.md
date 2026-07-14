@@ -88,6 +88,13 @@ exists, the lesson or journal entry that paid for it.*
 - **Dynamic Memory reclaim is set by the floor, not the ceiling** *(lesson
   128)*, and a just-booted guest's balloon transient wears the face of a
   hardware-absent failure — measure past the warm-up window.
+- **`Get-VM | ConvertTo-Json` serializes `State` as the raw enum INTEGER**
+  *(2026-07-11, #816; lesson 243)*. The `State` property JSON-serializes as the
+  raw enum number (2, 3, …), not `"Off"`/`"Running"`, and a one-element `Get-VM`
+  pipeline emits a bare object where a list is expected — two traps in one idiom.
+  Emit tab-separated lines with `"$($_.Name)`t$($_.State)"` to stringify the enum
+  and get a uniform line-per-VM shape at zero parse cost. And `Get-VM` with NO
+  name filter is how a sealed guest stops being invisible to a box-state sweep.
 
 ## Node / JavaScript
 
@@ -138,6 +145,15 @@ exists, the lesson or journal entry that paid for it.*
   stays ~4 MB forever; the reserved KV pool tracks `cache_size` in `cl_mem`, and
   weights plus buffers land in `usm_host`. Headlining `usm_device` reports a
   permanent zero.
+- **A draft-wired OpenVINO GenAI pipeline needs `num_assistant_tokens` XOR
+  `assistant_confidence_threshold` on every request** *(lesson 222; 2026-07-10,
+  #778)*. On the OpenVINO GenAI 2026.2.1 substrate there is no per-request
+  draft-OFF: a pipeline constructed with a draft model demands exactly one of
+  those two generation-config knobs on every call, so spec-decode ON and OFF are
+  two distinct pipeline constructions — the OFF arm is a true autoregressive
+  baseline, not the same pipeline with a flag flipped. This is why a fair
+  spec-decode A/B builds two pipelines (standing harness
+  `scripts/benchmark_spec_decode_ab.py`).
 
 ## Git on Windows
 

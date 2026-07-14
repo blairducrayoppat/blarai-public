@@ -134,6 +134,39 @@ def test_import_contract_closes_the_loop_even_when_oracle_names_drift():
     assert "app` package" not in prompt
 
 
+def test_compile_prompts_surfaces_call_signatures_rec1_v3():
+    # #826 rec-1 v3: the coder is shown the CALL SIGNATURES the oracle uses (arity +
+    # keywords), not just the importable names — so the built callable accepts the exact
+    # call the acceptance file makes (the B4n2 park was a one-arg build vs a two-arg call).
+    oracle = (
+        "from app.core import check_answer\n\n"
+        "def test_quiz():\n    assert check_answer('cat', 'cat') == 'correct'\n"
+    )
+    prompt = compile_prompts(
+        [{"repo": "R", "task": "only", "prompt": "build quiz"}],
+        _PY_SPEC, oracle_code=oracle,
+    )[0]["prompt"]
+    assert "argument shapes" in prompt
+    assert "check_answer(2 positional args)" in prompt
+    # additive: the existing importable-names contract is still present (byte-preserved).
+    assert "app.core.check_answer" in prompt and "MUST provide" in prompt
+
+
+def test_compile_prompts_no_signature_line_when_no_calls():
+    # An oracle that imports but never CALLS a first-party callable → no signature line
+    # (byte-identical to the pre-#826 prompt for that shape).
+    oracle = (
+        "from app.core import CONSTANT\n\n"
+        "def test_const():\n    assert CONSTANT == 3\n"
+    )
+    prompt = compile_prompts(
+        [{"repo": "R", "task": "only", "prompt": "build it"}],
+        _PY_SPEC, oracle_code=oracle,
+    )[0]["prompt"]
+    assert "argument shapes" not in prompt
+    assert "app.core.CONSTANT" in prompt  # the import contract still surfaces
+
+
 def test_oracle_import_contract_parser_shapes():
     # Unit-level: the parser extracts first-party symbols and drops test-runner/stdlib deps.
     code = (

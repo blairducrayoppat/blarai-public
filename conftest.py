@@ -299,6 +299,170 @@ def _guard_fleet_reconcile(
     monkeypatch.setattr(_so, "reconcile_at_boot_for_roots", lambda *a, **k: None)
 
 
+# ---------------------------------------------------------------------------
+# REAL HYPER-V VM BOUNDARY TRIPWIRE (#817 — the fail-loud structural control)
+# ---------------------------------------------------------------------------
+# 2026-07-10: the standing gate itself STARTED the real BlarAI-Orchestrator VM
+# three times in one day (Hyper-V Worker-Admin 18500 events at 10:26:00 /
+# 14:41:06 / 23:10:51) — #788's ``_ensure_vm_for_feature`` reads the
+# ``launcher.__main__`` module globals at its point of use, while the
+# pre-existing guest-parser tests mocked only the ``launcher.guest_parser``
+# import site, so the enabled-path tests sailed past their own mocks into the
+# real primitives and PASSED *because* Hyper-V actually complied.  The
+# same-day surgical fix (the benign-stub fourth member of
+# ``launcher/tests/conftest.py``) protects ``launcher.__main__`` callers in
+# ``launcher/tests`` only; THIS fixture is the structural control for the
+# whole gate selection.
+#
+# Enforcement point: patching named wrappers at their import sites is exactly
+# the pattern that failed — twice in two days (#783: tests force-STOPPED the
+# live VM via an import-armed teardown; #817: tests STARTED it via a moved
+# point-of-use seam).  So the sentinel sits at the ONE choke point every real
+# Hyper-V operation funnels through: ``launcher.vm_manager._run_ps``, the
+# module's single PowerShell door.  Every wrapper (``get_vm_state`` /
+# ``start_vm`` / ``stop_vm`` / ``ensure_vm_running`` / ``verify_vm_zero_nic``
+# / ``copy_file_to_vm`` / ``is_guest_service_interface_enabled``) resolves
+# ``_run_ps`` through the vm_manager module namespace AT CALL TIME, so
+# from-import bindings of the wrappers elsewhere (``launcher.__main__``,
+# ``launcher.guest_parser``, ``launcher.guest_deploy``, and
+# ``shared/fleet/swap_ops``'s lazy point-of-use imports) cannot evade it —
+# a moved import seam trips the wire instead of mutating Hyper-V.
+#
+# The sentinel raises via ``pytest.fail`` — BaseException-derived, so a broad
+# ``except Exception`` anywhere between the test and the boundary (e.g. the
+# defensive wrapper in test_guest_boundary_hyperv._vm_running) cannot swallow
+# the violation into a silent fallback path.
+#
+# Opt-out composition (all locked by
+# tests/integration/test_real_vm_boundary_tripwire.py):
+# - Per-test patches of ``vm_manager._run_ps`` or the wrapper seams layer
+#   OVER this autouse patch and win (mock.patch / monkeypatch inside the test
+#   activate after fixture setup and unwind before fixture teardown) —
+#   ``launcher/tests/test_vm_manager.py`` and
+#   ``tests/integration/test_swap_ops.py`` keep working unchanged.
+# - ``launcher/tests``' benign-stub autouse patches the ``launcher.__main__``
+#   bindings, so those tests never reach vm_manager internals at all; the two
+#   fixtures patch DIFFERENT objects and compose in either order.
+# - Legitimately-real tiers (the @hardware guest-boundary round-trip; future
+#   supervised go-live slots) opt out explicitly with
+#   ``@pytest.mark.real_vm`` (registered in pyproject.toml).
+#
+# NOT covered (named residuals): a test that spawns the launcher as a
+# SUBPROCESS bypasses any in-process patch (those tiers are @hardware /
+# supervised); ``vm_manager.request_elevation`` (UAC relaunch via
+# ShellExecuteW, not a Hyper-V mutation — test_vm_manager exercises it
+# directly over mocked ctypes and a function-level sentinel would false-fire).
+
+
+@pytest.fixture(autouse=True)
+def _real_vm_boundary_tripwire(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No test may reach the REAL Hyper-V VM boundary unmocked (#817)."""
+    if request.node.get_closest_marker("real_vm"):
+        return
+    import launcher.vm_manager as _vm
+
+    nodeid = request.node.nodeid
+
+    def _trip(*args: object, **kwargs: object) -> tuple[int, str, str]:
+        command = args[0] if args else kwargs.get("command", "<unknown>")
+        pytest.fail(
+            f"REAL Hyper-V VM boundary reached by an unmocked test (#817): "
+            f"{nodeid} would have executed PowerShell {command!r} against the "
+            f"real BlarAI-Orchestrator VM. launcher.vm_manager._run_ps is the "
+            f"choke point every real VM operation (Get-VM / Start-VM / "
+            f"Stop-VM / Copy-VMFile ...) funnels through; on 2026-07-10 "
+            f"exactly this path let the standing gate genuinely START the VM "
+            f"(the #788 seam mismatch). Fix: patch the seam your code under "
+            f"test actually reads, per-test — the launcher.__main__ bindings "
+            f"(get_vm_state / ensure_vm_running / stop_vm) or the "
+            f"launcher.vm_manager functions / _run_ps itself; a per-test "
+            f"mock.patch / monkeypatch layers over this tripwire and wins. "
+            f"Legitimately-real supervised tiers opt out with "
+            f"@pytest.mark.real_vm."
+        )
+
+    monkeypatch.setattr(_vm, "_run_ps", _trip)
+
+
+# ---------------------------------------------------------------------------
+# LAUNCHER VM-BINDING RESIDUE TRIPWIRE (#836 — the leaked-benign-mock haunting)
+# ---------------------------------------------------------------------------
+# ``_ensure_vm_for_feature`` (#788) reads the ``launcher.__main__`` module
+# globals ``get_vm_state`` / ``ensure_vm_running`` / ``stop_vm`` at its point of
+# use.  The ``launcher/tests`` autouse fixture replaces those three names with
+# benign mocks per-test and restores the genuine ``vm_manager`` functions at its
+# teardown.  But a launcher test that ``monkeypatch.setattr``-s one of those
+# fixture-owned names re-installs the benign mock AFTER that restore: the shared
+# function-scoped ``monkeypatch`` is created early (the two autouse fixtures
+# above request it), so it tears down LAST — after the launcher fixture's
+# ``mock.patch.object.__exit__`` already put the real function back.  The mock
+# then rides ``launcher.__main__.get_vm_state`` for the rest of the SESSION and
+# silently defeats the #817 positive control downstream (its ``_ensure_vm_for_
+# feature`` fast-paths on the leaked RUNNING mock and never trips the wire — the
+# 2026-07-11 "DID NOT RAISE" incident, worked around by constructed-world
+# pinning in ``test_real_vm_boundary_tripwire.py``, root-caused here as #836).
+#
+# This session-end tripwire turns that whole leak class from a silent haunting
+# into a caught, self-naming defect: at teardown it asserts the three
+# ``launcher.__main__`` VM bindings are still the GENUINE ``vm_manager``
+# functions, and fails loud naming the residue + the fix if any is a mock.
+
+_LAUNCHER_VM_BINDINGS: tuple[str, ...] = ("get_vm_state", "ensure_vm_running", "stop_vm")
+
+
+def launcher_vm_binding_residue(
+    current: dict[str, object], genuine: dict[str, object]
+) -> dict[str, object]:
+    """Pure decision function for the launcher VM-binding residue tripwire.
+
+    Returns ``{name: leaked_value}`` for every binding in *current* whose value
+    is NOT (by identity) the genuine ``vm_manager`` function of the same name in
+    *genuine*; an empty dict means the bindings are clean.  Factored out of the
+    ``_launcher_vm_binding_residue_tripwire`` fixture and locked directly by
+    ``tests/test_launcher_vm_binding_residue_tripwire.py`` (mirrors the
+    ``port_leak_verdict`` + ``test_port_leak_detector.py`` pattern).
+    """
+    return {
+        name: value
+        for name, value in current.items()
+        if value is not genuine.get(name)
+    }
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _launcher_vm_binding_residue_tripwire() -> Generator[None, None, None]:
+    """No pytest session may end with a mock stranded on a launcher VM binding (#836)."""
+    yield
+    import sys as _sys
+
+    main_mod = _sys.modules.get("launcher.__main__")
+    if main_mod is None:
+        return  # launcher.__main__ never imported this session — nothing to check
+
+    import launcher.vm_manager as _vm
+
+    genuine = {name: getattr(_vm, name) for name in _LAUNCHER_VM_BINDINGS}
+    current = {name: getattr(main_mod, name, None) for name in _LAUNCHER_VM_BINDINGS}
+    leaked = launcher_vm_binding_residue(current, genuine)
+    if leaked:
+        details = ", ".join(f"{name} -> {value!r}" for name, value in leaked.items())
+        pytest.fail(
+            f"launcher.__main__ VM binding(s) left non-genuine at session end "
+            f"(#836): {details}. A test replaced a launcher-conftest-owned name "
+            f"(get_vm_state / ensure_vm_running / stop_vm) via "
+            f"monkeypatch.setattr — the shared monkeypatch tears down AFTER the "
+            f"launcher/tests autouse fixture restores the real function, so its "
+            f"undo re-installs the benign mock and strands it for the rest of "
+            f"the session, silently defeating the #817 boundary tripwire's "
+            f"positive control. Fix: in the offending test, CONFIGURE the "
+            f"fixture's already-installed mock (set .return_value / assert on "
+            f"launcher.__main__.<name>) instead of monkeypatching the name — see "
+            f"launcher/tests/test_launcher.py::TestCleanupAtExit."
+        )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _disarm_launcher_atexit_cleanup() -> Generator[None, None, None]:
     """No pytest process may leave the launcher's production teardown armed (#783).

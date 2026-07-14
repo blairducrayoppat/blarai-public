@@ -484,9 +484,98 @@ class DecomposeResult:
     split_oversize: bool = False  # True if the #691 envelope split replaced an under-split lump
     used_grammar: bool = False  # True if the MAIN emission ran grammar-constrained (W2)
     message: str = ""
+    #: #824 structured decompose fingerprint for the downgrade instrument (the why-flat
+    #: evidence the next battery night MEASURES instead of infers; #827's classifier
+    #: pattern-matches it). All-empty for callers that build a DecomposeResult directly
+    #: (e.g. a decomposition override) — never load-bearing for behavior, evidence only.
+    diagnostics: dict = field(default_factory=dict)
 
 
-def _parse_candidates(text: str, *, max_tasks: int) -> list[dict]:
+# ---------------------------------------------------------------------------
+# #824 — duplicate-``task``-key collapse recovery (the decompose-downgrade lift)
+# ---------------------------------------------------------------------------
+# The live root cause of B5/habit going FLAT (state/decompose-debug-20260710.log): the 14B
+# emitted a well-formed multi-task decomposition but OMITTED the ``},{`` object separators, so
+# every task's key-group landed in ONE JSON object with a repeated ``"task"`` key. ``json.loads``
+# is happy — duplicate keys are legal, LAST wins — so the array parses to a SINGLE candidate and
+# the plan silently drops to flat mode (no job oracle, no wave gates). Unlike the #748 tail-
+# bracket slip this is VALID json, so ``_repair_json_array`` never fires. This recovers the
+# intended objects deterministically (the model proposes, THIS disposes — the #748 philosophy).
+
+#: A top-level ``"task"`` key occurrence in the model's array. Counting these in the RAW span
+#: gives the model's INTENDED task count independent of whether the JSON structure survived —
+#: the #824 "intent" signal that distinguishes an honest single-task goal (0-1 hits) from a
+#: multi-task plan the parser lost to a duplicate-key collapse (>=2 hits, <2 parsed).
+_TASK_KEY_RE = re.compile(r'"task"\s*:')
+
+#: Appended to the decompose prompt for the ONE bounded retry-with-guidance when a malformed
+#: collapse could not be recovered deterministically (short + single-focus — plan c.1721).
+_RETRY_GUIDANCE = (
+    "\nYour previous answer collapsed into a SINGLE task because several tasks were merged "
+    "into ONE JSON object. Return a JSON ARRAY with EACH task as its OWN separate object — "
+    '[{...}, {...}, {...}] — with a comma AND a new opening brace between tasks. Never repeat '
+    'the "task" key inside one object.\n'
+)
+
+
+class _MultiTask:
+    """Marker wrapping the raw ``(key, value)`` pairs of a single JSON object that carried two
+    or more ``"task"`` keys — a #824 duplicate-key collapse. ``object_pairs_hook`` cannot return
+    several objects from one ``{...}``, so it returns this marker and the caller splits it back
+    into the objects the model intended. Nested objects (a task's ``contract``) never carry a
+    ``task`` key, so they pass through the hook as ordinary dicts and are never wrapped."""
+
+    __slots__ = ("pairs",)
+
+    def __init__(self, pairs: list) -> None:
+        self.pairs = pairs
+
+
+def _dup_task_pairs_hook(pairs: list):
+    """``object_pairs_hook`` that preserves a duplicate-``task`` object as a :class:`_MultiTask`
+    marker (so the collapse stays recoverable) and returns a normal last-wins dict otherwise."""
+    if sum(1 for k, _ in pairs if k == "task") >= 2:
+        return _MultiTask(pairs)
+    return dict(pairs)
+
+
+def _split_multitask(marker: "_MultiTask") -> list[dict]:
+    """Split a collapsed multi-``task`` object into the objects the model intended: a new object
+    STARTS at every ``task`` key and collects the following pairs until the next ``task`` key.
+    Last-wins WITHIN a group (an ordinary ``dict``) preserves JSON semantics for a legitimately
+    repeated non-task key inside a single task. Leading pairs before the first ``task`` key (a
+    malformed head, if any) form no group and are dropped."""
+    groups: list[list] = []
+    for key, value in marker.pairs:
+        if key == "task":
+            groups.append([])
+        if groups:
+            groups[-1].append((key, value))
+    return [dict(g) for g in groups]
+
+
+def _recover_collapsed_tasks(span: str) -> list[dict]:
+    """#824 deterministic recovery of a duplicate-``task``-key collapse: re-parse the array span
+    preserving duplicate keys and expand any :class:`_MultiTask` element into its intended
+    objects. ``[]`` when the span does not parse this way (the caller keeps its prior result)."""
+    try:
+        data = json.loads(span, object_pairs_hook=_dup_task_pairs_hook)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for item in data:
+        if isinstance(item, _MultiTask):
+            out.extend(_split_multitask(item))
+        elif isinstance(item, dict):
+            out.append(item)
+    return out
+
+
+def _parse_candidates(
+    text: str, *, max_tasks: int, diag: "dict | None" = None
+) -> list[dict]:
     """Best-effort parse of the model output into ``[{task, prompt}]``; ``[]`` on failure.
 
     M2 W2: ALSO carries the optional graph fields when present-and-valid — a cleaned
@@ -507,21 +596,40 @@ def _parse_candidates(text: str, *, max_tasks: int) -> list[dict]:
         if start == -1:
             return []
         span = text[start:]
+    parse_span = span  # the span that actually parsed (repaired below if the strict parse fails)
     try:
         data = json.loads(span)
     except (ValueError, TypeError):
         # #748: one wrong closer at the tail of an otherwise-perfect graph must
         # not cost the whole plan — try the bounded deterministic repair before
         # giving up (repair-then-parse; still-broken keeps today's [] fallback).
+        parse_span = _repair_json_array(span)
         try:
-            data = json.loads(_repair_json_array(span))
+            data = json.loads(parse_span)
         except (ValueError, TypeError):
             return []
+        if diag is not None:
+            diag["repair"] = "json-bracket"
         logger.info(
             "decompose: JSON repair salvaged the array (span_len=%d)", len(span)
         )
     if not isinstance(data, list):
         return []
+    # #824 duplicate-``task``-key collapse recovery: the model emitted >=2 ``"task"`` keys but
+    # they collapsed into FEWER objects (missing ``},{`` separators -> one object, last-wins).
+    # Recover the intended objects BEFORE cleaning so a well-formed multi-task plan is not
+    # silently reduced to a single task -> flat mode. Tight gate — fires ONLY when the parse
+    # under-produced (<2 dicts) yet the parsed span clearly intended >=2 tasks, so a healthy
+    # multi-task parse (and the #748 double-brace case, already 6 dicts) is never touched. Runs
+    # on ``parse_span`` so a span that ALSO needed the #748 bracket repair still recovers.
+    dict_count = sum(1 for x in data if isinstance(x, dict))
+    if dict_count < 2 and len(_TASK_KEY_RE.findall(parse_span)) >= 2:
+        recovered = _recover_collapsed_tasks(parse_span)
+        if len(recovered) > dict_count:
+            data = recovered
+            if diag is not None:
+                diag["repair"] = "duplicate-key-split"
+                diag["recovered_candidates"] = len(recovered)
     out: list[dict] = []
     for item in data:
         if not isinstance(item, dict):
@@ -996,6 +1104,86 @@ def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[
     return accepted
 
 
+#: Diagnostics schema version — bump when the field set changes so #827's classifier can pin it.
+_DIAGNOSTICS_SCHEMA = "decompose-diagnostics/v1"
+
+
+def _build_diagnostics(
+    *, raw: str, task_key_hits: int, parsed: int, coherent: int, final_tasks: int,
+    used_grammar: bool, gen_error: str, repair: str, retry_attempted: bool, retry_used: bool,
+    split_oversize: bool, fell_back: bool, idea: str,
+) -> dict:
+    """#824 structured why-flat fingerprint. ``outcome`` is the headline (``plan-graph`` earns
+    the job oracle + wave gates; ``single-task`` / ``fallback`` skip them = flat mode), and
+    ``flat_reason`` classifies WHY a non-graph outcome happened so the next battery night
+    measures the root instead of inferring it:
+
+      * ``""``                    — plan-graph (>=2 coherent tasks, no downgrade).
+      * ``malformed-collapse``    — the model INTENDED >=2 tasks (``task_key_occurrences``>=2)
+                                    but the parse yielded <2 even after the duplicate-key
+                                    recovery + the retry — the B5/habit downgrade class.
+      * ``collapsed-by-ruler``    — the model gave >=2 parseable tasks but the right-sizing
+                                    ruler legitimately collapsed them to one (structural).
+      * ``leaf-goal``             — a single coherent unit by ``_is_leaf_goal`` (honest single).
+      * ``single-task``           — the model emitted one well-formed task (honest single).
+      * ``no-array`` /
+        ``empty-or-unparseable``  — model output carried no usable array -> single-task fallback.
+    """
+    if final_tasks >= 2:
+        outcome, flat_reason = "plan-graph", ""
+    elif fell_back:
+        outcome = "fallback"
+        flat_reason = "no-array" if "[" not in (raw or "") else "empty-or-unparseable"
+    else:
+        outcome = "single-task"
+        if parsed < 2 and task_key_hits >= 2:
+            flat_reason = "malformed-collapse"
+        elif parsed >= 2:
+            flat_reason = "collapsed-by-ruler"
+        elif _is_leaf_goal(idea):
+            flat_reason = "leaf-goal"
+        else:
+            flat_reason = "single-task"
+    return {
+        "schema": _DIAGNOSTICS_SCHEMA,
+        "raw_len": len(raw or ""),
+        "task_key_occurrences": task_key_hits,
+        "parsed_candidates": parsed,
+        "coherent_tasks": coherent,
+        "final_tasks": final_tasks,
+        "used_grammar": used_grammar,
+        "gen_error": gen_error or "",
+        "repair": repair,
+        "retry_attempted": retry_attempted,
+        "retry_used": retry_used,
+        "split_oversize": split_oversize,
+        "fell_back": fell_back,
+        "outcome": outcome,
+        "flat_reason": flat_reason,
+    }
+
+
+def _dump_decompose_debug(raw: str, diagnostics: dict) -> None:
+    """When ``BLARAI_DECOMPOSE_DEBUG=<path>`` is set, append the STRUCTURED diagnostics record
+    (one JSON object per call — classifier-ready for #827) AND the raw model output (for human
+    forensics). This upgrades the #748 ad-hoc text dump: the fingerprint now carries the
+    classified why-flat reason, not just the raw. Env-gated + fail-soft — zero cost/risk unset.
+    (The env dump remains a COLLECTION tool; the always-on per-run evidence is
+    ``swap_ops.write_decompose_diagnostics``, written at the flat-vs-graph decision.)"""
+    try:
+        import os as _os
+
+        dbg = _os.environ.get("BLARAI_DECOMPOSE_DEBUG")
+        if not dbg:
+            return
+        with open(dbg, "a", encoding="utf-8") as fh:
+            fh.write("\n=== decompose diagnostics === "
+                     + json.dumps(diagnostics, ensure_ascii=False) + "\n")
+            fh.write(f"=== decompose raw (len={len(raw or '')}) ===\n{raw or ''}\n")
+    except Exception:  # noqa: BLE001 — a debug dump must never affect a dispatch
+        pass
+
+
 def decompose_request(
     idea: str,
     repo: str,
@@ -1035,35 +1223,65 @@ def decompose_request(
     if not idea:
         return DecomposeResult(ok=False, message="Nothing to dispatch — the idea is empty.")
 
+    parse_diag: dict = {}
     raw, used_grammar, gen_error = _generate_plan_json(
         _DECOMPOSE_TEMPLATE.format(max_tasks=max_tasks, idea=idea),
         generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
         max_tasks=max_tasks,
     )
 
-    candidates = _parse_candidates(raw, max_tasks=_PARSE_CEILING)
+    candidates = _parse_candidates(raw, max_tasks=_PARSE_CEILING, diag=parse_diag)
+    # #824 model-INTENT proxy: how many tasks the model TRIED to emit, independent of whether the
+    # JSON structure survived (a duplicate-key collapse hides the count from json.loads). >=2 hits
+    # with <2 parsed is the malformed-collapse downgrade the recovery + retry target.
+    task_key_hits = len(_TASK_KEY_RE.findall(raw or ""))
+
+    # #824 bounded RETRY-WITH-GUIDANCE: the raw shows MULTI-task intent (>=2 "task" keys) yet the
+    # parse — after the deterministic duplicate-key recovery — still yielded <2 candidates, a
+    # malformed emission the recovery could not salvage. Re-ask ONCE, free-text, with a short
+    # single-focus correction, and adopt it ONLY on a strict improvement (>=2 candidates AND more
+    # than attempt 1). Skipped when the grammar path produced the output (well-formed by
+    # construction) or the goal is a single coherent leaf. FAIL-SOFT: a raising / empty / no-better
+    # retry keeps attempt 1 — a failed retry NEVER blocks the dispatch.
+    retry_attempted = retry_used = False
+    if (
+        len(candidates) < 2
+        and task_key_hits >= 2
+        and not used_grammar
+        and not _is_leaf_goal(idea)
+    ):
+        retry_attempted = True
+        guided = _DECOMPOSE_TEMPLATE.format(max_tasks=max_tasks, idea=idea).replace(
+            "/no_think\n", _RETRY_GUIDANCE + "/no_think\n"
+        )
+        try:
+            retry_raw = generate_fn(guided)
+        except Exception:  # noqa: BLE001 — a retry failure must NEVER block the dispatch
+            retry_raw = ""
+        retry_diag: dict = {}
+        retry_candidates = _parse_candidates(
+            retry_raw, max_tasks=_PARSE_CEILING, diag=retry_diag
+        )
+        if len(retry_candidates) >= 2 and len(retry_candidates) > len(candidates):
+            candidates = retry_candidates
+            raw = retry_raw  # downstream logging/diagnostics reflect the ADOPTED attempt
+            parse_diag = retry_diag
+            task_key_hits = len(_TASK_KEY_RE.findall(raw or ""))
+            retry_used = True
+
     # #740 live-verify diagnostic: make the decompose outcome visible in the AO log so a
     # minimal-fallback root cause (malformed JSON / no array / truncation / think block) is
     # never invisible again.
     logger.info(
-        "decompose: raw_len=%d used_grammar=%s parsed_candidates=%d gen_error=%r",
+        "decompose: raw_len=%d used_grammar=%s parsed_candidates=%d gen_error=%r "
+        "task_key_hits=%d repair=%r retry=%s",
         len(raw or ""), used_grammar, len(candidates), gen_error,
+        task_key_hits, parse_diag.get("repair", ""), retry_used,
     )
     if not candidates:
         logger.warning("decompose: NO candidates parsed — raw head: %r", (raw or "")[:800])
-    # #740/#748 live diagnostic (env-gated; zero-cost unset): raw-output dump — bypasses the AO
-    # logging config, which does not emit this module's logger to stdout. Set
-    # BLARAI_DECOMPOSE_DEBUG=<path> to capture. This dump + its gpu_inference twins localized the
-    # #748 three-defect stack (swallowed xgrammar crash / tool-bait / tail bracket slip).
-    try:
-        import os as _os
-        _dbg = _os.environ.get("BLARAI_DECOMPOSE_DEBUG")
-        if _dbg:
-            with open(_dbg, "a", encoding="utf-8") as _f:
-                _f.write(f"\n=== decompose raw (len={len(raw or '')} cands={len(candidates)} "
-                         f"grammar={used_grammar} err={gen_error!r}) ===\n{raw or ''}\n")
-    except Exception:
-        pass
+    parsed_candidates = len(candidates)
+
     # Right-size: _collapse removes the structural/scaffold/per-test-case splits, leaving
     # the fewest coherent FEATURE tasks (a one-function goal -> 1). The ruler then enforces
     # the max_tasks cap. The leaf stop-condition (_is_leaf_goal) is the recursion-bound
@@ -1092,6 +1310,14 @@ def decompose_request(
             split_oversize = True
 
     if tasks:
+        diagnostics = _build_diagnostics(
+            raw=raw, task_key_hits=task_key_hits, parsed=parsed_candidates,
+            coherent=len(tasks), final_tasks=len(tasks), used_grammar=used_grammar,
+            gen_error=gen_error, repair=parse_diag.get("repair", ""),
+            retry_attempted=retry_attempted, retry_used=retry_used,
+            split_oversize=split_oversize, fell_back=False, idea=idea,
+        )
+        _dump_decompose_debug(raw, diagnostics)
         msg = f"Decomposed into {len(tasks)} task(s)."
         if split_oversize:
             msg += " (envelope: split an oversized single task into gated steps.)"
@@ -1102,12 +1328,21 @@ def decompose_request(
             split_oversize=split_oversize,
             used_grammar=used_grammar,
             message=msg,
+            diagnostics=diagnostics,
         )
 
     # Fallback: a single validated task (the increment-1 framing). Never zero work.
     fallback = [{"repo": repo_target, "task": slugify_task(idea), "prompt": idea}]
+    diagnostics = _build_diagnostics(
+        raw=raw, task_key_hits=task_key_hits, parsed=parsed_candidates,
+        coherent=0, final_tasks=1, used_grammar=used_grammar, gen_error=gen_error,
+        repair=parse_diag.get("repair", ""), retry_attempted=retry_attempted,
+        retry_used=retry_used, split_oversize=False, fell_back=True, idea=idea,
+    )
+    _dump_decompose_debug(raw, diagnostics)
     note = f"model error ({gen_error})" if gen_error else "model output unusable"
     return DecomposeResult(
         ok=True, tasks=fallback, fell_back=True,
         message=f"Decomposition fell back to a single task ({note}).",
+        diagnostics=diagnostics,
     )

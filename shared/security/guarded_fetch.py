@@ -128,7 +128,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from shared.security import egress_guard
+from shared.security import egress_guard, ip_block
 from shared.security.escalation_consent import (
     EscalationContext,
     request_escalation_consent,
@@ -509,20 +509,16 @@ def _validate_url(url: str) -> tuple[Optional[_ValidatedTarget], Optional[str]]:
 
 
 def _is_blocked_ip(addr: object) -> bool:
-    """True iff ``addr`` (an ip_address) is in a range an external fetch must never reach."""
-    try:
-        return bool(
-            addr.is_loopback  # type: ignore[union-attr]
-            or addr.is_private  # type: ignore[union-attr]
-            or addr.is_link_local  # type: ignore[union-attr]
-            or addr.is_reserved  # type: ignore[union-attr]
-            or addr.is_multicast  # type: ignore[union-attr]
-            or addr.is_unspecified  # type: ignore[union-attr]
-            # CGNAT 100.64.0.0/10 is not flagged by is_private in stdlib ipaddress.
-            or (addr.version == 4 and int(addr) >> 22 == (0x64400000 >> 22))  # type: ignore[union-attr]
-        )
-    except AttributeError:
-        return True  # cannot classify -> Fail-Closed (block)
+    """True iff ``addr`` (an ip_address) is in a range an external fetch must never reach.
+
+    Delegates to the ONE canonical blocked-range predicate
+    (:func:`shared.security.ip_block.is_blocked_ip`) so this fetch-side check and
+    ``egress_guard``'s pin-side check can never diverge — a range is added in one
+    place and both doors move together (Vikunja #802 / AUDIT-3). This wrapper is
+    kept (not inlined) so the ``_is_blocked_ip`` name this module's callers
+    (:func:`_validate_url`, :func:`_resolution_blocked_reason`) use is unchanged.
+    """
+    return ip_block.is_blocked_ip(addr)  # type: ignore[arg-type]
 
 
 def _door_resolve(host, port):

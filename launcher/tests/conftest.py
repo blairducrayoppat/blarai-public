@@ -35,7 +35,19 @@ mocked, but two early production steps were never among them:
    observed 2026-07-06; confirmed empirically — one run of
    ``test_production_happy_path`` writes nine PEMs into ``<repo_root>/certs/``).
 
-The autouse fixture patches all three steps AS SEEN BY ``launcher.__main__`` so:
+4. **The real Hyper-V VM boundary (#817).** ``_ensure_vm_for_feature`` (#788,
+   ``8bea7c54``) reads the ``launcher.__main__`` module globals
+   ``get_vm_state``/``ensure_vm_running`` at its point of use, while the
+   pre-existing ``test_guest_parser.py`` enabled-path tests mock only the
+   ``launcher.guest_parser`` import site — so every standing-gate run with the
+   guest VM Off genuinely STARTED ``BlarAI-Orchestrator`` via ``Start-VM``
+   (the test passed *because* of the real mutation), ``_cleanup`` never runs
+   under pytest, and the VM stranded Running (Hyper-V Worker-Admin 18500
+   events 10:26:00 / 14:41:06 / 23:10:51 on 2026-07-10 — the #788 c.1580
+   "VM-start anomaly", root-caused by controlled repro). The #783 class in
+   reverse: tests must neither kill NOR start the real VM.
+
+The autouse fixture patches all four steps AS SEEN BY ``launcher.__main__`` so:
 
 * a live BlarAI can never ``os._exit`` a test run (fail-loud gate integrity);
 * tests never read or write the checkout's REAL ``certs/launcher.lock``
@@ -43,14 +55,22 @@ The autouse fixture patches all three steps AS SEEN BY ``launcher.__main__`` so:
 * the pytest process token is never mutated by a test;
 * the per-boot cert mint is REDIRECTED to a throwaway tmp dir — the REAL
   ``provision_per_boot_certs`` still runs (the boot's cert flow keeps full
-  coverage), but it never writes the checkout's ``<repo_root>/certs/`` (#751).
+  coverage), but it never writes the checkout's ``<repo_root>/certs/`` (#751);
+* the real Hyper-V boundary is stubbed benign (``get_vm_state`` → RUNNING,
+  ``ensure_vm_running``/``stop_vm`` → True) — ``_ensure_vm_for_feature``
+  fast-paths without touching Hyper-V, and a test that WANTS other VM
+  behavior patches the same names per-test as before (a decorator/per-test
+  patch layers on top of this fixture and wins) (#817).
 
 ``test_instance_lock.py`` and ``test_privilege_hardening.py`` are unaffected:
 they exercise ``launcher.instance_lock`` / ``launcher.privilege_hardening``
 directly, and only the ``launcher.__main__`` bindings are patched here. The
 production refusal semantics (refuse + hard exit WITHOUT cleanup) stay
 covered by ``test_launcher.py``'s ``TestInstanceLockRefusal``, which
-re-patches the lock to a refusal per-test.
+re-patches the lock to a refusal per-test. ``launcher/tests/test_vm_manager.py``
+is likewise unaffected: it exercises ``launcher.vm_manager`` functions directly
+(over a mocked ``_run_ps``), and only the ``launcher.__main__`` bindings are
+patched here.
 """
 
 from __future__ import annotations
@@ -61,6 +81,7 @@ from unittest import mock
 import pytest
 
 from launcher.instance_lock import InstanceLockResult
+from launcher.vm_manager import VMState
 
 # Imported from the SOURCE module (not ``launcher.__main__``) so this reference
 # stays the genuine, unpatched cert-minting function even while the fixture
@@ -123,5 +144,14 @@ def _isolate_launcher_process_side_effects(
         mock.patch.object(
             main_mod, "provision_per_boot_certs", _provision_into_tmp
         ),
+        # #817: the real Hyper-V boundary. RUNNING makes _ensure_vm_for_feature
+        # fast-path True without a start attempt; a test wanting Off/failure
+        # semantics patches these same names per-test (its patch layers on top
+        # of this fixture and wins).
+        mock.patch.object(
+            main_mod, "get_vm_state", return_value=VMState.RUNNING
+        ),
+        mock.patch.object(main_mod, "ensure_vm_running", return_value=True),
+        mock.patch.object(main_mod, "stop_vm", return_value=True),
     ):
         yield

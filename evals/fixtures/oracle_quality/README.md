@@ -11,3 +11,9 @@
 Sensitivity mutations are defined in the golden cases (append-override
 transforms applied to a TEMP COPY of the reference — fixtures are never
 mutated in place).
+
+The SAME two fixtures also back the `contract` (#752-F3 import/contract) and
+`criteria-coverage` golden cases (`oq-contract-*` / `oq-covg-*`) — no
+separate fixture files were needed: `declared_exports` and `criteria` ride
+inline in the golden JSONL, checked against `b2_job_oracle.py`'s real
+imports and the real B2 behavior criteria.

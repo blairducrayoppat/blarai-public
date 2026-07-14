@@ -163,6 +163,75 @@ class TestLauncherMain:
             mock_gateway_cls.call_args.kwargs["images_enabled"] is sentinel_flag
         )
 
+    @patch("launcher.__main__.AssistantOrchestratorService")
+    @patch("launcher.__main__.PolicyAgentService")
+    @patch("launcher.__main__.BlarAIApp")
+    @patch("launcher.__main__.TransportGateway")
+    @patch("launcher.__main__.build_session_store")
+    @patch("launcher.__main__.build_shared_pipeline")
+    @patch("launcher.__main__._run_uat2_prompt_flow_preflight", return_value=True)
+    @patch("launcher.__main__.ensure_vm_running", return_value=True)
+    @patch("launcher.__main__.get_vm_state")
+    @patch("launcher.__main__.is_admin", return_value=True)
+    def test_gateway_wires_session_ttl_from_orchestrator(
+        self,
+        _mock_admin,
+        mock_vm_state,
+        _mock_ensure_vm,
+        _mock_prompt_flow,
+        mock_build_pipeline,
+        mock_build_store,
+        mock_gateway_cls,
+        mock_app_cls,
+        mock_policy_service_cls,
+        mock_orchestrator_service_cls,
+    ) -> None:
+        """#801: the launcher threads the AO-resolved
+        [context].session_idle_ttl_s into the TransportGateway as
+        ``session_state_ttl_s=`` — read off the already-started orchestrator
+        service, never a second TOML parse — so ONE operator knob bounds
+        session-keyed state in both processes. Sentinel-asserted so a future
+        edit that stops threading it fails loud (the built-but-unthreaded
+        class, lesson 46)."""
+        from launcher.__main__ import VMState, main
+
+        mock_vm_state.return_value = VMState.RUNNING
+
+        mock_build_result = MagicMock()
+        mock_build_result.ok = True
+        mock_build_result.pipeline = MagicMock()
+        mock_build_result.error = None
+        mock_build_pipeline.return_value = mock_build_result
+
+        mock_build_store.return_value = MagicMock()
+        mock_gateway = MagicMock()
+        mock_gateway.check_pa_status = AsyncMock(return_value=True)
+        mock_gateway_cls.return_value = mock_gateway
+        mock_app_cls.return_value = MagicMock()
+
+        mock_policy_service = MagicMock()
+        mock_policy_service.start.return_value = True
+        mock_policy_service.running = True
+        mock_policy_service_cls.from_runtime_mode.return_value = mock_policy_service
+
+        sentinel_ttl = object()
+        mock_orchestrator_service = MagicMock()
+        mock_orchestrator_service.start.return_value = True
+        mock_orchestrator_service.running = True
+        mock_orchestrator_service.session_idle_ttl_s = sentinel_ttl
+        mock_orchestrator_service_cls.from_runtime_mode.return_value = (
+            mock_orchestrator_service
+        )
+
+        result = main()
+
+        assert result == 0
+        mock_gateway_cls.assert_called_once()
+        assert (
+            mock_gateway_cls.call_args.kwargs["session_state_ttl_s"]
+            is sentinel_ttl
+        )
+
     @patch("launcher.__main__.request_elevation", return_value=True)
     @patch("launcher.__main__.is_admin", return_value=False)
     def test_requests_elevation_when_not_admin(
@@ -761,12 +830,26 @@ class TestRunUat2PromptFlowPreflight:
 class TestCleanupAtExit:
     """Sprint 8 EA-4 WI-8 + 2026-06-10 vm-stop-ratchet fix: _cleanup guards.
 
-    All cases mock Hyper-V fully — ``stop_vm`` and ``get_vm_state`` are patched
-    on ``launcher.__main__`` so no real VM is ever touched.  The 2026-06-10 fix
-    introduced the ``vm_stop_on_exit`` policy (``always`` (default) /
+    All cases mock Hyper-V fully so no real VM is ever touched.  The 2026-06-10
+    fix introduced the ``vm_stop_on_exit`` policy (``always`` (default) /
     ``if_started`` / ``never``); these cases pin each policy via the
     ``BLARAI_VM_STOP_ON_EXIT`` env var (or its absence for the default) so the
     ambient environment cannot perturb them.
+
+    #836 restore-discipline note: ``get_vm_state`` and ``stop_vm`` are already
+    replaced with benign mocks by the ``launcher/tests`` autouse fixture
+    (``conftest.py``), which restores the GENUINE functions at its teardown.
+    These cases therefore CONFIGURE those fixture-owned mocks (return value +
+    call assertions) rather than ``monkeypatch.setattr``-ing the two names.
+    Monkeypatching a fixture-owned name here LEAKS: the shared ``monkeypatch``
+    (created early to satisfy the root-conftest autouse fixtures that request it)
+    tears down AFTER this package's autouse fixture — so its undo would
+    re-install the benign mock *after* the fixture had already restored the real
+    function, stranding the mock on ``launcher.__main__.get_vm_state`` for the
+    rest of the session (the leak the session-end tripwire in the root
+    ``conftest.py`` now catches).  The other module globals (``_session_store``,
+    ``_vm_was_started``, …) are NOT fixture-owned, so ``monkeypatch`` restores
+    them correctly and is still used for those.
     """
 
     def test_services_running_vm_was_started(self, monkeypatch) -> None:
@@ -780,16 +863,14 @@ class TestCleanupAtExit:
         ao = MagicMock()
         ao.running = True
         store = MagicMock()
-        stop_vm_mock = MagicMock(return_value=True)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        main_mod.get_vm_state.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", pa)
         monkeypatch.setattr(main_mod, "_orchestrator_service", ao)
         monkeypatch.setattr(main_mod, "_session_store", store)
         monkeypatch.setattr(main_mod, "_vm_was_started", True)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(
-            main_mod, "get_vm_state", MagicMock(return_value=main_mod.VMState.RUNNING)
-        )
 
         main_mod._cleanup()
 
@@ -808,16 +889,14 @@ class TestCleanupAtExit:
         pa.running = False
         ao = MagicMock()
         ao.running = False
-        stop_vm_mock = MagicMock(return_value=True)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        main_mod.get_vm_state.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", pa)
         monkeypatch.setattr(main_mod, "_orchestrator_service", ao)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", True)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(
-            main_mod, "get_vm_state", MagicMock(return_value=main_mod.VMState.RUNNING)
-        )
 
         main_mod._cleanup()
 
@@ -835,15 +914,15 @@ class TestCleanupAtExit:
 
         monkeypatch.setenv("BLARAI_VM_STOP_ON_EXIT", "always")
 
-        stop_vm_mock = MagicMock(return_value=True)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.RUNNING)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", False)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         main_mod._cleanup()
 
@@ -856,15 +935,15 @@ class TestCleanupAtExit:
 
         monkeypatch.setenv("BLARAI_VM_STOP_ON_EXIT", "always")
 
-        stop_vm_mock = MagicMock(return_value=True)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.OFF)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.OFF
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", True)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         main_mod._cleanup()
 
@@ -885,15 +964,15 @@ class TestCleanupAtExit:
 
         pa = MagicMock()
         pa.running = True
-        stop_vm_mock = MagicMock(return_value=True)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.RUNNING)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", pa)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", False)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         main_mod._cleanup()
 
@@ -907,15 +986,15 @@ class TestCleanupAtExit:
 
         monkeypatch.setenv("BLARAI_VM_STOP_ON_EXIT", "if_started")
 
-        stop_vm_mock = MagicMock(return_value=True)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.RUNNING)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", True)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         main_mod._cleanup()
 
@@ -931,15 +1010,15 @@ class TestCleanupAtExit:
 
         monkeypatch.setenv("BLARAI_VM_STOP_ON_EXIT", "never")
 
-        stop_vm_mock = MagicMock(return_value=True)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.RUNNING)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", True)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         main_mod._cleanup()
 
@@ -960,15 +1039,16 @@ class TestCleanupAtExit:
 
         monkeypatch.delenv("BLARAI_VM_STOP_ON_EXIT", raising=False)  # default: always
 
-        stop_vm_mock = MagicMock(return_value=False)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.RUNNING)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm
+        stop_vm_mock.return_value = False
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", True)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         # Capture at INFO so both the WARNING and the final INFO "complete"
         # line are recorded (the 'complete' line proves cleanup ran to the end).
@@ -995,15 +1075,15 @@ class TestCleanupAtExit:
 
         assert main_mod._resolve_vm_stop_policy() == main_mod.VM_STOP_POLICY_ALWAYS
 
-        stop_vm_mock = MagicMock(return_value=True)
-        get_state_mock = MagicMock(return_value=main_mod.VMState.RUNNING)
+        # Fixture-owned mocks (see class docstring): configure, don't monkeypatch.
+        stop_vm_mock = main_mod.stop_vm  # fixture default: return_value=True
+        get_state_mock = main_mod.get_vm_state
+        get_state_mock.return_value = main_mod.VMState.RUNNING
 
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", False)
-        monkeypatch.setattr(main_mod, "stop_vm", stop_vm_mock)
-        monkeypatch.setattr(main_mod, "get_vm_state", get_state_mock)
 
         main_mod._cleanup()
 
@@ -1015,16 +1095,15 @@ class TestCleanupAtExit:
         monkeypatch.delenv("BLARAI_VM_STOP_ON_EXIT", raising=False)
 
         store = MagicMock()
+        # get_vm_state / stop_vm are fixture-owned (see class docstring):
+        # configure, don't monkeypatch.  default policy (always) queries live
+        # state — VM Off means no stop, and this case only asserts the session
+        # store is closed (stop_vm keeps its benign fixture default).
+        main_mod.get_vm_state.return_value = main_mod.VMState.OFF
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", store)
         monkeypatch.setattr(main_mod, "_vm_was_started", False)
-        monkeypatch.setattr(main_mod, "stop_vm", MagicMock(return_value=True))
-        # default policy (always) queries live state — VM Off means no stop,
-        # and this case only asserts the session store is closed.
-        monkeypatch.setattr(
-            main_mod, "get_vm_state", MagicMock(return_value=main_mod.VMState.OFF)
-        )
 
         main_mod._cleanup()
 
@@ -1035,14 +1114,13 @@ class TestCleanupAtExit:
 
         monkeypatch.delenv("BLARAI_VM_STOP_ON_EXIT", raising=False)
 
+        # get_vm_state / stop_vm are fixture-owned (see class docstring):
+        # configure, don't monkeypatch (stop_vm keeps its benign fixture default).
+        main_mod.get_vm_state.return_value = main_mod.VMState.OFF
         monkeypatch.setattr(main_mod, "_policy_agent_service", None)
         monkeypatch.setattr(main_mod, "_orchestrator_service", None)
         monkeypatch.setattr(main_mod, "_session_store", None)
         monkeypatch.setattr(main_mod, "_vm_was_started", False)
-        monkeypatch.setattr(main_mod, "stop_vm", MagicMock(return_value=True))
-        monkeypatch.setattr(
-            main_mod, "get_vm_state", MagicMock(return_value=main_mod.VMState.OFF)
-        )
 
         main_mod._cleanup()
 

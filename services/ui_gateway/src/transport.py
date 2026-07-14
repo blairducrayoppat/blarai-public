@@ -29,10 +29,12 @@ import asyncio
 import json
 import logging
 import socket as _socket_mod
+import ssl
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 from services.ui_gateway.src.document_loader import (
@@ -56,6 +58,10 @@ from services.ui_gateway.src.dispatch_coordinator import (
     DispatchCoordinator,
     parse_dispatch_command,
 )
+from services.ui_gateway.src.coord_coordinator import (
+    CoordCoordinator,
+    parse_coord_command,
+)
 from services.ui_gateway.src.preferences_coordinator import (
     PreferencesCoordinator,
     parse_preference_command,
@@ -66,13 +72,14 @@ from services.ui_gateway.src.session_store import (
     derive_session_title,
 )
 from services.ui_gateway.src.constants import (
-    PA_HANDSHAKE_BACKOFF_BASE_S,
-    PA_HANDSHAKE_MAX_RETRIES,
+    PA_HANDSHAKE_BUDGET_S,
     PA_HANDSHAKE_TIMEOUT_S,
     PLAN_RESPONSE_TIMEOUT_S,
     PROMPT_RESPONSE_TIMEOUT_S,
+    SESSION_STATE_TTL_S,
     STREAM_TOKEN_BUFFER_LIMIT,
     TOOL_CALL_BUFFER_MAX_TOKENS,
+    pa_handshake_backoff_schedule,
 )
 from shared.constants import (
     ORCHESTRATOR_VM_ID,
@@ -85,8 +92,13 @@ from shared.ipc import (
     VsockAddress,
     VsockConfig,
     VsockTransport,
+    require_bool,
+    require_int,
+    require_str,
+    require_str_list,
 )
 from shared.ipc.vsock import AF_HYPERV, HV_PROTOCOL_RAW
+from shared.ttl_dict import TtlDict
 
 # Maximum bytes of serialized history to include in a PROMPT_REQUEST.
 # Sized conservatively to stay well under the 64 KB envelope limit even
@@ -109,6 +121,18 @@ class StartupState(str, Enum):
     HANDSHAKING = "HANDSHAKING"
     OPERATIONAL = "OPERATIONAL"
     FAILED = "FAILED"
+
+
+class HandshakeConfigurationError(ConnectionError):
+    """A Boot-Phase-3 handshake precondition is structurally absent (#808).
+
+    Raised when the handshake cannot possibly succeed regardless of how
+    long we wait — no endpoint configured (port=0) or production mTLS cert
+    paths missing. The budgeted retry loop treats this as NON-RETRYABLE and
+    fails immediately (Fail-Closed): the 180 s cold-load patience exists
+    for a PA that is still loading, not for a misconfiguration that no
+    amount of retrying can mint a port or a certificate for.
+    """
 
 
 @dataclass(frozen=True)
@@ -147,14 +171,23 @@ class StreamToken:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StreamToken:
-        """Deserialize from a dict."""
+        """Deserialize from an untrusted IPC payload dict.
+
+        Absent fields keep their safe defaults; present fields must carry
+        their declared type (#803 — a mistyped field fails the decode with
+        the deterministic ``ValueError`` fingerprint, it is never coerced).
+
+        Raises:
+            ValueError: If a field is present but not its declared type
+                (Fail-Closed).
+        """
         return cls(
-            token=str(data.get("token", "")),
-            token_index=int(data.get("token_index", 0)),
-            is_final=bool(data.get("is_final", False)),
-            is_tool_call=bool(data.get("is_tool_call", False)),
-            session_id=str(data.get("session_id", "")),
-            is_thinking=bool(data.get("is_thinking", False)),
+            token=require_str(data, "token"),
+            token_index=require_int(data, "token_index"),
+            is_final=require_bool(data, "is_final"),
+            is_tool_call=require_bool(data, "is_tool_call"),
+            session_id=require_str(data, "session_id"),
+            is_thinking=require_bool(data, "is_thinking"),
         )
 
 
@@ -189,12 +222,25 @@ class GatewayPGOVResult:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> GatewayPGOVResult:
-        """Deserialize from a dict."""
+        """Deserialize from an untrusted IPC payload dict.
+
+        Absent fields keep their Fail-Closed defaults (``approved=False``);
+        present fields must carry their declared type (#803).  This kills
+        the worst historical swallow on this boundary: a malformed container
+        in ``approved`` used to bool-coerce to ``True`` — a governance
+        verdict flowing APPROVED off malformed input.  It now fails the
+        decode.
+
+        Raises:
+            ValueError: If a field is present but not its declared type
+                (``reason_codes`` must be a list of str — a bare str must
+                not explode into characters).
+        """
         return cls(
-            approved=bool(data.get("approved", False)),
-            sanitized_text=str(data.get("sanitized_text", "")),
-            reason_codes=list(data.get("reason_codes", [])),
-            request_id=str(data.get("request_id", "")),
+            approved=require_bool(data, "approved"),
+            sanitized_text=require_str(data, "sanitized_text"),
+            reason_codes=require_str_list(data, "reason_codes"),
+            request_id=require_str(data, "request_id"),
         )
 
 
@@ -263,6 +309,10 @@ class TransportGateway:
         fleet_dispatch_enabled: bool = False,
         fleet_dispatch_agentic_setup_dir: str = "",
         fleet_dispatch_projects_dir: str = "",
+        coordinator_enabled: bool = False,
+        coordinator_projects: "dict[str, int] | None" = None,
+        coordinator_campaign_state_path: str = "",
+        session_state_ttl_s: float = SESSION_STATE_TTL_S,
     ) -> None:
         """Initialize the Transport Gateway.
 
@@ -291,6 +341,31 @@ class TransportGateway:
                             ``False`` (dormant) — the launcher passes the
                             AO-resolved value; every existing call site stays
                             dormant.
+            coordinator_enabled: The resolved ``[coordinator].enabled`` flag
+                            (#843, ADR-039 — the Coordinator program C1 read
+                            surface). Default ``False`` (dormant) — with this
+                            off, ``/coord status`` returns a clear disabled
+                            notice and NEVER touches Vikunja or fleet state
+                            (checked before any collaborator, mirroring
+                            ``fleet_dispatch_enabled``'s dormancy shape).
+            coordinator_projects: Vikunja project ids the read surface
+                            reports on, keyed by DISPLAY NAME (never a
+                            hardcoded id — ADR-039 §2.12.11). ``None``/empty
+                            is valid (no projects configured yet); the
+                            operator populates this after the separate,
+                            operator-run Kanban substrate-setup migration.
+            coordinator_campaign_state_path: An optional path to a
+                            battery-campaign-state JSON file (tri-state
+                            read). Empty string (the default) reads as a
+                            benign EMPTY, never a failure — see
+                            ``shared/fleet/work_state.read_campaign_state``.
+            session_state_ttl_s: Idle TTL (seconds) for the gateway's
+                            session-keyed coordinator state (#801) — pending
+                            documents, preview metadata, pending ingests,
+                            pending dispatch plans.  Swept at each turn start;
+                            ``<= 0`` disables the reaper.  The launcher threads
+                            the AO-resolved ``[context].session_idle_ttl_s`` so
+                            one knob bounds both processes.
         """
         self._session_store = session_store
         self._dev_mode: bool = dev_mode
@@ -303,9 +378,20 @@ class TransportGateway:
         self._mtls_cert_path: str = mtls_cert_path
         self._mtls_key_path: str = mtls_key_path
         self._ca_cert_path: str = ca_cert_path
+        # #805: the mTLS client SSLContext is immutable per-boot config (client
+        # cert chain + CA trust + CERT_REQUIRED + TLS floor) and is safe to reuse
+        # across every per-message connection.  Built once on the first
+        # production connect (see _client_ssl_context) and cached here so the
+        # disk PEM reads + context construction leave the per-turn hot path.
+        # Stays None in dev_mode (the loopback path skips mTLS entirely).
+        self._client_ssl_ctx: ssl.SSLContext | None = None
         # UC-003 Workstream B #1: the resolved image weld-lock, threaded into
         # the ingest coordinator below (default False = dormant).
         self._images_enabled: bool = bool(images_enabled)
+        # #801: idle TTL for the session-keyed coordinator dicts below (and the
+        # ingest/dispatch coordinators'). Swept at each turn start; <= 0
+        # disables the reaper. One knob with the AO's session_idle_ttl_s.
+        self._session_state_ttl_s: float = float(session_state_ttl_s)
         self._state: StartupState = StartupState.INITIALIZING
         self._connected: bool = False
         self._tool_call_buffer: list[StreamToken] = []
@@ -318,7 +404,9 @@ class TransportGateway:
 
         # Pending documents buffer — keyed by session_id.
         # Filled by load_document(); drained into each PROMPT_REQUEST.
-        self._pending_documents: dict[str, list[dict[str, str]]] = {}
+        # TtlDict (#801): a /load never followed by a prompt would otherwise
+        # hold the document text until restart; the turn-start sweep bounds it.
+        self._pending_documents: TtlDict[list[dict[str, str]]] = TtlDict()
         # Sessions where the user issued /trust — every PROMPT_REQUEST for
         # the session carries documents_trusted_for_tools=True. Cleared on
         # /unload (the secure default re-applies on the next /load). Layer 3
@@ -342,7 +430,9 @@ class TransportGateway:
         # popped by the dispatcher (ingest_preview_meta) to attach the editable
         # body + doc_uuid to that preview frame.  Pop-on-read so it never leaks
         # onto a later non-preview turn (a refusal, an /approve confirmation).
-        self._pending_preview_meta: dict[str, dict[str, str]] = {}
+        # TtlDict (#801): a preview frame that is never rendered never pops —
+        # the turn-start sweep bounds the orphans.
+        self._pending_preview_meta: TtlDict[dict[str, str]] = TtlDict()
 
         # Local generative imaging coordinator (UC-010, ADR-033 — DORMANT):
         # /imagine, /edit, /save.  Default wiring reaches the AO over the same
@@ -386,6 +476,32 @@ class TransportGateway:
             execute_fn=self._dispatch_execute_fn,
         )
 
+        # Coordinator program C1 read surface (#843, ADR-039 — DORMANT):
+        # /coord status composes a READ-ONLY snapshot of fleet-swap state +
+        # the fleet queue + the latest run + the battery campaign (if
+        # configured) + every configured Vikunja project's board + flow
+        # metrics, over the SAME loopback-pinned vikunja_bridge the #749 job
+        # ticket bridge uses (no second network path). DORMANCY IS THE FLAG
+        # ALONE: enabled=false (the shipped default) makes handle_command
+        # return the disabled notice BEFORE touching Vikunja or fleet state.
+        # No write path exists on this coordinator at all — C2-C5 (lifecycle
+        # coordination, work origination, graduated autonomy) land under the
+        # self-governance boundary #848 implements; this module has nothing
+        # for those controls to bound.
+        self._coord_coordinator: CoordCoordinator = CoordCoordinator(
+            enabled=bool(coordinator_enabled),
+            fleet_config=_build_fleet_config(
+                agentic_setup_dir=fleet_dispatch_agentic_setup_dir or None,
+                projects_dir=fleet_dispatch_projects_dir or None,
+            ),
+            coordinator_projects=coordinator_projects,
+            campaign_state_path=(
+                Path(coordinator_campaign_state_path)
+                if coordinator_campaign_state_path
+                else None
+            ),
+        )
+
         # Operator-preferences coordinator (#770 M1, Loop 1): /remember +
         # /preferences over the same connection-per-message AO leg.  The
         # gateway parse of operator-typed text is the tier's ONLY write
@@ -407,11 +523,20 @@ class TransportGateway:
         return self._connected
 
     async def check_pa_status(self) -> bool:
-        """Perform Boot-Phase-3 PA handshake with retry logic.
+        """Perform Boot-Phase-3 PA handshake with budgeted retry logic (#808).
 
-        Attempts vsock connection to the Policy Agent with exponential
-        backoff (1s, 2s, 4s). Returns True on success, False after
-        max retries exceeded.
+        Attempts vsock connection to the Policy Agent on a capped-exponential
+        backoff schedule (1s, 2s, 4s, 8s, then every 15s) whose planned
+        sleeps sum to ``PA_HANDSHAKE_BUDGET_S`` (180 s — the documented
+        cold-14B-load ceiling, matching ``real_backend_ready``). Returns
+        True on success, False once the budget is exhausted (Fail-Closed).
+        The healthy path is unchanged: a first-attempt success sleeps zero
+        seconds. A cold/slow PA that becomes ready anywhere inside the
+        budget is caught within at most one backoff-cap (15 s).
+
+        A structurally-absent configuration (no endpoint, missing
+        production mTLS certs — :class:`HandshakeConfigurationError`) fails
+        IMMEDIATELY without retries: patience cannot mint a port or a cert.
 
         If the gateway is already connected (e.g. launcher already
         passed handshake + prompt-flow preflight), returns True
@@ -427,8 +552,11 @@ class TransportGateway:
         self._state = StartupState.HANDSHAKING
         logger.info("Boot-Phase-3: beginning PA handshake")
 
-        for attempt in range(PA_HANDSHAKE_MAX_RETRIES):
-            backoff = PA_HANDSHAKE_BACKOFF_BASE_S * (2 ** attempt)
+        schedule = pa_handshake_backoff_schedule()
+        attempts_total = len(schedule) + 1
+        attempts_made = 0
+        for attempt in range(attempts_total):
+            attempts_made = attempt + 1
             try:
                 success = await self._attempt_pa_handshake()
                 if success:
@@ -439,6 +567,14 @@ class TransportGateway:
                         attempt + 1,
                     )
                     return True
+            except HandshakeConfigurationError:
+                logger.error(
+                    "Boot-Phase-3: handshake configuration absent — "
+                    "failing immediately, retries cannot repair it "
+                    "(Fail-Closed, #808)",
+                    exc_info=True,
+                )
+                break
             except Exception:
                 logger.warning(
                     "Boot-Phase-3: PA handshake attempt %d failed",
@@ -446,20 +582,25 @@ class TransportGateway:
                     exc_info=True,
                 )
 
-            if attempt < PA_HANDSHAKE_MAX_RETRIES - 1:
+            if attempt < len(schedule):
+                backoff = schedule[attempt]
                 logger.info(
-                    "Boot-Phase-3: retrying in %.1fs (attempt %d/%d)",
+                    "Boot-Phase-3: retrying in %.1fs (attempt %d/%d, "
+                    "aggregate backoff budget %.0fs)",
                     backoff,
                     attempt + 1,
-                    PA_HANDSHAKE_MAX_RETRIES,
+                    attempts_total,
+                    PA_HANDSHAKE_BUDGET_S,
                 )
                 await asyncio.sleep(backoff)
 
         self._state = StartupState.FAILED
         self._connected = False
         logger.error(
-            "Boot-Phase-3: PA handshake FAILED after %d attempts — Fail-Closed",
-            PA_HANDSHAKE_MAX_RETRIES,
+            "Boot-Phase-3: PA handshake FAILED after %d attempts "
+            "(aggregate backoff budget %.0fs) — Fail-Closed",
+            attempts_made,
+            PA_HANDSHAKE_BUDGET_S,
         )
         return False
 
@@ -470,6 +611,12 @@ class TransportGateway:
         In production host_mode, uses loopback + mTLS (fidelity-2).
         In production guest_mode, uses AF_HYPERV + mTLS (#615 — activated).
 
+        Every mode's attempt is bounded by ``PA_HANDSHAKE_TIMEOUT_S`` per
+        socket operation (#808 — production previously rode the 180 s
+        ``PROMPT_RESPONSE_TIMEOUT_S`` default, so a mute-but-accepting
+        server could stall the whole boot inside one attempt; the budgeted
+        retry loop owns the patience, this bounds one probe).
+
         The transport is stored on success for subsequent send_prompt /
         stream_tokens calls.
 
@@ -477,10 +624,29 @@ class TransportGateway:
             True if handshake succeeded.
 
         Raises:
-            ConnectionError: If connection or protocol exchange fails.
+            HandshakeConfigurationError: If a handshake precondition is
+                structurally absent (no endpoint / missing production mTLS
+                certs) — non-retryable, the budget loop fails immediately.
+            ConnectionError: If connection or protocol exchange fails
+                (retryable — the PA may still be loading).
         """
         if self._port == 0 and self._dev_mode:
-            raise ConnectionError("No PA endpoint configured (port=0)")
+            raise HandshakeConfigurationError("No PA endpoint configured (port=0)")
+        if not self._dev_mode:
+            # Production preconditions (#808): these cannot become true by
+            # waiting — fail the whole handshake immediately, not after
+            # 180 s of pointless retries. The connect helpers keep their own
+            # fail-closed checks (defense in depth for non-handshake callers).
+            if not self._mtls_cert_path or not self._ca_cert_path:
+                raise HandshakeConfigurationError(
+                    "Production handshake refused: per-boot mTLS cert paths "
+                    "not provisioned (Fail-Closed, ADR-026)"
+                )
+            if self._host_mode and self._port == 0:
+                raise HandshakeConfigurationError(
+                    "Production host-mode handshake refused: no PA endpoint "
+                    "configured (port=0)"
+                )
 
         transport: VsockTransport | None = None
         try:
@@ -497,12 +663,18 @@ class TransportGateway:
                     )
             elif self._host_mode:
                 # Production host-mode: loopback + mTLS (fidelity-2 / SDV §4).
-                transport = await asyncio.to_thread(self._connect_host_loopback_mtls)
+                # Bounded by the handshake per-attempt timeout (#808).
+                transport = await asyncio.to_thread(
+                    self._connect_host_loopback_mtls, PA_HANDSHAKE_TIMEOUT_S
+                )
                 if transport is None:
                     raise ConnectionError("Host-mode loopback+mTLS connection failed")
             else:
                 # Production guest-mode: AF_HYPERV + mTLS (#615 — activated).
-                transport = await asyncio.to_thread(self._connect_hyperv)
+                # Bounded by the handshake per-attempt timeout (#808).
+                transport = await asyncio.to_thread(
+                    self._connect_hyperv, PA_HANDSHAKE_TIMEOUT_S
+                )
                 if transport is None:
                     raise ConnectionError("AF_HYPERV connection failed")
 
@@ -572,6 +744,41 @@ class TransportGateway:
             # Production guest-mode: AF_HYPERV + mTLS (#615 — activated).
             return await asyncio.to_thread(self._connect_hyperv, timeout_s)
 
+    def _client_ssl_context(self) -> ssl.SSLContext | None:
+        """Return the reusable mTLS client SSLContext, building it once (#805).
+
+        The client SSLContext is immutable per-boot configuration — the client
+        cert chain, the CA trust store, ``CERT_REQUIRED``, the TLS floor and the
+        no-hostname posture — and Python's ``ssl`` module explicitly supports
+        reusing one context across many connections (and threads).  Building it
+        once and caching it removes the per-message disk PEM reads + context
+        construction from the hot path (send_prompt, every tool round-trip,
+        ingest, imagine, plan); the connection-per-message architecture is
+        unchanged.
+
+        Fail-closed is preserved exactly: a build failure returns ``None`` (the
+        caller refuses the connection) and is NOT cached, so the next connect
+        retries the build rather than being permanently poisoned by a transient
+        failure.  The cert/verify posture is byte-identical to the prior
+        per-connection build — the very object ``create_client_ssl_context``
+        produced before, now shared.  (A first-connect race between two worker
+        threads at most builds the context twice; both are valid and one wins
+        the cache — harmless, so no lock is taken.)
+        """
+        ctx = self._client_ssl_ctx
+        if ctx is not None:
+            return ctx
+        from shared.ipc.vsock import create_client_ssl_context
+
+        ctx = create_client_ssl_context(
+            self._mtls_cert_path,
+            self._mtls_key_path,
+            self._ca_cert_path,
+        )
+        if ctx is not None:
+            self._client_ssl_ctx = ctx
+        return ctx
+
     def _connect_host_loopback_mtls(
         self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S
     ) -> VsockTransport | None:
@@ -606,14 +813,11 @@ class TransportGateway:
             )
             return None
         try:
-            from shared.ipc.vsock import create_client_ssl_context
             import ssl as _ssl_mod
 
-            ssl_ctx = create_client_ssl_context(
-                self._mtls_cert_path,
-                self._mtls_key_path,
-                self._ca_cert_path,
-            )
+            # #805: reuse the per-boot mTLS client context instead of rebuilding
+            # it (disk PEM reads + context construction) on every message.
+            ssl_ctx = self._client_ssl_context()
             if ssl_ctx is None:
                 logger.error(
                     "Host-mode loopback: mTLS client SSL context creation failed"
@@ -639,6 +843,13 @@ class TransportGateway:
                 _socket=wrapped,
             )
         except (OSError, _ssl_mod.SSLError) as exc:
+            # #805 regression fix (2026-07-11): a failed connect can mean the
+            # cached client SSLContext was built while the per-boot certs were
+            # mid-re-mint (briefly inconsistent during the battery's boot /
+            # ensure-ao re-mint). Drop the cache so the next retry rebuilds from
+            # the settled certs on disk — restoring the pre-#805 self-healing the
+            # per-message rebuild gave us (caching poisoned all 16 boot retries).
+            self._client_ssl_ctx = None
             logger.error("Host-mode loopback+mTLS connect failed: %s", exc)
             return None
 
@@ -694,18 +905,16 @@ class TransportGateway:
             raw = _socket_mod.socket(
                 AF_HYPERV, _socket_mod.SOCK_STREAM, HV_PROTOCOL_RAW
             )
-            raw.settimeout(PROMPT_RESPONSE_TIMEOUT_S)
+            # #808: honor the caller's timeout — this previously hardcoded
+            # PROMPT_RESPONSE_TIMEOUT_S, silently ignoring the timeout_s
+            # parameter (the handshake path passes the 5 s per-attempt bound).
+            raw.settimeout(timeout_s)
             raw.connect((ORCHESTRATOR_VM_ID, VSOCK_SERVICE_GUID))
 
             # Wrap with the per-boot mTLS client context so the handshake
-            # is NOT deferred until the first send.
-            from shared.ipc.vsock import create_client_ssl_context
-
-            ssl_ctx = create_client_ssl_context(
-                self._mtls_cert_path,
-                self._mtls_key_path,
-                self._ca_cert_path,
-            )
+            # is NOT deferred until the first send.  #805: reuse the cached
+            # context rather than rebuilding it per AF_HYPERV connection.
+            ssl_ctx = self._client_ssl_context()
             if ssl_ctx is None:
                 logger.error("AF_HYPERV: mTLS client SSL context creation failed")
                 raw.close()
@@ -719,6 +928,9 @@ class TransportGateway:
                 _socket=wrapped,
             )
         except (OSError, _ssl_mod.SSLError) as exc:
+            # #805 regression fix: drop the cached client SSLContext on failure so
+            # the next retry rebuilds from fresh per-boot certs (see the host path).
+            self._client_ssl_ctx = None
             logger.error("AF_HYPERV connect failed: %s", exc)
             if raw is not None:
                 try:
@@ -753,6 +965,9 @@ class TransportGateway:
         if session_id not in self._pending_documents:
             self._pending_documents[session_id] = []
         self._pending_documents[session_id].append(doc)
+        # In-place append does not restamp the TtlDict entry — touch so a
+        # fresh /load always restarts the idle clock (#801).
+        self._pending_documents.touch(session_id)
         injection_warnings = scan_for_injection(doc["content"])
         logger.info(
             "load_document: session=%s file=%s size=%d bytes stashed",
@@ -1024,6 +1239,12 @@ class TransportGateway:
             spec=AcceptanceSpec.from_dict(result.get("criteria", {})),
             fell_back=bool(result.get("fell_back", False)),
             message=str(result.get("message", "")),
+            # #819: the CLARIFY early-return payload (empty on a normal plan). The coordinator
+            # renders these + holds the dispatch until the operator answers.
+            questions=list(result.get("questions", [])),
+            # #820: the REVISE early-return payload (empty on a normal plan). The coordinator
+            # applies these ops to the pending plan (byte-stable keeps + new adds).
+            revision=list(result.get("revision", [])),
         )
 
     # ── Headless-coding dispatch — EXECUTE seam (#670) ──────────────────
@@ -1180,6 +1401,35 @@ class TransportGateway:
         if command is None:
             return None
         reply = await self._dispatch_coordinator.handle_command(session_id, command)
+        self._persist_informational_turn(session_id, stripped, reply)
+        return reply
+
+    async def handle_coord_command(self, session_id: str, text: str) -> str | None:
+        """Intercept ``/coord`` BEFORE prompt dispatch (#843, ADR-039 — the
+        Coordinator program C1 read surface).
+
+        Gateway-side by design (the dispatch/imagine/ingest pattern): a
+        deterministic, READ-ONLY status report, never a model call.
+        DORMANT-safe — with ``[coordinator].enabled=false`` the coordinator
+        returns a clear disabled notice and touches NEITHER Vikunja NOR
+        fleet state (checked before either is reached).
+
+        Returns the reply text when the message was handled (a ``/coord``
+        command), or ``None`` for a normal prompt — the caller then proceeds
+        with the unchanged ``send_prompt`` flow. Persisted as an
+        INFORMATIONAL turn (mirrors ``handle_dispatch_command``), which the
+        gateway's own history filter already excludes from ever re-entering
+        the model's context on a later turn — the structural half of "ticket
+        content read through /coord status must not become chat injection"
+        (ADR-039 §2.7 / §2.12.13); ``shared/fleet/coord_render.py`` adds the
+        render-time neutralization on top, as defense-in-depth."""
+        stripped = text.strip()
+        if not stripped:
+            return None
+        command = parse_coord_command(stripped)
+        if command is None:
+            return None
+        reply = await self._coord_coordinator.handle_command(session_id, command)
         self._persist_informational_turn(session_id, stripped, reply)
         return reply
 
@@ -1717,6 +1967,14 @@ class TransportGateway:
         if not stripped:
             raise ValueError("Prompt cannot be empty")
 
+        # #801 turn-boundary hygiene — BEFORE the new request id is minted:
+        # evict prior turns' PGOV verdicts (turn-scoped by design; both
+        # consumers read the verdict within its own turn) and sweep expired
+        # session-keyed coordinator state. Fail-soft: hygiene never blocks
+        # the prompt path.
+        self._evict_prior_pgov_results()
+        await self._reap_expired_session_state()
+
         # /external <content> — designate content as UNTRUSTED-external (ADR-023
         # §3.1); interim gateway-side affordance (the proper UI gesture is EA-6).
         # The original /external text is still persisted to history below; the AO
@@ -1918,13 +2176,14 @@ class TransportGateway:
 
             elif msg_type == MessageType.PGOV_RESULT:
                 resolved_req_id = req_id.strip() or (self._active_request_id or "")
-                result = GatewayPGOVResult(
-                    approved=bool(payload.get("approved", False)),
-                    sanitized_text=str(
-                        payload.get("sanitized_text", "")
-                    ),
-                    reason_codes=list(payload.get("reason_codes", [])),
-                    request_id=resolved_req_id,
+                # #803: route through the strict from_dict — a mistyped field
+                # (e.g. a container in ``approved``) raises ValueError and ends
+                # the stream Fail-Closed (nothing cached → get_pgov_result
+                # falls back to default-deny) instead of bool-coercing a
+                # malformed value into an APPROVED verdict.  The request_id is
+                # envelope-resolved, never payload-supplied.
+                result = GatewayPGOVResult.from_dict(
+                    {**payload, "request_id": resolved_req_id}
                 )
                 if resolved_req_id:
                     self._pgov_cache[resolved_req_id] = result
@@ -2032,6 +2291,74 @@ class TransportGateway:
         if not pgov_approved:
             logger.info("Tool-call buffer flushed — PGOV denied, tokens discarded")
         return tokens
+
+    def _evict_prior_pgov_results(self) -> None:
+        """Evict prior turns' PGOV verdicts at the turn boundary — the
+        implementation of the LA-decided "internal caches evict every turn"
+        (#801 c.1713).
+
+        The verdict cache is turn-scoped: both production consumers
+        (ui_backend dispatcher, ui_shell app) read a turn's result exactly
+        once, after its stream completes and BEFORE the next ``send_prompt``.
+        Clearing at the start of the next turn evicts every turn's entry
+        while preserving every read (including a re-read within the same
+        turn — deliberately NOT pop-on-read, which would flip a same-turn
+        re-read of an APPROVED verdict to default-DENY, a correctness
+        landmine fail-closed in name only) and bounds the cache at O(1):
+        the active turn's entry plus at most the last completed turn's
+        entry between turns. Also covers abandoned turns (a stream-arc
+        timeout that never read its verdict — pop-on-read would leak those).
+        """
+        evicted = len(self._pgov_cache)
+        if evicted:
+            self._pgov_cache.clear()
+            logger.debug(
+                "send_prompt: evicted %d prior-turn PGOV result(s) "
+                "(turn boundary)",
+                evicted,
+            )
+
+    async def _reap_expired_session_state(self) -> None:
+        """Sweep expired session-keyed coordinator state (#801 idle backstop).
+
+        Runs at each turn start. Bounds the dicts that are otherwise cleared
+        only by their completion pop: pending documents, one-shot preview
+        metadata, pending ingest previews (best-effort REJECTED through the
+        AO so its pending row + encrypted staging blob clean up too), and
+        pending dispatch plans/clarifications. Growth in these dicts requires
+        operator activity, so an activity-driven sweep bounds them; an idle
+        app holds only its already-bounded past entries.
+
+        Fail-soft: the hygiene sweep must never break the prompt path — any
+        unexpected error is logged and the turn proceeds (the leak persists
+        one more turn).
+        """
+        ttl_s = self._session_state_ttl_s
+        if ttl_s <= 0:
+            return
+        try:
+            for name, expired in (
+                ("pending_documents", self._pending_documents.sweep(ttl_s)),
+                ("pending_preview_meta", self._pending_preview_meta.sweep(ttl_s)),
+            ):
+                if expired:
+                    # Eviction events are LOGGED (LA condition, #801 c.1666).
+                    # Session ids only — never document content.
+                    logger.info(
+                        "Session-state reaper: dropped %d expired %s "
+                        "entry(ies) for session(s): %s",
+                        len(expired),
+                        name,
+                        ", ".join(expired),
+                    )
+            await self._ingest_coordinator.reap_expired(ttl_s)
+            self._dispatch_coordinator.reap_expired(ttl_s)
+        except Exception as exc:  # noqa: BLE001 — hygiene must not break the turn
+            logger.error(
+                "Session-state reaper failed (state persists one more turn): %s",
+                exc,
+                exc_info=True,
+            )
 
     def reset(self) -> None:
         """Reset gateway state for retry. Returns to INITIALIZING."""

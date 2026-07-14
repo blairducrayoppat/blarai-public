@@ -30,14 +30,78 @@ SESSION_DB_PATH: str = (
 # Boot-Phase-3 Handshake
 # ---------------------------------------------------------------------------
 
-PA_HANDSHAKE_MAX_RETRIES: int = 3
-"""Maximum number of PA vsock handshake attempts before Fail-Closed."""
-
 PA_HANDSHAKE_BACKOFF_BASE_S: float = 1.0
-"""Base backoff duration (seconds). Doubles each retry: 1s, 2s, 4s."""
+"""Base backoff duration (seconds). Doubles each retry (1s, 2s, 4s, 8s)
+until it reaches ``PA_HANDSHAKE_BACKOFF_CAP_S``."""
 
 PA_HANDSHAKE_TIMEOUT_S: float = 5.0
-"""Per-attempt connection timeout (seconds)."""
+"""Per-attempt connection timeout (seconds).
+
+Governs the handshake attempt in ALL transport modes (#808): the dev
+loopback ``VsockConfig`` AND the production host-mode / guest-mode socket
+timeouts. (Before #808 only the dev path used this; a production handshake
+attempt rode ``PROMPT_RESPONSE_TIMEOUT_S`` = 180 s per socket op, so one
+mute-but-accepting server could stall the whole boot on a single attempt.)
+The retry schedule below owns the patience; this bounds one probe."""
+
+PA_HANDSHAKE_BACKOFF_CAP_S: float = 15.0
+"""Ceiling for the exponential backoff between handshake attempts (#808).
+
+Uncapped doubling would sleep 64+ s between tail attempts, leaving up to a
+minute of blindness to a PA that became ready early in the gap. Capping at
+15 s means a cold-loading PA is caught within at most 15 s of becoming
+ready, anywhere inside the budget. Registered in
+``shared/timeout_registry.py``."""
+
+PA_HANDSHAKE_BUDGET_S: float = 180.0
+"""Aggregate planned-backoff budget (seconds) for the Boot-Phase-3 PA
+handshake before Fail-Closed (#808, System Qualities Audit Resilience #2).
+
+Matches the documented cold-load ceiling the rest of the system already
+grants the same physical event — a cold Qwen3-14B load can exceed 2 minutes
+(``shared.fleet.swap_ops.real_backend_ready(timeout_s)`` = 180 s;
+``AoReensurer.boot_wait_s`` = 180 s). The prior aggregate was ~15-18 s
+(3 attempts x 5 s + 1+2 s backoff; ~3 s when the socket refuses instantly),
+which converted a legitimately cold/slow PA into a hard boot outage needing
+a manual relaunch. The wall-clock worst case additionally carries per-attempt
+time on top of this budget, bounded by ``PA_HANDSHAKE_MAX_RETRIES`` x
+``PA_HANDSHAKE_TIMEOUT_S``-scale probes. Registered in
+``shared/timeout_registry.py``; a registry relation lock binds it to the
+``real_backend_ready`` ceiling."""
+
+
+def pa_handshake_backoff_schedule() -> tuple[float, ...]:
+    """The planned sleeps between Boot-Phase-3 handshake attempts (#808).
+
+    Exponential from ``PA_HANDSHAKE_BACKOFF_BASE_S`` (doubling), capped at
+    ``PA_HANDSHAKE_BACKOFF_CAP_S``, extended until the cumulative sleep
+    reaches exactly ``PA_HANDSHAKE_BUDGET_S`` (the final step is trimmed if
+    the values ever stop dividing evenly). With the shipped values:
+    ``(1, 2, 4, 8, 15 x 11)`` — 15 sleeps summing to 180.0 s, i.e. 16
+    attempts.
+
+    Single source of truth for the retry loop
+    (``TransportGateway.check_pa_status``) AND the TUI boot banner's
+    attempt markers (``BlarAIApp._poll_boot_status``) — the two surfaces
+    must never disagree about the schedule (lesson 221: the pair, not the
+    values, is what rots).
+    """
+    delays: list[float] = []
+    total = 0.0
+    step = PA_HANDSHAKE_BACKOFF_BASE_S
+    while total < PA_HANDSHAKE_BUDGET_S:
+        delay = min(step, PA_HANDSHAKE_BACKOFF_CAP_S, PA_HANDSHAKE_BUDGET_S - total)
+        delays.append(delay)
+        total += delay
+        step = min(step * 2.0, PA_HANDSHAKE_BACKOFF_CAP_S)
+    return tuple(delays)
+
+
+PA_HANDSHAKE_MAX_RETRIES: int = len(pa_handshake_backoff_schedule()) + 1
+"""Total PA handshake attempts before Fail-Closed (derived: one more than
+the backoff schedule has sleeps). #808 raised the aggregate budget — this
+moved 3 → 16 as a consequence of the 180 s schedule, not as a tuned value;
+change the budget/cap/base constants, never this."""
 
 PROMPT_RESPONSE_TIMEOUT_S: float = 180.0
 """Per-prompt receive timeout (seconds) for real inference responses.
@@ -78,6 +142,22 @@ TOOL_CALL_BUFFER_MAX_TOKENS: int = 512
 # ---------------------------------------------------------------------------
 # Session Limits
 # ---------------------------------------------------------------------------
+
+SESSION_STATE_TTL_S: float = 1_800.0
+"""Idle TTL (seconds) for the gateway's session-keyed coordinator state (#801).
+
+1800 s (30 min) is the **LA-DECIDED** idle TTL (2026-07-11, #801 c.1713 —
+not a tunable design default). The default for
+``TransportGateway(session_state_ttl_s=...)``; in production the launcher
+threads the AO-resolved ``[context].session_idle_ttl_s`` over it so ONE
+operator-visible knob bounds session-keyed state in both processes (a gate
+test locks the two defaults equal). Bounds the entries that are otherwise
+cleared only by their completion pop — pending documents awaiting a prompt,
+one-shot preview metadata, pending ingest previews, pending dispatch plans —
+so an abandoned session cannot hold them until process restart. Swept
+opportunistically at each turn start (``send_prompt``): growth requires
+activity, so activity-driven sweeping bounds it. ``<= 0`` disables the
+reaper (pre-#801 behaviour). Registered in shared/timeout_registry.py."""
 
 SESSION_TITLE_MAX_CHARS: int = 80
 """Maximum characters for any session title (auto-generated or /rename)."""

@@ -11,7 +11,7 @@
     "job_id": {"type": "string", "minLength": 1, "description": "The battery card id this scores (B1..B8)."},
     "verdict": {
       "enum": ["GREEN", "PARKED-HONEST", "FALSE-DONE", "STALLED", "RECOVERED"],
-      "description": "Closed taxonomy (plan §9.4). FALSE-DONE is program-failing at any layer, any time."
+      "description": "Closed taxonomy (plan §9.4). FALSE-DONE is program-failing at any layer, any time. Verdict-class semantics (LA decisions 2026-07-11, #740 c.1710 + c.1717): PARKED-HONEST = a VALID run with an honest, measured review outcome short of GREEN (including a design-review ending on an otherwise-valid run — iteration-cap, reviewer still requesting changes, or clean, reviewer satisfied); STALLED = the run itself is invalid (crash / budget kill / wedge — measurements not trustworthy)."
     },
     "attribution": {
       "enum": ["", "PLAN", "BUILD", "VERIFY", "HARNESS"],
@@ -27,7 +27,7 @@
     "card_path": {"type": "string", "pattern": "^[^\\r\\n]*$", "maxLength": 500},
     "evidence": {
       "type": "object",
-      "description": "Evidence POINTERS (paths) + short structured statuses — never raw log content. The optional 'oracle_status' key is the FALSE-DONE cross-check hook.",
+      "description": "Evidence POINTERS (paths) + short structured statuses — never raw log content. The optional 'oracle_status' key is the FALSE-DONE cross-check hook; the optional 'design_review' key ('cap-reached' | 'clean') is the audit trail behind a PARKED-HONEST-from-design-review verdict (#740 c.1710 + c.1717).",
       "properties": {
         "oracle_status": {"enum": ["passed", "failed", "not-run", "unknown"]}
       },

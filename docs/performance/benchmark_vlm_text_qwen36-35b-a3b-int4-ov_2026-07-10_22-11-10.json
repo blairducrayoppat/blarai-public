@@ -1,0 +1,249 @@
+{
+  "benchmark": "vlm_text_inference",
+  "model": "qwen36-35b-a3b-int4-ov",
+  "device": "GPU",
+  "timestamp": "2026-07-10T22:11:10",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "prompt_set_version": "v1",
+  "prefill_probe_version": "pp-v1",
+  "runs": 5,
+  "warmup": 2,
+  "cooldown_s": 30.0,
+  "max_new_tokens": 256,
+  "load_seconds": 53.5,
+  "sys_available_gb_before_load": 23.51,
+  "sys_available_gb_after_load": 7.51,
+  "sys_available_gb_min_during": 4.72,
+  "generation": {
+    "median_tps": 1.59,
+    "mean_tps": 1.7,
+    "p95_tps": 2.26,
+    "median_ttft_ms": 2448.0,
+    "errors": []
+  },
+  "prefill": {
+    "median_pp_tok_per_sec": 4.0,
+    "runs": [
+      {
+        "input_tokens": 441,
+        "prefill_ms": 131381.47820002632,
+        "prefill_tok_per_sec": 3.3566375263991484,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 146551.18779995246,
+        "prefill_tok_per_sec": 3.0091874833657477,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 105727.96849999577,
+        "prefill_tok_per_sec": 4.171081751183157,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 110356.78299999563,
+        "prefill_tok_per_sec": 3.9961295355992523,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 118564.53020003391,
+        "prefill_tok_per_sec": 3.7194935049797366,
+        "error": null
+      }
+    ]
+  },
+  "coherence_note": "Full output texts below are the openvino.genai #3870 reproduction evidence \u2014 judged by the reviewer, not by this script.",
+  "gen_runs": [
+    {
+      "prompt_index": 0,
+      "token_count": 108,
+      "latency_first_token_ms": 1902.5829999591224,
+      "latency_total_ms": 55339.52199999476,
+      "throughput_tok_per_sec": 2.0210738493072737,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze the Request:** The user is asking for the capital city of France.\n2.  **Retrieve knowledge:** Access internal knowledge base regarding geography and countries.\n    *   Country: France\n    *   capital: Paris\n3.  **Formulate the answer:** State the fact clearly.\n    *   \"The capital city of France is Paris.\"\n4.  **Final output generation.**\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 2220.669900008943,
+      "latency_total_ms": 157132.960500021,
+      "throughput_tok_per_sec": 1.6525480257793055,
+      "output_text": "Here's a thinking process that leads to the answer:\n\n1.  **Analyze the Request:** The user is asking for the conversion factor between bytes and kilobytes (KB).\n\n2.  **Identify the context:**\n    *   *Computer Science/Storage (Binary):* Historically, 1 KB = 1024 bytes ($2^{10}$).\n    *   *SI Units/Metric (decimal):* 1 KB = 1000 bytes.\n    *   *Data Transfer/Networking:* Often uses decimal (1000), but sometimes binary.\n\n3.  **Determine the standard answer:**\n    *   In the context of *computer memory* (RAM, hard drive capacity historically), the binary definition is dominant.\n    *   $1 \\text{ KB} = 1024 \\text{ bytes}$.\n\n4.  **Consider the SI definition:**\n    *   The International System of Units (SI) defines \"kilo\" as 1000.\n    *   However, in computing, the binary prefix \"kibi\" ($2^{10}$) is often what is meant by \"kilobyte\"",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 2248.0758000165224,
+      "latency_total_ms": 177960.00700001605,
+      "throughput_tok_per_sec": 1.4569300914951226,
+      "output_text": "</think>\n\n</think>\n\nA **Transformer** is a type of artificial neural network architecture that has become the foundation for most modern large language models (like Chatbots) and other advanced AI systems.\n\nThink of it as a **super-efficient efficient information processor** that excels at understanding the **context** and **relationships** between different parts of a piece of data, especially text.\n\n### The Core Idea: Attention\n\nThe key innovation of the Transformer is a mechanism called **\"self - attention.\"**\n\n*   **What it does:** When the model reads a sentence like \"The animal didn't cross the street because it was too tired,\" the attention mechanism helps the model figure out that the pronoun \"it\" refers to \"the animal.\"\n*   **why it's great:** Unlike older models that read words one by one in a strict order, a Transformer can look at **all the words in a sentence at once** and weigh their importance relative to each other. This makes it incredibly good at understanding meaning, grammar, and nuance.\n\n### Why it's a big deal\n\n1.  **Speed and parallelism:** Transformers can process entire sentences or documents in parallel, rather than waiting for one word to finish before starting the next. This makes training",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 3601.880899979733,
+      "latency_total_ms": 173019.37350002117,
+      "throughput_tok_per_sec": 1.5110600214368737,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in the context of machine learning (ML) models.\n    *   **Key question:** What is it?\n    *   **key question:** why does it help with inference speed?\n\n2.  **Define \"Quantization\" (The \"What\"):**\n    *   *Analogy:* Think of a ruler. A standard ruler has infinite marks. A quantized ruler has marks at specific intervals (e.g., 1cm, 2cm).\n    *   *Technical definition:* Reducing the numerical precision of the numbers (weights and activations) used in a neural network.\n    *   *Standard precision:* usually 32-bit (float32).\n    *   *target precision:* 8 bit (int8), 16 bit (float16), or even binary (1 bit).\n    *   *Goal:* Approximating high-precision values with lower-precision representations.\n\n3.  **Explain the benefit (the \"Why\"):**\n    *   *Memory:* Smower numbers take less space.",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 108,
+      "latency_first_token_ms": 1880.2443000022322,
+      "latency_total_ms": 54145.777800004,
+      "throughput_tok_per_sec": 2.066371330544179,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze the Request:** The user is asking for the capital city of France.\n2.  **Retrieve knowledge:** Access internal knowledge base regarding geography and countries.\n    *   Country: France\n    *   capital: Paris\n3.  **Formulate the answer:** State the fact clearly.\n    *   \"The capital city of France is Paris.\"\n4.  **Final output generation.**\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 3193.752899998799,
+      "latency_total_ms": 164960.4683999787,
+      "throughput_tok_per_sec": 1.5825257946838378,
+      "output_text": "Here's a thinking process that leads to the answer:\n\n1.  **Analyze the Request:** The user is asking for the conversion factor between bytes and kilobytes (KB).\n\n2.  **Identify the context:**\n    *   *Computer Science/Storage (Binary):* Historically, 1 KB = 1024 bytes ($2^{10}$).\n    *   *SI Units/Metric (decimal):* 1 KB = 1000 bytes.\n    *   *Data Transfer/Networking:* Often uses decimal (1000), but sometimes binary.\n\n3.  **Determine the standard answer:**\n    *   In the context of *computer memory* (RAM, hard drive capacity historically), the binary definition is dominant.\n    *   $1 \\text{ KB} = 1024 \\text{ bytes}$.\n\n4.  **Consider the SI definition:**\n    *   The International System of Units (SI) defines \"kilo\" as 1000.\n    *   However, in computing, the binary prefix \"kibi\" ($2^{10}$) is often what is meant by \"kilobyte\"",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 2181.4260999672115,
+      "latency_total_ms": 161252.70929996623,
+      "throughput_tok_per_sec": 1.6093413899109201,
+      "output_text": "</think>\n\n</think>\n\nA **Transformer** is a type of artificial neural network architecture that has become the foundation for most modern large language models (like Chatbots) and other advanced AI systems.\n\nThink of it as a **super-efficient efficient information processor** that excels at understanding the **context** and **relationships** between different parts of a piece of data, especially text.\n\n### The Core Idea: Attention\n\nThe key innovation of the Transformer is a mechanism called **\"self - attention.\"**\n\n*   **What it does:** When the model reads a sentence like \"The animal didn't cross the street because it was too tired,\" the attention mechanism helps the model figure out that the pronoun \"it\" refers to \"the animal.\"\n*   **why it's great:** Unlike older models that read words one by one in a strict order, a Transformer can look at **all the words in a sentence at once** and weigh their importance relative to each other. This makes it incredibly good at understanding meaning, grammar, and nuance.\n\n### Why it's a big deal\n\n1.  **Speed and parallelism:** Transformers can process entire sentences or documents in parallel, rather than waiting for one word to finish before starting the next. This makes training",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 4119.521499960683,
+      "latency_total_ms": 191800.29169999762,
+      "throughput_tok_per_sec": 1.3640182727678811,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in the context of machine learning (ML) models.\n    *   **Key question:** What is it?\n    *   **key question:** why does it help with inference speed?\n\n2.  **Define \"Quantization\" (The \"What\"):**\n    *   *Analogy:* Think of a ruler. A standard ruler has infinite marks. A quantized ruler has marks at specific intervals (e.g., 1cm, 2cm).\n    *   *Technical definition:* Reducing the numerical precision of the numbers (weights and activations) used in a neural network.\n    *   *Standard precision:* usually 32-bit (float32).\n    *   *target precision:* 8 bit (int8), 16 bit (float16), or even binary (1 bit).\n    *   *Goal:* Approximating high-precision values with lower-precision representations.\n\n3.  **Explain the benefit (the \"Why\"):**\n    *   *Memory:* Smower numbers take less space.",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 108,
+      "latency_first_token_ms": 1883.4432999719866,
+      "latency_total_ms": 56978.85319998022,
+      "throughput_tok_per_sec": 1.9602358925363736,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze the Request:** The user is asking for the capital city of France.\n2.  **Retrieve knowledge:** Access internal knowledge base regarding geography and countries.\n    *   Country: France\n    *   capital: Paris\n3.  **Formulate the answer:** State the fact clearly.\n    *   \"The capital city of France is Paris.\"\n4.  **Final output generation.**\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 2880.8135999715887,
+      "latency_total_ms": 163670.84869998507,
+      "throughput_tok_per_sec": 1.5921384670434626,
+      "output_text": "Here's a thinking process that leads to the answer:\n\n1.  **Analyze the Request:** The user is asking for the conversion factor between bytes and kilobytes (KB).\n\n2.  **Identify the context:**\n    *   *Computer Science/Storage (Binary):* Historically, 1 KB = 1024 bytes ($2^{10}$).\n    *   *SI Units/Metric (decimal):* 1 KB = 1000 bytes.\n    *   *Data Transfer/Networking:* Often uses decimal (1000), but sometimes binary.\n\n3.  **Determine the standard answer:**\n    *   In the context of *computer memory* (RAM, hard drive capacity historically), the binary definition is dominant.\n    *   $1 \\text{ KB} = 1024 \\text{ bytes}$.\n\n4.  **Consider the SI definition:**\n    *   The International System of Units (SI) defines \"kilo\" as 1000.\n    *   However, in computing, the binary prefix \"kibi\" ($2^{10}$) is often what is meant by \"kilobyte\"",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 2790.914300014265,
+      "latency_total_ms": 170421.1937999935,
+      "throughput_tok_per_sec": 1.5271703940577854,
+      "output_text": "</think>\n\n</think>\n\nA **Transformer** is a type of artificial neural network architecture that has become the foundation for most modern large language models (like Chatbots) and other advanced AI systems.\n\nThink of it as a **super-efficient efficient information processor** that excels at understanding the **context** and **relationships** between different parts of a piece of data, especially text.\n\n### The Core Idea: Attention\n\nThe key innovation of the Transformer is a mechanism called **\"self - attention.\"**\n\n*   **What it does:** When the model reads a sentence like \"The animal didn't cross the street because it was too tired,\" the attention mechanism helps the model figure out that the pronoun \"it\" refers to \"the animal.\"\n*   **why it's great:** Unlike older models that read words one by one in a strict order, a Transformer can look at **all the words in a sentence at once** and weigh their importance relative to each other. This makes it incredibly good at understanding meaning, grammar, and nuance.\n\n### Why it's a big deal\n\n1.  **Speed and parallelism:** Transformers can process entire sentences or documents in parallel, rather than waiting for one word to finish before starting the next. This makes training",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 3381.6758999601007,
+      "latency_total_ms": 166371.83249997906,
+      "throughput_tok_per_sec": 1.5706469969731303,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in the context of machine learning (ML) models.\n    *   **Key question:** What is it?\n    *   **key question:** why does it help with inference speed?\n\n2.  **Define \"Quantization\" (The \"What\"):**\n    *   *Analogy:* Think of a ruler. A standard ruler has infinite marks. A quantized ruler has marks at specific intervals (e.g., 1cm, 2cm).\n    *   *Technical definition:* Reducing the numerical precision of the numbers (weights and activations) used in a neural network.\n    *   *Standard precision:* usually 32-bit (float32).\n    *   *target precision:* 8 bit (int8), 16 bit (float16), or even binary (1 bit).\n    *   *Goal:* Approximating high-precision values with lower-precision representations.\n\n3.  **Explain the benefit (the \"Why\"):**\n    *   *Memory:* Smower numbers take less space.",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 108,
+      "latency_first_token_ms": 1514.9146999465302,
+      "latency_total_ms": 48422.79659997439,
+      "throughput_tok_per_sec": 2.3023849217957517,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze the Request:** The user is asking for the capital city of France.\n2.  **Retrieve knowledge:** Access internal knowledge base regarding geography and countries.\n    *   Country: France\n    *   capital: Paris\n3.  **Formulate the answer:** State the fact clearly.\n    *   \"The capital city of France is Paris.\"\n4.  **Final output generation.**\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 2427.458900026977,
+      "latency_total_ms": 150516.9365000329,
+      "throughput_tok_per_sec": 1.7286846043948079,
+      "output_text": "Here's a thinking process that leads to the answer:\n\n1.  **Analyze the Request:** The user is asking for the conversion factor between bytes and kilobytes (KB).\n\n2.  **Identify the context:**\n    *   *Computer Science/Storage (Binary):* Historically, 1 KB = 1024 bytes ($2^{10}$).\n    *   *SI Units/Metric (decimal):* 1 KB = 1000 bytes.\n    *   *Data Transfer/Networking:* Often uses decimal (1000), but sometimes binary.\n\n3.  **Determine the standard answer:**\n    *   In the context of *computer memory* (RAM, hard drive capacity historically), the binary definition is dominant.\n    *   $1 \\text{ KB} = 1024 \\text{ bytes}$.\n\n4.  **Consider the SI definition:**\n    *   The International System of Units (SI) defines \"kilo\" as 1000.\n    *   However, in computing, the binary prefix \"kibi\" ($2^{10}$) is often what is meant by \"kilobyte\"",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 2032.5846999767236,
+      "latency_total_ms": 166008.68379999883,
+      "throughput_tok_per_sec": 1.5612031351218154,
+      "output_text": "</think>\n\n</think>\n\nA **Transformer** is a type of artificial neural network architecture that has become the foundation for most modern large language models (like Chatbots) and other advanced AI systems.\n\nThink of it as a **super-efficient efficient information processor** that excels at understanding the **context** and **relationships** between different parts of a piece of data, especially text.\n\n### The Core Idea: Attention\n\nThe key innovation of the Transformer is a mechanism called **\"self - attention.\"**\n\n*   **What it does:** When the model reads a sentence like \"The animal didn't cross the street because it was too tired,\" the attention mechanism helps the model figure out that the pronoun \"it\" refers to \"the animal.\"\n*   **why it's great:** Unlike older models that read words one by one in a strict order, a Transformer can look at **all the words in a sentence at once** and weigh their importance relative to each other. This makes it incredibly good at understanding meaning, grammar, and nuance.\n\n### Why it's a big deal\n\n1.  **Speed and parallelism:** Transformers can process entire sentences or documents in parallel, rather than waiting for one word to finish before starting the next. This makes training",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 4437.848900037352,
+      "latency_total_ms": 171871.90369999735,
+      "throughput_tok_per_sec": 1.5289601646800777,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in the context of machine learning (ML) models.\n    *   **Key question:** What is it?\n    *   **key question:** why does it help with inference speed?\n\n2.  **Define \"Quantization\" (The \"What\"):**\n    *   *Analogy:* Think of a ruler. A standard ruler has infinite marks. A quantized ruler has marks at specific intervals (e.g., 1cm, 2cm).\n    *   *Technical definition:* Reducing the numerical precision of the numbers (weights and activations) used in a neural network.\n    *   *Standard precision:* usually 32-bit (float32).\n    *   *target precision:* 8 bit (int8), 16 bit (float16), or even binary (1 bit).\n    *   *Goal:* Approximating high-precision values with lower-precision representations.\n\n3.  **Explain the benefit (the \"Why\"):**\n    *   *Memory:* Smower numbers take less space.",
+      "error": null
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 108,
+      "latency_first_token_ms": 2018.472199968528,
+      "latency_total_ms": 49770.07089997642,
+      "throughput_tok_per_sec": 2.261704381428012,
+      "output_text": "Here's a thinking process:\n\n1.  **Analyze the Request:** The user is asking for the capital city of France.\n2.  **Retrieve knowledge:** Access internal knowledge base regarding geography and countries.\n    *   Country: France\n    *   capital: Paris\n3.  **Formulate the answer:** State the fact clearly.\n    *   \"The capital city of France is Paris.\"\n4.  **Final output generation.**\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 2835.2421000017785,
+      "latency_total_ms": 160755.14200003818,
+      "throughput_tok_per_sec": 1.62107498904222,
+      "output_text": "Here's a thinking process that leads to the answer:\n\n1.  **Analyze the Request:** The user is asking for the conversion factor between bytes and kilobytes (KB).\n\n2.  **Identify the context:**\n    *   *Computer Science/Storage (Binary):* Historically, 1 KB = 1024 bytes ($2^{10}$).\n    *   *SI Units/Metric (decimal):* 1 KB = 1000 bytes.\n    *   *Data Transfer/Networking:* Often uses decimal (1000), but sometimes binary.\n\n3.  **Determine the standard answer:**\n    *   In the context of *computer memory* (RAM, hard drive capacity historically), the binary definition is dominant.\n    *   $1 \\text{ KB} = 1024 \\text{ bytes}$.\n\n4.  **Consider the SI definition:**\n    *   The International System of Units (SI) defines \"kilo\" as 1000.\n    *   However, in computing, the binary prefix \"kibi\" ($2^{10}$) is often what is meant by \"kilobyte\"",
+      "error": null
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 2468.7381999683566,
+      "latency_total_ms": 165690.1218999992,
+      "throughput_tok_per_sec": 1.5684219444584429,
+      "output_text": "</think>\n\n</think>\n\nA **Transformer** is a type of artificial neural network architecture that has become the foundation for most modern large language models (like Chatbots) and other advanced AI systems.\n\nThink of it as a **super-efficient efficient information processor** that excels at understanding the **context** and **relationships** between different parts of a piece of data, especially text.\n\n### The Core Idea: Attention\n\nThe key innovation of the Transformer is a mechanism called **\"self - attention.\"**\n\n*   **What it does:** When the model reads a sentence like \"The animal didn't cross the street because it was too tired,\" the attention mechanism helps the model figure out that the pronoun \"it\" refers to \"the animal.\"\n*   **why it's great:** Unlike older models that read words one by one in a strict order, a Transformer can look at **all the words in a sentence at once** and weigh their importance relative to each other. This makes it incredibly good at understanding meaning, grammar, and nuance.\n\n### Why it's a big deal\n\n1.  **Speed and parallelism:** Transformers can process entire sentences or documents in parallel, rather than waiting for one word to finish before starting the next. This makes training",
+      "error": null
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 3787.642299954314,
+      "latency_total_ms": 166939.15799999377,
+      "throughput_tok_per_sec": 1.5690936054229871,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in the context of machine learning (ML) models.\n    *   **Key question:** What is it?\n    *   **key question:** why does it help with inference speed?\n\n2.  **Define \"Quantization\" (The \"What\"):**\n    *   *Analogy:* Think of a ruler. A standard ruler has infinite marks. A quantized ruler has marks at specific intervals (e.g., 1cm, 2cm).\n    *   *Technical definition:* Reducing the numerical precision of the numbers (weights and activations) used in a neural network.\n    *   *Standard precision:* usually 32-bit (float32).\n    *   *target precision:* 8 bit (int8), 16 bit (float16), or even binary (1 bit).\n    *   *Goal:* Approximating high-precision values with lower-precision representations.\n\n3.  **Explain the benefit (the \"Why\"):**\n    *   *Memory:* Smower numbers take less space.",
+      "error": null
+    }
+  ],
+  "not_measured": [
+    "speculative decoding (does not exist for this pipeline class/model family)",
+    "co-resident cost (benchmarked alone)",
+    "vision/image inputs (text-only probe)",
+    "long-context decode (256-token generations only)"
+  ]
+}

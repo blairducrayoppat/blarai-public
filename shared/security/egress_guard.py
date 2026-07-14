@@ -100,6 +100,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Final, Optional
 
+from shared.security import ip_block
+
 logger = logging.getLogger(__name__)
 
 # Windows AF_HYPERV address family (mirrors shared/ipc/vsock.py:39). getattr keeps
@@ -277,20 +279,15 @@ def _is_blocked_pin_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> b
     ``guarded_fetch``'s pre-fetch resolve-and-recheck, which refuses the whole
     fetch — including a name resolving to loopback, which this layer permits for
     IPC. Together they close the named-host-to-internal SSRF in both layers.)
+
+    Delegates to the ONE canonical blocked-range predicate
+    (:func:`shared.security.ip_block.is_blocked_ip`) so this pin-side check and
+    ``guarded_fetch``'s fetch-side check can never diverge — a range is added in one
+    place and both doors move together (Vikunja #802 / AUDIT-3). This wrapper is
+    kept (not inlined) so the pin-context docstring above stays at the call site and
+    the ``_is_blocked_pin_ip`` name its caller uses is unchanged.
     """
-    try:
-        return bool(
-            addr.is_loopback
-            or addr.is_private
-            or addr.is_link_local
-            or addr.is_reserved
-            or addr.is_multicast
-            or addr.is_unspecified
-            # CGNAT 100.64.0.0/10 is not flagged by is_private in stdlib ipaddress.
-            or (addr.version == 4 and int(addr) >> 22 == (0x64400000 >> 22))
-        )
-    except AttributeError:
-        return True  # cannot classify -> Fail-Closed (do not pin)
+    return ip_block.is_blocked_ip(addr)
 
 
 def _record_resolution_pins(host: str, addr_infos: Any) -> None:

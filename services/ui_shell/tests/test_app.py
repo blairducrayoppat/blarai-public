@@ -608,21 +608,29 @@ class TestActionSubmitPromptBranches:
 
 from services.ui_gateway.src.constants import (  # noqa: E402
     PA_HANDSHAKE_BACKOFF_BASE_S,
+    PA_HANDSHAKE_BUDGET_S,
     PA_HANDSHAKE_MAX_RETRIES,
+    pa_handshake_backoff_schedule,
 )
 
 
 class TestBootPollAttemptMarkers:
-    """WI-9: attempt_markers list computation from _poll_boot_status (app.py:237-242)."""
+    """WI-9: attempt_markers list computation from _poll_boot_status.
+
+    #808: the markers derive from the SAME ``pa_handshake_backoff_schedule()``
+    the gateway's retry loop executes — this test mirrors the app.py
+    computation and locks the banner to the budget (lesson 221: the display
+    window and the retry budget must never disagree).
+    """
 
     def test_poll_boot_status_advances_all_attempt_markers(self) -> None:
         """attempt_markers has PA_HANDSHAKE_MAX_RETRIES entries with correct elapsed times."""
-        attempt_markers: list[float] = []
+        schedule = pa_handshake_backoff_schedule()
+        attempt_markers: list[float] = [0.0]
         elapsed = 0.0
-        for attempt_index in range(PA_HANDSHAKE_MAX_RETRIES):
+        for delay in schedule:
+            elapsed += delay
             attempt_markers.append(elapsed)
-            if attempt_index < PA_HANDSHAKE_MAX_RETRIES - 1:
-                elapsed += PA_HANDSHAKE_BACKOFF_BASE_S * (2 ** attempt_index)
 
         assert len(attempt_markers) == PA_HANDSHAKE_MAX_RETRIES
         assert attempt_markers[0] == 0.0
@@ -633,3 +641,7 @@ class TestBootPollAttemptMarkers:
         # Markers are strictly increasing
         for i in range(1, len(attempt_markers)):
             assert attempt_markers[i] > attempt_markers[i - 1]
+        # #808: the LAST planned attempt fires exactly at the aggregate
+        # backoff budget — the banner's arithmetic covers the whole widened
+        # window, not the old ~3 s one.
+        assert attempt_markers[-1] == pytest.approx(PA_HANDSHAKE_BUDGET_S)

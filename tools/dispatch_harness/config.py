@@ -18,6 +18,15 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+# #811 / AUDIT-12: the SSOT fleet-root resolver + env-var names, so the harness honors
+# the SAME env override -> TOML -> compiled-in fallback order the AO entrypoint uses
+# (this loader is the second reader of [fleet_dispatch]; it must not bypass the resolver).
+from shared.fleet.dispatch import (
+    FLEET_AGENTIC_SETUP_DIR_ENV,
+    FLEET_PROJECTS_DIR_ENV,
+    resolve_fleet_root,
+)
+
 # The committed AO config, relative to the repo root (this file lives at tools/dispatch_harness/).
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CONFIG = (
@@ -52,11 +61,12 @@ def load_harness_config(config_path: str | Path | None = None) -> HarnessConfig:
     """
     path = Path(config_path) if config_path else _DEFAULT_CONFIG
     if not path.is_file():
+        # Missing config: the env override still resolves (else "" -> compiled-in fallback).
         return HarnessConfig(
             port=_DEFAULT_VSOCK_PORT,
             fleet_dispatch_enabled=False,
-            agentic_setup_dir="",
-            projects_dir="",
+            agentic_setup_dir=resolve_fleet_root(FLEET_AGENTIC_SETUP_DIR_ENV, ""),
+            projects_dir=resolve_fleet_root(FLEET_PROJECTS_DIR_ENV, ""),
             swap_run_budget_s=_DEFAULT_RUN_BUDGET_S,
             config_path=path,
         )
@@ -77,8 +87,12 @@ def load_harness_config(config_path: str | Path | None = None) -> HarnessConfig:
     return HarnessConfig(
         port=int(ipc.get("vsock_port", _DEFAULT_VSOCK_PORT)),
         fleet_dispatch_enabled=bool(fd.get("enabled", False)),
-        agentic_setup_dir=str(fd.get("agentic_setup_dir", "") or ""),
-        projects_dir=str(fd.get("projects_dir", "") or ""),
+        agentic_setup_dir=resolve_fleet_root(
+            FLEET_AGENTIC_SETUP_DIR_ENV, fd.get("agentic_setup_dir", "")
+        ),
+        projects_dir=resolve_fleet_root(
+            FLEET_PROJECTS_DIR_ENV, fd.get("projects_dir", "")
+        ),
         swap_run_budget_s=float(fd.get("swap_run_budget_s", _DEFAULT_RUN_BUDGET_S)),
         config_path=path,
     )

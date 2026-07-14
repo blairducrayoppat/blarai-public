@@ -383,6 +383,200 @@ def extract_import_contract(rel_path: str, source: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Job-oracle import PROBE targets (#822 H3/H3b/H4) — the STRUCTURED sibling of
+# extract_import_contract: the same first-party import surface, but as machine
+# targets a resolve-probe can import + getattr, not the human contract STRINGS
+# ---------------------------------------------------------------------------
+#
+# extract_import_contract SURFACES the oracle's imports into the coder's prompt as
+# advisory text; #822 moves that contract from advisory to ENFORCED — a post-merge
+# probe that actually RESOLVES each module from the repo root exactly as the oracle
+# will, and getattrs each named export (closing the stub-module evasion: a module
+# that imports but whose export is absent). The probe needs the imports STRUCTURED
+# (module + names), not rendered lines, so this sibling walks the SAME AST/regex and
+# emits targets. It is byte-decoupled from extract_import_contract (that function's
+# string output is regression-locked green-path bytes and must not move), but the two
+# read the same source with the same first-party/skip rules, so a probe target exists
+# for every contract line that names a resolvable module.
+
+#: A single import the probe must resolve on the merged tree.
+#:   kind    "py" | "node"
+#:   module  (py) the dotted module the oracle imports (``cli`` / ``a.b``);
+#:           "" for a node target (node keys on ``spec``).
+#:   spec    (node) the exact ESM/CJS specifier (``../src/storage.mjs``); "" for py.
+#:   level   (py) the relative-import level (0 = absolute; >0 = a package-relative
+#:           import the standalone probe cannot resolve without a package context —
+#:           recorded but not probed, see real_run_import_probe).
+#:   names   the export NAMES the oracle binds from the module (``["addExpense"]``);
+#:           [] when the oracle imports the module itself (``import x`` / ``import
+#:           '..'`` / ``import * as ns``) — then only resolution is checked.
+#:   raw     the human contract line (for naming the exact unresolved entry in the
+#:           coder's fix-cycle prompt — the signal B6n2's coder lacked at 23/24).
+
+
+def _py_probe_targets(source: str) -> list[dict]:
+    """Structured first-party import targets from a Python oracle (mirror of
+    :func:`_py_import_contract`, same first-party/skip filtering)."""
+    import sys
+
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+    stdlib = getattr(sys, "stdlib_module_names", frozenset())
+
+    def _first_party(top: str) -> bool:
+        return bool(top) and top not in stdlib and top not in _ORACLE_IMPORT_SKIP
+
+    out: list[dict] = []
+    seen: set[str] = set()
+
+    def _add(target: dict) -> None:
+        raw = _clean_token(target["raw"], max_len=_IMPORT_LINE_MAX)
+        if not raw or not _quote_free(raw) or raw in seen:
+            return
+        seen.add(raw)
+        target["raw"] = raw
+        out.append(target)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if _first_party(alias.name.split(".")[0]):
+                    _add({"kind": "py", "module": alias.name, "spec": "",
+                          "level": 0, "names": [], "raw": f"import {alias.name}"})
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if node.level == 0 and not _first_party(module.split(".")[0]):
+                continue
+            names = [a.name for a in node.names if a.name]
+            if not names:
+                continue
+            target = "." * node.level + module
+            _add({"kind": "py", "module": module, "spec": "", "level": node.level,
+                  "names": list(names),
+                  "raw": f"from {target} import {', '.join(names)}"})
+    _attach_python_signatures(out, source, _first_party)
+    return out[:_IMPORT_CONTRACT_MAX]
+
+
+def _attach_python_signatures(
+    targets: list[dict], source: str, is_first_party
+) -> None:
+    """#826 — attach the per-callable ARITY contract to each python probe target (the
+    SIGNATURE layer the gate probe enforces beyond #822's name-resolution). Derives the
+    interface contract (:mod:`shared.fleet.interface_contract`) with the SAME first-party
+    predicate as the target walk, so every signature maps to a target that exists, and
+    adds an OPTIONAL ``signatures`` key (absent when the module has no derived call —
+    byte-identical to the pre-#826 target for a pure ``import``-only oracle)."""
+    try:
+        from shared.fleet.interface_contract import derive_interface_contract
+
+        sig_by_module = derive_interface_contract(
+            source, is_first_party=is_first_party
+        ).probe_signatures()
+    except Exception:  # noqa: BLE001 — a derivation miss must never break target-building
+        return
+    for tgt in targets:
+        sigs = sig_by_module.get(str(tgt.get("module", "")))
+        if sigs:
+            tgt["signatures"] = sigs
+
+
+def _node_import_names(what: str) -> list[str]:
+    """The EXPORT names a node import binding requires, from the text between
+    ``import`` and ``from``. ``{ a, b as c }`` → the export names ``a``, ``b`` (the
+    alias ``c`` is local, the module must export ``b``); a bare default binding
+    (``Foo``) → ``default``; ``* as ns`` → [] (namespace — resolution only)."""
+    names: list[str] = []
+    text = " ".join(str(what).split())
+    brace = re.search(r"\{([^}]*)\}", text)
+    if brace:
+        for part in brace.group(1).split(","):
+            token = part.strip()
+            if not token:
+                continue
+            export_name = token.split(" as ")[0].strip()
+            if export_name and _quote_free(export_name) and export_name not in names:
+                names.append(export_name)
+        # A default binding may precede the brace group: `Foo, { a }`.
+        head = text[: brace.start()].rstrip().rstrip(",").strip()
+    else:
+        head = text
+    if head and "*" not in head and head not in ("", "default"):
+        # `Foo` or `Foo, ` — a default import binds the module's default export.
+        if "default" not in names:
+            names.insert(0, "default")
+    return names
+
+
+def _node_probe_targets(source: str) -> list[dict]:
+    """Structured first-party import targets from a node oracle (mirror of
+    :func:`_mjs_import_contract`, same first-party-specifier filtering)."""
+    out: list[dict] = []
+    seen: set[str] = set()
+
+    def _add(spec: str, names: list[str], raw: str) -> None:
+        raw = _clean_token(raw, max_len=_IMPORT_LINE_MAX)
+        if not raw or "`" in raw or raw in seen:
+            return
+        seen.add(raw)
+        out.append({"kind": "node", "module": "", "spec": spec.strip(),
+                    "level": 0, "names": list(names), "raw": raw})
+
+    for line in (source or "").splitlines():
+        m = _MJS_IMPORT_FROM_RE.match(line)
+        if m and _first_party_specifier(m.group("spec")):
+            spec = m.group("spec").strip()
+            what = " ".join(_clean_token(m.group("what"), max_len=80).split())
+            names = _node_import_names(what) if _quote_free(what) else []
+            _add(spec, names, f"import {what} from '{spec}'" if what else f"import '{spec}'")
+            continue
+        m = _MJS_SIDE_EFFECT_IMPORT_RE.match(line)
+        if m and _first_party_specifier(m.group("spec")):
+            spec = m.group("spec").strip()
+            _add(spec, [], f"import '{spec}'")
+            continue
+        m = _MJS_REQUIRE_RE.search(line)
+        if m and _first_party_specifier(m.group("spec")):
+            spec = m.group("spec").strip()
+            what = " ".join(_clean_token(m.group("what"), max_len=80).split())
+            names = _node_import_names(what) if _quote_free(what) else []
+            _add(spec, names, f"const {what} = require('{spec}')" if what else f"require('{spec}')")
+    for tgt in out:
+        called = [n for n in tgt["names"] if _node_name_is_called(source or "", n)]
+        if called:
+            tgt["callables"] = called
+    return out[:_IMPORT_CONTRACT_MAX]
+
+
+def _node_name_is_called(source: str, name: str) -> bool:
+    """#826 node twin (cheap + sound): is the imported EXPORT ``name`` invoked as
+    ``name(`` anywhere in the oracle? Bounds the typeof-function check to callables the
+    oracle actually calls (``default`` is skipped — the local binding differs from the
+    export name, so we never mislabel it). A pure structural scan; false negatives (a
+    call we cannot see) simply skip the check — never a false red."""
+    if not name or name == "default":
+        return False
+    return bool(re.search(r"(?<![\w$.])" + re.escape(name) + r"\s*\(", source))
+
+
+def extract_import_probe_targets(rel_path: str, source: str) -> list[dict]:
+    """The STRUCTURED first-party import surface of a job-acceptance oracle — the same
+    module/spec + export names as :func:`extract_import_contract`, but as machine
+    targets a post-merge resolve-probe imports and getattrs (#822). Dispatch by
+    extension (``.py`` → ast; ``.mjs``/``.js`` → import-line regex; other → ``[]``).
+    Pure + deterministic; each ``raw`` control-stripped, length-capped, de-duplicated —
+    same input ⇒ same targets."""
+    low = str(rel_path).lower()
+    if low.endswith(".py"):
+        return _py_probe_targets(source or "")
+    if low.endswith((".mjs", ".js")):
+        return _node_probe_targets(source or "")
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Pack assembly (deterministic, capped)
 # ---------------------------------------------------------------------------
 

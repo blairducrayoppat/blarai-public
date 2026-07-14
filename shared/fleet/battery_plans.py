@@ -12,23 +12,33 @@ THE SEAM (Vikunja #752 F1/F2, "Seam 2"). Rather than change the general 14B deco
 would risk false-splits on genuinely-simple real fleet jobs — the CARD's declared shape
 AUTHORIZES a pre-built decomposition + job oracle for BATTERY jobs ONLY. The AO's PLAN handler
 consults :func:`resolve_plan_override` with the dispatched repo; for a sandbox ``battery-*`` repo
-whose card declares ``shape: "diamond"`` (``units >= 2``) it returns a generic
-:class:`~shared.fleet.acceptance.DecompositionOverride` that ``generate_plan`` uses in place of
-the 14B decompose + job-oracle generation. Every NON-battery repo returns ``None`` IMMEDIATELY
-(a name that does not start with ``battery-`` never even reads a card), so production plan
-generation is byte-identical to today.
+whose card declares a carded shape (``"diamond"`` or ``"chain"``) with ``units >= 2`` it returns a
+generic :class:`~shared.fleet.acceptance.DecompositionOverride` that ``generate_plan`` uses in
+place of the 14B decompose + job-oracle generation. Every NON-battery repo returns ``None``
+IMMEDIATELY (a name that does not start with ``battery-`` never even reads a card), so production
+plan generation is byte-identical to today.
 
 ALL battery coupling lives HERE. ``acceptance.generate_plan`` only gained a GENERIC
 ``decomposition_override`` param (it knows nothing of cards); the AO only DECIDES to call this
 resolver and passes the result through. This module reads the battery card JSON directly (it
 never imports ``tools.dispatch_harness`` — runtime code must not depend on the harness).
 
-THE ``app`` PACKAGE CONVENTION. The diamond arms live under the ``app`` package
-(``app/tokenize.py``, ``app/word_frequencies.py``, ``app/neighbor_pairs.py``, ``app/report.py``)
-and the F2 job oracle imports ``from app.tokenize import tokenize`` etc. This MUST match the
-sibling #752 F3 fix (per-task oracles pinned to ``app``); the two are reconciled at merge. The
-task SLUG namespace is kebab-case (``word-frequencies``); the importable MODULE namespace is
-underscore (``app.word_frequencies``) — deliberately distinct, and both are asserted by tests.
+THE ``app`` PACKAGE CONVENTION. The plan arms live under the ``app`` package
+(``app/tokenize.py``, ``app/storage.py``, ...) and the F2 job oracle imports from those exact
+modules. This MUST match the sibling #752 F3 fix (per-task oracles pinned to ``app``); the two
+are reconciled at merge. The task SLUG namespace is kebab-case (``word-frequencies``); the
+importable MODULE namespace is underscore (``app.word_frequencies``) — deliberately distinct,
+and both are asserted by tests.
+
+WHY B1 NEEDS AN OVERRIDE (2026-07-13). B1 is a 3-task Python CLI chain. The 14B planner
+consistently generates tasks without ``creates``/``exports`` contracts for this goal (the expense
+tracker names are ambiguous — is storage in ``main.py``? ``expense_tracker.py``? ``app/core.py``?
+— so the planner follows the «use empty values when unsure» instruction and the oracle-generation
+gate skips the oracle). 14 consecutive nights: oracle_status=not-run, verdict PARKED-HONEST
+[BUILD] (task failed) or STALLED [VERIFY] (all merged but oracle absent). The fix is the same
+pattern as B2: a card-authorised explicit plan with known module paths so the oracle can import
+deterministically. The chain is storage→add→list; the oracle tests only ``app.storage`` (the
+stable public interface the other two tasks build on).
 """
 
 from __future__ import annotations
@@ -212,12 +222,191 @@ def test_combined_report_presents_both_findings_together():
 '''
 
 
-#: Registry of carded diamond builders, keyed by card id. A diamond card WITHOUT a registered
-#: builder resolves to ``None`` (fail-closed — never inject a shape we cannot author), so a future
-#: diamond card (B9, ...) is a one-line addition here plus its own oracle, not a decomposer change.
-_DIAMOND_BUILDERS = {
+def build_expense_tracker_chain(repo_target: str) -> list[dict]:
+    """The B1 expense-tracker 3-arm CHAIN decomposition.
+
+    ``store-expenses`` -> ``add-expense`` -> ``list-expenses`` — 2 dependency
+    edges, 2 waves. All arms live under the ``app`` package so the job oracle can
+    import from known paths (``app.storage``) without guessing. Module name is
+    underscore (``app.storage``); task slug is kebab-case (``store-expenses``).
+
+    The explicit contracts are the key fix: the 14B planner consistently leaves
+    contracts empty for this goal (ambiguous file naming) which prevents oracle
+    generation. The override pins the module layout so the oracle is always generated
+    and the job-acceptance gate always runs.
+    """
+    return [
+        {
+            "repo": repo_target,
+            "task": "store-expenses",
+            "prompt": (
+                "Build the persistence layer for an expense-tracker command-line tool in this "
+                "repo: a Python module app/storage.py that stores and retrieves expense records. "
+                "Make app/ an importable package (add app/__init__.py). "
+                "The module must export two functions: "
+                "(1) save_expense(amount, category, date) — appends a new expense dict with keys "
+                "'amount' (float), 'category' (str), and 'date' (str, ISO format YYYY-MM-DD) to "
+                "the persistent store (a JSON file named expenses.json in the working directory); "
+                "(2) load_expenses() -> list[dict] — reads all saved expenses from expenses.json "
+                "and returns them as a list ordered newest-first (by 'date' descending; equal "
+                "dates preserve insertion order). Return [] when the file is absent or empty. "
+                "Include pytest unit tests in tests/test_storage.py."
+            ),
+            "depends_on": [],
+            "contract": {
+                "creates": ["app/__init__.py", "app/storage.py"],
+                "exports": [
+                    "save_expense(amount, category, date)",
+                    "load_expenses() -> list[dict]",
+                ],
+                "notes": (
+                    "expenses.json: list of {amount: float, category: str, date: str}. "
+                    "load_expenses() returns newest-first by date."
+                ),
+            },
+        },
+        {
+            "repo": repo_target,
+            "task": "add-expense",
+            "prompt": (
+                "Build the expense-input command for the expense-tracker CLI: a Python module "
+                "app/expense_input.py that handles user input for adding a new expense. "
+                "Import save_expense from app.storage — never reimplement storage logic. "
+                "The module must export add_expense(amount, category, date) which validates the "
+                "inputs (amount must be a positive number; category and date must be non-empty "
+                "strings) and calls save_expense to persist the record. Raise ValueError with a "
+                "clear message for invalid inputs. "
+                "Also add an 'add' subcommand to the CLI entry point cli.py (create it if absent) "
+                "so the user can run: python cli.py add <amount> <category> <date>. "
+                "Include pytest unit tests in tests/test_expense_input.py."
+            ),
+            "depends_on": ["store-expenses"],
+            "contract": {
+                "creates": ["app/expense_input.py", "cli.py"],
+                "exports": ["add_expense(amount, category, date)"],
+                "notes": (
+                    "add_expense validates then delegates to app.storage.save_expense. "
+                    "cli.py adds an 'add' subcommand."
+                ),
+            },
+        },
+        {
+            "repo": repo_target,
+            "task": "list-expenses",
+            "prompt": (
+                "Build the expense-listing command for the expense-tracker CLI: extend cli.py "
+                "(created by the add-expense task) with a 'list' subcommand so the user can run: "
+                "python cli.py list — which prints all saved expenses newest-first, one per line, "
+                "in a readable format that shows the date, category, and amount. "
+                "Import load_expenses from app.storage — never reimplement storage logic. "
+                "The output must show at minimum the amount, category, and date of each expense. "
+                "Include pytest unit tests in tests/test_expense_list.py."
+            ),
+            "depends_on": ["add-expense"],
+            "contract": {
+                "creates": [],
+                "exports": [],
+                "notes": (
+                    "Extends cli.py with a 'list' subcommand that calls app.storage.load_expenses "
+                    "and prints each expense newest-first."
+                ),
+            },
+        },
+    ]
+
+
+#: The B1 JOB-level acceptance oracle — graded once on the final integrated tree after all
+#: three arms merge. Tests only ``app.storage`` (the stable public interface); the add and
+#: list commands build on it so a correct storage layer is necessary + largely sufficient.
+#: Authored here (not model-written) because the card authorises the chain shape. The oracle
+#: does NOT test interactive CLI behaviour (that is eyeball-tier per the card).
+_EXPENSE_TRACKER_JOB_ORACLE_PY = '''\
+"""Job-level acceptance oracle for B1 expense-tracker chain.
+
+Graded once on the final integrated tree after all three arms merge. Tests
+app.storage (the public persistence interface the add/list commands build on).
+"""
+import os
+
+
+def _clear() -> None:
+    """Remove persisted state before each test."""
+    for name in ("expenses.json",):
+        if os.path.exists(name):
+            os.remove(name)
+
+
+from app.storage import save_expense, load_expenses
+
+
+def test_expense_persists_after_save() -> None:
+    """The program must save expenses to a file so they persist after closing."""
+    _clear()
+    save_expense(12.50, "groceries", "2024-01-15")
+    loaded = load_expenses()
+    assert len(loaded) >= 1, "load_expenses must return the saved expense"
+    amounts = [
+        float(e.get("amount", e.get("cost", e.get("price", 0)))) for e in loaded
+    ]
+    assert any(abs(a - 12.50) < 0.01 for a in amounts), (
+        f"Saved amount 12.50 not found in loaded expenses: {loaded}"
+    )
+
+
+def test_expense_stores_category_and_date() -> None:
+    """Must allow adding an expense with amount, category, and date."""
+    _clear()
+    save_expense(5.99, "coffee", "2024-01-20")
+    loaded = load_expenses()
+    assert len(loaded) >= 1, "load_expenses must return the saved expense"
+    e = loaded[0]
+    # Accept any reasonable key name for category.
+    cat = str(
+        e.get("category") or e.get("type") or e.get("kind") or e.get("label") or ""
+    ).lower()
+    assert "coffee" in cat, f"Category 'coffee' not stored; expense dict: {e}"
+    # Accept any reasonable key name for date.
+    date_val = (
+        e.get("date") or e.get("day") or e.get("when") or e.get("timestamp") or ""
+    )
+    assert date_val, f"Date not stored in expense; expense dict: {e}"
+
+
+def test_list_expenses_newest_first() -> None:
+    """Must display all expenses with newest first."""
+    _clear()
+    save_expense(10.00, "groceries", "2024-01-10")
+    save_expense(20.00, "fuel",      "2024-01-15")
+    save_expense(5.00,  "coffee",    "2024-01-12")
+    loaded = load_expenses()
+    assert len(loaded) >= 3, f"Expected >=3 expenses, got {len(loaded)}: {loaded}"
+    # Extract dates and verify descending order.
+    dates = []
+    for e in loaded:
+        d = str(
+            e.get("date") or e.get("day") or e.get("when") or e.get("timestamp") or ""
+        )
+        if d:
+            dates.append(d)
+    if len(dates) >= 2:
+        assert dates == sorted(dates, reverse=True), (
+            f"Expenses must be listed newest-first; got date order: {dates}"
+        )
+'''
+
+
+#: Registry of carded plan builders, keyed by card id. A card WITHOUT a registered builder
+#: resolves to ``None`` (fail-closed — never inject a shape we cannot author). Adding support
+#: for a new card is a one-line addition here plus its own builder + oracle constant.
+#: Covers diamond (B2) and chain (B1) shapes; see :func:`resolve_plan_override` for the
+#: accepted shape list.
+_PLAN_BUILDERS = {
+    "B1": (build_expense_tracker_chain, _EXPENSE_TRACKER_JOB_ORACLE_PY),
     "B2": (build_text_stats_diamond, _TEXT_STATS_JOB_ORACLE_PY),
 }
+
+# Back-compat alias so tests / any import that still references _DIAMOND_BUILDERS keeps working.
+_DIAMOND_BUILDERS = _PLAN_BUILDERS
 
 
 def _load_cards(spec_dir: Path) -> list[dict]:
@@ -256,16 +445,19 @@ def resolve_plan_override(
 ) -> "DecompositionOverride | None":
     """Return the card-authorised :class:`DecompositionOverride` for *repo*, or ``None``.
 
-    Fires ONLY for a sandbox ``battery-*`` repo whose card declares ``shape == "diamond"`` and
-    ``units >= 2`` AND has a registered arm builder (:data:`_DIAMOND_BUILDERS`). Every other
-    repo — every production/operator dispatch — returns ``None``, and a name that does not start
-    with ``battery-`` returns immediately WITHOUT reading any card (production plan generation is
-    byte-identical + zero-cost). Wholly fail-soft: any error resolves to ``None`` (never inject a
-    half-built override, never crash a plan request).
+    Fires ONLY for a sandbox ``battery-*`` repo whose card declares a carded shape
+    (``"diamond"`` or ``"chain"``) with ``units >= 2`` AND has a registered arm builder
+    (:data:`_PLAN_BUILDERS`). Every other repo — every production/operator dispatch — returns
+    ``None``, and a name that does not start with ``battery-`` returns immediately WITHOUT reading
+    any card (production plan generation is byte-identical + zero-cost). Wholly fail-soft: any
+    error resolves to ``None`` (never inject a half-built override, never crash a plan request).
 
     ``projects_dir`` is the fleet projects root (the arms carry ``projects_dir / <slug>`` as their
     absolute repo, mirroring :func:`~shared.fleet.decompose.decompose_request`). ``spec_dir``
     overrides the battery card directory (tests)."""
+    # Carded shapes that this resolver handles. A card with shape NOT in this set falls
+    # through to the live 14B decompose path (the normal behaviour for "mixed", "flat", etc.).
+    _HANDLED_SHAPES = frozenset({"diamond", "chain"})
     try:
         name = Path(str(repo)).name
         if not name.startswith(_SANDBOX_REPO_PREFIX):
@@ -276,14 +468,14 @@ def resolve_plan_override(
             return None
         shape = str(card.get("shape", "")).strip().lower()
         units = card.get("units")
-        if shape != "diamond" or not isinstance(units, int) or units < 2:
+        if shape not in _HANDLED_SHAPES or not isinstance(units, int) or units < 2:
             return None
-        entry = _DIAMOND_BUILDERS.get(str(card.get("id", "")))
+        entry = _PLAN_BUILDERS.get(str(card.get("id", "")))
         if entry is None:
             logger.warning(
-                "battery_plans: card %s declares shape=diamond but no arm builder is registered "
-                "— NOT overriding the decomposition (add one to _DIAMOND_BUILDERS).",
-                card.get("id"),
+                "battery_plans: card %s declares shape=%s but no arm builder is registered "
+                "— NOT overriding the decomposition (add one to _PLAN_BUILDERS).",
+                card.get("id"), shape,
             )
             return None
         builder, oracle_code = entry
@@ -291,7 +483,7 @@ def resolve_plan_override(
         repo_target = str(Path(projects_dir) / card_repo)
         tasks = builder(repo_target)
         if len(tasks) < 2:
-            return None  # a 1-task "diamond" is not a diamond — let the normal path run
+            return None  # a 1-task plan is not a multi-task plan — let the normal path run
         # Defence-in-depth: a malformed committed oracle must fail CLOSED to "no job oracle"
         # (the driver then records job-acceptance not-run — honest), never ride as junk.
         try:
@@ -306,8 +498,8 @@ def resolve_plan_override(
             job_oracle_path=JOB_ORACLE_PATH_PYTHON if oracle_code else "",
         )
         logger.info(
-            "battery_plans: card %s (%s) authorises a %d-arm diamond override for repo %r.",
-            card.get("id"), shape, len(tasks), repo,
+            "battery_plans: card %s (%s) authorises a %d-arm %s override for repo %r.",
+            card.get("id"), shape, len(tasks), shape, repo,
         )
         return override
     except Exception as exc:  # noqa: BLE001 — a resolver failure must never sink a plan request

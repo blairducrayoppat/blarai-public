@@ -1512,8 +1512,16 @@ def main() -> int:
         _step("Provisioning per-boot mTLS certificates (ADR-026)…")
         try:
             _repo_root_for_certs = Path(__file__).resolve().parent.parent
+            # #863: the battery's per-job AO reboots (boot_launcher_detached sets
+            # BLARAI_REUSE_CERTS=1) reuse an existing consistent per-boot cert set
+            # rather than re-mint a fresh CA under the still-running/leaked prior AO
+            # (which rotates the CA out from under its leaf -> handshake fails, the
+            # deterministic per-job STALL night-20260711). Production / interactive
+            # boots leave the env var unset -> per-boot minting (ADR-026) unchanged.
+            _reuse_certs = os.environ.get("BLARAI_REUSE_CERTS", "") == "1"
             _per_boot_certs = provision_per_boot_certs(
-                repo_root=_repo_root_for_certs
+                repo_root=_repo_root_for_certs,
+                reuse_if_consistent=_reuse_certs,
             )
             _step(
                 f"Per-boot mTLS certs provisioned ✓  "
@@ -1943,6 +1951,21 @@ def main() -> int:
         # AO-resolved roots into the gateway's fleet config (empty -> compiled-in fallback).
         fleet_dispatch_agentic_setup_dir=_orchestrator_service.fleet_dispatch_agentic_setup_dir,
         fleet_dispatch_projects_dir=_orchestrator_service.fleet_dispatch_projects_dir,
+        # Coordinator program C1 read surface (#843, ADR-039): thread the
+        # AO-resolved [coordinator] settings into the gateway's
+        # CoordCoordinator (single source of truth, read off the started
+        # orchestrator service — never a second TOML parse). Default-dormant:
+        # false until the operator flips [coordinator].enabled.
+        coordinator_enabled=_orchestrator_service.coordinator_enabled,
+        coordinator_projects=_orchestrator_service.coordinator_projects,
+        coordinator_campaign_state_path=(
+            _orchestrator_service.coordinator_battery_campaign_state_path
+        ),
+        # #801: thread the AO-resolved [context].session_idle_ttl_s into the
+        # gateway's session-state reaper (single source of truth, read off the
+        # started orchestrator service — never a second TOML parse), so ONE
+        # operator-visible knob bounds session-keyed state in both processes.
+        session_state_ttl_s=_orchestrator_service.session_idle_ttl_s,
     )
     _step("Transport gateway ready ✓")
     activation_evidence["steps"]["gateway_initialized"] = True

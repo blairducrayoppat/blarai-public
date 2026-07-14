@@ -506,6 +506,57 @@ class RpcDispatcher:
                 }))
                 return
 
+        # ── Coordinator status interception (#843, ADR-039 — DORMANT) ──
+        # /coord is handled by the GATEWAY (deterministic, READ-ONLY: compose a
+        # work-state snapshot + render it — no model call, no write path),
+        # emitted as ONE informational token frame + a terminal end frame (same
+        # shape as /dispatch status). getattr-guarded; DORMANT-safe (disabled ->
+        # a clear notice, Vikunja/fleet state never touched).
+        coord_handler = getattr(self._gateway, "handle_coord_command", None)
+        if coord_handler is not None:
+            try:
+                coord_text = await asyncio.wait_for(
+                    coord_handler(session_id, prompt),
+                    timeout=self._imagine_failsafe_s,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "_m_prompt: coord interception timed out after %.0fs "
+                    "(session=%s) — emitting failsafe terminal frame",
+                    self._imagine_failsafe_s, session_id,
+                )
+                await send(stream_frame(rid, "token", {
+                    "token": (
+                        "The coordinator status command timed out before the "
+                        "backend replied (Fail-Closed). Retry it."
+                    ),
+                    "token_index": 0,
+                    "is_final": True,
+                    "is_tool_call": False,
+                    "session_id": session_id,
+                    "is_thinking": False,
+                }))
+                await send(stream_frame(rid, "end", {
+                    "request_id": "",
+                    "informational": True,
+                    "failsafe": True,
+                }))
+                return
+            if coord_text is not None:
+                await send(stream_frame(rid, "token", {
+                    "token": coord_text,
+                    "token_index": 0,
+                    "is_final": True,
+                    "is_tool_call": False,
+                    "session_id": session_id,
+                    "is_thinking": False,
+                }))
+                await send(stream_frame(rid, "end", {
+                    "request_id": "",
+                    "informational": True,
+                }))
+                return
+
         # ── Imagine / image-gen interception (UC-010, ADR-033 — DORMANT) ──
         # /imagine, /edit, /save are handled by the GATEWAY (deterministic tool
         # output) before any AO prompt dispatch, emitted as ONE informational

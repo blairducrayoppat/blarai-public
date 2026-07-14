@@ -3,12 +3,31 @@ Eval Harness — Oracle-Quality Check Engine (#765)
 ==================================================
 The deterministic half of the oracle-quality measurement: given an oracle's
 SOURCE TEXT (the 14B-written acceptance-test file — per-task #690 or
-job-level W4), this module answers two kinds of question with no model in
+job-level W4), this module answers four kinds of question with no model in
 the loop:
 
   * STATIC findings — is the oracle structurally trustworthy? (real test
     functions with real assertions; no degenerate ``assert True`` bodies;
     no module-level skip; imports parseable.)
+
+  * CONTRACT findings — does the oracle import only first-party symbols the
+    job's declared task contracts actually export (the #752-F3 class: "the
+    seeded per-task oracle does `from text_analyzer import analyze_text`;
+    the coder named its module differently"). This is a THIN WRAPPER over
+    the real production check (:func:`shared.fleet.oracle_qa.
+    scan_invented_contracts`, #821 ``CLASS_INVENTED_CONTRACT``) — the eval
+    suite measures the SAME logic the live dispatch fleet's authorship-time
+    QA gate runs, never a parallel implementation that could drift from it.
+
+  * CRITERIA-COVERAGE findings — does every ``[behavior]``/``[smoke]``
+    acceptance criterion map to at least one test in the oracle? This is a
+    deliberately SEPARATE, self-contained lexical heuristic (keyword overlap
+    between a criterion's text/check and each test function's name+body) —
+    NOT the production #821 ``verify_traceability`` matrix, which verifies a
+    MODEL-DECLARED coverage map and therefore cannot run model-free. See
+    :func:`criteria_coverage_findings` for the exact rule and its documented
+    blind spot (a same-behavior paraphrase with disjoint vocabulary reads as
+    uncovered — a coarse LEXICAL match, not semantic understanding).
 
   * EXECUTION outcome — what happens when the oracle runs against a given
     implementation tree? The vocabulary matters more than the boolean:
@@ -41,6 +60,7 @@ tree.
 from __future__ import annotations
 
 import ast
+import re
 import shutil
 import subprocess
 import sys
@@ -48,6 +68,13 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# Reused, not reimplemented: the real #821 authorship-time QA check for the
+# #752-F3 import/contract class. shared.fleet.oracle_qa is pure-Python and
+# model-free (verified: no torch/openvino/genai import anywhere under
+# shared/fleet/, and evals/plan_calibration.py already imports
+# shared.fleet.dispatch — the same cross-package reuse precedent).
+from shared.fleet.oracle_qa import scan_invented_contracts
 
 #: Execution-outcome vocabulary (mirrors #765 Layer 2's scorecard evidence values).
 RUN_PASSED = "passed"
@@ -62,6 +89,14 @@ FLAG_DEGENERATE_ASSERT = "degenerate-assert"
 FLAG_MODULE_SKIP = "module-skip"
 FLAG_LOW_ASSERTIONS = "low-assertions"
 FLAG_SYNTAX_ERROR = "syntax-error"
+
+#: Contract-finding flag: a first-party import the job's declared task
+#: contracts never export (the #752-F3 class).
+FLAG_IMPORT_NOT_IN_CONTRACT = "import-not-in-contract"
+
+#: Criteria-coverage flag: at least one test-tier ([behavior]/[smoke])
+#: criterion has no test that lexically overlaps it.
+FLAG_UNCOVERED_CRITERIA = "uncovered-criteria"
 
 #: A test function with fewer real assertions than this is flagged low.
 _MIN_ASSERTS_PER_TEST = 1
@@ -153,6 +188,192 @@ def static_oracle_findings(oracle_code: str) -> StaticFindings:
         test_count=len(assert_counts),
         assert_counts=assert_counts,
         flags=tuple(flags),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Contract findings — the #752-F3 class (imports satisfiable against the
+# declared job contract). A thin wrapper over the real #821 production check.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ContractFindings:
+    """Whether the oracle's first-party imports stay within the job's
+    declared task contracts (union of every task's ``contract.exports``,
+    #740 W2 shape). Empty ``declared_exports`` is a caller error here (the
+    eval case always supplies one) — production code's own fail-soft-empty
+    behavior lives in :func:`shared.fleet.oracle_qa.scan_invented_contracts`
+    and is preserved (an empty contract simply finds nothing, never raises).
+    """
+
+    flags: tuple[str, ...] = ()
+    invented_symbols: tuple[str, ...] = ()
+    detail: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "flags": list(self.flags),
+            "invented_symbols": list(self.invented_symbols),
+            "detail": self.detail,
+        }
+
+
+def contract_import_findings(
+    oracle_code: str, declared_exports: "list[str] | tuple[str, ...] | set[str]"
+) -> ContractFindings:
+    """The #752-F3 static check: does the oracle import a first-party NAME
+    (``from <module> import <name>``) that no task's declared ``contract.
+    exports`` actually promises? An oracle importing a symbol the contract
+    never exports is a defect — the coder was never told to build it, so
+    collection fails on plumbing, not logic, and a real coder failure is
+    indistinguishable from a VERIFY-side defect (BUILD_JOURNAL 2026-07-07,
+    "Measuring the judge").
+
+    Delegates to :func:`shared.fleet.oracle_qa.scan_invented_contracts` — the
+    SAME AST walk the live dispatch fleet's authorship-time QA gate (#821)
+    runs before a job oracle seeds — so this eval measures production
+    behavior verbatim rather than a second, possibly-drifting heuristic.
+    Fail-closed: unparseable source yields no importable symbols (the upstream
+    ``_first_party_imports`` catches ``SyntaxError``/``ValueError`` and
+    returns ``[]``), so a syntax-broken oracle reads as contract-clean here —
+    :func:`static_oracle_findings` is the check that catches that class; this
+    function answers ONLY the import/contract question."""
+    exports = {str(e) for e in declared_exports}
+    findings = scan_invented_contracts(oracle_code, exports)
+    symbols = tuple(f.subject for f in findings)
+    flags = (FLAG_IMPORT_NOT_IN_CONTRACT,) if symbols else ()
+    detail = "; ".join(f.message for f in findings) if findings else ""
+    return ContractFindings(flags=flags, invented_symbols=symbols, detail=detail)
+
+
+# ---------------------------------------------------------------------------
+# Criteria-coverage findings — a self-contained lexical heuristic (NOT the
+# production #821 verify_traceability matrix, which verifies a MODEL-
+# DECLARED coverage map and so cannot run model-free; see the module
+# docstring).
+# ---------------------------------------------------------------------------
+
+#: Criterion tiers whose text becomes coder test-writing instructions —
+#: mirrors ``shared.fleet.acceptance.TEST_TIERS`` (duplicated as a small,
+#: stable 2-value vocabulary rather than imported, so this module's only
+#: cross-package coupling stays the one deliberate reuse above).
+_CRITERIA_TEST_TIERS: frozenset[str] = frozenset({"behavior", "smoke"})
+
+#: A criterion counts as COVERED by a test when at least this many of the
+#: criterion's significant words also appear in that test's name+body
+#: (floored to the criterion's own word count when it has fewer). Low by
+#: design: this is a coarse LEXICAL heuristic (exact-token overlap, no
+#: stemming/synonyms), not semantic understanding — see
+#: :func:`criteria_coverage_findings`.
+_MIN_KEYWORD_OVERLAP = 2
+
+#: Short/grammatical words dropped before matching — carry no domain content
+#: and would otherwise inflate overlap between unrelated criterion/test pairs.
+_STOPWORDS: frozenset[str] = frozenset({
+    "the", "an", "and", "are", "was", "were", "been", "being", "its", "that",
+    "this", "these", "those", "into", "for", "with", "when", "then", "should",
+    "must", "can", "will", "shall", "not", "does", "each", "your", "you",
+})
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _significant_words(text: str) -> set[str]:
+    """Lowercased, punctuation-split (underscores split too — a regex over
+    ``[a-z0-9]+`` treats ``word_frequencies`` as two tokens, which is what
+    lets a snake_case test name overlap a plain-English criterion), with
+    stopwords and sub-3-character tokens dropped."""
+    words = _WORD_RE.findall(text.lower())
+    return {w for w in words if len(w) >= 3 and w not in _STOPWORDS}
+
+
+@dataclass(frozen=True)
+class CriteriaCoverageFindings:
+    """Per-criterion lexical coverage verdict over one oracle."""
+
+    flags: tuple[str, ...] = ()
+    covered: tuple[str, ...] = ()
+    uncovered: tuple[str, ...] = ()
+    detail: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "flags": list(self.flags),
+            "covered": list(self.covered),
+            "uncovered": list(self.uncovered),
+            "detail": self.detail,
+        }
+
+
+def criteria_coverage_findings(
+    oracle_code: str, criteria: "list[dict[str, Any]]"
+) -> CriteriaCoverageFindings:
+    """Deterministic, offline HEURISTIC answering: does each ``[behavior]``/
+    ``[smoke]`` acceptance criterion map to >=1 test in the oracle?
+
+    Each ``criteria`` item is an ``AcceptanceCriterion``-shaped dict
+    (``shared.fleet.acceptance.AcceptanceCriterion.to_dict()``):
+    ``{"id": ..., "text": ..., "tier": ..., "check": ...}`` — the exact shape
+    (and the ``- [tier] text (check: ...)`` rendering) the real
+    ``generate_acceptance_oracle`` / job-level W4 prompts already use, so a
+    caller can pass a spec's real criteria unmodified.
+
+    Rule (documented, not hidden): tokenize each test-tier criterion's
+    ``text + check`` into significant words (:func:`_significant_words`);
+    tokenize every ``def test*`` function's full source (name + body) the
+    same way. A criterion is COVERED iff at least one test shares
+    ``min(2, len(criterion_words))`` or more words with it. Criteria outside
+    :data:`_CRITERIA_TEST_TIERS` (visual/human) are ignored — never counted
+    covered or uncovered — mirroring
+    :attr:`shared.fleet.acceptance.AcceptanceSpec.human`'s carve-out (only an
+    operator can judge those).
+
+    KNOWN LIMITATION (pinned by a golden case, not swept under the rug): this
+    is exact-token lexical overlap — no stemming, no synonyms. A test that
+    correctly covers a criterion but is phrased with disjoint vocabulary (a
+    genuine paraphrase) reads as uncovered. That is the documented boundary
+    of "heuristic keyword/structure match" (#765); closing it needs either
+    stemming or the model-assisted #821 traceability matrix, not this
+    function.
+
+    Fail-closed: unparseable oracle source returns the ``syntax-error`` flag
+    (mirroring :func:`static_oracle_findings`) rather than silently reporting
+    every criterion covered or uncovered."""
+    try:
+        tree = ast.parse(oracle_code)
+    except SyntaxError as exc:
+        return CriteriaCoverageFindings(
+            flags=(FLAG_SYNTAX_ERROR,), detail=f"SyntaxError: {exc.msg}"
+        )
+
+    test_word_sets: list[set[str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+            segment = ast.get_source_segment(oracle_code, node) or node.name
+            test_word_sets.append(_significant_words(segment))
+
+    covered: list[str] = []
+    uncovered: list[str] = []
+    for c in criteria:
+        tier = str(c.get("tier", ""))
+        if tier not in _CRITERIA_TEST_TIERS:
+            continue
+        label = str(c.get("id") or c.get("text") or "criterion")
+        crit_words = _significant_words(str(c.get("text", "")) + " " + str(c.get("check", "")))
+        needed = min(_MIN_KEYWORD_OVERLAP, len(crit_words))
+        is_covered = bool(crit_words) and needed > 0 and any(
+            len(crit_words & tw) >= needed for tw in test_word_sets
+        )
+        (covered if is_covered else uncovered).append(label)
+
+    flags = (FLAG_UNCOVERED_CRITERIA,) if uncovered else ()
+    detail = (
+        f"covered={covered} uncovered={uncovered}"
+        if (covered or uncovered) else "no test-tier criteria supplied"
+    )
+    return CriteriaCoverageFindings(
+        flags=flags, covered=tuple(covered), uncovered=tuple(uncovered), detail=detail
     )
 
 

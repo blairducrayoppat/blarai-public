@@ -37,6 +37,14 @@ from shared.models.weight_integrity import (
 
 logger = logging.getLogger(__name__)
 
+# Status vocabulary for :meth:`SharedInferencePipeline.try_run_exclusive` —
+# the coordinator drafting seam (#845 C3, design §3.4). Strings, not an enum:
+# this module predates the coordinator and stays vocabulary-light; the
+# coordinator-facing enum lives in ``shared.coordinator.drafting``.
+TRY_RUN_BUSY = "busy"
+TRY_RUN_NOT_RESIDENT = "not_resident"
+TRY_RUN_RAN = "ran"
+
 try:
     import openvino_genai as ov_genai  # type: ignore[import-untyped]
 
@@ -119,6 +127,54 @@ class SharedInferencePipeline:
             )
         self._pipeline = pipeline
         logger.info("SharedInferencePipeline: 14B reload complete.")
+
+    def try_run_exclusive(self, fn: "Callable[[Any], Any]") -> "tuple[str, Any | None]":
+        """Non-blocking, residency-gated exclusive section — the coordinator
+        drafting seam's acquire point (#845 C3, design §3.3 wall 4 / §3.4).
+
+        The heartbeat's drafting adapter must never wait on, queue behind, or
+        preempt a chat generation, and must never trigger the lazy 14B reload
+        :meth:`generate` performs — so it cannot use :meth:`generate` at all.
+        This method is the sanctioned alternative, keeping every lock
+        semantic inside the lock's owner:
+
+          * **Try-acquire, never block**: ``self._lock.acquire(blocking=False)``.
+            Held by anyone (a chat turn, a PA classification, an image-gen
+            eviction) ⇒ return ``(TRY_RUN_BUSY, None)`` immediately.
+          * **Positive residency, under the lock**: acquiring the lock is NOT
+            evidence the 14B is resident — the UC-010 image-generation path
+            evicts via :meth:`unload` and releases with the pipeline absent.
+            ``self._pipeline is None`` ⇒ ``(TRY_RUN_NOT_RESIDENT, None)`` and,
+            unlike :meth:`generate`, **no reload is ever initiated** (the
+            rebuild closure is not consulted; a non-resident 14B is the
+            caller's defer, never this method's load).
+          * **Residency pinned for the duration**: :meth:`unload` and
+            :meth:`generate` serialise on this same lock, so while *fn* runs
+            the pipeline can neither be evicted nor swapped under it — the
+            residency check cannot go stale (no TOCTOU).
+          * ``(TRY_RUN_RAN, fn(<raw pipeline>))`` otherwise. *fn* receives the
+            RAW resident pipeline (calling back into this wrapper's
+            :meth:`generate` from inside *fn* would re-acquire the
+            non-reentrant lock and deadlock — pass the raw handle through
+            instead). An exception from *fn* propagates to the caller; the
+            ``finally`` releases the lock on every path.
+
+        ``generate_call_count`` is NOT incremented here — it counts
+        :meth:`generate` calls specifically, and *fn* is opaque to this
+        wrapper.
+
+        DORMANT: the only intended caller is the AO's ``coordinator_draft()``
+        drafting adapter, itself uncalled until the heartbeat cycle limb wires
+        it behind ``[coordinator].heartbeat_enabled``.
+        """
+        if not self._lock.acquire(blocking=False):
+            return (TRY_RUN_BUSY, None)
+        try:
+            if self._pipeline is None:
+                return (TRY_RUN_NOT_RESIDENT, None)
+            return (TRY_RUN_RAN, fn(self._pipeline))
+        finally:
+            self._lock.release()
 
     def unload(self) -> None:
         """Evict the underlying 14B to free GPU/system RAM.

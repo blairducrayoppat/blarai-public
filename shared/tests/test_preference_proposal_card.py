@@ -15,6 +15,7 @@ from shared.ipc.preference_proposal import (
     PROPOSAL_BLOCK_CLOSE,
     ProposalAction,
     ProposalCard,
+    UntrustedContextKind,
     extract_proposal_block,
     render_proposal_block,
     render_proposal_text,
@@ -83,6 +84,55 @@ class TestRender:
     def test_bad_token_refused_at_block_render(self) -> None:
         with pytest.raises(ValueError):
             render_proposal_block(_add_card(token="NOThex"))
+
+
+class TestUntrustedGrain:
+    """#792 — the untrusted-context NOTICE is sized to the grain. The bool
+    gates whether any notice shows; ``untrusted_kind`` selects which."""
+
+    def test_knowledge_recall_shows_a_proportionate_notice_not_the_alarm(
+        self,
+    ) -> None:
+        text = render_proposal_text(
+            _add_card(
+                untrusted_context=True,
+                untrusted_kind=UntrustedContextKind.KNOWLEDGE_RECALL,
+                provenance_label="content recalled from your knowledge bank",
+            )
+        )
+        assert "content recalled from your knowledge bank" in text
+        assert "your own curated knowledge bank" in text   # proportionate notice
+        assert "untrusted content" not in text             # NOT the strong alarm
+        assert "read it carefully" not in text
+
+    def test_document_or_web_keeps_the_strong_warning(self) -> None:
+        text = render_proposal_text(
+            _add_card(
+                untrusted_context=True,
+                untrusted_kind=UntrustedContextKind.DOCUMENT_OR_WEB,
+            )
+        )
+        assert "untrusted content" in text
+        assert "read it carefully" in text
+        assert "your own curated knowledge bank" not in text
+
+    def test_bare_untrusted_context_defaults_to_the_strong_warning(self) -> None:
+        # Back-compat: untrusted_context=True with the default NONE kind gets the
+        # alarm — an un-classified caller is never handed the reassurance.
+        text = render_proposal_text(_add_card(untrusted_context=True))
+        assert "untrusted content" in text
+        assert "your own curated knowledge bank" not in text
+
+    def test_bool_gates_notice_even_when_a_kind_is_set(self) -> None:
+        # untrusted_context=False shows no notice regardless of the kind.
+        text = render_proposal_text(
+            _add_card(
+                untrusted_context=False,
+                untrusted_kind=UntrustedContextKind.KNOWLEDGE_RECALL,
+            )
+        )
+        assert "untrusted content" not in text
+        assert "your own curated knowledge bank" not in text
 
 
 class TestDisplaySanitization:

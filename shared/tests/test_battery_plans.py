@@ -280,6 +280,27 @@ def test_resolve_override_fires_for_the_real_b2_card(tmp_path):
     assert all(t["repo"] == str(tmp_path / "battery-b2-text-stats") for t in ov.tasks)
 
 
+def test_resolve_override_fires_for_the_real_b1_card(tmp_path):
+    # B1 is a chain shape — the override must fire and supply the 3-arm plan + oracle.
+    # This regression lock prevents B1 from STALLING again due to oracle-not-generated.
+    ov = battery_plans.resolve_plan_override("battery-b1-expense-cli", projects_dir=tmp_path)
+    assert ov is not None, (
+        "B1 chain card must get an override — without it the plan has no contracts, "
+        "no oracle is generated, and all-tasks-merged produces STALLED [VERIFY]"
+    )
+    assert len(ov.tasks) == 3, f"B1 chain must have exactly 3 arms, got {len(ov.tasks)}"
+    assert ov.job_oracle_path == JOB_ORACLE_PATH_PYTHON
+    assert "from app.storage import save_expense, load_expenses" in ov.job_oracle_code
+    # All arms must carry the absolute repo path.
+    assert all(t["repo"] == str(tmp_path / "battery-b1-expense-cli") for t in ov.tasks)
+    # The first arm must declare creates/exports so generate_job_acceptance_oracle would
+    # have generated an oracle from the declared contracts (structural invariant).
+    store_task = ov.tasks[0]
+    assert store_task["task"] == "store-expenses"
+    assert store_task["contract"]["creates"], "store-expenses must declare file creates"
+    assert store_task["contract"]["exports"], "store-expenses must declare function exports"
+
+
 def test_resolve_override_none_for_non_battery_repo(tmp_path):
     # Fast path: a production/operator repo never reads a card.
     assert battery_plans.resolve_plan_override("rocket-calc", projects_dir=tmp_path) is None

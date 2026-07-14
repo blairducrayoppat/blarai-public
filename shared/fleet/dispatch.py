@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -115,7 +116,7 @@ class TaskOutcome:
 
     task: str
     outcome: str  # the raw run-fleet outcome word (processed/errored/skipped…)
-    result: str  # classified: MERGED | PARKED | BLOCKED | NOTHING | UNKNOWN
+    result: str  # classified: MERGED | PARKED | BLOCKED | NOTHING | TIMEOUT | UNKNOWN
     detail: str  # the raw RESULT: line text
 
 
@@ -146,19 +147,25 @@ _NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 
 def _safe_run(
-    cmd: list[str], timeout_s: float, cwd: "str | None" = None
+    cmd: list[str], timeout_s: float, cwd: "str | None" = None, *,
+    env: "dict[str, str] | None" = None,
 ) -> tuple[bool, str, str]:
     """Bounded, no-shell subprocess. Returns (ok, stdout, stderr). Fail-Closed.
 
     ``cwd`` (M2 W4, additive — the default is byte-identical) lets a gate run inside a
     target repo without the repo path ever entering a command STRING: the path rides
     the process's working directory, never a shell line (§10 S1 argv-only rule).
-    ``creationflags=_NO_WINDOW`` (#761): console-subsystem children of the console-less
-    pythonw-spawned driver must not each be allocated a visible console."""
+    ``env`` (#822 H1, additive keyword-only — ``None`` is byte-identical: the child
+    inherits ``os.environ``) is an OVERLAY merged over the current environment
+    (``{**os.environ, **env}``), so the clean-env grader can pin ``PYTHONPATH`` +
+    ``PYTHONSAFEPATH`` without a global mutation and without disturbing every other
+    caller. ``creationflags=_NO_WINDOW`` (#761): console-subsystem children of the
+    console-less pythonw-spawned driver must not each be allocated a visible console."""
     try:
+        run_env = {**os.environ, **env} if env is not None else None
         cp = subprocess.run(  # noqa: S603 — vector argv, no shell
             cmd, capture_output=True, text=True, timeout=timeout_s, cwd=cwd or None,
-            creationflags=_NO_WINDOW,
+            creationflags=_NO_WINDOW, env=run_env,
         )
         return (cp.returncode == 0, cp.stdout or "", cp.stderr or "")
     except subprocess.TimeoutExpired:
@@ -633,6 +640,36 @@ def create_project(
 # empty/absent — the target is no longer hard-wired.
 _AGENTIC_SETUP = Path(r"C:\Users\mrbla\agentic-setup")
 _PROJECTS = Path(r"C:\Users\mrbla\projects")
+
+# #811 / AUDIT-12 (12-Factor III — store machine-specific config in the environment):
+# the SHIPPED default.toml carries NO absolute home path for these two fleet roots.
+# Both the AO entrypoint config-loader and the dispatch-harness config-loader resolve
+# each root through resolve_fleet_root() below — one SSOT, so an env override is
+# honored uniformly wherever the TOML is read (the residual risk was a second reader
+# bypassing the resolver). Env-var names follow the repo's BLARAI_-prefix convention
+# (cf. BLARAI_VM_STOP_ON_EXIT, BLARAI_UI).
+FLEET_AGENTIC_SETUP_DIR_ENV: str = "BLARAI_FLEET_AGENTIC_SETUP_DIR"
+FLEET_PROJECTS_DIR_ENV: str = "BLARAI_FLEET_PROJECTS_DIR"
+
+
+def resolve_fleet_root(env_name: str, toml_value: "object" = "") -> str:
+    """Resolve one fleet-dispatch root path string. Order (highest precedence first):
+
+      1. the ``env_name`` environment variable (operator/host override), stripped;
+      2. the ``[fleet_dispatch]`` TOML value (empty in the shipped default);
+      3. ``""`` — an empty resolution.
+
+    An empty ("") result is intentional and load-bearing: every caller passes it to
+    :func:`build_default_config` as ``resolve_fleet_root(...) or None``, which then
+    applies the compiled-in this-host fallback (:data:`_AGENTIC_SETUP` /
+    :data:`_PROJECTS`). So on the build host — no env var, empty TOML — the runtime
+    path is byte-identical to the old baked config, while the shipped config file
+    holds no machine-specific absolute path (12-Factor III, #811).
+    """
+    env_val = os.environ.get(env_name, "").strip()
+    if env_val:
+        return env_val
+    return str(toml_value or "")
 
 
 def build_default_config(

@@ -52,11 +52,13 @@ class _PlanHarness:
     a stub resolved-config.
     """
 
-    def __init__(self, fake_gen, projects_root, *, enabled=True) -> None:
+    def __init__(self, fake_gen, projects_root, *, enabled=True, clarify=True, revise=True) -> None:
         self._framer = MessageFramer()
         self._fake_gen = fake_gen
         self._resolved_config = SimpleNamespace(
             fleet_dispatch_enabled=enabled,
+            fleet_dispatch_clarify_enabled=clarify,
+            fleet_dispatch_revise_enabled=revise,
             fleet_dispatch_agentic_setup_dir="",
             fleet_dispatch_projects_dir=str(projects_root),
         )
@@ -67,6 +69,12 @@ class _PlanHarness:
     _handle_plan_request = AssistantOrchestratorService._handle_plan_request
     _fleet_projects_dir = AssistantOrchestratorService._fleet_projects_dir
     fleet_dispatch_enabled = AssistantOrchestratorService.fleet_dispatch_enabled
+    fleet_dispatch_clarify_enabled = (
+        AssistantOrchestratorService.fleet_dispatch_clarify_enabled
+    )
+    fleet_dispatch_revise_enabled = (
+        AssistantOrchestratorService.fleet_dispatch_revise_enabled
+    )
     fleet_dispatch_agentic_setup_dir = (
         AssistantOrchestratorService.fleet_dispatch_agentic_setup_dir
     )
@@ -132,6 +140,63 @@ def test_plan_handler_raising_generator_never_crashes(tmp_path):
     assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": "an idea here"})
     payload = h._framer.decode_plan_result(t.sent[0])
     assert payload["ok"] is True  # graceful, not a crash
+
+
+def _clarify_gen(prompt: str) -> str:
+    """A 14B stand-in that ASKS requirements questions for the clarify prompt (#819), else
+    behaves like _good_gen (tasks/criteria)."""
+    if "ask ONLY the few questions" in prompt:  # the #819 clarify prompt marker
+        return json.dumps([
+            {"axis": "surface", "question": "Where will you use this — computer or browser?"},
+            {"axis": "persistence", "question": "Should your data be saved between uses?"},
+        ])
+    return _good_gen(prompt)
+
+
+def test_plan_handler_clarify_returns_questions(tmp_path):
+    # #819: an underspecified goal with the stage ON returns CLARIFY questions (no tasks yet).
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_clarify_gen, projects, clarify=True)
+    t = _FakeTransport()
+    assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": "a todo app"})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["ok"] is True
+    assert [q["axis"] for q in payload["questions"]] == ["surface", "persistence"]
+    assert payload["tasks"] == []  # early-return: no decompose ran
+
+
+def test_plan_handler_clarify_disabled_no_questions(tmp_path):
+    # With the knob OFF, an underspecified goal goes straight to decompose (pre-#819).
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_clarify_gen, projects, clarify=False)
+    t = _FakeTransport()
+    assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": "a todo app"})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["questions"] == [] and len(payload["tasks"]) >= 1
+
+
+def test_plan_handler_requirements_thread_and_goal_stays_clean(tmp_path):
+    # The re-plan: an enriched goal (goal + the requirements sentinel) suppresses clarify and
+    # threads the requirements into the task context, while spec.goal stays the clean goal.
+    from shared.fleet import clarify as _clarify
+
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    enriched = _clarify.compose_planning_goal(
+        "a todo app",
+        _clarify.compose_requirements_block(
+            [{"question": "q", "answer": "on my computer", "assumed": False}]
+        ),
+    )
+    h = _PlanHarness(_clarify_gen, projects, clarify=True)
+    t = _FakeTransport()
+    assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": enriched})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["questions"] == []                       # clarify suppressed on the re-plan
+    assert payload["criteria"]["goal"] == "a todo app"      # spec.goal is the CLEAN goal
+    assert any("on my computer" in tk["prompt"] for tk in payload["tasks"])
 
 
 def test_plan_handler_disabled_fails_closed(tmp_path):
@@ -250,3 +315,57 @@ def test_plan_generate_fn_raises_on_fail_closed_error():
     gen = AssistantOrchestratorService._plan_generate_fn(stub)
     with pytest.raises(RuntimeError, match="PLAN generation failed"):
         gen("decompose this idea")
+
+
+# ── #820 plan-revision branch ────────────────────────────────────────────
+
+
+def _revise_gen(prompt: str) -> str:
+    """A 14B stand-in that emits REVISE edit ops (the revise prompt asks for a JSON array of
+    {op,ref,task,prompt}). Any non-revise prompt falls through to the good generator."""
+    if "REVISE the plan" in prompt:
+        return json.dumps([
+            {"op": "keep", "ref": 1},
+            {"op": "add", "task": "csv-export", "prompt": "add a CSV export button"},
+        ])
+    return _good_gen(prompt)
+
+
+def test_plan_handler_revise_branch_returns_ops(tmp_path):
+    from shared.fleet import revise as _revise
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_revise_gen, projects)
+    t = _FakeTransport()
+    goal = _revise.compose_revision_goal("a todo app", "add a csv export", ["Build tracker"])
+    assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": goal})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["ok"] is True
+    # The revise early-return carries edit OPS, not tasks/criteria.
+    assert payload["revision"] and payload["tasks"] == []
+    ops = payload["revision"]
+    assert ops[0]["op"] == "keep" and ops[1]["op"] == "add" and ops[1]["task"] == "csv-export"
+
+
+def test_plan_handler_revise_disabled_fails_closed(tmp_path):
+    from shared.fleet import revise as _revise
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_revise_gen, projects, revise=False)
+    t = _FakeTransport()
+    goal = _revise.compose_revision_goal("a todo app", "add export", ["Build tracker"])
+    assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": goal})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["ok"] is False and "turned off" in payload["message"]
+    assert payload["revision"] == [] and payload["tasks"] == []
+
+
+def test_plan_handler_normal_goal_has_no_revision(tmp_path):
+    # A plain (non-revise) goal never populates the revision payload — byte-identical to today.
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_good_gen, projects)
+    t = _FakeTransport()
+    assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": "a calculator"})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["ok"] is True and payload["revision"] == [] and payload["tasks"]

@@ -79,11 +79,6 @@ except ImportError:
 # Backward-compatibility runtime flag retained for existing tests.
 _OV_AVAILABLE = _OV_GENAI_AVAILABLE
 
-try:
-    import numpy as np
-except ImportError:
-    np = None  # type: ignore[assignment]
-
 # Label mapping for classification output
 _LABELS: list[str] = ["ALLOW", "DENY", "ESCALATE"]
 
@@ -718,10 +713,7 @@ class PolicyGPUInference:
         # SharedInferencePipeline instead.
         self._shared_pipeline = shared_pipeline
 
-        # OpenVINO runtime objects (legacy fields retained for compatibility)
-        self._core: Any = None
-        self._compiled_model: Any = None
-        self._infer_request: Any = None
+        # OpenVINO runtime pipeline (GenAI LLMPipeline)
         self._pipeline: Any = None
         self._loaded: bool = False
         self._integrity_result: IntegrityCheckResult | None = None
@@ -1033,36 +1025,6 @@ class PolicyGPUInference:
     def unload(self) -> None:
         """Release GPU resources and compiled model."""
         self._pipeline = None
-        self._infer_request = None
-        self._compiled_model = None
-        self._core = None
         self._loaded = False
         self._integrity_result = None
         logger.info("GPU PA classifier unloaded.")
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _softmax(logits: Any) -> Any:
-    """Numerically-stable softmax over a 1-D array.
-
-    Args:
-        logits: Raw model output (numpy array or array-like).
-
-    Returns:
-        Probability distribution (numpy array, sums to 1.0).
-
-    Raises:
-        RuntimeError: If NumPy is not available.
-    """
-    if np is None:
-        raise RuntimeError("NumPy not available - cannot compute softmax.")
-    x = np.asarray(logits, dtype=np.float64)
-    x_shifted = x - x.max()
-    e_x = np.exp(x_shifted)
-    return e_x / e_x.sum()
-
-

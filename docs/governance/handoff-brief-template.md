@@ -79,6 +79,8 @@ completes:
 
 <what is done vs. not; how the successor knows it is finished>
 
+**Deferred/blocked items — BOTH halves required:** each deferred or blocked item has the durable record (ticket comment / CURRENT-STATE) **AND** a queue placement (#859 / the Coordinator board) with its unblock predicate. List the queue entries here. A deferred item with a record but no queue placement is a *dropped* item — "durability without distribution is half the job" (LESSONS.md lesson 10).
+
 ## Risks
 
 <the real risk surfaces — build may fail, external post is irreversible, data
@@ -86,8 +88,8 @@ mutation, model/hardware contention, etc. — each with the mitigation>
 
 ## Operational constraints (inherited)
 
-<air-gap/privacy tier, never-destructive-git, feature-branches-only, pause-fleet
-rules, LOCALAPPDATA isolation, record-hardware-results, journal obligation, etc.>
+<air-gap/privacy tier, never-destructive-git, feature-branches-only,
+LOCALAPPDATA isolation, record-hardware-results, journal obligation, etc.>
 
 ## Authorizations (be explicit + bounded)
 

@@ -35,33 +35,21 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable
 
+from shared.fleet import doom_check as _doom
 from shared.fleet import swap_state as _ss
 from shared.fleet.dispatch import FleetDispatchConfig, parse_summary, slugify_task
 
-# Coder/fleet child-process names whose CPU activity means "the run is doing work". Lowercased,
-# matched as a prefix-or-equal against the process name (psutil names include the .exe on Windows).
-_CODER_PROC_NAMES: tuple[str, ...] = (
-    "opencode",        # the coder agent runtime
-    "dotnet",          # .NET build/test
-    "node",            # JS/TS toolchains the coder may spawn
-    "msbuild",
-    "playwright",      # browser-driven verify
-    "msedge",
-    "ovms",            # the 30B server itself (generation)
-    "python",          # the detached swap driver + run-fleet pwsh children
-    "pwsh",
-    "powershell",
-    # The [3/5] verify gate's workers (night-20260709 B4 false-doom): verify-project.ps1
-    # spawns uv/ruff/mutmut-via-uv/git as NATIVE processes that burn CPU while every watched
-    # log stays quiet by design — a doom window shorter than the gate's own budget then reads
-    # a working verify as a dead run.
-    "uv",              # ephemeral test/lint installs + runners (uv run --with pytest/mutmut)
-    "ruff",            # native lint binary
-    "git",             # worktree/diff operations between steps
-)
+# The coder-process-name list + CPU threshold were PROMOTED to shared/fleet/doom_check.py
+# (#844 C2 — the driver-integrated stop-doomed-fast checks), which is now their SSOT: the
+# harness monitor (this external poller) and the driver's DoomWatchdog must never drift on
+# what counts as "the run is doing work". Values are byte-identical to the tuple that lived
+# here (including the night-20260709 B4 false-doom additions — the [3/5] verify gate's
+# uv/ruff/git native workers, which burn CPU while every watched log stays quiet by design).
+_CODER_PROC_NAMES: tuple[str, ...] = _doom.CODER_PROC_NAMES
 
-#: CPU-percent above which a process counts as "actively working" for a sample.
-_CPU_ACTIVE_THRESHOLD: float = 5.0
+#: CPU-percent above which a process counts as "actively working" for a sample (SSOT:
+#: shared/fleet/doom_check.py — see the promotion note above).
+_CPU_ACTIVE_THRESHOLD: float = _doom.CPU_ACTIVE_THRESHOLD
 
 # Swap-phase classification (the multi-task #686 fix). A multi-task dispatch runs run-fleet ONCE
 # PER TASK — each invocation overwrites SUMMARY.txt — and the 14B swap-back happens in the detached

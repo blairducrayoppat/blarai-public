@@ -49,10 +49,16 @@ INTEGRATION REQUIREMENTS FROM THE SPIKE (RESULTS.md), ALL BUILT HERE
 * **Track own cancels.** opencode 1.17.8 returns ``StopReason=end_turn`` even on
   a cancel — a real fidelity gap. We NEVER trust StopReason; the tracker records
   "did I send cancel, and why" itself.
-* **Semantic stall signal (#779 closes here).** idle = "no ``session/update`` for
-  ``ACP_IDLE_TIMEOUT_S``" — a direct liveness signal that fires during a long
-  single-artifact write (the #779 blind spot the mtime/new-file heuristic had),
-  and cannot confuse "thinking" with "wedged" (the #687 false-doom class).
+* **Semantic stall signal (#779 / recalibrated #790).** idle = "no
+  ``session/update`` for ``ACP_IDLE_TIMEOUT_S``". This retired the #779
+  mtime/new-file blind spot, but the 2026-07-12 battery proved the signal is
+  NOT the incremental heartbeat the design assumed: opencode-acp emits NO
+  ``session/update`` (and writes NO stderr line) for the whole of a long
+  model-generation window, so a healthy 30B generating its first/next response
+  looks IDENTICAL to a wedged one on every channel we can see. The bound is
+  therefore a coarse "it's never coming back" catch, and must be sized to clear
+  a full generation burst — 600 s, not the spike's 120 s (which false-killed
+  18/24 candidates). See ``ACP_IDLE_TIMEOUT_S`` for the full calibration note.
 
 THE RESULT CONTRACT (drop-in for ``Invoke-CandidateBuild``)
 ===========================================================
@@ -72,8 +78,11 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+from shared.fleet import acp_progress
 
 # ---------------------------------------------------------------------------
 # Registered timeouts / caps (see shared/timeout_registry.py — the ACP idle
@@ -81,12 +90,36 @@ from typing import Any, Callable, Optional
 # ---------------------------------------------------------------------------
 
 #: idle = "no session/update for this long" -> a WEDGED coder (TimedOut, 'idle').
-#: The #759 spike measured the healthy 30B run's max inter-event gap at 83 s
-#: (the cold-prefill wait before the first token; p99 54 s, 0 gaps > 90 s), so
-#: 120 s clears the worst healthy gap with margin while still catching a true
-#: hang faster than the stdin path's 240 s transcript-idle — and on a signal
-#: that cannot confuse "thinking" with "dead". Registered: shared/timeout_registry.py.
-ACP_IDLE_TIMEOUT_S: float = 120.0
+#:
+#: CALIBRATION — the 2026-07-12 battery (#790). The #759 spike's 83 s "max
+#: healthy inter-event gap" was UNREPRESENTATIVE: it undersampled the long
+#: single-generation tail. On the first real coder battery under driver=acp, a
+#: 120 s bound FALSE-KILLED 18 of 24 candidates (75%). Two shapes, one cause:
+#:   * first-token starvation — the 30B spends >120 s generating its FIRST
+#:     response (plan + reasoning + first edit) before emitting any tool_call,
+#:     so the ONLY session/updates the client sees are the startup
+#:     available_commands_update + a used=0 usage_update, then silence -> kill;
+#:   * mid-run generation gap — a candidate that DID edit/run tests then enters
+#:     one long generation burst (e.g. writing the implementation) and is killed
+#:     mid-stream (opencode logs `error=Aborted`) even though it was producing.
+#: The load-bearing fact the spike missed: during a model-generation window
+#: opencode-acp emits NO session/update AND writes NO line to its own stderr
+#: (both channels verified dark across the full 120 s in the battery
+#: transcripts), and — before the first edit — nothing is on disk either. So
+#: there is NO real-time signal that distinguishes "generating a long response"
+#: from "wedged"; the ONLY lever is how long we wait. The cost is asymmetric —
+#: false-killing a working candidate is catastrophic (and collapses best-of-N,
+#: since all N die the same generation-time death), while waiting longer on a
+#: genuinely hung coder is cheap: the ceiling backstop still fires, and at 600 s
+#: a true hang is caught at 1/6 of the 3600 s ceiling. So the bound must clear a
+#: full multi-minute generation burst with margin, not just the cold-prefill
+#: wait. 600 s does; 120 s did not. This is a calibration the LA/coordinator can
+#: retighten with real (non-censored) gap data — see the timeout_registry entry.
+#: NOTE: the live per-run value is `acp.idle_sec` in agentic-setup
+#: configs/fleet-driver.json (it overrides this default via --idle-sec); bumping
+#: it there is the operator go-live step that makes this fix take effect on the
+#: battery. Registered: shared/timeout_registry.py.
+ACP_IDLE_TIMEOUT_S: float = 600.0
 
 #: Hard turn cap — bounds even a coder that keeps making edits. Mirrors
 #: Invoke-AgentRun's MaxSteps=45 (fleet-lib.ps1); a cap is NOT a timeout (the
@@ -212,6 +245,14 @@ class AcpEventTracker:
     clock: Callable[[], float] = time.monotonic
     max_steps: int = ACP_MAX_STEPS
     spin_steps: int = ACP_SPIN_STEPS
+    #: #844 C2 — durable progress for the coordinator (a separate process that
+    #: cannot see the monotonic ``clock``). Both default off, so existing
+    #: construction is unchanged; wired in ``_run_acp_session``. ``wall_clock`` is
+    #: SEPARATE from ``clock`` on purpose: monotonic for idle timing, wall-clock for
+    #: the cross-process durable timestamp.
+    run_id: str = ""
+    progress_path: Optional[Path] = None
+    wall_clock: Callable[[], float] = time.time
 
     steps: int = 0
     edits: int = 0
@@ -237,10 +278,14 @@ class AcpEventTracker:
     def on_session_update(self, payload: dict[str, Any]) -> None:
         """Fold one normalized ``session/update`` payload into the counts.
 
-        Every payload — of any kind — advances the liveness clock (the direct
-        semantic stall signal that retires the #779 file-event blind spot: a
-        long single-artifact write still emits ``tool_call_update`` /
-        ``agent_message_chunk`` heartbeats)."""
+        Every payload — of any kind (tool_call, tool_call_update,
+        agent_message_chunk, thought, plan, usage) — advances the liveness
+        clock. Token/message activity WITHOUT a new discrete step keeps a
+        candidate alive: emitting is working. The caveat the #790 battery
+        surfaced is upstream of this method, not in it — opencode-acp does not
+        reliably EMIT those heartbeats during a long generation window, so the
+        idle bound (``ACP_IDLE_TIMEOUT_S``) must be generous enough to span one;
+        this method resets on whatever DOES arrive."""
         self.event_count += 1
         self.last_event_monotonic = self.clock()
         self._write_transcript(payload)
@@ -253,6 +298,10 @@ class AcpEventTracker:
         # usage can arrive as its own event or ride a tool/message payload.
         if "usage" in payload or kind_of_update == "usage_update":
             self._on_usage(payload)
+
+        # #844 C2 — refresh the durable coordinator-facing progress snapshot after
+        # folding this event (additive + fail-soft; never affects the run).
+        self._write_progress()
 
     def _on_tool_call(self, payload: dict[str, Any]) -> None:
         tcid = payload.get("toolCallId") or payload.get("id") or ""
@@ -316,6 +365,32 @@ class AcpEventTracker:
 
     def is_idle(self, now: Optional[float] = None, idle_timeout: float = ACP_IDLE_TIMEOUT_S) -> bool:
         return idle_exceeded(self.clock() if now is None else now, self.last_event_monotonic, idle_timeout)
+
+    # -- durable coordinator-facing progress (#844 C2) ---------------------
+    def _write_progress(self) -> None:
+        """Durable, WALL-CLOCK progress snapshot for the COORDINATOR — a separate
+        process that cannot see this tracker's monotonic clock. Additive +
+        FAIL-SOFT: a write failure never affects the run (mirrors
+        :meth:`_write_transcript`); the in-run idle/kill logic is untouched. The
+        coordinator READS this to compose its cross-run operational view; the
+        wall-clock stamp is what makes the age computable across processes."""
+        if self.progress_path is None:
+            return
+        now_iso = datetime.fromtimestamp(self.wall_clock(), tz=timezone.utc).isoformat()
+        acp_progress.write_acp_progress(
+            acp_progress.AcpProgressSnapshot(
+                run_id=self.run_id,
+                last_event_at=now_iso,
+                updated_at=now_iso,
+                event_count=self.event_count,
+                steps=self.steps,
+                edits=self.edits,
+                failed_tool_calls=self.failed_tool_calls,
+                tokens_in=self.tokens_in,
+                tokens_out=self.tokens_out,
+            ),
+            path=self.progress_path,
+        )
 
     # -- transcript --------------------------------------------------------
     def _write_transcript(self, payload: dict[str, Any]) -> None:
@@ -541,8 +616,14 @@ async def _run_acp_session(args: argparse.Namespace) -> dict[str, Any]:
     prompt_text = Path(args.prompt_file).read_text(encoding="utf-8") if args.prompt_file else (args.prompt or "")
 
     exe = resolve_opencode_exe(args.opencode_exe)
-    tracker = AcpEventTracker(log_path=Path(log_path), max_steps=int(args.max_steps),
-                              spin_steps=int(args.spin_steps))
+    _log = Path(log_path)
+    tracker = AcpEventTracker(
+        log_path=_log, max_steps=int(args.max_steps), spin_steps=int(args.spin_steps),
+        # #844 C2 — the coordinator reads runs_dir/<run_id>/acp-progress.json; the
+        # per-run logs live in that same run dir, so derive both from the log path.
+        run_id=_log.parent.name,
+        progress_path=_log.with_name(acp_progress.ACP_PROGRESS_FILENAME),
+    )
     cancel = CancelState()
     tracker.write_line(f"[acp-driver] opencode={exe} model={model} cwd={workdir} "
                        f"idle={idle_timeout}s ceiling={args.timeout_sec}s "

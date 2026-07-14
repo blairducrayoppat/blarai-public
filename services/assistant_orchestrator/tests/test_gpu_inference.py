@@ -2,14 +2,13 @@
 GPU Inference Tests — Assistant Orchestrator
 ===============================================
 P1.8: Tests for Orchestrator GPU generation, KV-cache management,
-preemption detection, token sampling, and circuit breaker integration.
+and circuit breaker integration.
 
 Test strategy:
-  - Unit tests: data classes, softmax, token sampling logic.
+  - Unit tests: data classes.
   - Integration tests: mocked OpenVINO for full generate() pipeline.
   - Fail-Closed tests: verify behavior when model/OV unavailable.
   - KV-cache tests: session warm/cold tracking.
-  - Preemption tests: timing anomaly detection logic.
   - Statistics tests: cumulative token/request counters.
 """
 
@@ -30,11 +29,8 @@ from services.assistant_orchestrator.src.gpu_inference import (
     GenerationConfig,
     GenerationResult,
     OrchestratorGPUInference,
-    PreemptionEvent,
     QWEN3_IM_END_TOKEN_ID,
     _DEFAULT_SYSTEM_PROMPT,
-    _sample_token,
-    _softmax,
 )
 
 
@@ -53,8 +49,6 @@ class TestGenerationResult:
             token_count=3,
             latency_first_token_ms=10.0,
             latency_total_ms=30.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
         )
         assert r.tokens == [1, 2, 3]
@@ -69,8 +63,6 @@ class TestGenerationResult:
             token_count=0,
             latency_first_token_ms=0.0,
             latency_total_ms=0.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
             error="Model not loaded",
         )
@@ -84,26 +76,10 @@ class TestGenerationResult:
             token_count=0,
             latency_first_token_ms=0.0,
             latency_total_ms=0.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=False,
         )
         with pytest.raises(AttributeError):
             r.text = "mutated"  # type: ignore[misc]
-
-    def test_preemption_metadata(self) -> None:
-        r = GenerationResult(
-            tokens=[1],
-            text="a",
-            token_count=1,
-            latency_first_token_ms=5.0,
-            latency_total_ms=50.0,
-            was_preempted=True,
-            resume_latency_ms=42.5,
-            truncated=False,
-        )
-        assert r.was_preempted is True
-        assert r.resume_latency_ms == 42.5
 
     def test_truncated_flag(self) -> None:
         r = GenerationResult(
@@ -112,8 +88,6 @@ class TestGenerationResult:
             token_count=4096,
             latency_first_token_ms=0.0,
             latency_total_ms=0.0,
-            was_preempted=False,
-            resume_latency_ms=0.0,
             truncated=True,
         )
         assert r.truncated is True
@@ -152,113 +126,6 @@ class TestGenerationConfig:
 
 
 # ---------------------------------------------------------------------------
-# Test: PreemptionEvent
-# ---------------------------------------------------------------------------
-
-
-class TestPreemptionEvent:
-    """PreemptionEvent dataclass validation."""
-
-    def test_fields(self) -> None:
-        e = PreemptionEvent(
-            step_index=10,
-            step_latency_ms=50.0,
-            median_latency_ms=5.0,
-            ratio=10.0,
-            timestamp=1234567890.0,
-        )
-        assert e.step_index == 10
-        assert e.ratio == pytest.approx(10.0)
-
-    def test_frozen(self) -> None:
-        e = PreemptionEvent(
-            step_index=0,
-            step_latency_ms=1.0,
-            median_latency_ms=1.0,
-            ratio=1.0,
-            timestamp=0.0,
-        )
-        with pytest.raises(AttributeError):
-            e.step_index = 5  # type: ignore[misc]
-
-
-# ---------------------------------------------------------------------------
-# Test: Softmax
-# ---------------------------------------------------------------------------
-
-
-class TestSoftmax:
-    """Numerically-stable softmax."""
-
-    def test_uniform(self) -> None:
-        logits = np.array([1.0, 1.0, 1.0])
-        probs = _softmax(logits)
-        np.testing.assert_allclose(probs, [1 / 3, 1 / 3, 1 / 3], atol=1e-7)
-
-    def test_single_peak(self) -> None:
-        logits = np.array([0.0, 0.0, 100.0])
-        probs = _softmax(logits)
-        assert probs[2] > 0.99
-
-    def test_numerical_stability(self) -> None:
-        """Large logits should not cause overflow."""
-        logits = np.array([1000.0, 1001.0, 1002.0])
-        probs = _softmax(logits)
-        assert np.all(np.isfinite(probs))
-        assert abs(probs.sum() - 1.0) < 1e-7
-
-    def test_sums_to_one(self) -> None:
-        logits = np.random.randn(100)
-        probs = _softmax(logits)
-        assert abs(probs.sum() - 1.0) < 1e-7
-
-
-# ---------------------------------------------------------------------------
-# Test: Token Sampling
-# ---------------------------------------------------------------------------
-
-
-class TestSampleToken:
-    """Token sampling strategies."""
-
-    def test_greedy(self) -> None:
-        logits = np.array([0.1, 0.3, 0.9, 0.2])
-        config = GenerationConfig(do_sample=False)
-        token = _sample_token(logits, config)
-        assert token == 2  # argmax
-
-    def test_temperature_zero_is_greedy(self) -> None:
-        """Low temperature collapses to near-deterministic."""
-        logits = np.array([1.0, 10.0, 0.5])
-        config = GenerationConfig(temperature=0.01, do_sample=True)
-        # With very low temperature, should almost always pick index 1
-        results = [_sample_token(logits, config) for _ in range(20)]
-        assert all(r == 1 for r in results)
-
-    def test_top_k_filtering(self) -> None:
-        """Top-k=1 should always select the highest logit."""
-        logits = np.array([0.1, 0.9, 0.5])
-        config = GenerationConfig(top_k=1, temperature=1.0, do_sample=True)
-        token = _sample_token(logits, config)
-        assert token == 1
-
-    def test_top_p_filtering(self) -> None:
-        """Top-p filtering with very low p should concentrate sampling."""
-        logits = np.array([0.01, 0.01, 100.0, 0.01])
-        config = GenerationConfig(
-            top_p=0.1, top_k=0, temperature=1.0, do_sample=True,
-        )
-        token = _sample_token(logits, config)
-        assert token == 2  # dominant logit
-
-    def test_returns_int(self) -> None:
-        logits = np.random.randn(100)
-        config = GenerationConfig()
-        token = _sample_token(logits, config)
-        assert isinstance(token, int)
-
-
-# ---------------------------------------------------------------------------
 # Test: Fail-Closed Defaults
 # ---------------------------------------------------------------------------
 
@@ -293,7 +160,6 @@ class TestFailClosedDefaults:
         assert self.engine.device == "GPU"
         assert self.engine.total_tokens_generated == 0
         assert self.engine.total_requests == 0
-        assert self.engine.preemption_events == []
 
 
 # ---------------------------------------------------------------------------
@@ -349,18 +215,6 @@ class TestStatistics:
         assert engine.total_tokens_generated == 0
         assert engine.total_requests == 0
 
-    def test_reset(self) -> None:
-        engine = OrchestratorGPUInference(model_dir="/test")
-        engine._total_tokens_generated = 100
-        engine._total_requests = 5
-        engine._preemption_events.append(
-            PreemptionEvent(0, 10.0, 1.0, 10.0, 0.0)
-        )
-        engine.reset_statistics()
-        assert engine.total_tokens_generated == 0
-        assert engine.total_requests == 0
-        assert engine.preemption_events == []
-
 
 # ---------------------------------------------------------------------------
 # Test: Unload
@@ -384,67 +238,6 @@ class TestUnload:
         assert engine.is_kv_warm("s1") is False
         assert engine.total_tokens_generated == 0
         assert engine.total_requests == 0
-
-
-# ---------------------------------------------------------------------------
-# Test: Preemption Detection Logic
-# ---------------------------------------------------------------------------
-
-
-class TestPreemptionDetection:
-    """Timing anomaly detection for GPU preemption (ADR-011: all inference on GPU)."""
-
-    def test_no_detection_below_min_samples(self) -> None:
-        engine = OrchestratorGPUInference(model_dir="/test")
-        preempted, resume = engine._check_preemption(
-            step=1,
-            step_ms=100.0,
-            step_times=[1.0, 100.0],  # only 2 samples
-            already_preempted=False,
-            max_resume_ms=0.0,
-        )
-        assert preempted is False
-
-    def test_detection_on_timing_anomaly(self) -> None:
-        engine = OrchestratorGPUInference(model_dir="/test")
-        # 4 normal steps + 1 anomalous step (>5× median)
-        step_times = [1.0, 1.1, 1.0, 0.9, 50.0]
-        preempted, resume = engine._check_preemption(
-            step=4,
-            step_ms=50.0,
-            step_times=step_times,
-            already_preempted=False,
-            max_resume_ms=0.0,
-        )
-        assert preempted is True
-        assert resume > 0.0
-        assert len(engine.preemption_events) == 1
-        assert engine.preemption_events[0].step_index == 4
-
-    def test_no_false_positive_on_normal_variation(self) -> None:
-        engine = OrchestratorGPUInference(model_dir="/test")
-        step_times = [1.0, 1.2, 0.8, 1.1, 1.3]  # normal variation
-        preempted, _ = engine._check_preemption(
-            step=4,
-            step_ms=1.3,
-            step_times=step_times,
-            already_preempted=False,
-            max_resume_ms=0.0,
-        )
-        assert preempted is False
-        assert len(engine.preemption_events) == 0
-
-    def test_preserves_already_preempted(self) -> None:
-        engine = OrchestratorGPUInference(model_dir="/test")
-        step_times = [1.0, 1.0, 1.0, 1.0, 1.0]  # no anomaly
-        preempted, _ = engine._check_preemption(
-            step=4,
-            step_ms=1.0,
-            step_times=step_times,
-            already_preempted=True,  # already flagged
-            max_resume_ms=10.0,
-        )
-        assert preempted is True  # stays True
 
 
 # ---------------------------------------------------------------------------

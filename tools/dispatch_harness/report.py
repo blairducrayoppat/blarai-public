@@ -23,6 +23,7 @@ class JobReport:
     goal: str
     plan_ok: bool = False           # PLAN returned criteria (vs a refusal / wiring notice)
     asked_clarifying: bool = False  # the coordinator asked an Inc-4 question
+    asked_requirements: bool = False  # #819: the coordinator asked requirements questions
     answered: str = ""              # the option number/text the harness replied with
     approved: bool = False          # /dispatch approve fired EXECUTE successfully
     run_id: str = ""

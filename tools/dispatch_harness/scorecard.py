@@ -28,12 +28,21 @@ SCORECARD_SCHEMA = "battery-scorecard/v1"
 # ---------------------------------------------------------------------------
 # The closed verdict + attribution taxonomies (plan §9.4 — do not extend
 # casually; every consumer treats these as exhaustive)
+#
+# Verdict-class semantics (LA decisions 2026-07-11, #740 c.1710 + c.1717):
+# PARKED-HONEST is a VALID run with an honest, MEASURED review outcome short of
+# GREEN (including a design-review ending on an otherwise-valid run — the
+# iteration-cap ending, reviewer still requesting changes, AND the clean ending,
+# reviewer satisfied; evidence.design_review = "cap-reached" | "clean"); STALLED
+# is reserved for harness/run-invalid classes — crashes, budget kills, wedges —
+# runs whose measurements can't be trusted. The campaign's zero-STALLED
+# banking rule keys on exactly this line.
 # ---------------------------------------------------------------------------
 
 VERDICT_GREEN = "GREEN"                  # job oracle green, unattended
-VERDICT_PARKED_HONEST = "PARKED-HONEST"  # refused with evidence — verification success
+VERDICT_PARKED_HONEST = "PARKED-HONEST"  # VALID run: refused / bar MEASURED (missed or met sans oracle), with evidence
 VERDICT_FALSE_DONE = "FALSE-DONE"        # reported done without oracle evidence — program-failing
-VERDICT_STALLED = "STALLED"              # could not run / had to be killed / could not be scored
+VERDICT_STALLED = "STALLED"              # run INVALID: could not run / killed / could not be scored
 VERDICT_RECOVERED = "RECOVERED"          # crash path fired and recovery worked
 
 VERDICTS: frozenset[str] = frozenset(

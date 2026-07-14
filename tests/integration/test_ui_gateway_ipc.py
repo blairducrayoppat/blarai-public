@@ -118,7 +118,14 @@ class TestLiveHandshake:
 
     @pytest.mark.asyncio
     async def test_handshake_non_operational_response(self) -> None:
-        """Non-OPERATIONAL response → handshake fails, transport not stored."""
+        """Non-OPERATIONAL response → handshake fails, transport not stored.
+
+        #808: the retry schedule is stubbed to two zero sleeps — the real
+        180 s budgeted schedule would make this live-socket test sleep three
+        minutes; the retried-then-FAILED semantics are what matter here.
+        """
+        import services.ui_gateway.src.transport as transport_module
+
         async def handler(
             reader: asyncio.StreamReader,
             writer: asyncio.StreamWriter,
@@ -132,8 +139,14 @@ class TestLiveHandshake:
         server = await asyncio.start_server(handler, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]
         try:
-            gw = TransportGateway(dev_mode=True, port=port)
-            ok = await gw.check_pa_status()
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(
+                    transport_module,
+                    "pa_handshake_backoff_schedule",
+                    lambda: (0.0, 0.0),
+                )
+                gw = TransportGateway(dev_mode=True, port=port)
+                ok = await gw.check_pa_status()
             assert ok is False
             assert gw.state == StartupState.FAILED
             assert gw._transport is None
@@ -283,7 +296,13 @@ class TestLiveStreamTokens:
                     writer,
                     _framer.encode_generation_complete(request_id=prompt_rid),
                 )
-            await asyncio.sleep(1)
+            # Close the connection so the gateway's "waiting for PGOV or
+            # stream close" path ends on EOF. Without this the handler left
+            # the socket open and stream_tokens blocked for the FULL 180 s
+            # PROMPT_RESPONSE_TIMEOUT_S receive timeout — a pre-existing
+            # 3-minute stall in the slow tier, surfaced by the #808 timing
+            # audit (the test still passed, on timeout instead of EOF).
+            writer.close()
 
         server = await asyncio.start_server(handler, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]

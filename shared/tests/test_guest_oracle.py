@@ -332,17 +332,23 @@ def _snapshot_zip(oracle_body: str) -> bytes:
 def test_execute_snapshot_injected_runner_passed_and_failed():
     calls = []
 
-    def fake_run(cmd, timeout_s, cwd):
-        calls.append((cmd, cwd))
+    def fake_run(cmd, timeout_s, cwd, env=None):
+        calls.append((cmd, cwd, env))
         return (True, "2 passed", "")
 
     res = go.execute_snapshot(_snapshot_zip(_PASSING_ORACLE), ORACLE_PATH, run=fake_run)
     assert res["status"] == "passed" and "exit 0" in res["evidence"]
-    cmd, _cwd = calls[0]
-    assert cmd[1:] == ["-m", "pytest", "-q", ORACLE_PATH]  # -m pytest, never bare pytest
+    cmd, cwd, env = calls[0]
+    assert cmd[1:3] == ["-m", "pytest"]  # -m pytest, never bare pytest
+    # #822 H1: the guest grades with the SAME clean-env recipe as the host, so the
+    # #744 host/guest agreement matrix cannot be fooled into agreeing on a
+    # conftest-gamed verdict (a coder conftest.py rides the *.py snapshot).
+    assert "--noconftest" in cmd and "--import-mode=importlib" in cmd
+    assert "-c" in cmd and cmd[-2:] == ["-q", ORACLE_PATH]
+    assert env.get("PYTHONSAFEPATH") == "1" and env.get("PYTHONPATH") == cwd
 
     res = go.execute_snapshot(_snapshot_zip(_FAILING_ORACLE), ORACLE_PATH,
-                              run=lambda c, t, w: (False, "1 failed", ""))
+                              run=lambda c, t, w, env=None: (False, "1 failed", ""))
     assert res["status"] == "failed"
 
 
@@ -364,7 +370,7 @@ def test_execute_snapshot_bad_zip_not_run_never_a_raise():
 
 
 def test_execute_snapshot_runner_exception_not_run():
-    def exploding_run(_c, _t, _w):
+    def exploding_run(_c, _t, _w, env=None):
         raise OSError("no python")
 
     res = go.execute_snapshot(_snapshot_zip(_PASSING_ORACLE), ORACLE_PATH, run=exploding_run)

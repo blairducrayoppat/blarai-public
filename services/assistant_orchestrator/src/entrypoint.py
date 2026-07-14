@@ -59,18 +59,25 @@ import secrets
 import threading
 import time
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace as dataclass_replace
 from pathlib import Path
 from typing import NamedTuple
 
+from shared.coordinator.drafting import CoordinatorDraftResult, DraftStatus
 from shared.crypto.jwt_validator import AgenticJWTValidator
 from shared.inference import image_gen as image_gen
-from shared.inference.shared_pipeline import SharedInferencePipeline
+from shared.inference.shared_pipeline import (
+    TRY_RUN_BUSY,
+    TRY_RUN_NOT_RESIDENT,
+    TRY_RUN_RAN,
+    SharedInferencePipeline,
+)
 from shared.inference.vlm import describe_image, unload as unload_vlm
 from shared.ipc.protocol import MessageFramer, MessageType
 from shared.ipc.vsock import VsockAddress, VsockConfig, VsockListener, VsockTransport
 from shared.models.weight_integrity import load_manifest, load_manifest_verified
+from shared.service_signals import install_graceful_shutdown
 from shared.runtime_config import (
     ConfigResolutionError,
     DeploymentMode,
@@ -79,6 +86,7 @@ from shared.runtime_config import (
     resolve_service_config_path,
     resolve_service_root,
 )
+from shared import config_validation
 from shared.constants import (
     DRAFT_MODEL_OV_PATH,
     JWT_VALIDITY_SECONDS,
@@ -98,12 +106,15 @@ from services.assistant_orchestrator.src.proposal_staging import ProposalStaging
 from shared.ipc.preference_proposal import (
     ProposalAction,
     ProposalCard,
+    UntrustedContextKind,
     render_proposal_block,
 )
 from shared.fleet.swap_ops import execute_swap_dispatch, write_swap_progress
+from shared.fleet.model_profiles import AO_BRAIN_MODEL_ID, resolve_hidden_block_re
 from services.assistant_orchestrator.src.pgov import (
     PGOVResult,
     TOOL_CALL_ALLOWLIST,
+    set_default_embedding_device,
     validate_output,
 )
 from services.assistant_orchestrator.src.substrate import (
@@ -125,6 +136,14 @@ logger = logging.getLogger(__name__)
 # Input context budget (distinct from max_new_tokens which caps output length).
 # No TOML config field exists for this; a module-level constant is used per ISS-8 scope.
 DEFAULT_CONTEXT_BUDGET_TOKENS: int = 8192
+
+# Session idle-reaper check cadence (#801) — how often the serve loop LOOKS for
+# idle sessions, NOT how long a session may idle (that is the registered
+# [context].session_idle_ttl_s TTL — 30 min, LA-decided, #801 c.1713). Poll
+# grain below registry value (see the shared/timeout_registry.py BACKLOG
+# note). 60 s gives 30 checks per TTL window (worst-case overshoot ~3%) and
+# costs one monotonic() compare per loop iteration.
+_SESSION_REAP_INTERVAL_S: float = 60.0
 
 # ── Lazy / context-aware image grounding (#561) ────────────────────────────
 # When the user prompts about a staged image, the 14B ("the brain") formulates
@@ -162,11 +181,37 @@ _PLAN_SYSTEM_PROMPT: str = (
     "array) — no prose, no explanations, no tool calls. /no_think"
 )
 
+# Cap on a coordinator heartbeat DRAFT completion (#845 C3 limb 5, design §2 step 9 /
+# §3.4). A draft is bounded single-decision prose (summarize the one finished run;
+# render one detected condition's proposal in plain language) — short by design, but
+# the cap must still leave headroom for /no_think slippage (a stray <think> block
+# spends this budget before the strip removes it). Callers may tighten per call; the
+# inference layer hard-caps at its own circuit-breaker max regardless.
+_COORDINATOR_DRAFT_MAX_NEW_TOKENS: int = 1024
+
+# #845 C3: a coordinator draft is an INTERNAL structural emission — the same posture
+# as the PLAN sequence above (#748 lesson): minimal persona, NO tools advertised,
+# /no_think. The conversational system prompt's tool directive live-baited the 14B
+# into <tool_call> answers that the hidden-block strip reduced to '' — a drafted
+# status note must never die the same way.
+_COORDINATOR_DRAFT_SYSTEM_PROMPT: str = (
+    "You draft short, plain-language project-status notes from the facts "
+    "provided in the request. Respond with ONLY the requested text — no "
+    "preamble, no explanations, no tool calls. /no_think"
+)
+
 # Hidden model blocks that must never leak into a VLM query (defensive: the AO
 # default is /no_think, but strip anyway so a stray block can't become a query).
-_HIDDEN_BLOCK_RE: "re.Pattern[str]" = re.compile(
-    r"<think>.*?</think>|<tool_call>.*?</tool_call>", re.DOTALL
-)
+#
+# #834: the strip pattern is the AO brain's family-conditioned hidden-block binding,
+# resolved ONCE at import from agentic-setup/configs/model-profiles.json. FAIL-SOFT +
+# byte-identical: an absent/unreadable/malformed manifest (the normal state off the
+# dev box) resolves to exactly the historical
+# re.compile(r"<think>.*?</think>|<tool_call>.*?</tool_call>", re.DOTALL); the manifest's
+# qwen3-14b.reasoning_strip.hidden_block_tags rebuilds that same pattern, so nothing
+# observable changes until a model swap edits the tags. The SAME binding backs
+# gpu_inference._visible_text — one canonical source (dossier sec 6.2).
+_HIDDEN_BLOCK_RE: "re.Pattern[str]" = resolve_hidden_block_re(AO_BRAIN_MODEL_ID)
 
 
 def _strip_hidden_blocks(text: str) -> str:
@@ -446,6 +491,22 @@ class AssistantOrchestratorEntrypointConfig:
     behaviour). Resolved from [substrate].embed_cache_idle_unload_s in config;
     defaults to 900 s (15 min)."""
 
+    session_idle_ttl_s: float = 1800.0
+    """Seconds a conversation may sit with no turn activity before the AO's
+    in-RAM state for it is reaped (Vikunja #801): ``ContextManager.
+    destroy_session`` clears the conversation context, KV-warm flag, trust
+    flag, and user-documents flag; the egress-envelope manager drops the
+    session's envelope in the same sweep. Correctness-safe: the durable
+    transcript lives in the gateway's encrypted session store and a reaped
+    session is lazily re-created + history-reseeded on its next
+    PROMPT_REQUEST (FUT-07); the reap cost is one cold KV prefill. ``0`` or
+    negative DISABLES reaping (pre-#801 unbounded-until-restart behaviour).
+    Resolved from [context].session_idle_ttl_s; the 1800 s (30 min) default
+    is **LA-DECIDED** (2026-07-11, #801 c.1713 — not a tunable design
+    default) and registered in shared/timeout_registry.py. The launcher
+    threads this SAME value into the gateway's session-state reaper so both
+    processes bound session-keyed state on one operator-visible knob."""
+
     knowledge_enabled: bool = True
     """Knowledge bank (UC-002 Substrate v2, #655) master switch. When False the
     bank is never constructed: INGEST_* frames get a loud KNOWLEDGE_BANK_DISABLED
@@ -504,6 +565,22 @@ class AssistantOrchestratorEntrypointConfig:
     fleet). When False (the dormant default) /dispatch returns a disabled notice
     and NO host subprocess is spawned. Fail-closed: a missing key resolves to
     False. Resolved from [fleet_dispatch].enabled."""
+    fleet_dispatch_clarify_enabled: bool = True
+    """#819 — the requirements-clarification stage gate. When True (the default,
+    proven-defaults-live) an interactive /dispatch with an underspecified goal is
+    asked a FEW targeted questions BEFORE decompose; a sufficient goal is asked
+    nothing (the sufficiency check). A battery/headless card dispatch NEVER clarifies
+    regardless (generate_plan skips it when a decomposition_override is present), so
+    the operator-less harness cannot hang on questions. Set False to disable the stage
+    (every /dispatch goes straight to decompose == pre-#819 behaviour). Resolved from
+    [fleet_dispatch].clarify."""
+    fleet_dispatch_revise_enabled: bool = True
+    """#820 — the plan-revision stage gate. When True (the default, proven-defaults-live) an
+    operator who gives free-text feedback on a PENDING plan card gets the 14B to revise the
+    EXISTING plan (tasks added/removed/reordered/re-scoped, everything else preserved) instead
+    of rejecting and re-rolling. Revision is OPERATOR-INITIATED only (the `/dispatch revise`
+    verb), so a battery/headless run never revises regardless. Set False to refuse `/dispatch
+    revise` (Fail-Closed) — accept/reject unchanged. Resolved from [fleet_dispatch].revise."""
     swap_min_free_gb: float = 21.0
     """Pre-load headroom gate for the increment-2 model swap (design §4.3), in **GiB**:
     the driver aborts the 30B load (gracefully, restoring the 14B) if free RAM is below
@@ -559,6 +636,26 @@ class AssistantOrchestratorEntrypointConfig:
     "stepping aside" reply before signalling the launcher to exit, so the WinUI shows the
     notice before its window closes. Live-tuned knob (#670). Resolved from
     [fleet_dispatch].step_aside_grace_s."""
+
+    # ── Coordinator program C1 read surface (#843, ADR-039 — DORMANT) ────
+    coordinator_enabled: bool = False
+    """Master gate for /coord status (the Coordinator program's C1 read surface).
+    When False (the dormant default) /coord returns a disabled notice and NEVER
+    touches Vikunja or fleet state. Fail-closed: a missing key resolves to False.
+    Resolved from [coordinator].enabled. NOTE: #848 (the self-governance controls
+    program) adds further [coordinator] keys on its own branch — reconcile any
+    overlap at merge (see the default.toml section comment)."""
+    coordinator_projects: "tuple[tuple[str, int], ...]" = ()
+    """Vikunja project ids the read surface reports on, keyed by DISPLAY NAME —
+    ids are NEVER hardcoded (ADR-039 §2.12.11). A tuple of (name, id) pairs (a
+    frozen dataclass cannot default to a mutable dict); empty is valid (no
+    projects configured yet). Resolved from [coordinator].projects (a TOML
+    inline table, converted at parse time)."""
+    coordinator_battery_campaign_state_path: str = ""
+    """An optional path to a battery-campaign-state JSON file (tri-state read).
+    Empty (the default) reads as a benign EMPTY, never a failure — see
+    shared/fleet/work_state.read_campaign_state. Resolved from
+    [coordinator].battery_campaign_state_path."""
 
     # ── UC-010 Local Generative Imaging (ADR-033 — DORMANT) ──────────────
     image_gen_enabled: bool = False
@@ -774,6 +871,10 @@ class AssistantOrchestratorService:
         # gate egress tools whether the service was fully start()ed or a test
         # constructed it directly.
         self._egress_envelope = EgressEnvelopeManager()
+        # Next monotonic instant the serve loop may RUN the idle-session reaper
+        # (#801) — a throttle so the sweep costs one compare per loop iteration,
+        # not a full dict walk. 0.0 = eligible immediately.
+        self._next_session_reap_check: float = 0.0
         self._shared_pipeline = shared_pipeline
         # Personal Knowledge Substrate (USE-CASE-002, ADR-016). Lazily built in
         # start(); None means memory is off (graceful degradation).
@@ -892,6 +993,240 @@ class AssistantOrchestratorService:
             if cfg is not None
             else False
         )
+
+    @property
+    def fleet_dispatch_clarify_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].clarify`` gate (#819, requirements-clarification).
+
+        Default ``True`` (ship ON — proven-defaults-live) before ``start()`` resolves the
+        config and on a missing key; the CLARIFY stage still self-suppresses for a battery/
+        headless card dispatch (a ``decomposition_override`` in ``generate_plan``), so this
+        only governs the INTERACTIVE ask. Never re-parses the TOML."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_clarify_enabled", True))
+            if cfg is not None
+            else True
+        )
+
+    @property
+    def fleet_dispatch_revise_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].revise`` gate (#820, plan-feedback revision).
+
+        Default ``True`` (ship ON — proven-defaults-live) before ``start()`` resolves the
+        config and on a missing key. Governs ONLY the operator-initiated ``/dispatch revise``
+        verb; a battery/headless run never revises regardless (revision is never auto-invoked).
+        Never re-parses the TOML."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_revise_enabled", True))
+            if cfg is not None
+            else True
+        )
+
+    @property
+    def coordinator_enabled(self) -> bool:
+        """Resolved ``[coordinator].enabled`` gate (#843, ADR-039 — the
+        Coordinator program's C1 read surface).
+
+        The single source of truth the launcher threads into the gateway's
+        CoordCoordinator (mirrors ``fleet_dispatch_enabled``). Fail-closed:
+        ``False`` before ``start()`` resolves the config and the resolved
+        value (default ``False``, dormant) thereafter — never re-parses the
+        TOML."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "coordinator_enabled", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def coordinator_projects(self) -> "dict[str, int]":
+        """Resolved ``[coordinator].projects`` — Vikunja project ids keyed by
+        DISPLAY NAME (ADR-039 §2.12.11: never a hardcoded id). Empty before
+        ``start()`` resolves the config and on a missing key. Converted back
+        to a ``dict`` here (the housing config dataclass stores an immutable
+        tuple of pairs — see ``AssistantOrchestratorEntrypointConfig``)."""
+        cfg = self._resolved_config
+        pairs = getattr(cfg, "coordinator_projects", ()) if cfg is not None else ()
+        return dict(pairs)
+
+    @property
+    def coordinator_battery_campaign_state_path(self) -> str:
+        """Resolved ``[coordinator].battery_campaign_state_path`` — an
+        optional battery-campaign-state JSON file path (tri-state read).
+        Empty (the default) before ``start()`` resolves the config and on a
+        missing key."""
+        cfg = self._resolved_config
+        return (
+            str(getattr(cfg, "coordinator_battery_campaign_state_path", ""))
+            if cfg is not None
+            else ""
+        )
+
+    # ── Coordinator heartbeat — drafting adapter (#845 C3 limb 5) ───────
+    # The heartbeat's ONE way to reach the 14B (design §3.3 wall 4 / §3.4):
+    # a bounded, non-blocking, residency-gated single-decision draft on the
+    # service object the launcher already holds — no conversational
+    # round-trip (§2.13.7), no session, no context navigation (§2.14.5:
+    # deterministic code composes the prompt; this adapter adds no fourth
+    # sensory leg). DORMANT: no production code path calls this method —
+    # the heartbeat cycle (a later limb, behind
+    # [coordinator].heartbeat_enabled) is the only intended caller.
+
+    def coordinator_draft(
+        self,
+        prompt: str,
+        *,
+        max_new_tokens: int = _COORDINATOR_DRAFT_MAX_NEW_TOKENS,
+        json_schema: "dict | None" = None,
+    ) -> CoordinatorDraftResult:
+        """One bounded coordinator draft against an idle, resident 14B (§3.4).
+
+        The §3.4 contract, mechanically:
+
+          * **Non-blocking try-acquire** on the AO's single-flight inference
+            lock (``SharedInferencePipeline``'s, the one serializing PA and
+            AO ``generate()``). Held by ANYTHING — a chat turn, a PA
+            classification — ⇒ ``busy`` immediately: the heartbeat never
+            waits on, queues behind, or preempts a chat generation.
+          * **Positive residency check** under the held lock, via the SAME
+            eviction bookkeeping the UC-010 image-generation big jobs drive
+            (``SharedInferencePipeline.is_loaded`` — ``unload()`` clears it
+            with the lock released after, so lock-acquired is NOT
+            residency evidence). Not resident ⇒ ``not_resident``; this
+            method **never initiates a load, a reload, an eviction, or a
+            swap** — the wrapper's lazy-reload ``generate()`` path is
+            structurally bypassed.
+          * **Exactly one bounded model call** on the drafted path:
+            deterministic settings (greedy ``do_sample=False``), the
+            minimal no-tools drafting persona, ``/no_think``, the tool
+            grammar never armed (#748), hidden blocks stripped from the
+            returned text.
+          * **Grammar fail-soft (#743)**: *json_schema*, when given,
+            constrains the WHOLE response; an unavailable/failed constraint
+            degrades to the plain bounded generation with the degradation
+            named in ``reason`` — never a raise, never a retry holding the
+            lock.
+          * **Never a raise out of the seam**: a model-path failure after
+            the defer checks pass is an IN-BAND structured failure — a
+            ``drafted`` result with empty ``text`` and the cause in
+            ``reason`` (callers key prose availability off ``has_text`` and
+            fall back to their deterministic rendering, design §2 step 9).
+
+        Both defers (``busy`` / ``not_resident``) are normal outcomes for
+        the caller to record and retry on a LATER cycle — never queued,
+        never waited for. See :mod:`shared.coordinator.drafting` for the
+        result contract.
+        """
+        inference = self._inference
+        if inference is None:
+            return CoordinatorDraftResult(
+                status=DraftStatus.NOT_RESIDENT,
+                text="",
+                reason=(
+                    "AO inference engine not constructed — draft deferred "
+                    "(the adapter never initiates a load)"
+                ),
+            )
+
+        schema_text: str | None = None
+        if json_schema is not None:
+            import json
+
+            schema_text = json.dumps(json_schema)
+
+        try:
+            outcome = inference.try_generate_text_exclusive(
+                prompt,
+                max_new_tokens=max_new_tokens,
+                config=GenerationConfig(
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,  # greedy / temp-0 equivalent — reproducible
+                    tool_call_grammar=False,  # #748: never armed for structural emissions
+                    json_schema=schema_text,
+                ),
+                system_prompt=_COORDINATOR_DRAFT_SYSTEM_PROMPT,
+            )
+        except Exception as exc:  # noqa: BLE001 — never a raise out of the seam
+            logger.warning("coordinator_draft: draft attempt failed fail-soft: %s", exc)
+            return CoordinatorDraftResult(
+                status=DraftStatus.DRAFTED,
+                text="",
+                reason=(
+                    f"draft attempt failed fail-soft: {exc} — deterministic "
+                    "fallback rendering applies"
+                ),
+            )
+
+        if outcome.status == TRY_RUN_BUSY:
+            return CoordinatorDraftResult(
+                status=DraftStatus.BUSY,
+                text="",
+                reason=(
+                    "inference lock held (a generation is in flight) — draft "
+                    "deferred, never queued"
+                ),
+            )
+        if outcome.status == TRY_RUN_NOT_RESIDENT:
+            return CoordinatorDraftResult(
+                status=DraftStatus.NOT_RESIDENT,
+                text="",
+                reason=(
+                    "14B not positively resident — draft deferred "
+                    + (f"({outcome.note})" if outcome.note else "(evicted or not attached)")
+                ),
+            )
+
+        # TRY_RUN_RAN — exactly one bounded model call happened.
+        degradation = f" [{outcome.note}]" if outcome.note else ""
+        result = outcome.result
+        gen_error = getattr(result, "error", None) if result is not None else "no result"
+        if result is None or gen_error:
+            return CoordinatorDraftResult(
+                status=DraftStatus.DRAFTED,
+                text="",
+                reason=(
+                    f"generation failed fail-soft: {gen_error} — deterministic "
+                    f"fallback rendering applies{degradation}"
+                ),
+            )
+        text = (result.text or "").strip()
+        if not text:
+            return CoordinatorDraftResult(
+                status=DraftStatus.DRAFTED,
+                text="",
+                reason=(
+                    "generation produced no answer text (hidden blocks only or "
+                    f"empty) — deterministic fallback rendering applies{degradation}"
+                ),
+            )
+        return CoordinatorDraftResult(
+            status=DraftStatus.DRAFTED,
+            text=text,
+            reason=f"drafted{degradation}",
+        )
+
+    @property
+    def session_idle_ttl_s(self) -> float:
+        """Resolved ``[context].session_idle_ttl_s`` — the session idle-reap TTL (#801).
+
+        The single source of truth the launcher threads into the gateway's
+        session-state reaper (mirrors ``fleet_dispatch_enabled``), so both
+        processes bound session-keyed state on ONE operator-visible knob.
+        Before ``start()`` resolves the config the LA-decided default
+        (1800 s / 30 min, #801 c.1713) applies — never re-parses the TOML.
+        ``<= 0`` means reaping is DISABLED (the pre-#801 behaviour), never
+        an instant reap.
+        """
+        cfg = self._resolved_config
+        if cfg is None:
+            return 1800.0
+        try:
+            return float(getattr(cfg, "session_idle_ttl_s", 1800.0))
+        except (TypeError, ValueError):
+            return 1800.0
 
     @property
     def swap_min_free_gb(self) -> float:
@@ -1128,6 +1463,13 @@ class AssistantOrchestratorService:
         self._jwt_validator = jwt_validator
         self._listener = listener
         self._resolved_config = resolved
+        # #807: stamp the resolved [embeddings].device as the pgov module
+        # default BEFORE any detector-creating path runs, so a leakage-
+        # detector singleton created via the module-level check_leakage()
+        # (Stage 5) honours the configured device instead of pinning CPU.
+        # The build sites below still pass the device explicitly — this
+        # closes the ordering assumption, it does not replace them.
+        set_default_embedding_device(resolved.embeddings_device)
         self._context_manager = ContextManager(max_context_tokens=DEFAULT_CONTEXT_BUDGET_TOKENS)
         # Persistent semantic memory (USE-CASE-002, ADR-016). Reuses the
         # bge-small embedder the PGOV leakage detector loads — one model, one
@@ -1236,6 +1578,21 @@ class AssistantOrchestratorService:
         self._jwt_validator = None
         self._inference = None
         self._resolved_config = None
+        # #801 (LA decision, c.1713): app close releases EVERY in-RAM session
+        # immediately — made observable (logged) rather than implied by object
+        # teardown, and the egress envelopes (which live OUTSIDE the context
+        # manager and previously survived a stop()/start() cycle) go with it.
+        context_manager = self._context_manager
+        if context_manager is not None:
+            released = list(context_manager.active_sessions)
+            if released:
+                logger.info(
+                    "AO stop: released %d in-RAM session(s) immediately "
+                    "(app close, #801): %s",
+                    len(released),
+                    ", ".join(released),
+                )
+        self._egress_envelope.retain_only(())
         self._context_manager = None
         if self._substrate is not None:
             try:
@@ -1274,6 +1631,25 @@ class AssistantOrchestratorService:
         self._running = False
         logger.info("Assistant Orchestrator entrypoint stopped.")
 
+    def install_signal_handlers(
+        self, signals: Iterable[int] | None = None
+    ) -> tuple[int, ...]:
+        """Arm SIGTERM/SIGINT → graceful :meth:`stop` for this AO (AUDIT-13 / #812).
+
+        Gives the Assistant Orchestrator its OWN disposability drain, independent
+        of the launcher: on a termination signal the listener is stopped, the IPC
+        loop joined, the model + any resident diffusion pipeline unloaded, and the
+        in-RAM sessions released via :meth:`stop`. Opt-in and fail-safe — see
+        :func:`shared.service_signals.install_graceful_shutdown`. In the default
+        host topology the launcher owns process signal disposition (and already
+        drains the AO via ``stop()``); this method is for the process-leader
+        topology where the AO runs as its own (headless) process. Returns the
+        signals actually armed (``()`` if none — e.g. called off the main thread).
+        """
+        return install_graceful_shutdown(
+            self.stop, service_name="AssistantOrchestrator", signals=signals
+        )
+
     def _load_entrypoint_config(self) -> AssistantOrchestratorEntrypointConfig:
         config_path = self._resolve_config_path()
 
@@ -1291,12 +1667,24 @@ class AssistantOrchestratorService:
         ipc = config_data.get("ipc", {})
         pgov = config_data.get("pgov", {})
         egress = config_data.get("egress", {})
+        context_section = config_data.get("context", {})
         substrate = config_data.get("substrate", {})
         knowledge = config_data.get("knowledge", {})
         embeddings = config_data.get("embeddings", {})
         image_generation = config_data.get("image_generation", {})
         fleet_dispatch = config_data.get("fleet_dispatch", {})
         web_search = config_data.get("web_search", {})
+        coordinator = config_data.get("coordinator", {})
+
+        # #811 / AUDIT-12: resolve the two fleet roots through the SSOT resolver
+        # (env override -> TOML value -> "" -> compiled-in this-host fallback). The
+        # shipped default.toml carries no absolute home path; the resolved runtime
+        # value on this box is unchanged (12-Factor III).
+        from shared.fleet.dispatch import (
+            FLEET_AGENTIC_SETUP_DIR_ENV,
+            FLEET_PROJECTS_DIR_ENV,
+            resolve_fleet_root,
+        )
 
         model_dir = self._resolve_path(repo_root, service_root, str(gpu.get("model_dir", "")))
 
@@ -1336,6 +1724,18 @@ class AssistantOrchestratorService:
             )
         except (TypeError, ValueError):
             embed_cache_idle_unload_s = DEFAULT_EMBED_CACHE_IDLE_UNLOAD_S
+
+        # Session idle-reap TTL (Vikunja #801). Default 30 min (LA-decided,
+        # #801 c.1713); 0 or negative disables reaping (pre-#801
+        # unbounded-until-restart behaviour). A malformed value falls back to
+        # the decided default rather than to "disabled" — the backstop should
+        # survive a config typo.
+        try:
+            session_idle_ttl_s = float(
+                context_section.get("session_idle_ttl_s", 1800.0)
+            )
+        except (TypeError, ValueError):
+            session_idle_ttl_s = 1800.0
 
         cert_path = (
             self._resolve_path(repo_root, service_root, str(ipc.get("mtls_cert_path", "")))
@@ -1428,6 +1828,7 @@ class AssistantOrchestratorService:
             deployment_mode=self._deployment_mode,
             require_signed_manifest=require_signed_manifest,
             embed_cache_idle_unload_s=embed_cache_idle_unload_s,
+            session_idle_ttl_s=session_idle_ttl_s,
             embeddings_device=(
                 str(embeddings.get("device", "CPU")).strip().upper() or "CPU"
             ),
@@ -1454,14 +1855,36 @@ class AssistantOrchestratorService:
             # Headless-coding dispatch (brief §9). Fail-closed: absent 'enabled'
             # -> False (dormant) -> /dispatch refuses, no subprocess ever spawned.
             fleet_dispatch_enabled=bool(fleet_dispatch.get("enabled", False)),
+            fleet_dispatch_clarify_enabled=bool(fleet_dispatch.get("clarify", True)),
+            fleet_dispatch_revise_enabled=bool(fleet_dispatch.get("revise", True)),
             swap_min_free_gb=float(fleet_dispatch.get("swap_min_free_gb", 21.0)),
             # #670 P2: out-of-band overall-run budget (s); the resolver property + the driver's
             # _coerce_budget both clamp a non-positive value to 0.0 (disabled, never instant-timeout).
             swap_run_budget_s=float(fleet_dispatch.get("swap_run_budget_s", 10800.0)),
-            fleet_dispatch_agentic_setup_dir=str(
-                fleet_dispatch.get("agentic_setup_dir", "")
+            fleet_dispatch_agentic_setup_dir=resolve_fleet_root(
+                FLEET_AGENTIC_SETUP_DIR_ENV,
+                fleet_dispatch.get("agentic_setup_dir", ""),
             ),
-            fleet_dispatch_projects_dir=str(fleet_dispatch.get("projects_dir", "")),
+            fleet_dispatch_projects_dir=resolve_fleet_root(
+                FLEET_PROJECTS_DIR_ENV,
+                fleet_dispatch.get("projects_dir", ""),
+            ),
+            # Coordinator program C1 read surface (#843, ADR-039). Fail-closed:
+            # an absent 'enabled' -> False (dormant) -> /coord refuses, Vikunja/
+            # fleet state never touched. 'projects' is a TOML inline table
+            # ({"name" = id, ...}); converted to an immutable tuple of pairs
+            # here since the housing dataclass is frozen (no mutable dict
+            # default). A malformed entry (a non-integer id) raises at boot —
+            # consistent with this file's existing config-parsing convention
+            # for every other typed TOML field.
+            coordinator_enabled=bool(coordinator.get("enabled", False)),
+            coordinator_projects=tuple(
+                (str(k), int(v))
+                for k, v in dict(coordinator.get("projects", {}) or {}).items()
+            ),
+            coordinator_battery_campaign_state_path=str(
+                coordinator.get("battery_campaign_state_path", "")
+            ),
             # M2 plan-graph (W1-W6, #740). Fail-closed: absent key -> False (the flat
             # serial queue, byte-identical today-behavior).
             fleet_dispatch_plan_graph=bool(fleet_dispatch.get("plan_graph", False)),
@@ -1568,8 +1991,8 @@ class AssistantOrchestratorService:
         )
 
     def _validate_config_data(self, config_data: dict[str, object], config_path: Path) -> None:
-        runtime = self._require_section_dict(config_data, "runtime", code="AO_CFG_RUNTIME_SECTION_MISSING")
-        runtime_mode_raw = self._require_non_empty_str(
+        runtime = config_validation.require_section_dict(config_data, "runtime", code="AO_CFG_RUNTIME_SECTION_MISSING")
+        runtime_mode_raw = config_validation.require_non_empty_str(
             runtime,
             "deployment_mode",
             code="AO_CFG_RUNTIME_MODE_MISSING",
@@ -1584,15 +2007,15 @@ class AssistantOrchestratorService:
                 ),
             )
 
-        gpu = self._require_section_dict(config_data, "gpu", code="AO_CFG_GPU_SECTION_MISSING")
-        device = self._require_non_empty_str(gpu, "device", code="AO_CFG_GPU_DEVICE_MISSING")
+        gpu = config_validation.require_section_dict(config_data, "gpu", code="AO_CFG_GPU_SECTION_MISSING")
+        device = config_validation.require_non_empty_str(gpu, "device", code="AO_CFG_GPU_DEVICE_MISSING")
         if device.upper() != "GPU":
             raise ConfigResolutionError(
                 code="AO_CFG_DEVICE_INVALID",
                 message=f"Orchestrator device must be GPU per ADR-011, got '{device}'.",
             )
-        self._require_non_empty_str(gpu, "model_dir", code="AO_CFG_MODEL_DIR_MISSING")
-        self._require_int_range(gpu, "priority", minimum=1, maximum=7, code="AO_CFG_PRIORITY_INVALID")
+        config_validation.require_non_empty_str(gpu, "model_dir", code="AO_CFG_MODEL_DIR_MISSING")
+        config_validation.require_int_range(gpu, "priority", minimum=1, maximum=7, code="AO_CFG_PRIORITY_INVALID")
 
         spec_decode = gpu.get("speculative_decoding_enabled")
         if spec_decode is not None and not isinstance(spec_decode, bool):
@@ -1609,43 +2032,43 @@ class AssistantOrchestratorService:
                     message="'gpu.draft_model_dir' must be a non-empty string when specified.",
                 )
 
-        generation = self._require_section_dict(config_data, "generation", code="AO_CFG_GENERATION_SECTION_MISSING")
-        self._require_int_range(
+        generation = config_validation.require_section_dict(config_data, "generation", code="AO_CFG_GENERATION_SECTION_MISSING")
+        config_validation.require_int_range(
             generation,
             "max_new_tokens",
             minimum=1,
             maximum=4096,
             code="AO_CFG_MAX_NEW_TOKENS_INVALID",
         )
-        self._require_float_range(
+        config_validation.require_float_range(
             generation,
             "temperature",
             minimum=0.0,
             maximum=2.0,
             code="AO_CFG_TEMPERATURE_INVALID",
         )
-        self._require_int_range(
+        config_validation.require_int_range(
             generation,
             "top_k",
             minimum=0,
             maximum=1000,
             code="AO_CFG_TOP_K_INVALID",
         )
-        self._require_float_range(
+        config_validation.require_float_range(
             generation,
             "top_p",
             minimum=0.0,
             maximum=1.0,
             code="AO_CFG_TOP_P_INVALID",
         )
-        self._require_float_range(
+        config_validation.require_float_range(
             generation,
             "repetition_penalty",
             minimum=0.5,
             maximum=2.0,
             code="AO_CFG_REPETITION_PENALTY_INVALID",
         )
-        self._require_bool(
+        config_validation.require_bool(
             generation,
             "do_sample",
             code="AO_CFG_DO_SAMPLE_INVALID",
@@ -1660,8 +2083,8 @@ class AssistantOrchestratorService:
                 ),
             )
 
-        security = self._require_section_dict(config_data, "security", code="AO_CFG_SECURITY_SECTION_MISSING")
-        dev_mode = self._require_bool(security, "dev_mode", code="AO_CFG_DEV_MODE_INVALID")
+        security = config_validation.require_section_dict(config_data, "security", code="AO_CFG_SECURITY_SECTION_MISSING")
+        dev_mode = config_validation.require_bool(security, "dev_mode", code="AO_CFG_DEV_MODE_INVALID")
 
         if not dev_mode:
             jwt_ca_path = security.get("jwt_ca_cert_path")
@@ -1678,11 +2101,11 @@ class AssistantOrchestratorService:
                     message="'gpu.weight_manifest' is required when dev_mode=false.",
                 )
 
-        ipc = self._require_section_dict(config_data, "ipc", code="AO_CFG_IPC_SECTION_MISSING")
-        self._require_int_range(ipc, "vsock_cid", minimum=0, maximum=2**32 - 1, code="AO_CFG_VSOCK_CID_INVALID")
-        self._require_int_range(ipc, "vsock_port", minimum=1, maximum=65535, code="AO_CFG_VSOCK_PORT_INVALID")
-        self._require_int_range(ipc, "timeout_ms", minimum=1, maximum=120000, code="AO_CFG_TIMEOUT_INVALID")
-        self._require_int_range(
+        ipc = config_validation.require_section_dict(config_data, "ipc", code="AO_CFG_IPC_SECTION_MISSING")
+        config_validation.require_int_range(ipc, "vsock_cid", minimum=0, maximum=2**32 - 1, code="AO_CFG_VSOCK_CID_INVALID")
+        config_validation.require_int_range(ipc, "vsock_port", minimum=1, maximum=65535, code="AO_CFG_VSOCK_PORT_INVALID")
+        config_validation.require_int_range(ipc, "timeout_ms", minimum=1, maximum=120000, code="AO_CFG_TIMEOUT_INVALID")
+        config_validation.require_int_range(
             ipc,
             "max_message_bytes",
             minimum=1024,
@@ -1690,8 +2113,8 @@ class AssistantOrchestratorService:
             code="AO_CFG_MAX_MESSAGE_BYTES_INVALID",
         )
 
-        pgov = self._require_section_dict(config_data, "pgov", code="AO_CFG_PGOV_SECTION_MISSING")
-        self._require_float_range(
+        pgov = config_validation.require_section_dict(config_data, "pgov", code="AO_CFG_PGOV_SECTION_MISSING")
+        config_validation.require_float_range(
             pgov,
             "cosine_similarity_threshold",
             minimum=0.0,
@@ -1791,7 +2214,7 @@ class AssistantOrchestratorService:
                         ),
                     )
             if knowledge.get("retrieve_k") is not None:
-                self._require_int_range(
+                config_validation.require_int_range(
                     knowledge,
                     "retrieve_k",
                     minimum=1,
@@ -1799,7 +2222,7 @@ class AssistantOrchestratorService:
                     code="AO_CFG_KNOWLEDGE_RETRIEVE_K_INVALID",
                 )
             if knowledge.get("embed_max_tokens") is not None:
-                self._require_int_range(
+                config_validation.require_int_range(
                     knowledge,
                     "embed_max_tokens",
                     minimum=16,
@@ -1807,7 +2230,7 @@ class AssistantOrchestratorService:
                     code="AO_CFG_KNOWLEDGE_EMBED_MAX_TOKENS_INVALID",
                 )
             if knowledge.get("staging_max_bytes") is not None:
-                self._require_int_range(
+                config_validation.require_int_range(
                     knowledge,
                     "staging_max_bytes",
                     minimum=1024,
@@ -1848,18 +2271,18 @@ class AssistantOrchestratorService:
                     ),
                 )
             if image_generation.get("steps") is not None:
-                self._require_int_range(
+                config_validation.require_int_range(
                     image_generation, "steps", minimum=1, maximum=200,
                     code="AO_CFG_IMAGE_GEN_STEPS_INVALID",
                 )
             for _dim_key in ("max_width", "max_height"):
                 if image_generation.get(_dim_key) is not None:
-                    self._require_int_range(
+                    config_validation.require_int_range(
                         image_generation, _dim_key, minimum=64, maximum=2048,
                         code="AO_CFG_IMAGE_GEN_DIM_INVALID",
                     )
             if image_generation.get("idle_unload_s") is not None:
-                self._require_int_range(
+                config_validation.require_int_range(
                     image_generation, "idle_unload_s", minimum=0, maximum=86_400,
                     code="AO_CFG_IMAGE_GEN_IDLE_UNLOAD_INVALID",
                 )
@@ -1941,74 +2364,10 @@ class AssistantOrchestratorService:
                     ),
                 )
             if image_generation.get("hires_max_edge") is not None:
-                self._require_int_range(
+                config_validation.require_int_range(
                     image_generation, "hires_max_edge", minimum=64, maximum=4096,
                     code="AO_CFG_IMAGE_GEN_HIRES_MAX_EDGE_INVALID",
                 )
-
-    @staticmethod
-    def _require_section_dict(config_data: dict[str, object], key: str, *, code: str) -> dict[str, object]:
-        value = config_data.get(key)
-        if not isinstance(value, dict):
-            raise ConfigResolutionError(code=code, message=f"Missing or invalid section [{key}].")
-        return value
-
-    @staticmethod
-    def _require_non_empty_str(section: dict[str, object], key: str, *, code: str) -> str:
-        value = section.get(key)
-        if not isinstance(value, str) or not value.strip():
-            raise ConfigResolutionError(code=code, message=f"Missing or invalid '{key}' value.")
-        return value.strip()
-
-    @staticmethod
-    def _require_bool(section: dict[str, object], key: str, *, code: str) -> bool:
-        value = section.get(key)
-        if not isinstance(value, bool):
-            raise ConfigResolutionError(code=code, message=f"'{key}' must be a boolean.")
-        return value
-
-    @staticmethod
-    def _require_int_range(
-        section: dict[str, object],
-        key: str,
-        *,
-        minimum: int,
-        maximum: int,
-        code: str,
-    ) -> int:
-        value = section.get(key)
-        if not isinstance(value, int):
-            raise ConfigResolutionError(code=code, message=f"'{key}' must be an integer.")
-        if value < minimum or value > maximum:
-            raise ConfigResolutionError(
-                code=code,
-                message=(
-                    f"'{key}' out of range: {value}. Expected {minimum}..{maximum}."
-                ),
-            )
-        return value
-
-    @staticmethod
-    def _require_float_range(
-        section: dict[str, object],
-        key: str,
-        *,
-        minimum: float,
-        maximum: float,
-        code: str,
-    ) -> float:
-        value = section.get(key)
-        if not isinstance(value, (float, int)):
-            raise ConfigResolutionError(code=code, message=f"'{key}' must be a number.")
-        parsed = float(value)
-        if parsed < minimum or parsed > maximum:
-            raise ConfigResolutionError(
-                code=code,
-                message=(
-                    f"'{key}' out of range: {parsed}. Expected {minimum}..{maximum}."
-                ),
-            )
-        return parsed
 
     @staticmethod
     def _resolve_path(repo_root: Path, service_root: Path, raw_path: str) -> Path:
@@ -2191,6 +2550,68 @@ class AssistantOrchestratorService:
                 ),
             )
 
+    def _maybe_reap_idle_sessions(self, now: float | None = None) -> list[str]:
+        """Throttled idle-session reap — the #801 ``destroy_session`` caller.
+
+        Runs at most once per ``_SESSION_REAP_INTERVAL_S``; between checks the
+        cost is one monotonic compare. Only ever called from the serve-loop
+        thread (the same thread that handles every request), so it can never
+        destroy a session MID-turn — a session is only reaped between
+        connections, and a reaped session is lazily re-created + history-
+        reseeded on its next PROMPT_REQUEST (FUT-07).
+
+        Fail-soft by design: the hygiene sweep must never take the serve loop
+        down — any unexpected error is logged and the loop continues (the
+        leak this bounds merely persists one more interval).
+
+        Returns:
+            The session ids reaped this call (empty off-interval / when idle
+            reaping is disabled / when nothing was idle enough).
+        """
+        current = time.monotonic() if now is None else now
+        if current < self._next_session_reap_check:
+            return []
+        self._next_session_reap_check = current + _SESSION_REAP_INTERVAL_S
+        context_manager = self._context_manager
+        if context_manager is None:
+            return []
+        ttl_s = self.session_idle_ttl_s
+        if ttl_s <= 0:
+            return []
+        try:
+            reaped = context_manager.reap_idle_sessions(ttl_s, now=current)
+            # Envelopes are per-session state OUTSIDE the context manager —
+            # retain only the survivors' (deterministic, clock-free; dropping
+            # an envelope is fail-closed: gate() on a missing envelope DENIES).
+            dropped_envelopes = self._egress_envelope.retain_only(
+                context_manager.active_sessions
+            )
+        except Exception as exc:  # noqa: BLE001 — hygiene must not kill the loop
+            logger.error(
+                "Session idle-reaper failed (state persists one more "
+                "interval): %s",
+                exc,
+                exc_info=True,
+            )
+            return []
+        if reaped:
+            # Eviction events are LOGGED (LA condition, #801 c.1666). Session
+            # ids are opaque uuids — never conversation content.
+            logger.info(
+                "Session idle-reaper: destroyed %d idle session(s) "
+                "(ttl=%.0fs): %s",
+                len(reaped),
+                ttl_s,
+                ", ".join(reaped),
+            )
+        if dropped_envelopes:
+            logger.info(
+                "Session idle-reaper: dropped %d orphaned egress envelope(s): %s",
+                len(dropped_envelopes),
+                ", ".join(dropped_envelopes),
+            )
+        return reaped
+
     def _serve_forever(self) -> None:
         listener = self._listener
         while (
@@ -2198,6 +2619,9 @@ class AssistantOrchestratorService:
             and listener.running
             and not self._stop_event.is_set()
         ):
+            # #801: opportunistic idle-session reap, throttled inside. Runs on
+            # THIS thread between connections — never during a turn.
+            self._maybe_reap_idle_sessions()
             transport = listener.accept()
             if transport is None:
                 time.sleep(0.01)
@@ -2397,7 +2821,14 @@ class AssistantOrchestratorService:
                 )
             )
         try:
+            from shared.fleet import clarify as _clarify
             from shared.fleet.acceptance import generate_plan
+
+            # #819: the goal may arrive enriched with the operator's clarified requirements
+            # (the re-plan after the CLARIFY questions were answered) — split them back off so
+            # spec.goal stays the clean goal and the requirements thread into the sub-prompts.
+            # A plain goal (no sentinel) yields requirements="" == today's flow byte-identical.
+            clean_goal, requirements = _clarify.split_planning_goal(goal)
 
             projects_dir = self._fleet_projects_dir()
             # #752 F1/F2: a battery card can DECLARE a plan shape the 14B right-sizing ruler
@@ -2417,11 +2848,20 @@ class AssistantOrchestratorService:
                 decomposition_override = None
 
             plan = generate_plan(
-                goal,
+                clean_goal,
                 repo,
                 generate_fn=self._plan_generate_fn(),
                 projects_dir=projects_dir,
                 decomposition_override=decomposition_override,
+                # #819: ask the CLARIFY questions on the FIRST pass (no requirements yet);
+                # generate_plan self-suppresses for a re-plan (requirements present) and for a
+                # battery card (decomposition_override present — the harness never hangs).
+                clarify=self.fleet_dispatch_clarify_enabled,
+                requirements=requirements,
+                # #820: run the revise model call when the goal carries the revise sentinel
+                # (operator feedback on a pending plan). generate_plan detects the sentinel and
+                # returns edit ops early; a non-revise goal ignores this flag entirely.
+                revise=self.fleet_dispatch_revise_enabled,
             )
         except Exception as exc:  # noqa: BLE001 — fail-closed: never crash the AO loop
             logger.error("PLAN request failed: %s", exc, exc_info=True)
@@ -2439,6 +2879,8 @@ class AssistantOrchestratorService:
                 fell_back=plan.fell_back,
                 tasks=plan.tasks,
                 criteria=plan.spec.to_dict(),
+                questions=plan.questions,  # #819: non-empty only on the CLARIFY early-return
+                revision=plan.revision,  # #820: non-empty only on the REVISE early-return
                 request_id=request_id,
             )
         )
@@ -2950,10 +3392,16 @@ class AssistantOrchestratorService:
                 embed_model_revision=embed_model_revision,
             )
             # Production-wiring regression lock: has_encryption MUST be True.
-            assert store.has_encryption is True, (
-                "REGRESSION: EncryptedSubstrateStore.has_encryption is not True — "
-                "encryption wiring silently disabled"
-            )
+            # Explicit raise, not assert, so the tripwire survives a future
+            # `python -O` invocation (#804, CWE-617); caught by the outer
+            # except → substrate memory loud-disabled, AO boot unaffected.
+            if store.has_encryption is not True:
+                raise StoreProvisioningError(
+                    "AO_SUBSTRATE_ENCRYPTION_WIRING_FAILED: "
+                    "EncryptedSubstrateStore.has_encryption is not True — "
+                    "encryption wiring silently disabled "
+                    "(production-wiring regression)"
+                )
             logger.info(
                 "Substrate ready (encrypted): %s (%d existing chunks)",
                 db_path,
@@ -3842,24 +4290,48 @@ class AssistantOrchestratorService:
                 "unavailable).",
             )
 
-        # Provenance + the D-1(a) untrusted-context flag (the weak-signal defense).
+        # Provenance + the D-1(a) untrusted-context flag (the weak-signal
+        # defense).  The GATE (whether a notice shows at all) is unchanged:
+        # has_untrusted_content, exactly as Layer 3 reads it.  What #792 refines
+        # is the notice GRAIN — untrusted_provenance_tiers tells us WHICH source
+        # was in the turn, so operator-curated knowledge recall (his own bank)
+        # gets a proportionate notice instead of the document/web alarm.
         untrusted = False
         has_docs = False
+        untrusted_tiers: frozenset[Provenance] = frozenset()
         cm = self._context_manager
         if cm is not None:
             try:
                 untrusted = bool(cm.has_untrusted_content(session_id))
                 has_docs = bool(cm.has_user_loaded_documents(session_id))
+                untrusted_tiers = frozenset(
+                    cm.untrusted_provenance_tiers(session_id)
+                )
             except Exception:  # noqa: BLE001 — fail-safe: assume no context signal
-                untrusted, has_docs = False, False
-        if untrusted:
+                untrusted, has_docs, untrusted_tiers = False, False, frozenset()
+        # Fail safe: the proportionate knowledge-recall notice is used ONLY when
+        # operator-curated knowledge is the SOLE untrusted tier present.  Any
+        # document / pasted-external / web-search tier alongside it (or an
+        # unrecognized tier that leaves untrusted True but the set not exactly
+        # {KNOWLEDGE}) keeps the strong warning — a hostile instruction could be
+        # hiding, and the operator gets the alarm, never the reassurance.
+        knowledge_only = untrusted and untrusted_tiers == frozenset(
+            {Provenance.UNTRUSTED_KNOWLEDGE}
+        )
+        if knowledge_only:
+            provenance_label = "content recalled from your knowledge bank"
+            untrusted_kind = UntrustedContextKind.KNOWLEDGE_RECALL
+        elif untrusted:
             provenance_label = (
                 "content from a document or web result in this conversation"
             )
+            untrusted_kind = UntrustedContextKind.DOCUMENT_OR_WEB
         elif has_docs:
             provenance_label = "a document you loaded into this conversation"
+            untrusted_kind = UntrustedContextKind.NONE
         else:
             provenance_label = "your last message"
+            untrusted_kind = UntrustedContextKind.NONE
 
         # Decide the action against the ACTIVE tier (deterministic P5 probe).
         try:
@@ -3893,6 +4365,7 @@ class AssistantOrchestratorService:
                 target_pref_id=similar.pref_id,
                 provenance_label=provenance_label,
                 untrusted_context=untrusted,
+                untrusted_kind=untrusted_kind,
                 target_number=_number_of(similar.pref_id),
                 target_body=similar.body,
             )
@@ -3906,6 +4379,7 @@ class AssistantOrchestratorService:
                 target_pref_id=similar.pref_id,
                 provenance_label=provenance_label,
                 untrusted_context=untrusted,
+                untrusted_kind=untrusted_kind,
                 target_number=_number_of(similar.pref_id),
                 target_body=similar.body,
             )
@@ -3916,6 +4390,7 @@ class AssistantOrchestratorService:
                 type_tag=type_tag,
                 provenance_label=provenance_label,
                 untrusted_context=untrusted,
+                untrusted_kind=untrusted_kind,
             )
 
         card_block = render_proposal_block(staged.to_card())
@@ -4251,10 +4726,16 @@ class AssistantOrchestratorService:
                 embed_model_revision=embed_model_revision,
             )
             # Production-wiring regression lock (same contract as substrate).
-            assert bank.has_encryption is True, (
-                "REGRESSION: EncryptedKnowledgeBank.has_encryption is not True — "
-                "encryption wiring silently disabled"
-            )
+            # Explicit raise, not assert, so the tripwire survives a future
+            # `python -O` invocation (#804, CWE-617); caught by the outer
+            # except → knowledge feature loud-disabled, AO boot unaffected.
+            if bank.has_encryption is not True:
+                raise StoreProvisioningError(
+                    "AO_KNOWLEDGE_BANK_ENCRYPTION_WIRING_FAILED: "
+                    "EncryptedKnowledgeBank.has_encryption is not True — "
+                    "encryption wiring silently disabled "
+                    "(production-wiring regression)"
+                )
             self._ingest_cipher = cipher
             self._ingest_audit = ingest_audit
             logger.info(

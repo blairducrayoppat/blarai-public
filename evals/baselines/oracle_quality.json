@@ -1,14 +1,21 @@
 {
   "aggregates": {
     "errors": 0,
-    "evaluated": 20,
+    "evaluated": 27,
     "failed": 0,
     "pass_rate": 1.0,
-    "passed": 20,
+    "passed": 27,
     "skipped_hardware": 1,
-    "total": 21
+    "total": 28
   },
   "cases": {
+    "oq-contract-001": "pass",
+    "oq-contract-002": "pass",
+    "oq-contract-003": "pass",
+    "oq-covg-001": "pass",
+    "oq-covg-002": "pass",
+    "oq-covg-003": "pass",
+    "oq-covg-004": "pass",
     "oq-fmode-001": "pass",
     "oq-fmode-002": "pass",
     "oq-fmode-003": "pass",
@@ -31,7 +38,7 @@
     "oq-static-009": "pass",
     "oq-static-010": "pass"
   },
-  "generated_at": "2026-07-08T00:40:10.675321+00:00",
-  "git_sha": "b303182",
+  "generated_at": "2026-07-12T09:07:38.565535+00:00",
+  "git_sha": "047d5dfc",
   "suite": "oracle_quality"
 }

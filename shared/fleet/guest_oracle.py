@@ -49,6 +49,7 @@ from __future__ import annotations
 import ast
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -440,11 +441,54 @@ def safe_extract_snapshot(snapshot_zip: bytes, dest: str | Path) -> list[str]:
     return sorted(extracted)
 
 
-def _default_pytest_run(cmd: list[str], timeout_s: float, cwd: str) -> tuple[bool, str, str]:
-    """Bounded, no-shell pytest subprocess (argv-only — §10 S1)."""
+# ---------------------------------------------------------------------------
+# #822 H1 CLEAN-ENVIRONMENT GRADING — guest mirror of the host grade recipe.
+#
+# The guest snapshot is *.py-ONLY, but conftest.py AND sitecustomize.py are *.py,
+# so a coder conftest rides the snapshot into the guest and — before this — the
+# guest re-ran the SAME gamed tree with a bare ``python -m pytest``, so the #744
+# host/guest agreement matrix would AGREE on a conftest-gamed GREEN (r3adversary
+# §1). The guest now grades with the SAME recipe as the host so the two can never
+# be fooled into agreeing on a perturbed verdict.
+#
+# guest_oracle.py ships to the NIC-less Alpine guest and must stay stdlib at module
+# scope, so the recipe is REDECLARED here (the JOB_ORACLE_ALLOWED_PATHS precedent)
+# rather than imported from ``shared.fleet.grade_env`` — and a HOST-SIDE lock
+# (test_import_probe_gate.py) pins these EQUAL to grade_env's SSOT so they can never
+# drift. Host grader/probe/#821-seed import grade_env directly; only the guest twin
+# redeclares.
+_CLEAN_GRADE_INI_FILENAME = "grade-clean.ini"
+_CLEAN_GRADE_INI_CONTENT = (
+    "[pytest]\n"
+    "# BlarAI grader clean config (#822 H1) — harness-owned, passed via `-c` so the\n"
+    "# coder's pytest.ini / pyproject [tool.pytest] / tox.ini / setup.cfg cannot\n"
+    "# influence the grade. Paired with --noconftest, -o addopts=,\n"
+    "# --import-mode=importlib, PYTHONSAFEPATH=1, and an explicit PYTHONPATH=<repo>.\n"
+    "addopts =\n"
+)
+
+
+def _clean_pytest_args(ini_path: str) -> list[str]:
+    """The clean-env pytest flags (guest redeclaration of grade_env.clean_pytest_args;
+    host-locked equal)."""
+    return ["--noconftest", "-c", str(ini_path), "-o", "addopts=", "--import-mode=importlib"]
+
+
+def _clean_grade_env_overlay(root: str) -> dict:
+    """The clean-env env overlay (guest redeclaration of grade_env.clean_grade_env;
+    host-locked equal): PYTHONPATH=<extract root> + PYTHONSAFEPATH=1."""
+    return {"PYTHONPATH": str(root), "PYTHONSAFEPATH": "1"}
+
+
+def _default_pytest_run(cmd: list[str], timeout_s: float, cwd: str, *,
+                        env: "dict | None" = None) -> tuple[bool, str, str]:
+    """Bounded, no-shell pytest subprocess (argv-only — §10 S1). ``env`` (#822 H1,
+    additive; ``None`` inherits) is an OVERLAY merged over ``os.environ`` so the guest
+    grade pins PYTHONPATH/PYTHONSAFEPATH exactly like the host."""
     try:
+        run_env = {**os.environ, **env} if env is not None else None
         cp = subprocess.run(  # noqa: S603 — vector argv, no shell
-            cmd, capture_output=True, text=True, timeout=timeout_s, cwd=cwd,
+            cmd, capture_output=True, text=True, timeout=timeout_s, cwd=cwd, env=run_env,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return (False, "", f"pytest run failed to complete: {type(exc).__name__}")
@@ -455,15 +499,20 @@ def execute_snapshot(
     snapshot_zip: bytes,
     oracle_rel_path: str,
     *,
-    run: "Callable[[list[str], float, str], tuple[bool, str, str]] | None" = None,
+    run: "Callable[..., tuple[bool, str, str]] | None" = None,
     timeout_s: float = 600.0,
 ) -> dict:
-    """The GUEST-side half: extract the snapshot and pytest the job oracle.
+    """The GUEST-side half: extract the snapshot and pytest the job oracle under the
+    #822 H1 CLEAN-ENVIRONMENT recipe (the same the host grader uses).
 
     Pure stdlib + pytest, so the exact code the guest service will run is
-    offline-testable on the host today.  ``python -m pytest`` (never the bare
-    CLI) so the snapshot root lands on ``sys.path`` — the host gate's own
-    #748 lesson, inherited rather than relearned.
+    offline-testable on the host today.  The recipe (``--noconftest -c <clean.ini>
+    -o addopts= --import-mode=importlib`` + ``PYTHONPATH=<extract root>`` +
+    ``PYTHONSAFEPATH=1``) denies a coder conftest.py/pytest.ini/sitecustomize that
+    rode the *.py snapshot any influence over the grade, while the clean ``PYTHONPATH``
+    gives the self-contained oracle its first-party imports (the #748 snapshot-root-on-
+    sys.path lesson, now via an explicit path instead of the cwd auto-insert
+    PYTHONSAFEPATH denies).
 
     Returns the closed ``{"status", "reason", "evidence"}`` result shape;
     every machinery failure is an honest ``not-run``."""
@@ -484,10 +533,17 @@ def execute_snapshot(
                     REASON_NO_ORACLE,
                     f"snapshot does not contain the oracle at {oracle_rel_path!r}",
                 )
+            # Write the harness-owned clean.ini INTO the extract root (never a coder
+            # file — the snapshot is *.py-only, so no collision) and grade with the
+            # clean recipe + env.
+            ini = Path(tmp) / _CLEAN_GRADE_INI_FILENAME
+            ini.write_text(_CLEAN_GRADE_INI_CONTENT, encoding="utf-8")
             ok, out, err = runner(
-                [sys.executable, "-m", "pytest", "-q", oracle_rel_path],
+                [sys.executable, "-m", "pytest",
+                 *_clean_pytest_args(str(ini)), "-q", oracle_rel_path],
                 timeout_s,
                 tmp,
+                env=_clean_grade_env_overlay(tmp),
             )
             tail = (out + "\n" + err).strip()[-500:]
             return {

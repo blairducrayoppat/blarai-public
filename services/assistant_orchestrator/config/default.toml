@@ -97,6 +97,24 @@ block_tools_on_untrusted_content = true
 spotlighting_enabled = true
 max_history_turns = 20
 max_context_tokens = 4096
+# Session idle-reap TTL (Vikunja #801). Seconds a conversation may sit with NO
+# turn activity before the AO destroys its in-RAM state (conversation context,
+# KV-warm flag, /trust flag, user-documents flag, egress envelope). The audit
+# found destroy_session had ZERO production callers -- every session since boot
+# stayed resident until restart, unbounded for a "decades of use" process.
+# Reaping is correctness-safe: the durable transcript lives in the gateway's
+# encrypted session store, and a reaped session is lazily re-created + history-
+# reseeded on its next prompt (FUT-07); the /trust flag re-derives from the
+# request payload. The cost of a reap is one cold KV prefill on the next
+# prompt, never data loss. 1800 s (30 min) is the LA-DECIDED value
+# (2026-07-11, #801 c.1713 -- not a tunable design default): an idle
+# conversation releases its RAM after 30 minutes; resume reloads from disk.
+# The launcher threads this SAME value into the gateway's session-state
+# reaper (pending documents, ingest previews, dispatch plans), so one knob
+# bounds both processes. Set to 0 (or negative) to DISABLE reaping (the
+# pre-#801 behaviour). Registered in shared/timeout_registry.py (gate-locked
+# against drift; review path = operator-workflow telemetry).
+session_idle_ttl_s = 1800
 
 [substrate]
 # Personal Knowledge Substrate (USE-CASE-002, ADR-016 / ADR-025) live-memory
@@ -319,6 +337,27 @@ illustration_lora_sha256 = "b4c8132f85ab7d75f5789eaf0054153a6011b505719f1253fb7d
 # cannot co-reside — milestone 1); both stay dormant behind this same flag.
 enabled = true
 
+# #819 — requirements-clarification stage. When true (the default, proven-defaults-live)
+# an interactive /dispatch whose goal is underspecified is asked a FEW targeted, plain-
+# language questions (where it runs, whether data is saved, the must-work feature, the
+# look, the size) BEFORE the work is broken down; the answers thread into decompose + the
+# acceptance oracle + every task so the coder builds to them. A goal that already carries
+# those answers is asked NOTHING (a sufficiency check, not a quiz). A battery/headless card
+# dispatch NEVER clarifies (the card IS the spec), so the operator-less harness can't hang.
+# Set false to send every /dispatch straight to decompose (pre-#819 behaviour).
+clarify = true
+
+# #820 — plan-feedback revision loop. When true (the default, proven-defaults-live) an
+# operator who gives free-text feedback on a PENDING plan card (`/dispatch revise <what to
+# change>`) gets the 14B to REVISE the existing breakdown — tasks added/removed/reordered/
+# re-scoped per the feedback, every untouched task preserved byte-for-byte — instead of
+# rejecting and re-rolling the whole plan from scratch. Bounded (3 revisions per plan, surfaced
+# honestly); each revision replaces the pending plan and re-renders with a plain-language
+# CHANGED-vs-KEPT delta; an incoherent revision re-renders the ORIGINAL card untouched (never a
+# lost plan). Revision is OPERATOR-INITIATED only, so a battery/headless run never revises.
+# Set false to refuse `/dispatch revise` (accept/reject unchanged). Set false to disable.
+revise = true
+
 # Increment-2 swap: pre-load headroom gate — GiB of free RAM required after BlarAI
 # fully steps aside, before the 30B is loaded. 20 GiB (LA-set 2026-07-09, #777) —
 # MEASURED on the current substrate (OpenVINO GenAI 2026.2.1, warm compile cache):
@@ -351,11 +390,20 @@ swap_run_budget_s = 10800.0
 # Pre-go-live (#670): the dispatch target is config-driven, NOT compiled in. These two
 # roots locate (a) the agentic-setup fleet — its scripts/ + state/ (queue + runs) derive
 # from this root — and (b) the operator's projects dir, the ONLY allowed dispatch target
-# (the fleet refuses ~/BlarAI regardless). Forward slashes are fine on Windows. Change
-# them here to point at a different layout without a code change; an empty value falls
-# back to the build_default_config compiled-in default for this box.
-agentic_setup_dir = "C:/Users/mrbla/agentic-setup"
-projects_dir = "C:/Users/mrbla/projects"
+# (the fleet refuses ~/BlarAI regardless).
+#
+# #811 / AUDIT-12 (12-Factor III): the SHIPPED default carries NO absolute home path.
+# Each root resolves through shared.fleet.dispatch.resolve_fleet_root(), order:
+#   1. env override — BLARAI_FLEET_AGENTIC_SETUP_DIR / BLARAI_FLEET_PROJECTS_DIR
+#   2. the value below (empty in the shipped default)
+#   3. "" -> build_default_config's compiled-in this-host fallback (see
+#      shared/fleet/dispatch.py: _AGENTIC_SETUP / _PROJECTS)
+# On the build host, with neither env nor value set, (3) yields the same two fleet
+# roots the old baked config pointed at — byte-identical runtime behavior. A different
+# operator points the fleet elsewhere by setting the env var OR filling a value in
+# (forward slashes are fine on Windows) — no code change either way.
+agentic_setup_dir = ""
+projects_dir = ""
 
 # Increment-3 EXECUTE: reply-then-exit grace (seconds). After the operator approves a
 # dispatch, the AO sends the "stepping aside" reply and waits this long before signalling
@@ -400,6 +448,108 @@ vikunja_bridge_project_id = 0
 # an unreachable guest is an honest not-run in guest-oracle.json — never a
 # verdict change, never a blocked 14B restore.
 guest_oracle_enabled = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [coordinator] — the self-governance boundary + Coordinator program (ADR-039).
+# DORMANT. Every flag ships OFF. The seven structural controls
+# (shared/coordinator/) are built and regression-locked (#848); C1 (#843) wires
+# the READ SURFACE into the boot path behind `enabled`. This section documents
+# the whole surface so the dormant state is explicit and greppable, exactly as
+# [fleet_dispatch]/[image_generation] were staged dormant before go-live. The
+# #848 SG keys and the #843 read-surface keys were reconciled into this one
+# section at the C1 merge (both dormant; no key collision beyond the shared
+# `enabled` master gate).
+#
+# The self-governance boundary is CONSTITUTIONAL (ADR-039 §2.1): BlarAI has zero
+# write path to the governed core (its own code/config/prompts/policy, models/keys,
+# governing docs, the proposal-staging store, and the agentic-setup fleet's
+# verify-gate/oracle/harness config). These flags NEVER grant such a path — the
+# forbidden-target set is config-defined but not modifiable via any BlarAI surface
+# (controls 1/4/7). Flag changes are operator-only, made outside BlarAI.
+[coordinator]
+# Master gate for the Coordinator role. false (dormant default) = no coordinator
+# surface is constructed and /coord returns a clear disabled notice, NEVER touching
+# Vikunja or fleet state (checked before either is reached). C1 wires the read
+# surface behind this.
+enabled = false
+# C3 (#845) bounded wake cycle. Dormant default off.
+heartbeat_enabled = false
+# ── C3 heartbeat cadence (#845, design doc §8.3/§9 — ALL inert while
+# heartbeat_enabled=false). AC-power cycle interval (seconds; registered in
+# shared/timeout_registry.py); on battery or an undeterminable power state the
+# interval stretches by the multiplier AND model drafting is deferred
+# (deterministic organizing continues — ADR-039 §2.12.12). boot_grace delays the
+# first cycle past boot/preflights and floors the quiet-queue tripwire's
+# idle-grace. overnight_window is the runtime-readable quiet window (local
+# wall-clock, "HH:MM-HH:MM", may span midnight; empty = no window; malformed =
+# no window WITH a surfaced note — the swap gate independently owns the real
+# GPU conflict). operator_absent is the ADR-039 §2.12.9 absence switch:
+# Expedite-only surfacing, digests accumulate, proposal TTLs pause.
+heartbeat_interval_s = 900
+heartbeat_battery_multiplier = 4
+heartbeat_boot_grace_s = 300
+overnight_window = "23:00-09:00"
+operator_absent = false
+# C3 (#845) §7 output-router mode. true (default): every operator-visible and
+# board-visible heartbeat effect is diverted to the born-encrypted shadow journal
+# (shared/coordinator/shadow_journal.py) — zero Vikunja writes, zero operator
+# surfacing; machinery-health alarms alone still reach the operator (never
+# shadow-gated, §7.2). Flipped to false ONLY at the #855 graduation ceremony
+# after measured shadow precision — with heartbeat_enabled these are the two
+# independent locks on live output (§7.1). Resolution is fail-closed toward
+# TRUE: a missing or mistyped value resolves true (shadow is the safe
+# direction); only an explicit boolean false goes live.
+shadow_mode = true
+# C4 (#846) work-origination proposals. Dormant default off.
+work_origination_enabled = false
+# C2 (#844) driver-integrated stop-doomed-fast checks (shared/fleet/doom_check.py).
+# false (dormant default): the dispatch spec never carries the flag, the detached
+# swap driver runs NO doom watchdog, and swap behavior is byte-identical to
+# pre-#844. true (go-live, an LA ceremony): the AO-side dispatch threads the flag
+# into the spec, and a DETERMINED-doomed coder — no watched-log progress AND no
+# coder CPU for >= the registered 240 s grace, ONLY while a run-fleet child is
+# live — is stopped fast via the SAME stop/abort machinery the budget watchdog
+# uses (teardown-inert, honest doom-stop labeling). Elapsed time alone is NEVER
+# the doom signal.
+swap_doom_checks_enabled = false
+# Control 7 — signed policy verification (mirrors [security].require_signed_manifest).
+# false (dormant default): an unsigned/absent policy file is permitted with a WARNING,
+# and the compiled-in governed-core defaults are authoritative; a present-but-invalid
+# signature is still FAIL-CLOSED (no silent downgrade). true: a missing/invalid policy
+# signature refuses to start. The TPM-signed positive path is an operator ceremony,
+# identical in status to the weight manifest's signing.
+require_signed_policy = false
+# Path to the signed policy file (control 7). Empty (dormant default) = compiled-in
+# governed-core defaults are authoritative.
+policy_path = ""
+# Control 5 — graduated-autonomy ladder. EMPTY on a fresh install: every action class
+# is propose-only until an LA go-live ceremony adds it here (each a DECISION_REGISTER
+# row + a per-class Agents-Rule-of-Two re-analysis, ADR-039 §2.10). Multi-operator
+# default: nothing an operator can click hands BlarAI a write path to itself.
+enabled_auto_classes = []
+#
+# ── C1 read-surface keys (#843, ADR-039 §2.10). READ-ONLY: `/coord status`
+# composes a snapshot of fleet-swap state + the fleet queue + the latest run + the
+# battery campaign (if configured) + configured Vikunja projects' boards + flow
+# metrics, over the SAME loopback-pinned vikunja_bridge the #749 job-ticket bridge
+# uses — zero new egress, no second network path. Gated by `enabled` above.
+#
+# Vikunja project ids the read surface reports on, keyed by a DISPLAY NAME — ids are
+# NEVER hardcoded elsewhere (ADR-039 §2.12.11: every Vikunja id is name-resolved at
+# runtime, so a re-migrated or per-installation project set needs no code change).
+# Empty by default; an operator populates this after running the SEPARATE,
+# operator-run Kanban substrate-setup migration script
+# (tools/dispatch_harness/coordinator_setup.py — discover-or-create, never run by
+# BlarAI itself). TOML inline-table form, e.g.:
+#   projects = { "Coder Jobs" = 7 }
+projects = {}
+# An optional path to a battery-campaign-state JSON file (tri-state read —
+# shared/fleet/work_state.read_campaign_state). Empty (the default) reads as a benign
+# EMPTY, never a failure: no campaign-state file with a stable schema is produced
+# inside the BlarAI tree today (the battery harness's campaign bookkeeping lives
+# partly in the sibling agentic-setup install) — point this at whatever your own
+# install actually writes, if anything.
+battery_campaign_state_path = ""
 
 [security]
 fail_closed = true

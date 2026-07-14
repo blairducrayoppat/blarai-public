@@ -59,11 +59,13 @@ class TestGoldenIntegrity:
     def test_all_design_case_classes_present(self) -> None:
         cases = load_golden(_GOLDEN)
         kinds = {str(c["kind"]) for c in cases}
-        # Design doc §6 cases 1-6 + §6.7 poisoning red-team (M2 W3).
+        # Design doc §6 cases 1-6 + §6.7 poisoning red-team (M2 W3) + #792
+        # propose/no-propose pair.
         assert kinds == {
             "capture_fidelity",       # §6.1
             "pinned_injection",       # §6.2 offline half
             "model_applies",          # §6.2 model half
+            "proposes_preference",    # #792 propose/no-propose pair (model half)
             "update_contradiction",   # §6.3
             "abstention",             # §6.4
             "non_decay",              # §6.5
@@ -106,8 +108,9 @@ class TestSuiteSemantics:
         model_ids = {
             str(c["id"])
             for c in load_golden(_GOLDEN)
-            if c["kind"] in ("model_applies", "abstention")
-            # §6.7 FAMA is a model-mode poisoning case (mode: model).
+            # model_applies/abstention + #792 proposes_preference are all
+            # model-in-the-loop by kind; §6.7 FAMA opts in via mode: model.
+            if c["kind"] in ("model_applies", "abstention", "proposes_preference")
             or c.get("mode") == "model"
         }
         skipped = {
@@ -258,6 +261,104 @@ class TestFakeGeneratorWiring:
         )
         assert report.results[0].status is CaseStatus.ERROR
         assert "boom" in report.results[0].detail
+
+
+# ---------------------------------------------------------------------------
+# C2. #792 propose/no-propose golden pair — detection locked WITHOUT hardware
+# ---------------------------------------------------------------------------
+
+
+_EXPLICIT_CUE = "Remember this preference: always respond in English unless I ask otherwise."
+_IMPLICIT_DIRECTIVE = "Respond in English unless I explicitly ask for another language."
+_PROPOSE_CALL = (
+    '<tool_call>{"name": "propose_preference", '
+    '"arguments": {"text": "always respond in English unless asked otherwise"}}'
+    "</tool_call>"
+)
+
+
+def _prop_case(case_id: str, prompt: str) -> dict[str, Any]:
+    return {
+        "id": case_id,
+        "kind": "proposes_preference",
+        "description": "propose-detection wiring case",
+        "prompt": prompt,
+        "preferences": [],
+        "expect_propose": True,
+    }
+
+
+class TestProposesPreferencePair:
+    """The c.1687/c.1688 golden pair (#792). The MODEL run is hardware-gated, so
+    offline we lock the DETECTION contract with a fake generator: a
+    propose_preference tool call in the raw output scores propose=True; a
+    conversational answer (the live known-miss shape) scores propose=False."""
+
+    def test_pair_present_with_the_exact_live_utterances(self) -> None:
+        cases = {str(c["id"]): c for c in load_golden(_GOLDEN)}
+        assert cases["pm-prop-explicit-001"]["prompt"] == _EXPLICIT_CUE
+        assert cases["pm-prop-implicit-001"]["prompt"] == _IMPLICIT_DIRECTIVE
+        for cid in ("pm-prop-explicit-001", "pm-prop-implicit-001"):
+            assert cases[cid]["kind"] == "proposes_preference"
+            assert cases[cid]["preferences"] == []
+        # LA-DECIDED posture (#792 c.1763, conservative/explicit-cue-only): the
+        # explicit "remember this" cue MUST propose; the implicit directive MUST
+        # NOT (staying quiet without an explicit cue is correct). The pair locks
+        # both sides of a settled decision (reviewed re-baseline, lesson 186).
+        assert cases["pm-prop-explicit-001"]["expect_propose"] is True
+        assert cases["pm-prop-implicit-001"]["expect_propose"] is False
+
+    def test_emitted_propose_call_scores_pass(self, tmp_path: Path) -> None:
+        golden = _write_golden(tmp_path, [_prop_case("pm-prop-explicit-001", _EXPLICIT_CUE)])
+        report = pm.run_suite(
+            golden, include_hardware=True,
+            hardware_generator=lambda _p, _s: _PROPOSE_CALL,
+        )
+        assert report.results[0].status is CaseStatus.PASS
+        assert report.results[0].actual["proposes_preference"] is True
+        assert report.results[0].actual["tool"] == "propose_preference"
+
+    def test_propose_call_detected_even_behind_a_think_block(
+        self, tmp_path: Path
+    ) -> None:
+        golden = _write_golden(tmp_path, [_prop_case("pm-prop-explicit-001", _EXPLICIT_CUE)])
+        report = pm.run_suite(
+            golden, include_hardware=True,
+            hardware_generator=lambda _p, _s: (
+                "<think>this is a standing rule</think>" + _PROPOSE_CALL
+            ),
+        )
+        assert report.results[0].status is CaseStatus.PASS
+
+    def test_conversational_answer_is_the_known_miss(self, tmp_path: Path) -> None:
+        # The exact live 2026-07-10 shape: a bare acknowledgment, no tool call.
+        golden = _write_golden(tmp_path, [_prop_case("pm-prop-implicit-001", _IMPLICIT_DIRECTIVE)])
+        report = pm.run_suite(
+            golden, include_hardware=True,
+            hardware_generator=lambda _p, _s: "Sure! Let me know how I can assist you.",
+        )
+        assert report.results[0].status is CaseStatus.FAIL
+        assert report.results[0].actual["proposes_preference"] is False
+        assert report.results[0].actual["tool"] is None
+
+    def test_a_different_tool_call_is_not_a_propose(self, tmp_path: Path) -> None:
+        other = '<tool_call>{"name": "search_knowledge", "arguments": {"query": "x"}}</tool_call>'
+        golden = _write_golden(tmp_path, [_prop_case("pm-prop-explicit-001", _EXPLICIT_CUE)])
+        report = pm.run_suite(
+            golden, include_hardware=True, hardware_generator=lambda _p, _s: other
+        )
+        assert report.results[0].status is CaseStatus.FAIL
+        assert report.results[0].actual["tool"] == "search_knowledge"
+
+    def test_missing_expect_propose_is_a_case_error(self, tmp_path: Path) -> None:
+        bad = _prop_case("pm-prop-explicit-001", _EXPLICIT_CUE)
+        del bad["expect_propose"]
+        golden = _write_golden(tmp_path, [bad])
+        report = pm.run_suite(
+            golden, include_hardware=True, hardware_generator=lambda _p, _s: _PROPOSE_CALL
+        )
+        assert report.results[0].status is CaseStatus.ERROR
+        assert "expect_propose" in report.results[0].detail
 
 
 # ---------------------------------------------------------------------------
