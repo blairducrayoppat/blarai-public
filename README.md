@@ -6,6 +6,8 @@
 
 https://github.com/user-attachments/assets/9ffd473b-93e5-4763-a9ec-e12ac6afa10c
 
+**&#9654; Watch it run (2 minutes):** [streaming player](https://blairducrayoppat.github.io/blarai-public/demo.html) &middot; [1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-v1)
+
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
 local disk, and **zero external network dependency by default**. It is a
@@ -173,8 +175,9 @@ controls rather than a per-item rubber-stamp.
   model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
-- **Standing test gate.** **4919 passed / 0 skipped / 120 deselected**, plus the
-  model-quality eval gate green, on the merged main line. Hardware, WinUI, and
+- **Standing test gate.** **8779 passed / 0 failed / 0 skipped / 125 deselected**
+  (live baseline, 2026-07-22), plus the model-quality eval gate green, on the merged
+  main line. Hardware, WinUI, and
   slow tiers are deselected from the standing gate and run separately. Test policy
   and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
 
