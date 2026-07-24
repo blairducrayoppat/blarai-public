@@ -2,6 +2,16 @@
 
 **A personal, locally-run, security-first AI system engineered for decades of use on consumer hardware.**
 
+**&#9654; Watch it run (2 minutes):**
+
+https://github.com/user-attachments/assets/6df40e93-a4ec-4444-845b-27f71703acad
+
+*([streaming player](https://blairducrayoppat.github.io/blarai-public/demo.html) &middot; [1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-v1))*
+
+**&#9654; The vision film (66 seconds):**
+
+https://github.com/user-attachments/assets/9ffd473b-93e5-4763-a9ec-e12ac6afa10c
+
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
 local disk, and **zero external network dependency by default**. It is a
@@ -14,6 +24,44 @@ The design premise is uncompromising: a system that holds decades of a person's
 private data must assume every component can fail or be subverted, must fail
 *closed* when it does, and must be able to prove — cryptographically and in a
 tamper-evident audit trail — what it did and why.
+
+---
+
+## Recent enhancements (as of July 2026)
+
+Highlights of what has landed on the main line since the previous public snapshot.
+Every item below corresponds to code, tests, or measurements in this repository —
+not roadmap intentions.
+
+- **A self-coordination layer that cannot touch its own governed core.** A new
+  coordinator (`shared/coordinator/`) can plan and prioritize the system's own work,
+  but it is *structurally* severed from the trust spine: it has no write path to its
+  own policy, egress, or security configuration, and its output is advisory only. It
+  currently runs in shadow mode — observing and proposing, never acting on the live
+  controls — with its promotion criteria written down in advance and its shadow-mode
+  precision measured rather than assumed.
+- **Independent model-quality evaluation.** A grading harness (`shared/grading/`)
+  scores the assistant's answers against committed baselines, with a *second,
+  independent* grader — a different model — cross-checking the primary one, so a blind
+  spot in one grader is more likely to be caught by the other. Quality regressions fail
+  the evaluation gate with real exit codes.
+- **Prompt-injection defense, made explicit.** Untrusted external content is
+  provenance-tagged and datamarked so it can never gain instruction authority, and a
+  dedicated scanner (`shared/security/injection_scan.py`) screens for injection
+  patterns — exercised by an adversarial test corpus, not merely asserted.
+- **Two new architecture decisions, recorded in the open.** ADR-040 pins the resident
+  model's key/value-cache precision against measured memory headroom; ADR-041 defines
+  the host-mode action-authorization boundary. Both live in `docs/adrs/`, beside a
+  decision register updated in the same change that makes each decision.
+- **Auditable governance.** Every review pass now produces a machine-checkable
+  *disposition record* — each finding marked fixed, deferred-with-evidence, or
+  rejected-with-argument — with dozens landed this month under `docs/reviews/`. New
+  governance documents cover model-weight integrity verification, credential lifecycle,
+  and document lifecycle.
+- **The standing test gate grew to 9047 passing / 0 failed / 0 skipped** on the merged
+  main line (hardware, WinUI, and slow tiers run at their own ceremonies), and the
+  measured-performance dataset gained dozens of new captures — key/value-cache
+  precision sweeps, coordinator shadow-precision, and more — under `docs/performance/`.
 
 ---
 
@@ -169,7 +217,8 @@ controls rather than a per-item rubber-stamp.
   model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
-- **Standing test gate.** **4919 passed / 0 skipped / 120 deselected**, plus the
+- **Standing test gate.** **9047 passed / 0 failed / 0 skipped / 125 deselected**
+  (live baseline, 2026-07-23), plus the
   model-quality eval gate green, on the merged main line. Hardware, WinUI, and
   slow tiers are deselected from the standing gate and run separately. Test policy
   and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
