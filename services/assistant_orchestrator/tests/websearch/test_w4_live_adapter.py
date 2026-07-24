@@ -33,13 +33,19 @@ from typing import Any
 import pytest
 
 import shared.security.guarded_fetch as guarded_fetch_mod
+from services.assistant_orchestrator.src.websearch import (
+    live_adapter as live_adapter_mod,
+)
 from services.assistant_orchestrator.src.websearch.live_adapter import (
+    DEFAULT_MAX_PARSE_DEPTH,
+    DEFAULT_MAX_RESPONSE_BYTES,
     KAGI_SEARCH_ENDPOINT,
     MAX_SEARCH_LIMIT,
     MAX_SNIPPET_CHARS,
     MAX_TITLE_CHARS,
     WEB_SEARCH_FETCH_PURPOSE,
     LiveKagiAdapter,
+    _within_parse_depth,
     format_search_results,
     make_web_search_runner,
 )
@@ -455,3 +461,198 @@ class TestFormatAndRunner:
             tools.clear_web_search_runner()
         assert result == tools.WEB_SEARCH_ERROR_NOTICE
         assert tools.is_retrieval_notice(result)
+
+
+# ---------------------------------------------------------------------------
+# #727 — the fail-closed response-PARSE guard (validate-before-trust). stdlib
+# json.loads has NO size or recursion-depth bound, so an oversized or
+# pathologically-deep response (compromised / MITM'd Kagi endpoint) could
+# resource-exhaust the host DURING parsing. The guard bounds BOTH dimensions
+# BEFORE json.loads and fails closed to [] (never a raise) on violation. Every
+# lock is tested ON (it BLOCKS when engaged) AND with the lock relaxed on the
+# SAME body (it PARSES) — so a green result proves the CAP was the cause, not an
+# unrelated skip (security-by-design principle 12).
+# ---------------------------------------------------------------------------
+
+
+def _deep_nested_body(levels: int) -> str:
+    """A VALID Kagi v1 envelope whose ``data.search[0].props`` is a nested array
+    ``levels`` deep. Under a generous depth cap it parses and yields ONE result
+    ('A', since the entry carries url+title; ``props`` is ignored by the parser);
+    under a tight cap the whole body is rejected unparsed."""
+    nested = "[" * levels + "]" * levels
+    return (
+        '{"meta": {"ms": 1}, "data": {"search": [{"url": "https://a.example/", '
+        '"title": "A", "props": ' + nested + "}]}}"
+    )
+
+
+class TestParseDepthScanner:
+    """The non-recursive, string-aware depth pre-scan (``_within_parse_depth``)."""
+
+    def test_shallow_within_limit_is_true(self) -> None:
+        assert _within_parse_depth('{"a": [1, 2, 3]}', 2) is True
+
+    def test_over_limit_is_false(self) -> None:
+        assert _within_parse_depth("[[[]]]", 2) is False  # nests 3 deep
+
+    def test_counts_both_objects_and_arrays(self) -> None:
+        # An ARRAY bomb (what an object_hook would MISS) is caught.
+        assert _within_parse_depth("[" * 50 + "]" * 50, 12) is False
+
+    def test_braces_inside_strings_do_not_count(self) -> None:
+        # Brackets that are STRING DATA are not structure — no false trip.
+        body = '{"snippet": "' + "[" * 100 + '"}'
+        assert _within_parse_depth(body, 3) is True
+
+    def test_escaped_quote_keeps_string_open(self) -> None:
+        # A backslash-escaped quote does NOT close the string, so the brackets
+        # after it stay ignored (string-awareness is escape-aware).
+        body = '{"s": "he said \\"' + "[" * 40 + '\\" done"}'
+        assert _within_parse_depth(body, 3) is True
+
+
+class TestResponseSizeGuard:
+    def test_oversized_response_rejected_before_parse(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """LOCK ON: a decoded response over the byte cap is rejected unparsed —
+        [] and a fail-loud, secret-free WARNING naming the cap."""
+        _patch_door(
+            monkeypatch,
+            lambda url: _ok_result(_kagi_body(_entry("https://a.example/", "A"))),
+        )
+        adapter = LiveKagiAdapter(KagiApiKey(_SENTINEL), max_response_bytes=64)
+        with caplog.at_level(logging.WARNING):
+            assert adapter.search_sync("q") == []
+        assert "parse cap" in caplog.text
+        assert _SENTINEL not in caplog.text
+
+    def test_same_body_parses_under_a_generous_cap(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """LOCK RELAXED (toggle): the IDENTICAL body parses when the cap is wide,
+        proving the block above was CAUSED by the cap, not an unrelated reason."""
+        _patch_door(
+            monkeypatch,
+            lambda url: _ok_result(_kagi_body(_entry("https://a.example/", "A"))),
+        )
+        adapter = LiveKagiAdapter(KagiApiKey(_SENTINEL), max_response_bytes=10_000_000)
+        assert [r.title for r in adapter.search_sync("q")] == ["A"]
+
+    def test_normal_response_unaffected_by_the_default_cap(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Transparency: a normal Kagi reply is well under the 2 MiB default cap
+        and parses unchanged through the shipped adapter."""
+        _patch_door(
+            monkeypatch,
+            lambda url: _ok_result(
+                _kagi_body(
+                    _entry("https://a.example/", "A", "s1"),
+                    _entry("https://b.example/", "B", "s2"),
+                )
+            ),
+        )
+        assert [r.title for r in _adapter().search_sync("q")] == ["A", "B"]
+
+    def test_default_parse_cap_is_below_the_door_wire_cap(self) -> None:
+        """COMPOSITION LOCK: the parse-side cap is a SECOND, tighter lock DOWN-
+        STREAM of the egress door's on-the-wire byte cap — never a duplicate or a
+        looser one. If someone widens the parse cap past the door cap, this fails
+        and forces a reviewed reconciliation."""
+        assert DEFAULT_MAX_RESPONSE_BYTES < guarded_fetch_mod._MAX_BODY_BYTES
+
+
+class TestResponseDepthGuard:
+    def test_overdeep_response_rejected_by_the_default_depth(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """LOCK ON (shipped default depth = 12): a pathologically-deep but VALID
+        JSON reply is rejected unparsed — [] + a fail-loud WARNING naming depth."""
+        _patch_door(monkeypatch, lambda url: _ok_result(_deep_nested_body(40)))
+        with caplog.at_level(logging.WARNING):
+            assert _adapter().search_sync("q") == []
+        assert "parse depth" in caplog.text
+        assert _SENTINEL not in caplog.text
+
+    def test_same_deep_body_parses_under_a_generous_depth(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """LOCK RELAXED (toggle): the IDENTICAL deep body parses when the depth
+        cap is wide — proving depth was the cause. The entry has url+title, so
+        it yields one result and the deep ``props`` is ignored by the parser."""
+        _patch_door(monkeypatch, lambda url: _ok_result(_deep_nested_body(40)))
+        adapter = LiveKagiAdapter(KagiApiKey(_SENTINEL), max_parse_depth=200)
+        assert [r.title for r in adapter.search_sync("q")] == ["A"]
+
+    def test_normal_response_within_the_default_depth(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Transparency: a real Kagi v1 reply (nests ~5) is under the 12 default
+        and parses unchanged."""
+        _patch_door(
+            monkeypatch,
+            lambda url: _ok_result(
+                _kagi_body(
+                    _entry("https://a.example/", "A"),
+                    infobox=[{"title": "box", "url": "https://x", "snippet": "y"}],
+                )
+            ),
+        )
+        assert [r.title for r in _adapter().search_sync("q")] == ["A"]
+
+    def test_recursion_error_at_json_loads_still_returns_empty(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """DEFENSE-IN-DEPTH backstop (#727 NIT 2a): the never-raise contract must
+        not rest on the depth pre-scan ALONE. Simulate a too-lenient / miscounting
+        pre-scan (monkeypatched to accept everything) and feed a deep body that
+        makes stdlib json.loads raise RecursionError — which is NOT a
+        JSONDecodeError/ValueError. search_sync must still return [] and NEVER
+        raise (fail-closed via the broadened `except`)."""
+        # Force the pre-scan to MISS (as if it under-counted) so json.loads is
+        # actually reached with the deep body.
+        monkeypatch.setattr(
+            live_adapter_mod, "_within_parse_depth", lambda _text, _d: True
+        )
+        deep = "[" * 20_000 + "]" * 20_000  # real json.loads -> RecursionError
+        _patch_door(monkeypatch, lambda url: _ok_result(deep))
+        with caplog.at_level(logging.ERROR):
+            # Must NOT raise (RecursionError, or anything) — degrades to [].
+            assert _adapter().search_sync("q") == []
+        # Fail-loud: the backstop names the raised type; the key never leaks.
+        assert "RecursionError" in caplog.text
+        assert "backstop" in caplog.text
+        assert _SENTINEL not in caplog.text
+
+
+class TestParseGuardMisconfigFailClosed:
+    """A bad guard bound must NEVER disarm the guard — it clamps to the safe
+    default (fail-closed toward the tighter posture)."""
+
+    def test_zero_byte_cap_clamps_to_default_not_reject_everything(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_door(
+            monkeypatch,
+            lambda url: _ok_result(_kagi_body(_entry("https://a.example/", "A"))),
+        )
+        # 0 / negative would DISABLE the guard (reject-all) if honoured — the
+        # adapter clamps it to DEFAULT_MAX_RESPONSE_BYTES instead.
+        adapter = LiveKagiAdapter(KagiApiKey(_SENTINEL), max_response_bytes=0)
+        assert adapter._max_response_bytes == DEFAULT_MAX_RESPONSE_BYTES
+        assert [r.title for r in adapter.search_sync("q")] == ["A"]
+
+    def test_bad_depth_clamps_to_default(self) -> None:
+        assert (
+            LiveKagiAdapter(KagiApiKey(_SENTINEL), max_parse_depth=-3)._max_parse_depth
+            == DEFAULT_MAX_PARSE_DEPTH
+        )
+        # bool is an int subclass — must NOT slip through as depth-1.
+        assert (
+            LiveKagiAdapter(
+                KagiApiKey(_SENTINEL), max_parse_depth=True  # type: ignore[arg-type]
+            )._max_parse_depth
+            == DEFAULT_MAX_PARSE_DEPTH
+        )

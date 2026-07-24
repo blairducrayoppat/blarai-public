@@ -1,0 +1,45 @@
+{
+  "purpose": "35B-A3B multimodal quality probe (consolidation gate B \u2014 operator judges quality)",
+  "timestamp": "2026-07-16T21:53:22",
+  "hardware": "Intel Core Ultra 7 258V / Arc 140V, driver 32.0.101.8826",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "model": "OpenVINO/Qwen3.6-35B-A3B-int4-ov (official), VLMPipeline, GPU",
+  "max_new_tokens": 420,
+  "note": "thinking ON (no working disable on this substrate \u2014 genai #3937 / PR #4139); outputs are verbatim, quality judged by the operator, never by this script",
+  "cases": [
+    {
+      "label": "rendered_scene",
+      "image": "blarai_lighthouse3.png",
+      "prompt": "Describe this image in detail: setting, style, lighting, and mood.",
+      "image_size": [
+        1536,
+        1536
+      ],
+      "seconds": 20.1,
+      "output": "The user wants a detailed description of the provided image, focusing on four specific aspects: setting, style, lighting, and mood.\n\n1.  **Setting:**\n    *   **Subject:** A lighthouse complex on a small, rocky island or jetty.\n    *   **Structure:** There's a tall, white lighthouse tower with a lantern room at the top. Next to it is a smaller, white building with a red roof (likely the keeper's quarters). There's also a tiny shed-like structure further to the right.\n    *   **Environment:** The island is surrounded by water (ocean/sea). The horizon line is visible in the distance.\n    *   **Sky:** A dramatic sky with a thick band of dark clouds stretching horizontally across the upper third. Above that, a darker, almost reddish-brown layer. Below the clouds, the sky is a gradient of bright orange.\n\n2.  **Style:**\n    *   **Genre:** Landscape photography / Seascape.\n    *   **Aesthetic:** It looks like a high-quality, possibly AI-generated or heavily edited photograph due to the perfect symmetry and the slightly \"painterly\" quality of the clouds and water. It has a cinematic feel.\n    *   **Composition:** Central composition. The lighthouse is the focal point, placed slightly below the center. The horizon line divides the image roughly in half (though the sky takes up more visual weight due to color).\n\n3.  **Lighting:**\n    *   **Time of Day:** Sunset (or possibly sunrise, but the deep orange suggests sunset).\n    *   **Source:** The sun is low on the horizon, behind the clouds or just below the visible frame.\n    *   **Effect:** The scene is backlit/silhouetted to an extent, but the lighthouse itself is illuminated. The lantern room is glowing with a warm yellow light, contrasting with the white tower. The buildings are white but cast in shadow on the side facing the viewer (or"
+    },
+    {
+      "label": "logo_graphic",
+      "image": "blair_glow.png",
+      "prompt": "Describe this graphic: what it depicts, its style, colors, and what kind of project or product it would suit.",
+      "image_size": [
+        512,
+        512
+      ],
+      "seconds": 14.3,
+      "output": "The user wants a detailed description of the provided image.\n\n**1. Visual Analysis:**\n*   **Text:** The central element is the text \"BIAIr\".\n*   **Typography:** It's a sans-serif font. It looks modern, clean, and bold.\n*   **Coloring of Text:**\n    *   \"B\" is a light cream/off-white.\n    *   \"I\" is the same light cream/off-white.\n    *   \"A\" is a bright, glowing yellow/orange.\n    *   \"I\" (the second one) is the same bright yellow/orange.\n    *   \"r\" is the light cream/off-white.\n    *   Wait, let me look closer. It looks like \"BIAIr\".\n    *   Actually, looking at the spacing and capitalization: \"B\" (capital), \"I\" (capital), \"A\" (capital), \"I\" (capital), \"r\" (lowercase). No, wait.\n    *   Let's re-examine the letters.\n    *   \"B\" - Capital.\n    *   \"I\" - Capital.\n    *   \"A\" - Capital.\n    *   \"I\" - Capital.\n    *   \"r\" - Lowercase.\n    *   Wait, looking at the \"I\"s. The first \"I\" is tall. The second \"I\" is tall. The \"r\" is lowercase.\n    *   Actually, let's look at the \"A\". It's yellow. The \"I\" next to it is yellow.\n    *   Let's look at the \"B\" and \"I\" before it. They are cream.\n    *   Let's look at the \"r\" after. It is cream.\n    *   So the text is \"BIAIr\".\n    *   Wait, is it \"BIA\" + \"Ir\"? Or \"B\" + \"IA\" + \""
+    },
+    {
+      "label": "detail_render",
+      "image": "hand2.png",
+      "prompt": "Describe exactly what this image shows, including any anatomical or structural details, and note anything that looks wrong or artificial.",
+      "image_size": [
+        1024,
+        1024
+      ],
+      "seconds": 15.4,
+      "output": "The user wants a detailed description of the image, focusing on anatomical and structural details, and specifically asking to identify anything that looks wrong or artificial.\n\n**1. Initial Scan & Subject Identification:**\n*   **Foreground:** Three people sitting at a round wooden table.\n    *   Left: A man with dark curly hair, beard, sunglasses, denim jacket.\n    *   Center: A woman with reddish-brown curly hair, glasses, denim jacket, holding a fork.\n    *   Right: A woman with long reddish hair, denim jacket, profile view.\n*   **Table:** Wooden, round.\n*   **Items on Table:** A glass of orange juice, a plate of french fries.\n*   **Background:** A street scene with buildings.\n    *   Left building: Red facade, arched doorways/windows with dark awnings.\n    *   Right building: White/cream facade, arched doorways/windows with dark awnings, balconies above.\n*   **Background People:** Blurry figures walking away.\n\n**2. Detailed Analysis - Anatomical & Structural:**\n*   **Man (Left):**\n    *   Hair: Dark, tight curls (afro style).\n    *   Face: Beard, mustache. Wearing black rectangular sunglasses.\n    *   Hands: Resting on the table. The left hand is near the juice glass. The fingers look a bit stiff.\n    *   Clothing: Blue denim jacket over a white t-shirt.\n*   **Woman (Center):**\n    *   Hair: Voluminous, reddish-brown afro/curly hair.\n    *   Face: Smiling broadly, showing teeth. Wearing black-rimmed glasses.\n    *   Hands: Holding a fork. The fingers look slightly unnatural\u2014maybe too long or the grip is odd.\n    *   Clothing: Dark blue denim jacket over a white t-shirt.\n*   **Woman (Right):**\n    *   Hair: Long"
+    }
+  ],
+  "load_seconds": 38.6
+}

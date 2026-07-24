@@ -1,0 +1,76 @@
+{
+  "measurement": "coordinator-shadow-precision",
+  "ticket": "#855",
+  "measured_at": "2026-07-22T23:40:30Z (newest journal entry in the graded set; grading run 2026-07-22 ~23:15 local, overnight session)",
+  "journal_population": {
+    "source": "%LOCALAPPDATA%/BlarAI/coordinator/shadow-journal.db via shared.coordinator.shadow_journal.build_shadow_journal (sanctioned read API, c.2240 precedent)",
+    "total_entries": 330,
+    "by_kind": {"digest": 202, "board_move": 126, "stall_comment": 1, "tripwire_alarm": 1},
+    "oldest": "2026-07-15T02:02:59Z",
+    "newest": "2026-07-22T23:40:30Z",
+    "accrual_check": "321 measured 2026-07-22 ~13:34 local (c.2365) -> 330 at dump; accrual HEALTHY"
+  },
+  "graded_window": {
+    "definition": "re-shadow window: start of the graded set (seq 156, 2026-07-19T19:01:57Z — a CHOSEN boundary, not a system event: the journal's observable restart signature is seq 154 at 18:31:55Z, ten minutes after the #946 merge, so the guard may have been live from seq 154) through seq 330 (2026-07-22T23:40:30Z). Corrected twice by independent verification: an earlier revision labeled the boundary as the first GUARDED digest (seq 165, 21:12Z), then as a 'guard-live boot' at 19:01Z; neither label was right, and no rate changes under any of the three boundaries (all drafted cycles are >= seq 165; seq 156-164 add 8 undrafted digests + 1 board move on an already-counted decision pair)",
+    "entries_graded": 175,
+    "composition": {"digests": 91, "board_move_effects": 82, "stall_comment": 1, "tripwire_alarm": 1},
+    "distinct_board_decisions": 7,
+    "guarded_prose_cycles": 34,
+    "distinct_drafted_statements": "10 (9 accepted + 1 rejected)"
+  },
+  "deterministic_layer": {
+    "precision": "7/7 distinct board decisions correct (100%)",
+    "method": "each decision re-derived through shared/fleet/coord_lifecycle.resolve_board_transition's locked rule (Done requires oracle GREEN + merged; parked task -> Ready; else dispatch started -> In Progress) against the run's scorecard.json read tonight",
+    "decisions": [
+      {"run": "20260719-002208-bd", "scorecard": "PARKED-HONEST[BUILD], oracle FAILED 4/6, all tasks merged, no parked task", "move": "In Progress", "correct": true},
+      {"run": "20260719-233631-bd", "scorecard": "PARKED-HONEST[BUILD], oracle FAILED 3/6, parked at implement-quiz-logic", "move": "Ready", "correct": true},
+      {"run": "20260720-235311-bd", "scorecard": "PARKED-HONEST[VERIFY], oracle FAILED 5/6 (broken exam #1008 era), all merged, no parked task", "move": "In Progress", "correct": true},
+      {"run": "20260721-111715-bd", "scorecard": "PARKED-HONEST[BUILD], oracle not-run (wave gate failed)", "move": "In Progress", "correct": true},
+      {"run": "20260721-172005-bd", "scorecard": "GREEN, oracle passed", "move": "Done", "correct": true},
+      {"run": "20260722-122919-bd", "scorecard": "GREEN, oracle passed", "move": "Done", "correct": true},
+      {"run": "20260722-140757-bd", "scorecard": "GREEN, oracle passed", "move": "Done", "correct": true}
+    ],
+    "stall_comments": {"count": 1, "graded": "correct — task 914 created 2026-07-16T04:27 local, flagged 2026-07-20T02:19 local at age 3.9d, matching the comment's own figure; Standard-class outlier per ADR-039 §2.8"},
+    "tripwire_alarms": {"count": 1, "graded": "benign-informational, correct — kind drafting-deferred (busy), machinery_health false; 0 false quiet-queue alarms in window"},
+    "false_stalls": 0,
+    "false_tripwires": 0
+  },
+  "guard_layer": {
+    "guarded_cycles": 34,
+    "actions": {"accepted": 33, "rejected": 1},
+    "catch_rate": {
+      "value": "0/1",
+      "detail": "ONE false drafted statement entered the window and the guard ACCEPTED it: '...successfully merged and acceptance tests passed... all components merged and tested' on 20260719-002208-bd, whose job oracle FAILED 4 of 6 tests. Accepted on 3 cycles (seq 167, 171, 173). Root cause: the success-claim lexicon screens verdict-class phrases ('completed successfully') but not evidence-field claims ('acceptance tests passed'); the statement's opening verdict echo (INCOMPLETE) was correct, so layers 1-2 passed it and layer 3's lexicon did not match."
+    },
+    "false_refusal_rate": {
+      "per_cycle": "1/34 (2.9%)",
+      "per_accurate_statement": "1/9 (8 accepted-accurate + 1 rejected-accurate; corrected from 1/8, whose denominator wrongly excluded the refused statement itself)",
+      "detail": "The guard's ONLY live firing (seq 319, 20260721-111715-bd) rejected ACCURATE prose: 'the overall run did not complete successfully' — a negated failure statement matched as claim:completed-successfully. This is the module docstring's documented refusal bias (negation-blind matching, priced deliberately toward refusal) and the reviewer's predicted false-refusal class from #946 c.2219, now measured live. Fail-safe direction held: the deterministic headline stood alone."
+    },
+    "structural_layers": "held on all 34 cycles — every one of the 10 distinct drafted statements (including the rejected one) opened with the correct verdict token (echo contract), no model text displaced a deterministic headline (severance), rejected text journaled with raw prose (provenance)",
+    "headline_accuracy": "7/7 headlines consistent with the deliberately-coarse contract (SUCCEEDED = oracle GREEN + merged; PARKED = a parked task; INCOMPLETE = everything else). Ceremony-relevant observation: the contract renders 'all merged, acceptance exam FAILED' as 'INCOMPLETE — run did not complete' (20260719-002208-bd, 20260720-235311-bd) — truth-direction correct, mechanism invisible to the operator.",
+    "accepted_prose_quality_notes": [
+      "20260720-235311-bd (x12 cycles): 'did not complete all planned tasks' is mechanism-wrong (all 6 tasks merged; the acceptance exam failed) though failure-direction-correct",
+      "20260719-233631-bd v1 (x1 cycle): 'run ... has completed with some features merged' — wording drift inside a correct PARKED frame",
+      "no false-success statement was accepted in the window other than the catch-rate miss above"
+    ]
+  },
+  "coverage_honesty": {
+    "harvest_semantics": "latest-finished-run-only per cycle (heartbeat_cycle._harvest_and_move reads snapshot.latest_run) and app-uptime-dependent — grading coverage is 'the latest run at each up-cycle', not 'every run'",
+    "finished_runs_never_graded_in_window": [
+      {"run": "20260721-184705-bd", "verdict": "GREEN"},
+      {"run": "20260721-230126-bd", "verdict": "GREEN"},
+      {"run": "20260722-002149-bd", "verdict": "GREEN"},
+      {"run": "20260722-165617-bd", "verdict": "PARKED-HONEST[BUILD] — the guard's most valuable prose class, still unsampled"}
+    ],
+    "recorded_anomaly": "the 2026-07-22T23:25Z and 23:40Z cycles harvested 20260722-140757-bd although 20260722-165617-bd had already finished (~21:56Z scorecard-wise); mechanism NOT diagnosed tonight — recorded with evidence for a daylight look",
+    "parked_prose_undersampling": "c.2220's caveat remains true: PARKED-run prose is under-sampled in the guarded set (the one PARKED-run drafted statement was the false-refusal rejection)"
+  },
+  "not_measured": [
+    "stall RECALL on a quiet board (fixture-proven only, unchanged from 07-18)",
+    "guard behavior on negated-failure wordings over GREEN runs (predicted false-refusal class; no live instance yet)",
+    "prose for the four unharvested runs (never drafted)",
+    "graduation threshold adequacy — deliberately unconfigured, LA-set at ceremony (c.2337: pre-specify BEFORE the next grading window opens)"
+  ],
+  "hardware_context": "Intel Core Ultra 7 258V, Arc 140V iGPU; coordinator drafting on the resident Qwen3-14B (OpenVINO GenAI); measurement itself is GPU-free (journal read + scorecard cross-check)"
+}

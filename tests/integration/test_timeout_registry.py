@@ -215,3 +215,42 @@ def test_live_value_resolver_fails_loud_on_broken_rows():
     for entry in broken:
         with pytest.raises((AttributeError, KeyError, TypeError)):
             live_value(entry)
+
+
+# ---------------------------------------------------------------------------
+# #927 — the per-card run-budget (window, budget) pair (LA-approved 2026-07-17).
+# The EXTERNAL Task-Scheduler ceiling row owns this pair; its BlarAI-side lever
+# is the per-card run_budget_s clamp registered above (CARD_RUN_BUDGET_MAX_S).
+# The full C2/C3 arithmetic lock lives in test_battery_execution_limit.py (the
+# (window,budget) pair's derivation owner); here we lock the registry-internal
+# half: the registered clamp must dominate the C2 floor, or the lever the
+# EXTERNAL row documents is unusable, and the pair's documentation must survive.
+# ---------------------------------------------------------------------------
+
+# The coherence lock's C2 floor: a 2-wave/best-of-2 job's minimum per-job budget
+# (2 x 2 x 3600 s), the value the 10800 s swap_run_budget_s default fails.
+_C2_FLOOR_S = 14400.0
+
+
+def test_927_per_card_clamp_dominates_the_c2_floor():
+    # A card must be able to clear the C2 floor WITHOUT hitting the per-card
+    # clamp; if a future shrink of CARD_RUN_BUDGET_MAX_S dropped below the floor,
+    # the per-card lever (the #927 fix for the multi-wave starvation) would be
+    # unusable — every provisioned budget would clamp back below coherence.
+    by_attr = {e.attribute: e.seconds for e in REGISTRY}
+    assert by_attr["CARD_RUN_BUDGET_MAX_S"] > _C2_FLOOR_S
+
+
+def test_927_external_ceiling_row_names_the_coherence_pair():
+    # The EXTERNAL Task-Scheduler ceiling row (un-importable, BACKLOG-named) must
+    # keep documenting its (window,budget) coherence pair after #927 — the
+    # quarterly review walks it here, not in an importable constant.
+    external = " ".join(
+        desc for name, desc in BACKLOG if name.startswith("EXTERNAL: Task Scheduler")
+    )
+    assert external, "the EXTERNAL Task-Scheduler ceiling BACKLOG row is missing"
+    for token in ("verify-battery-budget-coherence", "C2", "PT16H", "per-card"):
+        assert token in external, (
+            f"the EXTERNAL ceiling row no longer documents '{token}' — the #927 "
+            f"(window,budget) coherence pair must stay named for the quarterly review"
+        )

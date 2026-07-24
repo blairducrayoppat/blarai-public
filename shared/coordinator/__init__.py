@@ -1,4 +1,4 @@
-"""BlarAI Coordinator — self-governance boundary (ADR-039 #848). DORMANT.
+"""BlarAI Coordinator — self-governance boundary (ADR-039 #848).
 
 The constitutional security foundation of the Coordinator program (`#841`): the
 structural severance of BlarAI's self-modification paths. BlarAI has **zero write
@@ -7,10 +7,12 @@ governing docs, ruler/flag/trigger defs, the proposal-staging store, and the
 agentic-setup fleet's verify-gate/oracle/harness config); it may observe and advise
 on its own backlog, but never execute against itself (ADR-039 §2.1).
 
-This package implements the seven structural controls, each DORMANT behind
-``[coordinator]`` config flags (default off), each fail-closed (a boundary check that
-errors DENIES, never allows). NO live code path reads any of this today — C1 (`#843`)
-wires it. Importing this package arms nothing and changes no behavior.
+This package implements the seven structural controls, each gated behind
+``[coordinator]`` config flags (dormant default: off), each fail-closed (a boundary
+check that errors DENIES, never allows). Importing this package arms nothing and
+changes no behavior — construction is what a flag gates, not import. Which flags are
+set is read from ``services/assistant_orchestrator/config/default.toml``, never from
+this docstring; the severance above binds identically at every flag setting.
 
 Controls (ADR-039 §2.2):
   1. Identity-based governed-core severance — :mod:`shared.coordinator.governed_core`

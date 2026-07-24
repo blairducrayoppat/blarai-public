@@ -71,9 +71,10 @@ no-ops onto the current bucket) — so a crash between any two steps leaves no
 duplicate comment, no duplicate proposal, and no duplicate board move on the next
 full cycle.
 
-DORMANCY: no production boot path calls :func:`run_wake_cycle` today. The limb-6
-``build_heartbeat`` factory (behind ``[coordinator].heartbeat_enabled``, default
-false) wires it later. Importing this module arms nothing.
+REACHABILITY: :func:`run_wake_cycle` is driven by the ``build_heartbeat`` factory,
+which constructs nothing while ``[coordinator].heartbeat_enabled`` is false (the
+dormant default) and runs the cycle on its interval when true. Importing this module
+arms nothing.
 """
 
 from __future__ import annotations
@@ -84,7 +85,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Final, Mapping
+from typing import Any, Callable, Final, Mapping, Sequence
 
 from shared.coordinator import cadence
 from shared.coordinator.config import CoordinatorConfig, GovernedCoreRoots
@@ -95,6 +96,13 @@ from shared.fleet import coord_redispatch as cr
 from shared.fleet import coord_stall_monitor as csm
 from shared.fleet import vikunja_bridge as vb
 from shared.fleet import work_state as ws
+from shared.coordinator.prose_guard import (
+    VERDICT_SUCCEEDED,
+    GuardDecision,
+    ProseGuard,
+    RunTruth,
+    compose_run_headline,
+)
 from shared.fleet.coord_stall_state import coordinator_state_dir
 from shared.fleet.dispatch import FleetDispatchConfig, read_acceptance_record
 from shared.security.file_dacl import ensure_owner_only_dacl
@@ -195,6 +203,14 @@ DRAFT_STATUSES: Final[frozenset[str]] = frozenset(
     {"drafted", "busy", "not_resident", "failed"}
 )
 
+#: The drafted-span kinds, in digest-precedence order (#946). ``_draft`` tags
+#: every prompt with one of these and ``_guard_prose`` iterates EXACTLY this
+#: tuple — a new kind added to one without the other is a test-visible drift
+#: (see test_draft_kinds_are_exhaustive), never a silently un-guarded span.
+DRAFT_KIND_RUN_SUMMARY: Final[str] = "run_summary"
+DRAFT_KIND_PROPOSAL: Final[str] = "proposal"
+DRAFT_KINDS: Final[tuple[str, ...]] = (DRAFT_KIND_RUN_SUMMARY, DRAFT_KIND_PROPOSAL)
+
 #: The snapshot substrates the §8.1 tripwire predicate actually CONSULTS (review
 #: 66789b24 finding 2): the Vikunja transport (Ready counting) and the swap state
 #: (the WIP leg). ``board_history`` is age metadata — irrelevant to counting
@@ -255,6 +271,20 @@ class DigestRecord:
     absence_accumulated: bool = False
     """True when this digest was produced during operator absence — the router
     accumulates it into the catch-up brief instead of surfacing it (§8.2)."""
+    run_headline: str = ""
+    """#946 layer 1: the DETERMINISTIC verdict headline for the harvested run
+    (composed by :func:`shared.coordinator.prose_guard.compose_run_headline`
+    from the same truth the board-move ruler used; "" when no run harvested).
+    RENDERER CONTRACT: any live digest surface MUST lead with this line and
+    render ``model_prose`` beneath it under an explicit model label — model
+    text never stands as the claim of record."""
+    prose_guard_action: str = ""
+    """#946 audit: the guard's decision on this cycle's draft — "accepted",
+    "rejected:<reason>", or "" when nothing was drafted. Journaled so the #855
+    re-shadow window measures catch rate AND false-refusal rate."""
+    model_prose_rejected: str = ""
+    """The raw draft the guard refused ("" when none) — kept as evidence for
+    the false-refusal measurement; NEVER rendered to the operator."""
 
 
 @dataclass(frozen=True)
@@ -490,6 +520,12 @@ def evaluate_quiet_queue_tripwire(
                 tasks = bucket.get("tasks")
                 if isinstance(tasks, (list, tuple)):
                     ready_tasks.extend(t for t in tasks if isinstance(t, Mapping))
+        # #887: a SYNTHETIC battery/test ticket in Ready is not real work waiting to
+        # be pulled — it must never fire the quiet-queue alarm. Filtered BEFORE the
+        # resource-eligibility seam so it is neither an alarm nor gated-inventory
+        # (its honest park was its deliverable; the /coord test-class line surfaces
+        # it instead).
+        ready_tasks = [t for t in ready_tasks if not cl.is_test_class(t)]
         if eligible_ready is None:
             eligible = list(ready_tasks)
         else:
@@ -711,7 +747,7 @@ def run_wake_cycle(
     _observe_board_history(env, snapshot, now, steps, conditions)
 
     # ── Step 5: harvest the latest run → board movement (deterministic ruler) ──
-    board_moves = _harvest_and_move(env, snapshot, steps, conditions)
+    board_moves, run_truth = _harvest_and_move(env, snapshot, steps, conditions)
 
     # ── Step 6: stall pass (one comment per NEW episode; absence-filtered) ──
     stall_result = _stall_pass(env, snapshot, now, absence_active, steps, conditions)
@@ -772,7 +808,34 @@ def run_wake_cycle(
         steps.append(StepOutcome("tripwire", False, f"{type(exc).__name__}: {exc}"))
 
     # ── Step 9: model drafting (FULL mode only; deferrals are normal) ───────
-    drafts = _draft(env, decision, snapshot, redispatch, steps, conditions)
+    drafts, drafts_by_kind = _draft(
+        env, decision, snapshot, redispatch, run_truth, steps, conditions
+    )
+
+    # ── Step 9.5: prose guard (#946) — model spans validated, fail-closed ───
+    # The harvested task names travel with the truth: they are the ONLY
+    # vocabulary #1067's negated-failure carve-out accepts in a variable
+    # position, and they come from the same snapshot leg compose_run_headline
+    # reads — one harvest, several consumers, no re-derivation. An unreadable
+    # leg yields an empty tuple, which NARROWS the carve-out rather than
+    # widening it (fail-closed by construction, not by vigilance).
+    #
+    # The FULL harvested record travels — (task, result) pairs, the same shape
+    # compose_run_headline takes. The guard partitions it itself: merged names
+    # may only appear in a merged claim, non-merged names only in a
+    # not-run/skipped/parked one. An earlier cut split it HERE and forwarded
+    # merged-only names to every clause, which inverted the not-merged clause
+    # completely — "bill-splitter was parked" accepted when it had merged, and
+    # refused when it truly had. Splitting at one place removes the mismatch.
+    # An unreadable leg yields an empty tuple, which NARROWS the carve-out
+    # (fail-closed by construction, not by vigilance).
+    _lr = snapshot.latest_run
+    run_task_results: tuple[tuple[str, str], ...] = (
+        tuple((o.task, o.result) for o in _lr.value[1])
+        if _lr.status is vb.ReadStatus.OK and _lr.value is not None
+        else ()
+    )
+    guarded = _guard_prose(run_truth, drafts_by_kind, steps, run_task_results)
 
     # ── Step 10: the digest (at most one; routing is limb 4's) ─────────────
     digest: DigestRecord | None = None
@@ -785,7 +848,8 @@ def run_wake_cycle(
             conditions=conditions,
             stall_result=stall_result,
             tripwire=tripwire,
-            drafts=drafts,
+            run_truth=run_truth,
+            guarded=guarded,
             absence_active=absence_active,
             prior_digest=prior_digest,
         )
@@ -1027,17 +1091,24 @@ def _harvest_and_move(
     snapshot: "ws.WorkStateSnapshot",
     steps: list[StepOutcome],
     conditions: list[SurfacedCondition],
-) -> list[BoardMoveRecord]:
+) -> "tuple[list[BoardMoveRecord], RunTruth | None]":
     """§2 step 5: the latest run's STRUCTURED facts → the deterministic ruler → the
     routed move sink. ``oracle_passed`` comes only from the scorecard; a repeat move
     onto the current bucket is a no-op at the board, so re-driving this every cycle
-    is crash-convergent by construction."""
+    is crash-convergent by construction.
+
+    Also returns the run's :class:`RunTruth` (#946): the SAME facts the ruler
+    consumed, computed once here, feed the drafting contract, the prose guard,
+    and the deterministic digest headline — one source of truth, no
+    re-derivation. ``None`` when no finished run (or this leg faulted): with no
+    truth there is no run drafting and no headline — fail-closed."""
     moves: list[BoardMoveRecord] = []
+    truth: "RunTruth | None" = None
     try:
         lr = snapshot.latest_run
         if lr.status is not vb.ReadStatus.OK or lr.value is None:
             steps.append(StepOutcome("harvest-board-move", True, "no finished run"))
-            return moves
+            return moves, truth
         run_id, outcomes = lr.value
         merged = any(o.result == RESULT_MERGED for o in outcomes)
         parked = any(o.result == RESULT_PARKED for o in outcomes)
@@ -1045,6 +1116,12 @@ def _harvest_and_move(
             lambda rid: _default_read_scorecard(env.fleet_config, rid)
         )
         oracle_passed = oracle_passed_from_scorecard(read_scorecard(run_id))
+        truth = RunTruth(
+            run_id=run_id,
+            oracle_passed=oracle_passed,
+            merged=merged,
+            parked=parked,
+        )
         transition = cl.resolve_board_transition(
             dispatch_started=True,
             oracle_passed=oracle_passed,
@@ -1055,7 +1132,7 @@ def _harvest_and_move(
             steps.append(
                 StepOutcome("harvest-board-move", True, f"run {run_id}: no move warranted")
             )
-            return moves
+            return moves, truth
 
         move_card = env.move_card or vb.move_job_card
         attempts: list[str] = []
@@ -1102,7 +1179,7 @@ def _harvest_and_move(
         steps.append(
             StepOutcome("harvest-board-move", False, f"{type(exc).__name__}: {exc}")
         )
-    return moves
+    return moves, truth
 
 
 def _stall_pass(
@@ -1296,48 +1373,94 @@ def _draft(
     decision: cadence.CycleDecision,
     snapshot: "ws.WorkStateSnapshot",
     redispatch: "cr.RedispatchCycleResult | None",
+    run_truth: "RunTruth | None",
     steps: list[StepOutcome],
     conditions: list[SurfacedCondition],
-) -> list[DraftOutcome]:
+) -> "tuple[list[DraftOutcome], dict[str, DraftOutcome]]":
     """§2 step 9: bounded single-decision drafting, FULL mode only. The prompt is
     composed HERE by deterministic code from the snapshot's already-composed legs
     (§2.14.5 — the model never navigates to a fourth source). ``busy`` /
     ``not_resident`` stop further calls this cycle (one deferral is the fact; the
-    next cycle retries). No correctness depends on any of this."""
+    next cycle retries). No correctness depends on any of this.
+
+    #946 drafting contract: the run summary is drafted ONLY when the harvest leg
+    produced a :class:`RunTruth` (no truth → no run prose, fail-closed), and its
+    prompt carries the deterministic verdict plus the verdict-echo requirement
+    the prose guard enforces. Returns ``(all outcomes, outcomes by kind)`` —
+    kinds are ``"run_summary"`` / ``"proposal"`` — so the guard step validates
+    each span against the right contract."""
     if decision.mode is not cadence.CycleMode.FULL:
         steps.append(
             StepOutcome(
                 "drafting", True, "deferred: " + "; ".join(decision.reasons or ("mode",))
             )
         )
-        return []
+        return [], {}
     if env.draft is None:
         steps.append(StepOutcome("drafting", True, "no drafting seam wired (dormant)"))
-        return []
+        return [], {}
 
-    prompts: list[str] = []
+    prompts: list[tuple[str, str]] = []
     lr = snapshot.latest_run
     if lr.status is vb.ReadStatus.OK and lr.value is not None:
-        run_id, outcomes = lr.value
-        facts = "; ".join(f"{o.task}: {o.result}" for o in outcomes)
-        prompts.append(
-            "Summarize this finished coding-fleet run in two plain-language "
-            f"sentences for the operator. Run {run_id} outcomes: {facts}."
-        )
+        if run_truth is None:
+            steps.append(
+                StepOutcome(
+                    "drafting-run-summary",
+                    True,
+                    "run summary not drafted: harvest produced no truth "
+                    "(fail-closed — no verdict, no prose)",
+                )
+            )
+        else:
+            run_id, outcomes = lr.value
+            facts = "; ".join(f"{o.task}: {o.result}" for o in outcomes)
+            verdict = run_truth.verdict()
+            prompts.append(
+                (
+                    DRAFT_KIND_RUN_SUMMARY,
+                    f"The run's recorded verdict is {verdict}. Begin your reply "
+                    f'with exactly "{verdict}: " and do not contradict this '
+                    "verdict. Summarize this finished coding-fleet run in two "
+                    "plain-language sentences for the operator. "
+                    # #1067: the measured false-suppression case is prose that
+                    # states a failure by NEGATING a success word ("the run did
+                    # not complete successfully"). Deciding whether such a
+                    # sentence asserts success or failure is a parsing problem
+                    # the guard cannot do reliably — six designs were rejected
+                    # trying. Asking for the positive statement of the failure
+                    # instead removes the ambiguity at the source, and costs
+                    # nothing: it never widens what the guard accepts, so there
+                    # is no new way for a false claim to get through.
+                    + (
+                        "State what happened directly rather than by negating a "
+                        'success word: write "the run did not finish" rather '
+                        'than "the run did not complete successfully". '
+                        if verdict != VERDICT_SUCCEEDED
+                        else ""
+                    )
+                    + f"Run {run_id} outcomes: {facts}.",
+                )
+            )
     if redispatch is not None and redispatch.staged:
         first = redispatch.staged[0]
         prompts.append(
-            "In one plain-language sentence, describe this pending proposal for "
-            f"the operator: redispatch of parked task {first.task!r}."
+            (
+                DRAFT_KIND_PROPOSAL,
+                "In one plain-language sentence, describe this pending proposal "
+                f"for the operator: redispatch of parked task {first.task!r}.",
+            )
         )
 
     results: list[DraftOutcome] = []
-    for prompt in prompts:
+    by_kind: dict[str, DraftOutcome] = {}
+    for kind, prompt in prompts:
         try:
             outcome = env.draft(prompt)
         except Exception as exc:  # noqa: BLE001 — the seam is fail-soft
             outcome = DraftOutcome(status="failed", reason=f"draft seam raised: {exc}")
         results.append(outcome)
+        by_kind[kind] = outcome
         if outcome.status in ("busy", "not_resident"):
             conditions.append(
                 SurfacedCondition(
@@ -1354,7 +1477,69 @@ def _draft(
             ", ".join(r.status for r in results) if results else "nothing to draft",
         )
     )
-    return results
+    return results, by_kind
+
+
+#: The one process-wide guard instance (#946). Deliberately not injectable via
+#: ``CycleEnv``: the guard is integrity machinery, not a seam — tests exercise
+#: it through the REAL instance (and prove the locks off via direct
+#: construction, principle 12), never by substituting a permissive fake here.
+_PROSE_GUARD: Final[ProseGuard] = ProseGuard()
+
+
+@dataclass(frozen=True)
+class GuardedProse:
+    """The prose-guard step's outcome (#946): at most one accepted span for the
+    digest, plus the audit trail the shadow journal keeps."""
+
+    accepted_text: str = ""
+    action: str = ""
+    rejected_text: str = ""
+
+
+def _guard_prose(
+    run_truth: "RunTruth | None",
+    drafts_by_kind: "dict[str, DraftOutcome]",
+    steps: list[StepOutcome],
+    run_task_results: "Sequence[tuple[str, str]]" = (),
+) -> GuardedProse:
+    """§2 step 9.5 (#946): validate the drafted span that would become the
+    digest's ``model_prose``. Run summaries validate against the harvest truth
+    (verdict echo + consistency screen); verdict-less annotations pass the
+    success-claim screen only. A refused draft is DROPPED — no fall-through to
+    a second span, no rewrite — the deterministic skeleton and headline stand
+    alone, and the raw refusal is preserved for the #855 false-refusal
+    measurement.
+
+    *run_task_results* carries this run's harvested ``(task, result)`` pairs to
+    #1067's negated-failure carve-out, which accepts that vocabulary and
+    nothing else in its variable positions and partitions it by result itself.
+    Defaulting to empty keeps every caller fail-closed: no vocabulary means the
+    carve-out consumes strictly less."""
+    for kind in DRAFT_KINDS:
+        outcome = drafts_by_kind.get(kind)
+        if outcome is None or outcome.status != "drafted" or not outcome.text:
+            continue
+        if kind == DRAFT_KIND_RUN_SUMMARY:
+            if run_truth is None:
+                # _draft never drafts a run summary without truth; keep the
+                # refusal anyway so a future regression fails closed, not open.
+                decision = GuardDecision(False, "rejected:no-truth")
+            else:
+                decision = _PROSE_GUARD.validate_run_summary(
+                    run_truth, outcome.text, task_results=run_task_results
+                )
+        else:
+            decision = _PROSE_GUARD.validate_annotation(
+                outcome.text, task_results=run_task_results
+            )
+        steps.append(StepOutcome("prose-guard", True, f"{kind}: {decision.action}"))
+        if decision.accepted:
+            return GuardedProse(
+                accepted_text=outcome.text.strip(), action=decision.action
+            )
+        return GuardedProse(action=decision.action, rejected_text=outcome.text)
+    return GuardedProse()
 
 
 def _compose_digest(
@@ -1366,12 +1551,14 @@ def _compose_digest(
     conditions: list[SurfacedCondition],
     stall_result: "csm.StallCycleResult | None",
     tripwire: TripwireResult | None,
-    drafts: list[DraftOutcome],
+    run_truth: "RunTruth | None",
+    guarded: GuardedProse,
     absence_active: bool,
     prior_digest: DigestRecord | None,
 ) -> DigestRecord:
-    """§2 step 10 / §7.4: the deterministic skeleton, plus step-9 prose when a
-    draft landed. Never raises (pure over already-computed values)."""
+    """§2 step 10 / §7.4: the deterministic skeleton — now including the #946
+    deterministic verdict headline — plus step-9 prose ONLY when the prose
+    guard accepted it. Never raises (pure over already-computed values)."""
     open_by_project: dict[str, int] = {}
     for project in snapshot.projects:
         if project.flow is not None:
@@ -1396,7 +1583,18 @@ def _compose_digest(
         if lr.status is vb.ReadStatus.OK and lr.value is not None
         else ()
     )
-    prose = next((d.text for d in drafts if d.status == "drafted" and d.text), "")
+
+    run_headline = ""
+    if (
+        run_truth is not None
+        and lr.status is vb.ReadStatus.OK
+        and lr.value is not None
+    ):
+        run_headline = compose_run_headline(
+            run_truth, [(o.task, o.result) for o in lr.value[1]]
+        )
+
+    prose = guarded.accepted_text
 
     return DigestRecord(
         cycle_started_at=started_at,
@@ -1413,4 +1611,7 @@ def _compose_digest(
         model_prose=prose,
         model_drafted=bool(prose),
         absence_accumulated=absence_active,
+        run_headline=run_headline,
+        prose_guard_action=guarded.action,
+        model_prose_rejected=guarded.rejected_text,
     )

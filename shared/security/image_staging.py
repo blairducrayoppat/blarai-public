@@ -29,12 +29,13 @@ pair causes authentication failure.  Files are DACL-hardened at creation
 (#637) and deleted by the AO immediately after the image row persists —
 staging is a handoff, not a store.
 
-DORMANT (UC-003 Workstream B): no module here performs a live fetch.  This
-is the host-internal transport that MOVES already-fetched bytes; the fetch
-itself stays behind the egress weld (3 existing locks + the 4th
-``[knowledge].images_enabled=false`` lock) until a separate LA-reviewed
-go-live ceremony.  Image bytes are display-only — NEVER chunked, embedded,
-indexed, or sent to any VLM/inference.
+SCOPE (UC-003 Workstream B): no module here performs a live fetch.  This is the
+host-internal transport that MOVES already-fetched bytes; the fetch itself is
+welded INDEPENDENTLY of the text door — the BED-1 ``uc003-image-ingest``
+purpose-deny, the separate ``[knowledge].images_enabled`` gate, and the
+MIME/magic-byte gate — and opens only by a separate LA-reviewed go-live
+ceremony, never as a side effect of another scope going live.  Image bytes are
+display-only — NEVER chunked, embedded, indexed, or sent to any VLM/inference.
 
 Security posture (Fail-Closed):
   * ``doc_uuid`` is validated as a canonical UUID (reused from

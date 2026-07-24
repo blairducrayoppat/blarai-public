@@ -684,6 +684,54 @@ def test_contract_seam_failure_is_fail_soft(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# #790 sub-task 5 — the canonical package rides every fleet task dict, so the
+# dispatch-side seeder names the python skeleton after the ORACLE's layout
+# (one canonical tree — never the generic app/ twin that grew B4's duplicate)
+# ---------------------------------------------------------------------------
+
+
+def test_fleet_task_carries_canonical_package_from_contract(tmp_path):
+    """`_fleet_task_for` stamps `canonical_package` when the contract names ONE root,
+    and stamps NOTHING when the contract is empty or names two roots (ambiguous —
+    the seeder keeps its legacy generic skeleton rather than guessing)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    driver = _driver(tmp_path, _ops([]), tasks, plan)
+    ptask = driver._plan.tasks[0]
+
+    driver._oracle_canonical_package = "flashcard_app"
+    assert driver._fleet_task_for(ptask)["canonical_package"] == "flashcard_app"
+
+    driver._oracle_canonical_package = ""
+    assert "canonical_package" not in driver._fleet_task_for(ptask)
+
+
+def test_run_plan_waves_stamps_canonical_package_on_every_task(tmp_path):
+    """End to end through the seam: the B4-shaped contract resolves to ONE root and
+    every dispatched task dict carries it (the first, dependency-less task included —
+    that is the one whose fresh worktree actually seeds the skeleton)."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    seen: list = []
+
+    def run_task(t):
+        seen.append(t)
+        return _merged(t)
+
+    ops = _ops(
+        [], run_task=run_task,
+        job_oracle_contract=lambda: [
+            "from flashcard_app import card_manager, quiz_engine, "
+            "score_tracker, main"],
+    )
+    _driver(tmp_path, ops, tasks, plan).run()
+    assert seen, "no task ran"
+    assert all(t.get("canonical_package") == "flashcard_app" for t in seen)
+
+
+# ---------------------------------------------------------------------------
 # #789 — the plan-graph scorecard carries evidence.mode == "plan-graph"
 # ---------------------------------------------------------------------------
 

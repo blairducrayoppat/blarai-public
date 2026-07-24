@@ -9,7 +9,33 @@
 > built exe. It is the baseline confirmation. Tier 2 (model-loaded) requires the GPU model and
 > is the end-to-end run.
 >
-> **Scheduled:** Sprint-17-kickoff home (batched with the #615 hardware boot, per Sprint-16 SCR §5).
+> **Scheduled:** ~~Sprint-17-kickoff home (batched with the #615 hardware boot, per Sprint-16 SCR §5).~~
+>
+> > **Staleness note (2026-07-20, #979).** That scheduling trigger is long past —
+> > Sprint 17 closed, and the project is in Phase 5. Read the line above as
+> > history, not as a pending appointment.
+> >
+> > **The procedure itself is still valid and still live.** Verified on disk: the
+> > venv interpreter, both harness test files
+> > (`tests/harness/test_winui_critical_path.py`,
+> > `tests/harness/test_winui_model_loaded.py`) and the built
+> > `BlarAI.Desktop.exe` all resolve today. The `@winui` tier it drives is a
+> > current, deliberately deselected-by-default test tier — see
+> > `docs/TEST_GOVERNANCE.md` §1 and its tier table — not a retired one.
+> >
+> > One command below was **not** correct and has been fixed: the "if the exe is
+> > not built" recovery step omitted `-r win-x64 --self-contained`, which this
+> > project's WinUI build requires. That is the step you reach for exactly when
+> > the exe is missing, so it mattered most where it was wrong.
+> >
+> > **Two things to know before you run it:** these tests drive the **real BlarAI
+> > window** via UI Automation, so they take over the screen and will fight a
+> > BlarAI instance you are using; and the Sprint-16 framing throughout (stream
+> > numbers, SCR references, "deferred" language) describes the context it was
+> > written in, not the current sprint.
+> >
+> > This file is a candidate for relocation to the sprint-16 archive under #951;
+> > it is left in place here because it is the working procedure for a live tier.
 
 ---
 
@@ -20,8 +46,11 @@
    the commands and paste me the output.
 3. **Close BlarAI before starting.** If BlarAI is running (visible in the taskbar), close it first.
    The harness launches its own copy.
-4. **Stop anytime.** If anything looks wrong, paste me the error and stop. Nothing here modifies
-   data, changes security settings, or affects the running system.
+4. **Stop anytime.** If anything looks wrong, paste me the error and stop. Nothing here
+   modifies data or changes security settings. It does, however, **affect the running
+   system**: these tests drive the real BlarAI window via UI Automation, so they take
+   over the screen and will fight a BlarAI instance you are using (see the staleness
+   note at the top).
 5. **If a test fails:** do NOT retry blindly — paste me the output. A test failure here is
    diagnostic information (a real bug found), not a mistake.
 
@@ -71,7 +100,7 @@ A passing run looks like:
 PASSED tests/harness/test_winui_critical_path.py::test_app_launch_prompt_box_is_live
 PASSED tests/harness/test_winui_critical_path.py::test_greeting_panel_visible_on_fresh_start
 ...
-PASSED tests/harness/test_winui_critical_path.py::test_status_bar_exists_for_degraded_state_assertions
+PASSED tests/harness/test_winui_critical_path.py::test_status_bar_host_is_present_for_degraded_state_assertions
 13 passed in ...s
 ```
 
@@ -147,7 +176,7 @@ If `Test-Path` in the "Before you start" section returned `False`:
 
 ```
 cd C:\Users\mrbla\blarai
-dotnet build "services\ui_winui\BlarAI.Desktop.csproj" -c Debug -p:Platform=x64
+dotnet build "services\ui_winui\BlarAI.Desktop.csproj" -c Debug -p:Platform=x64 -r win-x64 --self-contained
 ```
 
 When it says `Build succeeded`, re-run the `Test-Path` check above, then start at Tier 1.

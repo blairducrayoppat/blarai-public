@@ -55,7 +55,17 @@ from shared.fleet import vikunja_bridge as vb
 # Review/Verify -> Done; classes of service Expedite / Fixed-date / Standard /
 # Intangible. Re-exported (the names stay valid in this module's namespace so
 # run_setup / find_orphans reference them unchanged).
-from shared.fleet.coord_lifecycle import CLASSES_OF_SERVICE, KANBAN_BUCKETS
+from shared.fleet.coord_lifecycle import (
+    CLASSES_OF_SERVICE,
+    KANBAN_BUCKETS,
+    PROVENANCE_LABELS,
+)
+
+#: Every label the migration provisions: the class-of-service labels PLUS the
+#: #887 provenance labels (``Battery/Test``). Kept as one tuple so ``run_setup``
+#: creates and ``find_orphans`` recognizes exactly the same set the runtime
+#: reasons over — the stale-label-id lesson, one list only.
+SETUP_LABELS: tuple[tuple[str, str], ...] = (*CLASSES_OF_SERVICE, *PROVENANCE_LABELS)
 
 
 def run_setup(
@@ -76,7 +86,7 @@ def run_setup(
         results[f"bucket:{title}"] = vb.ensure_bucket(
             project_id, view_id, title, transport=transport
         )
-    for title, hex_color in CLASSES_OF_SERVICE:
+    for title, hex_color in SETUP_LABELS:
         results[f"label:{title}"] = vb.ensure_label(
             title, hex_color, transport=transport
         )
@@ -100,7 +110,7 @@ def find_orphans(
     advisory/curation pass, never a blocking one, so a down Vikunja simply
     means "nothing to report this run", not a crash."""
     known_buckets = set(KANBAN_BUCKETS)
-    known_labels = {name for name, _ in CLASSES_OF_SERVICE}
+    known_labels = {name for name, _ in SETUP_LABELS}
 
     buckets_read = vb.list_buckets(project_id, view_id, transport=transport)
     labels_read = vb.list_labels(transport=transport)

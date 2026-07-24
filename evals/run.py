@@ -35,6 +35,12 @@ from typing import Any
 from evals import baseline as baseline_mod
 from evals.baseline import BaselineError, Comparison
 from evals.loader import GoldenDataError
+from evals.model_target import (
+    CAPABILITY_CHOICES,
+    ModelTarget,
+    ModelTargetError,
+    resolve_model_target,
+)
 from evals.suites import SUITE_NAMES, get_runner
 from evals.types import SuiteReport
 
@@ -79,6 +85,37 @@ def _build_parser() -> argparse.ArgumentParser:
             "NEVER in CI — loads the Qwen3-14B model)."
         ),
     )
+    parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=None,
+        help=(
+            "OPT-IN hardware model-target override (#931): load an arbitrary "
+            "OpenVINO model directory instead of the default Qwen3-14B. Requires "
+            "--capability. No override => byte-identical default 14B path. Only "
+            "affects --include-hardware runs."
+        ),
+    )
+    parser.add_argument(
+        "--capability",
+        choices=CAPABILITY_CHOICES,
+        default=None,
+        help=(
+            "Capability contract for --model-dir: 'text-llm' (LLMPipeline, the "
+            "14B contract) or 'multimodal-vlm' (VLMPipeline, e.g. the 35B-A3B). "
+            "Required whenever --model-dir is given — the pipeline class is never "
+            "guessed (fail-closed)."
+        ),
+    )
+    parser.add_argument(
+        "--no-speculative",
+        action="store_true",
+        help=(
+            "For a 'text-llm' --model-dir override, load WITHOUT speculative "
+            "decoding (no pruned draft). Ignored for 'multimodal-vlm' (which has "
+            "no draft-model spec-decode for this pipeline class)."
+        ),
+    )
     return parser
 
 
@@ -89,7 +126,8 @@ def _print_summary(
     line = (
         f"[{report.suite}] {agg['passed']}/{agg['evaluated']} passed "
         f"({agg['pass_rate']:.1%}), {agg['failed']} failed, "
-        f"{agg['errors']} errors, {agg['skipped_hardware']} hardware-skipped"
+        f"{agg['errors']} errors, {agg['skipped_hardware']} hardware-skipped, "
+        f"{agg['tool_calls']} tool-call"
     )
     print(line)
     if comparison is not None:
@@ -107,6 +145,12 @@ def _print_summary(
                 f"[{report.suite}] known-fail cases tracked in baseline: "
                 f"{', '.join(comparison.known_failures)}"
             )
+        if comparison.known_tool_calls:
+            print(
+                f"[{report.suite}] known tool-call cases tracked in baseline "
+                f"(unscorable one-shot, #1023): "
+                f"{', '.join(comparison.known_tool_calls)}"
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,13 +158,36 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     suites = list(SUITE_NAMES) if args.suite == "all" else [args.suite]
 
+    # Resolve the OPT-IN hardware model-target override once (fail-closed: a
+    # malformed override is a harness error, exit 2 — never a silent default).
+    try:
+        model_target: ModelTarget | None = resolve_model_target(
+            model_dir=args.model_dir,
+            capability=args.capability,
+            no_speculative=args.no_speculative,
+        )
+    except ModelTargetError as exc:
+        print(f"HARNESS ERROR: {exc}", file=sys.stderr)
+        return EXIT_HARNESS_ERROR
+    if model_target is not None and not args.include_hardware:
+        print(
+            "HARNESS ERROR: --model-dir/--capability was given without "
+            "--include-hardware — the override only affects model-in-the-loop "
+            "hardware cases (fail-closed; refusing a run that would silently "
+            "ignore the override).",
+            file=sys.stderr,
+        )
+        return EXIT_HARNESS_ERROR
+
     full_report: dict[str, Any] = {"suites": {}, "regressions": []}
     any_regression = False
 
     for suite_name in suites:
         try:
             runner = get_runner(suite_name)
-            report = runner(include_hardware=args.include_hardware)
+            report = runner(
+                include_hardware=args.include_hardware, model_target=model_target
+            )
         except (GoldenDataError, KeyError) as exc:
             print(f"[{suite_name}] HARNESS ERROR: {exc}", file=sys.stderr)
             return EXIT_HARNESS_ERROR

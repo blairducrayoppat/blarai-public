@@ -902,8 +902,14 @@ migration via the Vikunja API if the instance permits — settled during the C1 
 
 *Ratified 2026-07-12 — LA: "i officially signoff on 848." Records the doctrine correction the F1 closure
 earned. The mechanism ships in `#848` (`feat/848-sg-boundary`, `3f2622c4`; merged to main `c0731036`),
-DORMANT behind `[coordinator]` flags — no live behavior change (the coordinator surface has no live wiring
-yet).*
+shipped behind `[coordinator]` flags, dormant by default at ratification.*
+
+> **ACTIVATION RECORD (added 2026-07-20) — the wiring the note above calls "not yet live" IS live.**
+> `default.toml` now carries `[coordinator] enabled = true` and `heartbeat_enabled = true`, and the
+> heartbeat runs in shadow mode. The 2026-07-12 parenthetical is retained above as the record of that
+> date, not as a claim about current wiring. Read live flag state from `default.toml`, never from this
+> ADR. The severance ratified here binds identically at every flag setting — that is the point of a
+> structural boundary, and it is why activation does not weaken the decision.
 
 **Corrects** the base control-1 framing, which treated the hardlink-overwrite vector (SG-review F1) as
 covered by an inode-identity comparison against a small set of governed-core **anchor** files (the
@@ -933,4 +939,7 @@ is retained (the new layer is additive); the §2.17 / control-7 claim-discipline
 regression locks (a hardlink to each of the four proven non-anchor targets now DENIES at both
 `is_governed_core_target` and `check_target(phase="EXECUTION")`; the `st_nlink == 1` no-over-denial guard;
 the fail-closed-on-error guard). Independent author≠verifier re-verify: **PASS, F1 class closed**. Blast-radius
-gate 189 passed. DORMANT — no live module imports `shared.coordinator`.
+gate 189 passed. Dormant by default at the time of this entry. **Superseded 2026-07-20:** live modules
+DO import `shared.coordinator` — `services/assistant_orchestrator/src/entrypoint.py:67` and
+`launcher/__main__.py:1169` among them. The import-count claim was a snapshot, not a property; the
+boundary's guarantees do not rest on it.

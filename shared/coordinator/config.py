@@ -5,11 +5,12 @@ This module is the DORMANT ``[coordinator]`` config surface and the code-level
 renamed-clone identity filesets, and the protected-config-section set. It imports
 nothing else from :mod:`shared.coordinator` (leaf module — no cycles).
 
-**Everything here ships DORMANT.** :class:`CoordinatorConfig` default-constructs to
+**Every default here is off.** :class:`CoordinatorConfig` default-constructs to
 "fully off" — the coordinator is disabled, the whole graduated-autonomy ladder is
-empty, and signed-policy verification is not required. No live code path in this
-repo reads ``[coordinator]`` today; C1 (`#843`) wires it. This module therefore
-changes NO runtime behavior — it only makes the surface exist.
+empty, and signed-policy verification is not required. This module only resolves
+values; it never acts on them, so importing it changes no runtime behavior. What the
+coordinator actually does is decided by the RESOLVED ``[coordinator]`` values — read
+them from ``services/assistant_orchestrator/config/default.toml``, never from here.
 
 Design tenets (ADR-039 §2.1, §2.2):
   * **Fail-closed resolution.** A missing/mistyped TOML key resolves to the *safe*

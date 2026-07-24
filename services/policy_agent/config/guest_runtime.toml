@@ -19,6 +19,7 @@ speculative_decoding_enabled = true                         # ADR-012 §2.6
 fail_closed = true
 dev_mode = false  # #641: was true. resolve_dev_mode(GUEST) already forces False, so this is a no-op at runtime — it makes the shipped file match the safe resolution and removes the insecure default.
 require_signed_manifest = false  # FUT-04: capability built; the guest signed-manifest ceremony has not run. Guest profile is dormant (production runs host-mode); this no longer relies on dev_mode to bypass the sig check.
+require_signed_draft_manifest = false  # FUT-05 / #917: the standalone draft's signature posture (this guest profile IS the standalone path — it injects no shared pipeline). Dormant = digest-only; the draft signing ceremony has not run. Read by gpu_inference._verify_draft_integrity.
 
 [jwt]
 issuer = "policy_agent"

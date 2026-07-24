@@ -1,0 +1,95 @@
+{
+  "date": "2026-07-16",
+  "title": "MusicGen medium/large text-to-music on Intel Arc 140V via PyTorch XPU (Windows) — first GPU music-generation numbers on this box; OpenVINO export negative result",
+  "context": "BlarAI vision-trailer scoring (dev-side tooling) + tier/backend groundwork for the Cinematic Studio capability (#858). Follows the 2026-07-11 CPU baseline (musicgen_medium_cpu_2026-07-11.json).",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (Xe2, 16 GB shared LPDDR5X)",
+    "gpu_driver": "32.0.101.8826",
+    "ram": "32 GB LPDDR5X (31.3 GB effective)",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "python": "3.11.9",
+    "torch": "2.13.0+xpu (pytorch.org/whl/xpu wheel index)",
+    "transformers": "5.14.1",
+    "backend": "PyTorch native Intel-GPU (XPU) device; standard transformers MusicgenForConditionalGeneration.generate(), fp32 weights, no quantization",
+    "isolated_venv": "scratchpad musicgen/venv_xpu (separate from the CPU-baseline venv and from all BlarAI runtime venvs)"
+  },
+  "methodology": "Single-run generations via gen_music.py (same script as the CPU baseline). Rates are wall-clock generate() time only; model load reported separately. seed=0, guidance_scale=3.0, do_sample=true. Full track = 7 prompted sections (11-18 s each, 97 s raw) rendered serially in one process and crossfade-concatenated (1.0 s).",
+  "results": {
+    "medium_probe_15s": {
+      "model": "facebook/musicgen-medium (1.5B, fp32)",
+      "audio_s": 14.9,
+      "compute_s": 277.5,
+      "rate_s_audio_per_min": 3.23,
+      "model_load_s": 31.5,
+      "process_rss_gb_after_load": 9.54
+    },
+    "medium_full_track_91s": {
+      "model": "facebook/musicgen-medium (1.5B, fp32)",
+      "audio_s": 90.6,
+      "compute_s": 2555.8,
+      "rate_s_audio_per_min_sustained": 2.13,
+      "per_section_rates": [4.10, 2.94, 3.24, 3.11, 2.53, 1.41, 1.58],
+      "thermal_note": "Per-section rate decays 4.10 -> ~1.5 s-audio/min across the 42.6-min run — sustained-load throttling on the passively-constrained laptop iGPU; single-section jobs see the higher rate."
+    },
+    "large_health_probe_3s": {
+      "model": "facebook/musicgen-large (3.3B, fp32)",
+      "audio_s": 2.9,
+      "compute_s": 194.1,
+      "rate_s_audio_per_min": 0.91,
+      "model_load_s": 67.1,
+      "process_rss_gb_after_load": 14.82,
+      "system_avail_gb_at_trough": 4.3,
+      "caveat": "3-s probe is overhead-dominated (first-generation kernel warmup included) — deliberately a fit/health check, not a rate figure; sustained rate comes from the full-track run."
+    },
+    "large_full_track_91s": {
+      "model": "facebook/musicgen-large (3.3B, fp32)",
+      "audio_s": 90.6,
+      "compute_s": 2730.8,
+      "rate_s_audio_per_min_sustained": 1.99,
+      "per_section_rates": [1.27, 2.14, 2.36, 1.94, 2.49, 2.62, 2.57],
+      "model_load_s": 42.5,
+      "process_rss_gb_after_load": 14.82,
+      "note": "Run detached on an otherwise-quiet box; per-section rate ROSE across the run."
+    },
+    "medium_bf16_probe_15s": {
+      "model": "facebook/musicgen-medium (1.5B, bf16 — weights verified bfloat16)",
+      "audio_s": 14.9,
+      "compute_s": 329.1,
+      "rate_s_audio_per_min": 2.72,
+      "vs_fp32_probe": "16% SLOWER than the identical fp32 probe (3.23); RSS essentially unchanged (9.33 vs 9.54 GB). bf16 is a loss on this path.",
+      "model_load_s": 9.1
+    },
+    "cpu_reference": {
+      "medium_cpu_2026_07_11": 0.83,
+      "xpu_speedup_probe": "3.9x",
+      "xpu_speedup_sustained": "2.6x"
+    }
+  },
+  "corrections": {
+    "medium_rate_decay_attribution": "The medium full-track per-section decay (4.10 -> ~1.5) was originally attributed to sustained-load thermal throttling. DISPROVEN same day: the large full-track run (detached, box otherwise quiet) shows rates RISING across a longer run (1.27 -> 2.57). The medium decay was CONTENTION from an active interactive session sharing the box, not heat."
+  },
+  "engine_queue_finding": {
+    "summary": "Windows Task Manager's per-GPU 'Neural' graph is a driver submission-queue class, NOT an XMX matrix-unit meter.",
+    "evidence": "Live '\\GPU Engine(*engtype_*)' counters: torch-xpu MusicGen fp32 avg 39% engtype_Compute / 0.0% neural; torch-xpu bf16 likewise compute-only; OpenVINO INT8 SDXL (BlarAI UC-010 pipeline) ran on engtype_Neural with compute at 0.0%.",
+    "implication": "OpenVINO submits through the driver's neural queue; PyTorch XPU submits through compute queues at any precision. XMX-unit utilization itself is not observable with any current tool."
+  },
+  "negative_results": {
+    "optimum_cli_openvino_export": "optimum-cli export openvino --model facebook/musicgen-medium --weight-format int8 FAILS: 'musicgen ... custom or unsupported architecture' (optimum 2.2.0 / optimum-intel 2.0.0 / nncf 3.2.0 / openvino 2026.2.1). The OpenVINO route for MusicGen requires the manual notebook-style conversion (separate text-encoder/decoder/EnCodec IRs + a patched generate loop) — relevant to any future #858 OpenVINO-substrate port.",
+    "libsndfile_vorbis_crash": "soundfile/libsndfile (bundled wheel) hard-crashes the process (no traceback, exit 127) encoding this 90.6-s mono 32 kHz track to OGG/VORBIS, at both float32 and float64 input; a 2-s clip encodes fine. MP3 (MPEG_LAYER_III) encodes the same array without issue. Dev-side gotcha, tracked here as a reproducible toolchain footnote."
+  },
+  "not_measured": [
+    "musicgen-small on XPU",
+    "fp16 (only bf16 tested against fp32)",
+    "INT8/INT4 quantized variants (blocked: no optimum-intel musicgen export; manual OpenVINO conversion not attempted)",
+    "OpenVINO GPU pipeline comparison (same blocker)",
+    "NPU offload",
+    "co-resident Qwen3-14B contention (box was otherwise idle)",
+    "power draw / thermal telemetry",
+    "XMX matrix-unit utilization (no tool exposes it; queue-class evidence only)",
+    "multi-seed variance (seed=0 only)",
+    "perceptual quality A/B medium-vs-large (operator-judged, delivered same day, verdict pending)"
+  ]
+}

@@ -198,6 +198,409 @@ class TestBaselineComparison:
         )
         assert not comparison.has_regressions
 
+    # -- #1000: the hardware tier must have teeth ---------------------------
+    # A case BASELINED as skipped_hardware that later RUNS and FAILS was
+    # absorbed into known_failures by a branch fall-through, so the run exited
+    # 0.  That is how the 2026-07-07 ceremony reported "0 regressions" while
+    # 3 of 4 injection-resistance cases were failing.  These lock both
+    # directions: the failure is caught, and the neighbouring semantics that
+    # were correct are provably unchanged.
+
+    @pytest.mark.parametrize("status", [CaseStatus.FAIL, CaseStatus.ERROR])
+    def test_unbaselined_hardware_case_that_fails_is_a_regression(
+        self, status: CaseStatus
+    ) -> None:
+        base = {"cases": {"case-1": "skipped_hardware"}}
+        comparison = compare(self._report_with(status), base)
+        assert comparison.has_regressions, (
+            "a case the baseline never measured cannot fail silently"
+        )
+        assert any("unbaselined failure" in r for r in comparison.regressions)
+        # It must NOT be laundered into known_failures — that list means
+        # "a deficiency somebody consciously recorded", and nobody did.
+        assert comparison.known_failures == []
+
+    def test_unbaselined_hardware_case_that_passes_is_not_a_regression(
+        self,
+    ) -> None:
+        # The first successful measurement of a never-measured case is good
+        # news, not a regression. Guards against over-correcting #1000 into
+        # failing every newly-run hardware case.
+        base = {"cases": {"case-1": "skipped_hardware"}}
+        comparison = compare(self._report_with(CaseStatus.PASS), base)
+        assert not comparison.has_regressions
+        assert comparison.known_failures == []
+
+    def test_recorded_known_failure_still_is_not_a_regression(self) -> None:
+        # The #1000 fix must not swallow the genuine known-failure path: a
+        # baseline that actually RECORDED a fail is a tracked deficiency.
+        base = {"cases": {"case-1": "fail"}}
+        comparison = compare(self._report_with(CaseStatus.ERROR), base)
+        assert not comparison.has_regressions
+        assert comparison.known_failures == ["case-1"]
+
+    @pytest.mark.parametrize(
+        "bogus",
+        [
+            "skipped",              # a plausible-looking wrong status
+            "SKIPPED_HARDWARE",     # right word, wrong case
+            "skipped_hardware ",    # trailing whitespace from a hand-edit
+            "passed",               # one-char typo of the PASS status
+            "",                     # empty string
+            "skipped_missing_model",  # a status that does not exist yet
+        ],
+    )
+    def test_noncanonical_baseline_status_cannot_absorb_a_failure(
+        self, bogus: str
+    ) -> None:
+        # #1000 is an ALLOWLIST: only a recorded fail/error earns silence.
+        # Baselines are hand-editable JSON, and `load_baseline` validates
+        # only that `cases` is a dict — never the status values. Under the
+        # old "known shapes, else benign" form every string below silently
+        # absorbed a real failure. Note "passed" in particular: a one-char
+        # typo of the PASS status also disabled the primary
+        # baseline-pass -> fail regression branch.
+        base = {"cases": {"case-1": bogus}}
+        comparison = compare(self._report_with(CaseStatus.FAIL), base)
+        assert comparison.has_regressions, (
+            f"baseline status {bogus!r} absorbed a real failure"
+        )
+        assert comparison.known_failures == []
+
+    # -- #1010: compare() validates its own baseline values ------------------
+    # #1000 rejects malformed baselines at load time, which protects every
+    # caller that reads a committed FILE.  ``compare`` itself takes a plain
+    # dict and used to die with an unhashable-type TypeError on a non-string
+    # value — a crash held closed only by the absence of a caller that
+    # bypasses ``load_baseline``.  These drive ``compare`` DIRECTLY with each
+    # malformed shape: a failure is never absorbed, nothing raises, and a
+    # well-formed baseline's result is provably unchanged.
+
+    @pytest.mark.parametrize(
+        "bad_value",
+        [
+            ["fail"],            # the ticket's confirmed crash (unhashable)
+            {"status": "fail"},  # unhashable mapping
+            3,                   # number
+            None,                # JSON null — present, NOT absent
+            True,                # bool
+        ],
+    )
+    def test_non_string_baseline_value_cannot_absorb_a_failure(
+        self, bad_value: object
+    ) -> None:
+        base = {"cases": {"case-1": bad_value}}
+        comparison = compare(self._report_with(CaseStatus.FAIL), base)
+        assert comparison.has_regressions, (
+            f"baseline value {bad_value!r} absorbed a real failure"
+        )
+        assert any(
+            "malformed baseline value" in r for r in comparison.regressions
+        )
+        # Never laundered into known_failures — that list means "a deficiency
+        # somebody consciously recorded", and a broken value records nothing.
+        assert comparison.known_failures == []
+
+    def test_present_and_null_is_not_reported_as_absent(self) -> None:
+        # ``dict.get``'s None default used to conflate {"case-1": null}
+        # (present, malformed) with an id absent from the baseline entirely.
+        # Both are regressions, but they earn different messages — a null is
+        # a broken recording to repair, not a new case to baseline.
+        base = {"cases": {"case-1": None}}
+        comparison = compare(self._report_with(CaseStatus.FAIL), base)
+        assert any(
+            "malformed baseline value" in r for r in comparison.regressions
+        )
+        assert not any(
+            "new failing case" in r for r in comparison.regressions
+        )
+
+    def test_non_string_baseline_value_with_passing_case_is_inert(self) -> None:
+        # A baseline value can only matter through the known-failure or
+        # improvement branches; a passing case must neither crash on a
+        # malformed one nor mint an "improvement" from garbage.  (Rejecting
+        # the malformed FILE is load_baseline's job, exit 2.)
+        base = {"cases": {"case-1": ["fail"]}}
+        comparison = compare(self._report_with(CaseStatus.PASS), base)
+        assert not comparison.has_regressions
+        assert comparison.improvements == []
+        assert comparison.known_failures == []
+
+    @pytest.mark.parametrize(
+        "bad_baseline",
+        [
+            {"cases": ["case-1"]},       # list where the object should be
+            {"cases": "case-1: pass"},   # string
+            {"cases": 3},                # number
+            {"cases": None},             # JSON null
+            ["cases"],                   # the whole baseline is not an object
+        ],
+    )
+    def test_structurally_wrong_cases_block_is_a_regression_not_a_crash(
+        self, bad_baseline: object
+    ) -> None:
+        # Strongest direction: even an all-green run must not report clean
+        # against a baseline that cannot be read — silence there is
+        # indistinguishable from "compared and found clean".  Before #1010
+        # these shapes raised TypeError/ValueError out of dict().
+        comparison = compare(self._report_with(CaseStatus.PASS), bad_baseline)
+        assert comparison.has_regressions
+        assert any(
+            "malformed baseline" in r for r in comparison.regressions
+        )
+        assert comparison.known_failures == []
+
+    def test_well_formed_baseline_result_is_unchanged(self) -> None:
+        # The #1010 validation must be invisible to a well-formed baseline:
+        # one composite run exercising every branch — known-fail,
+        # improvement, pass->fail regression, new failing case, vanished
+        # case, hardware skips on both sides — produces exactly the
+        # pre-#1010 comparison.
+        base = {
+            "cases": {
+                "known-1": "fail",
+                "improved-2": "error",
+                "regressed-3": "pass",
+                "steady-4": "pass",
+                "vanished-5": "pass",
+                "hw-6": "skipped_hardware",
+            }
+        }
+        report = SuiteReport(suite="probe")
+        for case_id, status in (
+            ("known-1", CaseStatus.FAIL),
+            ("improved-2", CaseStatus.PASS),
+            ("regressed-3", CaseStatus.ERROR),
+            ("steady-4", CaseStatus.PASS),
+            ("new-7", CaseStatus.FAIL),
+            ("hw-8", CaseStatus.SKIPPED_HARDWARE),
+        ):
+            report.results.append(
+                CaseResult(case_id=case_id, status=status, detail="probe")
+            )
+        comparison = compare(report, base)
+        assert comparison.known_failures == ["known-1"]
+        assert comparison.improvements == ["improved-2"]
+        assert len(comparison.regressions) == 3
+        assert any(
+            "regressed vs baseline: regressed-3" in r
+            for r in comparison.regressions
+        )
+        assert any(
+            "new failing case not in baseline: new-7" in r
+            for r in comparison.regressions
+        )
+        assert any(
+            "baselined case missing from run: vanished-5" in r
+            for r in comparison.regressions
+        )
+
+
+# ---------------------------------------------------------------------------
+# C2. tool_call status — an honest recording, never silence by default (#1006)
+# ---------------------------------------------------------------------------
+# Live-caught 2026-07-21: the first hardware answer-quality ceremony scored two
+# cases as FAIL on an empty string because the model (correctly) answered with
+# a tool call the one-shot harness cannot execute — production runs the tool
+# loop and shows a real answer.  These lock the new status end to end:
+# detection at the suite seam, every baseline transition loud except the
+# recorded steady state, and the allowlist property extended (a tool_call
+# baseline can never absorb a real failure).
+
+
+class TestToolCallStatus:
+    @staticmethod
+    def _report_with(status: CaseStatus, detail: str = "probe") -> SuiteReport:
+        report = SuiteReport(suite="probe")
+        report.results.append(
+            CaseResult(case_id="case-1", status=status, detail=detail)
+        )
+        return report
+
+    # -- baseline transitions ------------------------------------------------
+
+    def test_pass_to_tool_call_is_a_regression(self) -> None:
+        base = {"cases": {"case-1": "pass"}}
+        comparison = compare(self._report_with(CaseStatus.TOOL_CALL), base)
+        assert comparison.has_regressions
+        assert any(
+            "answers with a tool call" in r for r in comparison.regressions
+        )
+
+    def test_recorded_tool_call_steady_state_is_silent_but_listed(self) -> None:
+        base = {"cases": {"case-1": "tool_call"}}
+        comparison = compare(self._report_with(CaseStatus.TOOL_CALL), base)
+        assert not comparison.has_regressions
+        assert comparison.known_tool_calls == ["case-1"]
+
+    def test_new_tool_call_case_is_a_regression(self) -> None:
+        base = {"cases": {}}
+        comparison = compare(self._report_with(CaseStatus.TOOL_CALL), base)
+        assert comparison.has_regressions
+        assert any(
+            "new tool-call case" in r for r in comparison.regressions
+        )
+
+    def test_skipped_hardware_to_tool_call_is_a_regression(self) -> None:
+        # The 2026-07-21 shape exactly: first measurement of a never-measured
+        # case discovers it answers with a tool call.  Loud — the operator
+        # records it deliberately; it never inherits skipped-silence.
+        base = {"cases": {"case-1": "skipped_hardware"}}
+        comparison = compare(self._report_with(CaseStatus.TOOL_CALL), base)
+        assert comparison.has_regressions
+
+    def test_tool_call_to_pass_is_an_improvement(self) -> None:
+        base = {"cases": {"case-1": "tool_call"}}
+        comparison = compare(self._report_with(CaseStatus.PASS), base)
+        assert not comparison.has_regressions
+        assert comparison.improvements == ["case-1"]
+
+    def test_tool_call_baseline_cannot_absorb_a_real_failure(self) -> None:
+        # The #1000 allowlist property, extended to the new member: only a
+        # RECORDED fail/error earns known_failures.
+        base = {"cases": {"case-1": "tool_call"}}
+        comparison = compare(self._report_with(CaseStatus.FAIL), base)
+        assert comparison.has_regressions
+        assert comparison.known_failures == []
+
+    def test_baselined_tool_call_missing_from_run_is_a_regression(self) -> None:
+        # Only skipped_hardware is exempt from the vanished-case check — a
+        # recorded tool-call case that disappears means the golden set shrank
+        # without a conscious refresh.
+        base = {"cases": {"case-1": "tool_call"}}
+        comparison = compare(SuiteReport(suite="probe"), base)
+        assert comparison.has_regressions
+        assert any("missing from run" in r for r in comparison.regressions)
+
+    # -- detection at the suite seam ----------------------------------------
+
+    @staticmethod
+    def _golden_file(tmp_path: Path) -> Path:
+        from evals.suites.answer_quality import SUITE_NAME  # noqa: F401
+
+        path = tmp_path / "answer_quality.jsonl"
+        case = {
+            "id": "aq-probe-01",
+            "description": "probe",
+            "category": "factual",
+            "mode": "model",
+            "prompt": "what is 2+2?",
+            "checks": {"must_contain": ["4"]},
+        }
+        path.write_text(json.dumps(case) + "\n", encoding="utf-8")
+        return path
+
+    def _run_with_generator(self, tmp_path: Path, raw: str) -> SuiteReport:
+        from evals.suites.answer_quality import run_suite
+
+        return run_suite(
+            golden_file=self._golden_file(tmp_path),
+            include_hardware=True,
+            hardware_generator=lambda composed: raw,
+        )
+
+    def test_tool_call_only_generation_records_tool_call_status(
+        self, tmp_path: Path
+    ) -> None:
+        raw = '<tool_call>{"name": "calculate", "arguments": {}}</tool_call>'
+        report = self._run_with_generator(tmp_path, raw)
+        (result,) = report.results
+        assert result.status is CaseStatus.TOOL_CALL
+        # Evidence attached: the report must show WHAT the model tried to
+        # call, or the status is just a fancier silence.
+        assert "calculate" in str(result.actual)
+
+    def test_all_think_empty_generation_stays_a_fail(self, tmp_path: Path) -> None:
+        # The principled line: production would display the same emptiness,
+        # so an all-<think> answer is a REAL failure, never tool_call.
+        raw = "<think>working it out but never answering</think>"
+        report = self._run_with_generator(tmp_path, raw)
+        (result,) = report.results
+        assert result.status is CaseStatus.FAIL
+
+    def test_normal_answer_path_is_unchanged(self, tmp_path: Path) -> None:
+        report = self._run_with_generator(tmp_path, "2+2 is 4.")
+        (result,) = report.results
+        assert result.status is CaseStatus.PASS
+
+    def test_tool_call_with_visible_text_is_scored_normally(
+        self, tmp_path: Path
+    ) -> None:
+        # A tool call ALONGSIDE a visible answer is scoreable — the user sees
+        # the text.  Detection fires only on hidden-blocks-only generations.
+        raw = '<tool_call>{"name": "x"}</tool_call>The answer is 4.'
+        report = self._run_with_generator(tmp_path, raw)
+        (result,) = report.results
+        assert result.status is CaseStatus.PASS
+
+    # -- aggregates + baseline round-trip ------------------------------------
+
+    def test_tool_call_excluded_from_pass_rate_but_counted(
+        self, tmp_path: Path
+    ) -> None:
+        raw = '<tool_call>{"name": "calculate"}</tool_call>'
+        report = self._run_with_generator(tmp_path, raw)
+        agg = report.aggregates()
+        assert agg["tool_calls"] == 1
+        assert agg["evaluated"] == 0
+        assert agg["pass_rate"] == 0.0
+
+    def test_tool_call_status_survives_baseline_round_trip(
+        self, tmp_path: Path
+    ) -> None:
+        report = self._report_with(CaseStatus.TOOL_CALL)
+        path = baseline_mod.write_baseline(report, tmp_path)
+        loaded = load_baseline("probe", tmp_path)
+        assert loaded["cases"]["case-1"] == "tool_call"
+        assert path.exists()
+
+    def test_unclosed_tool_call_mention_stays_a_fail(self, tmp_path: Path) -> None:
+        # Review finding on the first cut: production's parser requires a
+        # CLOSED <tool_call>…</tool_call> pair; an unclosed marker MENTION
+        # runs no tool — the user sees emptiness, so the eval must score a
+        # real FAIL, never launder it into tool_call (the lenient-direction
+        # error this status exists to eliminate).
+        raw = "<think>maybe emit a <tool_call block here</think>"
+        report = self._run_with_generator(tmp_path, raw)
+        (result,) = report.results
+        assert result.status is CaseStatus.FAIL
+
+    def test_offline_fixture_tool_call_only_records_tool_call(
+        self, tmp_path: Path
+    ) -> None:
+        # The offline path must behave identically to the model path — same
+        # helper, locked here so the equivalence is pinned, not incidental.
+        from evals.suites.answer_quality import run_suite
+
+        path = tmp_path / "answer_quality.jsonl"
+        case = {
+            "id": "aq-probe-02",
+            "description": "probe",
+            "category": "factual",
+            "mode": "offline",
+            "fixture_response": '<tool_call>{"name": "x"}</tool_call>',
+            "checks": {"must_contain": ["4"]},
+        }
+        path.write_text(json.dumps(case) + "\n", encoding="utf-8")
+        report = run_suite(golden_file=path, include_hardware=False)
+        (result,) = report.results
+        assert result.status is CaseStatus.TOOL_CALL
+
+    def test_detection_tag_matches_the_resolved_strip_binding(self) -> None:
+        # Drift lock against the RESOLVED binding, not the hard-coded
+        # fallback: the production strip resolves its tags from the model
+        # manifest (#834), and a model swap edits the MANIFEST while the
+        # compiled default stays byte-identical forever.  Detection depends
+        # on the resolved strip removing closed tool-call blocks, so the tag
+        # must be present in what the manifest actually resolves to today.
+        from evals.suites.answer_quality import _TOOL_CALL_TAG
+        from shared.fleet.model_profiles import (
+            AO_BRAIN_MODEL_ID,
+            resolve_hidden_block_tags,
+        )
+
+        assert _TOOL_CALL_TAG in resolve_hidden_block_tags(AO_BRAIN_MODEL_ID)
+
 
 # ---------------------------------------------------------------------------
 # D. Runner exit-code semantics
@@ -327,6 +730,24 @@ class TestHarnessFailClosed:
             '{"no_cases_block": true}', encoding="utf-8"
         )
         with pytest.raises(BaselineError, match="cases"):
+            load_baseline("governance", tmp_path)
+
+    @pytest.mark.parametrize(
+        "bad_value", ['["fail"]', '{"status": "fail"}', "null", "3"]
+    )
+    def test_non_string_case_status_is_a_harness_error(
+        self, tmp_path: Path, bad_value: str
+    ) -> None:
+        # #1000: a malformed baseline is a HARNESS error (exit 2), never a
+        # regression (exit 1) — the codes mean different things. `compare`
+        # tests baseline values for set membership, which raises TypeError on
+        # an unhashable value; unhandled, the interpreter exits 1 and a
+        # malformed baseline arrives wearing a regression's exit code.
+        # Rejecting non-string statuses at load time keeps exit 2 exit 2.
+        (tmp_path / "governance.json").write_text(
+            '{"cases": {"case-1": ' + bad_value + "}}", encoding="utf-8"
+        )
+        with pytest.raises(BaselineError, match="non-string case statuses"):
             load_baseline("governance", tmp_path)
 
     def test_escalation_consent_case_restores_verifier_state(self) -> None:

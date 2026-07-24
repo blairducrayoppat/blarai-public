@@ -183,11 +183,19 @@ _PLAN_SYSTEM_PROMPT: str = (
 
 # Cap on a coordinator heartbeat DRAFT completion (#845 C3 limb 5, design §2 step 9 /
 # §3.4). A draft is bounded single-decision prose (summarize the one finished run;
-# render one detected condition's proposal in plain language) — short by design, but
-# the cap must still leave headroom for /no_think slippage (a stray <think> block
-# spends this budget before the strip removes it). Callers may tighten per call; the
-# inference layer hard-caps at its own circuit-breaker max regardless.
-_COORDINATOR_DRAFT_MAX_NEW_TOKENS: int = 1024
+# render one detected condition's proposal in plain language) — two sentences,
+# 40–80 tokens in practice. THE CAP IS THE WORST-CASE CHAT-WAIT BOUND: a draft
+# holds the single-flight inference lock while it generates, so an arriving chat
+# turn waits up to cap ÷ measured decode speed (~13 tok/s on this box,
+# PERFORMANCE_LOG 2026-07-x entries). LA-decided at the 2026-07-14 heartbeat
+# shadow go-live ceremony (limb-5 review finding 1, #845 c.1894): 128 bounds the
+# wait at ~10 s while leaving ~2× headroom over a real draft; a runaway
+# (/no_think slippage — a stray <think> block spending the budget before the
+# strip removes it) gets truncated, and the deterministic skeleton fallback
+# carries the facts regardless (no correctness ever rides on the prose).
+# Callers may tighten per call; the inference layer hard-caps at its own
+# circuit-breaker max regardless.
+_COORDINATOR_DRAFT_MAX_NEW_TOKENS: int = 128
 
 # #845 C3: a coordinator draft is an INTERNAL structural emission — the same posture
 # as the PLAN sequence above (#748 lesson): minimal persona, NO tools advertised,
@@ -541,6 +549,22 @@ class AssistantOrchestratorEntrypointConfig:
     ADR-027 Am.1 ceremony populates the allowlist. Resolved from
     [web_search].enabled; absent -> False (fail-closed dormant default)."""
 
+    web_search_max_response_bytes: int = 2 * 1024 * 1024
+    """#727 — fail-closed PARSE-guard byte cap for the live web_search adapter.
+    A decoded Kagi HTTP response larger than this many bytes is rejected BEFORE
+    stdlib json.loads (which has no size bound), failing closed to no results. A
+    second, INDEPENDENT lock downstream of the egress door's 8 MiB on-the-wire
+    cap (guarded_fetch._MAX_BODY_BYTES), deliberately tighter. Resolved from
+    [web_search].max_response_bytes; absent -> this safe default (the guard is
+    never disarmed)."""
+
+    web_search_max_parse_depth: int = 12
+    """#727 — fail-closed PARSE-guard nesting cap for the live web_search
+    adapter. JSON nested deeper than this many brace/bracket levels is rejected
+    BEFORE stdlib json.loads (which has no recursion-depth bound), failing closed
+    to no results. Kagi v1 nests ~5. Resolved from [web_search].max_parse_depth;
+    absent -> this safe default."""
+
     embeddings_device: str = "CPU"
     """Inference device for the shared bge-small embedding model (#720) —
     substrate memory, knowledge bank, and PGOV Stage-5 leakage all ride the
@@ -581,6 +605,23 @@ class AssistantOrchestratorEntrypointConfig:
     of rejecting and re-rolling. Revision is OPERATOR-INITIATED only (the `/dispatch revise`
     verb), so a battery/headless run never revises regardless. Set False to refuse `/dispatch
     revise` (Fail-Closed) — accept/reject unchanged. Resolved from [fleet_dispatch].revise."""
+    fleet_dispatch_advanced_intake_enabled: bool = False
+    """#1031 — the ADVANCED INTAKE front (staged specification), SLICE S1 ONLY. DORMANT
+    DEFAULT ``False``, deliberately unlike the two stage gates above: a NEW capability on the
+    operator-facing front, so it ships off and its go-live is an LA ceremony rather than a
+    proven-defaults-live flip.
+
+    True enables TWO deterministic rulers over the criteria list and nothing else: a realism
+    guard demoting an objective-tier criterion whose ``check`` is EMPTY (only the empty case —
+    the wider ambition was withdrawn during review), and a delivery floor adding a
+    machine-gated SMOKE criterion to a web/web-static spec. It does NOT widen the elicitation
+    interview, does NOT co-author criteria, does NOT derive an oracle import contract, and
+    does NOT make the coverage check blocking — those are S2–S4 and are unbuilt (#1042: this
+    docstring previously described the whole programme as though S1 shipped it).
+
+    False is byte-identical to today's planning. Fail-closed AND validate-don't-coerce: a
+    missing key, an unresolved config, or any non-boolean value all resolve False; only an
+    explicit boolean ``True`` enables it. Resolved from [fleet_dispatch].advanced_intake."""
     swap_min_free_gb: float = 21.0
     """Pre-load headroom gate for the increment-2 model swap (design §4.3), in **GiB**:
     the driver aborts the 30B load (gracefully, restoring the 14B) if free RAM is below
@@ -631,6 +672,13 @@ class AssistantOrchestratorEntrypointConfig:
     never touches the guest-oracle seams, byte-identical today-behavior. Resolved
     from [fleet_dispatch].guest_oracle_enabled (default OFF until the supervised
     live in-guest proof)."""
+    fleet_dispatch_already_satisfied_precheck: bool = False
+    """#1049 already-satisfied pre-check: before a plan-graph wave dispatches
+    (once at least one task merged), grade the job acceptance oracle against the
+    current tree; a PASS records the remaining tasks as HONEST SKIPs instead of
+    spending coder candidates on work a prior wave already delivered. Fail-closed:
+    a missing key resolves to False — the driver never consults the pre-check
+    seam. Resolved from [fleet_dispatch].already_satisfied_precheck."""
     step_aside_grace_s: float = 2.0
     """EXECUTE reply-then-exit grace (seconds): the AO waits this long after sending the
     "stepping aside" reply before signalling the launcher to exit, so the WinUI shows the
@@ -656,6 +704,39 @@ class AssistantOrchestratorEntrypointConfig:
     Empty (the default) reads as a benign EMPTY, never a failure — see
     shared/fleet/work_state.read_campaign_state. Resolved from
     [coordinator].battery_campaign_state_path."""
+
+    # ── Coordinator C3 heartbeat keys (#845, design §3.2/§9 — DORMANT) ────
+    # Resolved via CoordinatorConfig.from_toml (the ONE fail-closed resolver for
+    # [coordinator] cadence/shadow semantics — bool-as-number rejected, sub-1
+    # multipliers refused, interval floored, shadow_mode fail-closed toward
+    # TRUE) and re-materialized here because this housing dataclass is the
+    # launcher's single source of truth (never a second TOML parse downstream).
+    coordinator_heartbeat_enabled: bool = False
+    """C3 (#845) wake-cycle gate. False (the dormant default) means the
+    launcher's build_heartbeat factory returns None — no thread, no object,
+    nothing constructed (structural absence, design §3.2). Flipping it is the
+    LA's heartbeat ceremony. Resolved from [coordinator].heartbeat_enabled."""
+    coordinator_heartbeat_interval_s: float = 900.0
+    """AC-power wake-cycle interval (registered in shared/timeout_registry.py).
+    Resolved from [coordinator].heartbeat_interval_s."""
+    coordinator_heartbeat_battery_multiplier: float = 4.0
+    """Battery interval stretch (ADR-039 §2.12.12). Resolved from
+    [coordinator].heartbeat_battery_multiplier."""
+    coordinator_heartbeat_boot_grace_s: float = 300.0
+    """First-cycle boot grace + the tripwire idle-grace floor (registered).
+    Resolved from [coordinator].heartbeat_boot_grace_s."""
+    coordinator_overnight_window: str = "23:00-09:00"
+    """Runtime-readable overnight quiet window (design §8.3). Resolved from
+    [coordinator].overnight_window."""
+    coordinator_operator_absent: bool = False
+    """Operator-absence mode switch (design §8.2). Resolved from
+    [coordinator].operator_absent."""
+    coordinator_shadow_mode: bool = True
+    """The #855 shadow gate (design §7.2). TRUE (the safe default — missing or
+    mistyped values also resolve TRUE) diverts all heartbeat output to the
+    born-encrypted shadow journal; only a genuine TOML boolean false — the
+    #855 graduation ceremony — goes live. Resolved from
+    [coordinator].shadow_mode via CoordinatorConfig.from_toml."""
 
     # ── UC-010 Local Generative Imaging (ADR-033 — DORMANT) ──────────────
     image_gen_enabled: bool = False
@@ -736,14 +817,6 @@ class AssistantOrchestratorEntrypointConfig:
     """Hires-fix refined-edge cap — a GPU-OOM circuit breaker, since the refine
     runs co-resident with the 14B. Resolved from
     [image_generation].hires_max_edge."""
-
-    image_gen_model_variant: str = image_gen.VARIANT_PHOTOREAL_SDXL
-    """DEPRECATED back-compat key (#703). Image style is now selected PER REQUEST
-    (the IMAGE_GEN_REQUEST ``style`` field → ``_image_gen_config_for_style``), so
-    this AO-instance-wide variant selector no longer picks the model. Still parsed
-    + enum-validated (a typo is rejected) for back-compat; default = photoreal
-    SDXL. Resolved from [image_generation].model_variant. (Removal is a tracked
-    hardening follow-up.)"""
 
     image_gen_illustration_model_dir: str = (
         "models/sdxl-illustration/openvino-int8-gpu"
@@ -1025,6 +1098,26 @@ class AssistantOrchestratorService:
         )
 
     @property
+    def fleet_dispatch_advanced_intake_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake`` gate (#1031, staged intake).
+
+        Default ``False`` — FAIL-CLOSED, and deliberately opposite to the two gates above:
+        an unresolved config, a missing key, or a pre-``start()`` read all yield False. Its
+        go-live is an LA ceremony. Never re-parses the TOML.
+
+        #1042: resolves via ``is True`` rather than ``bool()`` — the same validate-don't-coerce
+        rule the TOML parse uses, so a non-boolean attribute cannot engage the front by
+        accident either. The earlier wording claimed the front "can never engage by accident";
+        that was measurably false at the parse site and the claim is not restated here — what
+        holds is the narrower, checkable one: only an explicit boolean ``True`` resolves True."""
+        cfg = self._resolved_config
+        return (
+            getattr(cfg, "fleet_dispatch_advanced_intake_enabled", False) is True
+            if cfg is not None
+            else False
+        )
+
+    @property
     def coordinator_enabled(self) -> bool:
         """Resolved ``[coordinator].enabled`` gate (#843, ADR-039 — the
         Coordinator program's C1 read surface).
@@ -1063,6 +1156,91 @@ class AssistantOrchestratorService:
             str(getattr(cfg, "coordinator_battery_campaign_state_path", ""))
             if cfg is not None
             else ""
+        )
+
+    # ── C3 heartbeat properties (#845, design §3.2) — the launcher's single
+    # source of truth for the build_heartbeat factory (mirrors
+    # coordinator_enabled; never a second TOML parse). Each fail-closed
+    # before start(): flag off, registered cadence defaults, shadow TRUE. ──
+
+    @property
+    def coordinator_heartbeat_enabled(self) -> bool:
+        """Resolved ``[coordinator].heartbeat_enabled`` (#845 C3). ``False``
+        (dormant) before ``start()`` and on a missing key — the launcher's
+        ``build_heartbeat`` then constructs NOTHING (structural absence)."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "coordinator_heartbeat_enabled", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def coordinator_heartbeat_interval_s(self) -> float:
+        """Resolved ``[coordinator].heartbeat_interval_s`` — the AC-power wake
+        interval (registered in shared/timeout_registry.py)."""
+        cfg = self._resolved_config
+        return (
+            float(getattr(cfg, "coordinator_heartbeat_interval_s", 900.0))
+            if cfg is not None
+            else 900.0
+        )
+
+    @property
+    def coordinator_heartbeat_battery_multiplier(self) -> float:
+        """Resolved ``[coordinator].heartbeat_battery_multiplier`` — the
+        battery interval stretch (ADR-039 §2.12.12)."""
+        cfg = self._resolved_config
+        return (
+            float(getattr(cfg, "coordinator_heartbeat_battery_multiplier", 4.0))
+            if cfg is not None
+            else 4.0
+        )
+
+    @property
+    def coordinator_heartbeat_boot_grace_s(self) -> float:
+        """Resolved ``[coordinator].heartbeat_boot_grace_s`` — the first-cycle
+        boot grace + tripwire idle-grace floor (registered)."""
+        cfg = self._resolved_config
+        return (
+            float(getattr(cfg, "coordinator_heartbeat_boot_grace_s", 300.0))
+            if cfg is not None
+            else 300.0
+        )
+
+    @property
+    def coordinator_overnight_window(self) -> str:
+        """Resolved ``[coordinator].overnight_window`` — the runtime-readable
+        quiet window (design §8.3)."""
+        cfg = self._resolved_config
+        return (
+            str(getattr(cfg, "coordinator_overnight_window", "23:00-09:00"))
+            if cfg is not None
+            else "23:00-09:00"
+        )
+
+    @property
+    def coordinator_operator_absent(self) -> bool:
+        """Resolved ``[coordinator].operator_absent`` (design §8.2)."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "coordinator_operator_absent", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def coordinator_shadow_mode(self) -> bool:
+        """Resolved ``[coordinator].shadow_mode`` (#855 gate, design §7.2).
+        TRUE — the shadow-safe direction — before ``start()``, on a missing
+        key, and on any mistyped value (CoordinatorConfig.from_toml's
+        inverted fail-closed resolve); only a genuine TOML boolean ``false``
+        (the #855 graduation ceremony) reads live."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "coordinator_shadow_mode", True))
+            if cfg is not None
+            else True
         )
 
     # ── Coordinator heartbeat — drafting adapter (#845 C3 limb 5) ───────
@@ -1307,6 +1485,19 @@ class AssistantOrchestratorService:
         cfg = self._resolved_config
         return (
             bool(getattr(cfg, "fleet_dispatch_guest_oracle_enabled", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_already_satisfied_precheck(self) -> bool:
+        """Resolved ``[fleet_dispatch].already_satisfied_precheck`` (#1049).
+        Fail-closed: ``False`` before ``start()`` resolves the config and on a
+        missing key — the swap driver never consults the pre-check seam and every
+        wave dispatches exactly as before."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_already_satisfied_precheck", False))
             if cfg is not None
             else False
         )
@@ -1675,6 +1866,11 @@ class AssistantOrchestratorService:
         fleet_dispatch = config_data.get("fleet_dispatch", {})
         web_search = config_data.get("web_search", {})
         coordinator = config_data.get("coordinator", {})
+        # C3 (#845): the fail-closed [coordinator] cadence/shadow resolver —
+        # ONE resolution, re-materialized into the housing dataclass below.
+        from shared.coordinator.config import CoordinatorConfig as _CoordinatorConfig
+
+        _coordinator_cfg = _CoordinatorConfig.from_toml(coordinator)
 
         # #811 / AUDIT-12: resolve the two fleet roots through the SSOT resolver
         # (env override -> TOML value -> "" -> compiled-in this-host fallback). The
@@ -1845,6 +2041,16 @@ class AssistantOrchestratorService:
             # -> False (structurally dormant); True alone opens no egress
             # (RULE 3 + the empty allowlist deny at loop AND door).
             web_search_enabled=bool(web_search.get("enabled", False)),
+            # #727 — fail-closed PARSE-guard bounds for the live adapter (a
+            # second, INDEPENDENT lock downstream of the egress door's 8 MiB
+            # on-the-wire cap). Absent -> the safe compiled-in defaults, so the
+            # guard is ALWAYS armed. Validated as positive ints at boot (below).
+            web_search_max_response_bytes=int(
+                web_search.get("max_response_bytes", 2 * 1024 * 1024)
+            ),
+            web_search_max_parse_depth=int(
+                web_search.get("max_parse_depth", 12)
+            ),
             # The 4th weld lock for UC-003 Workstream B images. Fail-closed:
             # absent key -> False (dormant), so image fetch never engages
             # unless the operator deliberately flips it AND opens the door.
@@ -1857,6 +2063,18 @@ class AssistantOrchestratorService:
             fleet_dispatch_enabled=bool(fleet_dispatch.get("enabled", False)),
             fleet_dispatch_clarify_enabled=bool(fleet_dispatch.get("clarify", True)),
             fleet_dispatch_revise_enabled=bool(fleet_dispatch.get("revise", True)),
+            # #1031: fail-closed default False — a missing key leaves the advanced front OFF.
+            # #1042: `is True`, NOT bool(). bool() COERCES rather than validates, and
+            # _validate_config_data type-checks ZERO [fleet_dispatch] keys, so
+            # `advanced_intake = "false"` — the shape a hand-edited rollback takes — coerced to
+            # True and silently ENGAGED a capability whose go-live is an LA ceremony, with no
+            # error and a config file that reads as OFF. Only an explicit TOML boolean `true`
+            # turns this on; every other value, truthy garbage included, resolves False.
+            # Deliberately NOT applied to enabled/clarify/revise: those default TRUE, so a
+            # truthy accident is not a posture change for them (pre-merge review scope note).
+            fleet_dispatch_advanced_intake_enabled=(
+                fleet_dispatch.get("advanced_intake", False) is True
+            ),
             swap_min_free_gb=float(fleet_dispatch.get("swap_min_free_gb", 21.0)),
             # #670 P2: out-of-band overall-run budget (s); the resolver property + the driver's
             # _coerce_budget both clamp a non-positive value to 0.0 (disabled, never instant-timeout).
@@ -1885,6 +2103,21 @@ class AssistantOrchestratorService:
             coordinator_battery_campaign_state_path=str(
                 coordinator.get("battery_campaign_state_path", "")
             ),
+            # C3 heartbeat keys (#845): resolved through CoordinatorConfig.from_toml
+            # — the ONE fail-closed resolver for [coordinator] cadence/shadow
+            # semantics (bool-as-number rejected; sub-1 multiplier refused;
+            # interval floored at 60 s; shadow_mode fail-closed toward TRUE) —
+            # then re-materialized into this housing dataclass so the launcher
+            # keeps reading a single source of truth.
+            coordinator_heartbeat_enabled=_coordinator_cfg.heartbeat_enabled,
+            coordinator_heartbeat_interval_s=_coordinator_cfg.heartbeat_interval_s,
+            coordinator_heartbeat_battery_multiplier=(
+                _coordinator_cfg.heartbeat_battery_multiplier
+            ),
+            coordinator_heartbeat_boot_grace_s=_coordinator_cfg.heartbeat_boot_grace_s,
+            coordinator_overnight_window=_coordinator_cfg.overnight_window,
+            coordinator_operator_absent=_coordinator_cfg.operator_absent,
+            coordinator_shadow_mode=_coordinator_cfg.shadow_mode,
             # M2 plan-graph (W1-W6, #740). Fail-closed: absent key -> False (the flat
             # serial queue, byte-identical today-behavior).
             fleet_dispatch_plan_graph=bool(fleet_dispatch.get("plan_graph", False)),
@@ -1897,6 +2130,11 @@ class AssistantOrchestratorService:
             # swap driver never touches the guest-oracle seams).
             fleet_dispatch_guest_oracle_enabled=bool(
                 fleet_dispatch.get("guest_oracle_enabled", False)
+            ),
+            # #1049 already-satisfied pre-check. Fail-closed: absent key -> False
+            # (the swap driver never consults the pre-check seam).
+            fleet_dispatch_already_satisfied_precheck=bool(
+                fleet_dispatch.get("already_satisfied_precheck", False)
             ),
             step_aside_grace_s=float(fleet_dispatch.get("step_aside_grace_s", 2.0)),
             image_gen_model_dir=str(
@@ -1946,16 +2184,10 @@ class AssistantOrchestratorService:
             image_gen_require_signed_manifest=bool(
                 image_generation.get("require_signed_manifest", False)
             ),
-            # UC-010 model VARIANT (illustration support). Absent -> the live
-            # photoreal SDXL default (byte-identical to the pre-variant path).
-            # The value is enum-validated in _validate_config_data (fail-closed
-            # on an unknown variant). The illustration_* keys are consumed ONLY
-            # when the variant selects them (see start()).
-            image_gen_model_variant=str(
-                image_generation.get(
-                    "model_variant", image_gen.VARIANT_PHOTOREAL_SDXL
-                )
-            ),
+            # UC-010 illustration support: the illustration_* keys below are
+            # consumed ONLY when a per-request style selects them (see
+            # _image_gen_config_for_style); absent -> the live photoreal SDXL
+            # default.
             image_gen_illustration_model_dir=str(
                 image_generation.get(
                     "illustration_model_dir",
@@ -2171,6 +2403,54 @@ class AssistantOrchestratorService:
                     code="AO_CFG_WEB_SEARCH_ENABLED_INVALID",
                     message="'web_search.enabled' must be a boolean.",
                 )
+            # #727 — the two additive PARSE-guard caps, when present, MUST be
+            # positive integers. A non-int / non-positive value would disarm or
+            # invert the fail-closed guard, so it is surfaced as a boot-time
+            # misconfiguration, never a silent coercion. (bool is an int
+            # subclass, so it is excluded explicitly.)
+            for _ws_cap_key in ("max_response_bytes", "max_parse_depth"):
+                _ws_cap = web_search.get(_ws_cap_key)
+                if _ws_cap is not None and (
+                    not isinstance(_ws_cap, int)
+                    or isinstance(_ws_cap, bool)
+                    or _ws_cap <= 0
+                ):
+                    raise ConfigResolutionError(
+                        code="AO_CFG_WEB_SEARCH_PARSE_GUARD_INVALID",
+                        message=(
+                            f"'web_search.{_ws_cap_key}' must be a positive "
+                            "integer when present."
+                        ),
+                    )
+            # #727 NIT 3 — the byte cap must ALSO not EXCEED the egress door's
+            # on-the-wire cap (guarded_fetch._MAX_BODY_BYTES, 8 MiB): the parse
+            # guard is meant to be a TIGHTER, INDEPENDENT second lock downstream
+            # of the door, so a configured value above the door cap would make it
+            # a silent no-op (the door truncates the body first). Reject it
+            # LOUDLY at boot — surface the misconfiguration, never silently clamp
+            # (matches the guard's own "surface misconfig, never coerce" stance).
+            # Imported here (not at module load) to keep httpx off the import
+            # path for callers that never resolve config, mirroring the lazy
+            # door import in _maybe_register_web_search.
+            _ws_max_bytes = web_search.get("max_response_bytes")
+            if isinstance(_ws_max_bytes, int) and not isinstance(
+                _ws_max_bytes, bool
+            ):
+                from shared.security.guarded_fetch import (
+                    _MAX_BODY_BYTES as _door_max_body_bytes,
+                )
+
+                if _ws_max_bytes > _door_max_body_bytes:
+                    raise ConfigResolutionError(
+                        code="AO_CFG_WEB_SEARCH_PARSE_GUARD_INVALID",
+                        message=(
+                            "'web_search.max_response_bytes' "
+                            f"({_ws_max_bytes}) must not exceed the egress "
+                            f"door's on-the-wire byte cap "
+                            f"({_door_max_body_bytes}) — the parse guard must "
+                            "stay a tighter, independent lock."
+                        ),
+                    )
 
         # [knowledge] is OPTIONAL (back-compat: older configs omit it and get
         # the secure defaults) but strictly validated when present — the
@@ -2255,20 +2535,6 @@ class AssistantOrchestratorService:
                 raise ConfigResolutionError(
                     code="AO_CFG_IMAGE_GEN_ENABLED_INVALID",
                     message="'image_generation.enabled' must be a boolean.",
-                )
-            # Model variant is an enum: fail-closed on an unknown value so a typo
-            # cannot silently fall back to the wrong model (UC-010 illustration).
-            ig_variant = image_generation.get("model_variant")
-            if ig_variant is not None and (
-                not isinstance(ig_variant, str)
-                or ig_variant not in image_gen.KNOWN_VARIANTS
-            ):
-                raise ConfigResolutionError(
-                    code="AO_CFG_IMAGE_GEN_VARIANT_INVALID",
-                    message=(
-                        "'image_generation.model_variant' must be one of "
-                        f"{sorted(image_gen.KNOWN_VARIANTS)}."
-                    ),
                 )
             if image_generation.get("steps") is not None:
                 config_validation.require_int_range(
@@ -2862,6 +3128,10 @@ class AssistantOrchestratorService:
                 # (operator feedback on a pending plan). generate_plan detects the sentinel and
                 # returns edit ops early; a non-revise goal ignores this flag entirely.
                 revise=self.fleet_dispatch_revise_enabled,
+                # #1031: the staged-intake gate. Dormant by default; when off, generate_plan
+                # is byte-identical to today. A battery card never enters the advanced front
+                # (the card IS the spec), same self-suppression as clarify above.
+                advanced_intake=self.fleet_dispatch_advanced_intake_enabled,
             )
         except Exception as exc:  # noqa: BLE001 — fail-closed: never crash the AO loop
             logger.error("PLAN request failed: %s", exc, exc_info=True)
@@ -2974,14 +3244,18 @@ class AssistantOrchestratorService:
             # M2 (#740): the plan-graph knob rides the config -> the spec -> the
             # detached driver. False (default) keeps the flat queue byte-identical.
             plan_graph=self.fleet_dispatch_plan_graph,
-            # #749: the durable-ticket knobs ride the config so the driver's REPORT
-            # phase can post outcomes (the driver-side wiring is a tracked TODO —
-            # the seam is present, dormant until #749's driver leg lands).
+            # #749: the durable-ticket knobs ride the config -> the spec -> the
+            # detached driver, whose REPORT leg posts the job outcome (wired
+            # 2026-07-14 at the LA-present supervised proof; find-or-create +
+            # scorecard comment; GREEN+oracle closes, PARKED/STALLED stay open).
             vikunja_bridge=self.fleet_dispatch_vikunja_bridge,
             vikunja_bridge_project_id=self.fleet_dispatch_vikunja_bridge_project_id,
             # #744: the guest-oracle knob rides the config -> the spec -> the
             # detached driver. False (default) never touches the guest seams.
             guest_oracle_enabled=self.fleet_dispatch_guest_oracle_enabled,
+            # #1049: the already-satisfied pre-check knob rides the same chain.
+            # False (default) never consults the pre-check seam.
+            already_satisfied_precheck=self.fleet_dispatch_already_satisfied_precheck,
         )
         # UC-010 SEAM A (DORMANT behind BLARAI_ENABLE_ASSET_GENERATION): with the 14B
         # STILL resident and BEFORE the swap, generate the planned image assets and commit
@@ -5402,8 +5676,18 @@ class AssistantOrchestratorService:
                 make_web_search_runner,
             )
 
+            # #727 — thread the fail-closed PARSE-guard bounds from config into
+            # the adapter (a second, independent lock downstream of the door's
+            # 8 MiB on-the-wire cap). The adapter also clamps a bad value to its
+            # safe default, so the guard is armed even on a direct construction.
             tools.register_web_search_runner(
-                make_web_search_runner(LiveKagiAdapter(key))
+                make_web_search_runner(
+                    LiveKagiAdapter(
+                        key,
+                        max_response_bytes=resolved.web_search_max_response_bytes,
+                        max_parse_depth=resolved.web_search_max_parse_depth,
+                    )
+                )
             )
 
             from shared.security import guarded_fetch
@@ -5422,9 +5706,11 @@ class AssistantOrchestratorService:
             logger.warning(
                 "web_search runner REGISTERED (flag on + key loaded). Egress "
                 "still binds at RULE 3 + the deterministic egress allowlist "
-                "at BOTH the tool loop (D4) and the egress door — an empty "
-                "allowlist denies every search until the ADR-027 Am.1 "
-                "go-live ceremony populates it."
+                "at BOTH the tool loop (D4) and the egress door — only hosts "
+                "in that allowlist are reachable, and an allowlist with no "
+                "entries denies every search. The allowlist's contents are the "
+                "authority on what is reachable (DeterministicPolicyChecker."
+                "_EGRESS_ALLOWLIST); this line must never restate them."
             )
             return True
         except Exception as exc:  # noqa: BLE001 — registration failure is dormancy

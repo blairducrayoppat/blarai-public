@@ -1529,6 +1529,20 @@ class OrchestratorGPUInference:
         t_end = time.perf_counter()
         total_ms = (t_end - t_start) * 1000.0
 
+        # #895 (residual of #806): derive token_count/tokens by re-encoding the
+        # think-STRIPPED output_text here — deliberately, NOT from the generation
+        # result. This bare-string generate() path returns a plain str with no
+        # perf_metrics, and the only pipeline-reported count
+        # (perf_metrics.get_num_generated_tokens) counts the RAW generated tokens:
+        # it INCLUDES the <think> block stripped above plus special tokens, and is
+        # uncapped. token_count feeds context-window budget eviction
+        # (context_manager.add_turn -> trim_to_budget) and output validation
+        # against the stored, think-stripped turn, so it MUST measure that stripped
+        # text — substituting the raw generated count would over-charge the budget
+        # and evict conversation history early (a multi-turn quality regression).
+        # The re-encode is host-side and linear; #806's O(M^2) hot path was the
+        # per-chunk streamer rescan (now _IncrementalVisibleText), not this pass.
+        # Regression lock: tests/test_gpu_inference.py::TestTokenCountSemantics.
         output_tokens: list[int] = []
         if output_text and self._tokenizer is not None and np is not None:
             try:

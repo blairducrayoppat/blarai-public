@@ -51,10 +51,25 @@ from pathlib import Path
 from typing import Any, Callable
 
 from evals.loader import GoldenDataError, golden_path, load_golden
+from evals.model_target import Capability, ModelTarget
 from evals.rubric import score_answer, validate_checks
 from evals.types import CaseResult, CaseStatus, SuiteReport
 
 SUITE_NAME: str = "preference_memory"
+
+# A ``multimodal-vlm`` #931 override targets a VLMPipeline checkpoint. The
+# preference model generator is ``OrchestratorGPUInference`` (LLMPipeline) AND
+# these cases score a ``propose_preference`` TOOL-CALL emission whose VLM
+# behaviour is unproven — so VLM model cases here are SKIPPED (loud, explained)
+# rather than mis-pipelined. See #931 follow-on (pairs with the PA-classifier
+# VLM follow-on).
+_VLM_PREF_NOT_WIRED_DETAIL: str = (
+    "multimodal-vlm capability is not wired for the preference-memory model "
+    "generator (OrchestratorGPUInference is LLMPipeline-bound; the "
+    "propose_preference tool-call path is unproven on VLMPipeline) — skipped, "
+    "not mis-pipelined (#931 follow-on). Use --capability text-llm for a dense "
+    "override."
+)
 
 _VALID_KINDS: frozenset[str] = frozenset(
     {
@@ -139,6 +154,8 @@ def _seed_bank(bank, preferences: list[dict[str, Any]]) -> None:
 
 def make_preference_model_generator(
     model_dir: Path | None = None,
+    *,
+    speculative_decoding_enabled: bool | None = None,
 ) -> Callable[[str, str], str]:
     """Model-in-the-loop generator taking ``(prompt, system_prompt)``.
 
@@ -146,6 +163,13 @@ def make_preference_model_generator(
     greedy decoding) but passes the COMPOSED system prompt — the pinned block
     rides the same ``system_prompt`` override seam production uses (#748 /
     #770), so the eval measures the real injection geometry.
+
+    Args:
+        model_dir: Explicit AO model directory (defaults to the 14B).
+        speculative_decoding_enabled: ``None`` (default) constructs
+            ``OrchestratorGPUInference`` EXACTLY as before (byte-identical); a
+            #931 ``text-llm`` override passes the declared speculative-decode
+            contract explicitly.
     """
     from evals.suites.answer_quality import (
         default_model_dir,
@@ -159,7 +183,13 @@ def make_preference_model_generator(
     resolved = model_dir or default_model_dir()
     if not resolved.exists():
         raise FileNotFoundError(f"AO model directory not found: {resolved}")
-    inference = OrchestratorGPUInference(model_dir=str(resolved))
+    if speculative_decoding_enabled is None:
+        inference = OrchestratorGPUInference(model_dir=str(resolved))
+    else:
+        inference = OrchestratorGPUInference(
+            model_dir=str(resolved),
+            speculative_decoding_enabled=speculative_decoding_enabled,
+        )
     if not inference.load_model():
         raise RuntimeError(f"AO model failed to load from {resolved}")
 
@@ -682,11 +712,21 @@ def _validate_case(case: dict[str, Any]) -> str | None:
     return None
 
 
+def _pref_model_dir(model_target: ModelTarget | None) -> Path | None:
+    """The AO model directory for the #931 override, else ``None`` (14B default).
+
+    ``None`` lets :func:`make_preference_model_generator` resolve its own
+    ``default_model_dir()`` — byte-identical to the pre-#931 path.
+    """
+    return model_target.model_dir if model_target is not None else None
+
+
 def run_suite(
     golden_file: Path | None = None,
     *,
     include_hardware: bool = False,
     hardware_generator: Callable[[str, str], str] | None = None,
+    model_target: ModelTarget | None = None,
 ) -> SuiteReport:
     """Run the preference-memory suite.
 
@@ -698,6 +738,11 @@ def run_suite(
         hardware_generator: Injectable ``(prompt, system_prompt) -> raw text``
             for model cases; built via :func:`make_preference_model_generator`
             when None and hardware was requested.
+        model_target: The #931 OPT-IN hardware model-target override. ``None``
+            keeps the byte-identical default 14B path. A ``text-llm`` target
+            loads its directory (honoring the speculative-decode contract). A
+            ``multimodal-vlm`` target SKIPS the model cases (loud, explained) —
+            the VLM preference generator is a #931 follow-on.
     """
     path = golden_file or golden_path(SUITE_NAME)
     try:
@@ -713,6 +758,10 @@ def run_suite(
 
     report = SuiteReport(suite=SUITE_NAME)
     generator = hardware_generator
+    vlm_target = (
+        model_target is not None
+        and model_target.capability is Capability.MULTIMODAL_VLM
+    )
 
     for case in cases:
         case_id = str(case.get("id", "<missing-id>"))
@@ -738,9 +787,25 @@ def run_suite(
                     )
                 )
                 continue
+            if vlm_target and hardware_generator is None:
+                report.results.append(
+                    CaseResult(
+                        case_id=case_id, status=CaseStatus.SKIPPED_HARDWARE,
+                        description=description,
+                        detail=_VLM_PREF_NOT_WIRED_DETAIL,
+                    )
+                )
+                continue
             try:
                 if generator is None:
-                    generator = make_preference_model_generator()
+                    generator = make_preference_model_generator(
+                        _pref_model_dir(model_target),
+                        speculative_decoding_enabled=(
+                            model_target.speculative_decode
+                            if model_target is not None
+                            else None
+                        ),
+                    )
                 if kind == "proposes_preference":
                     passed, expected, actual, detail = _run_proposes_case(
                         case, generator

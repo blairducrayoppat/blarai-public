@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from shared.fleet import acceptance as acc
+from shared.fleet import clarify as clr
 from shared.fleet import oracle_qa as oq
 from shared.fleet import swap_ops as so
 from shared.fleet.acceptance import (
@@ -202,6 +203,239 @@ def test_scan_invented_return_conservative():
     assert oq.scan_invented_return_contracts(triv, "a thing") == []
     # The clean oracle asserts a NUMBER (total() == 7) → never flagged.
     assert oq.scan_invented_return_contracts(_CLEAN, "an expense tracker") == []
+
+
+# ---------------------------------------------------------------------------
+# #1043 — the corpus/author alignment. The oracle is authored from the PLANNING SEED
+# (goal + the operator's clarified requirements, #819/#1032) while ``spec.goal`` stays
+# the CLEAN goal by design. Judging the oracle against the narrower spec text convicted
+# it for asserting exactly the value the operator supplied.
+# ---------------------------------------------------------------------------
+
+#: The operator's own words, and the oracle that legitimately encodes them. Nothing here
+#: is invented — "Saved" reaches the oracle only because the operator asked for it.
+_OPERATOR_ANSWER = "show the word Saved after each entry"
+_OPERATOR_GROUNDED_ORACLE = (
+    "from store import add_item\n\n"
+    "def test_adding_an_entry_confirms():\n"
+    "    assert add_item('milk') == 'Saved'\n"
+)
+
+
+def _real_operator_answers(*clarifications: dict) -> tuple[str, ...]:
+    """Build the grounding input the way PRODUCTION does — through the REAL composer and
+    its REAL extractor, never a hand-written approximation.
+
+    Load-bearing (#1043 review F3): the first draft of these locks hand-wrote the
+    authored-from string and even hand-approximated the house header, so the boilerplate-
+    poisoning defect sailed through a suite written to catch exactly that class. A fixture
+    that merely RESEMBLES the real string is how such a defect survives its own test.
+    """
+    return clr.operator_answers_from_block(clr.compose_requirements_block(list(clarifications)))
+
+
+def test_spec_corpus_grounds_on_the_operator_answers():
+    """The corpus spans every channel the operator's words arrive through."""
+    spec = _spec(_crit("c2", "adding an entry shows it in the list"))
+    # The spec alone does NOT contain the operator's word — this is the trap.
+    assert "saved" not in oq._spec_corpus(spec)
+    # The operator's answer, routed through the real composer, carries it in.
+    corpus = oq._spec_corpus(spec, _real_operator_answers(
+        {"question": "confirm?", "answer": _OPERATOR_ANSWER, "assumed": False}))
+    assert "saved" in corpus
+    assert "an expense tracker" in corpus       # the goal is still there
+    assert "adding an entry" in corpus          # so are the criteria
+
+
+def test_house_boilerplate_never_enters_the_grounding_corpus():
+    """#1043 review F1 — the reachable blocker the first build shipped.
+
+    ``authored_from`` used to be the RENDERED requirements block, whose fixed header
+    ("The person clarified these requirements — build to them:") entered the corpus on
+    EVERY clarified dispatch. That granted authority to words no operator uttered, so an
+    oracle asserting ``classify(...) == 'person'`` was excused — a genuinely-bad oracle
+    silently forgiven, violating this slice's own "zero effect on a bad oracle" bar.
+
+    Grounding is authority; only the operator may confer it. Built through the real
+    composer so a header reword cannot quietly re-open the hole.
+    """
+    answers = _real_operator_answers(
+        {"question": "store phone?", "answer": "yes, store a phone number with each contact",
+         "assumed": False})
+    spec = _spec(_crit("c2", "shows saved contacts"))
+    corpus = oq._spec_corpus(spec, answers)
+
+    for word in ("person", "build", "clarified", "requirements", "them", "these"):
+        assert word not in corpus, (
+            f"house boilerplate {word!r} reached the grounding corpus — the judge now "
+            "excuses an oracle asserting our own prose back at us"
+        )
+
+    # The concrete conviction the poisoning excused. 'person' is an ordinary return value.
+    invented = ("from classify import classify\n\n"
+                "def test_x():\n    assert classify('Bob Smith') == 'person'\n")
+    assert [f.cls for f in oq.scan_invented_return_contracts(invented, corpus)] == [
+        oq.CLASS_INVENTED_RETURN
+    ]
+    # POSITIVE CONTROL: the operator's OWN word still grounds, so the exclusion above is
+    # about provenance and not about the corpus being empty.
+    grounded = ("from store import add_item\n\n"
+                "def test_y():\n    assert add_item('x') == 'phone'\n")
+    assert oq.scan_invented_return_contracts(grounded, corpus) == []
+
+
+def test_model_written_criteria_ground_because_the_coder_is_given_them():
+    """The admission rule is "requirement content the CODER was also given", NOT "the
+    operator wrote it" — and this lock exists because the docstring once claimed the latter.
+
+    Criteria are written by the 14B and they DO ground the scanner. That is correct rather
+    than a hole: :func:`compile_prompts` puts each criterion's text/check verbatim into the
+    coder's task prompt, so a criterion naming a value genuinely instructed the coder to
+    produce it and an oracle asserting it blindsides nobody. The clarify question fails
+    exactly this test — it never reaches the coder — which is why excluding it is right
+    while excluding criteria would be wrong.
+
+    If a future change stops compiling criteria into the coder's prompt, the justification
+    for admitting them evaporates. This asserts that premise instead of trusting the prose.
+    """
+    crit = _crit("c2", "each saved row is marked Ledgered in the list")
+    spec = _spec(crit)
+    assert "ledgered" in oq._spec_corpus(spec)
+
+    oracle = ("from ledger import save_row\n\n"
+              "def test_marks():\n    assert save_row({}) == 'Ledgered'\n")
+    assert oq.scan_invented_return_contracts(oracle, oq._spec_corpus(spec)) == []
+
+    # The premise, asserted against the REAL compiler: the coder IS given that text.
+    compiled = acc.compile_prompts(
+        [{"repo": "X", "task": "core", "prompt": "build core"},
+         {"repo": "X", "task": "report", "prompt": "build report"}],
+        spec,
+    )
+    assert any("Ledgered" in str(t.get("prompt", "")) for t in compiled), (
+        "criteria no longer reach the coder's prompts — the reason model-written criteria "
+        "may ground the invented-return scanner has gone away, so the admission rule in "
+        "_spec_corpus's docstring is now false and the exclusion must be revisited."
+    )
+
+
+def test_assumed_answer_grounds_but_its_tag_does_not():
+    """The "just decide for me" path renders an ``(assumed)`` marker. The ANSWER is a
+    deterministic in-repo default (legitimate grounding); the MARKER is house prose."""
+    answers = _real_operator_answers(
+        {"question": "where?", "answer": "save to a local file", "assumed": True})
+    corpus = oq._spec_corpus(_spec(_crit("c2", "keeps data")), answers)
+    assert "local file" in corpus
+    assert "assumed" not in corpus
+
+
+def test_spec_corpus_unions_recorded_clarification_ANSWERS():
+    """A spec carrying the #819 record grounds on the ANSWER — and the record rides
+    ``to_dict``/``from_dict``, so a RECONSTRUCTED spec keeps that grounding. The model's
+    QUESTION text is excluded (see the laundering lock below)."""
+    spec = AcceptanceSpec(
+        goal="a todo app",
+        criteria=(_crit("c2", "adding an entry shows it in the list"),),
+        clarifications=({"question": "confirm each entry?", "answer": _OPERATOR_ANSWER,
+                         "assumed": False},),
+    )
+    corpus = oq._spec_corpus(AcceptanceSpec.from_dict(spec.to_dict()))
+    assert "saved" in corpus                  # the operator's ANSWER grounds
+    assert "confirm each entry" not in corpus  # the model's QUESTION does not
+
+
+def test_model_authored_question_cannot_launder_an_invention():
+    """Grounding IS authority, so only human/deterministic text may confer it.
+
+    The clarify model writes the QUESTION, and its questions routinely name a candidate
+    value. If the question entered the corpus, the model could excuse its own invented
+    return contract — here excusing an assertion the operator's answer explicitly REFUSED.
+    (Found in independent review of the first #1043 build, which admitted the question.)
+    """
+    spec = AcceptanceSpec(
+        goal="a todo app",
+        criteria=(_crit("c2", "adding an entry shows it in the list"),),
+        clarifications=({"question": "Should add_item return the string Saved?",
+                         "answer": "no, return None", "assumed": False},),
+    )
+    corpus = oq._spec_corpus(spec)
+    assert "saved" not in corpus, "the model's question text leaked into the grounding corpus"
+    findings = oq.scan_invented_return_contracts(_OPERATOR_GROUNDED_ORACLE, corpus)
+    assert [f.cls for f in findings] == [oq.CLASS_INVENTED_RETURN], (
+        "an assertion the operator REFUSED was excused — the model laundered its own "
+        "invention through its own question text"
+    )
+
+    # POSITIVE CONTROL: the same oracle IS excused when the OPERATOR's answer names the
+    # value. Without this arm the assertion above could pass on a scanner that always fires.
+    said_yes = AcceptanceSpec(
+        goal="a todo app",
+        criteria=(_crit("c2", "adding an entry shows it in the list"),),
+        clarifications=({"question": "Should add_item return the string Saved?",
+                         "answer": "yes, return Saved", "assumed": False},),
+    )
+    assert oq.scan_invented_return_contracts(
+        _OPERATOR_GROUNDED_ORACLE, oq._spec_corpus(said_yes)) == []
+
+
+def test_spec_corpus_fail_soft_unchanged():
+    """No operator answers and no clarifications → the goal alone, exactly as before;
+    nothing at all → '' (which DISABLES the scanner rather than inventing a finding)."""
+    assert oq._spec_corpus(AcceptanceSpec(goal="a todo app")) == "a todo app"
+    assert oq._spec_corpus(AcceptanceSpec(goal="")) == ""
+    assert oq._spec_corpus(AcceptanceSpec(goal=""), ()) == ""
+    assert oq._spec_corpus(AcceptanceSpec(goal="a todo app"), None) == "a todo app"
+
+
+def test_validate_does_not_convict_an_operator_supplied_return_value():
+    """#1043, with its toggle-off: the SAME oracle + spec is RED without the alignment
+    and GREEN with it, so the lock demonstrably sees the real defect."""
+    crits = [_crit("c2", "adding an entry shows it in the list")]
+    spec = _spec(*crits)
+    tasks = _tasks(exports=("add_item(text)",), creates=("store.py",))
+    answers = _real_operator_answers(
+        {"question": "confirm?", "answer": _OPERATOR_ANSWER, "assumed": False})
+    common = dict(
+        generate_fn=lambda p: "",  # any regeneration attempt yields nothing usable
+        structured_generate_fn=_full_cover_structured(
+            {"c2": ["test_adding_an_entry_confirms"]}),
+    )
+
+    # TOGGLE OFF (the pre-#1043 behaviour — judge against the spec alone): RED.
+    off = oq.validate_authored_oracle(
+        _OPERATOR_GROUNDED_ORACLE, "python", spec, tasks, **common)
+    assert off.counts[oq.CLASS_INVENTED_RETURN] == 1, (
+        "the toggle-off arm must reproduce the defect — a lock whose negative arm is "
+        "already clean proves nothing"
+    )
+
+    # ALIGNED: the oracle is judged against what the operator said → clean.
+    on = oq.validate_authored_oracle(
+        _OPERATOR_GROUNDED_ORACLE, "python", spec, tasks, operator_answers=answers, **common)
+    assert on.counts[oq.CLASS_INVENTED_RETURN] == 0
+    assert on.verdict == "seed"
+    assert on.regen_rounds == 0          # nothing to regenerate → no wasted GPU round
+    assert "Saved" in on.oracle_code     # the operator's value SURVIVES into the exam
+
+
+def test_alignment_does_not_blind_the_scanner_to_a_real_invention():
+    """The alignment widens grounding to the operator's words — and NOT one word more.
+    A value neither the spec NOR the operator's answers name is still convicted.
+
+    Built through the real composer: an earlier draft hand-wrote this fixture, including a
+    hand-approximated "the person clarified" phrase, and that near-miss is precisely why it
+    failed to notice the real header was poisoning the corpus (#1043 review F3).
+    """
+    crits = [_crit("c2", "quizzes the user on flashcards")]
+    result = oq.validate_authored_oracle(
+        _INVENTED_RETURN_ONLY, "python", _spec(*crits),
+        _tasks(exports=("check_answer(word)",), creates=("flashcards.py",)),
+        generate_fn=lambda p: "",
+        structured_generate_fn=_full_cover_structured({"c2": ["test_quiz"]}),
+        operator_answers=_real_operator_answers(
+            {"question": "where?", "answer": "use it on my phone", "assumed": False}),
+    )
+    assert result.counts[oq.CLASS_INVENTED_RETURN] == 1
 
 
 def test_check_import_contract_flags_undeclared_module():
@@ -403,6 +637,113 @@ def test_request_coverage_map_grammar_first_then_freetext():
     # Unusable emission → None (caller stamps coverage unknown, never invents a verdict).
     m3 = oq.request_coverage_map(_CLEAN, crits, generate_fn=lambda p: "no json here")
     assert m3 is None
+
+
+# ---------------------------------------------------------------------------
+# #1003 order-independence probe — the coverage map is the one place two
+# candidate lists are co-presented for a matching judgement (criteria in spec
+# insertion order, test names in AST source order), with no order control on
+# either. These probes run the SAME deterministic pipeline twice — source
+# order, then BOTH lists reversed — and assert an identical covered-id set,
+# converting "we assume order doesn't matter" into a gate-enforced claim.
+# ---------------------------------------------------------------------------
+
+#: Three order-probe tests whose SOURCE ORDER (which derives the prompt's
+#: test-name list) can be reversed wholesale; each body is order-free and
+#: exercises a first-party symbol, so coverage never depends on position.
+_ORDER_PROBE_TESTS = (
+    "def test_add_expense_records():\n"
+    "    add_expense(3)\n"
+    "    assert total() == 3\n",
+    "def test_total_sums_expenses():\n"
+    "    add_expense(3)\n"
+    "    add_expense(4)\n"
+    "    assert total() == 7\n",
+    "def test_report_lists_totals():\n"
+    "    add_expense(2)\n"
+    "    assert '2' in report()\n",
+)
+
+
+def _order_probe_oracle(blocks: tuple[str, ...]) -> str:
+    return "from expense import add_expense, total, report\n\n" + "\n\n".join(blocks)
+
+
+def _order_probe_criteria() -> list[AcceptanceCriterion]:
+    return [_crit("c1", "records an expense"),
+            _crit("c2", "sums expenses"),
+            _crit("c3", "reports the total", "smoke")]
+
+
+def _prompt_lists(prompt: str) -> tuple[list[str], list[str]]:
+    """Read the two co-presented lists back EXACTLY as the prompt orders them
+    (criteria lines are ``- {id} [{tier}] {text}``; test names one CSV line)."""
+    criteria_part = prompt.split("Criteria:\n", 1)[1].split("\n\n", 1)[0]
+    ids = [line.split()[1] for line in criteria_part.splitlines()]
+    names_part = prompt.split("Test functions present in the file: ", 1)[1].split("\n\n", 1)[0]
+    return ids, [n.strip() for n in names_part.split(",")]
+
+
+def test_coverage_map_order_probe_identical_covered_set_under_swap():
+    # The free-text half of the oracle_qa.request_coverage_map injection seam.
+    # The judge is scripted and purely POSITION-driven — it pairs the i-th
+    # criterion with the i-th test name exactly as the prompt presents them —
+    # so reversing both lists together must yield the same pairing, and any
+    # asymmetry the probe surfaces belongs to the deterministic path (prompt
+    # build, emission parse, AST verify), not to a model. NOTE (#1003 honest
+    # scope): this establishes the surrounding pipeline is order-blind; only a
+    # swapped-order run against the live 14B would measure model position bias.
+    crits = _order_probe_criteria()
+    seen: list[list[str]] = []
+
+    def judge(prompt: str) -> str:
+        ids, names = _prompt_lists(prompt)
+        seen.append(ids)
+        return json.dumps({cid: [name] for cid, name in zip(ids, names, strict=True)})
+
+    code_fwd = _order_probe_oracle(_ORDER_PROBE_TESTS)
+    map_fwd = oq.request_coverage_map(code_fwd, crits, generate_fn=judge)
+    assert map_fwd, "scripted judge produced no usable forward emission"
+    covered_fwd, uncovered_fwd, _ = oq.verify_traceability(code_fwd, map_fwd, crits)
+
+    crits_rev = list(reversed(crits))
+    code_rev = _order_probe_oracle(tuple(reversed(_ORDER_PROBE_TESTS)))
+    map_rev = oq.request_coverage_map(code_rev, crits_rev, generate_fn=judge)
+    assert map_rev, "scripted judge produced no usable reversed emission"
+    covered_rev, uncovered_rev, _ = oq.verify_traceability(code_rev, map_rev, crits_rev)
+
+    # The swap must actually REACH the judge — otherwise the probe is vacuous.
+    assert seen == [["c1", "c2", "c3"], ["c3", "c2", "c1"]]
+    assert set(covered_fwd) == set(covered_rev) == {"c1", "c2", "c3"}
+    assert uncovered_fwd == [] and uncovered_rev == []
+
+
+def test_coverage_map_order_probe_structured_path_identical():
+    # The grammar-first half of the same seam: the schema pre-fills
+    # ``required`` in criteria order, so a reversed input reverses the schema
+    # the judge answers from. The covered set must be order-blind here exactly
+    # as on the free-text path.
+    seen: list[list[str]] = []
+
+    def structured(prompt: str, schema: str) -> str:
+        ids = list(json.loads(schema)["required"])
+        seen.append(ids)
+        _, names = _prompt_lists(prompt)
+        return json.dumps({cid: [name] for cid, name in zip(ids, names, strict=True)})
+
+    def covered_set(code: str, criteria: list[AcceptanceCriterion]) -> set[str]:
+        cov = oq.request_coverage_map(
+            code, criteria, generate_fn=lambda p: "", structured_generate_fn=structured)
+        assert cov, "scripted judge produced no usable grammar emission"
+        covered, _, _ = oq.verify_traceability(code, cov, criteria)
+        return set(covered)
+
+    crits = _order_probe_criteria()
+    fwd = covered_set(_order_probe_oracle(_ORDER_PROBE_TESTS), crits)
+    rev = covered_set(_order_probe_oracle(tuple(reversed(_ORDER_PROBE_TESTS))),
+                      list(reversed(crits)))
+    assert seen == [["c1", "c2", "c3"], ["c3", "c2", "c1"]]
+    assert fwd == rev == {"c1", "c2", "c3"}
 
 
 # ---------------------------------------------------------------------------

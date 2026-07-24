@@ -156,18 +156,33 @@ def ao_socket_ready(port: int, *, timeout_s: float = 2.0) -> bool:
         return False
 
 
-def ao_mtls_healthy(
+#: :func:`probe_ao_mtls` outcomes (#906). The probe names WHY it failed so the
+#: ensure-ao log never claims "cert drift" for a cold-load handshake timeout —
+#: the night-20260714 runner log mislabeled exactly that, and a mislabeled
+#: control message sends the NEXT diagnosis at the wrong cause (fail-loud means
+#: loud AND honest). ``ao_mtls_healthy`` stays the boolean wrapper every
+#: existing caller uses.
+AO_MTLS_HEALTHY = "healthy"
+AO_MTLS_VERIFY_FAILED = "verify-failed"   # the REAL cert drift (CERTIFICATE_VERIFY_FAILED)
+AO_MTLS_TIMEOUT = "timeout"               # connect/handshake timed out (the cold-load window)
+AO_MTLS_TLS_ERROR = "tls-error"           # a non-verify TLS failure (protocol/record layer)
+AO_MTLS_UNREACHABLE = "unreachable"       # refused / reset / no listener
+AO_MTLS_UNPROBEABLE = "unprobeable"       # certs absent, or no blessed client context
+
+
+def probe_ao_mtls(
     port: int,
     cert_path: Path,
     key_path: Path,
     ca_cert_path: Path,
     *,
     timeout_s: float = 5.0,
-) -> bool:
-    """True iff a client can COMPLETE the loopback mTLS handshake with the AO on *port*
-    using the launcher-provisioned gateway certs — i.e. the AO's server leaf verifies
-    against the CURRENT on-disk CA. This is the health that the bare-socket
-    ``ao_socket_ready`` cannot see.
+) -> str:
+    """Probe the loopback mTLS handshake with the AO on *port* and name the outcome
+    (one of the ``AO_MTLS_*`` constants above) — ``AO_MTLS_HEALTHY`` iff a client can
+    COMPLETE the handshake using the launcher-provisioned gateway certs, i.e. the AO's
+    server leaf verifies against the CURRENT on-disk CA. This is the health that the
+    bare-socket ``ao_socket_ready`` cannot see.
 
     THE FAILURE THIS CATCHES (found live 2026-07-06). The launcher mints a FRESH per-boot
     CA into ``certs/`` on every boot (``provision_per_boot_certs``), and an AO holds its
@@ -179,28 +194,58 @@ def ao_mtls_healthy(
     mTLS-aware turns that orphan into a re-boot (the launcher re-mints + reloads ONE
     consistent set) instead of a cascade of harness stalls.
 
+    WHY A NAMED REASON (#906, night-20260714): only ``AO_MTLS_VERIFY_FAILED`` is cert
+    drift. A handshake that TIMES OUT during the post-swap 14B cold-load window is a
+    different state with a different cure (wait, don't re-mint), and logging it as
+    "cert drift" sent a real diagnosis at the wrong cause.
+
     Reuses the SAME client context the real transport builds
     (:func:`shared.ipc.vsock.create_client_ssl_context` — CERT_REQUIRED, check_hostname
     False, TLS>=1.2) and the SAME gateway client cert the dispatch presents, so a PASS here
     proves the dispatch's mTLS will verify too. NO application bytes are sent — the completed
-    handshake alone is the proof, then the socket is closed. Fail-closed: certs absent,
-    connection refused, or verify failure all -> not healthy (unprobeable == not healthy)."""
+    handshake alone is the proof, then the socket is closed. Fail-closed: every non-healthy
+    outcome reads NOT ready to the caller (unprobeable == not healthy); nothing raises."""
     for p in (cert_path, key_path, ca_cert_path):
         if not Path(p).is_file():
-            return False
+            return AO_MTLS_UNPROBEABLE
     try:
         from shared.ipc.vsock import create_client_ssl_context
     except Exception:  # noqa: BLE001 — cannot build the blessed context -> unprobeable
-        return False
+        return AO_MTLS_UNPROBEABLE
     ctx = create_client_ssl_context(str(cert_path), str(key_path), str(ca_cert_path))
     if ctx is None:
-        return False
+        return AO_MTLS_UNPROBEABLE
     try:
         with socket.create_connection(("127.0.0.1", int(port)), timeout=timeout_s) as raw:
             with ctx.wrap_socket(raw, server_side=False):
-                return True
-    except (ssl.SSLError, OSError):
-        return False
+                return AO_MTLS_HEALTHY
+    except ssl.SSLCertVerificationError:
+        return AO_MTLS_VERIFY_FAILED
+    except TimeoutError:
+        # socket.timeout — both the TCP connect and the in-handshake
+        # "The handshake operation timed out" land here (TimeoutError precedes
+        # OSError: it is an OSError subclass, and NOT an SSLError).
+        return AO_MTLS_TIMEOUT
+    except ssl.SSLError:
+        return AO_MTLS_TLS_ERROR
+    except OSError:
+        return AO_MTLS_UNREACHABLE
+
+
+def ao_mtls_healthy(
+    port: int,
+    cert_path: Path,
+    key_path: Path,
+    ca_cert_path: Path,
+    *,
+    timeout_s: float = 5.0,
+) -> bool:
+    """True iff :func:`probe_ao_mtls` completes the loopback mTLS handshake — the
+    boolean wrapper every pre-#906 caller keeps using; see the probe for the full
+    failure story and the named non-healthy outcomes."""
+    return probe_ao_mtls(
+        port, cert_path, key_path, ca_cert_path, timeout_s=timeout_s
+    ) == AO_MTLS_HEALTHY
 
 
 # ---------------------------------------------------------------------------
@@ -440,10 +485,11 @@ class AoReensurer:
             # Maybe a swap-back relaunch is still cold-loading the 14B — wait for it
             # to bind BEFORE booting a second launcher (a second `python -m launcher`
             # would hit the single-instance lock and burn the boot; lesson 209).
-            self.log(f"{tag} AO not answering on :{self.port} — waiting up to "
+            self.log(f"{tag} AO not READY on :{self.port} (down, or up-but-unhealthy — see "
+                     "the [ensure-ao] line above when one was logged) — waiting up to "
                      f"{self.initial_grace_s:.0f}s for any in-flight relaunch before re-booting.")
             if self._poll_ready(self.initial_grace_s):
-                self.log(f"{tag} AO came up on its own — no re-boot needed.")
+                self.log(f"{tag} AO became ready on its own — no re-boot needed.")
                 return True
             self.log(f"{tag} still down — re-booting the launcher (python -m launcher, production).")
             self.boot()
@@ -497,11 +543,23 @@ class AoReensurer:
             # on a state the reboot cannot fix). Production always has them.
             if not (cert.is_file() and key.is_file() and ca.is_file()):
                 return True
-            if ao_mtls_healthy(port, cert, key, ca):
+            reason = probe_ao_mtls(port, cert, key, ca)
+            if reason == AO_MTLS_HEALTHY:
                 return True
-            log(f"[ensure-ao] :{port} accepts TCP but the mTLS handshake FAILS — cert drift "
-                "(the AO's leaf no longer verifies against the current CA); treating as NOT "
-                "ready so the launcher re-mints + reboots one consistent set.")
+            if reason == AO_MTLS_VERIFY_FAILED:
+                log(f"[ensure-ao] :{port} accepts TCP but the mTLS handshake fails "
+                    "VERIFICATION — cert drift (the AO's leaf no longer verifies against "
+                    "the current CA); treating as NOT ready so the launcher re-mints + "
+                    "reboots one consistent set.")
+            else:
+                # #906: NOT cert drift — name the real state (a cold-load handshake
+                # timeout is the common shape) instead of mislabeling it; the cure is
+                # the same fail-closed NOT-ready, but the LOG must not send the next
+                # diagnosis at the wrong cause (night-20260714).
+                log(f"[ensure-ao] :{port} accepts TCP but the mTLS probe did not complete "
+                    f"({reason}) — treating as NOT ready (fail-closed; NOT a verification "
+                    "failure, so this is not the drift shape — likely the post-swap "
+                    "cold-load window).")
             return False
 
         return cls(
@@ -1297,6 +1355,147 @@ def stalled_scorecard(card_id: str, reason: str, *, card: dict | None = None,
 
 
 # ---------------------------------------------------------------------------
+# #1058 — sandbox-freshness precondition (lesson 225's third-instance control)
+# ---------------------------------------------------------------------------
+#
+# Gate the expensive resource on the cheapest probe of the experiment's validity
+# precondition. The archive-by-rename + re-init block lives in the nightly
+# WRAPPER (run-battery-night.ps1), so wrapper-launched runs are fresh BY
+# CONSTRUCTION — but a direct `python -m tools.dispatch_harness.battery`
+# invocation has no such guarantee, and a card dispatched onto a sandbox
+# carrying a prior run's `agent:` commits builds on that work and confounds the
+# measurement (the 2026-07-21 17:19 baseline shape). This gate reads each
+# card's sandbox git history BEFORE any per-card spend (the AO re-ensure can
+# boot a launcher and load the resident model; the dispatch spends the GPU) and
+# refuses anything but a provably fresh history. Deny-by-default: freshness is
+# an ALLOWLIST of init/seed subjects, an unrecognized subject is prior work,
+# and a history that cannot be READ is refused, never waved through. The only
+# opt-out is explicit (``--allow-dirty-sandbox``) and is recorded in the
+# scorecard evidence, so the run's condition rides its own record.
+
+SANDBOX_FRESH = "fresh"
+SANDBOX_DIRTY = "dirty"
+SANDBOX_UNDETERMINED = "undetermined"
+
+#: Commit subjects a FRESH battery sandbox may carry (the allowlist): the
+#: nightly wrapper's re-init commit (run-battery-night.ps1), the /newproject
+#: scaffold commit (shared.fleet.dispatch), and the fleet's protected ``seed:``
+#: commits (new-agent-task.ps1). Anything else — above all ``agent: <task>``
+#: work commits (fleet-lib.ps1) — is a prior run's work.
+FRESH_SUBJECTS_EXACT: frozenset[str] = frozenset({
+    "init battery sandbox",
+    "Initial commit (created by BlarAI)",
+})
+FRESH_SUBJECT_PREFIXES: tuple[str, ...] = ("seed:",)
+#: The dirty-sandbox signature the refusal names specially (diagnostic only —
+#: ANY non-allowlisted subject dirties; this prefix is not a blocklist).
+AGENT_SUBJECT_PREFIX = "agent:"
+
+#: Bound on the freshness probe's git call (shared/timeout_registry.py row).
+SANDBOX_PROBE_TIMEOUT_S = 30.0
+
+#: The explicit opt-out spelling — recorded VERBATIM in the scorecard evidence
+#: so a deliberate dirty-sandbox experiment is auditable from the record alone.
+SANDBOX_OPT_OUT_FLAG = "--allow-dirty-sandbox"
+
+
+@dataclass(frozen=True)
+class SandboxFreshness:
+    """One sandbox-history read: the probe's classification plus the evidence
+    that produced it. ``state`` is the contract — only :data:`SANDBOX_FRESH`
+    passes the gate; :data:`SANDBOX_UNDETERMINED` is a refusal, not a shrug."""
+
+    state: str                       # SANDBOX_FRESH | SANDBOX_DIRTY | SANDBOX_UNDETERMINED
+    commit_count: int = 0            # subjects read (0 = unborn HEAD — legitimately fresh)
+    agent_commits: int = 0           # offending subjects matching AGENT_SUBJECT_PREFIX
+    offending: tuple[str, ...] = ()  # first non-allowlisted subjects (diagnostic, bounded)
+    detail: str = ""                 # why UNDETERMINED ("" when the history was read)
+
+
+def probe_sandbox_freshness(
+    repo_dir: Path, *, timeout_s: float = SANDBOX_PROBE_TIMEOUT_S
+) -> SandboxFreshness:
+    """Read *repo_dir*'s own emitted evidence — its FULL git history (``--all``,
+    so a prior PARKED run's unmerged branch counts too) — and classify it:
+    FRESH (every subject on the init/seed allowlist; an unborn HEAD qualifies —
+    nothing has ever happened there), DIRTY (any other subject), or
+    UNDETERMINED (the history cannot be read: dir missing, no repository at the
+    sandbox ROOT, git absent/failed/timed out). The root anchor matters: without
+    a ``.git`` at the sandbox root, ``git -C`` would walk UP and read a parent
+    repository's history — a wrong-subject probe. Pure and fail-closed: never
+    raises; every unreadable shape is UNDETERMINED, and only FRESH is a pass."""
+    try:
+        root = Path(repo_dir)
+        if not root.is_dir():
+            return SandboxFreshness(SANDBOX_UNDETERMINED,
+                                    detail=f"sandbox dir missing: {root}")
+        if not (root / ".git").exists():
+            return SandboxFreshness(SANDBOX_UNDETERMINED,
+                                    detail=f"no git repository at the sandbox root: {root}")
+        cp = subprocess.run(  # noqa: S603 — vector argv, no shell
+            ["git", "-C", str(root), "log", "--all", "--format=%s"],
+            capture_output=True, text=True, timeout=timeout_s,
+        )
+        if cp.returncode != 0:
+            tail = (cp.stderr or cp.stdout or "").strip().splitlines()
+            return SandboxFreshness(
+                SANDBOX_UNDETERMINED,
+                detail=f"git log failed (exit {cp.returncode}): "
+                       f"{tail[-1] if tail else 'no output'}",
+            )
+        subjects = [line for line in cp.stdout.splitlines() if line.strip()]
+    except Exception as exc:  # noqa: BLE001 — an unreadable history refuses, never crashes
+        return SandboxFreshness(SANDBOX_UNDETERMINED,
+                                detail=f"probe failed: {type(exc).__name__}: {exc}")
+    offending = [s for s in subjects
+                 if s not in FRESH_SUBJECTS_EXACT
+                 and not s.startswith(FRESH_SUBJECT_PREFIXES)]
+    if offending:
+        return SandboxFreshness(
+            SANDBOX_DIRTY,
+            commit_count=len(subjects),
+            agent_commits=sum(1 for s in offending if s.startswith(AGENT_SUBJECT_PREFIX)),
+            offending=tuple(offending[:5]),
+        )
+    return SandboxFreshness(SANDBOX_FRESH, commit_count=len(subjects))
+
+
+def _evidence_str(text: str) -> str:
+    """Clip free text into one evidence-contract string (single line, capped —
+    the S6 pointers/statuses rule; same shape as :func:`_note`)."""
+    one_line = " / ".join(part.strip() for part in str(text).splitlines() if part.strip())
+    return one_line[:297] + "…" if len(one_line) > 300 else one_line
+
+
+def sandbox_evidence(fresh: SandboxFreshness, *, opted_out: bool) -> dict:
+    """The scorecard evidence block for one probed card (strings only — the S6
+    contract the fail-closed writer enforces). ``sandbox_opt_out`` appears IFF
+    the run carried the opt-out flag — the run's condition rides its own
+    record, which is the lesson's actual content."""
+    block: dict = {
+        "sandbox_freshness": fresh.state,
+        "sandbox_commit_count": str(fresh.commit_count),
+    }
+    if fresh.agent_commits:
+        block["sandbox_agent_commits"] = str(fresh.agent_commits)
+    if fresh.offending:
+        block["sandbox_offending_subjects"] = [_evidence_str(s) for s in fresh.offending]
+    if fresh.detail:
+        block["sandbox_probe_detail"] = _evidence_str(fresh.detail)
+    if opted_out:
+        block["sandbox_opt_out"] = SANDBOX_OPT_OUT_FLAG
+    return block
+
+
+def _stamp_sandbox_evidence(card_sc: Scorecard, block: dict) -> Scorecard:
+    """Fold the sandbox-condition block into *card_sc*'s evidence (no-op on an
+    empty block, i.e. any path the gate did not probe)."""
+    if not block:
+        return card_sc
+    return replace(card_sc, evidence={**(card_sc.evidence or {}), **block})
+
+
+# ---------------------------------------------------------------------------
 # The battery run
 # ---------------------------------------------------------------------------
 
@@ -1647,6 +1846,7 @@ async def run_battery(
     dry_run: bool,
     log=print,
     ensure_ao: "Callable[[str], bool] | None" = None,
+    allow_dirty_sandbox: bool = False,
 ) -> BatterySummary:
     """Drive every card through ``harness.run_job`` (serially — one residency per
     job by design), adopt-or-synthesize + cross-check its scorecard, write each
@@ -1656,7 +1856,16 @@ async def run_battery(
     so a flaky swap-back that left the AO down is recovered (a re-boot) instead of
     cascading into every later job STALLING. ``None`` (dry-run / tests) skips it —
     the fake in-process AO needs no socket. It never raises (fail-soft); a False
-    result just means the job will STALL honestly (and the next job re-tries)."""
+    result just means the job will STALL honestly (and the next job re-tries).
+
+    ``allow_dirty_sandbox`` (#1058, lesson 225's third-instance control): every
+    LIVE card is refused (fail-loud STALLED [HARNESS]) unless its sandbox git
+    history proves fresh — see :func:`probe_sandbox_freshness`. ``True`` is the
+    deliberate dirty-sandbox experiment: a DIRTY sandbox proceeds and the
+    condition is recorded in the scorecard evidence; an UNDETERMINED one is
+    still refused (a condition that was never observed cannot be recorded).
+    ``--dry-run`` skips the gate — the fake AO drives a fake projects dir and
+    spends nothing the gate exists to protect."""
     summary = BatterySummary(out_dir=str(out_dir), dry_run=dry_run)
     out_dir.mkdir(parents=True, exist_ok=True)
     runs_dir = getattr(harness.config, "runs_dir", None)
@@ -1670,6 +1879,49 @@ async def run_battery(
     for card in cards:
         cid = str(card.get("id"))
         started = _now_utc()
+        # #1058 sandbox-freshness gate — BEFORE any per-card spend (the re-ensure
+        # below can boot a launcher + load the resident model; the dispatch spends
+        # the GPU). Refusal costs THIS card, never the night (the lesson-220
+        # containment contract), and every probed card's condition — pass, refuse
+        # or opt-out — rides its scorecard evidence.
+        sandbox_block: dict = {}
+        if not dry_run:
+            repo_dir = (Path(projects_dir) / str(card.get("repo", ""))
+                        if projects_dir else None)
+            fresh = (probe_sandbox_freshness(repo_dir) if repo_dir is not None
+                     else SandboxFreshness(SANDBOX_UNDETERMINED,
+                                           detail="harness config has no projects_dir"))
+            sandbox_block = sandbox_evidence(fresh, opted_out=allow_dirty_sandbox)
+            if fresh.state == SANDBOX_DIRTY and allow_dirty_sandbox:
+                log(f"[battery {cid}] sandbox DIRTY ({fresh.agent_commits} 'agent:' "
+                    f"commit(s), {fresh.commit_count} total) — proceeding on the "
+                    f"RECORDED {SANDBOX_OPT_OUT_FLAG} opt-out; the condition rides "
+                    "the scorecard evidence.")
+            elif fresh.state != SANDBOX_FRESH:
+                if fresh.state == SANDBOX_DIRTY:
+                    example = f" (e.g. {fresh.offending[0]!r})" if fresh.offending else ""
+                    reason = (
+                        f"sandbox-freshness gate (#1058): {card.get('repo')} is DIRTY — "
+                        f"{fresh.agent_commits} 'agent:' commit(s) among "
+                        f"{fresh.commit_count} total{example}; a run on prior work is "
+                        "confounded. Re-init via run-battery-night.ps1's archive+init "
+                        f"block, or opt out DELIBERATELY with {SANDBOX_OPT_OUT_FLAG} "
+                        "(the condition is then recorded in the scorecard)."
+                    )
+                else:
+                    reason = (
+                        f"sandbox-freshness gate (#1058): {card.get('repo')} freshness "
+                        f"UNDETERMINED ({fresh.detail}) — refused fail-closed; "
+                        f"{SANDBOX_OPT_OUT_FLAG} cannot waive an unreadable history "
+                        "(a condition that was never observed cannot be recorded)."
+                    )
+                log(f"[battery {cid}] REFUSED: {reason}")
+                sc = stalled_scorecard(cid, reason, card=card, dry_run=dry_run)
+                sc = _stamp_sandbox_evidence(replace(sc, started_utc=started),
+                                             sandbox_block)
+                summary.scorecards.append(sc)
+                _write(sc, out_dir, log)
+                continue
         if ensure_ao is not None:
             # Blocking (socket + bounded boot wait); run off the event loop.
             await asyncio.to_thread(ensure_ao, cid)
@@ -1693,7 +1945,7 @@ async def run_battery(
             report = await harness.run_job(job)
         except Exception as exc:  # noqa: BLE001 — one job's crash must not sink the battery
             sc = stalled_scorecard(cid, f"harness exception: {exc}", card=card, dry_run=dry_run)
-            sc = replace(sc, started_utc=started)
+            sc = _stamp_sandbox_evidence(replace(sc, started_utc=started), sandbox_block)
             summary.scorecards.append(sc)
             _write(sc, out_dir, log)
             continue
@@ -1720,7 +1972,9 @@ async def run_battery(
             sc, card=card, projects_dir=projects_dir, runs_dir=runs_dir,
             run_id=report.run_id, allowlist=green_allowlist, log=log,
         )
-        sc = replace(sc, started_utc=started)
+        # #1058: the probed condition rides EVERY probed card's record — a fresh
+        # pass, an opt-out dirty run, and the refusal above all carry it.
+        sc = _stamp_sandbox_evidence(replace(sc, started_utc=started), sandbox_block)
         try:
             _write(sc, out_dir, log)
         except ValueError as exc:
@@ -1735,7 +1989,9 @@ async def run_battery(
             sc = stalled_scorecard(
                 cid, f"invalid composed scorecard: {exc}", card=card, dry_run=dry_run
             )
-            sc = replace(sc, started_utc=started)
+            # sandbox_block is contract-valid by construction (_evidence_str),
+            # so re-stamping cannot re-trip the writer this path degrades from.
+            sc = _stamp_sandbox_evidence(replace(sc, started_utc=started), sandbox_block)
             _write(sc, out_dir, log)
         summary.scorecards.append(sc)
         # #749: fail-soft, knob-gated durable-ticket post — the single per-job
@@ -1778,17 +2034,29 @@ def _post_job_ticket(cfg, card: dict, report: JobReport, sc: Scorecard, log) -> 
     rigged B8 GREEN rewritten to FALSE-DONE lands as an OPEN ticket, never a
     wrongly-closed one. The harness's own post-adoption seam stays OFF during a
     battery run (``report_outcomes_to_vikunja`` defaults False), so a completed job
-    posts exactly ONE outcome comment — never two."""
+    posts exactly ONE outcome comment — never two.
+
+    #887: this call site IS the trusted battery-origin seam — it exists ONLY on the
+    battery run path and ``card`` is the battery spec, so EVERY ticket it creates is
+    intrinsically synthetic. It threads that STRUCTURAL fact to the bridge as the
+    ``service_class_label`` structured constant (``cl.TEST_CLASS_LABEL``), never a
+    value derived from the card's untrusted ``goal`` text — so the ticket lands with
+    the Battery/Test class of service and off the operator's actionable headline."""
     if cfg is None or not getattr(cfg, "vikunja_bridge", False):
         return
     run_id = sc.run_id or report.run_id
     if not run_id:
         return
     try:
+        from shared.fleet import coord_lifecycle as cl
         from shared.fleet import vikunja_bridge as vb
 
         ticket_id = vb.ensure_job_ticket(
-            cfg, run_id, str(card.get("goal", "")), str(card.get("repo", ""))
+            cfg,
+            run_id,
+            str(card.get("goal", "")),
+            str(card.get("repo", "")),
+            service_class_label=cl.TEST_CLASS_LABEL,
         )
         if ticket_id is not None:
             vb.post_outcome(cfg, ticket_id, sc.to_dict())
@@ -1927,6 +2195,11 @@ def _build_parser() -> argparse.ArgumentParser:
                         "for live runs; a fresh temp dir for --dry-run).")
     p.add_argument("--dry-run", action="store_true",
                    help="Drive the harness's fake in-process AO end-to-end (no GPU/model/AO).")
+    p.add_argument("--allow-dirty-sandbox", action="store_true",
+                   help="DELIBERATE dirty-sandbox experiment only (#1058): run a card whose "
+                        "sandbox carries prior work instead of refusing it. The observed "
+                        "condition is recorded in the scorecard evidence either way; a "
+                        "sandbox whose history cannot be read is still refused (fail-closed).")
     p.add_argument("--config", metavar="TOML",
                    help="Override the AO default.toml path (port + fleet roots).")
     p.add_argument("--dev-mode", action="store_true",
@@ -2047,7 +2320,8 @@ def main(argv: list[str] | None = None) -> int:
 
         run_summary = asyncio.run(
             run_battery(harness, selected, out_dir=out_dir, dry_run=args.dry_run,
-                        ensure_ao=ensure_ao)
+                        ensure_ao=ensure_ao,
+                        allow_dirty_sandbox=args.allow_dirty_sandbox)
         )
         summary.scorecards.extend(run_summary.scorecards)
         # re-write the combined summary (includes any unknown-id STALLED cards)

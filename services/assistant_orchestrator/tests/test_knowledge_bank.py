@@ -578,10 +578,50 @@ class TestHybridRetrieval:
         assert hits and hits[0].doc_uuid == r.doc_uuid
 
     def test_fts_match_expr_neutralises_operators(self) -> None:
-        """Free-form query text cannot inject FTS5 syntax."""
+        """Free-form query text cannot inject FTS5 syntax.  The bare ``OR``
+        token now lowercases into the #795 stopword set and is filtered."""
         expr = _fts_match_expr('drop "table NEAR(x) OR *')
-        assert expr == '"drop" OR "table" OR "NEAR" OR "x" OR "OR"'
+        assert expr == '"drop" OR "table" OR "NEAR" OR "x"'
         assert _fts_match_expr("!!! ???") == ""
+
+    def test_fts_match_expr_filters_stopwords(self) -> None:
+        """#795: function words are dropped (case-insensitively) so they
+        cannot flood the keyword limb with noise matches."""
+        expr = _fts_match_expr("What is the status of the certificate rotation")
+        assert expr == '"status" OR "certificate" OR "rotation"'
+
+    def test_fts_match_expr_all_stopwords_keeps_unfiltered(self) -> None:
+        """#795 fail-safe: a query whose indexable words are ALL stopwords
+        keeps its full unfiltered expression — never an empty MATCH."""
+        assert _fts_match_expr("what is it") == '"what" OR "is" OR "it"'
+
+    def test_fts_match_expr_without_stopwords_is_unchanged(self) -> None:
+        """#795: a query with no stopwords builds an expression byte-identical
+        to the pre-filter behaviour."""
+        expr = _fts_match_expr("turbocharger boost pressure")
+        assert expr == '"turbocharger" OR "boost" OR "pressure"'
+
+    def test_stopword_flooded_query_still_retrieves(
+        self, bank: EncryptedKnowledgeBank
+    ) -> None:
+        """#795 seam: the filtered MATCH expression runs against real FTS5
+        and the content tokens alone still find the document."""
+        r = _submit(bank)
+        bank.approve(r.doc_uuid)
+        hits = bank.retrieve("what is the engine doing in the turbochargers", k=1)
+        assert hits and hits[0].doc_uuid == r.doc_uuid
+
+    def test_all_stopword_query_lexical_limb_runs_without_error(
+        self, bank: EncryptedKnowledgeBank
+    ) -> None:
+        """#795 fail-safe seam: an all-stopword query reaches real FTS5 with
+        its unfiltered expression (no FTS5 error, no match-everything), and
+        the vector limb still fuses the document in."""
+        r = _submit(bank)
+        bank.approve(r.doc_uuid)
+        hits = bank.retrieve("what is it about", k=1)
+        assert len(hits) == 1
+        assert hits[0].doc_uuid == r.doc_uuid
 
     def test_query_with_only_punctuation_skips_lexical_limb(
         self, bank: EncryptedKnowledgeBank

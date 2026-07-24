@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 #: The provisional age-timestamp source (ADR-039 §2.14.2 — OPEN, see the
 #: module docstring). Vikunja's native ``created`` field is the only
@@ -277,4 +277,74 @@ def compute_flow_metrics(
         throughput_count=throughput,
         aging_outliers=tuple(outliers),
         skipped_unparseable=len(open_tasks) - len(ages),
+    )
+
+
+@dataclass(frozen=True)
+class PartitionedFlowMetrics:
+    """Flow metrics split into the operator's actionable HEADLINE and the
+    surfaced-but-non-actionable TEST class (#887).
+
+    ``headline`` covers REAL work — the open-count / oldest-age / mean-age /
+    throughput the operator steers by. ``test_class`` covers SYNTHETIC
+    battery/test-originated work, computed identically but kept OFF the headline
+    so a synthetic park (whose honest park was its deliverable) never inflates the
+    signals the ``/coord`` read surface exists to give. Both are ALWAYS present (a
+    partition, never a hide): a renderer surfaces the test class on its own line."""
+
+    headline: FlowMetrics
+    test_class: FlowMetrics
+
+
+def compute_partitioned_flow_metrics(
+    open_tasks: Sequence[Mapping[str, Any]],
+    all_tasks: Sequence[Mapping[str, Any]],
+    *,
+    is_test_class: Callable[[Mapping[str, Any]], bool],
+    now: datetime,
+    window_start: datetime,
+    window_end: datetime,
+    age_basis_field: str = DEFAULT_AGE_BASIS_FIELD,
+    outlier_threshold_stddev: float = DEFAULT_OUTLIER_THRESHOLD_STDDEV,
+) -> PartitionedFlowMetrics:
+    """Compose :func:`compute_flow_metrics` TWICE over a test-class partition of
+    the same board read (#887).
+
+    *is_test_class* is an INJECTED predicate over one task dict — this module
+    stays label-agnostic (it never learns WHICH label marks a test ticket; that
+    doctrine lives in :mod:`shared.fleet.coord_lifecycle`, and this module already
+    deliberately does not interpret ``labels``). Every task is routed to exactly
+    one side, so the two partitions are disjoint and exhaustive: with ZERO test
+    tickets the headline is byte-identical to a plain :func:`compute_flow_metrics`
+    over the whole board (the #887 back-compat lock). A predicate that RAISES is
+    treated as NOT-test (the conservative direction — a misclassified ticket stays
+    visible on the operator's actionable headline, never silently hidden)."""
+
+    def _is_test(task: Mapping[str, Any]) -> bool:
+        try:
+            return bool(is_test_class(task))
+        except Exception:  # noqa: BLE001 — a predicate fault never hides a ticket
+            return False
+
+    def _split(
+        tasks: Sequence[Mapping[str, Any]],
+    ) -> "tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]":
+        real: list[Mapping[str, Any]] = []
+        test: list[Mapping[str, Any]] = []
+        for task in tasks:
+            (test if _is_test(task) else real).append(task)
+        return real, test
+
+    real_open, test_open = _split(open_tasks)
+    real_all, test_all = _split(all_tasks)
+    common = dict(
+        now=now,
+        window_start=window_start,
+        window_end=window_end,
+        age_basis_field=age_basis_field,
+        outlier_threshold_stddev=outlier_threshold_stddev,
+    )
+    return PartitionedFlowMetrics(
+        headline=compute_flow_metrics(real_open, real_all, **common),
+        test_class=compute_flow_metrics(test_open, test_all, **common),
     )

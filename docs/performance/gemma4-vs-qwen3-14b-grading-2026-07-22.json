@@ -1,0 +1,803 @@
+{
+  "record": "gemma4-vs-qwen3-14b-grading-2026-07-22",
+  "ticket": "#1005",
+  "question": "Does an out-of-family grader mark BlarAI's coder output DIFFERENTLY from our own Qwen3-14B? Not better - differently. Every model in the fleet carries family: qwen3, so same-family familiarity bias is currently unmeasurable.",
+  "date": "2026-07-22",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (Xe2), driver 32.0.101.8826",
+    "ram": "32 GiB LPDDR5X on-package, 31.323 GiB visible",
+    "device_used": "GPU for both models"
+  },
+  "stack": {
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a",
+    "compiled_blob_cache": "DISABLED - the 2026-07-22 cache probe measured the OpenVINO compiled-blob cache silently changing a model's answer (correct -> wrong, 3/3 reproducible); no CACHE_DIR anywhere in this measurement"
+  },
+  "models": [
+    {
+      "role": "incumbent grader (production)",
+      "id": "qwen3-14b",
+      "precision": "INT4",
+      "path": "models/qwen3-14b/openvino-int4-gpu",
+      "family": "qwen3"
+    },
+    {
+      "role": "out-of-family instrument",
+      "id": "gemma-4-26B-A4B-it-int4-ov",
+      "precision": "INT4",
+      "family": "gemma4 (Google lineage)"
+    }
+  ],
+  "methodology": {
+    "rubric": "BlarAI's REAL green_quality jury rubric. Arm C IMPORTS the live surfaces (Juror, green_quality_emission_json_schema, parse_emission, LENSES) from tools/dispatch_harness/green_quality/jury.py so it cannot drift from production. Arms A/B used a COPY of Juror.build_prompt that is identical EXCEPT for one appended line ('Reply with ONLY one JSON object with exactly these four keys.') - necessary for an unconstrained arm, which has no grammar to enforce shape, but it is the one uncontrolled prompt difference between arms A and C and is named here rather than described away. It cannot explain arm A's worse determinism, and the argument that settles this is not 'it aids structural compliance' (arm A was already 9/9 parseable with all four fields enum-legal on every row, so compliance was saturated and the measured axis is verdict VALUES, not parse success). The settling argument: arm A's non-determinism is WITHIN-arm - identical prompt, do_sample=False, different outputs across runs - and a prompt difference BETWEEN arms cannot explain run-to-run variance WITHIN one arm at all. The variance source is the runtime, not the prompt. Secondarily, the appended line can only push output toward MORE constrained shape, so the confound is bounded in the safe direction. Arms A/B also use their own parse() while arm C uses the live parse_emission; immaterial here since arm C reported scored_runs 3/3 on every cell. (Corrected 2026-07-22 by independent audit finding P2-B - the record previously said 'verbatim copy', which was wrong.)",
+    "lenses": [
+      "correctness-beyond-oracle",
+      "graceful-bad-input",
+      "operator-legibility"
+    ],
+    "subjects": 3,
+    "subject_detail": {
+      "clean_cli": "synthetic, correct argparse CLI",
+      "defective_module": "synthetic, no entry point; unhandled ZeroDivisionError / KeyError / TypeError",
+      "battery_quiz_engine_REAL30B": "REAL Qwen3-Coder-30B-A3B output, read-only from the live battery sandbox C:/Users/mrbla/projects/battery-b4-flashcards-cli (night of 2026-07-21/22)"
+    },
+    "arms": {
+      "A": "verbatim production rubric -> verdicts. Unconstrained free-text JSON. 2 runs/cell.",
+      "B": "rubric + a probe-only 'why' field -> REASONS, so a right answer for an invented reason is visible. NOT the production prompt. 1 run/cell.",
+      "C": "PRODUCTION EMISSION PATH - xgrammar-constrained via StructuredOutputConfig.json_schema against the real enum-pinned schema. 3 runs/cell. Qwen3-14B only."
+    },
+    "sequencing": "models loaded sequentially - they cannot co-reside",
+    "decoding": "greedy (do_sample=False), max_new_tokens=320, no speculative decoding"
+  },
+  "results": {
+    "verdict_field_disagreements": {
+      "count": 13,
+      "of": 36,
+      "rows": [
+        {
+          "subject": "clean_cli",
+          "lens": "bad_input",
+          "field": "bad_input_handling",
+          "qwen3_14b": "throws",
+          "gemma4_26b_a4b": "graceful"
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "legibility",
+          "field": "bad_input_handling",
+          "qwen3_14b": "graceful",
+          "gemma4_26b_a4b": "throws"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "correctness",
+          "field": "naming_structure",
+          "qwen3_14b": "clear",
+          "gemma4_26b_a4b": "poor"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "correctness",
+          "field": "correctness_probe",
+          "qwen3_14b": "wrong",
+          "gemma4_26b_a4b": "none"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "bad_input",
+          "field": "bad_input_handling",
+          "qwen3_14b": "unchecked",
+          "gemma4_26b_a4b": "throws"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "bad_input",
+          "field": "naming_structure",
+          "qwen3_14b": "clear",
+          "gemma4_26b_a4b": "poor"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "bad_input",
+          "field": "correctness_probe",
+          "qwen3_14b": "wrong",
+          "gemma4_26b_a4b": "none"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "legibility",
+          "field": "naming_structure",
+          "qwen3_14b": "clear",
+          "gemma4_26b_a4b": "poor"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "correctness",
+          "field": "bad_input_handling",
+          "qwen3_14b": "graceful",
+          "gemma4_26b_a4b": "unchecked"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "correctness",
+          "field": "correctness_probe",
+          "qwen3_14b": "none",
+          "gemma4_26b_a4b": "minor"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "bad_input",
+          "field": "runnable_surface",
+          "qwen3_14b": "yes",
+          "gemma4_26b_a4b": "only-by-writing-code"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "bad_input",
+          "field": "bad_input_handling",
+          "qwen3_14b": "graceful",
+          "gemma4_26b_a4b": "throws"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "legibility",
+          "field": "runnable_surface",
+          "qwen3_14b": "yes",
+          "gemma4_26b_a4b": "only-by-writing-code"
+        }
+      ]
+    },
+    "determinism": {
+      "arm_A_unconstrained": {
+        "qwen3_14b": "0/9",
+        "gemma4_26b": "9/9",
+        "note": "verdict-level, 2 runs/cell"
+      },
+      "arm_C_grammar_constrained": {
+        "qwen3_14b_verdict_stable": "8/9",
+        "qwen3_14b_raw_stable": "6/9",
+        "runs_per_cell": 3,
+        "note": "the single unstable cell flips ONE field (runnable_surface: only-by-writing-code on run 1, no on runs 2-3); the other three fields are identical across all three runs. Run 1 differing from runs 2-3 is consistent with a first-call effect."
+      }
+    },
+    "resource": {
+      "_note": "ARM-LABELLED (correction 2026-07-22, independent audit finding P2-A). The first version of this block paired arm-C Qwen figures with arm-A Gemma figures without saying so. Both were real, but the unlabelled pairing biased BOTH ratios the same way. Gemma never ran arm C, so the ONLY like-for-like comparison is arm A vs arm A.",
+      "qwen3_14b_armA_unconstrained": {
+        "load_s": 13.98,
+        "steady_gb": 8.559
+      },
+      "qwen3_14b_armC_grammar_constrained": {
+        "load_s": 9.74,
+        "steady_gb": 7.73
+      },
+      "gemma4_26b_armA_unconstrained": {
+        "load_s": 30.4,
+        "steady_gb": 14.291
+      },
+      "gemma4_26b_armC": "NOT MEASURED - Gemma never ran the grammar-constrained arm",
+      "like_for_like_ratios_armA_vs_armA": {
+        "load": "30.4 / 13.98 = 2.17x",
+        "steady_gb": "14.291 / 8.559 = 1.67x"
+      },
+      "caveat": "the 14B's own load time swung 13.98s (arm A) -> 9.74s (arm C) with CACHE_DIR disabled in both, i.e. unexplained session-level variance - a second reason not to quote a single load figure without naming the run that produced it"
+    },
+    "adjudicated_findings": [
+      {
+        "subject": "battery_quiz_engine_REAL30B",
+        "caught_by": "gemma4_26b_a4b",
+        "missed_by": "qwen3_14b",
+        "claim": "KeyError if a card dict is missing question/answer keys",
+        "verified": "CONFIRMED BY EXECUTION against the real sandbox file: KeyError: question",
+        "why_reachable": "load_cards validates the OUTER container only (cards if isinstance(cards, list) else []) - element shape is never checked, so a malformed card list reaches run_quiz",
+        "incumbent_scored": "bad_input_handling=graceful, correctness_probe=none on all three lenses"
+      },
+      {
+        "subject": "battery_quiz_engine_REAL30B",
+        "caught_by": "gemma4_26b_a4b",
+        "missed_by": "qwen3_14b",
+        "claim": "AttributeError if answer_fn returns a non-string, due to the .strip() call",
+        "verified": "CONFIRMED BY EXECUTION: AttributeError: int object has no attribute strip",
+        "incumbent_scored": "correctness_probe=none"
+      },
+      {
+        "subject": "defective_module",
+        "caught_by": "qwen3_14b",
+        "missed_by": "gemma4_26b_a4b",
+        "claim": "unhandled ZeroDivisionError / KeyError / TypeError on real-world input",
+        "verified": "CONFIRMED BY EXECUTION: all three raise; well-formed control returns [2.0]",
+        "incumbent_scored": "qwen3_14b correctness_probe=wrong (right); gemma4 correctness_probe=none (wrong)"
+      }
+    ],
+    "exam_coverage_note": "No test in the battery sandbox's own suite covers a malformed card reaching run_quiz - so the job exam missed both defects Gemma caught, not only the 14B."
+  },
+  "read": [
+    "The two graders are DIFFERENTLY WRONG, which is the property #1005 asks for - an instrument needs independence, not superiority. Gemma caught two real, reachable, untested defects in shipped 30B-authored battery code that our 14B scored clean; the 14B caught a correctness defect in the synthetic module that Gemma scored clean.",
+    "The 14B's apparent 0/9 non-determinism in arm A is overwhelmingly an artefact of the UNCONSTRAINED probe path. On the production grammar-constrained path it is 8/9 verdict-stable over 3 runs/cell. Any claim that the production juror is unstable must be made against arm C, not arm A.",
+    "Because arm A's 14B verdicts were unstable, the 13/36 field disagreement count is an UPPER BOUND that mixes real cross-model difference with 14B run-to-run noise. It is not a rate."
+  ],
+  "not_measured": [
+    "Gemma on the grammar-constrained path (arm C ran the 14B only) - so the cross-model comparison is unconstrained-vs-unconstrained, and a constrained head-to-head is unmeasured",
+    "N>1 subject counts per defect class - 3 subjects is a FAILURE SHAPE, not a rate; nothing here supports a percentage claim about either grader",
+    "speculative decoding (production runs the 14B with a pruned 0.6B draft; both arms ran without it)",
+    "the full green_quality jury path (3 jurors + per-field majority + abstain) - this measures single-juror emissions, not the tallied verdict production actually uses",
+    "any answer_quality golden-set re-scoring, so the same-family INFLATION estimate #1005 wants is still unmeasured",
+    "Gemma co-residency with the 14B (sequential loads only)",
+    "sustained thermals, power, multi-seed variance beyond the runs stated"
+  ],
+  "raw_artifacts": {
+    "arm_A_B_qwen14b": {
+      "label": "qwen14b",
+      "model_dir": "C:/Users/mrbla/BlarAI/models/qwen3-14b/openvino-int4-gpu",
+      "load_seconds": 13.98,
+      "steady_delta_gb": 8.559,
+      "deterministic": "0/9",
+      "parseable": "9/9",
+      "rows": [
+        {
+          "subject": "clean_cli",
+          "lens": "correctness",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "The code uses argparse to handle input and converts Celsius to Fahrenheit correctly."
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "bad_input",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "throws",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "argparse's type=float and required=True will throw on invalid or missing input."
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "legibility",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "The code uses argparse with a clear command-line interface and well-named functions."
+        },
+        {
+          "subject": "defective_module",
+          "lens": "correctness",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "wrong"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "division by zero if any element in x has 'n' equal to zero."
+        },
+        {
+          "subject": "defective_module",
+          "lens": "bad_input",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "wrong"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "The function 'd' is defined but not exposed as an entry point, and it does not handle cases where 'x' is empty, 'i' has no 'v' or 'n' keys, or 'n' is zero."
+        },
+        {
+          "subject": "defective_module",
+          "lens": "legibility",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "The function 'd' is named clearly, and the code is structured in a way that is coherent, but there is no entry point and input validation is not performed."
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "correctness",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "The code may mishandle cards that are not properly formatted as a list in the JSON file."
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "bad_input",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "load_cards handles missing, invalid, or malformed JSON files by returning an empty list."
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "legibility",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": false,
+          "why": "The code uses clear function and variable names, and handles errors gracefully without exposing implementation details."
+        }
+      ]
+    },
+    "arm_A_B_gemma26b": {
+      "label": "gemma26b",
+      "model_dir": "models/gemma-4-26B-A4B-it-int4-ov",
+      "load_seconds": 30.4,
+      "steady_delta_gb": 14.291,
+      "deterministic": "9/9",
+      "parseable": "9/9",
+      "rows": [
+        {
+          "subject": "clean_cli",
+          "lens": "correctness",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The code uses standard argparse for input handling and a mathematically sound conversion formula."
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "bad_input",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The argparse module handles malformed input types (e.g., non-floats) by printing a usage message and exiting gracefully."
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "legibility",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "throws",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The argparse type=float will throw a ValueError if a non-numeric string is provided via the CLI."
+        },
+        {
+          "subject": "defective_module",
+          "lens": "correctness",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "poor",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The division `i['v'] / i['n']` will raise a ZeroDivisionError if any 'n' is zero."
+        },
+        {
+          "subject": "defective_module",
+          "lens": "bad_input",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "throws",
+            "naming_structure": "poor",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The function `d(x)` uses single-letter variables and will throw a `KeyError` or `ZeroDivisionError` if the input dictionary structure is malformed or contains zero."
+        },
+        {
+          "subject": "defective_module",
+          "lens": "legibility",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "poor",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The module lacks an entry point and uses single-letter variable names like 'd', 'x', 'r', 'i', and 'n'."
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "correctness",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "minor"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The code will raise an AttributeError if 'answer_fn' returns a non-string type because of the .strip() call."
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "bad_input",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "throws",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The code will throw a KeyError if a card dictionary is missing 'question' or 'answer' keys, and an AttributeError if answer_fn returns a non-string."
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "legibility",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "parse": "ok",
+          "deterministic": true,
+          "raw_identical": true,
+          "why": "The code requires a user to provide a custom function (answer_fn) to run, and it will crash if the JSON file contains objects without 'question' or 'answer' keys."
+        }
+      ]
+    },
+    "arm_C_qwen14b": {
+      "arm": "C-grammar-constrained",
+      "label": "qwen14b",
+      "model_dir": "C:/Users/mrbla/BlarAI/models/qwen3-14b/openvino-int4-gpu",
+      "runs_per_cell": 3,
+      "grammar_constrained": true,
+      "load_seconds": 9.74,
+      "steady_delta_gb": 7.73,
+      "verdict_stable": "8/9",
+      "raw_stable": "6/9",
+      "rows": [
+        {
+          "subject": "clean_cli",
+          "lens": "correctness-beyond-oracle",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": true,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "graceful-bad-input",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": true,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "clean_cli",
+          "lens": "operator-legibility",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": true,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "correctness-beyond-oracle",
+          "verdict": {
+            "runnable_surface": "only-by-writing-code",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "wrong"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "only-by-writing-code",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "wrong"
+            },
+            {
+              "runnable_surface": "no",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "wrong"
+            },
+            {
+              "runnable_surface": "no",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "wrong"
+            }
+          ],
+          "verdict_stable": false,
+          "raw_stable": false,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "graceful-bad-input",
+          "verdict": {
+            "runnable_surface": "no",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "no",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "no",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "no",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": true,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "defective_module",
+          "lens": "operator-legibility",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "unchecked",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "unchecked",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": true,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "correctness-beyond-oracle",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": false,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "graceful-bad-input",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": true,
+          "scored_runs": "3/3"
+        },
+        {
+          "subject": "battery_quiz_engine_REAL30B",
+          "lens": "operator-legibility",
+          "verdict": {
+            "runnable_surface": "yes",
+            "bad_input_handling": "graceful",
+            "naming_structure": "clear",
+            "correctness_probe": "none"
+          },
+          "all_verdicts": [
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            },
+            {
+              "runnable_surface": "yes",
+              "bad_input_handling": "graceful",
+              "naming_structure": "clear",
+              "correctness_probe": "none"
+            }
+          ],
+          "verdict_stable": true,
+          "raw_stable": false,
+          "scored_runs": "3/3"
+        }
+      ]
+    }
+  }
+}

@@ -689,6 +689,31 @@ def test_tripwire_fires_on_ready_and_idle(tmp_path, store) -> None:
     assert any(c.kind == "quiet-queue-tripwire" for c in result.conditions)
 
 
+def test_tripwire_ignores_test_class_ready_tasks(tmp_path, store) -> None:
+    """#887: a SYNTHETIC battery/test ticket sitting in Ready is not real work
+    waiting to be pulled — it must NOT fire the quiet-queue alarm, and (unlike a
+    resource-gated card) it is not counted as gated inventory either."""
+    battery = {"id": 9, "title": "battery-park", "labels": [{"title": cl.TEST_CLASS_LABEL}]}
+    snap = _snapshot(projects=(_project(ready_tasks=(battery,)),))
+    result = hc.evaluate_quiet_queue_tripwire(
+        snap, in_overnight_window=False, in_boot_grace=False, absence_active=False
+    )
+    assert not result.fired
+    assert result.ready_eligible_total == 0
+    assert result.gated_inventory == 0  # excluded outright, not gated
+
+
+def test_tripwire_counts_only_real_ready_work_in_a_mixed_column(tmp_path, store) -> None:
+    battery = {"id": 9, "title": "battery-park", "labels": [{"title": cl.TEST_CLASS_LABEL}]}
+    real = {"id": 1, "title": "go"}
+    snap = _snapshot(projects=(_project(ready_tasks=(battery, real)),))
+    result = hc.evaluate_quiet_queue_tripwire(
+        snap, in_overnight_window=False, in_boot_grace=False, absence_active=False
+    )
+    assert result.fired  # one REAL Ready item, nothing pulling
+    assert result.ready_eligible_total == 1
+
+
 def test_tripwire_suppressed_on_unreachable_substrate(tmp_path, store) -> None:
     """Unknown ≠ quiet: a dead substrate suppresses + surfaces, never alarms."""
     snap = _ready_snapshot(substrate_unreachable=("vikunja",))
@@ -803,13 +828,58 @@ def test_unreachable_swap_read_defers_drafting(tmp_path, store) -> None:
 
 
 def test_full_mode_drafts_and_digest_carries_prose(tmp_path, store) -> None:
-    spy = _DraftSpy()
+    """A guard-compliant draft (verdict echo, no contradicting claim) still
+    flows into the digest — #946 gates, it does not silence."""
+    text = "INCOMPLETE: The task merged; the acceptance grade did not run."
+    spy = _DraftSpy(hc.DraftOutcome(status="drafted", text=text))
     env = _env(tmp_path, store, _snapshot(latest_run=_merged_run()), draft=spy)
     result = _run(env)
     assert result.decision.mode is cadence.CycleMode.FULL
     assert spy.prompts  # called
+    # #946 drafting contract: the prompt carries the verdict + echo requirement.
+    assert "recorded verdict is INCOMPLETE" in spy.prompts[0]
     assert result.digest is not None and result.digest.model_drafted
-    assert result.digest.model_prose == "prose"
+    assert result.digest.model_prose == text
+    assert result.digest.prose_guard_action == "accepted"
+    assert result.digest.run_headline.startswith("Run r-9: INCOMPLETE")
+
+
+def test_prose_guard_rejects_false_success_prose_end_to_end(tmp_path, store) -> None:
+    """#946 wire lock — the #855-measured failure verbatim: success prose about
+    a non-success run is refused at the REAL run_cycle seam. The digest keeps
+    the deterministic headline, drops the prose, and journals the audit trail
+    (raw rejected text + action) for the false-refusal measurement."""
+    text = (
+        "The run passed all acceptance tests, confirming that the system is "
+        "fully functional and ready for use."
+    )
+    spy = _DraftSpy(hc.DraftOutcome(status="drafted", text=text))
+    env = _env(tmp_path, store, _snapshot(latest_run=_merged_run()), draft=spy)
+    result = _run(env)
+    d = result.digest
+    assert d is not None
+    assert d.model_prose == "" and not d.model_drafted
+    assert d.prose_guard_action == "rejected:echo-missing"
+    assert d.model_prose_rejected == text
+    assert d.run_headline.startswith("Run r-9: INCOMPLETE")
+    assert any(
+        s.name == "prose-guard" and "rejected" in s.detail for s in result.steps
+    )
+
+
+def test_prose_guard_rejects_lying_echo_end_to_end(tmp_path, store) -> None:
+    """#946 wire lock: an echo that CLAIMS a better verdict than the harvest
+    truth is a mismatch, not a pass — the echo is validated against truth,
+    never trusted as self-report."""
+    spy = _DraftSpy(
+        hc.DraftOutcome(status="drafted", text="SUCCEEDED: everything is great.")
+    )
+    env = _env(tmp_path, store, _snapshot(latest_run=_merged_run()), draft=spy)
+    result = _run(env)
+    d = result.digest
+    assert d is not None
+    assert d.model_prose == ""
+    assert d.prose_guard_action == "rejected:echo-mismatch:SUCCEEDED"
 
 
 def test_busy_draft_is_deferral_not_error(tmp_path, store) -> None:

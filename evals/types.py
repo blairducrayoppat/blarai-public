@@ -14,6 +14,15 @@ Statuses:
                       and hardware execution was not requested. Skipped
                       cases never count toward pass-rate and never trigger
                       or mask a regression.
+  tool_call         — the model answered with a native tool-call block and
+                      nothing else. Production would execute the tool loop
+                      and show the user its final answer; the single-shot
+                      harness cannot (#1023), so the case was REACHED but is
+                      UNSCORABLE one-shot. Distinct from an all-<think>
+                      empty answer, which production would also display as
+                      empty and which therefore stays a scoreable fail.
+                      Excluded from pass-rate; every baseline transition
+                      involving it is loud (see evals/baseline.py).
 """
 
 from __future__ import annotations
@@ -31,6 +40,7 @@ class CaseStatus(str, Enum):
     FAIL = "fail"
     ERROR = "error"
     SKIPPED_HARDWARE = "skipped_hardware"
+    TOOL_CALL = "tool_call"
 
 
 @dataclass(frozen=True)
@@ -99,9 +109,14 @@ class SuiteReport:
         )
 
     @property
+    def tool_calls(self) -> int:
+        return sum(1 for r in self.results if r.status is CaseStatus.TOOL_CALL)
+
+    @property
     def evaluated(self) -> int:
-        """Cases actually scored (total minus hardware-skipped)."""
-        return self.total - self.skipped_hardware
+        """Cases actually scored (total minus hardware-skipped and
+        tool-call cases — reached but unscorable one-shot)."""
+        return self.total - self.skipped_hardware - self.tool_calls
 
     @property
     def pass_rate(self) -> float:
@@ -119,6 +134,7 @@ class SuiteReport:
             "failed": self.failed,
             "errors": self.errors,
             "skipped_hardware": self.skipped_hardware,
+            "tool_calls": self.tool_calls,
             "pass_rate": round(self.pass_rate, 6),
         }
 

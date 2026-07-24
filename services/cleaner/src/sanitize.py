@@ -39,11 +39,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Cross-service imports of the canonical primitives (see module docstring).
+# Cross-service import of the canonical delimiter primitive (see module
+# docstring); the injection scanner is consumed from its shared home (#896 —
+# previously a cross-service reach into the gateway document loader).
 from services.assistant_orchestrator.src.context_manager import (
     _neutralize_delimiters,
 )
-from services.ui_gateway.src.document_loader import scan_for_injection
+from shared.security.injection_scan import scan_for_injection
 
 
 @dataclass(frozen=True)

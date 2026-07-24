@@ -662,3 +662,23 @@ gets a dated CURRENT-STATE comment per landing (the C2 discipline).
    silently — say so if you want it revisited.
 4. FYI residuals recorded, not built: thermal probe, `Resource:*` evaluators, own-move
    journal precision, C4's briefing/absence auto-detect.
+
+---
+
+## 14. Implementation errata (build phase — mechanism refinements within settled decisions)
+
+**§6.3 boot reconcile (limb 7, 2026-07-14; named at the limb-7 review's dimension-3 recommendation).**
+The approved text sketched boot-time staleness as "older than K × interval relative to its own
+started_at chain." As literally specified, every ordinary app-off night leaves a wall-clock-stale
+stamp, so the heuristic cannot distinguish a wedge from a shutdown and would notice at every boot —
+the §2.14.1 alarm-retraining failure in boot-notice form. The shipped mechanism keeps §6.3's intent
+(catch "wedged before the crash/shutdown") with sharper evidence: a **clean-stop marker** written by
+`Heartbeat.stop()` in the launcher's stop-first teardown motion, an **overdue-aware guard** on that
+marker (a heartbeat already past its own declared deadline + the registered slack at teardown — or
+one whose deadline cannot be parsed — withholds the marker, so a wedge-into-shutdown is never buried),
+and a **three-way reconcile** at the next enabled boot: `thread_dead` → wedge notice; neither dead nor
+cleanly stopped → crash/wedge notice; cleanly stopped or no stamp → silence. Stamps additionally carry
+a per-boot **session identity** (limb-7 review MAJOR 1): the in-session dead-man treats any stamp that
+is not this boot's exactly like no-stamp (the boot-expectation grace governs, uniformly), so a leftover
+crash stamp can never raise a present-tense alarm — the boot reconcile voices prior-session evidence,
+past tense, once. Intent unchanged; verified at the limb-7 re-verification pass.

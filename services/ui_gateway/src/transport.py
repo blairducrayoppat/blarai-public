@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import socket as _socket_mod
 import ssl
 import uuid
@@ -385,6 +386,18 @@ class TransportGateway:
         # disk PEM reads + context construction leave the per-turn hot path.
         # Stays None in dev_mode (the loopback path skips mTLS entirely).
         self._client_ssl_ctx: ssl.SSLContext | None = None
+        # #906: the on-disk cert GENERATION the cached context was built from —
+        # (st_mtime_ns, st_size) per (client cert, key, CA) file. "Immutable
+        # per-boot" (#805 above) holds for THIS process's boot, but a long-lived
+        # gateway (the battery runner holds ONE gateway all night) outlives AO
+        # launcher reboots, and a swap-restore relaunch re-mints the per-boot set
+        # under it. A context cached across that re-mint verifies against the
+        # SUPERSEDED CA and burns the next connect with CERTIFICATE_VERIFY_FAILED
+        # (night-20260714: B2/B5/B7 STALLED — one job per re-mint).
+        # _client_ssl_context() compares this at every connect and rebuilds on a
+        # provable change — the verify posture is untouched; the client simply
+        # follows the mint instead of trusting a stale trust store.
+        self._client_ssl_ctx_generation: "tuple[tuple[int, int], ...] | None" = None
         # UC-003 Workstream B #1: the resolved image weld-lock, threaded into
         # the ingest coordinator below (default False = dormant).
         self._images_enabled: bool = bool(images_enabled)
@@ -744,29 +757,65 @@ class TransportGateway:
             # Production guest-mode: AF_HYPERV + mTLS (#615 — activated).
             return await asyncio.to_thread(self._connect_hyperv, timeout_s)
 
-    def _client_ssl_context(self) -> ssl.SSLContext | None:
-        """Return the reusable mTLS client SSLContext, building it once (#805).
+    def _cert_generation_fingerprint(self) -> "tuple[tuple[int, int], ...] | None":
+        """Identity of the CURRENT on-disk cert generation — ``(st_mtime_ns,
+        st_size)`` for each of (client cert, client key, CA) — or ``None`` when
+        any file cannot be stat'd (absent / mid-mint: the generation is UNKNOWN,
+        which is deliberately distinct from CHANGED — see ``_client_ssl_context``).
 
-        The client SSLContext is immutable per-boot configuration — the client
-        cert chain, the CA trust store, ``CERT_REQUIRED``, the TLS floor and the
-        no-hostname posture — and Python's ``ssl`` module explicitly supports
-        reusing one context across many connections (and threads).  Building it
-        once and caching it removes the per-message disk PEM reads + context
-        construction from the hot path (send_prompt, every tool round-trip,
-        ingest, imagine, plan); the connection-per-message architecture is
-        unchanged.
+        Three ``os.stat`` calls (~µs) per connect — cheap enough for the per-turn
+        hot path while still catching every re-mint (``provision_per_boot_certs``
+        rewrites all three files, changing ``st_mtime_ns``)."""
+        try:
+            out = []
+            for p in (self._mtls_cert_path, self._mtls_key_path, self._ca_cert_path):
+                st = os.stat(p)
+                out.append((st.st_mtime_ns, st.st_size))
+            return tuple(out)
+        except OSError:
+            return None
+
+    def _client_ssl_context(self) -> ssl.SSLContext | None:
+        """Return the reusable mTLS client SSLContext, built once per on-disk
+        cert GENERATION (#805 reuse + #906 rotation-following).
+
+        The client SSLContext is immutable configuration for one cert
+        generation — the client cert chain, the CA trust store,
+        ``CERT_REQUIRED``, the TLS floor and the no-hostname posture — and
+        Python's ``ssl`` module explicitly supports reusing one context across
+        many connections (and threads).  Building it once and caching it
+        removes the per-message disk PEM reads + context construction from the
+        hot path (send_prompt, every tool round-trip, ingest, imagine, plan);
+        the connection-per-message architecture is unchanged.
+
+        #906: "once" is scoped to the cert generation, not the process
+        lifetime.  A long-lived gateway outlives AO launcher reboots, and a
+        swap-restore relaunch re-mints ``certs/`` under it; a context cached
+        across that re-mint verifies against the superseded CA and the next
+        connect dies ``CERTIFICATE_VERIFY_FAILED`` (night-20260714 B2/B5/B7).
+        Every call therefore compares the on-disk generation fingerprint and
+        rebuilds on a PROVABLE change.  An UNKNOWN generation (``None`` — files
+        absent or mid-mint) keeps serving the cached context: staleness is not
+        provable, a rebuild could not load the unreadable files anyway, and the
+        bounded verify-failure retry in ``_connect_host_loopback_mtls`` covers
+        the residual stat-then-mint race.
 
         Fail-closed is preserved exactly: a build failure returns ``None`` (the
         caller refuses the connection) and is NOT cached, so the next connect
         retries the build rather than being permanently poisoned by a transient
-        failure.  The cert/verify posture is byte-identical to the prior
-        per-connection build — the very object ``create_client_ssl_context``
-        produced before, now shared.  (A first-connect race between two worker
-        threads at most builds the context twice; both are valid and one wins
-        the cache — harmless, so no lock is taken.)
+        failure — and a PROVABLY superseded cached context is dropped rather
+        than served when its rebuild fails.  The cert/verify posture is
+        byte-identical to the prior per-connection build — the very object
+        ``create_client_ssl_context`` produced before, now shared.  (A
+        first-connect race between two worker threads at most builds the
+        context twice; both are valid and one wins the cache — harmless, so no
+        lock is taken.)
         """
+        current = self._cert_generation_fingerprint()
         ctx = self._client_ssl_ctx
-        if ctx is not None:
+        if ctx is not None and (
+            current is None or current == self._client_ssl_ctx_generation
+        ):
             return ctx
         from shared.ipc.vsock import create_client_ssl_context
 
@@ -777,10 +826,17 @@ class TransportGateway:
         )
         if ctx is not None:
             self._client_ssl_ctx = ctx
+            self._client_ssl_ctx_generation = current
+        else:
+            # A changed generation whose rebuild failed: never keep serving the
+            # provably superseded context (fail-closed; no-op when nothing was
+            # cached).
+            self._client_ssl_ctx = None
+            self._client_ssl_ctx_generation = None
         return ctx
 
     def _connect_host_loopback_mtls(
-        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S
+        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S, *, _rebuild_retry: bool = False
     ) -> VsockTransport | None:
         """Create a loopback + mTLS connection to the PA server (host-mode production).
 
@@ -812,11 +868,14 @@ class TransportGateway:
                 "(Fail-Closed)"
             )
             return None
+        raw: "_socket_mod.socket | None" = None
         try:
             import ssl as _ssl_mod
 
             # #805: reuse the per-boot mTLS client context instead of rebuilding
             # it (disk PEM reads + context construction) on every message.
+            # #906: _client_ssl_context() now follows cert re-mints (generation
+            # fingerprint), so this cached context tracks the CURRENT on-disk set.
             ssl_ctx = self._client_ssl_context()
             if ssl_ctx is None:
                 logger.error(
@@ -850,11 +909,34 @@ class TransportGateway:
             # the settled certs on disk — restoring the pre-#805 self-healing the
             # per-message rebuild gave us (caching poisoned all 16 boot retries).
             self._client_ssl_ctx = None
+            self._client_ssl_ctx_generation = None
+            if raw is not None:
+                try:
+                    raw.close()
+                except OSError:
+                    pass
+            if isinstance(exc, _ssl_mod.SSLCertVerificationError) and not _rebuild_retry:
+                # #906 defense-in-depth: a VERIFICATION failure (and only that —
+                # never a timeout/refusal, so no timeout doubling) right after a
+                # cert re-mint means this context was built from the superseded
+                # generation. The fingerprint check above makes this
+                # near-unreachable; it remains for the stat-then-mint race.
+                # Rebuild from the current on-disk set and retry ONCE — a genuine
+                # trust mismatch stays a loud failure, never a loop. Verification
+                # itself is never relaxed: the retry re-verifies against the
+                # freshly-read CA.
+                logger.warning(
+                    "Host-mode loopback+mTLS verify failed (%s) — rebuilding the "
+                    "client context from the current on-disk certs and retrying "
+                    "once (#906)",
+                    exc,
+                )
+                return self._connect_host_loopback_mtls(timeout_s, _rebuild_retry=True)
             logger.error("Host-mode loopback+mTLS connect failed: %s", exc)
             return None
 
     def _connect_hyperv(
-        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S
+        self, timeout_s: float = PROMPT_RESPONSE_TIMEOUT_S, *, _rebuild_retry: bool = False
     ) -> VsockTransport | None:
         """Create an AF_HYPERV connection to the Orchestrator VM with mTLS.
 
@@ -914,6 +996,8 @@ class TransportGateway:
             # Wrap with the per-boot mTLS client context so the handshake
             # is NOT deferred until the first send.  #805: reuse the cached
             # context rather than rebuilding it per AF_HYPERV connection.
+            # #906/#907: _client_ssl_context() follows cert re-mints (generation
+            # fingerprint), so this cached context tracks the CURRENT on-disk set.
             ssl_ctx = self._client_ssl_context()
             if ssl_ctx is None:
                 logger.error("AF_HYPERV: mTLS client SSL context creation failed")
@@ -931,12 +1015,29 @@ class TransportGateway:
             # #805 regression fix: drop the cached client SSLContext on failure so
             # the next retry rebuilds from fresh per-boot certs (see the host path).
             self._client_ssl_ctx = None
-            logger.error("AF_HYPERV connect failed: %s", exc)
+            self._client_ssl_ctx_generation = None
             if raw is not None:
                 try:
                     raw.close()
                 except OSError:
                     pass
+            if isinstance(exc, _ssl_mod.SSLCertVerificationError) and not _rebuild_retry:
+                # #907 parity with the host-loopback path (#906): a VERIFICATION
+                # failure — and only that, never a timeout/refusal — right after a
+                # cert re-mint means this context was built from the superseded
+                # generation. Rebuild from the current on-disk set and retry ONCE;
+                # a genuine trust mismatch stays a loud failure, never a loop.
+                # Verification is never relaxed: the retry re-verifies against the
+                # freshly-read CA. Closes the guest-topology (#615) gap #906 left
+                # covered only on the host path.
+                logger.warning(
+                    "AF_HYPERV+mTLS verify failed (%s) — rebuilding the client "
+                    "context from the current on-disk certs and retrying once "
+                    "(#907)",
+                    exc,
+                )
+                return self._connect_hyperv(timeout_s, _rebuild_retry=True)
+            logger.error("AF_HYPERV connect failed: %s", exc)
             return None
 
     def load_document(self, session_id: str, filename: str) -> dict[str, object]:

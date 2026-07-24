@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision Read — Advanced Intake (#1031) — Should we build a proper front door?</title>
+<style>
+  :root { --ink:#1a1c1e; --sub:#5f6368; --line:#e0e2e6; --good:#0b6e4f; --warn:#a15c07; --bad:#b3261e; --card:#f7f8fa; --accent:#1a4f8a; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: var(--ink); max-width: 46rem; margin: 2.5rem auto; padding: 0 1.25rem; line-height: 1.62; }
+  h1 { font-size: 1.7rem; line-height: 1.25; margin-bottom: .3rem; }
+  h2 { font-size: 1.15rem; margin-top: 2.2rem; border-bottom: 1px solid var(--line); padding-bottom: .3rem; }
+  h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: .3rem; }
+  .sub { color: var(--sub); font-size: .95rem; }
+  .decision { border: 2px solid var(--accent); border-radius: 10px; padding: 1.1rem 1.3rem; margin: 1.6rem 0; background: #f4f8fd; }
+  .decision .lab { font-family: Verdana, sans-serif; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); display:block; margin-bottom:.4rem; }
+  .decision .big { font-size: 1.15rem; font-weight: 700; }
+  .note { border-left: 4px solid var(--warn); background: #fdf8ef; padding: .9rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  .find { border-left: 4px solid var(--bad); background: #fdf3f2; padding: .9rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  .rec { border-left: 4px solid var(--good); background: #f1f8f4; padding: .9rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; margin: 1rem 0; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: Verdana, sans-serif; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--sub); }
+  code { font-family: Consolas, monospace; font-size: .88em; background: var(--card); padding: .08em .35em; border-radius: 4px; }
+  .good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .stage { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1.1rem; margin: .7rem 0; }
+  .stage b { color: var(--accent); }
+  .foot { color: var(--sub); font-size: .85rem; margin-top: 2.5rem; border-top: 1px solid var(--line); padding-top: .8rem; }
+  ul { padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+
+<h1>Should we build a proper front door?</h1>
+<p class="sub">Plain-language read of the Advanced Intake design sketch (ticket #1031) · written 2026-07-22 by the overnight session, from the sketch and the source it cites · you asked for this so you could decide on substance instead of reading 22,000 words of architecture</p>
+
+<div class="decision">
+<span class="lab">The decision in front of you</span>
+<span class="big">Should the system interview you properly before it starts building — instead of asking a few quick questions and going?</span>
+<p style="margin-bottom:0">That is the whole call. <b>Build / don't build / later.</b> Nothing here switches anything on: if you say build, it arrives switched off behind a flag, and turning it on is a separate occasion with you present.</p>
+</div>
+
+<h2>Why this, and why now</h2>
+
+<p>Last night handed us the argument for it, by accident. We shipped a code fix meant to stop the builder from sprawling beyond its assigned task. It worked — it moved the number from 15.7% to 14.5% against an ideal of 20%. A real improvement, and small.</p>
+
+<p>The much bigger improvement had already happened a week earlier, when we <i>rewrote the exam</i>. B4 — the flashcards test — had failed seven nights in a row. The cause was one module missing from the list of things its exam checked. Because the exam never mentioned that module, no task was ever told to build it, so the first task built everything instead. Repairing that one list fixed the behaviour <b>before the code fix ever ran</b>.</p>
+
+<p>That pattern holds across all eight test cards, not just this one. Where every task owns exactly one testable piece, builds come out clean. Where tasks share pieces or a piece is unowned, they sprawl. It is not about the programming language, the size of the job, or how many tasks there are.</p>
+
+<p class="note"><b>The blunt version:</b> the quality of the specification predicts the quality of the build better than anything we have changed about the builder itself. We have been tuning the engine while the steering was the problem.</p>
+
+<h2>What it would actually do</h2>
+
+<p>Four stages, on the path you already use. Small jobs keep the current quick route — nothing here slows down "just build me X."</p>
+
+<div class="stage"><b>Stage 1 — a real interview.</b> Instead of five fixed questions, it asks about purpose and audience, what you're actually delivering (a command-line tool, a web page, a service), whether you want real content or deliberate placeholders, the awkward cases in your own words, and — importantly — what is <i>not</i> in scope. Bounded to about one screenful and skippable; "just decide for me" already works and keeps working.</div>
+
+<div class="stage"><b>Stage 2 — writing the checklist together.</b> The system already sorts every check into "the machine verifies this" versus "you look at this yourself." Two new rules get added. First, anything delivered as a web page must carry a machine-checked item saying <i>the page actually loads and shows the thing</i> — which is precisely the failure that parked the Bill Splitter test. Second, if a check claims to be machine-verifiable but nobody can name how a machine would verify it, it gets demoted to "you check this," rather than dressed up with a fake test.</div>
+
+<div class="stage"><b>Stage 3 — guaranteeing the coverage.</b> The list of program pieces gets derived <i>from</i> your checklist, so that every build task owns exactly one testable piece by construction. Today the system notices coverage gaps and warns; in this mode it would try once to fix the gap, and if it still can't, it refuses to start and tells you where the hole is. You could still revise or reject — it is never a dead end.</div>
+
+<div class="stage"><b>Stage 4 — the approval card you already use.</b> Unchanged. Same card, same six things you grade aloud, same approve / revise / reject.</div>
+
+<h2>An honest correction the sketch makes about itself</h2>
+
+<p>The first draft of this design overstated how much of it was new. It was rewritten against the actual source code, and the corrected version is <b>considerably cheaper</b> than it first appeared:</p>
+
+<table>
+<tr><th>Sounds new</th><th>Actually already exists</th></tr>
+<tr><td>Sorting checks into machine-verified vs judge-yourself</td><td>Already built. Every check is sorted at creation, and the approval card already shows the two groups separately.</td></tr>
+<tr><td>Storing the interview transcript</td><td>Already built. A record is saved before every build, and it already carries your answers.</td></tr>
+<tr><td>Measuring coverage gaps</td><td>Already built — last night's merge added it. Today it warns; this would make it block, in this mode only.</td></tr>
+<tr><td>An interview stage at all</td><td>Already built and live. This extends its question set; it does not create it.</td></tr>
+</table>
+
+<p>So the build is mostly <i>extending three stages that already run</i>, not adding a new front. No new model, no new background process, no new network access, and no change to the rule that the assistant cannot write to its own governed core.</p>
+
+<h2>A defect the design work found along the way</h2>
+
+<div class="find">
+<b>Your answers don't reach the exam author on multi-part jobs.</b> When you answer the clarifying questions, those answers are supposed to inform whoever writes the acceptance exam. On single-task jobs they do. On multi-task jobs — the bigger, more valuable ones — the exam author receives the <i>original</i> short request instead, with your clarifications stripped. The code's own documentation explicitly claims <i>both</i> paths get them.
+<p><b>Verified directly, not taken on the sketch's word.</b> The enriched version of your request is assembled and then handed to the single-task exam author; the multi-task exam author is handed the plain goal on the very next branch. One word apart, in the same function. The documentation above them describes the behaviour we want and not the behaviour that runs.</p>
+<p style="margin-bottom:0">This is a bug, not a missing feature, and it is <b>independent of the decision on this page</b> — fixable on its own whether or not you green-light the intake. Two things make it low-risk to fix: the change is one identifier, and it is <b>inert for the nightly test battery</b>, whose cards supply their own plan and never go through the question stage. So it would only affect the jobs you start by hand — the ones where you actually answered questions. I have not fixed it; say the word and it's a small separate change with a regression test.</p>
+</div>
+
+<h2>What it would buy — and what it cannot</h2>
+
+<p><b>Expected, based on what we've measured:</b> fewer builds parked for reasons that were really specification gaps; web jobs crossing from "the logic exists" to "the page actually works"; no more invented placeholder content appearing without being asked for; less graphics-card time burned on vague requests; and every run's exam trustworthy because it was built to be, not because it happened to come out right.</p>
+
+<p><b>What it cannot do:</b> make the builder itself smarter — tasks stay bounded and machine-checkable either way. Make taste machine-checkable; "feels premium" stays your call by design. Or substitute for you on privacy, capability, and go-live decisions.</p>
+
+<h2>What it costs</h2>
+
+<table>
+<tr><th>Piece</th><th>What it is</th><th>Notes</th></tr>
+<tr><td>1</td><td>The delivery check and the honesty rule for checks</td><td>Self-contained. Build first — the rest depends on it.</td></tr>
+<tr><td>2</td><td>The extended interview</td><td>Independent of piece 1; could be built alongside.</td></tr>
+<tr><td>3</td><td>Coverage guaranteed by construction, plus the blocking refusal</td><td>Needs piece 1.</td></tr>
+<tr><td>4</td><td>Making sure your answers reach the exam author</td><td>Contains the bug above, which can go early.</td></tr>
+</table>
+
+<p>All four touch files that already exist. Each ships with tests proving it works <i>and</i> tests proving that with the flag off, the system behaves exactly as it does today — byte for byte.</p>
+
+<h2>The risks, stated plainly</h2>
+
+<ul>
+<li><b>Interrogation kills the tool.</b> If the interview becomes tedious you will stop using the good path and go back to one-shotting. The design bounds it to one screenful and keeps "just decide for me" — but this is the real risk, and it is a judgement about your own patience that only you can make.</li>
+<li><b>Blocking can frustrate.</b> Stage 3 refuses to start when it can't close a coverage gap. That is the point, but a refusal you disagree with is annoying. It stays confined to the advanced mode; the quick path never blocks.</li>
+<li><b>It is a capability addition to the part you touch.</b> Hence dormant-by-default and a separate go-live with you present.</li>
+</ul>
+
+<div class="rec">
+<b>My recommendation: build it, in that order, dormant.</b> The evidence for specification quality as the dominant lever is the strongest measured finding this system has produced, and it came from our own failure record rather than from theory. Piece 1 is worth having on its own merits even if you later decide the full interview isn't for you — the delivery check is exactly what the Bill Splitter failure asked for. I would also fix the exam-author bug regardless of what you decide here.
+</div>
+
+<h2>Three questions only you can answer</h2>
+
+<p>The sketch settled everything it could settle by reading the code. These three it deliberately left open, because they are product judgements rather than technical ones:</p>
+
+<ul>
+<li><b>Should accepted specifications become reusable templates</b> for similar future requests?</li>
+<li><b>Should the interview be available by voice?</b> The voice stack exists. Whether talking to it beats typing is your experience call.</li>
+<li><b>Should the same machinery be used to author the test cards themselves?</b> The seven-night B4 failure was a hand-written card with a flawed exam — this would prevent that class. It needs its own scoping because those cards live in the sibling installation.</li>
+</ul>
+
+<p>None of them blocks the build decision. They shape what comes after it.</p>
+
+<p class="foot">Sources: <code>docs/research/coder-capability-2026-07/advanced-intake-design-sketch-2026-07-21.md</code> (the full sketch, now committed) and its companion capability assessment · ticket #1031 · the measured evidence in #989 and the dispatch quality ledger. The sketch's own §5 is a build appendix written so a future agent can implement it without re-deriving the path — that work is done and is not part of what you are deciding.</p>
+
+</body>
+</html>

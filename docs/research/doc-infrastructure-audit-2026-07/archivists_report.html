@@ -1,0 +1,678 @@
+<title>The Archivist's Report — BlarAI</title>
+<style>
+  :root{
+    --paper:#f4f3ee; --card:#fbfaf7; --ink:#23281f; --ink2:#55604e; --muted:#7d8674;
+    --line:#ddd9cc; --line2:#c9c4b2;
+    --green:#0e7d58; --green-deep:#12523e; --brass:#a3762a; --blue:#3a6fb0;
+    --alert:#b3402e; --alert-bg:#f7e8e4;
+    --chip-bg:#e9e6da; --hi:#eef3ea;
+    --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+    --sans:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    --mono:"Cascadia Code",Consolas,"SF Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){ :root{
+    --paper:#171a16; --card:#1f231e; --ink:#e6e4da; --ink2:#a8b09c; --muted:#7d8674;
+    --line:#343a30; --line2:#454c40;
+    --green:#2e9678; --green-deep:#68c2a4; --brass:#b8822f; --blue:#5e92d6;
+    --alert:#d4644f; --alert-bg:#33221e;
+    --chip-bg:#2a2f27; --hi:#232921;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#171a16; --card:#1f231e; --ink:#e6e4da; --ink2:#a8b09c; --muted:#7d8674;
+    --line:#343a30; --line2:#454c40;
+    --green:#2e9678; --green-deep:#68c2a4; --brass:#b8822f; --blue:#5e92d6;
+    --alert:#d4644f; --alert-bg:#33221e;
+    --chip-bg:#2a2f27; --hi:#232921;
+  }
+  :root[data-theme="light"]{
+    --paper:#f4f3ee; --card:#fbfaf7; --ink:#23281f; --ink2:#55604e; --muted:#7d8674;
+    --line:#ddd9cc; --line2:#c9c4b2;
+    --green:#0e7d58; --green-deep:#12523e; --brass:#a3762a; --blue:#3a6fb0;
+    --alert:#b3402e; --alert-bg:#f7e8e4;
+    --chip-bg:#e9e6da; --hi:#eef3ea;
+  }
+  html{background:var(--paper)}
+  body{font-family:var(--serif);color:var(--ink);line-height:1.62;margin:0;background:var(--paper)}
+  .wrap{max-width:76rem;margin:0 auto;padding:0 1.25rem 6rem}
+  .col{max-width:46rem;margin:0 auto}
+  header.mast{border-bottom:3px double var(--line2);padding:3.5rem 0 2rem;margin-bottom:2.5rem}
+  .eyebrow{font-family:var(--sans);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);font-weight:600}
+  h1{font-size:clamp(2.1rem,5vw,3.1rem);line-height:1.08;margin:.35rem 0 .8rem;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+  .dek{font-size:1.12rem;color:var(--ink2);max-width:44rem;margin:0}
+  .stamp{font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-top:1.1rem}
+  h2{font-size:1.55rem;margin:3.2rem 0 .4rem;font-weight:600;letter-spacing:-.005em;text-wrap:balance}
+  h2 .no{color:var(--brass);font-family:var(--sans);font-size:.8rem;letter-spacing:.14em;display:block;margin-bottom:.3rem}
+  h3{font-size:1.12rem;margin:1.8rem 0 .3rem;font-weight:600}
+  p{margin:.65rem 0}
+  .lede{font-size:1.08rem}
+  strong{font-weight:600}
+  .heroStats{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:2rem 0 0}
+  .stat{background:var(--card);padding:1rem 1.1rem}
+  .stat .n{font-family:var(--mono);font-size:1.7rem;color:var(--green);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+  .stat .n.alert{color:var(--alert)}
+  .stat .l{font-family:var(--sans);font-size:.78rem;color:var(--ink2);margin-top:.25rem;line-height:1.35}
+  table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:.86rem}
+  .tblwrap{overflow-x:auto;margin:1.2rem 0;border:1px solid var(--line)}
+  th{text-align:left;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:.55rem .7rem;border-bottom:2px solid var(--line2);background:var(--card)}
+  td{padding:.55rem .7rem;border-bottom:1px solid var(--line);vertical-align:top;background:var(--card)}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .flag{display:inline-block;font-family:var(--sans);font-size:.68rem;font-weight:600;letter-spacing:.06em;padding:.1rem .45rem;border-radius:2px;vertical-align:1px}
+  .flag.bad{background:var(--alert-bg);color:var(--alert)}
+  .flag.ok{background:var(--hi);color:var(--green)}
+  .flag.warm{background:var(--chip-bg);color:var(--brass)}
+  .cardlist{display:grid;gap:1rem;margin:1.4rem 0}
+  .doccard{border:1px solid var(--line);background:var(--card);padding:1.05rem 1.2rem;position:relative}
+  .doccard.badcard{border-left:4px solid var(--alert)}
+  .doccard.goodcard{border-left:4px solid var(--green)}
+  .doccard.warmcard{border-left:4px solid var(--brass)}
+  .doccard h4{margin:0 0 .15rem;font-size:1.02rem;font-family:var(--mono);font-weight:600}
+  .doccard .meta{font-family:var(--sans);font-size:.76rem;color:var(--muted);margin-bottom:.45rem}
+  .doccard p{font-size:.94rem;margin:.35rem 0;font-family:var(--serif)}
+  .doccard .rx{font-family:var(--sans);font-size:.85rem;color:var(--green-deep);margin-top:.5rem}
+  .doccard .rx b{color:var(--green)}
+  figure{margin:1.6rem 0;border:1px solid var(--line);background:var(--card);padding:1rem 1.1rem}
+  figcaption{font-family:var(--sans);font-size:.78rem;color:var(--ink2);margin-top:.6rem;line-height:1.45}
+  .chart{position:relative}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font-family:var(--sans);font-size:.74rem;padding:.3rem .55rem;border-radius:3px;opacity:0;transition:opacity .1s;white-space:nowrap;z-index:5}
+  blockquote{margin:1.2rem 0;padding:.2rem 0 .2rem 1.1rem;border-left:3px solid var(--brass);color:var(--ink2);font-style:italic}
+  blockquote .who{display:block;font-style:normal;font-family:var(--sans);font-size:.74rem;letter-spacing:.05em;color:var(--muted);margin-top:.35rem}
+  .acts{counter-reset:act;margin:1.2rem 0;display:grid;gap:.9rem}
+  .act{border:1px solid var(--line);background:var(--card);padding:.9rem 1.1rem;display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:start}
+  .act .roman{font-family:var(--serif);font-size:1.5rem;color:var(--brass);font-weight:600;line-height:1.2;min-width:2.4rem}
+  .act h4{margin:0;font-size:1.02rem}
+  .act .dates{font-family:var(--sans);font-size:.72rem;color:var(--muted);letter-spacing:.05em}
+  .act p{font-size:.92rem;margin:.3rem 0 0}
+  .threads{display:grid;gap:.9rem;margin:1.2rem 0}
+  .thread{border-top:2px solid var(--green);background:var(--card);border-left:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:.9rem 1.1rem}
+  .thread h4{margin:0 0 .3rem;font-size:1rem}
+  .thread p{font-size:.92rem;margin:.3rem 0}
+  .decision{border:1px solid var(--line2);background:var(--card);margin:1rem 0;padding:1.05rem 1.2rem}
+  .decision .dn{font-family:var(--sans);font-size:.7rem;font-weight:700;letter-spacing:.14em;color:var(--brass)}
+  .decision h4{margin:.15rem 0 .35rem;font-size:1.05rem}
+  .decision p{font-size:.93rem;margin:.3rem 0}
+  .decision .rec{font-family:var(--sans);font-size:.8rem;color:var(--green-deep);background:var(--hi);display:inline-block;padding:.15rem .5rem;border-radius:2px;margin-top:.4rem}
+  .note{font-family:var(--sans);font-size:.85rem;color:var(--ink2);background:var(--hi);border:1px solid var(--line);padding:.8rem 1rem;margin:1.2rem 0}
+  .kicker{font-family:var(--sans);font-size:.85rem;color:var(--muted)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--chip-bg);padding:.08em .35em;border-radius:2px}
+  .toc{font-family:var(--sans);font-size:.85rem;columns:2;gap:2rem;border:1px solid var(--line);background:var(--card);padding:1rem 1.3rem;margin:1.6rem 0}
+  .toc a{color:var(--green-deep);text-decoration:none;display:block;padding:.14rem 0}
+  .toc a:hover{text-decoration:underline}
+  a{color:var(--green-deep)}
+  .quiet{color:var(--muted);font-size:.9em}
+  @media (max-width:640px){ .toc{columns:1} .act{grid-template-columns:1fr} }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+  svg text{font-family:var(--sans)}
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <div class="eyebrow">Documentation infrastructure audit &amp; archive mining · 2026-07-18</div>
+  <h1>The Archivist&rsquo;s Report</h1>
+  <p class="dek">BlarAI&rsquo;s records, weighed and mined: what every session is forced to read, what it costs, where the
+  gems are buried, and the archive that keeps all of it &mdash; forever &mdash; without making your sessions carry it.</p>
+  <div class="stamp">Prepared for the Lead Architect · evidence from 771 session transcripts, 465 journal entries, and every documentation surface across three repositories · Vikunja #945</div>
+  <div class="heroStats">
+    <div class="stat"><div class="n">579,000</div><div class="l">tokens in the build journal &mdash; nearly <b>3&times;</b> what one session can even hold</div></div>
+    <div class="stat"><div class="n">465</div><div class="l">journal entries written in 58 days &mdash; the &ldquo;record everything&rdquo; plan, executed</div></div>
+    <div class="stat"><div class="n">~24,000</div><div class="l">tokens of fixed overhead before a session does any work at all</div></div>
+    <div class="stat"><div class="n alert">15 / 15</div><div class="l">recent reads of the sprint pointer were full reads &mdash; of a file that has been wrong since June&nbsp;7</div></div>
+  </div>
+</header>
+
+<nav class="toc col">
+  <a href="#verdict">1 · The verdict</a>
+  <a href="#felt">2 · What you felt vs. what we measured</a>
+  <a href="#anatomy">3 · What a session actually reads</a>
+  <a href="#shelves">4 · The shelves, weighed</a>
+  <a href="#growth">5 · The curve that doesn&rsquo;t stop</a>
+  <a href="#mine">6 · The mine — what your journal is worth</a>
+  <a href="#lessons">7 · The lessons corpus</a>
+  <a href="#archive">8 · The archive wing</a>
+  <a href="#tug">9 · The tug-vector register</a>
+  <a href="#beyond">10 · Beyond this repository</a>
+  <a href="#decisions">11 · The decision sheet</a>
+  <a href="#next">12 · What happens next</a>
+</nav>
+
+<main class="col">
+
+<section id="verdict">
+  <h2><span class="no">§ 1</span>The verdict</h2>
+  <p class="lede">Your instinct was right, and the diagnosis is precise: <strong>the problem is not one bloated file — it
+  is that your archives never got an archive.</strong> Everything the project has ever recorded still sits on the
+  production reading path, so every working session pays for the entire history to reach this week&rsquo;s facts.</p>
+  <p>Three things surprised me, and they will surprise you:</p>
+  <p><strong>First — CLAUDE.md is innocent.</strong> It was never &ldquo;thousands of lines.&rdquo; It peaked at 399 lines on
+  July&nbsp;13 and was rewritten that same day to today&rsquo;s 273 — the audit graded it ~95% live. What you <em>felt</em>
+  as thousands of lines is real, though: it is the <em>effective</em> reading load — CLAUDE.md plus everything it commands
+  every session to read, plus the memory index, plus the per-ship archive lookups. That constellation never got the
+  July&nbsp;13 treatment, and the audit found <em>why</em>: nearly every frozen satellite names a maintenance owner — a
+  fleet role — that was retired months ago. The owners left; their documents froze mid-sentence; one even forbids anyone
+  else from editing it. Documents with living owners (the decision register, the field notes) stayed perfectly fresh.</p>
+  <p><strong>Second — the journal is not mostly waste.</strong> Seven mining agents read all 465 entries. Roughly
+  <strong>half the corpus is genuine, portfolio-grade narrative</strong> — failure stories with named trade-offs,
+  governance decisions with reasoning, and a human-and-machine collaboration record I believe is genuinely rare.
+  Your &ldquo;write everything down, mine it later&rdquo; bet paid off. Today is the mining day, and the mine is rich:
+  <strong>62 entries qualify as gems</strong>, and six threads run through the whole story.</p>
+  <p><strong>Third — you already made the key decision, back in April.</strong> Ticket #267 (doc-sprawl) established an
+  archive-not-delete policy, a document lifecycle rulebook, and even the lint tool — but its move workstream never ran.
+  Today&rsquo;s work is not a new idea needing new courage. It is executing a decision you already made, extended to the
+  three big logs that have grown since.</p>
+  <p>Nothing proposed below deletes anything. The library gets an <strong>archive wing</strong> (dated volumes, one-line
+  indexes), a <strong>front shelf</strong> (the curated anthology and canonical lessons), and <strong>a standing rule</strong>
+  that keeps the hot files small forever — because we proved a one-time diet doesn&rsquo;t hold.</p>
+</section>
+
+<section id="felt">
+  <h2><span class="no">§ 2</span>What you felt vs. what we measured</h2>
+  <p>You reported three symptoms. All three are real, and each one now has a measured cause.</p>
+  <div class="tblwrap"><table>
+    <tr><th style="width:33%">You felt&hellip;</th><th>We measured&hellip;</th></tr>
+    <tr><td><em>&ldquo;Sessions tugged in the wrong direction — worrying about old sprints and the old devplatform fleet.&rdquo;</em></td>
+        <td>The sprint pointer (<code>ACTIVE_SPRINT.md</code>) is a <b>mandated session-start read</b> — and it has been frozen since <b>June&nbsp;7</b>. All 15 recent reads were full reads of a file claiming &ldquo;Sprint 16 just closed, no sprint active, Sprint 17 next&rdquo; while Sprint 18&rsquo;s close-out files sit in the tree. It still speaks the retired sprint-paperwork vocabulary (design visions, completion reports, gap reports) and points at the retired Co-Lead fleet. Every session grounds itself on this. <span class="flag bad">MISINFORMATION, DELIVERED DAILY</span></td></tr>
+    <tr><td><em>&ldquo;I could feel it forgetting important things.&rdquo;</em></td>
+        <td>Working memory is finite, and archives are eating it. The lessons file alone is ~81,000 tokens — <b>40% of a session&rsquo;s entire attention span</b> — and doctrine requires consulting it before minting any lesson. It was read <b>87 times in the last 14 days</b>, the hottest document in the system. What archives consume, your actual task loses.</td></tr>
+    <tr><td><em>&ldquo;I could feel it regressing in many ways.&rdquo;</em></td>
+        <td>Stale doctrine is self-reinforcing: documents asserting yesterday&rsquo;s world get read as today&rsquo;s truth. The sharpest exhibit: <b>three doctrine surfaces currently pin three different test-gate counts</b> — CLAUDE.md says 8,518, test governance says 8,490, and the auto-loaded Copilot/Codex instructions say <b>2,212</b> (six thousand tests behind, describing the retired fleet as current). A documented sync rule exists; nothing enforces it. Each stale read nudges a session toward rebuilding yesterday.</td></tr>
+  </table></div>
+  <p class="kicker">And the friend&rsquo;s tiny CLAUDE.md? His project likely keeps its state somewhere. Yours keeps it
+  <em>everywhere</em> — which was the deliberate plan. The plan&rsquo;s second half, the archive, is what we build now.</p>
+</section>
+
+<section id="anatomy">
+  <h2><span class="no">§ 3</span>What a session actually reads</h2>
+  <p>From parsing all 771 stored session transcripts (including every subagent), here is the true &ldquo;instruction
+  load&rdquo; — the reading a session does before and during work, measured, not guessed:</p>
+  <div class="tblwrap"><table>
+    <tr><th>Layer</th><th>What</th><th class="num">~Tokens</th><th>How often</th></tr>
+    <tr><td rowspan="2"><b>Injected</b><br><span class="quiet">(automatic, invisible)</span></td><td>CLAUDE.md — the project doctrine</td><td class="num">9,600</td><td>every session <b>and every subagent</b></td></tr>
+    <tr><td>Memory index (~110 entries)</td><td class="num">4,900</td><td>every session and every subagent</td></tr>
+    <tr><td rowspan="3"><b>Mandated at start</b></td><td>Sprint pointer <span class="flag bad">stale since Jun 7</span></td><td class="num">5,700</td><td>every interactive session — 15/15 reads were full-file</td></tr>
+    <tr><td>Test governance §1 (the baseline wall)</td><td class="num">~2,600</td><td>every interactive session</td></tr>
+    <tr><td>Git history, board summary, task files</td><td class="num">~1,500+</td><td>every interactive session</td></tr>
+    <tr><td rowspan="4"><b>Per-ship archives</b></td><td>Lessons search before minting a number</td><td class="num">up to 81,000</td><td>87 reads in the last 14 days</td></tr>
+    <tr><td>Decision register append/consult</td><td class="num">20,000</td><td>45 reads / 32 sessions</td></tr>
+    <tr><td>Performance log append</td><td class="num">53,000</td><td>49 reads, 68 edits / 43 sessions</td></tr>
+    <tr><td>Journal navigation for folds &amp; retros</td><td class="num">large slices</td><td>103 reads — <b>zero</b> of them full (it no longer fits)</td></tr>
+  </table></div>
+  <p>The fixed floor is roughly <strong>24,000 tokens before any work happens</strong>; a working day&rsquo;s
+  doctrine-driven reads can pass 100,000. And the injected layer multiplies: with 507 subagent launches on record,
+  the injection tax alone has cost on the order of <strong>11 million tokens</strong> across the project&rsquo;s life.
+  Token cost is not your constraint — but <em>attention</em> is: every one of those tokens displaces the code and the
+  task the session should be thinking about.</p>
+</section>
+
+<section id="shelves">
+  <h2><span class="no">§ 4</span>The shelves, weighed</h2>
+  <p>Every constantly-read surface, with its measured heat and my prescription. Green edge: healthy or cold (leave it).
+  Brass edge: hot and oversized (rotate or tier it). Red edge: actively wrong (replace it).</p>
+
+  <figure class="chart" id="figBars">
+    <div id="barsMount"></div>
+    <figcaption>Token cost of the hot reading path, per surface. Bars are what a session pays to consult each document
+    today; the red bar is the one whose content is also six weeks wrong. Hover any bar for its measured read counts.
+    (A token is roughly three-quarters of a word; a session&rsquo;s working memory holds about 200,000.)</figcaption>
+  </figure>
+
+  <div class="cardlist">
+    <div class="doccard badcard"><h4>docs/sprints/ACTIVE_SPRINT.md</h4>
+      <div class="meta">22 KB · ~5,700 tokens · mandated session-start read · 15/15 recent reads full-file</div>
+      <p>Frozen June&nbsp;7 — <b>roughly 8 of its 10 active-block claims are false today</b>. It says no sprint is active
+      and Sprint&nbsp;17 is next; Sprints 17 <em>and</em> 18 have since run and closed. And it froze for a reason it states
+      itself: <em>&ldquo;Auto-maintained by Co-Lead Architect Phase 3 — do not hand-edit.&rdquo;</em> The maintainer role was
+      retired; the file ordered everyone else&rsquo;s hands off; nothing ever updated it again. Small, mandatory, and false.</p>
+      <div class="rx"><b>Rx:</b> retire the whole file to the archive; replace with a ≤30-line live pointer that carries a
+      visible refresh date and nothing historical. (Decision D3)</div></div>
+    <div class="doccard warmcard"><h4>LESSONS.md</h4>
+      <div class="meta">318 KB · 284 lessons · ~81,000 tokens · 87 reads in 14 days — the hottest document in the system</div>
+      <p>Born July&nbsp;3 at 190 KB, already +70%. Every lesson-mint must search it; every fold consults it. The corpus is
+      valuable — the cost is that consulting it means lifting the whole 81,000-token book.</p>
+      <div class="rx"><b>Rx:</b> three tiers — canonical lessons full-text hot (~30), a one-line index for all 284, full
+      text in an archive volume. The pre-mint search drops from ~81,000 tokens to ~5,000. Numbers stay permanent; nothing
+      is deleted. (Decision D2)</div></div>
+    <div class="doccard warmcard"><h4>BUILD_JOURNAL.md</h4>
+      <div class="meta">2.26 MB · 17,533 lines · 465 entries in 58 days · ~579,000 tokens · 103 reads (0 full) · 79 edits · 36 sessions · 15 worktree copies ≈ 34 MB disk</div>
+      <p>Physically unreadable in one sitting since roughly mid-June — three times a session&rsquo;s memory. Fine to append;
+      brutal to fold, survey, or mine. And it is your portfolio&rsquo;s raw material (§&nbsp;6).</p>
+      <div class="rx"><b>Rx:</b> monthly volumes + a one-line-per-entry index; hot file = current month (~80 KB); the
+      62-gem anthology becomes the curated front shelf. (Decision D1)</div></div>
+    <div class="doccard warmcard"><h4>docs/TEST_GOVERNANCE.md — §1</h4>
+      <div class="meta">30 KB · ~7,800 tokens · mandated session-start read · 25 reads, all recent</div>
+      <p>The live baseline block is one ~2,000-word paragraph of nested &ldquo;prior chapter&rdquo; history — which its own
+      text forbids growing. The doc simultaneously admits its named-scope table is stale. The control system&rsquo;s
+      manual is the least readable document in the governance set.</p>
+      <div class="rx"><b>Rx:</b> live figure in ≤10 lines (current number, environment deltas, pointer); chapters move to a
+      baseline-history archive. (Decision D4)</div></div>
+    <div class="doccard warmcard"><h4>PERFORMANCE_LOG.md</h4>
+      <div class="meta">205 KB · ~53,000 tokens · ~30 entries/month · 49 reads / 68 edits / 43 sessions</div>
+      <p>Healthy discipline, no rotation — plus a real structural defect: two insertion regimes fight (newest-at-top
+      section, then a mid-file template acting as a wall, then a newest-at-bottom tail). The JSON dataset beside it is
+      already per-file and needs no change — narrative and JSON are complementary, both stay.</p>
+      <div class="rx"><b>Rx:</b> hot = current month + a pinned &ldquo;landmark baselines&rdquo; header (~60 KB); monthly
+      volumes + index; fix the insertion-order defect in the same pass; move the 5.9 MB one-off HTML report out of the
+      dataset directory. (Decision D5)</div></div>
+    <div class="doccard goodcard"><h4>docs/DECISION_REGISTER.md · FIELD_NOTES.md · handoff template</h4>
+      <div class="meta">~20,000 / ~4,800 / ~2,500 tokens · all heavily used</div>
+      <p>The healthy ones — worth naming because they prove the pattern. All three have a living owner and a maintenance
+      rule that gets honored; all three are current to within a day. The decision register is dense, but the density is
+      legitimate (it indexes forty decisions, one paragraph each). The contrast with the frozen files is the whole lesson:
+      <b>documents with living owners stay true; documents owned by retired roles freeze.</b></p>
+      <div class="rx"><b>Rx:</b> leave them alone (a ~2-line compression of the retired-era cross-references at most).</div></div>
+    <div class="doccard goodcard"><h4>CLAUDE.md + memory index</h4>
+      <div class="meta">273 lines / ~9,600 tokens + ~110 entries / ~4,900 tokens · injected into every session and subagent</div>
+      <p>The doctrine file is post-diet and healthy — do not thin it for sport. Two real fixes: the status snapshot pinned a
+      stale test count the same day the live figure moved (pointer-not-number fix), and roughly a third of the memory
+      index restates what CLAUDE.md now says, or remembers retired worlds. The memory side is mine to clean, and I will.</p>
+      <div class="rx"><b>Rx:</b> surgical amendments only, shipped with the restructure; memory prune ~110 → ~65 entries. (Decision D8 + my own lane)</div></div>
+    <div class="doccard goodcard"><h4>The cold references</h4>
+      <div class="meta">Use Cases_FINAL.md (178 KB, 8 reads) · docs/IMPLEMENTATION_PLAN.md (103 KB, <b>0 reads ever</b>) · ADRs (38 files, read by number on demand)</div>
+      <p>Cold is fine — a reference consulted rarely costs nothing sitting on the shelf. One exception: the implementation
+      plan has never been read by any session, yet sits on the official live-pointer list. A dead pointer is clutter with
+      authority.</p>
+      <div class="rx"><b>Rx:</b> archive the implementation plan and delist it; leave the others exactly where they are. (Decision D6)</div></div>
+  </div>
+</section>
+
+<section id="growth">
+  <h2><span class="no">§ 5</span>The curve that doesn&rsquo;t stop</h2>
+  <p>The journal&rsquo;s growth, reconstructed from git history. It is not merely growing — it is <em>accelerating</em>:
+  ~40 KB/day averaged over its life, <strong>~85 KB/day across the last ten days</strong>. Your horizon is decades. At
+  July&rsquo;s pace the journal passes nine million tokens within a year — forty-five sessions&rsquo; worth of memory in
+  one file. Rotation is not tidiness; it is the only architecture compatible with the timeline you set.</p>
+  <figure class="chart" id="figGrowth">
+    <div id="growthMount"></div>
+    <figcaption>BUILD_JOURNAL.md size in tokens at sampled commits (solid line, direct-labeled endpoint), with the
+    July-pace projection to September&nbsp;1 (dashed). The grey band marks one full session&rsquo;s working memory
+    (~200,000 tokens) — crossed in mid-June, five weeks after the journal was born. Hover for exact values.</figcaption>
+  </figure>
+  <p class="kicker">LESSONS.md is on the same curve two months younger (+70% in its first two weeks), and
+  PERFORMANCE_LOG.md the same at ~50 KB/month. Same disease, same cure.</p>
+</section>
+
+<section id="mine">
+  <h2><span class="no">§ 6</span>The mine — what your journal is worth</h2>
+  <p class="lede">You asked me to find the value in the data. Seven agents read all 465 entries; I read their findings
+  against each other. The honest answer: <strong>this corpus is the most valuable thing the project owns after the code
+  itself</strong> — roughly half of it is genuine narrative with named trade-offs, and it holds three complete,
+  publishable storylines.</p>
+
+  <h3>The story in five acts</h3>
+  <div class="acts">
+    <div class="act"><div class="roman">I</div><div><h4>The pivot and the forging</h4><div class="dates">May 21 – Jun 7 · 123 entries</div>
+      <p>Abandoning the &ldquo;agent factory&rdquo; (259 automated sessions, only 15 touched real code — <em>&ldquo;a machine for
+      producing the appearance of work&rdquo;</em>) for one verified-live capability at a time. The Windows app built; a 16-agent
+      adversarial audit finds the theme that haunts the whole project — <em>built but switched off</em>; your near-quit
+      ultimatum kills over-engineering; the first production-posture prompt is answered on real hardware. The culture
+      — &ldquo;the screen is the only oracle; mocks lie&rdquo; — is coined here.</p></div></div>
+    <div class="act"><div class="roman">II</div><div><h4>The decision at the wall</h4><div class="dates">Jun 7 – 10 · 43 entries</div>
+      <p>Preparing to cut a door in the air-gap: you move the capstone security review <em>before</em> the sign-off so it can
+      still change the outcome, then use it to make the bar stricter. Disaster-tests on the real security chip; the
+      four-grade honesty scale; the GO decision.</p></div></div>
+    <div class="act"><div class="roman">III</div><div><h4>Cutting the door</h4><div class="dates">Jun 10 – 16 · 32 entries</div>
+      <p>The first packet ever to leave the box, with you at the screen — through one policy-gated door that re-welds itself.
+      Hostile web content parsed only inside a network-less guest VM. The era of beautiful collisions: individually-correct
+      security controls meeting each other for the first time.</p></div></div>
+    <div class="act"><div class="roman">IV</div><div><h4>Teaching it to build</h4><div class="dates">Jun 16 – Jul 2 · 70 entries</div>
+      <p>Image generation goes live in a real ceremony; the coding fleet is born and forces the hardest hardware problem on
+      the box (the 14B⇄30B model swap); your question — &ldquo;is this fundamentally flawed, or are local models just not smart
+      enough?&rdquo; — triggers the project&rsquo;s best strategic reversal (generate more, judge deterministically); the first
+      governed web search leaves the box; the system gets its first intelligence measurements.</p></div></div>
+    <div class="act"><div class="roman">V</div><div><h4>The honesty machine</h4><div class="dates">Jul 2 – 17 · ~100 entries</div>
+      <p>Nightly reliability batteries; the discovery that the fleet&rsquo;s <em>measurement instruments</em>, not its coder, were
+      the defect; instruments forced to earn belief with positive controls; two systematic audits; learning loops designed so
+      the model can suggest but never write; and the project&rsquo;s first upstream fixes to the engine it runs on.</p></div></div>
+  </div>
+
+  <h3>The six threads that run through everything</h3>
+  <div class="threads">
+    <div class="thread"><h4>1 · The novice was the best instrument in the lab</h4>
+      <p>The premiere finding, and the spine of your portfolio. Again and again, your plain-language questions caught what the
+      technical apparatus could not: <em>&ldquo;didn&rsquo;t we test AF_HYPERV already?&rdquo;</em> overturned a wrong architecture
+      diagnosis · <em>&ldquo;did you look at the image?&rdquo;</em> exposed the machine grading its own work · <em>&ldquo;stop
+      making the mature functions dormant&rdquo;</em> became liveness doctrine · four review rounds caught an unvalidated
+      maturity claim and an ownerless validation plan · <em>&ldquo;I feel like the project is missing a key piece because I am
+      a novice&rdquo;</em> found the untested half of disaster recovery. A domain-blind but rigor-literate human governance
+      layer catches failure classes automated verification structurally cannot. That is a publishable thesis, and you are its
+      existence proof.</p></div>
+    <div class="thread"><h4>2 · Two correct things collide</h4>
+      <p>Eight documented cases where individually-correct controls composed into failure — the kill-switch tripped by its own
+      door&rsquo;s safety check; the knowledge bank that could be written but never read; the policy gate that could never say
+      ALLOW because three fail-safe defaults stacked. The cure the project evolved: test the whole pipeline, and when a miss
+      is 100% one-sided, audit the plumbing before blaming the model. This is a specimen collection security educators would
+      envy.</p></div>
+    <div class="thread"><h4>3 · The instrument-trust ladder</h4>
+      <p>The project&rsquo;s epistemology grew up in three rungs: trust green tests → learn that mocks lie and the screen is the
+      oracle → learn that <em>instruments themselves</em> must earn belief with positive controls (the screenshot tool that
+      convicted an innocent app; the grader with the answer key in its pocket; the &ldquo;slowdown&rdquo; that was three
+      measurement bugs in a coat). Rare to see documented end-to-end in one corpus.</p></div>
+    <div class="thread"><h4>4 · The dormancy grammar</h4>
+      <p>Governance vocabulary maturing from binary to graduated to structural: welded-shut → build-hardened-before-the-door-opens
+      → proven-goes-live (your correction) → the strongest form, <em>structural absence</em> — the write path that simply does
+      not exist. Validated externally: an industry survey found every comparable memory system gives the model a pen; yours is
+      the only design where the pen structurally isn&rsquo;t there.</p></div>
+    <div class="thread"><h4>5 · The honesty economy</h4>
+      <p>Honesty implemented as machinery, not virtue: the four-grade claim scale; &ldquo;a comforting fiction in a security
+      document is worse than a named, accepted risk&rdquo;; the 1.4× that went in the log when 2× looked better; the promotional
+      trailer that deliberately shows a failing gate; the upstream fix filed with its device-substitution disclosed. An
+      AI-governance certification portfolio could be built on this thread alone.</p></div>
+    <div class="thread"><h4>6 · Upstream citizenship</h4>
+      <p>Novel silicon data no public datasheet had → community-grade benchmark datasets → a crash characterized on real
+      hardware, fixed, and contributed upstream to the engine itself. The workshop feeds the community while the product stays
+      sealed — the two-rulebook identity working exactly as designed.</p></div>
+  </div>
+
+  <h3>A taste of the gems</h3>
+  <blockquote>&ldquo;The green signal and the welded-shut state are the same fact viewed from two ends.&rdquo;
+    <span class="who">— June 12, the first packet ever to leave the box</span></blockquote>
+  <blockquote>&ldquo;We were about to tune an engine that was running fine and lying to its own dashboard.&rdquo;
+    <span class="who">— July 10, discovering the fleet&rsquo;s grader kept its answer key in its pocket</span></blockquote>
+  <blockquote>&ldquo;A verification line nobody reads is a verification line that does not exist.&rdquo;
+    <span class="who">— July 7, finding both fleet plugins silently dead for a week</span></blockquote>
+  <blockquote>&ldquo;My bandwidth model wasn&rsquo;t wrong — it was an upper bound dressed as a central estimate.&rdquo;
+    <span class="who">— July 8, the successor-model measurement</span></blockquote>
+  <p><strong>The anthology.</strong> The miners marked <strong>62 entries KEEP-HOT</strong> — the ones a hiring manager, an
+  AI-governance assessor, or an open-source maintainer would stop on. Proposal: preserve them <em>verbatim</em> (they are
+  already well-written; curation is selection, not rewriting) in a single anthology with three reading paths — the
+  governance path, the engineering path, and the collaboration path — as the journal&rsquo;s permanent front shelf and the
+  seed of your certification portfolio. The other 403 entries lose nothing: they move intact into dated volumes with a
+  one-line index. <em>(Decision D1.)</em></p>
+</section>
+
+<section id="lessons">
+  <h2><span class="no">§ 7</span>The lessons corpus</h2>
+  <p>All 284 lessons were read in full (the file&rsquo;s enormous single-line format defeats normal reading tools — the
+  miner had to slice it losslessly first, which is itself evidence). The verdict: <strong>a genuinely excellent corpus
+  wearing the wrong architecture.</strong> A two-tier structure already exists — a Rules section and a 20-class Canonical
+  Tier — but the canonical tier was curated on July&nbsp;3 from lessons 1–195, and <strong>the newest 89 lessons have no
+  canonical home</strong>; meanwhile every pre-mint search must grep the full 81,000-token list.</p>
+  <h3>What the corpus says about the project</h3>
+  <p>The chronic classes, ranked: <strong>built-but-wired-into-nothing</strong> (lesson 46 — six recorded recurrences,
+  the most-cited lesson in the file) · <strong>mocks-pass-but-production-crashes</strong> (fifteen-plus numbers by the
+  corpus&rsquo;s own count) · <strong>verify-the-premise-on-disk</strong> · <strong>measurement confounds</strong> · and,
+  dominating the newest third, <strong>&ldquo;who audits the auditor&rdquo;</strong> — positive controls, hermetic grading,
+  sensors out of the model&rsquo;s reach. The failure surface moved up a level, from the product to the instruments. That
+  progression is a maturity signal an assessor will recognize immediately.</p>
+  <p>Two findings I want on the record because they are the honest kind:</p>
+  <p><strong>The corpus proved its own thesis.</strong> Lesson 196 records that a class named in May recurred six more
+  times in June — <em>writing a lesson down installs nothing</em>. Every durable fix in the file is structural (a gate
+  test, a canary, a registry, a blessed seam); vigilance lost every single time. And the corpus keeps its debts in plain
+  text: two classes sit at their third instance with <em>no</em> structural control yet (lesson 14 → ticket #929, and the
+  stale-base-merge shape flagged July&nbsp;17), with a third one incident from arming. One true duplicate exists (lesson
+  226 restates 207 verbatim — merge their records).</p>
+  <p><strong>This restructure is the corpus&rsquo;s own medicine.</strong> Lesson 196: &ldquo;an append-only list dilutes
+  its own signal.&rdquo; Lesson 217: &ldquo;an invisible taxonomy earns a registered, gate-locked table.&rdquo; Applying
+  those two lessons to the lessons file itself is exactly what Decision D2 does.</p>
+  <h3>The tiering (Decision D2, concretely)</h3>
+  <p>Hot file ≈ 12–15,000 tokens: the Rules · the Canonical Tier refreshed to cover 196–284 · a <strong>Canon-32</strong>
+  block keeping the full text of the 32 lessons that earned permanent residency (46, 2, 3, 222, 257, 139, 38, 29, 13,
+  22&hellip;) · and a one-line index of all 284 (number, title, tags, recurrence count, control-exists flag). Full text of
+  everything moves to an append-only archive, numbers permanent forever. The mandatory pre-mint search drops from
+  ~81,000 tokens to at most ~7,000 — a 91% cut — and to nearly zero when the hot file is already loaded. Three
+  pure-mechanic lessons and the mechanic halves of ~19 others mirror into FIELD_NOTES.md, exactly as the file&rsquo;s own
+  Rule 4 orders.</p>
+</section>
+
+<section id="archive">
+  <h2><span class="no">§ 8</span>The archive wing</h2>
+  <p>The design extends what the repository already proved works. The per-entry ledger (born from a real merge-conflict
+  incident) is the pattern; the existing <code>docs/archive/</code> directory is the place; the #267 lifecycle rulebook
+  (living / reference / draft / superseded / archived, with frontmatter and a lint tool) is the law. We add one rule and
+  one structure:</p>
+  <p><strong>The rule — write to the head, rotate the tail.</strong> Every append-log keeps only the current month hot.
+  At the month-end retrospective (a session that already exists in doctrine — no new ritual), everything older moves into
+  a dated volume and its one-liners join the index. Recording-at-the-time-it-runs is untouched: new entries still land
+  in the hot file the moment work ships.</p>
+  <p><strong>The structure — index → volume, never the whole history.</strong></p>
+  <div class="tblwrap"><table>
+    <tr><th>Surface</th><th>Hot file becomes</th><th class="num">Hot size</th><th>Cold volumes</th></tr>
+    <tr><td>BUILD_JOURNAL.md</td><td>current month + anthology pointer</td><td class="num">≤ 80 KB <span class="quiet">(from 2,262)</span></td><td><code>docs/archive/journal/YYYY-MM.md</code> + index</td></tr>
+    <tr><td>LESSONS.md</td><td>canon (~30) + one-line index of all 284</td><td class="num">≤ 25 KB <span class="quiet">(from 318)</span></td><td>full text in archive volume; numbers permanent</td></tr>
+    <tr><td>PERFORMANCE_LOG.md</td><td>current month + landmark baselines</td><td class="num">≤ 60 KB <span class="quiet">(from 205)</span></td><td><code>docs/archive/performance/YYYY-MM.md</code> + index</td></tr>
+    <tr><td>ACTIVE_SPRINT.md</td><td>≤30-line live pointer, dated</td><td class="num">≤ 2 KB <span class="quiet">(from 22)</span></td><td>old content → sprint archive</td></tr>
+    <tr><td>TEST_GOVERNANCE §1</td><td>live figure ≤10 lines</td><td class="num">— </td><td>chapters → baseline-history file</td></tr>
+    <tr><td>docs/handoffs/ <span class="quiet">(121 briefs, ~3 live)</span></td><td>last 7 days</td><td class="num">~5 files</td><td>dated archive folders (git-ignored)</td></tr>
+    <tr><td>One-time moves <span class="quiet">(#267&rsquo;s unfinished half)</span></td><td colspan="3">~160 loose prompt-era files at docs/ root, the frozen 209 KB monolith ledger, 279 frozen sprint files, 22 executed scheduler XMLs, ~28 MB of research PDFs at repo root → <code>docs/archive/&hellip;</code> &amp; <code>docs/reference/papers/</code>, each with an index</td></tr>
+  </table></div>
+  <p><strong>The guarantee:</strong> any historical entry reachable in <strong>two reads</strong> — grep the small index,
+  open the one named volume. A session never again lifts a multi-hundred-kilobyte file to find one fact. And the index
+  lines cost nothing to author: they are lifted from the plain-summary lines your entries already carry.</p>
+  <p class="kicker">Everything moves under version control with history preserved; not one entry is deleted, ever.</p>
+</section>
+
+<section id="tug">
+  <h2><span class="no">§ 9</span>The tug-vector register</h2>
+  <p>The auditor swept every live surface for passages presenting the retired worlds — the old sprint paperwork, the
+  Co-Lead/executing-agent fleet, the sunsetting devplatform repo — as current. Of ~12,800 retired-term matches across the
+  repository, the overwhelming majority sit correctly in archives (fine — that is history being history).
+  <strong>Nineteen live surfaces are the problem</strong>, and four of them load into <em>every single session</em>:</p>
+  <div class="tblwrap"><table>
+    <tr><th>Surface</th><th>What it does to a session</th><th>Loaded</th></tr>
+    <tr><td>docs/sprints/ACTIVE_SPRINT.md</td><td>&ldquo;Co-Lead maintains this, hands off&rdquo; · &ldquo;Sprint 17 is next&rdquo; · &ldquo;the task source of truth is active_tasks.yaml&rdquo; (it&rsquo;s Vikunja) — the full retired cadence as live fact</td><td><span class="flag bad">EVERY SESSION</span></td></tr>
+    <tr><td>docs/TEST_GOVERNANCE.md</td><td>&ldquo;Maintained by: the EA that changes test counts&rdquo; — a retired role owns the control system&rsquo;s manual; plus the self-violating history wall</td><td><span class="flag bad">EVERY SESSION</span></td></tr>
+    <tr><td>.github/copilot-instructions.md</td><td>Describes the whole retired fleet as current, pins the 2,212 baseline (−6,306), and sends sessions into devplatform for &ldquo;the sprint protocol&rdquo;</td><td><span class="flag bad">AUTO (Copilot/Codex)</span></td></tr>
+    <tr><td>Memory index — ~8 retired-era entries</td><td>Old-fleet hooks (&ldquo;SDV amendments&rdquo;, &ldquo;EA numbering&rdquo;, cf-program sprints) whispered into every session</td><td><span class="flag bad">EVERY SESSION</span></td></tr>
+    <tr><td>/sprint-kickoff · /sprint-debrief · /sprint-discovery</td><td>Boot the session into &ldquo;Co-Lead Architect mode&rdquo; + the retired paperwork — 43 retired-term hits</td><td><span class="flag warm">ON INVOKE</span></td></tr>
+    <tr><td>docs/claude_projects/ + claude_cowork/ (7 files) · 2 fleet runbooks · governance README audience list · INDEX.md pointers</td><td>Latent: 100%-retired instruction manuals listed in live navigation with no &ldquo;retired&rdquo; flag — a trap for any session that opens them</td><td><span class="flag warm">DISCOVERABLE</span></td></tr>
+  </table></div>
+  <p><strong>The root cause is structural, and it names the cure.</strong> Every frozen surface declares a maintenance
+  owner that no longer exists. When the role retired, its documents froze mid-sentence — and one of them explicitly
+  forbids anyone else from touching it. Meanwhile every healthy surface (the decision register, the field notes, the
+  handoff template) has a living owner. The fix is not a cleanup pass; it is <em>re-owning every always-loaded document
+  to a role that exists</em>, then letting a gate check enforce freshness (Decision D8).</p>
+</section>
+
+<section id="beyond">
+  <h2><span class="no">§ 10</span>Beyond this repository</h2>
+  <p><strong>The strongest tug has a name — and it&rsquo;s three slash-commands.</strong> The only project-defined
+  commands anywhere are <code>/sprint-kickoff</code>, <code>/sprint-debrief</code>, and <code>/sprint-discovery</code> —
+  and they carry 43 retired-world references between them. <code>/sprint-kickoff</code> literally puts the session in
+  &ldquo;Co-Lead Architect mode,&rdquo; drafting the retired sprint paperwork under the retired protocol. Invoking any of
+  them drops a modern session straight into the old world, contradicting current doctrine. This is very likely a large
+  share of the backward pull you felt. <em>(Decision D10.)</em></p>
+  <p><strong>Stale worktrees.</strong> Fourteen worktrees in BlarAI, all with <em>zero</em> uncommitted work. Ten are
+  fully merged and stale — <strong>~637 MB reclaimable</strong>, including ten redundant 2.2 MB journal copies. Four
+  stay: two active, one deliberately held (#763, lands July&nbsp;21), one to double-check. The dispatch repo is the same
+  story: seven of its eight worktrees are merged-stale — which also solves a small mystery: the &ldquo;seven copies&rdquo;
+  of its lessons file are just worktree checkouts of one tracked file. Cleanup on merge is already standing doctrine;
+  I&rsquo;ll do it, re-verifying each one immediately before removal.</p>
+  <p><strong>A correction, on the record.</strong> I reported earlier that the coder-fleet brief (~12,700 tokens)
+  reloads into every dispatched agent. The sweep proved that wrong: nothing injects it — it is a one-time build
+  specification, and the real per-dispatch surface is the coder&rsquo;s own <code>AGENTS.md</code> config. The brief is
+  still worth slimming (roughly 55% of it is finished build-planning and 15% is stale), but it is not taxing your fleet.
+  The measured claim replaces my earlier one.</p>
+  <p><strong>My own memory files.</strong> 133 memories + the index. Roughly 15% should retire or merge: seven remember
+  the retired sprint-fleet era, three are superseded by later decisions, four clusters of near-duplicates fold thirteen
+  files into four — and the index itself is stale, with thirteen orphaned files it never lists. This is my
+  infrastructure; I&rsquo;ll clean it without ceremony.</p>
+  <p><strong>Confirmed earlier:</strong> the 290 MB / 19,253-file mass inside <code>docs/security/</code> is vendored
+  <code>node_modules</code> tooling under the June capstone deck&rsquo;s validation folders — git-ignored, regenerable
+  build debris, not authored content.</p>
+</section>
+
+<section id="decisions">
+  <h2><span class="no">§ 11</span>The decision sheet</h2>
+  <p>Ten decisions, each with my recommendation. Everything is reversible, nothing deletes content, and the journal and
+  lessons — your portfolio product — are moved and curated, never rewritten. Say yes/no per line, or &ldquo;all as
+  recommended.&rdquo;</p>
+
+  <div class="decision"><div class="dn">D1 · THE JOURNAL</div><h4>Rotate into monthly volumes + publish the 62-gem anthology</h4>
+    <p>Hot file becomes the current month; 465 entries move verbatim into dated volumes with a one-line index; the anthology
+    (three reading paths) becomes the curated front shelf and your portfolio seed.</p>
+    <div class="rec">Recommended — the single biggest win, and the portfolio product you asked for</div></div>
+  <div class="decision"><div class="dn">D2 · THE LESSONS</div><h4>Three tiers: canon hot, index for all, full text archived</h4>
+    <p>~30 canonical lessons stay full-text; all 284 keep their permanent numbers in a one-line index; full text moves to an
+    archive volume. The mandatory pre-mint search drops from ~81,000 tokens to ~5,000.</p>
+    <div class="rec">Recommended</div></div>
+  <div class="decision"><div class="dn">D3 · THE SPRINT POINTER</div><h4>Retire ACTIVE_SPRINT.md; replace with a dated ≤30-line live pointer</h4>
+    <p>The mandated session-start read stops being six weeks of misinformation. CLAUDE.md&rsquo;s grounding step points at the
+    replacement.</p>
+    <div class="rec">Recommended — do this one even if nothing else moves</div></div>
+  <div class="decision"><div class="dn">D4 · TEST GOVERNANCE</div><h4>Live baseline in ≤10 lines; history chapters to an archive file</h4>
+    <p>Exactly what the document already orders itself to do and doesn&rsquo;t.</p>
+    <div class="rec">Recommended</div></div>
+  <div class="decision"><div class="dn">D5 · THE PERFORMANCE LOG</div><h4>Monthly rotation + landmark header; fix the insertion-order defect</h4>
+    <p>The JSON dataset is untouched (it is already a proper archive); community contribution flows unchanged.</p>
+    <div class="rec">Recommended</div></div>
+  <div class="decision"><div class="dn">D6 · #267&rsquo;S UNFINISHED HALF</div><h4>Run the one-time archive moves you approved in April</h4>
+    <p>Docs-root sweep (~160 prompt-era files), frozen sprints, executed scheduler XMLs, the frozen monolith ledger, repo-root
+    research PDFs to a reference shelf, and delisting the never-read implementation plan. Every move under the existing
+    archive-not-delete policy, history preserved, indexes added.</p>
+    <div class="rec">Recommended</div></div>
+  <div class="decision"><div class="dn">D7 · THE SECOND ALWAYS-ON FILE</div><h4>Rewrite .github/copilot-instructions.md to the current world</h4>
+    <p>It auto-loads for Copilot/Codex sessions and is the most retired-world document still live: the old fleet described
+    as current, a baseline 6,306 tests stale, a pointer into devplatform. Rewrite it to mirror CLAUDE.md — with a pointer
+    to the live figure, never a pinned number. Also: retire the seven latent old-fleet instruction manuals
+    (claude_projects/, claude_cowork/, two fleet runbooks) to the archive with &ldquo;retired&rdquo; stubs, and fix the
+    navigation index&rsquo;s five stale lines.</p>
+    <div class="rec">Recommended</div></div>
+  <div class="decision"><div class="dn">D8 · THE STANDING RULE</div><h4>Re-own, budget, and gate-check every always-loaded document</h4>
+    <p>Four controls, so the cleanup never rots again: (1) <b>re-own</b> — every force-read document&rsquo;s
+    &ldquo;maintained by&rdquo; line names a role that exists today (the merging session; the month-end retrospective);
+    (2) <b>freshness gate test</b> — the standing test gate fails if the three gate-count surfaces disagree, if the sprint
+    pointer&rsquo;s refresh date falls more than two weeks behind the repository, or if a hot file exceeds its size budget;
+    (3) <b>retired-lexicon scanner</b> — the always-loaded set is automatically screened for retired-world vocabulary,
+    fail-loud, with a small documented allowlist; (4) <b>owned rotation</b> — the month-end retrospective session runs the
+    monthly volume rotation and the freshness sweep. Your own lessons file proved vigilance always loses to structure;
+    this is the structure. (The existing #267 lint gets its back-fill and becomes gate-eligible in the same motion.)</p>
+    <div class="rec">Recommended — this is the piece that makes it permanent</div></div>
+  <div class="decision"><div class="dn">D9 · THE WORKSHOP EDGES</div><h4>Slim the build-spec brief; clear the 290 MB tooling debris</h4>
+    <p>Slim the dispatch build-spec from 51 KB to ~18 KB (its dated lessons move to the fleet&rsquo;s own lessons file;
+    resolved investigation notes collapse) — corrected during this audit: it does <em>not</em> load per-dispatch, so this
+    is hygiene, not a per-agent tax. And remove the regenerable node_modules debris under docs/security (authored decks
+    stay, obviously).</p>
+    <div class="rec">Recommended</div></div>
+  <div class="decision"><div class="dn">D10 · THE THREE OLD CEREMONIES</div><h4>Rewrite /sprint-kickoff, /sprint-debrief, /sprint-discovery for the current world</h4>
+    <p>They are your ceremonies, so their fate is your call. Recommendation: keep all three (the kickoff/debrief/discovery
+    shape serves you well) but rewrite them onto today&rsquo;s process — the comprehension-gate flow, Vikunja as the queue,
+    the current doctrine — and strip the Co-Lead persona and retired sprint paperwork they still summon. Alternative:
+    retire them to the archive outright.</p>
+    <div class="rec">Recommended — rewrite, keep the ceremony shape</div></div>
+</section>
+
+<section id="next">
+  <h2><span class="no">§ 12</span>What happens next</h2>
+  <p><strong>Done today without needing you:</strong> this audit and report; the full evidence pack committed to
+  <code>docs/research/doc-infrastructure-audit-2026-07/</code>; the decision sheet mirrored onto ticket #945; the ten
+  merged-stale worktrees cleaned under standing doctrine (each re-verified clean and merged immediately before removal;
+  the held and active ones untouched); my own memory files pruned and their index reconciled (my infrastructure — a third
+  of it restates doctrine or remembers retired worlds).</p>
+  <p><strong>Waiting on your triage:</strong> the nine decisions above. On your go, the restructure ships in reviewed,
+  gate-green stages — one-time moves first, the three log rotations next, the standing rule last — each stage atomic
+  (merge + ticket + journal entry), with the board tracking every piece.</p>
+  <p><strong>What you will notice afterward:</strong> sessions that start on true facts, spend their attention on your
+  actual task, and a journal whose best 62 stories sit on one shelf you can hand to anyone.</p>
+  <p class="kicker">— The Ruthless Archivist · evidence: 771 transcripts parsed · 465 entries mined by 7 agents ·
+  5 specialist audits · every number in this report is measured, not estimated.</p>
+</section>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var css = getComputedStyle(document.documentElement);
+  function C(n){ return css.getPropertyValue(n).trim(); }
+  function refresh(){ css = getComputedStyle(document.documentElement); }
+
+  /* ---------- Chart B: hot-path token cost bars ---------- */
+  var bars = [
+    {name:"LESSONS.md", tok:81000, detail:"87 reads in last 14 days · 44 sessions", bad:false},
+    {name:"PERFORMANCE_LOG.md", tok:53000, detail:"49 reads · 68 edits · 43 sessions", bad:false},
+    {name:"DECISION_REGISTER.md", tok:20000, detail:"45 reads · 32 sessions", bad:false},
+    {name:"CLAUDE.md (injected)", tok:9600, detail:"auto-loaded into every session + subagent", bad:false},
+    {name:"TEST_GOVERNANCE.md", tok:7800, detail:"25 reads, all recent · mandated §1", bad:false},
+    {name:"ACTIVE_SPRINT.md", tok:5700, detail:"15/15 reads FULL · stale since Jun 7", bad:true},
+    {name:"Memory index (injected)", tok:4900, detail:"auto-loaded into every session + subagent", bad:false}
+  ];
+  function drawBars(){
+    refresh();
+    var W=680, rowH=34, padL=190, padR=70, padT=8, H=padT+bars.length*rowH+22;
+    var max=85000, s=(W-padL-padR)/max;
+    var g='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Token cost per hot document">';
+    [0,20000,40000,60000,80000].forEach(function(v){
+      var x=padL+v*s;
+      g+='<line x1="'+x+'" y1="'+padT+'" x2="'+x+'" y2="'+(H-20)+'" stroke="'+C('--line')+'" stroke-width="1"/>';
+      g+='<text x="'+x+'" y="'+(H-6)+'" font-size="10" fill="'+C('--muted')+'" text-anchor="middle">'+(v/1000)+'k</text>';
+    });
+    bars.forEach(function(b,i){
+      var y=padT+i*rowH, w=Math.max(2,b.tok*s), col=b.bad?C('--alert'):C('--green');
+      g+='<text x="'+(padL-8)+'" y="'+(y+rowH/2+3)+'" font-size="11" fill="'+C('--ink2')+'" text-anchor="end">'+b.name+'</text>';
+      g+='<rect class="bar" data-i="'+i+'" x="'+padL+'" y="'+(y+6)+'" width="'+w+'" height="'+(rowH-14)+'" rx="2" fill="'+col+'"/>';
+      g+='<text x="'+(padL+w+6)+'" y="'+(y+rowH/2+3)+'" font-size="10.5" fill="'+C('--ink2')+'" font-family="'+'Consolas,monospace'+'">'+(Math.round(b.tok/1000))+'k</text>';
+    });
+    g+='</svg>';
+    var m=document.getElementById('barsMount'); m.innerHTML=g;
+    var tip=document.createElement('div'); tip.className='tip'; document.getElementById('figBars').appendChild(tip);
+    m.querySelectorAll('.bar').forEach(function(r){
+      r.addEventListener('mousemove',function(e){
+        var b=bars[+r.getAttribute('data-i')], fig=document.getElementById('figBars').getBoundingClientRect();
+        tip.textContent=b.name+" — "+b.tok.toLocaleString()+" tokens · "+b.detail;
+        tip.style.opacity=1; tip.style.left=Math.min(e.clientX-fig.left+14, fig.width-tip.offsetWidth-8)+'px'; tip.style.top=(e.clientY-fig.top-30)+'px';
+      });
+      r.addEventListener('mouseleave',function(){ tip.style.opacity=0; });
+    });
+  }
+
+  /* ---------- Chart A: journal growth ---------- */
+  var pts = [
+    ["2026-05-21",1453],["2026-05-22",16677],["2026-06-02",32441],["2026-06-03",48852],
+    ["2026-06-04",80373],["2026-06-05",92347],["2026-06-07",146264],["2026-06-22",278912],
+    ["2026-07-04",330681],["2026-07-08",383193],["2026-07-17",573762]
+  ];
+  var proj = [ ["2026-07-17",573762], ["2026-08-01",893000], ["2026-09-01",1553000] ];
+  function T(d){ return new Date(d+"T00:00:00").getTime(); }
+  function drawGrowth(){
+    refresh();
+    var W=680,H=300,padL=56,padR=84,padT=14,padB=30;
+    var t0=T("2026-05-21"), t1=T("2026-09-01");
+    var ymax=1600000;
+    var X=function(t){ return padL+(t-t0)/(t1-t0)*(W-padL-padR); };
+    var Y=function(v){ return padT+(1-v/ymax)*(H-padT-padB); };
+    var g='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Journal growth in tokens over time">';
+    // context band: one session's memory
+    g+='<rect x="'+padL+'" y="'+Y(200000)+'" width="'+(W-padL-padR)+'" height="'+(Y(0)-Y(200000))+'" fill="'+C('--chip-bg')+'" opacity="0.55"/>';
+    g+='<text x="'+(padL+6)+'" y="'+(Y(200000)+14)+'" font-size="10" fill="'+C('--muted')+'">one session&#8217;s working memory (~200k)</text>';
+    [400000,800000,1200000,1600000].forEach(function(v){
+      g+='<line x1="'+padL+'" y1="'+Y(v)+'" x2="'+(W-padR)+'" y2="'+Y(v)+'" stroke="'+C('--line')+'" stroke-width="1"/>';
+      g+='<text x="'+(padL-6)+'" y="'+(Y(v)+3)+'" font-size="10" fill="'+C('--muted')+'" text-anchor="end">'+(v/1000)+'k</text>';
+    });
+    ["2026-06-01","2026-07-01","2026-08-01","2026-09-01"].forEach(function(d){
+      var lbl={"2026-06-01":"Jun","2026-07-01":"Jul","2026-08-01":"Aug","2026-09-01":"Sep"}[d];
+      g+='<text x="'+X(T(d))+'" y="'+(H-8)+'" font-size="10" fill="'+C('--muted')+'" text-anchor="middle">'+lbl+'</text>';
+    });
+    var line=pts.map(function(p,i){ return (i?'L':'M')+X(T(p[0]))+','+Y(p[1]); }).join('');
+    var area=line+'L'+X(T(pts[pts.length-1][0]))+','+Y(0)+'L'+X(T(pts[0][0]))+','+Y(0)+'Z';
+    g+='<path d="'+area+'" fill="'+C('--green')+'" opacity="0.12"/>';
+    g+='<path d="'+line+'" fill="none" stroke="'+C('--green')+'" stroke-width="2.2"/>';
+    var pl=proj.map(function(p,i){ return (i?'L':'M')+X(T(p[0]))+','+Y(p[1]); }).join('');
+    g+='<path d="'+pl+'" fill="none" stroke="'+C('--brass')+'" stroke-width="2" stroke-dasharray="5 5"/>';
+    var last=pts[pts.length-1];
+    g+='<circle cx="'+X(T(last[0]))+'" cy="'+Y(last[1])+'" r="4" fill="'+C('--green')+'"/>';
+    g+='<text x="'+(X(T(last[0]))+7)+'" y="'+(Y(last[1])-8)+'" font-size="10.5" fill="'+C('--ink2')+'">today · 574k</text>';
+    var pe=proj[proj.length-1];
+    g+='<text x="'+(X(T(pe[0]))-4)+'" y="'+(Y(pe[1])-8)+'" font-size="10.5" fill="'+C('--brass')+'" text-anchor="end">Sep 1 at July pace · ~1.55M</text>';
+    // hover targets
+    pts.concat([proj[1],proj[2]]).forEach(function(p){
+      g+='<circle class="pt" data-d="'+p[0]+'" data-v="'+p[1]+'" cx="'+X(T(p[0]))+'" cy="'+Y(p[1])+'" r="9" fill="transparent"/>';
+    });
+    g+='</svg>';
+    var m=document.getElementById('growthMount'); m.innerHTML=g;
+    var tip=document.createElement('div'); tip.className='tip'; document.getElementById('figGrowth').appendChild(tip);
+    m.querySelectorAll('.pt').forEach(function(c){
+      c.addEventListener('mousemove',function(e){
+        var fig=document.getElementById('figGrowth').getBoundingClientRect();
+        var proj = T(c.getAttribute('data-d'))>T("2026-07-17");
+        tip.textContent=c.getAttribute('data-d')+" · "+(Math.round(+c.getAttribute('data-v')/1000))+"k tokens"+(proj?" (projected)":"");
+        tip.style.opacity=1; tip.style.left=Math.min(e.clientX-fig.left+14, fig.width-tip.offsetWidth-8)+'px'; tip.style.top=(e.clientY-fig.top-32)+'px';
+      });
+      c.addEventListener('mouseleave',function(){ tip.style.opacity=0; });
+    });
+  }
+
+  function drawAll(){ drawBars(); drawGrowth(); }
+  drawAll();
+  new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+})();
+</script>

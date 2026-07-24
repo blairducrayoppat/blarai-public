@@ -10,6 +10,8 @@
   "repo": "battery-b4-flashcards-cli",
   "sandbox_only": true,
   "clarify_answer": "1",
+  "run_budget_s": 16200,
+  "run_budget_note": "#927 per-card run-budget (2026-07-17, LA-approved c.2156): B4's plan grain is the multi-wave 'Blair's-Lab class' starver — the 5-unit mixed shape decomposes to 6 dependent waves, and the idle-600 landing (#790) let each candidate run near its wall-clock ceiling, so the 10800 s (3 h) swap_run_budget_s default under-provisioned it (proven: the coherence lock's C2 FAIL, 10800 < the 14400 s 2-wave/best-of-2 floor). 16200 s (4.5 h) sits at the top of the LA-approved 14400-16200 band — clears the C2 floor with the most headroom for the heaviest wave count — while a global default bump was rejected (it derives a ~25 h floor at the 6-job campaign vs the PT16H / 57600 s Task-Scheduler ceiling, C3). Per-card so the default stays tight for single-wave jobs (e.g. B7). Coherence: verify-battery-budget-coherence.ps1 (C1/C2/C3) + verify-battery-task-settings.ps1 (T4). Lesson 221 (every window must dominate the budget beneath it).",
   "goal": "I want a flashcard study program I can use from a command window. It should keep my cards saved between sessions, let me bring in a whole deck of cards at once from a file, let me add a single card by typing its question and answer, quiz me by showing me questions and checking whether my answers are right, and keep my scores over time so I can see whether I am actually getting better.",
   "rigs": [],
   "expected_outcome": {

@@ -1,0 +1,120 @@
+{
+  "ticket": "#769 item 3 (feeds genai #3937)",
+  "probe": "thinking_toggle_llamaserver",
+  "timestamp": "2026-07-16T19:34:18",
+  "llamacpp_build": "b9957 official win-vulkan-x64 release",
+  "server_args": "-ngl 99, default reasoning handling (introspected per response)",
+  "prompt": "How many bytes are in one kilobyte?",
+  "max_tokens": 220,
+  "environment": {
+    "box_state_at_start": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": false,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 27.01,
+      "captured_utc": "2026-07-17T02:34:22Z"
+    }
+  },
+  "models": {
+    "qwen3.6-35b-a3b (MoE \u2014 the #3937/#36270 model)": {
+      "gguf": "Qwen3.6-35B-A3B-UD-IQ4_XS.gguf",
+      "server_log": "C:\\Users\\mrbla\\models\\gguf-769\\results\\server_Qwen3.6-35B-A3B-UD-IQ4_XS.log",
+      "offload_evidence": [
+        "0.08.295.625 I load_tensors: offloading output layer to GPU",
+        "0.08.295.655 I load_tensors: offloading 39 repeating layers to GPU",
+        "0.08.295.656 I load_tensors: offloaded 41/41 layers to GPU"
+      ],
+      "conditions": {
+        "A_plain": {
+          "thinking_detected": true,
+          "has_close_think_tag": false,
+          "leading_narration": true,
+          "first_200": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Identify Key Concept:** The question is about data storage units, specifically the ",
+          "label": "A plain",
+          "seconds": 13.8,
+          "reasoning_content_present": true,
+          "reasoning_content_first_120": "Here's a thinking process:\n\n1.  **Analyze User Question:** The user asks \"How many bytes are in one kilobyte?\"\n2.  **Ide",
+          "content_first_120": "",
+          "completion_tokens": 220
+        },
+        "B_no_think_switch": {
+          "thinking_detected": true,
+          "has_close_think_tag": false,
+          "leading_narration": true,
+          "first_200": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - Question: \"How many bytes are in one kilobyte?\"\n   - Constraint: \"/no_think\" (This is a directive to skip the thinking process in the outpu",
+          "label": "B /no_think",
+          "seconds": 11.8,
+          "reasoning_content_present": true,
+          "reasoning_content_first_120": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - Question: \"How many bytes are in one kilobyte?\"\n   - Constr",
+          "content_first_120": "",
+          "completion_tokens": 220
+        },
+        "C_enable_thinking_false": {
+          "thinking_detected": false,
+          "has_close_think_tag": false,
+          "leading_narration": false,
+          "first_200": "The number of bytes in one kilobyte depends on the context in which the term is used, as there are two different standards:\n\n### 1. Decimal System (SI Standard)\nIn the International System of Units (S",
+          "label": "C chat_template_kwargs enable_thinking=false",
+          "seconds": 11.9,
+          "reasoning_content_present": false,
+          "reasoning_content_first_120": "",
+          "content_first_120": "The number of bytes in one kilobyte depends on the context in which the term is used, as there are two different standar",
+          "completion_tokens": 220
+        }
+      }
+    },
+    "qwen3.6-27b (dense-hybrid)": {
+      "gguf": "Qwen3.6-27B-IQ4_NL.gguf",
+      "server_log": "C:\\Users\\mrbla\\models\\gguf-769\\results\\server_Qwen3.6-27B-IQ4_NL.log",
+      "offload_evidence": [
+        "0.06.809.840 I load_tensors: offloading output layer to GPU",
+        "0.06.809.846 I load_tensors: offloading 63 repeating layers to GPU",
+        "0.06.809.846 I load_tensors: offloaded 65/65 layers to GPU"
+      ],
+      "conditions": {
+        "A_plain": {
+          "thinking_detected": false,
+          "has_close_think_tag": false,
+          "leading_narration": false,
+          "first_200": "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////",
+          "label": "A plain",
+          "seconds": 59.7,
+          "reasoning_content_present": true,
+          "reasoning_content_first_120": "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////",
+          "content_first_120": "",
+          "completion_tokens": 220
+        },
+        "B_no_think_switch": {
+          "thinking_detected": false,
+          "has_close_think_tag": false,
+          "leading_narration": false,
+          "first_200": "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////",
+          "label": "B /no_think",
+          "seconds": 57.8,
+          "reasoning_content_present": true,
+          "reasoning_content_first_120": "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////",
+          "content_first_120": "",
+          "completion_tokens": 220
+        },
+        "C_enable_thinking_false": {
+          "thinking_detected": false,
+          "has_close_think_tag": false,
+          "leading_narration": false,
+          "first_200": "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////",
+          "label": "C chat_template_kwargs enable_thinking=false",
+          "seconds": 57.8,
+          "reasoning_content_present": false,
+          "reasoning_content_first_120": "",
+          "content_first_120": "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////",
+          "completion_tokens": 220
+        }
+      }
+    }
+  }
+}

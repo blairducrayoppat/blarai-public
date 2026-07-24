@@ -14,12 +14,12 @@ mid-deploy crash.
 ## Prerequisites
 
 - [STYLE.md](STYLE.md) — binding governance template.
-- [ADR-011](../adrs/ADR-011-Policy-Agent-GPU-NPU-Retirement.md) —
+- [ADR-011](../adrs/ADR-011-All-LLM-Inference-GPU-NPU-Retirement.md) —
   "All LLM inference on GPU." Motivates why the deployment must
   validate that the guest runtime's `device = GPU` constraint holds
   and that model artifacts are present before the service is allowed
   to start.
-- [ADR-012](../adrs/ADR-012-Qwen3-14B-Speculative-Decoding.md) —
+- [ADR-012](../adrs/ADR-012-Qwen3-14B-Model-Selection-Speculative-Decoding.md) —
   Qwen3-14B as the unified production model; Qwen3-0.6B draft for
   speculative decoding. Model-rollback commentary in §7 derives from
   ADR-012.

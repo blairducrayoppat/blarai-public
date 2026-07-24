@@ -1,10 +1,33 @@
 # How to Review Fleet Reports — Lead Architect Guide
 
-> **Who this is for**: you, the Lead Architect (LA). You are a non-developer reviewing the work your autonomous agent fleet does.
+> # ⛔ RETIRED — THE FLEET THIS DESCRIBES NO LONGER RUNS
 >
-> **What you'll learn**: how to open your report inbox, read a report, and decide whether to approve it or flag it for correction.
+> **No agent is writing these reports, and no agent is reviewing anyone's work.**
 >
-> **How long it takes**: once you've read this guide once, each individual report takes 1–5 minutes to review.
+> Verified 2026-07-19: `Wake EA Code`, `Wake SDO` and `Wake Co-Lead Architect` are all **Disabled**
+> scheduled tasks, disabled deliberately when the autonomous EA/SDO/Co-Lead fleet was retired. Two
+> claims in this guide are therefore false and worth naming, because believing them means trusting a
+> protection that is not engaged:
+>
+> - **"Peer review (EA↔SDO, SDO↔Co-Lead) catches the common mistakes"** — no such review happens.
+> - **"Within 15 minutes, Co-Lead's next scheduled wake will run"** after you flag `[CAR]` — nothing
+>   runs. A `[CAR]` comment is read by nobody. See
+>   [LA_CAR_WORKFLOW_HOWTO.md](LA_CAR_WORKFLOW_HOWTO.md), also retired.
+>
+> **What to do instead:** work through your Claude session directly. Ask what happened overnight, say
+> what looks wrong in plain language, and it investigates and reports back in the same conversation.
+> Vikunja is still the live work board — that part is real — but the board is driven by you and the
+> session, not by a wake-cycle fleet.
+>
+> On paths: Vikunja does **not** live at `C:\Users\mrbla\BlarAI\tools\vikunja` (that
+> path does not exist). The real binary is
+> `C:\Users\mrbla\devplatform\tools\vikunja\vikunja-v2.3.0-windows-4.0-amd64.exe`, and
+> the start-Vikunja step below has been corrected to use it. The
+> `AUTONOMOUS_FLEET_OPERATIONS.md` this file links to was archived under
+> `docs/archive/2026/retired_fleet_runbooks/`. Other links below are not maintained
+> and some are dead.
+>
+> **Kept only as historical record.** Do not follow the instructions below.
 
 ---
 
@@ -53,7 +76,7 @@ That's it. No approvals, no merges, no blocking the fleet. You're catching issue
 Vikunja is the task-tracker you already use. It runs locally on your machine. If it's not running, the easiest way to start it is to open your terminal (PowerShell) and run:
 
 ```
-cd C:\Users\mrbla\BlarAI\tools\vikunja
+cd C:\Users\mrbla\devplatform\tools\vikunja
 .\vikunja-v2.3.0-windows-4.0-amd64.exe
 ```
 

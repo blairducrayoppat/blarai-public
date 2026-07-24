@@ -31,9 +31,9 @@ The ladder's conservative directions, each a review-hardened lock:
     battery/overnight/swap gates cover the practical envelope, and no fake
     thermal control is pretended here (design §8.3 names the residual).
 
-DORMANCY: pure functions + probes with no callers in any production boot path.
-The C3 heartbeat cycle (a later limb, behind ``[coordinator].heartbeat_enabled``)
-is the only intended consumer. Importing this module arms nothing.
+REACHABILITY: pure functions + probes — no side effects beyond reading the power
+state. The C3 heartbeat cycle (behind ``[coordinator].heartbeat_enabled``, dormant
+default false) is the only consumer. Importing this module arms nothing.
 """
 
 from __future__ import annotations

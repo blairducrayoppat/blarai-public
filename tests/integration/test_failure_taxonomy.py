@@ -399,6 +399,68 @@ def test_load_history_excludes_the_current_night(tmp_path):
     assert ftax.load_history(current) == []
 
 
+def _night_dir(root: Path, stamp: str, classes: dict) -> Path:
+    """A synthetic night in the REAL nightly-runner shape (``--out <night>/scorecards``):
+    ``night-<stamp>/scorecards/battery-summary.json``. Returns the scorecards dir — the
+    exact ``out_dir`` the runner hands the battery."""
+    sc_dir = root / f"night-{stamp}" / "scorecards"
+    sc_dir.mkdir(parents=True)
+    (sc_dir / "battery-summary.json").write_text(json.dumps(
+        {"failure_taxonomy": {"failure_classes": classes}}
+    ), encoding="utf-8")
+    return sc_dir
+
+
+def test_n_synthetic_nights_yield_trend_nights_n(tmp_path):
+    """#1001 regression lock: N synthetic nights in the runner's nested layout yield
+    ``trend.nights == N`` through the real battery-close entry point. The unfixed reader
+    derived the search root from ``out_dir``'s PARENT — the night dir itself — so 11
+    consecutive real nights each reported themselves as night 1, and every KPI delta
+    ever rendered was ``None``."""
+    root = tmp_path / "battery"
+    for day in range(11, 15):
+        _night_dir(root, f"202607{day}-230000", {ftax.CLASS_ORACLE_DEFECT: day - 10})
+    current = _night_dir(root, "20260715-230000", {})
+    block = ftax.classify_and_stamp([], out_dir=current)
+    trend = block["trend"]
+    assert trend["nights"] == 5
+    assert trend["previous_label"] == "night-20260714-230000"
+    assert trend["by_class"][ftax.CLASS_ORACLE_DEFECT] == {
+        "current": 0, "previous": 4, "delta": -4}
+
+
+def test_load_history_labels_are_night_dirs_not_scorecards(tmp_path):
+    """The label is the dated run root, never the ``scorecards`` subdir it nests in."""
+    root = tmp_path / "battery"
+    _night_dir(root, "20260713-230000", {ftax.CLASS_ORACLE_DEFECT: 2})
+    current = _night_dir(root, "20260714-230000", {})
+    history = ftax.load_history(current)
+    assert [h["label"] for h in history] == ["night-20260713-230000"]
+
+
+def test_load_history_ignores_ad_hoc_families_in_the_battery_root(tmp_path):
+    """``daytime-*`` / proof runs park in the same battery root (at BOTH summary
+    depths, per the real tree) — the night KPI must not count them as nights."""
+    root = tmp_path / "battery"
+    _night_dir(root, "20260713-230000", {ftax.CLASS_ORACLE_DEFECT: 2})
+    day = root / "daytime-20260713-110000"
+    day.mkdir(parents=True)
+    (day / "battery-summary.json").write_text(json.dumps(
+        {"failure_taxonomy": {"failure_classes": {ftax.CLASS_ORACLE_DEFECT: 99}}}
+    ), encoding="utf-8")
+    proof = root / "b4-proof-20260713" / "scorecards"
+    proof.mkdir(parents=True)
+    (proof / "battery-summary.json").write_text(json.dumps(
+        {"failure_taxonomy": {"failure_classes": {ftax.CLASS_ORACLE_DEFECT: 99}}}
+    ), encoding="utf-8")
+    current = _night_dir(root, "20260714-230000", {})
+    history = ftax.load_history(current)
+    assert [h["label"] for h in history] == ["night-20260713-230000"]
+    trend = ftax.compute_trend({}, history)
+    assert trend["nights"] == 2
+    assert trend["by_class"][ftax.CLASS_ORACLE_DEFECT]["previous"] == 2
+
+
 # ---------------------------------------------------------------------------
 # Battery-close integration — the summary carries + persists the taxonomy
 # ---------------------------------------------------------------------------

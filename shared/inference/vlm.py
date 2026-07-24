@@ -21,7 +21,7 @@ import logging
 import threading
 from pathlib import Path
 
-from shared.diagnostics import log_memory
+from shared.diagnostics import log_memory, record_reclaim
 
 logger = logging.getLogger(__name__)
 
@@ -168,3 +168,8 @@ def unload() -> None:
         )
     else:
         logger.info("Qwen3-VL pipeline dereferenced + gc.")
+    # Structured In-Use reclaim record (#900, OFF by default). The VLM is one of
+    # the "other resident caches" the AO evicts before an image generate, so its
+    # reclaim behaviour is part of the same #33896 question. Reuses the snapshots
+    # above — no extra cost until a measurement run arms the probe. Fail-soft.
+    record_reclaim("vlm.unload", before, after, log=logger, model="qwen3-vl")

@@ -52,8 +52,10 @@ Two case modes (the ``mode`` field):
       criteria-coverage case needs no engine change, only a golden case).
       Skipped unless ``include_hardware=True``. The real-generator wiring
       lands at the first live 14B slot (#765 sequencing); until then a
-      hardware run without an injected ``oracle_generator`` reports ERROR
-      honestly rather than faking a measurement.
+      hardware run without an injected ``oracle_generator`` reports
+      SKIPPED_HARDWARE naming #765 — the case was never ATTEMPTED, which is
+      not a failure. A generator that RAISES still reports ERROR: attempted
+      and blew up is a different fact (#1009).
 
 Golden case schema (evals/golden/oracle_quality.jsonl):
   {"id": "oq-sound-001", "description": "...",
@@ -80,6 +82,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from evals.loader import GoldenDataError, golden_path, load_golden
+from evals.model_target import ModelTarget
 from evals.oracle_checks import (
     contract_import_findings,
     criteria_coverage_findings,
@@ -187,6 +190,7 @@ def run_suite(
     *,
     include_hardware: bool = False,
     oracle_generator: "Callable[[str], str] | None" = None,
+    model_target: ModelTarget | None = None,  # noqa: ARG001 — model wiring is the #765 live slot
 ) -> SuiteReport:
     """Run the oracle-quality suite.
 
@@ -198,8 +202,13 @@ def run_suite(
         oracle_generator: Injectable generator for model-mode cases — takes
             the case's ``goal_id``, returns the generated oracle SOURCE.
             The real-generator wiring is the #765 live-slot step; until it
-            lands, hardware runs without an injected generator report ERROR
-            honestly (never a faked measurement).
+            lands, hardware runs without an injected generator report
+            SKIPPED_HARDWARE (never attempted, so never a faked measurement).
+            A generator that RAISES reports ERROR — see #1009; the two paths
+            carry different facts and must not be unified.
+        model_target: The #931 OPT-IN hardware model-target override. Accepted
+            for signature uniformity; the model-generator wiring that would
+            consume it is the #765 live slot (unwired today).
     """
     path = golden_file or golden_path(SUITE_NAME)
     cases = load_golden(path)
@@ -231,8 +240,21 @@ def run_suite(
             continue
 
         if oracle_generator is None:
+            # #1009: COULD-NOT-ATTEMPT, not attempted-and-failed.  No generator
+            # was injected, so this case was never run — a fact known before
+            # anything executed, which is what SKIPPED_HARDWARE means.  It was
+            # ERROR until 2026-07-20, which was harmless only while a failing
+            # unbaselined case fell through to known_failures; once #1000 gave
+            # that path teeth, an unwired harness slot failed every
+            # --include-hardware run and the remediation on offer was to
+            # baseline it — laundering an unwired slot into a "known
+            # deficiency".  A skip still refuses to fake measurement (the
+            # posture #765 wanted): it is counted in ``skipped_hardware``,
+            # never in the pass rate, and carries the reason below.
+            # The exception path BELOW stays ERROR on purpose — that case was
+            # attempted and blew up, which is a different fact.
             report.results.append(CaseResult(
-                case_id=case_id, status=CaseStatus.ERROR,
+                case_id=case_id, status=CaseStatus.SKIPPED_HARDWARE,
                 description=description, expected=case["expect"],
                 detail=("real oracle-generator wiring lands at the first live 14B "
                         "slot (#765); inject oracle_generator to run this case")))

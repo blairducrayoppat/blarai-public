@@ -47,7 +47,30 @@ mocked, but two early production steps were never among them:
    "VM-start anomaly", root-caused by controlled repro). The #783 class in
    reverse: tests must neither kill NOR start the real VM.
 
-The autouse fixture patches all four steps AS SEEN BY ``launcher.__main__`` so:
+5. **The real shared-pipeline build (#902).** ``main()`` Step 2.5 calls the
+   REAL ``build_shared_pipeline`` — a full OpenVINO 14B GPU compile+load —
+   unless a test patches it. On a model-less checkout it fails fast (so those
+   tests silently passed for the WRONG reason: a Step-2.5 build failure also
+   returns 1), but on the operator's models-present primary the two failure-
+   path tests that never patched it (``test_policy_entrypoint_failure_returns_1``
+   / ``test_orchestrator_entrypoint_failure_returns_1``) genuinely compiled
+   the 14B onto the live Arc GPU mid-gate — exactly where the 2026-07-15
+   full-suite kills (#902) reproduced. A unit test asserting ``main()``'s
+   return code must never load a model.
+
+6. **The fleet boot-reconcile + its OVMS kill arm (#902).** The swap-recovery
+   reconcile (``shared.fleet.swap_state.reconcile_swap_state`` and its
+   ``swap_ops`` boot wrappers) converges a stranded swap by disarming the
+   fleet watchdog sentinel and force-stopping OVMS — kill-capable by design.
+   The 2026-07-07 incident (a gate run's boot-reconcile shot a live
+   production dispatch) is the class; the root conftest's
+   ``_guard_fleet_reconcile`` silently no-ops ONE entry name for all tests,
+   which is a single lock. ``_boot_reconcile_kill_tripwire`` below is the
+   independent second lock for THIS suite: any launcher test that reaches a
+   live reconcile or the OVMS kill arm fails LOUD naming #902, instead of
+   silently executing (or silently skipping) a kill-capable path.
+
+The main autouse fixture patches steps 1-5 AS SEEN BY ``launcher.__main__`` so:
 
 * a live BlarAI can never ``os._exit`` a test run (fail-loud gate integrity);
 * tests never read or write the checkout's REAL ``certs/launcher.lock``
@@ -60,7 +83,12 @@ The autouse fixture patches all four steps AS SEEN BY ``launcher.__main__`` so:
   ``ensure_vm_running``/``stop_vm`` → True) — ``_ensure_vm_for_feature``
   fast-paths without touching Hyper-V, and a test that WANTS other VM
   behavior patches the same names per-test as before (a decorator/per-test
-  patch layers on top of this fixture and wins) (#817).
+  patch layers on top of this fixture and wins) (#817);
+* ``build_shared_pipeline`` is stubbed to a benign SUCCEEDING build result —
+  no launcher test can compile the real 14B onto the GPU, and the failure-path
+  tests now reach (and test) the step they actually claim to test on EVERY
+  checkout; a test that wants a specific build result patches the same name
+  per-test as before (#902).
 
 ``test_instance_lock.py`` and ``test_privilege_hardening.py`` are unaffected:
 they exercise ``launcher.instance_lock`` / ``launcher.privilege_hardening``
@@ -128,6 +156,18 @@ def _isolate_launcher_process_side_effects(
         """
         return _real_provision_per_boot_certs(certs_dir=certs_dir)
 
+    def _benign_shared_pipeline_build(*_args: object, **_kwargs: object):
+        """A benign SUCCEEDING Step-2.5 build result — never the real 14B (#902).
+
+        ``main()`` reads ``.ok`` / ``.pipeline`` / ``.error`` off the result; a
+        MagicMock with ``ok=True`` lets the boot proceed to the step each test
+        actually asserts, without an OpenVINO GPU compile ever running inside the
+        gate. A test that wants a specific build outcome (happy-path pipeline
+        identity, a build FAILURE) patches ``launcher.__main__.build_shared_
+        pipeline`` per-test exactly as before — its patch layers over this one.
+        """
+        return mock.MagicMock(ok=True, pipeline=mock.MagicMock(), error=None)
+
     with (
         mock.patch.object(
             main_mod, "lock_path_for_repo", return_value=lock_dir / "launcher.lock"
@@ -153,5 +193,77 @@ def _isolate_launcher_process_side_effects(
         ),
         mock.patch.object(main_mod, "ensure_vm_running", return_value=True),
         mock.patch.object(main_mod, "stop_vm", return_value=True),
+        # #902: no launcher test may compile the real 14B (Step 2.5) inside the gate.
+        mock.patch.object(
+            main_mod, "build_shared_pipeline", _benign_shared_pipeline_build
+        ),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _boot_reconcile_kill_tripwire(
+    request: pytest.FixtureRequest,
+) -> Iterator[None]:
+    """No launcher test may run the live boot-reconcile or its OVMS kill arm (#902).
+
+    The swap-recovery reconcile is kill-capable by design (sentinel disarm +
+    ``Stop-Process -Force`` on OVMS); a launcher UNIT test asserting ``main()``'s
+    return code must never execute it against real state. The root conftest's
+    ``_guard_fleet_reconcile`` already no-ops ``swap_ops.reconcile_at_boot_for_roots``
+    for every unmarked test — ONE lock, and a silent one. This tripwire is the
+    independent second lock (defense-in-depth) for the launcher suite: it patches
+    ALL the reconcile entry points AND the kill arm with fail-loud sentinels, so a
+    future unmocked path (a real ``AssistantOrchestratorService.start()``, a moved
+    import seam, a dropped root guard) fails naming this hazard instead of killing
+    anything — the #817 tripwire pattern, applied to the #758/#902 door.
+
+    ``pytest.fail`` raises a BaseException-derived error, so the AO entrypoint's
+    ``except Exception`` around its reconcile call cannot swallow the violation.
+
+    Toggle proof (control tested OFF, security_by_design principle 12): outside
+    ``launcher/tests`` the same functions stay callable — the REAL reconcile is
+    exercised over tmp roots by ``tests/integration/test_swap_state.py`` and
+    ``tests/integration/test_swap_ops.py``. The ON side is locked by
+    ``launcher/tests/test_reconcile_tripwire.py``.
+    """
+    import shared.fleet.swap_ops as swap_ops_mod
+    import shared.fleet.swap_state as swap_state_mod
+
+    nodeid = request.node.nodeid
+
+    def _tripwire(name: str):
+        def _fail(*_args: object, **_kwargs: object) -> None:
+            pytest.fail(
+                f"KILL-CAPABLE fleet-swap path reached by a launcher unit test "
+                f"(#902): {nodeid} called {name}. The boot-reconcile converges "
+                f"stranded swaps by disarming the fleet sentinel and force-"
+                f"stopping OVMS — a launcher test must never run it live (the "
+                f"2026-07-07 live-dispatch kill / 2026-07-15 gate-kill class). "
+                f"Fix: patch the seam your code under test reads "
+                f"(AssistantOrchestratorService, or the swap_ops/swap_state "
+                f"function itself) per-test; a per-test mock.patch/monkeypatch "
+                f"layers over this tripwire and wins."
+            )
+
+        return _fail
+
+    with (
+        mock.patch.object(
+            swap_state_mod,
+            "reconcile_swap_state",
+            _tripwire("swap_state.reconcile_swap_state"),
+        ),
+        mock.patch.object(
+            swap_ops_mod, "reconcile_at_boot", _tripwire("swap_ops.reconcile_at_boot")
+        ),
+        mock.patch.object(
+            swap_ops_mod,
+            "reconcile_at_boot_for_roots",
+            _tripwire("swap_ops.reconcile_at_boot_for_roots"),
+        ),
+        mock.patch.object(
+            swap_ops_mod, "real_stop_ovms", _tripwire("swap_ops.real_stop_ovms")
+        ),
     ):
         yield

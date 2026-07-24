@@ -8,6 +8,7 @@ no live fleet state — fully offline).
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -241,6 +242,146 @@ def test_run_summary_ok_when_outcomes_parse(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# read_latest_run_summary — scorecard-first (#882)
+# ---------------------------------------------------------------------------
+
+
+def test_run_summary_prefers_scorecard_whole_job_truth(tmp_path):
+    """#882 regression (run 20260714-191219-bd): in plan-graph (M2) mode
+    SUMMARY.txt is rewritten per wave and at run end lists ONLY the final wave —
+    the scorecard carries the parked earlier wave that SUMMARY loses."""
+    cfg = _config(tmp_path)
+    run_dir = cfg.runs_dir / "20260714-191219-bd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "SUMMARY.txt").write_text(
+        "- add-projects-list: processed\n"
+        "    RESULT: MERGED into your project - just open the app and try it.\n",
+        encoding="utf-8",
+    )
+    (run_dir / "scorecard.json").write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {"id": "add-header", "status": "merged", "result": "MERGED"},
+                    {
+                        "id": "validate-html",
+                        "status": "parked",
+                        "result": "TIMEOUT",
+                        "detail": "the overall run budget elapsed mid-task",
+                    },
+                    {"id": "acceptance-tests", "status": "skipped", "result": "SKIPPED"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = ws.read_latest_run_summary(cfg)
+    assert result.status == vb.ReadStatus.OK
+    run_id, outcomes = result.value
+    assert run_id == "20260714-191219-bd"
+    by_task = {o.task: o for o in outcomes}
+    assert set(by_task) == {"add-header", "validate-html", "acceptance-tests"}
+    assert by_task["validate-html"].result == "PARKED"  # status is the state truth
+    assert "TIMEOUT" in by_task["validate-html"].detail  # cause preserved
+    assert by_task["add-header"].result == "MERGED"
+
+
+def test_run_summary_scorecard_parked_wave_is_redispatch_visible(tmp_path):
+    """The exact 2026-07-14 blindness: a parked NON-FINAL wave must satisfy
+    REDISPATCH_ELIGIBLE_RESULTS via scorecard-derived outcomes."""
+    from shared.fleet import coord_redispatch as cr
+
+    cfg = _config(tmp_path)
+    run_dir = cfg.runs_dir / "20260714-191219-bd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "scorecard.json").write_text(
+        json.dumps(
+            {"tasks": [{"id": "validate-html", "status": "parked", "result": "TIMEOUT"}]}
+        ),
+        encoding="utf-8",
+    )
+    result = ws.read_latest_run_summary(cfg)
+    assert result.status == vb.ReadStatus.OK
+    _, outcomes = result.value
+    assert any(o.result in cr.REDISPATCH_ELIGIBLE_RESULTS for o in outcomes)
+
+
+def test_run_summary_flat_scorecard_empty_status_uses_result_token(tmp_path):
+    """Review MAJOR-1 lock: FLAT (single-task) scorecards — build_flat_scorecard —
+    write status:"" and carry the classified token in `result` (real shape on disk,
+    e.g. run 20260711-000232-bd). They must surface, not be silently dropped: a
+    coordinator redispatch of one parked task produces EXACTLY this shape."""
+    cfg = _config(tmp_path)
+    run_dir = cfg.runs_dir / "20260711-000232-bd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "scorecard.json").write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "id": "retrieve-expense-list",
+                        "status": "",
+                        "result": "PARKED",
+                        "detail": "NOT merged - parked safely on branch",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = ws.read_latest_run_summary(cfg)
+    assert result.status == vb.ReadStatus.OK
+    _, outcomes = result.value
+    assert len(outcomes) == 1
+    assert outcomes[0].result == "PARKED"
+    assert outcomes[0].task == "retrieve-expense-list"
+
+
+def test_run_summary_all_unusable_scorecard_entries_fall_back_to_summary(tmp_path):
+    """Review MAJOR-1 lock (the fallback promise): a scorecard whose tasks all lack
+    BOTH status and result must yield None internally and fall back to SUMMARY —
+    an empty tuple would silently defeat the fallback."""
+    cfg = _config(tmp_path)
+    run_dir = cfg.runs_dir / "20260712-120000-bd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "scorecard.json").write_text(
+        json.dumps({"tasks": [{"id": "calc", "status": "", "result": ""}]}),
+        encoding="utf-8",
+    )
+    (run_dir / "SUMMARY.txt").write_text(
+        "- calc: built\n  RESULT: merged cleanly\n", encoding="utf-8"
+    )
+    result = ws.read_latest_run_summary(cfg)
+    assert result.status == vb.ReadStatus.OK
+    assert result.value[1][0].result == "MERGED"
+
+
+def test_run_summary_malformed_scorecard_falls_back_to_summary(tmp_path):
+    cfg = _config(tmp_path)
+    run_dir = cfg.runs_dir / "20260712-120000-bd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "scorecard.json").write_text("{not json", encoding="utf-8")
+    (run_dir / "SUMMARY.txt").write_text(
+        "- calc: built\n  RESULT: merged cleanly\n", encoding="utf-8"
+    )
+    result = ws.read_latest_run_summary(cfg)
+    assert result.status == vb.ReadStatus.OK
+    assert result.value[1][0].result == "MERGED"
+
+
+def test_run_summary_scorecard_without_tasks_falls_back(tmp_path):
+    cfg = _config(tmp_path)
+    run_dir = cfg.runs_dir / "20260712-120000-bd"
+    run_dir.mkdir(parents=True)
+    (run_dir / "scorecard.json").write_text(
+        json.dumps({"verdict": "GREEN"}), encoding="utf-8"
+    )
+    result = ws.read_latest_run_summary(cfg)
+    assert result.status == vb.ReadStatus.EMPTY
+    assert result.value == ("20260712-120000-bd", ())
+
+
+# ---------------------------------------------------------------------------
 # read_project_work_state — board + summary + flow, UNREACHABLE propagation
 # ---------------------------------------------------------------------------
 
@@ -387,6 +528,56 @@ def test_project_stalls_empty_when_board_unreachable(tmp_path):
     pw = ws.read_project_work_state("Coder Jobs", 7, now=_NOW, transport=fake)
     assert pw.stalls == ()
     assert pw.flow is None
+    assert pw.test_flow is None  # #887: no partition over an unknown board
+
+
+# ---------------------------------------------------------------------------
+# #887 — the battery/test class of service partition (end-to-end over the read)
+# ---------------------------------------------------------------------------
+
+
+def _battery_label() -> list[dict]:
+    return [{"id": 5001, "title": cl.TEST_CLASS_LABEL}]
+
+
+def test_battery_labelled_ticket_excluded_from_headline_flow(tmp_path):
+    """THE #887 regression lock (point 4): a battery-labelled fixture ticket never
+    enters the headline flow numbers; an unlabelled one does. Also: the synthetic
+    park is surfaced via ``test_flow`` and kept OUT of the actionable ``stalls``."""
+    fake = FakeVikunja()
+    # Two REAL open tasks + one SYNTHETIC battery-labelled open task.
+    fake.seed_task(7, title="real-a", done=False, created=_iso(_NOW - timedelta(hours=2)))
+    fake.seed_task(7, title="real-b", done=False, created=_iso(_NOW - timedelta(hours=3)))
+    fake.seed_task(
+        7, title="battery-park", done=False,
+        created=_iso(_NOW - timedelta(days=40)), labels=_battery_label(),
+    )
+
+    pw = ws.read_project_work_state("Coder Jobs", 7, now=_NOW, transport=fake)
+
+    # Headline = REAL work only (the synthetic 40-day park is NOT counted).
+    assert pw.flow is not None
+    assert pw.flow.open_count == 2
+    assert {a.title for a in pw.flow.ages} == {"real-a", "real-b"}
+    # The synthetic work is SURFACED on its own partition, not dropped.
+    assert pw.test_flow is not None
+    assert pw.test_flow.open_count == 1
+    assert pw.test_flow.ages[0].title == "battery-park"
+    # And it never enters the ACTIONABLE stall channel (no operator stall comment
+    # for a synthetic park — its honest park was its deliverable).
+    assert all(s.title != "battery-park" for s in pw.stalls)
+
+
+def test_unlabelled_ticket_still_enters_headline_flow(tmp_path):
+    """The back-compat half of the lock: with no battery labels, the headline is
+    exactly the whole open population (byte-identical to pre-#887)."""
+    fake = FakeVikunja()
+    fake.seed_task(7, title="t1", done=False, created=_iso(_NOW - timedelta(hours=2)))
+    fake.seed_task(7, title="t2", done=False, created=_iso(_NOW - timedelta(hours=3)))
+
+    pw = ws.read_project_work_state("Coder Jobs", 7, now=_NOW, transport=fake)
+    assert pw.flow is not None and pw.flow.open_count == 2
+    assert pw.test_flow is not None and pw.test_flow.open_count == 0
 
 
 def test_compose_reads_stall_seen_fingerprints(tmp_path):

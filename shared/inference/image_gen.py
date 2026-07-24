@@ -46,7 +46,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from shared.diagnostics import log_memory
+from shared.diagnostics import log_memory, record_reclaim
 
 logger = logging.getLogger(__name__)
 
@@ -932,6 +932,11 @@ def unload() -> None:
     global _pipe, _model_kind, _model_variant, _load_failed
     with _lock:
         already_clear = _pipe is None and not _load_failed
+        # Capture which model was resident BEFORE nulling, so the #900 reclaim
+        # record can name the evicted diffusion model/variant (measurement
+        # metadata only — read, not mutated behaviour).
+        evicted_kind = _model_kind
+        evicted_variant = _model_variant
         _pipe = None
         _model_kind = None
         _model_variant = None
@@ -951,3 +956,15 @@ def unload() -> None:
         )
     else:
         logger.info("Diffusion pipeline dereferenced + gc.")
+    # Structured In-Use reclaim record (#900, OFF by default). Reuses the
+    # before/after snapshots already taken above — no extra probe cost — so this
+    # is a no-op until a measurement run arms the probe. Fail-soft inside.
+    record_reclaim(
+        "image_gen.sdxl.unload",
+        before,
+        after,
+        log=logger,
+        model="sdxl",
+        variant=evicted_variant,
+        kind=evicted_kind,
+    )

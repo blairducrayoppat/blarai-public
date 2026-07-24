@@ -161,11 +161,26 @@ agent-first ordering by commit `c2a2ca2` from a fleet-hygiene
 maturation stream that ran in parallel with Sprint 9, not from the
 Sprint 9 SDV §5.1 14-doc plan.
 
-- [fleet-hygiene.md](fleet-hygiene.md) — owns the cross-role
-  contract for wake-launcher worktree topology, fleet-pause SOP,
-  branch-discipline rules, drift recovery, and the canonical
-  Pattern A / Pattern B per-EA worktree decision. Out-of-plan
-  (commits `a6ba981`..`c2a2ca2`).
+- ~~[fleet-hygiene.md](fleet-hygiene.md)~~ **RETIRED (file absent)** — owned the
+  autonomous-fleet cross-role contract (wake-launcher worktree topology,
+  fleet-pause SOP, drift recovery, the Pattern A / Pattern B per-EA worktree
+  decision); that fleet is retired. Branch-discipline rules now live in
+  `CLAUDE.md` `<git_discipline>`.
+
+### Documentation Lifecycle
+
+Cross-cutting hygiene addition (Vikunja #267). This cluster owns the
+lifecycle every `docs/` document moves through — the frontmatter it
+carries, the five states it can be in, and the rule that keeps the top
+level of `docs/` to the small living set. It is the convention companion
+to the navigation map in [`../INDEX.md`](../INDEX.md).
+
+- [doc-lifecycle.md](doc-lifecycle.md) — owns the doc-lifecycle
+  convention: required frontmatter (`title` / `status` / `area` /
+  `superseded_by`), the `living | reference | draft | superseded |
+  archived` state set, the archive layout, and the versioned-family
+  rule. Enforced advisorily by `tools/doc_lint/` (not yet gated).
+  Additive slice of #267; the archive-move workstream is separate.
 
 ## Audience Taxonomy Matrix
 
@@ -185,7 +200,7 @@ the ledger Notes (e.g., "operator (LA)" in fleet-hygiene.md maps to
 | [context-spotlighting.md](context-spotlighting.md) | — | ✓ | ✓ | ✓ | — |
 | [deployment-verification.md](deployment-verification.md) | ✓ | — | — | ✓ | — |
 | [error-recovery.md](error-recovery.md) | ✓ | ✓ | — | ✓ | — |
-| [fleet-hygiene.md](fleet-hygiene.md) | ✓ | — | — | ✓ | ✓ |
+| ~~[fleet-hygiene.md](fleet-hygiene.md)~~ **RETIRED (file absent)** | ✓ | — | — | ✓ | ✓ |
 | [gpu-runtime.md](gpu-runtime.md) | ✓ | ✓ | ✓ | — | — |
 | [ipc-protocol.md](ipc-protocol.md) | — | ✓ | ✓ | — | — |
 | [observability.md](observability.md) | — | ✓ | ✓ | ✓ | — |

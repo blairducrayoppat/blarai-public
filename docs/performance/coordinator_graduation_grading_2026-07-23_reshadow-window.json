@@ -1,0 +1,432 @@
+{
+  "generated_at": "2026-07-23T23:30:02+00:00",
+  "report": {
+    "decisions": {
+      "correct_decisions": 7,
+      "distinct_decisions": 9,
+      "dominant_type": "board:Done",
+      "dominant_type_count": 3,
+      "entries_examined": 84,
+      "graded_decisions": 7,
+      "grades": [
+        {
+          "correct": true,
+          "decision_type": "board:In Progress",
+          "expected": "In Progress",
+          "key": "board:20260719-002208-bd->In Progress",
+          "observed": "In Progress",
+          "occurrences": 5,
+          "reason": "dispatch started",
+          "run_id": "20260719-002208-bd"
+        },
+        {
+          "correct": true,
+          "decision_type": "board:Ready",
+          "expected": "Ready",
+          "key": "board:20260719-233631-bd->Ready",
+          "observed": "Ready",
+          "occurrences": 39,
+          "reason": "PARKED-HONEST \u2014 returned to Ready for redispatch review",
+          "run_id": "20260719-233631-bd"
+        },
+        {
+          "correct": true,
+          "decision_type": "board:In Progress",
+          "expected": "In Progress",
+          "key": "board:20260720-235311-bd->In Progress",
+          "observed": "In Progress",
+          "occurrences": 32,
+          "reason": "dispatch started",
+          "run_id": "20260720-235311-bd"
+        },
+        {
+          "correct": true,
+          "decision_type": "board:In Progress",
+          "expected": "In Progress",
+          "key": "board:20260721-111715-bd->In Progress",
+          "observed": "In Progress",
+          "occurrences": 1,
+          "reason": "dispatch started",
+          "run_id": "20260721-111715-bd"
+        },
+        {
+          "correct": true,
+          "decision_type": "board:Done",
+          "expected": "Done",
+          "key": "board:20260721-172005-bd->Done",
+          "observed": "Done",
+          "occurrences": 1,
+          "reason": "oracle GREEN + merged (close discipline)",
+          "run_id": "20260721-172005-bd"
+        },
+        {
+          "correct": true,
+          "decision_type": "board:Done",
+          "expected": "Done",
+          "key": "board:20260722-122919-bd->Done",
+          "observed": "Done",
+          "occurrences": 2,
+          "reason": "oracle GREEN + merged (close discipline)",
+          "run_id": "20260722-122919-bd"
+        },
+        {
+          "correct": true,
+          "decision_type": "board:Done",
+          "expected": "Done",
+          "key": "board:20260722-140757-bd->Done",
+          "observed": "Done",
+          "occurrences": 2,
+          "reason": "oracle GREEN + merged (close discipline)",
+          "run_id": "20260722-140757-bd"
+        },
+        {
+          "correct": null,
+          "decision_type": "signal:stall-or-tripwire",
+          "expected": "",
+          "key": "stall:914",
+          "observed": "stall on 914",
+          "occurrences": 1,
+          "reason": "not re-derivable from the journal: a stall is an aging outlier relative to the whole board at that instant, and a tripwire depends on the cycle's drafting state - neither input is journaled",
+          "run_id": ""
+        },
+        {
+          "correct": null,
+          "decision_type": "signal:stall-or-tripwire",
+          "expected": "",
+          "key": "tripwire:drafting-deferred",
+          "observed": "tripwire on drafting-deferred",
+          "occurrences": 1,
+          "reason": "not re-derivable from the journal: a stall is an aging outlier relative to the whole board at that instant, and a tripwire depends on the cycle's drafting state - neither input is journaled",
+          "run_id": ""
+        }
+      ],
+      "precision": 1.0,
+      "types_missing": [],
+      "types_seen": [
+        "board:Done",
+        "board:In Progress",
+        "board:Ready",
+        "signal:stall-or-tripwire"
+      ],
+      "ungradable": [
+        {
+          "correct": null,
+          "decision_type": "signal:stall-or-tripwire",
+          "expected": "",
+          "key": "stall:914",
+          "observed": "stall on 914",
+          "occurrences": 1,
+          "reason": "not re-derivable from the journal: a stall is an aging outlier relative to the whole board at that instant, and a tripwire depends on the cycle's drafting state - neither input is journaled",
+          "run_id": ""
+        },
+        {
+          "correct": null,
+          "decision_type": "signal:stall-or-tripwire",
+          "expected": "",
+          "key": "tripwire:drafting-deferred",
+          "observed": "tripwire on drafting-deferred",
+          "occurrences": 1,
+          "reason": "not re-derivable from the journal: a stall is an aging outlier relative to the whole board at that instant, and a tripwire depends on the cycle's drafting state - neither input is journaled",
+          "run_id": ""
+        }
+      ]
+    },
+    "journal_entries": 175,
+    "kind_counts": {
+      "board_move": 82,
+      "digest": 91,
+      "stall_comment": 1,
+      "tripwire_alarm": 1
+    },
+    "notes": [
+      "Truth is CONTRADICTION by the scorecard, which is not the same as lack of support. A scorecard with no `evidence` block yields oracle_passed=False (the fail-soft production default), so a tests-passed claim grades FALSE against a SILENT scorecard, not only against one that denies it. Such instances are easy catches for any lexicon and inflate the false-instance count relative to genuinely contradicted claims.",
+      "A superseded board move (a run whose later decision describes the end state the final scorecard records) is ABSTAINED, not scored - the scorecard as it stood at the earlier instant is not journaled."
+    ],
+    "provenance": {
+      "dev_mode": false,
+      "journal_path": "C:\\Users\\mrbla\\AppData\\Local\\BlarAI\\coordinator\\shadow-journal.db",
+      "runs_dir": "C:\\Users\\mrbla\\agentic-setup\\state\\fleet-runs",
+      "since": "",
+      "since_seq": 156
+    },
+    "ungradable_runs": [],
+    "window_first_at": "2026-07-19T19:01:57.073165+00:00",
+    "window_first_seq": 156,
+    "window_last_at": "2026-07-22T23:40:30.432259+00:00",
+    "window_last_seq": 330,
+    "words": {
+      "adversarial_cases": 26,
+      "adversarial_caught": 23,
+      "catch_rate": 0.8888888888888888,
+      "combined_caught": 24,
+      "combined_false_instances": 27,
+      "corpus_path": "shared/grading/data/coordinator_guard_adversarial_corpus.jsonl",
+      "corpus_sha256": "c31b0c565fcdb70609bea63f679e66bd4386cf609ba671831d1c15398c3a7688",
+      "distinct_statements": 10,
+      "false_suppression_rate": 0.029411764705882353,
+      "false_suppressions": 1,
+      "guard_fingerprint": "d26ba354f25f861b",
+      "guarded_cycles": 34,
+      "journaled_action_divergences": [
+        "seq 167 (run 20260719-002208-bd): journaled 'accepted', current guard 'rejected:claim:tests-passed'"
+      ],
+      "live_false_caught": 1,
+      "live_false_statements": 1,
+      "live_true_statements": 7,
+      "statements": [
+        {
+          "cycles": 2,
+          "first_seq": 165,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260719-002208-bd",
+          "text": "INCOMPLETE: All features were merged successfully, but the run did not complete as expected. The operator should investigate why the run did not finish properly despite all components being merged.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "All features were merged"
+              },
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "all components being merged"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        },
+        {
+          "cycles": 3,
+          "first_seq": 167,
+          "guard_accepted": false,
+          "guard_action": "rejected:claim:tests-passed",
+          "journaled_action": "accepted",
+          "run_id": "20260719-002208-bd",
+          "text": "INCOMPLETE: All features were successfully merged and acceptance tests passed, but the run was not completed as expected. The coding-fleet run for 20260719-002208-bd has finished with all components merged and tested.",
+          "truth": "false",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "tests-passed",
+                "predicate": "oracle_passed",
+                "span": "acceptance tests passed"
+              },
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "All features were successfully merged"
+              },
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "all components merged"
+              }
+            ],
+            "contradictions": [
+              "oracle_passed: statement asserts TRUE via 'acceptance tests passed', scorecard says False"
+            ],
+            "reason": "",
+            "truth": "false"
+          }
+        },
+        {
+          "cycles": 1,
+          "first_seq": 230,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260719-233631-bd",
+          "text": "PARKED: The run for 20260719-233631-bd has completed with some features merged and others not started. Data storage and card management were completed, but quiz logic was parked, and score tracking, command interface, and acceptance tests were skipped.",
+          "truth": "undetermined",
+          "verdict": {
+            "atoms": [],
+            "contradictions": [],
+            "reason": "no-decidable-claim",
+            "truth": "undetermined"
+          }
+        },
+        {
+          "cycles": 11,
+          "first_seq": 232,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260719-233631-bd",
+          "text": "PARKED: The run for implement-quiz-logic is parked, so that feature was not completed. The other tasks either merged or were skipped, and no acceptance tests were run.",
+          "truth": "undetermined",
+          "verdict": {
+            "atoms": [],
+            "contradictions": [],
+            "reason": "no-decidable-claim",
+            "truth": "undetermined"
+          }
+        },
+        {
+          "cycles": 3,
+          "first_seq": 292,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260720-235311-bd",
+          "text": "INCOMPLETE: All features were successfully merged into the main codebase, but the run did not complete all planned tasks. The operator should review the run for any missing steps or unresolved issues.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "All features were successfully merged"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        },
+        {
+          "cycles": 9,
+          "first_seq": 294,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260720-235311-bd",
+          "text": "INCOMPLETE: All features were successfully merged into the main codebase, but the run did not complete all planned tasks. The operator should review the run to ensure no critical steps were missed.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "All features were successfully merged"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        },
+        {
+          "cycles": 1,
+          "first_seq": 319,
+          "guard_accepted": false,
+          "guard_action": "rejected:claim:completed-successfully",
+          "journaled_action": "rejected:claim:completed-successfully",
+          "run_id": "20260721-111715-bd",
+          "text": "INCOMPLETE: The run 20260721-111715-bd is marked as incomplete. The bill-splitter and acceptance-tests components were merged, but the overall run did not complete successfully.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": false,
+                "label": "completed-successfully",
+                "predicate": "run_succeeded",
+                "span": "complete successfully"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        },
+        {
+          "cycles": 1,
+          "first_seq": 321,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260721-172005-bd",
+          "text": "SUCCEEDED: All components of the coding-fleet run completed successfully with no errors. Every module, including store-cards, import-deck, add-card, quiz, track-scores, and acceptance-tests, was merged as expected.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "completed-successfully",
+                "predicate": "run_succeeded",
+                "span": "completed successfully"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        },
+        {
+          "cycles": 2,
+          "first_seq": 323,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260722-122919-bd",
+          "text": "SUCCEEDED: All tasks in the coding-fleet run completed successfully. The store-expenses, add-expense, list-expenses, and acceptance-tests modules were all merged without issues.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "completed-successfully",
+                "predicate": "run_succeeded",
+                "span": "completed successfully"
+              },
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "all merged"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        },
+        {
+          "cycles": 1,
+          "first_seq": 330,
+          "guard_accepted": true,
+          "guard_action": "accepted",
+          "journaled_action": "accepted",
+          "run_id": "20260722-140757-bd",
+          "text": "SUCCEEDED: All features were successfully merged into the main codebase, and all acceptance tests passed. The run completed without issues, confirming that the inventory management system is now fully updated with new functionalities.",
+          "truth": "true",
+          "verdict": {
+            "atoms": [
+              {
+                "asserted": true,
+                "label": "all-merged",
+                "predicate": "all_merged",
+                "span": "All features were successfully merged"
+              },
+              {
+                "asserted": true,
+                "label": "tests-passed",
+                "predicate": "oracle_passed",
+                "span": "all acceptance tests passed"
+              }
+            ],
+            "contradictions": [],
+            "reason": "",
+            "truth": "true"
+          }
+        }
+      ],
+      "undetermined_statements": 2,
+      "undetermined_suppressions": 0,
+      "ungradable_statements": []
+    }
+  },
+  "tool": "shared.grading.coordinator_graduation"
+}

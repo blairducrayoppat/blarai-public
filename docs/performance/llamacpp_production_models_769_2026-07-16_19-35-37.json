@@ -1,0 +1,71 @@
+{
+  "ticket": "#769 item 1 (production models under llama.cpp)",
+  "date": "2026-07-16",
+  "purpose": "The production pair \u2014 Qwen3-14B (the assistant, dense) + Qwen3-Coder-30B-A3B (the fleet coder, MoE) \u2014 under llama.cpp b9957 on the same box/driver as the 2026-07-10 matrix and tonight's official-35B row; answers the serve-the-coder-via-llama-server question with data.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (16GB visible, uma:1, fp16:1, KHR_coopmat)",
+    "ram": "32 GB LPDDR5X (31.323 GiB effective)",
+    "os": "Windows 11 Pro 10.0.26200",
+    "gpu_driver": "32.0.101.8826"
+  },
+  "software": {
+    "llamacpp": "b9957 official win-vulkan-x64 + win-sycl-x64 release binaries"
+  },
+  "models": {
+    "qwen3_14b": "unsloth/Qwen3-14B-GGUF IQ4_NL (4.5 bpw, 8.54 GB)",
+    "coder_30b_a3b": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF IQ4_NL (4.5 bpw, 17.31 GB)"
+  },
+  "methodology": "llama-bench -ngl 99 -p 512 -n 128 -r 3 -o json (byte-identical protocol to docs/performance/llamacpp_vs_openvino_769_2026-07-10.json); box lean (BlarAI down, guest VM off, OVMS down); 20 s cooldown between cells; layer placement verified per model via verbose llama-server load logs (below) \u2014 both models are classic Qwen3 architectures (no DeltaNet/SSM ops, so the #19957 silent-CPU-fallback class does not apply); Vulkan device detection confirmed Arc 140V KHR_coopmat in every cell's log.",
+  "layer_offload_evidence": {
+    "qwen3_14b": "load_tensors: offloaded 41/41 layers to GPU",
+    "coder_30b_a3b": "load_tensors: offloaded 49/49 layers to GPU"
+  },
+  "results": {
+    "qwen3_14b": {
+      "llamacpp_vulkan_iq4nl": {
+        "prefill_pp512_toks": 194.3,
+        "prefill_pp512_stddev": 0.41,
+        "decode_tg128_toks": 7.52,
+        "decode_tg128_stddev": 0.02
+      },
+      "llamacpp_sycl_iq4nl": {
+        "prefill_pp512_toks": 82.36,
+        "prefill_pp512_stddev": 0.05,
+        "decode_tg128_toks": 2.24,
+        "decode_tg128_stddev": 0.01
+      },
+      "openvino_production_baseline": {
+        "decode_tg_toks_median": 13.6,
+        "note": "Qwen3-14B INT4 + pruned-6L draft, spec-decode ON \u2014 the production serving configuration (PERFORMANCE_LOG 2026-05-22/06-05 standing entry; 12.2 tg at 2K context). Spec-decode asymmetry named: the llama.cpp cells run WITHOUT a draft model."
+      }
+    },
+    "coder_30b_a3b": {
+      "llamacpp_vulkan_iq4nl": {
+        "prefill_pp512_toks": 415.12,
+        "prefill_pp512_stddev": 5.08,
+        "decode_tg128_toks": 27.07,
+        "decode_tg128_stddev": 0.14
+      },
+      "llamacpp_sycl_iq4nl": {
+        "prefill_pp512_toks": 105.85,
+        "prefill_pp512_stddev": 3.97,
+        "decode_tg128_toks": 6.56,
+        "decode_tg128_stddev": 0.04
+      },
+      "openvino_production_baseline": {
+        "decode_tg_toks_median": 38.58,
+        "note": "OVMS 2026.2 continuous batching, INT4, 2026-06-29 (benchmark_ovms_coder-30b_2026-06-29_13-29-30.json) \u2014 the production fleet-serving configuration."
+      }
+    }
+  },
+  "headline": "OpenVINO leads llama.cpp on decode for BOTH production models on this box: 14B 13.6 (spec-decode) vs 7.52 Vulkan / 2.24 SYCL; coder-30B-A3B 38.6 (OVMS) vs 27.07 Vulkan / 6.56 SYCL. The serve-the-coder-via-llama-server trial is NOT motivated by the data. Nuance vs the 07-10 matrix: SYCL's best-decode-on-MoE result on the 35B-A3B (8.14 vs Vulkan 7.37) does NOT generalize \u2014 on the coder-30B-A3B Vulkan wins decode 4.1x (27.07 vs 6.56).",
+  "not_measured": [
+    "llama.cpp with a draft model (spec-decode asymmetry vs the OV 14B baseline is named, not equalized)",
+    "prefill-vs-OV comparison for the 14B (OV baseline row cites decode; prefill baselines live in the standing prefill_14b JSONs)",
+    "flash-attn variants (Intel-iGPU stability default)",
+    "quantization parity (IQ4_NL vs OV INT4 are closest analogs, not identical)",
+    "sustained thermals (single evening, r=3)",
+    "cross-day OV baselines (14B 2026-05/06, coder 2026-06-29, llama.cpp cells tonight \u2014 same box/driver family, dates named)"
+  ]
+}

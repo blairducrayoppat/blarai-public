@@ -1,0 +1,46 @@
+{
+  "purpose": "Qwen3-VL-8B multimodal quality probe \u2014 head-to-head twin of the 35B probe (retire-VL decision evidence; operator judges quality)",
+  "timestamp": "2026-07-17T02:52:50",
+  "hardware": "Intel Core Ultra 7 258V / Arc 140V, driver 32.0.101.8826",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "model": "qwen3-vl-8b-instruct openvino-int4-ov (production vision model), VLMPipeline, GPU",
+  "max_new_tokens": 420,
+  "note": "cases + prompts + token budget imported from probe_35b_multimodal_quality.py (byte-identical head-to-head); outputs verbatim, quality judged by the operator",
+  "pair": "compare against probe_35b_multimodal_quality_*.json (2026-07-16 run)",
+  "cases": [
+    {
+      "label": "rendered_scene",
+      "image": "blarai_lighthouse3.png",
+      "prompt": "Describe this image in detail: setting, style, lighting, and mood.",
+      "image_size": [
+        1536,
+        1536
+      ],
+      "seconds": 27.8,
+      "output": "This image presents a dramatic and atmospheric coastal scene at sunset, rendered in a highly stylized, almost painterly photographic style.\n\n**Setting:**\nThe central subject is a classic white lighthouse situated on a small, rocky island or headland jutting into a vast ocean. The lighthouse is accompanied by a smaller, white building with a red roof, likely a keeper's quarters or auxiliary structure. The island is rugged and dark, silhouetted against the sky. The horizon is clearly defined, separating the sea from the sky, and the ocean stretches to the edges of the frame, appearing calm with gentle ripples.\n\n**Style:**\nThe image has a cinematic and highly stylized quality, reminiscent of a professional travel or landscape photograph. The composition is balanced and centered, drawing the viewer\u2019s eye directly to the lighthouse. The color palette is intentionally saturated and harmonious, dominated by warm oranges and deep purples, creating a visually striking and emotionally resonant image. The overall aesthetic is one of serene grandeur, with a touch of the sublime.\n\n**Lighting:**\nThe lighting is the most defining feature of the image. It is a dramatic sunset or sunrise, with the sun low on the horizon, casting a brilliant, fiery orange glow across the sky. This light illuminates the clouds from below, creating a strong contrast between the luminous orange sky and the dark, silhouetted clouds above. The lighthouse itself is lit from within \u2014 its lantern room glows warmly, casting a soft, golden light that stands out against the dark structure and the surrounding twilight. This internal illumination makes the lighthouse a beacon of warmth and safety in the vast, darkening landscape.\n\n**Mood:**\nThe mood is profoundly serene, peaceful, and slightly melancholic. The vastness of the ocean and sky evokes a sense of solitude and timelessness. The glowing lighthouse, a symbol of guidance and hope, adds a comforting and reassuring element to the scene. The warm, golden light of the sunset creates a feeling of tranquility and beauty, while the"
+    },
+    {
+      "label": "logo_graphic",
+      "image": "blair_glow.png",
+      "prompt": "Describe this graphic: what it depicts, its style, colors, and what kind of project or product it would suit.",
+      "image_size": [
+        512,
+        512
+      ],
+      "seconds": 21.3,
+      "output": "This graphic is a logo or app icon for a product or service named \u201cBLAiR\u201d.\n\nHere\u2019s a breakdown:\n\n**What it depicts:**\nIt\u2019s a stylized logo featuring the text \u201cBLAiR\u201d centered within a rounded square frame. The design is minimalist and modern, suggesting a digital product like a mobile app, software, or a brand identity.\n\n**Style:**\n- **Minimalist & Modern:** Clean lines, no extraneous graphics, focused on typography.\n- **Typography-Driven:** The entire identity is built around the lettering.\n- **Warm & Sophisticated:** The color palette and rounded shape convey approachability and warmth.\n- **Subtle Glow Effect:** The letter \u201cA\u201d has a soft, warm glow emanating from it, adding a touch of technology or innovation.\n\n**Colors:**\n- **Background:** A rich, warm brown, possibly reminiscent of wood, leather, or earth tones \u2014 conveying stability, warmth, or luxury.\n- **Text:** The letters \u201cB\u201d, \u201cL\u201d, \u201cr\u201d are a creamy off-white or beige, while the \u201cA\u201d is a vibrant, glowing yellow-orange. This contrast makes the \u201cA\u201d stand out as a focal point.\n- **Overall:** The color scheme is warm, earthy, and inviting, with a modern digital touch from the glow.\n\n**Suitable Project/Product:**\nGiven the name \u201cBLAiR\u201d and the design, this logo would suit:\n- **A digital product or service** (e.g., a mobile app, software platform, or SaaS tool).\n- **A brand focused on warmth, comfort, or personalization** \u2014 perhaps in lifestyle, wellness, or creative fields.\n- **A product with a \u201csmart\u201d or \u201cAI\u201d component** \u2014 the \u201cAI\u201d in the name and the glowing \u201cA\u201d suggest technology or artificial intelligence, making it ideal for an AI-powered app or service.\n- **A premium or boutique brand** \u2014 the sophisticated color palette and clean design suggest a high-quality, curated experience.\n\n**Possible interpretations:**\n"
+    },
+    {
+      "label": "detail_render",
+      "image": "hand2.png",
+      "prompt": "Describe exactly what this image shows, including any anatomical or structural details, and note anything that looks wrong or artificial.",
+      "image_size": [
+        1024,
+        1024
+      ],
+      "seconds": 23.0,
+      "output": "This image depicts three friends\u2014two men and one woman\u2014sitting at a round wooden table outdoors, sharing a meal of fries and drinks. The setting appears to be a sunny plaza or street with European-style buildings in the background, featuring arched doorways and dark green awnings.\n\nThe scene is bright and cheerful, with the three individuals smiling and engaged in conversation. The man on the left has dark, curly hair and a beard, wearing sunglasses and a denim jacket. The woman in the center has a voluminous, tightly curled, reddish-brown afro hairstyle and is wearing glasses and a denim jacket. The woman on the right has long, straight, reddish-brown hair and is also wearing a denim jacket.\n\nStructural and anatomical details:\n- The table is round with a smooth wooden surface.\n- A glass of orange juice sits before the man on the left.\n- A white plate of golden-brown fries is in front of the woman in the center.\n- The background buildings have arched doorways and windows with visible frames and balconies.\n- Other people are visible in the background, walking or standing, adding to the sense of a public space.\n\nWhat looks artificial or inconsistent:\n- The most noticeable issue is with the woman in the center. Her hair is extremely voluminous and tightly curled, but the curls appear to be uniformly dense and perfectly rounded, lacking the natural variation, flyaways, and texture typically seen in real human hair. The way the curls are rendered gives a slightly plastic, overly stylized appearance.\n- The lighting is very even and bright, with minimal shadows on the subjects\u2019 faces and clothing, which is unusual for a sunny outdoor scene. Realistic outdoor lighting would produce more defined shadows and highlights.\n- The edges of the subjects\u2019 clothing and hair have a slightly soft, overly smooth quality, suggesting digital rendering or AI generation rather than a photograph.\n- The fries on the plate are uniformly golden and identical in shape and size, lacking the natural variation in color and texture of real fries.\n- The background figures are somewhat blurred and"
+    }
+  ],
+  "load_seconds": 12.4
+}

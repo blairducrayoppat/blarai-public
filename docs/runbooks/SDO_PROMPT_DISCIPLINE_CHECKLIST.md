@@ -1,8 +1,42 @@
 # SDO Prompt-Discipline Checklist
 
+> ## RETIRED — describes a review process that no longer exists. Do not run.
+>
+> Every actor in this document has been retired. There is no SDO, no Executive
+> Assistant (EA), no Co-Lead Architect, and no autonomous fleet generating the EA
+> prompts this checklist was written to spot-check. Their scheduled wake tasks are
+> **Disabled** on this machine, deliberately, and were verified so during the
+> 2026-07-19 runbook audit (#979).
+>
+> **Nothing here produces a review.** There is no reviewer to perform the
+> independence check described below, and no queue of SDO-authored prompts to
+> check. If you follow §5 you will schedule a quarterly reminder for a review that
+> nobody will do.
+>
+> **Also broken, verified on disk:**
+> - The reminder-producer script §5 tells you to create and schedule
+>   (`tools\vikunja_mcp\schedule_sdo_discipline_check.py`) **does not exist
+>   anywhere** — not in this repo and not in devplatform. It appears never to have
+>   been written, so §5's Task Scheduler entry would point at nothing.
+> - `tools/vikunja_mcp/cli.py` and `tools/vikunja/…` (§5.1) are not in BlarAI;
+>   they live in the **devplatform** repo, which is being sunset.
+> - The prompt-library and workflow documents cited as its source of authority
+>   also moved to devplatform (see the references at the end).
+>
+> **What replaced it:** prompt quality is now the responsibility of the single
+> session doing the work, under `CLAUDE.md`, with adversarial review kept
+> author-≠-verifier per that file. There is no periodic committee check.
+>
+> Kept for historical reference only. **Note the lesson numbering here is NOT
+> BlarAI's.** `L-12` and `L-13` below are cf-program-era numbers pointing at
+> ledger Entries 40 and 41 (both 2026-04-18), archived at
+> `docs/archive/ledger/POST_OPERATIONAL_MATURATION_LEDGER.md`. BlarAI's own
+> `LESSONS.md` numbers 12 and 13 are **different, unrelated lessons** — do not
+> resolve these against that file.
+
 **Purpose**: Quarterly spot-check that SDO-generated EA prompts are maintaining the discipline codified in lessons L-12, L-13, and related rules.
 
-**Source of authority**: Recommendation §6.3 (`docs/CLAUDE_WORKFLOW_OPTIMIZATION_D7.md`). Reinforces the EA Prompt Library checklist at `docs/claude_projects/03_EA_PROMPT_LIBRARY_INSTRUCTIONS.md` §EA-prompt-review-checklist.
+**Source of authority**: Recommendation §6.3 (`devplatform\docs\CLAUDE_WORKFLOW_OPTIMIZATION_D7.md`). Reinforces the EA Prompt Library checklist at `devplatform\docs\claude_projects\03_EA_PROMPT_LIBRARY_INSTRUCTIONS.md` §EA-prompt-review-checklist. **Both are in the devplatform repo, not BlarAI** (moved by `3e73484a`, 2026-04-30).
 
 **Reviewer**: Co-Lead Architect (Tier 1). Not the SDO itself — this is an independence check.
 
@@ -187,11 +221,15 @@ Get-ScheduledTask -TaskName 'BlarAI-SDO-Discipline-Check'
 
 ## 6. Cross-references
 
-- [03_EA_PROMPT_LIBRARY_INSTRUCTIONS.md](../claude_projects/03_EA_PROMPT_LIBRARY_INSTRUCTIONS.md) §EA-prompt-review-checklist — primary source of the checklist items.
-- [01_CO_LEAD_ARCHITECT_INSTRUCTIONS.md](../claude_projects/01_CO_LEAD_ARCHITECT_INSTRUCTIONS.md) §EA-prompt-review-checklist — Co-Lead's parallel checklist.
-- [POST_OPERATIONAL_MATURATION_LEDGER.md](../POST_OPERATIONAL_MATURATION_LEDGER.md) Entries 39, 40, 41 — L-12 and L-13 incident records.
-- §6.3 in [CLAUDE_WORKFLOW_OPTIMIZATION_D7.md](../CLAUDE_WORKFLOW_OPTIMIZATION_D7.md).
-- [claude-projects-dirty-check scheduled task precedent](../CLAUDE_PROJECTS_MANIFEST.md) — Domain 4 pattern this runbook emulates.
+> Paths repo-qualified 2026-07-20 (#979). The `claude_projects/` and `CLAUDE_*`
+> documents are in the **devplatform** repo (`C:\Users\mrbla\devplatform`), not
+> BlarAI; the ledger moved into this repo's archive.
+
+- `devplatform\docs\claude_projects\03_EA_PROMPT_LIBRARY_INSTRUCTIONS.md` §EA-prompt-review-checklist — primary source of the checklist items.
+- `devplatform\docs\claude_projects\01_CO_LEAD_ARCHITECT_INSTRUCTIONS.md` §EA-prompt-review-checklist — the parallel reviewer checklist.
+- [POST_OPERATIONAL_MATURATION_LEDGER.md](../archive/ledger/POST_OPERATIONAL_MATURATION_LEDGER.md) Entries 39, 40, 41 — the L-12 and L-13 incident records. (The docs-root copy is now a stub; the content is in the archive.)
+- §6.3 in `devplatform\docs\CLAUDE_WORKFLOW_OPTIMIZATION_D7.md`.
+- `devplatform\docs\CLAUDE_PROJECTS_MANIFEST.md` — the claude-projects-dirty-check scheduled-task precedent this runbook emulates.
 
 ---
 

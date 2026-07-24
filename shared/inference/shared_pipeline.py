@@ -185,9 +185,24 @@ class SharedInferencePipeline:
         for the duration; the next :meth:`generate` reloads it lazily via the
         rebuild closure. Idempotent and thread-safe. A no-op when no rebuild
         closure is set — without one a reload would be impossible, so eviction is
-        refused rather than wedging the service (Fail-Closed)."""
+        refused rather than wedging the service (Fail-Closed).
+
+        #900 memory-reclaim probe (OFF by default): when armed, measures the
+        ``In-Use = Total − Available`` delta across the eviction to verify whether
+        the ~9.7 GB of the 14B actually returns to Windows on this chip or is
+        retained by the GPU driver (openvino #33896). When the probe is off this
+        method is byte-for-byte its old self — ``gc.collect()`` stays outside the
+        lock and no snapshot is taken."""
         import gc
 
+        from shared.diagnostics import (
+            memory_snapshot,
+            reclaim_probe_enabled,
+            record_reclaim,
+        )
+
+        probe_on = reclaim_probe_enabled()
+        before: dict[str, float] = {}
         with self._lock:
             if self._pipeline is None:
                 return
@@ -197,11 +212,19 @@ class SharedInferencePipeline:
                     "closure, so the 14B could not be reloaded. Keeping it."
                 )
                 return
+            # Snapshot the resident state under the lock ONLY when measuring, so
+            # the off path adds no lock-hold and no probe cost.
+            if probe_on:
+                before = memory_snapshot()
             self._pipeline = None
         gc.collect()
         logger.info(
             "SharedInferencePipeline: 14B evicted; reloads on next generate()."
         )
+        if probe_on:
+            record_reclaim(
+                "shared_pipeline.14b.unload", before, memory_snapshot(), log=logger
+            )
 
     def release_gpu_for_exit(self) -> bool:
         """Drop the underlying 14B to release its GPU/Level-Zero context — for the
@@ -212,17 +235,37 @@ class SharedInferencePipeline:
         would linger and the incoming 30B could OOM (run-2 fit by timing luck only).
         Calling this first releases the GPU gracefully before the hard exit. Idempotent +
         thread-safe; returns True if a pipeline was released. The ACTUAL GPU-context
-        teardown is live-validated on the box (the instrumented GPU-free before/after)."""
+        teardown is live-validated on the box (the instrumented GPU-free before/after,
+        #900). The #900 reclaim probe (OFF by default) is that instrumentation: when
+        armed it records the In-Use delta across this release; when off the method is
+        byte-for-byte its old self."""
         import gc
 
+        from shared.diagnostics import (
+            memory_snapshot,
+            reclaim_probe_enabled,
+            record_reclaim,
+        )
+
+        probe_on = reclaim_probe_enabled()
+        before: dict[str, float] = {}
         with self._lock:
             if self._pipeline is None:
                 return False
+            if probe_on:
+                before = memory_snapshot()
             self._pipeline = None
         gc.collect()
         logger.info(
             "SharedInferencePipeline: 14B GPU context released for process exit (#670)."
         )
+        if probe_on:
+            record_reclaim(
+                "shared_pipeline.14b.release_gpu_for_exit",
+                before,
+                memory_snapshot(),
+                log=logger,
+            )
         return True
 
     @property
@@ -256,6 +299,7 @@ def build_shared_pipeline(
     draft_manifest_path: Path | None = None,
     model_priority: str = "HIGH",
     kv_cache_precision: str | None = None,
+    require_signed_draft: bool = False,
 ) -> SharedPipelineBuildResult:
     """Construct one ``LLMPipeline`` + lock and return them wrapped.
 
@@ -283,6 +327,21 @@ def build_shared_pipeline(
             unset = the runtime default (FP16) — a Session-2 memory/quality A/B
             knob. On the Arc 140V (XMX) KV-cache quant is opt-in, so this must
             be set explicitly to engage.
+        require_signed_draft: FUT-05 / #107 — when True, the DRAFT manifest's
+            verification routes through the TPM-signature-checked loader
+            (``load_manifest_verified``): a missing OR invalid ``.sig`` fails the
+            draft integrity check (and thus the whole build, fail-closed), exactly
+            as ``[security].require_signed_manifest`` gates the 14B target at the
+            per-service boot gate. Sourced from
+            ``[security].require_signed_draft_manifest`` (the launcher reads it).
+            Default False = byte-identical to the pre-#107 behaviour: a DIGEST-only
+            draft check (the draft ``.sig`` is not consulted; the digest is still
+            enforced, so a tampered draft weight is caught). The drafts are
+            NON-AUTHORITATIVE (spec-decode proposals the signed 14B re-verifies),
+            so this is an independently-flippable defense-in-depth posture, kept
+            separate from the 14B's flag; it ships dormant (False) until the drafts
+            are signed and the LA flips it (enforcing the 14B's already-true flag on
+            the still-unsigned drafts would break boot — hence a separate flag).
 
     Returns:
         SharedPipelineBuildResult with ``.ok`` True on success, with
@@ -332,9 +391,16 @@ def build_shared_pipeline(
             )
         logger.info("Shared pipeline: target weight integrity verified (%s)", target_bin)
     if draft_manifest_path is not None:
+        # FUT-05 / #107: require_signed_draft threads the draft manifest through
+        # the TPM-signature-checked loader when the LA has flipped the draft
+        # posture. Default False = digest-only: the draft .sig is NOT consulted
+        # (require_signed=False takes verify_weight_integrity's bare load_manifest
+        # path), so a present-but-invalid .sig is ignored — but the digest is still
+        # enforced, so a tampered draft weight is still caught.
         draft_integrity = verify_weight_integrity(
             model_path=str(draft_bin),
             manifest_path=str(draft_manifest_path),
+            require_signed=require_signed_draft,
         )
         if not draft_integrity.verified:
             return SharedPipelineBuildResult(
@@ -343,7 +409,11 @@ def build_shared_pipeline(
                 draft_integrity=draft_integrity,
                 error=f"Draft weight integrity FAILED: {draft_integrity.error}",
             )
-        logger.info("Shared pipeline: draft weight integrity verified (%s)", draft_bin)
+        logger.info(
+            "Shared pipeline: draft weight integrity verified (%s, require_signed=%s)",
+            draft_bin,
+            require_signed_draft,
+        )
 
     # Construct one LLMPipeline. Speculative decoding is mandatory per
     # ADR-012 §3.1 — autoregressive solo runs at ~2-3 tps on the 14B,
@@ -423,6 +493,7 @@ def build_shared_pipeline(
             draft_manifest_path=draft_manifest_path,
             model_priority=model_priority,
             kv_cache_precision=kv_cache_precision,
+            require_signed_draft=require_signed_draft,
         )
         if not res.ok or res.pipeline is None:
             raise RuntimeError(

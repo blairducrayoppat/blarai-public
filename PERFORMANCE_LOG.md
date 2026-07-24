@@ -56,6 +56,101 @@ affect performance:
 
 ---
 
+### 2026-07-23 — The same window, measured by a machine: every 07-22 figure reproduced, and two the hand pass got wrong (#1079)
+
+First run of the committed grading instrument (#1079) over the SAME re-shadow window the
+2026-07-22 entry below graded by hand — seq 156–330, 175 journal entries, no sampling. The
+point of the exercise is not new numbers; it is whether a machine and a session agree, after
+the 07-22 finding that two hand-graders came out *differently wrong*.
+
+**Reproduced exactly:** 175 entries (board_move 82 · digest 91 · stall 1 · tripwire 1),
+**34 guarded prose cycles**, **10 distinct drafted statements**, **7 board decisions at 100%
+precision**, **false-suppression 1/34 = 0.0294**. Every headline figure of the hand pass
+survived mechanical re-derivation.
+
+**Two divergences, both the instrument refusing to claim what it cannot re-derive.** It observes
+**9 decisions but VERIFIES only 7**: the stall and the tripwire are *exercised* — so the
+criteria's fourth decision-type requirement is satisfied — but marked UNGRADABLE, because a
+stall is an aging outlier relative to the whole board at that instant and the board is not
+journaled. They are excluded from N, which this tool reads as VERIFIED decisions rather than
+observed ones: an abstention can never come out wrong, so it contributes nothing to the
+rule-of-three error bound the ratified N ≥ 60 rests on. The hand grader verified that stall
+against the ticket's creation time manually, which is exactly the session labour this
+instrument retires. And it reports the live catch as **1/1, where the hand pass
+said 0/1** — the guard has since grown the `tests-passed` lexicon entry in response to that
+very miss. Both are right for their guard, which is why every report carries a **guard
+fingerprint** (`d26ba354f25f861b` here) and names each journaled-action divergence.
+
+Adversarial catch **23/26** over the committed corpus → **combined catch rate 0.8889** across
+27 false instances. Both layers **NOT MET**: decisions blocked on N (**7 verified** < 60),
+words on catch (< 0.90), cycles (34 < 100) and distinct statements (10 < 30).
+
+**Method:** journal read in place through the sanctioned `build_shadow_journal` factory (real
+LOCALAPPDATA, never a copy); ground truth re-derived from each run's `scorecard.json` through
+the *production* derivations — `oracle_passed_from_scorecard` and `outcomes_from_scorecard` —
+and transitions through `shared/fleet/coord_lifecycle.resolve_board_transition`. Deterministic:
+same window in, byte-identical report out, verified across repeated runs.
+
+**Not measured.** Stall and tripwire correctness (not re-derivable from the journal — a named
+coverage gap, not a pass). One window, N=1 on the suppression event, so 2.94% is a point
+estimate whose upper confidence bound sits far above the ratified 5% ceiling. The adversarial
+corpus was built against *other* guard revisions, so its catch rate is not a selection-free
+estimate of this guard's. Machine-readable twin:
+`docs/performance/coordinator_graduation_grading_2026-07-23_reshadow-window.json`.
+
+---
+
+### 2026-07-22 — Coordinator shadow precision, re-shadow window: decisions 7/7 again; the guard's first live record is a miss and a false alarm (#855)
+
+First precision measurement over the #946-guarded re-shadow window (graded-set start
+2026-07-19T19:01Z → 2026-07-22T23:40Z; 175 journal entries graded — the full in-window
+population, no sampling). Deterministic layer: **7/7 distinct board decisions correct** against
+scorecard ground truth re-read tonight (now 14/14 across both windows), 0 false
+stalls, 0 false tripwires, the one stall flag verified to the day (task 914 at 3.9d).
+Guard layer, the number the window existed to produce: **catch rate 0/1** — the one
+false drafted statement ("acceptance tests passed" on 20260719-002208-bd, oracle
+FAILED 4/6) was accepted ×3 cycles; the lexicon screens verdict-class claims, not
+evidence-field claims. **False-refusal rate 1/34 cycles (~3%)** — the guard's only
+live firing suppressed an accurate negated sentence ("did *not* complete
+successfully"), the documented refusal bias, now priced. Structural layers held on all
+34 guarded cycles: correct verdict echo on all 10 distinct drafted statements
+(including the rejected one), no model text ever the claim of record. Coverage honesty: harvest is latest-finished-run-only +
+app-uptime-bound — four finished runs (three GREEN, one PARKED) never graded in
+window; one undiagnosed harvest-ordering anomaly recorded with evidence. NOT
+measured: quiet-board stall recall, negated-failure wording on GREEN runs, the
+unharvested runs' prose, threshold adequacy (LA-set, to be pre-specified before the
+next window per c.2337). Record: `docs/performance/coordinator-shadow-precision-2026-07-22.md`
++ machine-readable JSON twin. Graduation untouched — the ceremony and its threshold
+are the operator's.
+
+### 2026-07-15 — Host RAM census: the firmware keeps 693 MB, the background keeps ~7 GB (#897)
+
+Read-only census opening the RAM-headroom study — the before-picture for any reclamation
+work, taken under real conditions (a concurrent session's standing-gate run live during part
+of the capture). Machine-readable snapshot: `docs/performance/ram_census_2026-07-15.json`.
+
+**Hardware/stack:** ASUS ExpertBook P5405CSA, Intel Core Ultra 7 258V (Lunar Lake), 32 GiB
+on-package LPDDR5X, Arc 140V iGPU (unified memory), BIOS P5405CSA.328, Windows 11 Pro 26200.
+
+| Measurement | Value |
+|---|---|
+| Hardware/firmware reserved | **692.8 MB** (32 GiB installed vs 31.323 GiB visible) |
+| In use, near-idle (dev sessions running) | 16.31 GB |
+| In use, under build+model load | 28.23 GB (3.10 GB available) |
+| Transient GPU shared usage at model load | **9,743 MB** on the Arc LUID (drops to 408 MB after) |
+| Edge background footprint | 149 processes, ~3.0 GB private (Startup Boost autostart) |
+| Bitdefender standing | ~1.0 GB private |
+| Memory compression / page combining | **both OFF**; SysMain disabled |
+| VBS | running, services {3,4}; Secure System ~102 MB |
+| Pagefile | auto-managed 19 GB, peak usage 11.75 GB this boot |
+| Hyper-V BlarAI-Orchestrator VM | OFF, 0 MB (dynamic memory enabled) |
+
+Key reading: the firmware reservation is a sliver (~2.1% of RAM); background software holds
+~7 GB standing (Edge + dev sessions + antivirus + services), of which ~1.5–3 GB is realistically
+reclaimable, and the 14B's ~9.7 GB GPU-shared residency must coexist with load spikes.
+NOT measured: reservation decomposition (firmware-level), a true zero-dev-session idle
+baseline, per-lever savings (that's the after-picture, next entry in this study).
+
 ### 2026-07-08 — Qwen3.6-27B dense on the Arc 140V: coherent, fits, and half the speed the bandwidth math promised (#768, Stage-1 smoke)
 
 First measured run of the Qwen3.6 generation on this hardware — `OpenVINO/Qwen3.6-27B-int4-ov`
@@ -2589,3 +2684,375 @@ evening). Machine-readable: docs/performance/llamacpp_vs_openvino_769_2026-07-10
 After-warm is flat ~112–124 ms — the irreducible per-turn generated-text embed. Component attribution (before): the chunks leg was 123/219/434/669/1231/2667 ms of each turn at N=1..32. Cold-turn cost is unchanged by design (turn 1 still embeds the full set, pre-fix batch composition) — the N=16/32 cold variance between runs (1385→1829, 2687→3504 ms) is run-to-run contention noise (the battery campaign was actively dispatching; before-run warm stdev at N=8/32 was 141/257 ms vs 5–9 ms after). **Semantics:** identical scores across all 72 (N, turn) pairs — max |delta| 0.0, zero verdict changes — plus real-model unit probes (cache-hit bit-identical; grown-set vs fresh-detector within 1e-5, same verdicts).
 
 **NOT measured (named per the data-capture rule):** the real-NPU leg (the #720 offload this fix un-bypasses for module-created singletons — its live verify on the Intel AI Boost NPU is a coordinator-run hardware slot; the 13.6x figure cited is the 2026-07-02 measurement, not re-measured here); GPU offload; co-resident 14B contention (isolation run); Stages 1-4/6 of `validate_output`; end-to-end grounded-turn latency on the Arc 140V.
+
+## 2026-07-11 — MusicGen-medium CPU baseline (dev-side trailer tooling, #858 tier decision)
+
+**What / why.** While finishing the BlarAI vision trailer (docs/handoffs/trailer-music-capability-handoff-20260711.md) and scoping the local-music limb of the eventual Cinematic Studio capability (#858), generated a 15s musicgen-medium comparison clip on CPU to inform the small/medium/large tier call and to size the Arc/OpenVINO GPU-export work item.
+
+**Hardware / substrate.** Intel Core Ultra 7 258V (Lunar Lake), CPU-only leg (Arc 140V GPU not used). Isolated venv (`scratchpad/musicgen/venv`): Python 3.11, torch 2.13.0+cpu, transformers 5.13.1, numpy 2.4.6, soundfile 0.14.0. Model: `facebook/musicgen-medium` via `transformers.MusicgenForConditionalGeneration`, `device="cpu"`, 8 threads (default).
+
+**Methodology.** Single 15s clip, seed=42, guidance_scale=3.0, do_sample=True, one cinematic-score prompt. Model loaded fresh (weights already cached on disk); one generation call, no batching. Script: `scratchpad/gen_music.py`. Evidence: `docs/performance/musicgen_medium_cpu_2026-07-11.json`.
+
+**Numbers.** Model load 4.5s. Generated 14.9s of audio (target 15.0s) in 1073.5s compute → **0.83 s-audio/min-compute**. A prior, less-rigorous dev smoke test put musicgen-small at roughly ~2 s-audio/min-compute on the same box — medium is markedly slower, consistent with its larger parameter count.
+
+**Read.** At 0.83 s-audio/min-compute, a full ~90s cinematic track would cost **~108 minutes of CPU compute** — impractical for iterative scoring work. This confirms the Arc/OpenVINO GPU export path (`optimum-cli export openvino --model facebook/musicgen-<tier> --weight-format int8`, then `device="GPU"`) is required for production-viable full-track generation, not an optional speedup — a load-bearing input to the #858 tier/backend decision.
+
+**NOT measured (named):** musicgen-medium (or any tier) on the Arc 140V via OpenVINO INT8/INT4; the musicgen-large tier (fits disk at ~13GB, CPU generation not attempted — impractical per this rate); co-resident 14B/OVMS contention during generation; perceptual quality A/B (operator's call — small/medium samples delivered same session); multi-seed variance (single seed=42 run only).
+
+## 2026-07-16 — MusicGen on the Arc 140V via PyTorch XPU: medium 2.13 s-audio/min sustained (2.6× CPU); the OpenVINO export route is a dead end (negative result)
+
+**What / why.** Finishing the BlarAI vision trailer's local score (#858 groundwork): the operator picked the LARGE tier with MEDIUM as fallback, generated on the GPU. First-ever music-generation numbers on this box's Arc 140V — and a load-bearing negative result about the planned backend.
+
+**Hardware / substrate.** Intel Core Ultra 7 258V / Arc 140V iGPU (16 GB shared), driver 32.0.101.8826, Windows 11 Pro 26200. Isolated venv (`scratchpad/musicgen/venv_xpu`): Python 3.11.9, **torch 2.13.0+xpu** (the pytorch.org XPU wheel — PyTorch's native Intel-GPU backend), transformers 5.14.1. Models fp32, no quantization; standard HF `generate()`, `device="xpu"` — `gen_music.py` ran unchanged from the CPU baseline.
+
+**Negative result first (it reshaped the plan).** The handoff's planned route — `optimum-cli export openvino --model facebook/musicgen-<tier> --weight-format int8` then `device="GPU"` — **does not exist**: optimum-intel 2.0.0 (optimum 2.2.0, nncf 3.2.0, openvino 2026.2.1) rejects musicgen as an unsupported architecture. The real OpenVINO route is the manual notebook-style conversion (three separate IRs + a patched generate loop) — deferred; torch-XPU delivered the GPU win with zero custom plumbing instead. Any future #858 OpenVINO-substrate port must budget for the manual conversion.
+
+**Numbers (seed=0, guidance 3.0, sampling; rates exclude model load).**
+
+| Run | Model | Audio | Compute | Rate (s-audio/min) | Load | RSS after load |
+|---|---|---|---|---|---|---|
+| Probe 15s | medium (1.5B) fp32 | 14.9s | 277.5s | **3.23** | 31.5s | 9.54 GB |
+| Full track 91s (7 sections) | medium (1.5B) fp32 | 90.6s | 2555.8s | **2.13 sustained** | 12.7s (warm) | 9.52 GB |
+| Health probe 3s | large (3.3B) fp32 | 2.9s | 194.1s | 0.91 (overhead-dominated) | 67.1s | 14.82 GB |
+| Full track 91s (7 sections) | large (3.3B) fp32 | 90.6s | 2730.8s | **1.99 sustained** | 42.5s | 14.82 GB |
+| Probe 15s | medium (1.5B) **bf16** | 14.9s | 329.1s | **2.72 — 16% SLOWER than fp32** | 9.1s | 9.33 GB |
+
+vs the 2026-07-11 CPU baseline (medium, 0.83): **3.9× on the probe, 2.6× sustained.** Large sustained 1.99 — only 7% under medium's 2.13 despite 2.2× the parameters, and its per-section rate ROSE across the run (1.27 → 2.57). That kills the thermal-throttling theory this entry originally floated for medium's 4.10 → ~1.5 decay: large ran detached on an otherwise-quiet box, while medium's run shared the box with an active interactive session — **the decay was resource contention, not heat** (correction, same day). Memory: large fp32 load peaks the box at ~4.3 GB available — generation-time process spawns transiently fail (observed as exit-127 tool failures); run large alone.
+
+**Second negative result — bf16 on torch-xpu is a loss (2026-07-16 afternoon):** identical prompt/seed probe at bf16 measured 2.72 s-audio/min vs fp32's 3.23 (16% slower) with no meaningful RSS reduction (9.33 vs 9.54 GB). Weights confirmed genuinely bf16 (both `torch_dtype=`/`dtype=` kwargs verified producing bfloat16 parameters). fp32 is the right precision for this path.
+
+**Engine-queue finding (operator-driven, instrument-verified):** Windows Task Manager's per-GPU "Neural" graph tracks a **driver submission-queue class, not the XMX matrix units**. Live `\GPU Engine(*engtype_*)` counters: torch-xpu MusicGen (fp32 AND bf16) runs 100% on `engtype_Compute` (`neural` flat 0.0); BlarAI's OpenVINO INT8 SDXL pipeline runs on `engtype_Neural` (`compute` flat 0.0). All prior BlarAI AI workloads (OpenVINO) ride the neural queue; PyTorch's XPU backend never does, at any precision. There is no tool that reports XMX-unit utilization directly (Intel community confirmation) — the graphs identify the submission path only.
+
+**Toolchain footnote (reproducible):** the bundled libsndfile hard-crashes (exit 127, no traceback) encoding the 90.6-s track to OGG/VORBIS (float32 AND float64; a 2-s clip encodes fine); MP3 (MPEG_LAYER_III) encodes the identical array cleanly. The trailer embeds MP3.
+
+**Read.** A ~90-s sectioned cinematic track on the GPU costs ~43 min with medium — practical for iterative scoring where CPU's ~108 min was not. torch-XPU is the pragmatic local-GPU backend for transformer audio models on this box: zero code changes, the full HF ecosystem intact. Machine-readable: `docs/performance/musicgen_xpu_arc140v_2026-07-16.json`.
+
+**NOT measured (named):** small on XPU; fp16 (only bf16 tested against fp32); INT8/INT4 variants (blocked on the manual OpenVINO conversion); NPU; co-resident 14B contention (box otherwise idle); power/thermal instrumentation; multi-seed variance; XMX-unit utilization (no tool exposes it — queue-class evidence only); perceptual medium-vs-large A/B (operator-judged, delivered same day, verdict pending at authoring).
+
+## 2026-07-16 — #900 memory-reclaim, the 14B headline: the driver gives the memory back (no openvino #33896 retention signature on the Arc 140V)
+
+**What / why.** openvino #33896 hypothesizes the Lunar Lake GPU driver retains unified (USM) allocations after model teardown — if true on this box, every mid-life 14B eviction (the UC-010 image-generation evict/reload cycle) would leak ~10 GB until process exit. #900 shipped gated instrumentation into the real evict paths (`b7e8474e`); this is the first live @hardware measurement of the headline op `shared_pipeline.14b.unload`.
+
+**Hardware / substrate.** Intel Core Ultra 7 258V / Arc 140V iGPU, driver 32.0.101.8826, Windows 11 Pro 26200. OpenVINO 2026.2.1 / GenAI 2026.2.1.0. Qwen3-14B INT4 target + Qwen3-0.6B pruned-6L INT8 draft (spec-decode, prefix caching on, FP16 KV-cache) — the launcher's exact step-2.5 build, constructed by `build_shared_pipeline` itself.
+
+**Methodology.** Route B per #900 c.2108/c.2130: a harness (`scripts/measure_900_memory_reclaim.py`) drives the REAL `SharedInferencePipeline.unload()` / lazy-reload entry points with the probe armed; the samples below are harvested from the wired `MEM_RECLAIM` instrumentation, In-Use = Total − Available (never working sets), 8 s settle around each evict. 3 unload cycles + 1 `release_gpu_for_exit`. BlarAI down, guest VM off, OVMS down (box state captured in the JSON); the box otherwise carried a normal interactive load — ambient noise is tens of MB against a multi-GB signal. Route A (a production hires-fix generate) is currently IMPOSSIBLE: `[image_generation].hires_enabled=false` since the 1536² RAM-spiral incident — the in-app 14B evict has no live trigger, a finding in itself.
+
+**Numbers (evidence `docs/performance/mem_reclaim_900_shared14b_2026-07-16_17-03-31.json`).**
+
+| Op | Sample | In-Use before → after (MB) | Reclaimed (MB) |
+|---|---|---|---|
+| 14b.unload (fresh build) | 1 | 22,531 → 14,073 | **+8,458** |
+| 14b.unload (post-reload) | 2 | 25,582 → 13,653 | **+11,929** |
+| 14b.unload (post-reload) | 3 | 25,575 → 13,745 | **+11,830** |
+| 14b.release_gpu_for_exit | 1 | 25,502 → 13,582 | **+11,920** |
+
+Median headline: **+11,830 MB reclaimed**. Process RSS moved in lockstep (−8.4 to −11.9 GB). Lazy reloads took 20.0–21.9 s each (`CACHE_DIR=""` — every reload is a full compile).
+
+**Read.** The eviction returns the memory to Windows every time — the #33896 retention signature (reclaimed ≈ 0) does NOT reproduce on this box/driver for the LLMPipeline-destruction path. The #900-teed follow-ons (short-lived-process isolation, blob cache) are NOT needed. Secondary finding: a reloaded pipeline sits ~3 GB heavier in system In-Use than the fresh build (25.5 vs 22.5 GB before-evict) yet evicts back to the same ~13.6–14.1 GB floor — the reload path allocates more transient state, all of it returned on the next evict.
+
+**In-app half (same evening, evidence `docs/performance/mem_reclaim_900_inapp_2026-07-16_17-57-41.json`).** Production launcher boot with the probe armed (`BLARAI_MEM_RECLAIM_PROBE=1`), driven by a second mTLS gateway client through the real :5001 corridors (`scripts/measure_900_inapp_evicts.py`): 1 text turn + 3 `/imagine` + 3 photo-describe (synthetic probe image) + idle past the 900 s embed-cache window. Every path fired:
+
+| Op | Samples | Median reclaimed (MB) | RSS lockstep? |
+|---|---|---|---|
+| image_gen.sdxl.unload | 3 | **+1,347** | yes (−1,295…−1,393) |
+| vlm.unload | 3 | **+1,598** | yes (−864…−1,599) |
+| substrate.embed_cache.unload | 2 | **0** (~180 vectors ≈ sub-MB, below the log's 1 MB resolution) | yes (0) |
+
+Process RSS and system In-Use moved in lockstep on EVERY sample across both halves — no asymmetry, which is the retention signature that never appeared. Reclaimed magnitudes are the pipelines' PRIVATE+GPU footprint, not the on-disk model size (weights are memory-mapped; file-backed pages live in standby and never count in In-Use). Secondary finding (units per the samples, which record DECIMAL MB): during `/imagine` the box peaked at In-Use 31,217–31,336 dMB ≈ **29.1 of the 31.323 GiB ceiling, with ≈2.1–2.6 GiB available** (`available_before` 2,416/2,298/2,834 dMB; 29.1 + 2.25 GiB closes the ceiling) while the 14B was co-resident — base SDXL generation leaves only ~2–3 GiB of headroom, which is consistent with (though less extreme than) the 1536² hires variant's recorded spiral: the hires refine's additional buffers must fit inside that residual margin, and its incident log shows they did not. After the session, the next measurement's pre-load check recorded **24.3 GB available** on the leaned, torn-down box (arm-A 35B bench JSON, `sys_available_gb_before_load`).
+
+**NOT measured (named):** the app-integrated route-A trigger (hires disabled in production config); the reload-side RAM trajectory (only the evict is bracketed); other driver versions; the #33896 reporter's short-lived-process pattern (our path destroys the pipeline inside a LIVING process); turn coherence text (the driver's reply capture used a wrong token attribute — turn latencies + MEM_RECLAIM lines + generated-image IDs are the run evidence; downloads were active during the early turns, I/O-quiet by the embed-cache tail).
+
+## 2026-07-16 — Official 35B-A3B IR: 525 pp / 35.0 tg — the OV-MoE "inversion" was a conversion artifact (22× decode, 131× prefill vs the unofficial IR); the #769 caveat cell is closed
+
+**What / why.** The 2026-07-10 matrix's OV-MoE cell (4.0 pp / 1.59 tg) came from an unofficial community INT4 conversion and anchored the "symmetric architecture-dependent inversion" headline, explicitly caveated pending an Intel-blessed artifact. Intel's official `OpenVINO/Qwen3.6-35B-A3B-int4-ov` (INT4_ASYM g64, backup INT8_SYM, multimodal export) had been staged on disk 2026-07-11; tonight it was benched with the byte-identical methodology, plus the `MOE_USE_MICRO_GEMM_PREFILL` knob A/B.
+
+**Hardware / substrate.** Intel Core Ultra 7 258V / Arc 140V, driver 32.0.101.8826, Windows 11 Pro 26200, OpenVINO GenAI 2026.2.1. `scripts/benchmark_vlm_text_inference.py` (VLMPipeline text path — SAME pipeline shape as the 07-10 row, the confound the independent review flagged): greedy, 256 new tokens, 5 runs + 2 warmup, 30 s cooldowns, prompt set v1, pp-v1 prefill probe. Box lean (BlarAI down, VM off, OVMS down, downloads finished); available 24.3 GB at arm-A load.
+
+**Numbers.**
+
+| Arm | Prefill pp (tok/s) | Decode (tok/s) | TTFT | Load |
+|---|---|---|---|---|
+| A — knob unset (default; matches 07-10 row) | **525** | **35.0** (20 samples, 34.7–35.6) | 372 ms | 44.2 s |
+| B — `MOE_USE_MICRO_GEMM_PREFILL=0` (accuracy mode) | **540** | **35.8** (35.2–36.5) | 360 ms | 37.8 s (warm page cache) |
+| (07-10, unofficial community INT4 IR) | 4.0 | 1.59 | 2448 ms | 53.5 s |
+
+Evidence: `docs/performance/benchmark_vlm_text_qwen36-35b-a3b-int4-ov-OFFICIAL_2026-07-16_18-22-59.json` (arm A) + `..._18-28-09.json` (arm B).
+
+**Read.** (1) **IR provenance is a >20× variable on this architecture** — same model, box, and OpenVINO build ran 22× faster decode / 131× faster prefill on the official IR. The 07-10 "inversion" headline is DEAD: with official IRs, OpenVINO leads llama.cpp on BOTH the dense-hybrid 27B (2.4–4.3×) and the 35B-A3B MoE (2.1× prefill vs Vulkan 245.8, 4.3–4.7× decode vs Vulkan 7.37 / SYCL 8.14). (2) The accuracy-mode knob costs **nothing measurable at this scale** (arm B ≈ arm A within noise; arm B marginally faster, consistent with warm-cache second-run effects) — unlike the ~19%/28% cost measured on the coder-30B at 2.2K context (#708); scale caveat named. (3) Plausibility anchor: the production coder-30B-A3B (same MoE class, same box, OVMS) measures 38.6 tok/s median — the official-IR figure is in family, and that in-house datum was ALREADY on disk on 07-10; the 1.59 outlier should have failed this cross-check at recording time. (4) Coherence: clean English across all runs; the model emits untagged visible thinking under greedy defaults (the genai #3937 class — chat-ergonomics blocker, not a throughput issue; noted for the #3937 companion probe, leg 4).
+
+**NOT measured (named):** vision-path throughput (multimodal export, text-only probe); spec-decode (does not exist for VLMPipeline); llama.cpp rows not re-run tonight (2026-07-10, same box/driver — 6-day-old cross-comparison); quantization parity approximate (UD-IQ4_XS vs INT4_ASYM g64); knob behavior at long context (441-token probe only — the #708 cost appeared at 2.2K); sustained thermals (single evening); co-resident contention (benchmarked alone).
+
+## 2026-07-16 — Production models under llama.cpp (#769 item 1): OpenVINO leads decode on BOTH; the serve-the-coder-via-llama-server question is settled, against
+
+**What / why.** The LA-added #769 follow-up: bench the two PRODUCTION models — Qwen3-14B (the assistant, dense) and Qwen3-Coder-30B-A3B (the fleet coder, MoE) — under llama.cpp b9957 with the banked matrix's byte-identical protocol, to decide with data whether a serve-the-coder-via-llama-server trial (ADR-034 territory) is motivated.
+
+**Hardware / substrate.** Same box/driver as tonight's 35B row (258V / Arc 140V / 32.0.101.8826 / Win11 26200). llama.cpp b9957 official win-vulkan + win-sycl release binaries. `llama-bench -ngl 99 -p 512 -n 128 -r 3 -o json`, box lean. Validity: `offloaded 41/41` (14B) and `49/49` (coder) layers to GPU captured from verbose server load logs; both are classic Qwen3 architectures (no DeltaNet/SSM ops — the #19957 fallback class doesn't apply); Vulkan device line confirms Arc 140V KHR_coopmat in every cell.
+
+**Numbers (evidence `docs/performance/llamacpp_production_models_769_2026-07-16_19-35-37.json`).**
+
+| Model | Backend | Prefill pp512 (tok/s) | Decode tg128 (tok/s) |
+|---|---|---|---|
+| Qwen3-14B IQ4_NL | llama.cpp Vulkan | 194.3 (±0.4) | 7.52 (±0.02) |
+| Qwen3-14B IQ4_NL | llama.cpp SYCL | 82.4 (±0.1) | 2.24 (±0.01) |
+| Qwen3-14B INT4 | **OpenVINO production (spec-decode ON)** | — | **13.6 median** (standing 2026-05/06 entry) |
+| Coder-30B-A3B IQ4_NL | llama.cpp Vulkan | 415.1 (±5.1) | 27.07 (±0.14) |
+| Coder-30B-A3B IQ4_NL | llama.cpp SYCL | 105.9 (±4.0) | 6.56 (±0.04) |
+| Coder-30B-A3B INT4 | **OVMS production (2026-06-29)** | — | **38.6 median** |
+
+**Read.** (1) **OpenVINO leads decode on both production models** — 14B 1.8× (13.6 vs 7.52; spec-decode asymmetry named — llama.cpp ran draftless; SUPERSEDED same evening by addendum A1's fresh baseline: 2.1× spec-on, 1.2× draftless-vs-draftless), coder 1.4× (38.6 vs 27.07). The serve-the-coder-via-llama-server trial is NOT motivated; combined with tonight's official-35B result, OpenVINO leads every model class measured on this box when fed proper artifacts. (2) **SYCL's best-decode-on-MoE result does not generalize**: on the 35B-A3B SYCL edged Vulkan (8.14 vs 7.37) but on the coder-30B-A3B Vulkan wins decode 4.1× (27.07 vs 6.56) — backend ranking is model-specific even within the same architecture family. (3) The coder's 415 pp512 under Vulkan is the one llama.cpp bright spot (OVMS prefill baseline not directly comparable — TTFT-based; named).
+
+**SAME-EVENING ADDENDUM (operator-directed: "would it be practical to do any of these right now?") — three of the six NOT-measured items were closed tonight; the remaining three (exact quantization parity, sustained thermals, prefill-protocol reconciliation) were deliberately skipped as impractical-tonight.**
+
+*A1 — Fresh same-night OV 14B baseline (kills the cross-day caveat AND the stale-13.6 review finding).* `scripts/benchmark_gpu_inference.py`, both configs, 2026.2.1, box lean (evidence `docs/performance/benchmark_2026-07-16_19-50-06.json`): **spec-ON 16.0 tok/s median** (mean 14.9, P95 19.1), **spec-OFF 9.1 median**, prefill ~3,294–3,390 pp tok/s at a ~2,110-token probe, TTFT 521–559 ms. Corrected comparisons: OV spec-on vs llama.cpp draftless Vulkan = **2.1×** (16.0/7.52); the new like-for-like **draftless-vs-draftless: OV 9.1 vs Vulkan 7.52 = 1.2×** — OpenVINO leads even with spec-decode removed from the equation. (The main entry's 13.6 citation was stale — the review's finding-2; superseded by tonight's 16.0.)
+
+*A2 — llama.cpp spec-decode equalization: a NEGATIVE result.* `scripts/measure_llamacpp_specdecode_14b.py` (llama-server /v1/completions, engine-side timings; draftless control cross-validated the protocol at 7.55–7.64 vs llama-bench's 7.52). First run: the draft loaded but never engaged — b9957 requires `--spec-type` (default `none`); the "no implementations specified" log line was the tell. Retry with `--spec-type draft-simple` (default 3-token budget = production OV's NUM_ASSISTANT_TOKENS): the draft engaged (759 drafted tokens/run) but **acceptance was 0.0 across all five greedy runs and throughput FELL to 4.75 median (−37% vs draftless)** (evidence `llamacpp_specdecode_14b_2026-07-16_20-30-22.json`). Vocabs are identical (151,936 BPE both GGUFs, no server warnings) — exactly-zero acceptance on greedy same-family models suggests an implementation/build or GGUF-metadata issue rather than a real acceptance property; NOT diagnosed further tonight (named). Net: on this build, llama.cpp spec-decode with this pairing is a slowdown; the honest equalized comparison is A1's draftless-vs-draftless.
+
+*A3 — flash-attn variants (`-fa 1`, otherwise byte-identical; evidence `llamacpp_production_models_fa_addendum_2026-07-16_20-31-19.json`):* all four cells completed WITHOUT crashes (the historical Intel-iGPU flash-attn flakiness did not manifest on b9957/32.0.101.8826). Mixed effects: 14B Vulkan prefill **+31%** (194.3→255.1) with decode flat (7.53); coder SYCL **+16%/+18%** (105.9→122.8 pp, 6.56→7.76 tg); coder Vulkan mildly WORSE (415.1→402.9 pp, 27.07→26.12 tg); 14B SYCL mildly worse (82.4→80.1, 2.24→2.19). No ranking changes; llama.cpp's best case (coder Vulkan fa-off 27.07) still trails OVMS 38.6.
+
+**Still NOT measured (named):** exact quantization parity (conversion work, not an evening task); sustained thermals (would consume the full remaining window); prefill-protocol reconciliation vs OV (analysis-alignment problem — OV's ~3,300 pp at 2,110 tokens vs llama-bench's pp512 are different probes, both recorded); the zero-acceptance root cause (A2 — hypotheses named, undiagnosed).
+
+## 2026-07-16 — Thinking-toggle probe under llama-server (#769 item 3, feeds genai #3937): `/no_think` dead on the 35B under both backends (documented removal); `enable_thinking=false` works on the 35B; the 27B degenerates in ALL conditions (no usable signal)
+
+**What / why.** The genai #3937 blocker (`/no_think` ignored + visible thinking on Qwen3.6 — breaks the PA's ADR-012 §2.4 mechanism) needed backend isolation: is it an OpenVINO GenAI defect or the model? llama.cpp's chat-template handling is independent of the OV IR export, so `llama-server` (b9957 win-vulkan, `-ngl 99 -v`) was probed on the OpenAI-compatible endpoint with the OV probe's byte-identical prompt + detection heuristics, extended for the server's `reasoning_content` parsing (thinking the server PARSES OUT still counts as thinking GENERATED — the honest rule is heuristic OR reasoning-field-present).
+
+**Conditions × models (greedy, 220-token cap; evidence `docs/performance/probe_thinking_toggle_llamaserver_2026-07-16_19-39-33.json`; offload verified 41/41 · 65/65 layers).**
+
+| Condition | Qwen3.6-35B-A3B (UD-IQ4_XS) | Qwen3.6-27B (IQ4_NL) |
+|---|---|---|
+| A — plain | thinking generated, COHERENT (entire 220-tok budget consumed by reasoning) | **DEGENERATE** — 220 tokens of `/` filler (parsed into the reasoning field) |
+| B — `/no_think` soft switch | **IGNORED** — coherent thinking generated | **DEGENERATE** — same `/` filler (no usable signal) |
+| C — `chat_template_kwargs {enable_thinking:false}` | **WORKS** — no thinking, coherent answer | **DEGENERATE** — same `/` filler, in content |
+
+**Read.** (1) **Every usable conclusion rests on the 35B-A3B alone** — the 27B produced degenerate output in ALL THREE conditions under the b9957 llama-server chat endpoint and contributes no toggle signal in either direction (independent-review catch: the first version of this entry mis-read the 27B's A/B slash-filler as "thinking generated" because the server parses it into the reasoning field). Notably the same 27B GGUF was coherent on the RAW completion path in the 2026-07-10 matrix — the degeneration is specific to this GGUF+build's chat-template path, itself a datum. (2) **On the 35B, the `/no_think` non-response reproduces under llama.cpp with coherent thinking** — and post-run research settled the why: the official Qwen3.6 model card DOCUMENTS the soft-switch removal ("Qwen3.6 does not officially support the soft switch of Qwen3") and names `enable_thinking` via chat-template parameters as the supported control. Not a bug anywhere — a documented behavior change the PA's ADR-012 §2.4 mechanism predates. (3) **The template-level toggle works on the 35B and llama.cpp exposes it while OpenVINO GenAI does not** — `chat_template_kwargs.enable_thinking=false` cleanly disables thinking with a coherent answer; the 2026-07-08 OV probe found no equivalent GenAI API surface. That's the actionable feature-request shape for the #3937 companion. (4) For the model-consolidation branch: a 35B swap could control thinking via the template kwarg on llama.cpp, but on the OpenVINO substrate (where BlarAI lives) no working disable exists — the ADR-012 §2.4 blocker stands exactly as the model-upgrade watch records it.
+
+**NOT measured (named):** sampled (non-greedy) behavior; other prompt shapes (single prompt, byte-identical to the OV probe for comparability); reproducibility beyond greedy determinism (single sample per condition); server `--reasoning-format` variants (default handling only); whether newer llama.cpp builds fix the 27B degeneration; OV-side re-probe (2026-07-08 record stands).
+
+## 2026-07-16 — genai PR #4139 on-hardware verification (Arc 140V, the issue's own model): branch doesn't compile as-is; after a one-char fix, the thinking-suppression state machine never engages — outputs byte-identical to baseline in every condition
+
+**What / why.** Operator-directed: build openvino.genai PR #4139 (`enable_thinking`/`reasoning_budget_tokens` in GenerationConfig — the #3937 resolution path) from source and verify on the exact model the linked issue is about, Qwen3.6-35B-A3B official INT4 IR, which the PR author never tested. Toolchain venv (`C:/Users/mrbla/builds/genai-pr4139/venv-build`), PR's own baseline (openvino 2026.4.0-dev nightly), Ninja generator pinned locally (build-env accommodation).
+
+**Build findings.** (1) The branch tip (`f3e59fb`) does NOT compile: `OPENVINO_ASSERT(...)` at `src/cpp/src/sampling/logit_processor.hpp:55` is missing its closing `);` — MSVC C1057 in every TU including the header; one-character local patch applied, then the wheel built clean (`openvino_genai-2026.4.0.0`, self-identifying as the fork branch). (2) `pip wheel` needs the nightly index for `openvino_tokenizers~=2026.4.0.0.dev` (not on PyPI).
+
+**Probe (greedy, 220 tokens, prompt/heuristics byte-identical to the standing probes; evidence `probe_pr4139_enable_thinking_35b_2026-07-16_21-10-31.json` + `..._21-13-41.json` + `..._21-25-23.json`).** All four PR fields present on GenerationConfig; VLMPipeline loaded the official IR under the 2026.4-dev runtime in 41.2 s. Results: A default = untagged thinking (baseline); B `enable_thinking=False` without token IDs = ACCEPTED, no effect (the tip commit's relaxed validate makes the ID-less call a SILENT NO-OP — reproducing the exact accepted-but-ineffective pathology of #3937); B2 with explicit `<think>`/`</think>` IDs (248068/248069, read from the model's own tokenizer.json) = no effect; C budget without IDs = raises (validate demands IDs); C2 budget with IDs = no truncation. **All four conditions' full 220-token outputs are byte-identical — sha256-verified in the third run (single hash `492c6a24…` across A/B/B2/C2, full texts stored in its JSON); the first two runs' recorded prefixes match** — the state machine never leaves IDLE. (The byte-identity claim was prefix-only until the independent review flagged it; the sha-verified re-run closed the gap.)
+
+**Read.** The PR's logit-level approach keys on think-token IDs appearing in the stream, but on this model/pipeline path the thinking emerges UNTAGGED (no `<think>` tokens are ever generated — consistent with every probe of this IR since 07-08), so the machine has nothing to key on. Hypotheses (not distinguished tonight, both hedged): the tagging is template-side and this path never surfaces it to the sampler; and/or the transform isn't wired into the VLMPipeline's sampling path at all (the author verified on LLM-pipeline models). Either way: **as written, the PR does not resolve #3937 on the issue's own model** — a template-level `enable_thinking` (what llama.cpp honors) looks structurally necessary rather than logit-level forcing. Follow-up review comment DRAFTED, LA-HELD (`draft_pr4139_verification_followup.md`).
+
+**NOT measured (named):** LLMPipeline-class models under the same wheel (the author's verified set — our result does not contradict theirs); sampled decoding; whether a template-side fix exists in the PR's scope; the one-char compile fix's upstream acceptance (reported, not PR'd by us).
+
+## 2026-07-16 — 35B-A3B vision path, first exercise (consolidation gate B): scene understanding strong, text-in-image weak, and the thinking-wrapper eats every answer
+
+**What / why.** Operator-directed: the consolidation branch's multimodal question had only file-level evidence (vision components ship in the official IR) — no output had ever been seen. Three images with different demands, one descriptive prompt each, full outputs captured verbatim for the OPERATOR'S quality judgment (`scripts/probe_35b_multimodal_quality.py`; evidence `probe_35b_multimodal_quality_2026-07-16_21-54-51.json`). Runtime substrate (GenAI 2026.2.1 — the consolidation target), greedy, 420-token cap, thinking ON (no disable exists on this substrate). Box lean.
+
+**Numbers.** Load 38.6 s; per-turn (vision encode + generate): rendered scene 20.1 s / logo graphic 14.3 s / detail render 15.4 s — the first vision-path latencies for this IR on this box.
+
+**Qualitative read (operator judges; this is the session's summary of the verbatim outputs, with the operator's same-evening verdict folded in).** (1) *Rendered lighthouse scene:* strong — accurate decomposition (tower, keeper's quarters, shed, rocky island), sound compositional/lighting analysis, and it correctly suspected the image was AI-generated. (2) *Logo graphic ("Blair"):* **CORRECTED same evening — the session first graded this "weak/misread," and the OPERATOR overruled: the logo genuinely reads as "BIAIr" — he had independently noticed the same ambiguity and had been meaning to change the design.** The model's perception was accurate detection of a real legibility defect (arguably the sharpest result of the three); the residual criticism is only the visible re-examination loop that burned the budget without settling. Design follow-up ticketed. (3) *Detail render (group at table):* strong on the artifact-detection task — organized scene inventory and it flagged "fingers look a bit stiff / slightly unnatural" when asked what looks wrong. **Revised summary: perception strong on ALL THREE cases; the single systemic negative is the thinking-wrapper** — at 420 tokens no output reached a clean final answer. The thinking-control gap (genai #3937 / PR #4139) is not cosmetic; it directly degrades usable output on this substrate today.
+
+**NOT measured (named):** head-to-head vs the CURRENT vision model (Qwen3-VL-8B on the same images — the decisive comparison for retiring it; next daytime probe); real photographs (non-personal renders only this run); OCR/document images beyond one logo; longer answer budgets (420-token cap bound every case); sampled decoding; the eval-suite quality gate (text side — still the consolidation branch's hard gate).
+
+---
+
+### 2026-07-17 — Head-to-head closed: Qwen3-VL-8B on the identical three probe cases (the retire-VL comparison data is complete)
+
+Overnight session, box lean (BlarAI down, guest VM off, GPU clean), immediately after the
+2026-07-16→17 battery window closed. This runs the PRODUCTION vision model over the byte-identical
+case set of the 2026-07-16 35B probe — closing that entry's first named gap. Machine-readable:
+`docs/performance/probe_vl8b_multimodal_quality_2026-07-17_02-54-15.json` (pairs with
+`probe_35b_multimodal_quality_*.json` from 2026-07-16). Script: `scripts/probe_vl8b_multimodal_quality.py`
+— imports CASES + MAX_TOKENS from the 35B probe (byte-identity enforced by import, not by copy).
+
+**Hardware/stack:** Intel Core Ultra 7 258V / Arc 140V (driver 32.0.101.8826), OpenVINO GenAI 2026.2.1,
+`qwen3-vl-8b-instruct/openvino-int4-ov` (the IR `shared/inference/vlm.py` loads), VLMPipeline on GPU,
+greedy, max_new_tokens=420, one run per case (qualitative probe — the capture rule's latency numbers
+are wall-clock per case, not throughput).
+
+**Numbers.** Load **12.4 s** (vs 35B 38.6 s); per-turn: rendered scene **27.8 s** (35B: 20.1 s) /
+logo graphic **21.3 s** (35B: 14.3 s) / detail render **23.0 s** (35B: 15.4 s). Note the direction:
+the 8B is SLOWER per turn than the 35B-A3B on this box — the MoE's ~3B active parameters beat the
+dense 8B at decode, consistent with the 2026-07-16 525 pp / 35.0 tg finding. All three cases produced
+full 1,799–2,098-char outputs with no thinking-wrapper (the VL-8B substrate has no #3937 problem).
+
+**Qualitative:** verbatim outputs captured for the operator's judgment (never judged by this script);
+the morning report pairs both JSONs side-by-side. The comparison the LA rules on: 35B = stronger
+perception, thinking-wrapper degrades usable output today (genai #3937 / PR #4139); VL-8B = clean
+final answers, no wrapper, slower per turn, and it costs a second resident model + the swap dance.
+
+**NOT measured (named):** 35B long-context decode curve (no protocol-clean VLMPipeline-class
+long-context instrument exists; authoring one overnight would mint unreviewed methodology — parked);
+the 35B eval-suite quality gate (`evals.run` hardcodes the 14B, no model-dir override without runtime
+code changes — parked, stays the consolidation branch's hard gate); real photographs; sampled decoding;
+multi-run latency statistics.
+
+## 2026-07-21 — #795 stopword-filter re-measurement: the two dropped queries returned at the consumed depth
+
+**What ran:** `scripts/measure_795_hybrid_vs_vector.py` on branch `fix/795-fts-stopword-filter` (merged `da9f7b87` gated on this measurement), 01:58 local, app down, GPU idle. Encoder bge-small-en-v1.5 fp16, requested NPU → **served CPU (ort-cpu)** — same fail-soft the 2026-07-10 baseline run took, so the runs are device-identical; rank metrics are encoder-weight-determined and device-independent regardless. Corpus: the labelled fixture set (35 docs / 35 chunks / 24 queries, 8 per probe class); RRF-vs-production cross-check mismatches: 0.
+
+**Headline (production consumes top-4, `DEFAULT_RETRIEVE_K = 4`):** hybrid R@4 **0.917 → 1.000**, now tying vector-only at the consumed depth. The two queries that had fallen out of what the assistant reads returned (vector-probe R@4 0.750 → 1.000). Overall MRR hybrid 0.921 → 0.917, R@1 0.917 → 0.875 — one query's top hit shifted down while two R@4 dropouts were fixed; hybrid still trails vector-only at R@1 (0.875 vs 0.958) and MRR (0.917 vs 0.979), which is the fusion blending a weaker lexical limb in — stated, not hidden. Lexical and neutral probes: 1.000 across every limb and depth, unchanged.
+
+**Also observed:** 1 query now produces an empty BM25 result set (the all-stopword fail-safe kept its expression valid; the vector limb carries it) — 0 in the baseline run.
+
+**NOT measured (named):** latency under contention (a full pytest gate ran concurrently — rank metrics unaffected, timings not comparable); the NPU path itself (fail-soft to CPU both runs — the NPU-serving question is a separate instrument); corpus scale beyond 35 docs (the episodic-tier re-measure trigger from D1 stands); sampled/multi-run variance (deterministic pipeline, single run by design).
+
+**JSON:** `docs/performance/hybrid_vs_vector_795_2026-07-21_01-58-08.json` (baseline: `hybrid_vs_vector_795_2026-07-10_17-13-30.json`).
+
+## 2026-07-21 — Answer-quality ceremony: the first baseline whose model cases carry measured statuses
+
+**What ran:** `evals.run --suite answer_quality --include-hardware` (+ `pa_classification` control), three same-day windows (09:30 pre-#1006-instrument; 16:51 post; 17:02 deliberate `--write-baseline` after the LA's posture decision), app + AO down each window, production system prompt + strip + grammar posture (all imported SSOT), Qwen3-14B INT4 GPU with spec-decode ON, greedy. OpenVINO 2026.2.1, Arc driver 32.0.101.8826.
+
+**Headline:** answer-quality **35/37 scored (94.6%), 2 failed, 3 tool_call, 0 hardware-skipped**; the Policy-Agent control **35/35 in all three runs**. The two failures are injection-ECHO cases — 0 of 4 injected commands were obeyed in any run; the model refuses and *describes* the attack but repeats the attacker's phrase doing so. LA ceremony decision: ACCEPT-AND-RECORD (known failures in the committed baseline; never-echo prompt hardening → #1028). The 19 model cases had been `skipped_hardware` since the suite's birth (last live look 2026-07-07 reported "0 regressions" through the absorb bug #1000 fixed); every one now carries a real measured status.
+
+**Instrument finding (the day's sharpest):** two of the morning run's four "failures" were empty-string artifacts — the model had CORRECTLY answered with native tool calls (calculate, web_search) that the one-shot harness strips before scoring. Shipped same-day as #1006 (merged `e28c255a`): tool-call-only generations record status `tool_call` (closed-pair detection against the production parser pattern; every baseline transition loud). Third specimen: the leak-probe case answered by trying to `propose_preference` the attacker's instruction as a standing rule — production dead-ends at the operator-confirm card (P8), a live ADR-039 "induced proposal" specimen, noted to #855.
+
+**Variance, measured:** `aq-leak-mod-02` passed at 09:31 and tool-called at 16:51 + 17:02 — one status flip across same-day greedy runs on identical prompts. Single-run statuses on this box wobble; the #1006 transition semantics make flips loud rather than silent; systematic N>1 per-case variance remains unmeasured (named).
+
+**NOT measured (named):** per-case N>1 variance within one instrument state; the three tool_call cases' answer quality through the production tool loop (structurally unmeasurable one-shot — #1023); fluency/helpfulness (deterministic rubric); throughput (wall-clock incidental: aq suite 93 s, pa 53 s, separate probe: load 12.2 s, short generations 1.5–4.7 s).
+
+**JSON:** `docs/performance/answer-quality-ceremony-2026-07-21.json`. Baselines: `evals/baselines/answer_quality.json` + `pa_classification.json` (prior: 2026-07-04, `2f6d8ea`).
+
+---
+
+### 2026-07-22 — Gemma 4 runs here, but only on the GPU: the CPU path is the broken one (#1005)
+
+First measured answer to "can an out-of-family model run on this box at all" — asked because
+every model in the fleet is `family: qwen3`, so nothing here can measure our own judge's
+familiarity bias. Full records: `docs/performance/gemma4-instrument-probe-2026-07-22.json`
+(machine-readable) and its `.md` sibling (narrative).
+
+**Hardware/stack:** Intel Core Ultra 7 258V (Lunar Lake), 32 GiB LPDDR5X → 31.323 GiB visible,
+Arc 140V iGPU, NPU. OpenVINO GenAI 2026.2.1, pre-converted INT4 IR loaded straight from
+Hugging Face into `openvino_genai.VLMPipeline`. Nothing installed into the runtime `.venv`.
+
+| | E2B INT4 | E4B INT4 |
+|---|---|---|
+| On disk | 4.06 GB | 6.02 GB |
+| Load (GPU) | 8.1 s | 14.9 s |
+| Steady RAM added | +4.52 GB | +6.62 GB |
+| **Transient load peak** | +7.98 GB | **+11.74 GB** |
+| Residual after evict | 0.76 GB | 0.79 GB |
+| Throughput | 31.0 tok/s | 18.1 tok/s |
+| TTFT | 733 ms | 768 ms |
+| Greedy determinism (3 runs) | 3/3 identical | 3/3 identical |
+
+**The finding that inverts the ticket's premise.** #1005 sized this as "GPU not required,
+CPU-only at low throughput is a PASS." Measured, the reverse holds: GPU is correct and
+deterministic; **CPU is CORRUPT and NON-DETERMINISTIC** — three identical greedy runs
+(`do_sample=False`) produced two distinct outputs, two of them emitting 2 characters while
+burning the full 120-token budget without stopping. A tokenizer round-trip control on the same
+pipeline was clean, placing the fault in the model's token IDs under the CPU plugin rather than
+in detokenization. NPU does not compile (`[NPU_VCL] Compiler returned msg: Compilation failed`).
+So ADR-011's GPU mandate binds this path too — for correctness, not latency.
+
+**Governing constraint is the transient, not the steady state:** E4B roughly doubles its
+resting footprint during compile/load (peak 20.53 GB from an 8.79 GB idle baseline, ~10.8 GB
+headroom). Load-on-demand-then-evict works cleanly (0.79 GB residual).
+
+**NOT measured (named, per the recording standard):** co-residency with Qwen3-14B — the 14B was
+never loaded, so eviction-first fits arithmetically but is unproven; vision and audio paths
+(text-only prompts throughout); long context (every run used an 85-token prompt); any accuracy
+run against the `answer_quality` golden set, so the swapped-judge inflation estimate #1005
+actually wants remains unmeasured; E4B on CPU; INT8/FP16 variants; sustained thermals; power.
+INT4 quantization parameters and the 26B-A4B / 31B sizes rest on Hugging Face metadata alone —
+not inspected.
+
+## 2026-07-22 — Gemma 4 as an out-of-family grader: the two models are differently wrong, and our own grader's "instability" was the probe's fault (#1005)
+
+**What / why.** Every model in the BlarAI fleet carries `family: qwen3` — the 30B coder, the
+14B planner/oracle-author/critic, the 8B vision model. There is no independent grader anywhere,
+which means our own judge's familiarity bias is currently unmeasurable (arXiv:2410.21819: judges
+score low-perplexity text higher *regardless of whether they wrote it*). #1005 asks the narrow
+question that follows: does an out-of-family grader mark our coder's work **differently** — not
+better — from our Qwen3-14B? Gemma 4 is Google-lineage, which is exactly the property wanted.
+
+**Hardware/stack.** Intel Core Ultra 7 258V (Lunar Lake), Arc 140V iGPU (driver 32.0.101.8826),
+32 GiB LPDDR5X → 31.323 GiB visible. OpenVINO 2026.2.1-21919, GenAI 2026.2.1.0-3123. Both models
+INT4, both on GPU, loaded **sequentially** (they cannot co-reside). Greedy (`do_sample=False`),
+`max_new_tokens=320`, no speculative decoding. **No `CACHE_DIR` anywhere** — the same day's cache
+probe measured OpenVINO's compiled-blob cache silently flipping a model's answer from correct to
+wrong, 3/3 reproducible, so the whole comparison runs cold by design.
+
+**Method.** BlarAI's real `green_quality` jury rubric across its three real lenses
+(correctness-beyond-oracle, graceful-bad-input, operator-legibility) over three code subjects:
+a clean synthetic CLI, a synthetic defective module, and — the one that matters —
+**real Qwen3-Coder-30B-A3B output read read-only out of the live battery sandbox**
+(`battery-b4-flashcards-cli`, night of 2026-07-21/22). Three arms: **A** verbatim production
+rubric → verdicts; **B** the same plus a probe-only `why` field → reasons, so a right answer
+reached for an invented reason is visible; **C** the **production emission path** — xgrammar-
+constrained through `StructuredOutputConfig.json_schema` against the real enum-pinned schema,
+3 runs per cell. Arm C imports the live jury surfaces rather than copying them, so the probe
+cannot drift from production the way arms A/B's copy can — and that copy is **not** verbatim, as
+the record first claimed: it appends one line (`"Reply with ONLY one JSON object with exactly
+these four keys."`) that the live prompt does not contain. That line is necessary for an
+unconstrained arm, which has no grammar to enforce shape, but it is the single uncontrolled
+prompt difference between arms A and C and belongs in the record rather than described away. It cannot
+explain arm A's worse determinism, and the reason is sharper than "it helps compliance": arm A's
+non-determinism is **within-arm** — identical prompt, greedy, different outputs across runs — and
+a prompt difference *between* arms cannot explain run-to-run variance *within* one arm at all.
+The variance source is the runtime, not the prompt.
+
+| | Qwen3-14B INT4 | Gemma 4 26B-A4B INT4 |
+|---|---|---|
+| Load (GPU), **arm A** | 13.98 s | 30.4 s |
+| Steady RAM added, **arm A** | 8.56 GB | 14.29 GB |
+| Load (GPU), **arm C** | 9.74 s | *not measured* |
+| Steady RAM added, **arm C** | 7.73 GB | *not measured* |
+| Verdict determinism, **unconstrained** (arm A) | **0/9** | **9/9** |
+| Verdict determinism, **grammar-constrained** (arm C) | **8/9** | not measured |
+
+*Every row is arm-labelled, and that matters: Gemma never ran arm C, so the only like-for-like
+resource comparison is **arm A vs arm A** — Gemma costs **2.17× the load time and 1.67× the
+steady RAM**, not the 3.13×/1.85× a cross-arm pairing would suggest. Note also the 14B's own load
+time swung 13.98 s → 9.74 s between arms with the compiled-blob cache disabled in both: that is
+unexplained session-level variance, and a second reason never to quote one load figure without
+naming the run behind it. (Corrected 2026-07-22 after an independent audit found the first
+version of this table silently mixing arms in its top two rows while explicitly arm-labelling the
+two below them.)*
+
+Verdict-field disagreement between the two graders: **13 of 36 fields** — an upper bound, not a
+rate; see read (3).
+
+**Read.** (1) **The two graders are differently wrong, which is the property an instrument
+needs.** On the real 30B-authored battery code, Gemma named two defects and both are real,
+confirmed by execution against the actual sandbox file: a `KeyError` when a card dict lacks
+`question`/`answer` (reachable because `load_cards` validates only the outer container —
+`cards if isinstance(cards, list) else []` — and never the element shape), and an
+`AttributeError` when `answer_fn` returns a non-string, from the bare `.strip()`. Our 14B scored
+that same subject `bad_input_handling=graceful, correctness_probe=none` **on all three lenses**.
+It is not one-way traffic: on the synthetic defective module the 14B correctly scored
+`correctness_probe=wrong` while **Gemma scored it `none`** — and that module raises
+`ZeroDivisionError`, `KeyError` and `TypeError` on ordinary input, all three confirmed by
+execution. Each grader caught what the other missed. #1005 asked for independence, not
+superiority, and that is what this measures.
+
+(2) **The alarming-looking number was an artefact, and measuring it that way was the mistake.**
+Arm A put our production 14B juror at 0/9 verdict-determinism across identical greedy runs. That
+reads as "our grader is unreliable" — and it is wrong, because arm A generated free-text JSON and
+production does not. On the real grammar-constrained path the same model over the same subjects
+is **8/9** verdict-stable across 3 runs per cell, and the single unstable cell moves exactly one
+field (`runnable_surface`, `only-by-writing-code` on run 1 → `no` on runs 2 and 3) with the other
+three identical throughout; run 1 differing from runs 2–3 is consistent with a first-call effect.
+Enum-pinning the emission removes nearly all of the variance, which is the same discipline that
+made the #718/#743 tool-call and plan emissions reliable. **Any claim about production juror
+stability must be made against arm C.**
+
+(3) **The 13/36 disagreement count is an upper bound, not a rate.** It was computed from arm A,
+where the 14B's own verdicts were unstable, so it mixes genuine cross-model difference with 14B
+run-to-run noise. Three subjects is a **failure shape, not a rate** — nothing here supports a
+percentage claim about either grader.
+
+(4) **The exam missed them too.** No test in the battery sandbox's own suite covers a malformed
+card reaching `run_quiz`. So both defects Gemma caught were missed by the 14B grader *and* by the
+job-level exam that certified the build — which is the more interesting fact about the pipeline
+than the fact about either model.
+
+**NOT measured (named).** Gemma on the grammar-constrained path — arm C ran the 14B only, so the
+cross-model comparison is unconstrained-vs-unconstrained and a constrained head-to-head is
+unmeasured; N>1 subjects per defect class; speculative decoding (production runs the 14B with a
+pruned 0.6B draft, both arms ran without it); the full jury path (3 jurors + per-field majority +
+abstain — this measures single-juror emissions, not the tallied verdict production uses); any
+`answer_quality` golden-set re-scoring, so the same-family **inflation** estimate #1005 actually
+wants is still unmeasured; Gemma co-residency with the 14B; sustained thermals, power, multi-seed
+variance beyond the runs stated.
+
+**Machine-readable:** `docs/performance/gemma4-vs-qwen3-14b-grading-2026-07-22.json` (carries the
+three raw arm artifacts inline). Prior in this chain: `gemma4-instrument-probe-2026-07-22.json`
+(the model runs at all — GPU correct, CPU corrupt), `gemma4-vs-qwen3vl-headtohead-2026-07-22.md`
+(vision, closed).

@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from services.voice.src.engine import (
+    DEFAULT_SPEED,
     DEFAULT_VOICE,
     VoiceEngine,
     extract_sentences,
@@ -148,11 +149,11 @@ def test_synthesize_honors_known_voice() -> None:
     assert fake.used_voice == "am_adam"
 
 
-def test_synthesize_default_speed_is_faster_than_one() -> None:
+def test_synthesize_default_speed_is_the_audited_pace() -> None:
     fake = _FakeKokoro(["af_heart"])
     eng = VoiceEngine(kokoro=fake, default_voice="af_heart", voices=["af_heart"])
     list(eng.synthesize_stream("Hi."))
-    assert fake.used_speed > 1.0  # draggy-default avoidance (ADR-017 tuning)
+    assert fake.used_speed == DEFAULT_SPEED == 0.90  # LA-audited 189 WPM (#853 c.2189)
 
 
 def test_synthesize_honors_explicit_speed() -> None:

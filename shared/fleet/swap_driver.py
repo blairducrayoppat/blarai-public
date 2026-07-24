@@ -23,6 +23,7 @@ STRUCTURALLY INERT at teardown ENTRY, so it can never fire during the restore.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import threading
@@ -58,6 +59,10 @@ def _noop_ovms_alive() -> bool:
     new verify-stop branch is SKIPPED by default and the legacy exact-call-list tests stay
     green. The live ``real_ovms_alive`` supplies the real probe."""
     return False
+
+
+def _noop_post_ticket(_scorecard: dict) -> None:
+    """#749 default: no ticket I/O — byte-stable legacy tests, fail-closed specs."""
 
 
 def _noop_void() -> None:
@@ -125,6 +130,14 @@ def _noop_job_oracle(_repo: str, _rel_path: str) -> dict:
     return {"status": "not-run", "evidence": "job oracle unavailable"}
 
 
+def _noop_precheck_job_oracle(_repo: str, _rel_path: str) -> dict:
+    """Default ``SwapOps.precheck_job_oracle`` (#1049) — pre-check unavailable ⇒ an
+    honest ``not-run``, and a not-run pre-check NEVER skips (the wave dispatches
+    normally). Fail-closed by construction: a legacy caller/test that builds a
+    ``SwapOps`` without the live seam gets byte-identical dispatch behavior."""
+    return {"status": "not-run", "evidence": "already-satisfied pre-check unavailable"}
+
+
 def _noop_import_probe(_repo: str, _rel_path: str) -> dict:
     """Default ``SwapOps.run_import_probe`` (#822) — no probe available ⇒ ``ok=None``
     (could-not-run: honest, NON-BLOCKING, mirrors the wave gate's 'none'). INERT by
@@ -171,78 +184,16 @@ def _noop_exec_smoke(_repo: str, _rel_path: str) -> dict:
 # SIBLING while the PARKED task that actually OWNS the missing module was never even a
 # candidate — resolving 0/3 on the 2026-07-12 battery (B2 re-ran ``tokenize``; B4
 # ``implement-data-storage``; B7 ``password-generator-helper``, each a sibling of the
-# real owner). These pure helpers map a module to its owner PRECISELY — by created-file
-# PATH / leaf / exported symbol, by equality (never substring) — so ``_owning_task`` can
-# target the task whose contract produces the module, parked or not.
+# real owner). The pure ownership-key helpers map a module to its owner PRECISELY — by
+# created-file PATH / leaf / exported symbol, by equality (never substring) — so
+# ``_owning_task`` can target the task whose contract produces the module, parked or
+# not. They are SHARED with the plan-time contract-coverage check (which runs in the
+# acceptance layer, an import this module already depends on), so their single home is
+# ``context_pack`` — aliased here for this module's own call sites and its tests.
 
-#: File extensions that are code modules (stripped when normalizing a path/module to its
-#: identity). A dotted python module tail (``app.word_frequencies``) is NOT an extension,
-#: so it survives normalization and is later reinterpreted as a package path.
-_CODE_EXTS = frozenset({"py", "pyi", "js", "mjs", "cjs", "ts", "tsx", "jsx"})
-
-
-def _drop_code_ext(path: str) -> str:
-    """Strip ONE trailing code extension (``.py``/``.js``/``.mjs``/…). Leaves a dotted
-    python-module tail like ``app.word_frequencies`` intact (``word_frequencies`` is not
-    a code extension), so it can be reinterpreted as the package path below."""
-    base, dot, ext = path.rpartition(".")
-    return base if (base and dot and ext.lower() in _CODE_EXTS) else path
-
-
-def _normalize_module_token(token: str) -> str:
-    """A module token / node spec / file path -> forward-slash form, no leading ``./``
-    ``../`` relative prefix, no trailing code extension. (``../src/x.js`` -> ``src/x``.)"""
-    t = str(token or "").strip().replace("\\", "/")
-    while t.startswith("./") or t.startswith("../"):
-        t = t[t.index("/") + 1:]
-    return _drop_code_ext(t.strip("/"))
-
-
-def _module_forms(token: str) -> set[str]:
-    """PRECISE ownership keys for ONE unresolved import token — matched by EQUALITY
-    against a task's created-file forms, NEVER as a substring (the ``app``-substring bug).
-
-    A python dotted module ``app.word_frequencies`` yields the file path
-    ``app/word_frequencies`` and the leaf ``word_frequencies``; a node spec
-    ``../src/unit-converter-helper.js`` yields ``src/unit-converter-helper`` and the leaf
-    ``unit-converter-helper``. Deliberately does NOT emit a bare parent-package token
-    (``app``) — that coarse token is exactly what re-ran a sibling."""
-    t = _normalize_module_token(token)
-    if not t:
-        return set()
-    forms = {t, t.rsplit("/", 1)[-1]}
-    if "/" not in t and "." in t:  # a python dotted module -> its file path + leaf
-        dotted = t.replace(".", "/")
-        forms |= {dotted, dotted.rsplit("/", 1)[-1]}
-    return {f.lower() for f in forms if f}
-
-
-def _create_forms(path: str) -> set[str]:
-    """Ownership keys a task's contract ``creates`` entry answers to: its extensionless
-    path, its leaf basename, and each ANCESTOR PACKAGE directory as a segment-boundary
-    path prefix (so a bare-package import ``flashcard_app`` maps to the task that creates
-    ``flashcard_app/card_manager.py`` — the B4 shape). The package prefixes are whole path
-    segments, NEVER substrings, and a SPECIFIC module import never reduces to a bare parent
-    dir, so they cannot re-introduce the ``app``-substring false match."""
-    t = _normalize_module_token(path)
-    if not t:
-        return set()
-    forms = {t, t.rsplit("/", 1)[-1]}
-    segments = t.split("/")
-    for i in range(1, len(segments)):  # ancestor package dirs: a, a/b, … (+ each leaf seg)
-        forms.add("/".join(segments[:i]))
-        forms.add(segments[i - 1])
-    return {f.lower() for f in forms if f}
-
-
-def _export_symbol(entry: str) -> str:
-    """The bare symbol of a contract ``exports`` signature: ``convertUnit(a, b)`` ->
-    ``convertunit``; ``CardManager`` -> ``cardmanager`` (lowercased for case-insensitive
-    equality)."""
-    s = str(entry or "").strip()
-    for sep in ("(", " ", ":", "="):
-        s = s.split(sep, 1)[0]
-    return s.strip().lower()
+_module_forms = cp.module_forms
+_create_forms = cp.create_forms
+_export_symbol = cp.export_symbol
 
 
 def _owner_match_keys(unresolved: list) -> "tuple[set[str], set[str]]":
@@ -508,6 +459,13 @@ class SwapOps:
     # (internal model swap; the caller does NOT call stop_ovms).
     # Fail-soft; default no-ops so legacy tests are byte-stable and the driver is DORMANT-safe.
     run_critic: Callable[[str, str, str], dict] = _noop_critic
+    # #749 driver-side REPORT leg (wired 2026-07-14 at the LA-present supervised
+    # proof — the seam's named unblock): post the job scorecard to the run's
+    # durable Vikunja ticket. Called OUTSIDE the guarded REPORT sequence, after
+    # the scorecard/summary artifacts are on disk, wrapped by the caller — a
+    # Vikunja stall can only cost this one bounded post, never the teardown.
+    # Default no-op = byte-stable legacy tests + fail-closed pre-#749 specs.
+    post_job_ticket: Callable[[dict], None] = _noop_post_ticket
     # #687 task 2: whether the cross-model 14B critic is ACTIVE this run (BLARAI_ENABLE_CRITIC seen
     # by build_swap_ops in THIS — the swap_driver — process). Surfaced in the progress trail at the
     # critic phase so a DORMANT run is OBSERVABLE; the false-dormant trap is "the env was exported on
@@ -530,6 +488,16 @@ class SwapOps:
     # (repo, oracle_rel_path) -> {"status": "passed"|"failed"|"not-run", "evidence": str}
     # — the job-level oracle on the final integrated tree (W4; restore-before-grade).
     run_job_oracle: Callable[[str, str], dict] = _noop_job_oracle
+    # (repo, oracle_rel_path) -> {"status": "passed"|"failed"|"not-run", "evidence": str}
+    # — #1049 the already-satisfied PRE-CHECK: the SAME restore-before-grade job-oracle
+    # instrument, run against the CURRENT integrated tree BEFORE a wave dispatches, so
+    # work a prior wave already delivered is recorded as an honest SKIP instead of
+    # burning coder candidates. A single run, deliberately WITHOUT the #829 flake
+    # differential (the differential protects convictions; a non-passing pre-check
+    # convicts nobody — it just dispatches normally). Only "passed" skips; every other
+    # shape dispatches (fail-closed). Consulted ONLY when already_satisfied_precheck
+    # rides the spec as true; defaulted inert so every legacy caller/test is byte-stable.
+    precheck_job_oracle: Callable[[str, str], dict] = _noop_precheck_job_oracle
     # (repo, oracle_rel_path) -> {"ok": True|False|None, "unresolved": [...],
     # "evidence": str} — #822 symbol-level import-contract probe on the integrated
     # tree (resolve every first-party module/export the oracle imports, under the SAME
@@ -760,6 +728,91 @@ def _samples_consumed_from_run_dir(run_dir: "str | Path | None") -> int:
         return -1
 
 
+# ---------------------------------------------------------------------------
+# ORACLE FITNESS — the narrow, fail-soft read behind
+# ``compute_job_verdict(..., oracle_unfit=...)``.
+#
+# A job oracle that graded NOTHING is not evidence about the coder. #821's
+# oracle-QA pass stamps ``oracle_coverage: "k/n"`` into ``<run>/oracle-qa.json``
+# — how many of the plan's objective criteria trace to a real assertion. When
+# k == 0 with n > 0 the grader was seeded, ran, and covered NONE of what it was
+# supposed to check: its failures describe ITSELF, not the build (the measured
+# shape: a job oracle raising ``NameError`` on a module it never imports, plus
+# an unwrapped ``SystemExit: 0`` from the app exiting exactly as specified).
+# Attributing that park to BUILD convicts the coder of the grader's bug.
+#
+# Anchored on COVERAGE ONLY — deliberately not on the finding counts
+# (``invented_contract`` / ``traceability_gap``), which accumulate ACROSS
+# regeneration rounds and are inflated by a known false-positive: they measure
+# how much repair the oracle needed, not what it ended up grading. Coverage is
+# the strongest and least gameable signal — it is the grader's own statement of
+# what it actually checked.
+#
+# Fail toward CURRENT behaviour in every ambiguous case: an absent, unreadable,
+# unparseable, "unknown", or ``0/0`` coverage is NOT unfit, so a missing signal
+# can never silently re-tag a park. Like ``_samples_consumed_from_run_dir``
+# above this is a sibling of ``tools/dispatch_harness/failure_taxonomy``'s
+# bounded reads, not a shared import (``tools`` depends on ``shared``, never
+# the reverse) — and it is deliberately NOT routed through that module's
+# ORACLE-DEFECT classifier, which is advisory-locked (it asserts verdict and
+# attribution are byte-identical before and after) precisely so classification
+# can never move a verdict. The verdict must move HERE, in the pure function.
+# ---------------------------------------------------------------------------
+
+#: Bounded parse of the oracle-QA sidecar (decoded characters, not bytes — the
+#: real file is a sub-kilobyte stamp; measured 681 B on run 20260719-002208-bd).
+#: A truncated payload fails json.loads to ValueError and reads as "not unfit",
+#: the conservative direction.
+_ORACLE_QA_MAX_CHARS = 256 * 1024
+
+#: Longest ``oracle_coverage`` string worth parsing — the real stamp is "k/n"
+#: over a handful of criteria; anything longer is malformed, never a big number.
+_MAX_COVERAGE_LEN = 64
+
+#: The ``k/n`` coverage stamp written by ``shared.fleet.oracle_qa`` (#821).
+_COVERAGE_RX = re.compile(r"^\s*(\d+)\s*/\s*(\d+)\s*$")
+
+
+def _coverage_is_zero(coverage: object) -> bool:
+    """True IFF *coverage* is a ``"0/n"`` stamp with ``n > 0`` — the grader
+    covered NONE of n real criteria.
+
+    Every other input is False, and each False is a deliberate fail-toward-
+    current-behaviour: a non-string, an over-long string, "unknown" or any
+    other unparseable token (we cannot say the oracle was unfit), and ``"0/0"``
+    (no criteria to cover is a degenerate stamp, not a demonstrated blind
+    grader). Never raises."""
+    if not isinstance(coverage, str) or len(coverage) > _MAX_COVERAGE_LEN:
+        return False
+    match = _COVERAGE_RX.match(coverage)
+    if match is None:
+        return False
+    covered, total = int(match.group(1)), int(match.group(2))
+    return covered == 0 and total > 0
+
+
+def _oracle_unfit_from_run_dir(run_dir: "str | Path | None") -> bool:
+    """Was the job oracle UNFIT to adjudicate — i.e. does the run's own
+    ``oracle-qa.json`` disclose ``oracle_coverage: "0/n"`` (n > 0)?
+
+    Read-only, bounded, and fail-soft at every step: an absent *run_dir*, a
+    missing/unreadable/oversized/non-object sidecar, or any coverage value that
+    is not a literal zero-numerator fraction all return False — the answer that
+    preserves the pre-existing attribution. NEVER raises."""
+    if not run_dir:
+        return False
+    try:
+        path = Path(run_dir) / "oracle-qa.json"
+        if not path.is_file():
+            return False
+        data = json.loads(path.read_text(encoding="utf-8")[:_ORACLE_QA_MAX_CHARS])
+    except (OSError, ValueError, TypeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    return _coverage_is_zero(data.get("oracle_coverage"))
+
+
 def compute_job_verdict(
     plan: "pg.JobPlan",
     *,
@@ -769,13 +822,26 @@ def compute_job_verdict(
     degraded: bool = False,
     design_review_ending: str = "",
     oracle_flaky: bool = False,
+    oracle_unfit: bool = False,
+    satisfied_skips: "frozenset[str] | set[str] | None" = None,
 ) -> tuple[str, str]:
     """``(verdict, attribution)`` per the §9.4 taxonomy — pure, evidence-driven,
     vocabulary-aligned with Lane V's ``scorecard.py`` glosses (the adoption contract).
 
-    GREEN requires ALL of: not cancelled/stopped, every task ``merged``, no failed
-    wave gate, and the job oracle ``passed`` (the "job reports done ONLY when the job
-    oracle passes" rule as a computation — an unrun oracle can never be GREEN).
+    GREEN requires ALL of: not cancelled/stopped, every task DELIVERED (``merged``,
+    or an honest #1049 already-satisfied SKIP — see below), no failed wave gate, and
+    the job oracle ``passed`` (the "job reports done ONLY when the job oracle passes"
+    rule as a computation — an unrun oracle can never be GREEN).
+
+    ``satisfied_skips`` (#1049) is the set of task ids the driver recorded as
+    ALREADY-SATISFIED skips: before dispatching a wave, the SAME job-oracle
+    instrument that grades the finish line PASSED on the current tree, so the
+    remaining tasks were skipped without spending a coder candidate. Those ids —
+    and ONLY those ids — count as delivered here; a park-propagated or
+    gate-failure SKIP never does. The skip stays a SKIP on the scorecard's task
+    rows (never relabeled a pass), and it can never mint GREEN by itself: the
+    finish-line oracle must still independently pass. ``None``/empty (the
+    default) is byte-identical to the old every-task-merged condition.
 
     PARKED-HONEST = a VALID run with an honest, measured review outcome short of
     GREEN (a verification SUCCESS): work parked/blocked, a gate or the oracle
@@ -809,11 +875,40 @@ def compute_job_verdict(
     never mint GREEN — we do not know which run was right). It is deliberately narrow:
     a FAILED WAVE GATE stays BUILD (that instrument is not what the differential
     re-ran), a genuinely parked/blocked task stays BUILD (a real build failure), and
-    the flag can never upgrade any verdict — only relabel a job-oracle park's fault."""
+    the flag can never upgrade any verdict — only relabel a job-oracle park's fault.
+
+    ``oracle_unfit`` reclasses the SAME branch on the sibling question. ``oracle_flaky``
+    asks "was the grade REPRODUCIBLE?"; ``oracle_unfit`` asks "was the grader FIT to
+    adjudicate AT ALL?" — a job oracle that #821's oracle-QA pass discloses as covering
+    ZERO of n real criteria (``oracle_coverage: "0/n"``) graded nothing, so its failures
+    are evidence about ITSELF, not about the build, and the park's fault moves BUILD
+    (coder) -> VERIFY (grader). Before this, a blind grader's own defects were charged to
+    the coder: the measured founding case is battery card B4, run 20260719-002208-bd — six
+    of six build waves passed, the import probe and layout gate were clean, and the job
+    oracle failed 4-of-6 with three ``NameError``s on a module it never imported plus an
+    unwrapped ``SystemExit: 0`` (the app exiting exactly as specified), on an oracle whose
+    own QA sidecar read ``oracle_coverage: "0/6"``, ``covered: []``. The verdict was
+    PARKED-HONEST [BUILD]; the same B4/BUILD/ORACLE-DEFECT pairing is recorded again on
+    2026-07-16 in ``docs/quality/dispatch-quality-ledger.md``.
+
+    Both grader-fault conditions route identically and either one suffices, so the two are
+    order-independent. ``oracle_unfit`` inherits every narrowness ``oracle_flaky`` has: it
+    touches ONLY the job-oracle park, a FAILED WAVE GATE stays BUILD (coverage says
+    nothing about the integration instrument), a genuinely parked/blocked task stays
+    BUILD, PARKED-HONEST is preserved (an unfit oracle proves nothing, so it can never
+    mint GREEN), and pass-banking is untouched. It only ever RE-TAGS a park's fault."""
     if stopped:
         return (VERDICT_STALLED, ATTRIBUTION_HARNESS)
     statuses = [t.status for t in plan.tasks]
-    all_merged = bool(statuses) and all(s == pg.STATUS_MERGED for s in statuses)
+    sat = satisfied_skips or frozenset()
+    # #1049 "delivered": merged, or an already-satisfied skip the driver recorded
+    # (only those ids — a park-propagated/gate-failure SKIP is never delivered).
+    # With no satisfied skips this is exactly the old all-merged condition.
+    all_merged = bool(statuses) and all(
+        t.status == pg.STATUS_MERGED
+        or (t.status == pg.STATUS_SKIPPED and t.id in sat)
+        for t in plan.tasks
+    )
     gates_failed = any(g.get("status") == "failed" for g in wave_gates)
     acc = plan.job_acceptance.status
     if not cancelled and all_merged and not gates_failed and acc == "passed":
@@ -827,10 +922,16 @@ def compute_job_verdict(
         # differential never re-runs — a gate failure stays a BUILD fault.
         return (VERDICT_PARKED_HONEST, ATTRIBUTION_BUILD)
     if acc == "failed":
-        if oracle_flaky:
-            # #829: the job oracle FAILED then PASSED on a fresh hermetic re-run — the
-            # GRADER is nondeterministic, not the coder wrong. PARKED-HONEST stands (a
-            # flaky oracle can't mint GREEN); the fault is VERIFY, not BUILD.
+        if oracle_flaky or oracle_unfit:
+            # Two independent grader-fault findings, same reroute — either alone suffices:
+            #   * oracle_flaky (#829): the job oracle FAILED then PASSED on a fresh
+            #     hermetic re-run — the GRADER is nondeterministic, not the coder wrong.
+            #   * oracle_unfit: #821's oracle-QA disclosed oracle_coverage "0/n" — the
+            #     grader covered NONE of n real criteria, so it graded nothing and its
+            #     failures are evidence about itself (the B4 20260719-002208-bd shape:
+            #     a NameError on a module the oracle never imported, on 0/6 coverage).
+            # PARKED-HONEST stands in both cases (a broken grader can't mint GREEN, and
+            # an unfit one proves nothing at all); only the fault moves BUILD -> VERIFY.
             return (VERDICT_PARKED_HONEST, ATTRIBUTION_VERIFY)
         return (VERDICT_PARKED_HONEST, ATTRIBUTION_BUILD)
     if all_merged and acc == "not-run":
@@ -854,6 +955,13 @@ def compute_job_verdict(
     return (VERDICT_STALLED, ATTRIBUTION_VERIFY)
 
 
+#: Control characters (incl. newlines) stripped from scorecard evidence values built
+#: from repo-derived bytes (file names ride git output) — the adopter's validate
+#: demands single-line pointer/status strings, and that contract is enforced at the
+#: stamp site, mirroring the context-pack token hygiene.
+_EVIDENCE_CTRL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
 def build_scorecard(
     plan: "pg.JobPlan",
     *,
@@ -869,7 +977,10 @@ def build_scorecard(
     evidence_paths: "dict | None" = None,
     design_review_ending: str = "",
     oracle_flaky: bool = False,
+    oracle_unfit: bool = False,
+    scope_sprawl: "dict[str, list[str]] | None" = None,
     run_dir: "str | Path | None" = None,
+    satisfied_skips: "frozenset[str] | set[str] | None" = None,
 ) -> dict:
     """The machine-readable DRIVER job scorecard (plan §4.3/§9.4; §10 S6-structural),
     shaped to be ADOPTABLE by the battery runner's ``adopt_driver_scorecard``:
@@ -891,14 +1002,36 @@ def build_scorecard(
     stamped verbatim as ``evidence["design_review"]`` + a structural note (the
     machine-auditable trail behind a PARKED-HONEST-from-design-review verdict).
 
+    ``oracle_unfit`` (the grader-fitness finding — ``oracle_coverage: "0/n"`` in the
+    run's ``oracle-qa.json``) rides into :func:`compute_job_verdict` exactly as
+    ``oracle_flaky`` does, and is stamped as ``evidence["oracle_unfit"]`` + a note.
+    It is computed by the CALLER (see :func:`_oracle_unfit_from_run_dir` and the
+    driver's ``_emit_plan_artifacts``), deliberately not derived from ``run_dir``
+    here, so ``run_dir``'s evidence-only contract below stays literally true.
+
+    ``scope_sprawl`` (#989 c.2288) is the driver's per-task record of merged files
+    that a DIFFERENT task's contract creates (``task_id -> ["file (owner)", …]``,
+    ``SwapDriver._record_scope_sprawl``). Stamped as ``evidence["scope_sprawl"]`` +
+    a note — a named FINDING in the audit trail, never a verdict/attribution input
+    (both are already computed above from plan/wave_gates/job_acceptance alone).
+
     ``run_dir`` (#790) is the run's own log directory (``<runs_dir>/<run_id>``) —
     read-only, evidence-only, never consulted by :func:`compute_job_verdict`: a
     missing/wrong/unreadable value can only ever demote ``samples_consumed`` back
-    to its ``-1`` default, never the verdict or attribution."""
+    to its ``-1`` default, never the verdict or attribution.
+
+    ``satisfied_skips`` (#1049) is the driver's record of tasks skipped by the
+    already-satisfied pre-check (the job oracle passed on the current tree BEFORE
+    the wave dispatched — no coder candidate spent). It rides into
+    :func:`compute_job_verdict` (those ids count as delivered) and is stamped as
+    ``evidence["already_satisfied"]`` + a note, so the skip is LOUD in the audit
+    trail — recorded as a skip, never as a pass (the task rows keep status
+    ``skipped``)."""
     verdict, attribution = compute_job_verdict(
         plan, cancelled=cancelled, stopped=stopped, wave_gates=wave_gates,
         degraded=degraded, design_review_ending=design_review_ending,
-        oracle_flaky=oracle_flaky,
+        oracle_flaky=oracle_flaky, oracle_unfit=oracle_unfit,
+        satisfied_skips=satisfied_skips,
     )
     by_task = {getattr(o, "task", ""): o for o in outcomes}
     tasks = []
@@ -929,6 +1062,37 @@ def build_scorecard(
         # (#827 classifier / #832 green-audit read this; the full both-runs record is in
         # <run>/oracle-flake.json). Single-line string (the adopter's validate demands it).
         evidence["oracle_flaky"] = "true"
+    if oracle_unfit:
+        # The job oracle covered ZERO of n objective criteria (#821 oracle-QA's
+        # oracle_coverage "0/n" in <run>/oracle-qa.json) — the machine-auditable trail
+        # behind a VERIFY attribution on a job-oracle park. Stamped as a FACT whenever
+        # the finding holds, like design_review above, regardless of which verdict
+        # branch consumed it. Single-line string (the adopter's validate demands it).
+        evidence["oracle_unfit"] = "true"
+    if scope_sprawl:
+        # #989 c.2288 audit trail: merged task(s) authored files OTHER tasks' contracts
+        # own. A named FINDING only — never a verdict/attribution input (both were
+        # computed above from plan/wave_gates/job_acceptance alone). Single-line +
+        # bounded + control-stripped (the adopter's validate demands a pointer/status,
+        # never a log — and the file names originate in git bytes, so the single-line
+        # contract is enforced HERE, not assumed of the producer).
+        joined = "; ".join(
+            f"{tid}: " + ", ".join(items)
+            for tid, items in sorted(scope_sprawl.items()) if items
+        )
+        joined = _EVIDENCE_CTRL_RE.sub(" ", joined)
+        if joined:
+            evidence["scope_sprawl"] = (joined[:497] + "…") if len(joined) > 498 else joined
+    if satisfied_skips:
+        # #1049 audit trail: the tasks skipped by the already-satisfied pre-check
+        # (the job oracle passed on the current tree before the wave dispatched).
+        # A named FACT beside the verdict — the task rows keep status "skipped"
+        # (a skip is never relabeled a pass). Single-line + bounded +
+        # control-stripped (the adopter's validate demands a pointer/status).
+        sat_line = _EVIDENCE_CTRL_RE.sub(" ", ", ".join(sorted(satisfied_skips)))
+        if sat_line:
+            evidence["already_satisfied"] = (
+                (sat_line[:497] + "…") if len(sat_line) > 498 else sat_line)
     notes = []
     if cancelled:
         notes.append("cancelled by the operator mid-run")
@@ -944,6 +1108,18 @@ def build_scorecard(
         notes.append("job oracle was nondeterministic (failed then passed on a fresh "
                      "hermetic re-run) — the park is a grader defect (VERIFY), not the "
                      "coder's (#829)")
+    if oracle_unfit:
+        notes.append("job oracle graded ZERO of its objective criteria (oracle-qa "
+                     "oracle_coverage 0/n) — it was not fit to adjudicate, so the park "
+                     "is a grader defect (VERIFY), not the coder's")
+    if scope_sprawl and evidence.get("scope_sprawl"):
+        notes.append("scope-sprawl finding(s): merged task(s) authored files "
+                     "contracted to other tasks (see evidence.scope_sprawl)")
+    if satisfied_skips and evidence.get("already_satisfied"):
+        notes.append("already-satisfied skip(s): the job oracle passed on the "
+                     "current tree BEFORE the wave dispatched, so the remaining "
+                     "task(s) were honestly skipped without spending a coder "
+                     "candidate (#1049; see evidence.already_satisfied)")
     # #790: an honest recovery attempt only — never allowed to affect verdict/attribution
     # above (both were already computed from plan/wave_gates/job_acceptance alone).
     samples_consumed = _samples_consumed_from_run_dir(run_dir)
@@ -1005,7 +1181,14 @@ def compute_flat_verdict(
     ``dispatch._classify_result`` + the acceptance SKIP — MERGED / PARKED / BLOCKED /
     NOTHING / UNKNOWN / TIMEOUT / SKIPPED (#757) — so ANY non-MERGED outcome is an
     honest RED (a task parked, failed its gate, timed out, or was
-    skipped-because-unmerged)."""
+    skipped-because-unmerged).
+
+    NO ``oracle_flaky`` / ``oracle_unfit`` twin here, and the asymmetry is structural,
+    not an oversight: both flags reclass a JOB-ORACLE park, and flat mode runs no job
+    oracle at all (``build_flat_scorecard`` hard-codes ``job_acceptance.status`` to
+    ``not-run``). The BUILD park above is a per-task-outcome finding, so a
+    grader-fitness flag would have nothing to grade — wiring one in would be a control
+    that no code path can reach."""
     if stopped:
         return (VERDICT_STALLED, ATTRIBUTION_HARNESS)
     if not outcomes:
@@ -1234,6 +1417,11 @@ class SwapDriver:
         # touches the run_guest_oracle/write_guest_oracle seams — byte-identical
         # today-behavior, regression-locked.
         guest_oracle_enabled: bool = False,
+        # #1049 already-satisfied pre-check. False (the fail-closed default for a
+        # spec missing the key) means the driver NEVER touches the
+        # precheck_job_oracle seam — byte-identical legacy dispatch behavior,
+        # regression-locked. Resolved from [fleet_dispatch].already_satisfied_precheck.
+        already_satisfied_precheck: bool = False,
         # #790: the run's own log directory (<runs_dir>/<run_id>), read-only and
         # OPTIONAL — None (the default) reproduces today's byte-identical behavior
         # (samples_consumed stays -1, "not instrumented"). Passed straight through
@@ -1267,6 +1455,7 @@ class SwapDriver:
         self._task_refs: dict[str, tuple[str, str]] = {}   # task_id -> (base, merge)
         self._repo_bases: dict[str, str] = {}              # repo -> pre-dispatch HEAD (#693)
         self._skip_reasons: dict[str, str] = {}            # task_id -> why skipped
+        self._scope_sprawl: dict[str, list[str]] = {}      # task_id -> other-owned files (#989)
         self._wave_gates: list[dict] = []                  # {wave, status, evidence}
         self._job_evidence = ""
         # #829: set True iff the job-oracle grade FAILED then PASSED on a fresh hermetic
@@ -1305,11 +1494,21 @@ class SwapDriver:
         self._design_review_ending: str = ""
         self._guest_oracle_enabled = bool(guest_oracle_enabled)
         self._guest_oracle_signal: "dict | None" = None
+        # #1049: task ids skipped by the already-satisfied pre-check — the ONLY
+        # skips compute_job_verdict counts as delivered (a park-propagated skip
+        # never rides here). Feeds build_scorecard's evidence["already_satisfied"].
+        self._already_satisfied_precheck = bool(already_satisfied_precheck)
+        self._satisfied_skips: set[str] = set()
         self._run_dir = run_dir
         # #790 rec-1: the job oracle's first-party import contract, resolved once at the
         # top of the wave loop and appended to every task's prompt. [] = no oracle /
         # extraction unavailable (byte-identical to before the feature).
         self._oracle_import_contract: list[str] = []
+        # #790 sub-task 5: the ONE top-level package root the contract names ("" when
+        # none/ambiguous). Stamped onto every fleet task dict as `canonical_package` so
+        # the dispatch-side scaffold seeder names the skeleton after the ORACLE's layout
+        # instead of the generic app/ twin (the B4 duplicate-tree defect).
+        self._oracle_canonical_package: str = ""
         # #822 layout gate: budget for the ONE targeted import-contract fix cycle per
         # job (a re-run of the offending merged task with the exact unresolved entry
         # named). Per-run instance counter — a crash re-runs the whole job, so this
@@ -1329,14 +1528,19 @@ class SwapDriver:
         # pid-only (narrow reuse window), same as the entrypoint stamp.
         self._driver_pid = os.getpid()
         self._driver_pid_created = 0.0
+        # #902: image name — the reconciler's second identity axis (a recycled pid
+        # wearing a different image is provably not this driver). '' degrades to the
+        # create-time gate alone, exactly like the created stamp.
+        self._driver_image = ""
         try:
             import psutil
 
-            self._driver_pid_created = float(
-                psutil.Process(self._driver_pid).create_time()
-            )
+            _me = psutil.Process(self._driver_pid)
+            self._driver_pid_created = float(_me.create_time())
+            self._driver_image = _me.name() or ""
         except Exception:  # noqa: BLE001 — pid-only still guards
             self._driver_pid_created = 0.0
+            self._driver_image = ""
 
     def _phase(self, phase: str, *, error: str = "") -> None:
         # Best-effort: a phase-write failure (e.g. a full disk) must never derail the
@@ -1352,7 +1556,8 @@ class SwapDriver:
                              phase=phase, tasks=self._tasks, error=error,
                              plan_hash=self._plan_hash,
                              driver_pid=self._driver_pid,
-                             driver_pid_created=self._driver_pid_created),
+                             driver_pid_created=self._driver_pid_created,
+                             driver_image=self._driver_image),
                 path=self._path,
             )
         except BaseException:  # noqa: BLE001 — a pure audit write must NEVER derail teardown
@@ -1869,7 +2074,23 @@ class SwapDriver:
                 f"the oracle cannot import):\n{lines}\nProvide these EXACT module paths "
                 "and public names; do not rename or relocate them."
             )
+        # #989: the SCOPE CEILING. The interface block above names what the FINAL app
+        # must provide, and a ROOT task (no depends_on ⇒ no context pack ever composes
+        # for it) reads that with nothing else bounding its scope — the measured wave-1
+        # over-production shape (a root task building the entire app). Composed HERE,
+        # the one seam EVERY plan-graph task passes through, so a root task can never
+        # skip it; derived from the plan's own contracts, never hardcoded (a plan whose
+        # one task legitimately owns everything gets no ceiling).
+        ceiling = self._scope_ceiling(ptask)
+        if ceiling:
+            prompt = f"{prompt}\n\n{ceiling}"
         base["prompt"] = prompt
+        # #790 sub-task 5: the canonical package rides the task dict to run-fleet.ps1 →
+        # new-agent-task.ps1, whose scaffold seeder names the python skeleton's package
+        # after the ORACLE's contract (one canonical tree; no generic app/ twin). Only
+        # the FIRST task of a fresh repo actually seeds — later tasks ignore it.
+        if self._oracle_canonical_package:
+            base.setdefault("canonical_package", self._oracle_canonical_package)
         pack = self._build_pack(ptask)
         if pack:
             base["prompt"] = f"{prompt}\n\n{pack}"
@@ -1879,6 +2100,120 @@ class SwapDriver:
             except Exception:  # noqa: BLE001 — the audit log must never block the task
                 pass
         return base
+
+    def _scope_ceiling(self, ptask: "pg.PlanTask") -> str:
+        """The task's OWN scope boundary (#989), derived from the plan's contracts.
+
+        Names, from THIS task's contract, the deliverables it builds, and, from the
+        sibling contracts, the files that are OTHER tasks' deliverables — so a task
+        handed the whole app's module interface still knows which slice is its own.
+        Derivation rules (never hardcoded):
+
+        * a plan of fewer than two tasks gets NO ceiling — its one task legitimately
+          owns everything, and a boundary would be nonsense;
+        * a sibling file whose ownership keys intersect this task's own (a shared
+          ``__init__``, a leaf-name collision) is NOT forbidden — ambiguity resolves
+          toward permitting, never toward blocking a contracted deliverable;
+        * ``''`` when neither this task's nor any sibling's contract names a created
+          file — no boundary is derivable, and the plan-time contract-coverage check
+          (``context_pack.contract_coverage``) is the surface that flags that plan
+          shape loudly."""
+        if self._plan is None or len(self._plan.tasks) < 2:
+            return ""
+        own = [str(c).strip() for c in ptask.contract.creates if str(c).strip()]
+        own_forms: set[str] = set()
+        for c in own:
+            own_forms |= _create_forms(c)
+        others: list[str] = []
+        seen: set[str] = set()
+        for t in self._plan.tasks:
+            if t.id == ptask.id:
+                continue
+            for c in t.contract.creates:
+                path = str(c).strip()
+                key = cp.normalize_module_token(path).lower()
+                if not path or not key or key in seen:
+                    continue
+                seen.add(key)
+                if _module_forms(path) & own_forms:
+                    continue  # shared/ambiguous with this task's own contract
+                others.append(path)
+        if not own and not others:
+            return ""
+        lines: list[str] = []
+        if own:
+            listed = ", ".join(f"`{c}`" for c in own[:16])
+            lines.append(
+                "SCOPE — this task builds ONLY its own contracted deliverable(s): "
+                f"{listed} (plus their tests)."
+            )
+        if others:
+            listed = ", ".join(f"`{c}`" for c in others[:24])
+            more = " …" if len(others) > 24 else ""
+            lines.append(
+                "These files are contracted to OTHER tasks in this job and are NOT "
+                f"yours to create: {listed}{more}. Do NOT create, stub, or implement "
+                "them — each will be built by its own task; where your code needs one, "
+                "import it rather than re-creating it."
+            )
+        return "\n".join(lines)
+
+    def _record_scope_sprawl(
+        self, ptask: "pg.PlanTask", repo: str, base_ref: str, merge_ref: str
+    ) -> None:
+        """#989 (c.2288): after a task MERGES, name every file in its merged delta that
+        a DIFFERENT task's contract creates — the scope-sprawl FINDING. Advisory +
+        evidence-only by design: the merge already happened on the dispatch side and
+        the wave/layout/oracle gates stay the enforcers; this replaces a silent merge
+        with a NAMED record (progress trail + ``evidence.scope_sprawl`` on the
+        scorecard), and never touches verdict or attribution.
+
+        Keyed on the seam's ADDED-file list (``dep_delta``'s ``added`` key — git
+        ``--diff-filter=A``), NEVER the full changed-file list: file CREATION is the
+        over-production signal this finding measures, while an EDIT to a sibling-owned
+        file (a re-export line added to a sibling's ``__init__``) is legitimate
+        integration and would inflate the measurement. Matching is the PRECISE equality
+        ownership of ``module_forms``/``create_forms`` (never substring); a file this
+        task's own contract also answers for is never flagged (shared or ambiguous
+        ownership is not sprawl). Same degradation contract as the context packs on
+        this seam: a failed read, or a seam that does not provide ``added``, records
+        nothing (an evidence recorder, not a control path — "unmeasured", never a
+        guess from edits), and the seam's list cap makes the finding a FLOOR, never a
+        census."""
+        if self._plan is None or len(self._plan.tasks) < 2:
+            return
+        try:
+            delta = self._ops.dep_delta(repo, base_ref, merge_ref)
+        except Exception:  # noqa: BLE001 — a delta failure degrades to no finding
+            return
+        files = delta.get("added") if isinstance(delta, dict) else None
+        if not isinstance(files, list) or not files:
+            return
+        own_forms: set[str] = set()
+        for c in ptask.contract.creates:
+            own_forms |= _create_forms(str(c))
+        findings: list[str] = []
+        for rel in files:
+            keys = _module_forms(str(rel))
+            if not keys or keys & own_forms:
+                continue
+            owner = next(
+                (t for t in self._plan.tasks
+                 if t.id != ptask.id and _task_owns_module(t, keys, set())),
+                None,
+            )
+            if owner is not None:
+                findings.append(f"{rel} ({owner.id})")
+        if not findings:
+            return
+        self._scope_sprawl[ptask.id] = findings
+        self._progress(
+            f"Scope-sprawl finding [{ptask.id}]: authored file(s) contracted to other "
+            "task(s): " + ", ".join(findings[:8])
+            + (" …" if len(findings) > 8 else "")
+            + " — recorded as a named finding; the merge stands and the wave/oracle "
+            "gates remain the enforcers."
+        )
 
     def _statuses(self) -> dict:
         assert self._plan is not None
@@ -1917,6 +2252,68 @@ class SwapDriver:
         ]
         self._plan = _replace(self._plan, tasks=new_tasks)
         self._record_new_skips(before, outcomes, reason)
+
+    def _precheck_already_satisfied(self, next_wave_no: int, outcomes: list) -> bool:
+        """#1049 already-satisfied pre-check: gate the EXPENSIVE resource (a ~9-min
+        30B coder candidate, ×N best-of-N) on the CHEAP probe (one hermetic
+        job-oracle run) before dispatching a wave. The instrument is the SAME
+        restore-before-grade job oracle that grades the finish line, so "satisfied"
+        here means exactly what "done" means at REPORT time — never a heuristic
+        over contract fields (file existence proves nothing about content).
+
+        Returns True iff every still-pending task was recorded as an honest SKIP
+        (the caller then ends the wave loop; the finish-line oracle still grades
+        the tree independently). FAIL-CLOSED everywhere: knob off, nothing merged
+        yet, a failed wave gate, a raising/malformed/non-passing pre-check — each
+        dispatches the wave exactly as before. Only an explicit ``passed`` skips."""
+        assert self._plan is not None
+        if not self._already_satisfied_precheck:
+            return False
+        if not any(t.status == pg.STATUS_MERGED for t in self._plan.tasks):
+            # A tree no wave has touched cannot have been satisfied BY a prior
+            # wave, and #821's seed-time QA already proved the oracle fails on the
+            # pre-wave skeleton — don't pay an oracle run before wave 1.
+            return False
+        if any(g.get("status") == "failed" for g in self._wave_gates):
+            return False   # a broken integrated base is never "satisfied"
+        oracle_rel = self._plan.job_acceptance.oracle_path
+        try:
+            res = self._ops.precheck_job_oracle(self._repo(), oracle_rel)
+        except Exception as exc:  # noqa: BLE001 — fail-closed: dispatch normally
+            self._progress(
+                f"Already-satisfied pre-check could not run ({type(exc).__name__}) "
+                f"— dispatching wave {next_wave_no} normally (fail-closed)."
+            )
+            return False
+        if not isinstance(res, dict):
+            res = {"status": "not-run", "evidence": "pre-check returned a non-dict"}
+        status = str(res.get("status", "not-run"))
+        if status != "passed":
+            # failed / not-run / unknown: NEVER skip on an undetermined or unmet
+            # contract — the wave dispatches exactly as before (fail-closed).
+            self._progress(
+                f"Already-satisfied pre-check: the job oracle does not pass on the "
+                f"current tree ({status}) — dispatching wave {next_wave_no} normally."
+            )
+            return False
+        evidence = _EVIDENCE_CTRL_RE.sub(
+            " ", str(res.get("evidence", "") or "pre-check ran"))[:200]
+        pending = sorted(
+            t.id for t in self._plan.tasks if t.status == pg.STATUS_PENDING)
+        self._satisfied_skips.update(pending)
+        self._skip_all_pending(outcomes, (
+            f"already satisfied before wave {next_wave_no}: the job acceptance "
+            f"oracle PASSED on the current integrated tree (pre-dispatch check — "
+            f"no coder candidate spent; {evidence})"
+        ))
+        self._persist_plan()
+        self._progress(
+            "Already-satisfied pre-check: the job acceptance oracle PASSES on the "
+            f"current tree — remaining task(s) ({', '.join(pending)}) recorded as "
+            "HONEST SKIPs; no coder candidate spent (#1049). The finish-line "
+            "oracle still grades the tree independently."
+        )
+        return True
 
     def _try_redecompose(self, ptask: "pg.PlanTask", fleet_task: dict, outcome) -> bool:
         """W5: ONE evidence-fed re-decompose of a consistently-failing task (the fleet's
@@ -2016,6 +2413,20 @@ class SwapDriver:
                 + (" …" if len(self._oracle_import_contract) > 6 else "")
                 + " (build these exact module paths so the wave-final oracle can import)."
             )
+        # #790 sub-task 5: derive the ONE canonical package the contract names and ride
+        # it on every task dict — the dispatch-side seeder then names the python
+        # skeleton after the oracle's layout, so a B4-class job grows ONE tree instead
+        # of the generic app/ twin beside the real package. "" (no/ambiguous root) ⇒
+        # nothing stamped ⇒ the seeder keeps its legacy generic skeleton.
+        self._oracle_canonical_package = cp.canonical_package_from_contract(
+            self._oracle_import_contract)
+        if self._oracle_canonical_package:
+            self._progress(
+                "Canonical package derived from the oracle contract: "
+                f"{self._oracle_canonical_package} — the seeded skeleton and the "
+                "integrated layout carry this ONE top-level package (no generic "
+                "app/ twin)."
+            )
         wave_no = 0
         while True:
             if self._ops.cancel_requested():
@@ -2026,6 +2437,14 @@ class SwapDriver:
                 break
             wave = self._next_wave()
             if not wave:
+                break
+            # #1049: before spending a coder on this wave, ask whether the job's own
+            # acceptance oracle ALREADY passes on the integrated tree (a prior wave
+            # may have over-delivered — the measured 2026-07-14 shape: three
+            # same-file waves, wave 1 built the whole page, waves 2-3 burned
+            # ~27 min of GPU discovering it). A pass skips every remaining task as
+            # an HONEST SKIP; anything else dispatches normally (fail-closed).
+            if self._precheck_already_satisfied(wave_no + 1, outcomes):
                 break
             wave_no += 1
             self._progress(
@@ -2076,6 +2495,10 @@ class SwapDriver:
                     # #822 import probe). Non-blocking; inert on the noop seam.
                     self._run_static_pregate_for_task(
                         ptask, repo, base_ref, merge_ref, outcomes)
+                    # #989 c.2288: a merged task that authored files ANOTHER task's
+                    # contract owns is recorded as a NAMED finding, never merged
+                    # silently (advisory — the gates below stay the enforcers).
+                    self._record_scope_sprawl(current, repo, base_ref, merge_ref)
                 elif result == "BLOCKED":
                     self._plan = pg.mark_blocked(self._plan, ptask.id, detail)
                     self._record_new_skips(
@@ -2554,6 +2977,20 @@ class SwapDriver:
                 f"JOB acceptance oracle did not run — the job CANNOT report verified-done ({evidence})."
             )
 
+    def _post_ticket_fail_soft(self, scorecard: dict) -> None:
+        """#749 driver-side REPORT leg — WIRED 2026-07-14 at the LA-present
+        supervised proof (the prior TODO's named unblock condition). Called from
+        BOTH scorecard branches (flat + plan) AFTER their guarded artifact
+        writes, and deliberately OUTSIDE ``_guard`` per the original constraint:
+        the artifacts on disk are complete, the swap-critical phases are behind
+        us, and a Vikunja stall can cost only this one bounded call — never the
+        teardown (the bridge itself is loopback-pinned, swallow-all, and
+        resolves a disabled knob/unset project id to a silent no-op)."""
+        try:
+            self._ops.post_job_ticket(scorecard)
+        except Exception as exc:  # noqa: BLE001 — ticket I/O never affects a run
+            self._progress(f"job-ticket post skipped (fail-soft): {exc}")
+
     def _emit_plan_artifacts(self, outcomes: list) -> None:
         """W6: the machine scorecard + the human JOB_SUMMARY (teardown-time, guarded).
         Emitted for BOTH modes — plan mode from the ``JobPlan``, flat mode (no
@@ -2584,6 +3021,7 @@ class SwapDriver:
             self._guard("write scorecard", lambda: self._ops.write_scorecard(scorecard))
             self._guard("write job summary",
                         lambda: self._ops.write_job_summary(render_job_summary(scorecard)))
+            self._post_ticket_fail_soft(scorecard)  # #749 REPORT leg — both modes
             self._progress(
                 f"JOB verdict: {scorecard['verdict']}"
                 + (f" (attribution: {scorecard['attribution']})" if scorecard["attribution"] else "")
@@ -2606,20 +3044,20 @@ class SwapDriver:
             },
             design_review_ending=self._design_review_ending,
             oracle_flaky=self._job_oracle_flaky,
+            # Grader-FITNESS sibling of the #829 flake flag above: read the run's own
+            # #821 oracle-QA disclosure and, if the job oracle covered ZERO of n
+            # objective criteria, attribute a job-oracle park to VERIFY (the grader)
+            # instead of BUILD (the coder). Fail-soft — an absent or unreadable
+            # oracle-qa.json reads False, preserving the pre-existing attribution.
+            oracle_unfit=_oracle_unfit_from_run_dir(self._run_dir),
+            scope_sprawl=self._scope_sprawl,
             run_dir=self._run_dir,
+            satisfied_skips=frozenset(self._satisfied_skips),
         )
         self._guard("write scorecard", lambda: self._ops.write_scorecard(scorecard))
         self._guard("write job summary",
                     lambda: self._ops.write_job_summary(render_job_summary(scorecard)))
-        # #749 dispatch→Vikunja bridge (driver-side seam — NOT wired here):
-        # this REPORT phase is the natural home for posting the durable per-job
-        # ticket outcome (shared.fleet.vikunja_bridge.ensure_job_ticket +
-        # post_outcome, gated on config.vikunja_bridge / vikunja_bridge_project_id).
-        # It is DELIBERATELY left as a TODO: the swap driver is detached and must
-        # not take on mid-campaign ticket I/O (a Vikunja stall must never touch a
-        # live swap). The bridge is wired from the battery runner and the standalone
-        # harness (which own the REPORT-time post); the driver leg lands when #749's
-        # supervised live proof clears it. Do not add ticket I/O inside _guard here.
+        self._post_ticket_fail_soft(scorecard)  # #749 REPORT leg — both modes
         self._progress(
             f"JOB verdict: {scorecard['verdict']}"
             + (f" (attribution: {scorecard['attribution']})" if scorecard["attribution"] else "")

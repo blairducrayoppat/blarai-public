@@ -1,5 +1,33 @@
 # UC-010 Image-Generation Go-Live Runbook
 
+<!-- doc-rot gate (#994): the config flag(s) gating this ceremony. The EXECUTED banner below must agree with their LIVE state in services/assistant_orchestrator/config/default.toml — read there, never from this doc. -->
+<!-- Gating-flags: [image_generation].enabled, [image_generation].require_signed_manifest -->
+
+> ## STATUS: EXECUTED — 2026-06-16. Do not re-run.
+>
+> This ceremony has already been performed. `[image_generation].enabled` is
+> **`true`** in `services/assistant_orchestrator/config/default.toml`, flipped
+> after a verified TPM-signed manifest and the recorded operator content
+> attestation (ledger `20260616_182807`). The flip landed in commit `42c241ea`.
+>
+> **What this means for you:** image generation is LIVE. `/imagine`, `/edit` and
+> `/save` work today. For day-to-day use — what the commands do, the prompt
+> bounds, the tuning knobs — read `uc010_image_gen_operator_guide.md` instead;
+> that is the reference you want. This file is kept as the historical record of
+> how the capability was activated.
+>
+> **One live change that post-dates this ceremony:** `hires_enabled` was set to
+> `false` on 2026-07-02 (commit `fa4b127b`) after the 1536² refine exhausted
+> system RAM on this box. The operator guide §6 carries the measurements.
+> Anything below that assumes hires-fix is on describes the 2026-06-16 state.
+>
+> **If you are re-reading this to redo the activation:** don't — and note there is
+> **no automatic guard** to stop you. Step 4 is a manual config edit, not a checked
+> precondition, and the staging and signing steps would run against weights that are
+> already staged and signed. If image
+> generation looks broken, that is a diagnosis task, not a re-run of this
+> ceremony.
+
 **Staging → signing → attesting → flipping → live-verify.** ADR-033. For the
 Lead Architect (non-developer-friendly). This is the SEPARATE, LA-present
 ceremony that takes UC-010 Local Generative Imaging from DORMANT to live. It is
@@ -26,7 +54,9 @@ the ONLY thing that flips `[image_generation].enabled`. Reuses the
    key must already be provisioned — see `manifest_signing_ceremony.md`; if not,
    provision it first with `C:/Users/mrbla/blarai/.venv/Scripts/python.exe -m shared.security.provision_manifest_signing_key`).
 4. `[image_generation].require_signed_manifest = true` and `enabled = false` in
-   `services/assistant_orchestrator/config/default.toml` (the shipped defaults).
+   `services/assistant_orchestrator/config/default.toml`. **That was the
+   pre-ceremony state, not today's.** `enabled` is now `true` — flipping it is
+   what this ceremony did, on 2026-06-16. `require_signed_manifest` is still `true`.
 
 > **INTERPRETER — run every Python command below with the project venv, NOT the bare `python`.**
 > The dev box's system `python` is **3.14 and lacks `cryptography`**, so the sign / verify / provision

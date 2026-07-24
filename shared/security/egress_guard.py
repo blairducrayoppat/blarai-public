@@ -1,8 +1,10 @@
 r"""Code-enforced network egress kill-switch (fail-closed allowlist). ADR-020 + ADR-027.
 
-Tier-0 security hardening. BlarAI's no-external-network guarantee is, today,
-*environmental* — the machine is air-gapped and the source happens not to call
-any HTTP library. This module makes the guarantee *code-enforced*: once a process
+Tier-0 security hardening. An *environmental* no-external-network guarantee — a
+machine that happens to be off the network, source that happens not to call an
+HTTP library — is not a control, and this runtime does not rely on one: exactly
+ONE module imports an HTTP client (``shared.security.guarded_fetch``, enforced by
+the single-file import scan). This module makes the guarantee *code-enforced*: once a process
 calls :func:`arm`, the only sockets it can open are the legitimate local IPC
 channels the runtime needs. Every other outbound socket — and every
 ``connect``/``bind``/``sendto`` to a non-loopback address — is refused at
@@ -17,20 +19,20 @@ Allowlist (the local IPC the runtime legitimately uses):
                         (dev-mode vsock TCP substitute + the launcher's
                         ``127.0.0.1:5001`` Policy-Agent gateway path).
 
-ADR-027 network-facing machinery (Sprint 17 — STAGED/DORMANT)
-=============================================================
+ADR-027 network-facing machinery
+================================
 This module also carries the egress machinery the *network-facing era* needs
-(ADR-027), built ahead of #556 and shipped **dormant**: it changes NO external-
-egress behavior today — the active allowlist stays loopback + AF_HYPERV, and the
-exfil screen / allowlist-widening only matter once a web feature ships post-#556
-and adds an external endpoint. The machinery is wired and tested now so that the
-#598 air-gap GO/NO-GO is a scripted audit, not a from-scratch build. Three layers
-are added here (ADR-027 rules 1, 3, and the trip half of rule 4):
+(ADR-027). Its posture is a function of the allowlist, not of a date: with the
+external allowlist empty the guard permits loopback + AF_HYPERV only, and each
+entry added to it widens egress by exactly that one vetted endpoint. Read the
+live entries from the runtime wiring (:func:`external_allowlist`) and the
+per-scope runbooks under ``docs/runbooks/`` — never from this docstring. Three
+layers are added here (ADR-027 rules 1, 3, and the trip half of rule 4):
 
   - **Allowlist-widening mechanism** (rule 1) — :func:`allow_external_endpoint`
     registers ONE named, vetted external ``(host, port)`` at a time, deny-by-
-    default. **The live list is NOT widened this sprint** — no external endpoint
-    is registered; the mechanism exists, the door stays shut.
+    default. An empty list is a shut door; every entry is a deliberate, vetted
+    widen scoped to the feature that required it.
   - **Anomaly auto-trip** (rule 3) — :func:`trip` cuts ALL egress (loopback and
     vsock included) and alerts the operator. The guard auto-trips on (a) a
     connect/bind/send to an off-allowlist address, or (b) a positive detection
@@ -46,9 +48,9 @@ are added here (ADR-027 rules 1, 3, and the trip half of rule 4):
     never for the internal loopback/AF_HYPERV IPC, whose frames legitimately carry
     the runtime's own capability JWTs and user PII (screening those would trip the
     kill-switch on the first internal message — a self-DoS). A positive detection
-    on an external send calls :func:`trip`. With the external allowlist empty (the
-    dormant default this sprint) no socket is ever tagged, so a registered screener
-    is a behavior-free no-op.
+    on an external send calls :func:`trip`. Tagging is allowlist-scoped: with the
+    external allowlist empty no socket is ever tagged and a registered screener is
+    a behavior-free no-op; every allowlisted endpoint's sends are screened.
 
 The interface anchor H-b integrates against (exact signatures):
   - ``trip(reason: str) -> None``
@@ -151,7 +153,7 @@ class EgressTripped(EgressDenied):
 
 
 # ---------------------------------------------------------------------------
-# ADR-027 machinery — outbound-payload screening (STAGED/DORMANT).
+# ADR-027 machinery — outbound-payload screening (allowlist-scoped; see above).
 # ---------------------------------------------------------------------------
 
 
@@ -235,13 +237,14 @@ _tripped: bool = False
 _trip_reason: Optional[str] = None
 
 # Registered outbound-payload screeners (ADR-027 rule 4). Populated at arm() time
-# by the exfil-screen module via register_screener(). Empty == no screening
-# (the dormant default this sprint, since no web feature ships).
+# by the exfil-screen module via register_screener(). Empty == no screening;
+# populated == every allowlisted-external send is screened before it leaves.
 _screeners: list[OutboundScreener] = []
 
-# The widened external allowlist (ADR-027 §1). deny-by-default: empty this sprint
-# (the door stays shut). Each entry is a vetted (host, port) an enabled web
-# feature requires; allow_external_endpoint() adds one at a time. The host is
+# The widened external allowlist (ADR-027 §1). deny-by-default: it starts EMPTY
+# at import (a shut door) and is populated only by explicit runtime widens. Each
+# entry is a vetted (host, port) an enabled web feature requires;
+# allow_external_endpoint() adds one at a time. The host is
 # stored as a normalised numeric-or-name string; "*" port means any port on host.
 _ALLOWLIST_ANY_PORT: Final[str] = "*"
 _external_allowlist: set[tuple[str, str]] = set()
@@ -392,8 +395,8 @@ def _is_allowlisted_external(host: str | None, port: Any) -> bool:
          not the name) reach an allowlisted endpoint. The port still must match;
          an IP pinned for ``kagi.com:443`` is NOT admitted on some other port.
 
-    Deny-by-default holds: with an empty allowlist (the dormant baseline) this is
-    always False; an IP that nobody resolved has no pin and stays denied (and the
+    Deny-by-default holds: with an empty allowlist this is always False; an IP
+    that nobody resolved has no pin and stays denied (and the
     caller auto-trips it). Comparison is on the exact normalised host string.
     """
     if host is None or host == "":
@@ -561,7 +564,7 @@ def _check_connect(family: int, address: Any) -> None:
       1. If the kill-switch has tripped, ALL egress is refused (ADR-027 §3).
       2. AF_HYPERV and loopback are always permitted (the air-gapped baseline).
       3. An external destination is permitted ONLY if it is on the widened
-         allowlist (ADR-027 §1 — empty + dormant this sprint).
+         allowlist (ADR-027 §1 — empty allowlist permits no external destination).
       4. Any other external destination AUTO-TRIPS the kill-switch (ADR-027 §3:
          "an attempt to reach an off-allowlist address") and is then refused.
     """
@@ -606,9 +609,10 @@ def _is_external_screen_target(family: int, address: Any) -> bool:
     returns False (not screened). The address allowlist (:func:`_check_connect`)
     independently guarantees a payload can ONLY reach a loopback or an
     allowlisted-external destination, so "external-allowlisted" is the precise
-    and only set this screens. With the external allowlist empty (the dormant
-    baseline this sprint) this always returns False — screening is a behavior-free
-    no-op even when a screener is registered.
+    and only set this screens. The result is allowlist-scoped: with the external
+    allowlist empty this always returns False — screening is a behavior-free no-op
+    even when a screener is registered — and it returns True for exactly the
+    endpoints the allowlist names.
     """
     if family not in _INET_FAMILIES:
         return False
@@ -673,8 +677,8 @@ def _screen_outbound(data: Any) -> None:
     loopback/vsock frames (which carry the runtime's own JWTs/PII) are never
     screened and cannot self-trip the kill-switch. On a positive detection the
     kill-switch trips (ADR-027 §3: "a secret/PII detected leaving") and the send is
-    refused with :class:`EgressTripped`. With no screeners registered (the dormant
-    default this sprint) this is a near-free no-op. Fail-Closed: a screener that
+    refused with :class:`EgressTripped`. With no screeners registered this is a
+    near-free no-op. Fail-Closed: a screener that
     itself raises is treated as a detection rather than silently swallowed — a
     broken screen must not become an open door.
     """
@@ -750,7 +754,7 @@ class _GuardedSocket(_REAL_SOCKET):  # type: ignore[misc,valid-type]
         Called after a successful connect(). Scopes screening to exactly the
         sockets whose payloads can leave the box (a non-loopback INET host on the
         widened external allowlist); loopback and AF_HYPERV never tag. With the
-        external allowlist empty (the dormant baseline) this never tags.
+        external allowlist empty this never tags.
         """
         if _is_external_screen_target(self.family, address):
             self._screen_outbound_enabled = True
@@ -923,12 +927,14 @@ def allow_external_endpoint(host: str, port: int | str = _ALLOWLIST_ANY_PORT) ->
     ``(host, port)`` at a time, each added only as the feature that needs it ships
     (ADR-027 §1 — "starts with Kagi and grows one vetted endpoint at a time").
 
-    **STAGED/DORMANT this sprint:** this mechanism EXISTS but the live list is NOT
-    widened — no caller invokes it in runtime code, so the active allowlist stays
-    loopback + AF_HYPERV only and external egress remains fully denied. The first
-    real call lands when W4 Kagi search ships post-#556. (Calling it does not by
-    itself open egress: the kill-switch is still default-off, the PA still
-    adjudicates per ADR-027 rule 2, and the exfil screen still applies per rule 4.)
+    **Scope of one call:** a widen authorizes exactly one ``(host, port)`` and
+    nothing else; with no widen in force the active allowlist is loopback +
+    AF_HYPERV only and external egress is fully denied. Calling this does not by
+    itself open egress — the kill-switch still gates, the PA still adjudicates per
+    ADR-027 rule 2, and the exfil screen still applies per rule 4. Prefer the
+    scoped, auto-revoking widen in :func:`shared.security.guarded_fetch` over a
+    standing call: a widen that is never revoked is a permanent hole, and no
+    preflight or runtime check currently detects one.
 
     :param host: the external host — a numeric IP or a DNS name. A loopback host is
         rejected (already allowed; an explicit external entry is the point).
@@ -969,7 +975,7 @@ def revoke_external_endpoint(host: str, port: int | str = _ALLOWLIST_ANY_PORT) -
 
 
 def external_allowlist() -> frozenset[tuple[str, str]]:
-    """A snapshot of the widened external allowlist (empty == dormant baseline)."""
+    """A snapshot of the widened external allowlist (empty == no external egress)."""
     return frozenset(_external_allowlist)
 
 
@@ -985,7 +991,7 @@ def resolution_pins() -> dict[str, frozenset[str]]:
     The W4 enabling enhancement (ADR-024 amendment): records which allowlisted
     hostnames each numeric IP was resolved from, so the HTTP client's connect to a
     resolved IP is admitted at the allowlisted port. Empty when no allowlisted host
-    has been resolved (the dormant baseline). Intended for tests / introspection.
+    has been resolved. Intended for tests / introspection.
     """
     with _resolution_pins_lock:
         return {ip: frozenset(hosts) for ip, hosts in _resolution_pins.items()}

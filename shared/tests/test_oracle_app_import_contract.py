@@ -75,9 +75,12 @@ def test_oracle_template_pins_the_model_to_app():
     assert "app" in roots
     assert "calendar_math" not in roots and "text_analyzer" not in roots
 
-    # and the PROMPT itself pins `app` + forbids a second top-level module
+    # and the PROMPT itself pins `app` + forbids a second top-level module.
+    # The pinned example is the generic `from app.<module> import <fn>` form:
+    # the neutral seed (#1048) retired `app/core.py`, so no single module is
+    # canonical — the durable contract is the app-package pin, not one name.
     prompt = captured["p"]
-    assert "from app.core import" in prompt
+    assert "from app.<module> import" in prompt
     assert "top-level module" in prompt          # the explicit "do NOT invent a new top-level module"
     assert "calendar_math" in prompt             # named only as the FORBIDDEN example now
     # spec-blind routing guard preserved (must not collide with the criteria-proposal prompt)

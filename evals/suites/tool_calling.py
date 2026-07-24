@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any
 
 from evals.loader import GoldenDataError, golden_path, load_golden
+from evals.model_target import ModelTarget
 from evals.types import CaseResult, CaseStatus, SuiteReport
 
 SUITE_NAME: str = "tool_calling"
@@ -261,6 +262,7 @@ def run_suite(
     golden_file: Path | None = None,
     *,
     include_hardware: bool = False,  # noqa: ARG001 — suite is fully deterministic
+    model_target: ModelTarget | None = None,  # noqa: ARG001 — no model in this suite
 ) -> SuiteReport:
     """Run the tool-calling suite (deterministic; no model, no GPU)."""
     path = golden_file or golden_path(SUITE_NAME)

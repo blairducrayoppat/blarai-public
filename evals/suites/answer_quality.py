@@ -61,6 +61,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from evals.loader import GoldenDataError, golden_path, load_golden
+from evals.model_target import Capability, ModelTarget
 from evals.rubric import score_answer, validate_checks
 from evals.types import CaseResult, CaseStatus, SuiteReport
 
@@ -82,6 +83,39 @@ _VALID_CATEGORIES: frozenset[str] = frozenset(
 # Generation cap for model-mode cases: ample for a conversational answer,
 # bounded for eval-run wall-clock (the format cases need only a few tokens).
 _EVAL_MAX_NEW_TOKENS: int = 512
+
+#: The AO brain's tool-call tag name. Detection requires this tag in the
+#: RESOLVED strip binding (the gate lock asserts it against
+#: ``resolve_hidden_block_tags``, manifest-aware — a model swap that renames
+#: the tag in the manifest fails loudly there instead of silently breaking
+#: detection into bare empty-string fails).
+_TOOL_CALL_TAG: str = "tool_call"
+
+
+def _production_tool_call_pattern() -> "re.Pattern[str]":
+    """Production's CLOSED-pair tool-call pattern (imported, never copied —
+    SSOT). The AO enters the tool loop only on a closed
+    ``<tool_call>…</tool_call>`` block (``tools._TOOL_CALL_TAG_PATTERN``);
+    a bare marker mention is not a call and must not be detected as one."""
+    from services.assistant_orchestrator.src.tools import _TOOL_CALL_TAG_PATTERN
+
+    return _TOOL_CALL_TAG_PATTERN
+
+
+def is_tool_call_only(raw: str, stripped: str) -> bool:
+    """True when a generation was ONLY hidden blocks and contained a CLOSED
+    native tool-call block: production would execute the tool loop and show
+    the user its final answer; the one-shot harness cannot (#1023), so the
+    case is reached but unscorable — ``CaseStatus.TOOL_CALL``, never a bare
+    fail on an empty string. Deliberately NOT this status: an all-``<think>``
+    empty (production displays the same emptiness) and an UNCLOSED tool-call
+    mention (production's parser requires the closed pair, finds none, runs
+    no tool — the user sees emptiness) — both stay scoreable failures."""
+    return (
+        bool(raw.strip())
+        and not stripped
+        and _production_tool_call_pattern().search(raw) is not None
+    )
 
 # Session id used for the throwaway per-case ContextManager session.
 _EVAL_SESSION_ID: str = "eval-answer-quality"
@@ -199,8 +233,24 @@ def production_tool_call_grammar_posture() -> bool:
     return bool(generation.get("tool_call_grammar", True))
 
 
+def _default_system_prompt() -> str:
+    """The production AO system prompt (imported, never copied — SSOT).
+
+    The LLM path applies this inside ``generate_text`` (system_prompt=None ->
+    ``_DEFAULT_SYSTEM_PROMPT``); the VLM path applies the SAME prompt via manual
+    ChatML so the two pipelines' parity comparison is apples-to-apples.
+    """
+    from services.assistant_orchestrator.src.gpu_inference import (
+        _DEFAULT_SYSTEM_PROMPT,
+    )
+
+    return _DEFAULT_SYSTEM_PROMPT
+
+
 def make_real_ao_generator(
     model_dir: Path | None = None,
+    *,
+    target: ModelTarget | None = None,
 ) -> Callable[[str], str]:
     """Build the model-in-the-loop generator (Arc 140V required).
 
@@ -212,21 +262,50 @@ def make_real_ao_generator(
     the repo's temperature-0 determinism doctrine) so hardware runs are
     reproducible.
 
+    Args:
+        model_dir: Legacy explicit model directory override (kept for callers
+            that pass a directory directly). Ignored when ``target`` is given.
+        target: The #931 OPT-IN hardware model-target override. When ``None``
+            (the default), the resolution and construction are BYTE-IDENTICAL to
+            the historical default 14B ``LLMPipeline`` path. A ``text-llm``
+            target loads its directory through the same ``LLMPipeline`` loader,
+            honoring the declared speculative-decode contract. A
+            ``multimodal-vlm`` target loads through a ``VLMPipeline`` instead
+            (``evals.hardware_pipeline``).
+
     Raises:
         FileNotFoundError: If the model directory is absent (the model is
             gitignored; only the operator's machine has it).
         RuntimeError: If the model fails to load or a generation errors
             (fail-closed).
     """
+    # multimodal-vlm capability -> VLMPipeline arm (the 35B-A3B contract).
+    if target is not None and target.capability is Capability.MULTIMODAL_VLM:
+        from evals.hardware_pipeline import build_vlm_composed_generator
+
+        return build_vlm_composed_generator(
+            target.model_dir,
+            max_new_tokens=_EVAL_MAX_NEW_TOKENS,
+            system_prompt=_default_system_prompt(),
+        )
+
     from services.assistant_orchestrator.src.gpu_inference import (
         GenerationConfig,
         OrchestratorGPUInference,
     )
 
-    resolved = model_dir or default_model_dir()
+    resolved = target.model_dir if target is not None else (model_dir or default_model_dir())
     if not resolved.exists():
         raise FileNotFoundError(f"AO model directory not found: {resolved}")
-    inference = OrchestratorGPUInference(model_dir=str(resolved))
+    # No target => construct EXACTLY as before (byte-identical default). A
+    # text-llm override honors its declared speculative-decode contract.
+    if target is not None:
+        inference = OrchestratorGPUInference(
+            model_dir=str(resolved),
+            speculative_decoding_enabled=target.speculative_decode,
+        )
+    else:
+        inference = OrchestratorGPUInference(model_dir=str(resolved))
     if not inference.load_model():
         raise RuntimeError(f"AO model failed to load from {resolved}")
 
@@ -296,6 +375,25 @@ def _validate_case(case: dict[str, Any]) -> str | None:
     return None
 
 
+def _tool_call_result(case: dict[str, Any], raw: str) -> CaseResult:
+    """Record a tool-call-only generation as its own honest status.
+
+    ``actual`` carries the raw block (bounded) as evidence — the report must
+    show WHAT the model tried to call, or "tool_call" is just a fancier
+    silence."""
+    return CaseResult(
+        case_id=str(case["id"]),
+        status=CaseStatus.TOOL_CALL,
+        description=str(case.get("description", "")),
+        expected=case["checks"],
+        actual=raw[:400],
+        detail=(
+            "model answered with a native tool call; production would run "
+            "the tool loop — the one-shot harness cannot (#1023)"
+        ),
+    )
+
+
 def _score_case(case: dict[str, Any], answer: str) -> CaseResult:
     """Score a stripped answer against the case's rubric checks."""
     case_id = str(case["id"])
@@ -324,6 +422,7 @@ def run_suite(
     *,
     include_hardware: bool = False,
     hardware_generator: Callable[[str], str] | None = None,
+    model_target: ModelTarget | None = None,
 ) -> SuiteReport:
     """Run the answer-quality suite.
 
@@ -338,6 +437,11 @@ def run_suite(
             returns the RAW generation text (the suite applies the
             production strip). Built via :func:`make_real_ao_generator`
             when None and ``include_hardware`` is True.
+        model_target: The #931 OPT-IN hardware model-target override. ``None``
+            (the default) keeps the byte-identical default 14B ``LLMPipeline``
+            path; a target selects that model's directory + pipeline class for
+            the default generator (ignored when ``hardware_generator`` is
+            injected directly, e.g. by tests).
 
     Returns:
         SuiteReport with one CaseResult per golden case.
@@ -358,7 +462,11 @@ def run_suite(
 
         if case["mode"] == "offline":
             try:
-                answer = strip_for_display(str(case["fixture_response"]))
+                fixture = str(case["fixture_response"])
+                answer = strip_for_display(fixture)
+                if is_tool_call_only(fixture, answer):
+                    report.results.append(_tool_call_result(case, fixture))
+                    continue
                 report.results.append(_score_case(case, answer))
             except Exception as exc:  # noqa: BLE001 — scoring must not abort the run
                 report.results.append(
@@ -389,12 +497,15 @@ def run_suite(
 
         try:
             if generator is None:
-                generator = make_real_ao_generator()
+                generator = make_real_ao_generator(target=model_target)
             composed = compose_generation_context(
                 str(case["prompt"]), case.get("grounded_context")
             )
             raw = generator(composed)
             answer = strip_for_display(raw)
+            if is_tool_call_only(raw, answer):
+                report.results.append(_tool_call_result(case, raw))
+                continue
             report.results.append(_score_case(case, answer))
         except Exception as exc:  # noqa: BLE001 — scoring must not abort the run
             report.results.append(

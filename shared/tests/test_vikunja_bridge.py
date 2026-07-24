@@ -167,6 +167,18 @@ class FakeVikunja:
             self._next_id += 1
             return 200, {"id": self._next_id, "comment": body.get("comment", "")}
 
+        m = re.match(r"^/tasks/(\d+)/labels$", path)
+        if m and method == "PUT":  # #887: attach a global label to a task
+            tid = int(m.group(1))
+            label_id = int(body.get("label_id", 0) or 0)
+            label = next((l for l in self._labels if int(l["id"]) == label_id), None)
+            if label is None:
+                return 404, None
+            self._tasks.setdefault(tid, {"id": tid}).setdefault("labels", []).append(
+                dict(label)
+            )
+            return 200, dict(label)
+
         return 404, None
 
     # -- helpers ------------------------------------------------------------
@@ -235,6 +247,30 @@ class FakeVikunja:
 
     def is_done(self, tid: int) -> bool:
         return bool(self._tasks.get(tid, {}).get("done"))
+
+    def task_label_titles(self, tid: int) -> list[str]:
+        """The titles of every label attached to task *tid* (#887)."""
+        return [
+            str(l.get("title", ""))
+            for l in self._tasks.get(tid, {}).get("labels", [])
+        ]
+
+    @property
+    def label_attach_calls(self) -> int:
+        """How many ``PUT /tasks/{id}/labels`` (attach) calls were made (#887)."""
+        return sum(
+            1
+            for (mth, p, _b) in self.calls
+            if mth == "PUT" and re.match(r"^/tasks/\d+/labels$", p)
+        )
+
+    @property
+    def label_create_calls(self) -> int:
+        """How many ``PUT /labels`` (create) calls were made — the runtime bridge
+        must make ZERO of these (#887: label CREATION is migration-only)."""
+        return sum(
+            1 for (mth, p, _b) in self.calls if mth == "PUT" and p == "/labels"
+        )
 
     def last_body(self, method: str, path_re: str) -> dict | None:
         rx = re.compile(path_re)
@@ -334,6 +370,98 @@ def test_ticket_title_carries_the_run_id_marker():
     assert body is not None
     assert body["title"].startswith("[fleet-job RID-99]")
     assert tid is not None
+
+
+# ---------------------------------------------------------------------------
+# #887 — class-of-service / provenance label stamped at ticket CREATION
+# ---------------------------------------------------------------------------
+
+_BATTERY_LABEL = "Battery/Test"
+
+
+def test_service_class_label_stamped_on_create():
+    """A battery-originated job ticket is stamped with the (name-resolved)
+    Battery/Test label at creation — the #887 trusted-signal seam."""
+    fake = FakeVikunja()
+    fake.seed_label(5001, title=_BATTERY_LABEL, hex_color="455a64")
+    tid = vb.ensure_job_ticket(
+        _cfg(), "RID-CL", "build a calc", "battery-calc",
+        service_class_label=_BATTERY_LABEL, transport=fake,
+    )
+    assert tid is not None
+    assert fake.task_label_titles(tid) == [_BATTERY_LABEL]
+    assert fake.label_attach_calls == 1
+    assert fake.label_create_calls == 0  # NEVER created at runtime (migration-only)
+
+
+def test_no_label_param_is_byte_identical_to_today():
+    """The default (no service_class_label) makes ZERO label calls — the
+    back-compat lock for every real-dispatch caller (swap_ops / harness)."""
+    fake = FakeVikunja()
+    fake.seed_label(5001, title=_BATTERY_LABEL, hex_color="455a64")
+    tid = vb.ensure_job_ticket(_cfg(), "RID-NL", "g", "battery-x", transport=fake)
+    assert tid is not None
+    assert fake.task_label_titles(tid) == []
+    assert fake.label_attach_calls == 0
+
+
+def test_missing_label_still_creates_ticket_fail_soft():
+    """The label absent on the server (migration not yet run) must NOT lose the
+    ticket — it is created UNLABELED (the honest, non-destructive direction: a
+    labeling miss never hides a ticket) and the id is still returned so the
+    outcome comment still posts."""
+    fake = FakeVikunja()  # NO Battery/Test label seeded
+    tid = vb.ensure_job_ticket(
+        _cfg(), "RID-ML", "g", "battery-x",
+        service_class_label=_BATTERY_LABEL, transport=fake,
+    )
+    assert tid is not None            # ticket still created
+    assert fake.creates == 1
+    assert fake.task_label_titles(tid) == []
+    assert fake.label_attach_calls == 0   # nothing attached (label absent)
+    assert fake.label_create_calls == 0   # and NEVER created at runtime
+
+
+def test_label_only_applied_on_create_not_on_idempotent_reuse():
+    """An already-existing ticket (idempotent re-report) is returned untouched —
+    the label is stamped exactly once, at creation, never re-applied per report."""
+    fake = FakeVikunja()
+    fake.seed_label(5001, title=_BATTERY_LABEL, hex_color="455a64")
+    cfg = _cfg()
+    first = vb.ensure_job_ticket(
+        cfg, "RID-ONCE", "g", "battery-x",
+        service_class_label=_BATTERY_LABEL, transport=fake,
+    )
+    second = vb.ensure_job_ticket(
+        cfg, "RID-ONCE", "g", "battery-x",
+        service_class_label=_BATTERY_LABEL, transport=fake,
+    )
+    assert second == first
+    assert fake.label_attach_calls == 1  # only the create leg attached the label
+
+
+def test_label_failure_never_suppresses_the_ticket_id():
+    """A transport failure ON THE LABEL-ATTACH leg (after the ticket is created)
+    must not make ensure_job_ticket return None — that would suppress the outcome
+    comment. The label leg is fail-soft in isolation."""
+    fake = FakeVikunja()
+    fake.seed_label(5001, title=_BATTERY_LABEL, hex_color="455a64")
+
+    original_add = vb._VikunjaClient.add_label_to_task
+
+    def _boom(self, task_id, label_id):  # noqa: ANN001
+        raise OSError("simulated label-attach failure")
+
+    vb._VikunjaClient.add_label_to_task = _boom
+    try:
+        tid = vb.ensure_job_ticket(
+            _cfg(), "RID-BOOM", "g", "battery-x",
+            service_class_label=_BATTERY_LABEL, transport=fake,
+        )
+    finally:
+        vb._VikunjaClient.add_label_to_task = original_add
+    assert tid is not None      # the ticket id survives a labeling failure
+    assert fake.creates == 1
 
 
 # ---------------------------------------------------------------------------

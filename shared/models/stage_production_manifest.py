@@ -54,6 +54,18 @@ _DEFAULT_MODEL_DIR: Final[str] = "models/qwen3-14b/openvino-int4-gpu"
 _MANIFEST_FILENAME: Final[str] = "manifest.json"
 _MANIFEST_VERSION: Final[str] = "1.0.0"
 
+# FUT-05 / #107 + #917 — the ENFORCED speculative-decoding DRAFT model dirs (flat
+# layout, top-dir *.bin): both served drafts, each verified by a real code path and
+# signed by the ceremony. ``--drafts`` re-stages them so the signing ceremony has a
+# single documented staging command.
+#   - qwen3-0.6b-pruned-6l/openvino-int8-gpu — shared-pipeline draft (#107).
+#   - qwen3-0.6b/openvino-int4-gpu — PA standalone/fallback draft (#917).
+# Deliberately excluded: qwen2.5-1.5b (not a served model at all).
+_DRAFT_MODEL_DIRS: Final[tuple[str, ...]] = (
+    "models/qwen3-0.6b-pruned-6l/openvino-int8-gpu",
+    "models/qwen3-0.6b/openvino-int4-gpu",
+)
+
 
 def _model_dir() -> Path:
     override = os.environ.get("BLARAI_MODEL_DIR", "")
@@ -315,15 +327,54 @@ def stage_manifest_nested(
     return 0
 
 
+def stage_drafts() -> int:
+    """Stage the enforced speculative-decoding DRAFT manifest (FUT-05 / #107).
+
+    Runs the flat :func:`stage_manifest` for each dir in ``_DRAFT_MODEL_DIRS`` that
+    is present (the shared-pipeline draft; flat top-dir-``*.bin`` layout). A draft
+    that is absent (gitignored / not on this box) is skipped with a note, NOT a
+    failure. Returns 0 when every present draft staged cleanly, 1 if any present
+    draft failed to stage (fail-closed).
+    """
+    _header("BlarAI Draft Manifest Stager (FUT-05 / #107)")
+    staged = 0
+    skipped = 0
+    failed = 0
+    for rel in _DRAFT_MODEL_DIRS:
+        model_dir = Path(rel)
+        if not model_dir.exists():
+            print(f"  [skip] absent (gitignored / not on this box): {model_dir}")
+            skipped += 1
+            continue
+        manifest_path = model_dir / _MANIFEST_FILENAME
+        rc = stage_manifest(model_dir, manifest_path)
+        if rc == 0:
+            staged += 1
+        else:
+            failed += 1
+    print()
+    print(f"  Drafts staged  : {staged}")
+    print(f"  Drafts skipped : {skipped} (absent)")
+    print(f"  Drafts failed  : {failed}")
+    print()
+    print("  NEXT: sign the 14B + this draft with the SAME key —")
+    print("    python -m shared.security.provision_manifest_signing_key")
+    print()
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint.
 
     ``--nested`` (or ``BLARAI_MANIFEST_NESTED=1``) stages the diffusers-OV
     (SDXL / UC-010) NESTED layout — hashing nested ``.bin`` + ``.xml`` +
-    ``model_index.json`` keyed by relative path. The default is the flat 14B
-    layout (top-dir ``*.bin`` only), unchanged.
+    ``model_index.json`` keyed by relative path. ``--drafts`` stages the enforced
+    speculative-decoding DRAFT manifest (shared-pipeline draft; FUT-05 / #107). The
+    default is the flat 14B layout (top-dir ``*.bin`` only), unchanged.
     """
     args = list(argv if argv is not None else sys.argv[1:])
+    if "--drafts" in args:
+        return stage_drafts()
     nested = "--nested" in args or os.environ.get(
         "BLARAI_MANIFEST_NESTED", ""
     ).strip().lower() in ("1", "true", "yes")

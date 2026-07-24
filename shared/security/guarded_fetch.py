@@ -85,9 +85,12 @@ the shared :func:`_fetch_raw` transport core), then REPLACES the text decode + S
 injection scan with :func:`_validate_binary_content` — a MIME-allowlist + magic-byte
 gate (PNG/JPEG/GIF/WEBP only; SVG refused; header/body mismatch refused). It returns a
 :class:`BinaryFetchResult` (a frozen SIBLING of :class:`FetchResult`, NOT a reshape of
-it). The image path is DORMANT: with no adjudicator registered (and the
-``[knowledge].images_enabled`` 4th lock false), every image fetch DENIES until a
-separate LA-reviewed go-live ceremony. The byte cap is per-image (:data:`MAX_IMAGE_BYTES`),
+it). The image path is welded INDEPENDENTLY of the text door, so a text go-live never
+opens it: the registered adjudicator hard-denies the ``uc003-image-ingest`` purpose
+(BED-1, ``services/ui_gateway/src/url_adjudicator.py`` ``IMAGE_INGEST_DENY_PURPOSES``),
+``[knowledge].images_enabled`` gates it separately, and the MIME-allowlist + magic-byte
+gate binds whatever gets through. Lifting the purpose-deny is part of the image go-live
+ceremony, never a side effect. The byte cap is per-image (:data:`MAX_IMAGE_BYTES`),
 enforced by the same streaming-cap read that protects the text path.
 
 THE REGISTRATION SEAM (for callers)
@@ -135,9 +138,10 @@ from shared.security.escalation_consent import (
 )
 
 # The ADR-013 Layer-2 prompt-injection heuristic scanner (the single in-tree
-# implementation; reused, not reinvented). Imported lazily-at-module-load from the
-# gateway document loader — a sibling runtime module, no network dependency.
-from services.ui_gateway.src.document_loader import scan_for_injection
+# implementation; reused, not reinvented). #896: now homed in shared.security —
+# this module previously reached ACROSS the shared→services boundary into the
+# gateway document loader for it; the detector moved to its architectural home.
+from shared.security.injection_scan import scan_for_injection
 
 logger = logging.getLogger(__name__)
 
@@ -178,10 +182,11 @@ _META_CHARSET_RE: Final[re.Pattern[bytes]] = re.compile(
 # downstream image-staging / storage modules. They live HERE (the door) because
 # the door is the leaf module every image consumer already imports, and the
 # byte/MIME caps are a SECURITY contract that must be enforced at the fetch seam
-# itself — not just advised downstream. Everything stays DORMANT: nothing in this
-# module performs a live fetch, and the egress weld (the 3 existing locks + the
-# new `[knowledge].images_enabled=false` 4th lock) keeps every image GET refused
-# until a separate LA-reviewed go-live ceremony.
+# itself — not just advised downstream. These constants govern the IMAGE path
+# only. That path is welded INDEPENDENTLY of the text door — the BED-1
+# `uc003-image-ingest` purpose-deny, the separate `[knowledge].images_enabled`
+# gate, and the MIME/magic-byte gate below — so a text-door go-live never opens
+# it; only a separate LA-reviewed image ceremony does.
 
 # The lowercase MIME types an image fetch may return. SVG is DELIBERATELY ABSENT
 # (and explicitly refused below) — SVG is an XML document that can carry script /
@@ -375,7 +380,9 @@ def register_url_adjudicator(adjudicator: UrlAdjudicator) -> None:
     calls this once at its entry point with a ``Callable[[str, str], Verdict]``
     (url, purpose). With an adjudicator registered, :func:`fetch_external` consults
     it on every URL; with none registered (the default), every fetch is DENIED —
-    today's fail-closed posture, unchanged until a caller wires the real PA.
+    the fail-closed posture. The slot is SINGULAR and first-wins, so which
+    adjudicator is in force depends on which caller wired it first; the two egress
+    layers agree only while the deterministic one holds it (#977 OPEN).
 
     TODO (caller wiring — NOT done in this module by design): the registered
     callable is expected to build a
@@ -1418,11 +1425,13 @@ def fetch_external_binary(
     The text injection scan is SKIPPED on purpose: image bytes are not text, so the
     ADR-013 heuristic scanner has nothing to scan.
 
-    DORMANT (UC-003 Workstream B): with no adjudicator registered (the fail-closed
-    default), every call DENIES at Step 2 — nothing fetches a live image until the
-    LA-reviewed go-live ceremony registers the real PA adjudicator AND the
-    ``[knowledge].images_enabled`` 4th lock is flipped. This function does NOT flip
-    any lock.
+    WELDED (UC-003 Workstream B), independently of the text door: every call DENIES
+    at Step 2 whenever no adjudicator is registered (the fail-closed default) OR the
+    registered adjudicator refuses the purpose — and the production adjudicator
+    hard-denies ``uc003-image-ingest`` by BED-1 purpose-deny, so a text-door go-live
+    does NOT open this path. ``[knowledge].images_enabled`` gates it separately.
+    Opening it takes an LA-reviewed ceremony that lifts the purpose-deny AND flips
+    that flag. This function does NOT flip any lock.
 
     Every failure/ambiguous path returns a denied :class:`BinaryFetchResult`
     (``denied_reason`` set, body fields empty) rather than raising or fetching —
@@ -1451,8 +1460,10 @@ def fetch_external_binary(
         logger.warning("guarded_fetch: image URL refused by SSRF guard (%s)", reason)
         return BinaryFetchResult(url=str(url), denied_reason=f"SSRF guard: {reason}")
 
-    # Step 2 — Policy-Agent adjudication (+ ESCALATE consent). With no adjudicator
-    # registered (the dormant default), this DENIES — no image fetch until go-live.
+    # Step 2 — Policy-Agent adjudication (+ ESCALATE consent). DENIES when no
+    # adjudicator is registered (the fail-closed default) AND when the registered
+    # one refuses the purpose — the production adjudicator purpose-denies image
+    # ingest (BED-1), so this holds even after the text door goes live.
     verdict, deny_reason = _adjudicate(url, safe_purpose)
     if verdict is not Verdict.ALLOW:
         return BinaryFetchResult(url=url, denied_reason=f"policy: {deny_reason}")

@@ -32,10 +32,10 @@ The §3.4 contract, verbatim where it is load-bearing:
     deterministic fallback rendering (facts without prose), so an empty draft
     degrades the cycle's prose, never its correctness.
 
-DORMANCY: pure enum + frozen dataclass with no I/O and no callers in any
-production boot path. The AO's ``coordinator_draft()`` (this seam's producer)
-is itself uncalled until the heartbeat cycle limb wires it behind
-``[coordinator].heartbeat_enabled``. Importing this module arms nothing.
+REACHABILITY: pure enum + frozen dataclass with no I/O. The AO's
+``coordinator_draft()`` (this seam's producer) is driven by the heartbeat cycle
+behind ``[coordinator].heartbeat_enabled`` (dormant default false). Importing this
+module arms nothing.
 """
 
 from __future__ import annotations

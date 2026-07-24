@@ -1,50 +1,186 @@
+---
+title: Test Governance
+status: living
+area: testing
+---
+
 # Test Governance
 
-**BlarAI Phase 5 — Canonical Test Governance Reference**
-**Established:** 2026-04-18 | **Task:** P5-Task-6 | **Ledger:** Entry 38
-**Maintained by:** The EA that changes test counts MUST update this document.
+**BlarAI — Canonical Test Governance Reference** · Established 2026-04-18 (Ledger Entry 38)
+**Maintained by:** the merging session that changes test counts or gate scope — update §1's
+live baseline line in the SAME commit. This is gate-enforced:
+`tests/security/test_doctrine_freshness.py` fails if §1's figure disagrees with
+`CLAUDE.md <status_snapshot>` or if `.github/copilot-instructions.md` pins any count.
 
 ---
 
-## 1. Named Test Scopes
+## 1. The Standing Gate
 
-| Scope | Command | Covers | Baseline |
-|-------|---------|--------|----------|
-| UNIT | `pytest shared/ services/ --tb=short -q` | `shared/`, `services/` (no launcher, no integration) | 755 passed, 2 skipped |
-| FOCUSED | `pytest shared/ services/ launcher/ --tb=short -q` | `shared/`, `services/`, `launcher/` | 791 passed, 2 skipped |
-| REGRESSION | `pytest shared/ services/ tests/ --tb=short -q` | `shared/`, `services/`, `tests/` (slow excluded by default) | 755 passed, 2 skipped, 80 deselected |
-| FULL | `pytest -m "slow or not slow" shared/ services/ tests/ --tb=short -q` | All scopes including slow-marked integration tests | 835 passed, 2 skipped ⚠️ requires live runtime |
-| SERVICE | `pytest services/{service_name}/tests/ --tb=short -q` | Single service only | Varies |
-| SLOW | `pytest -m slow tests/integration/ --tb=short -q` | `tests/integration/` (slow-marked only) | 80 tests ⚠️ requires live runtime |
+**Selection:**
 
-**Valid `{service_name}` values:** `policy_agent`, `assistant_orchestrator`, `semantic_router`, `ui_gateway`, `ui_shell`
+```
+pytest shared/ services/ launcher/ tests/integration/ tests/security/ -m "not hardware and not winui and not slow"
+```
 
-> **FULL and SLOW scopes** exercise slow-marked integration tests that establish real socket connections
-> to the Orchestrator VM. Running without live services will cause test failures. Use these scopes only
-> for task/phase closure gates and runtime validation sessions.
+**Bar:** 0 failed, 0 skipped in a clean environment. A skip is investigated, never waved
+through. Always redirect `LOCALAPPDATA` (§2.6); run from a TERM-bearing shell with no
+`PYTHONIOENCODING` override (the PowerShell tool shell false-fails 3 tests — bash is the
+proven runner).
 
-> **⚠️ Baseline currency (updated 2026-06-07, Sprint-16 close — gate-scope fold, LA-directed):** the
-> per-scope counts in the table above are Sprint-8-era named-scope baselines and are **stale** (the suite
-> has grown many sprints since). The **canonical live baseline** is now the **standing gate** selection
-> `pytest shared/ services/ launcher/ tests/integration/ tests/security/ -m "not hardware and not winui and not slow"`
-> = **3225 passed, 0 skipped, 116 deselected** (2026-06-12, **post the #655 go-live prep** — ADR-027 Am.1 precondition-2 verification (all four activation preconditions MET) + dormant mTLS host-side plumbing (`[guest_parser].mtls_cert/key/ca`, plaintext default); **+3 regression tests** → **3225/0/116 green on clean main** (`6096387`, 2:21). The door stays welded by three implementation locks. **Prior chapter — 3222** (2026-06-12, **post the #655 url-adjudicator deterministic adapter** — `make_deterministic_url_adjudicate` over the already-dormant ADR-027 §2 egress carve-out (in-process `DeterministicPolicyChecker`, the verified pathway — NOT a vsock hop nor a second GPU adjudicator); **+7 regression tests** over the REAL checker → **3222/0/116 green on clean main** (`be603db`, 2:18). The empty egress allowlist denies every URL = a third door lock (adjudicator not-registered + `guest_parser` disabled being the other two). **Prior chapter — 3215** (2026-06-12, **post the #655 sub-task 6 host glue** — the `/ingest <url>` fetch→guest-parse→preview corridor: `clean_from_guest_parse` (host ADR-030 §5 injection compose, byte-identical to `clean_html`), `parse_round_trip` + `GuestParserManager.parse_html` (bridge/in-process content parse), the `ingest_coordinator` URL path through the one PA-gated `guarded_fetch` door, and the `url_adjudicator` factory; **+40 regression tests** → measured **3215/0/116 green on clean main** (`75ba1c7`, 2:10). The egress door stays **deny-by-default**: the adjudicator is built-not-registered and `guest_parser` ships `enabled=false`, so URL ingest refuses by two independent locks until the LA go-live ceremony. **Prior chapter — 3175** (2026-06-11, **post the #655 Stage C merges + the parser error-path hardening + the version bridge + the plaintext-AF_HYPERV fix**: the program-merge 2991 below grew **+70** (Stage C parse channel — `INGEST_PARSE_*` framing + chunking over the 64 KB vsock cap + the guest parser service + egress-scan extension over `services/cleaner/guest`) and **+61** (Stage C guest provisioning + launcher `guest_parser` wiring, `enabled=false` shipped default) → **3122/0/116 measured green** on the integrated tree (1:43; collect-only derivation 2991→3122, zero shortfall); then **+9** parser error-path regression locks (`526e798` — drop-not-crash on un-encodable error replies, 256-char request_id cap, accept-loop catch-all, violation-code split) → **3131/0/116**, 1:18; then **+29** the version bridge (3.14 AF_HYPERV subprocess so the 3.11 runtime reaches the guest; `83580ab`) + **+15** the plaintext-AF_HYPERV bring-up fix (decoupling transport-family from mTLS, fail-closed default; `01538fb`) → **3175/0/116 measured green** on the bridge+fix tree, 4:48. The guest-homed parser's host↔guest round-trip was PROVEN live over the real AF_HYPERV vsock boundary that day — see #655 c.1063). **Prior chapter — 2991** (2026-06-10, **post the #655 UC-002/003 program merge**: the 2565 post-eight-merge figure below grew **+4** (#657 VM stop-on-exit) then **+90** (#577 `guarded_fetch` egress door) → **2659** (the door merge-gate re-run measured 2659/2/116 non-elevated), then **+323** measured net-new from the UC-002/003 program — #655 knowledge bank / cleaner / ingest UX / Stage-A ADRs; collect-only derivation 2661→2984 selected, zero shortfall against the merged tree; measured **2984/0/116 green** on the integrated tree 2026-06-10 on a symlink-privilege (Dev-Mode/elevated) shell — a shell without the symlink-create privilege yields the standing ±2 symlink-skip delta described below; then **+7** from the merge-time real-pipeline integration test (`tests/integration/test_ingest_real_pipeline.py`, `689a08e` — real cleaner through the real ingest coordinator, runbook c.1040 item 4) → **2991/0/116 measured green on clean main**, 5:07). **Prior chapter — 2565** (2026-06-10, **post the eight LA-added gate-criteria merges**; that live run measured **2563/2/116 on a non-elevated shell** — the ±2 is exactly the standing symlink-privilege delta described below; bumped from the 2026-06-09 2360/0/116 by **+126 regression tests across #634 exfil-screen wiring (+14, `651ef4a`), #643 egress proving (+11, `14d21c3`), #637 data-map DACL hardening (+30, `2d82f69`), #639 ESCALATE human-review consumer (+31, `494ebb8`), and #649 Windows-Hello biometric verifier (+40, `c1f51e9`)** — taking the gate to 2486 — then **+61 more across the 2026-06-10 #652 launcher privilege-strip (+26: 16 privilege-strip + 10 orphan-guard), #607 audit-retention/segmentation (+24), and #653 egress fingerprint re-arm (+11)**; all eight landed in the gate selection (deselected unchanged at 116), then **+18 from #611 embedding-cache idle-unload** (2026-06-10, a live-memory footprint feature, not a gate criterion) → 2565. The 2360 itself = the Sprint-18-close 2342/0/113 + 18 #638 token-containment tests + 3 @hardware/@slow from the post-close #612 capstone work (113→116 deselected)). **Shell-elevation note (Sprint-18 finding (a)):** 2565/0 is the **elevated / Dev-Mode shell** number; a **non-elevated shell yields 2563/2**, where the two symlink tests `shared/tests/test_runtime_config.py:84` / `:104` skip for lack of the symlink-create privilege — **0 failures, identical coverage**. Do NOT mistake 2563/2 for a regression. (An isolated worktree that lacks the gitignored `bge-small-en-v1.5` ONNX model additionally env-skips \~20 `services/semantic_router/tests/test_router.py` cases — also benign, also not a regression; they pass on the main checkout where the model is present.) **Port-5001 seam — FIXED (Sprint-18, C6/#630):** the WinUI-harness teardown now reaps its spawned process tree (`tests/harness/process_tree.py`) and a session-scoped autouse fail-loud detector in the root `conftest.py` surfaces a leaked AO on loopback 5001 as a *failure* (free→held delta), not a silent skip — so the deterministic 2360/0 reproduces **without a manual process-kill** (re-confirmed twice from main + by the Sprint-18 Auditor SWAGR). (Under `require_signed_manifest = true` the FUT-04 C7 flip un-skipped 2 signed-manifest tests — prior figures 2212/2/103 Sprint-16, the suite grew across Sprints 17–18; Sprint-18 C1 verified the detached `.sig` at boot.)
+> **LIVE_GATE_BASELINE: 9047 passed / 0 failed / 0 skipped / 125 deselected**
+> *(as of 2026-07-23, #1067 v7 carve-out + honest grading instrument — prior 8919, +128:
+> MEASURED on merged main `c2316106` (primary LF checkout, models present, app down,
+> LOCALAPPDATA redirected, bash runner; 9047 passed / 0 failed / 0 skipped in 266 s),
+> NOT derived. The delta is the #1067 v7 guard suite grown for the carve-out plus the
+> grading instrument's new locks (exact-bipartition screen, fail-loud token cap,
+> grade_window figure lock, characterisation test) and the merge-session disposition
+> discipline. prose_guard.py's runtime behaviour is unchanged; nothing went live
+> (coordinator stays shadow). The branch worktree read 9024/1-CRLF-artifact/21-model-skip;
+> those resolve to 0/0 on the primary checkout, which is why the merged-main figure is
+> the authority — RE-MEASURE here, never derive from a worktree run.)*
 >
-> **This scope CHANGED at the Sprint-16 close** (BUILD_JOURNAL lesson 70; Sprint-16 SWAGR MINOR-4): the
-> prior Layer-A subset was `shared/ services/ launcher/` = 2187, which **excluded** two dirs whose locks
-> must actually fire — `tests/integration/` (the #619 production-parity lane: the boot-cascade smoke +
-> key-transition tests) and `tests/security/` (the posture guards `test_secure_defaults` /
-> `test_root_test_isolation` / `test_no_external_egress`). Both could pass on disk while a green gate said
-> nothing about them. They are now folded into the standing gate so a green run is real coverage. The
-> default `pytest` marker filter (`addopts`) now also deselects `hardware` + `winui` (matching the marker
-> docs), so the GPU boot-smoke (#619 real-model tier), the GUI harness (#621), and the socket E2E (`slow`)
-> stay dev-machine-only. **Still outside the gate:** the benchmark dirs (`tests/pa_quality_benchmark`,
-> `tests/substrate_benchmark`) — excluded from the explicit gate paths. (`tools/tests` was REMOVED
-> 2026-07-04, closing #626: its 4 collection errors were stale orphans of the platform-separation
-> extraction — the modules they import (`tools._project_context`, `tools._vikunja_client`) and the
-> maintained twin copies of all 6 test files live in devplatform, where the suite runs green (85 passed,
-> 2026-07-04) against the real modules. With the orphans gone, full-suite collection is clean and a bare
-> `pytest` becoming the gate is unblocked.) Treat this scope as the authority; the named-scope rows above
-> await a re-measure pass.
+> *(prior entry, 2026-07-23, #1079 grading instrument — prior 8883 (post-#1043 clean-env), +26: the coordinator
+> graduation grading tool's suite in
+> `shared/tests/test_coordinator_graduation_grading.py` — positive control
+> (asserted against a fixture whose known answer is a FAILING window), determinism,
+> oracle/guard independence, corpus fail-loud, superseded-decision abstention, and
+> the N-bar-counts-VERIFIED-decisions lock. MEASURED 8873 in the isolated build
+> worktree, where 21 model-dependent tests env-skip on the gitignored weights;
+> merged main restores those, hence 8909. The +26 was taken from
+> `pytest --collect-only`, not derived: an earlier +23/8891 pair was off by the
+> tests the later fix commits added, and BOTH surfaces carried the wrong figure
+> consistently — which is exactly the #970 hole, so
+> **RE-MEASURE on merged main before trusting this line** rather than relying on
+> the freshness gate, which only compares this figure to the CLAUDE.md snapshot.)*
+>
+> *(prior entry, 2026-07-23, S3 slice A — prior 8852, +16: the #1055 honest-revise
+> message's parametrized false-positive corpus (8 task-edit inputs the pre-merge
+> review's F1/F2 flagged) + true-positive/scope corpus (6 inputs) in
+> `tests/integration/test_dispatch_coordinator.py`. RE-MEASURED on merged main
+> `70d5ddee` (4:17, app down, LOCALAPPDATA redirected, bash runner).)*
+>
+> *(prior entry, 2026-07-23, the scaffold window — prior 8851, +1: the neutral-seed
+> prompt-companion lock (35e8df49). The merged-main re-run caught one
+> pre-existing lock the merge semantically outdated — the oracle-contract test
+> pinned the retired app.core literal; re-pinned to the app-package intent in
+> 8dce0935 and re-measured green at 8852.)*
+>
+> *(prior entry, 2026-07-23, the #1049 window — prior 8828, +23: the already-satisfied
+> pre-check suite + execute-handler contract locks, gated green on merged main
+> c67e99ab in the change's own attribution window.)*
+>
+> *(prior entry, 2026-07-23, the overnight merge train — prior 8780, +48 across five
+> serialized merges, each gated green on merged main: #1021 journal chronology
+> gate +5 (8785), #946 guard lexicon locks +5 (8790), #1059 lesson-tally sync
+> gate +10 (8800), #1060 ceremony-flag capability-truth gate +16 (8816), #1058
+> sandbox-freshness precondition +12 (8828, incl. its timeout-registry row).
+> Every figure MEASURED on merged main, never derived.)*
+>
+> *(prior entry, 2026-07-22, the journal fold's lesson-156 third-instance control — prior
+> 8776, +4 in `test_acceptance_clarify.py`: an `ast` enumeration of every consumer
+> of `planning_seed` after its mint in `generate_plan`, deny-by-default against an
+> explicit allowlist (`rule_spec` alone, which owns the clean `spec.goal` by
+> contract), a paired reached-by-the-seed assertion so "no offender" cannot be
+> satisfied by "no consumer," and a planted-violation toggle-off. Both locks
+> mutation-proven RED against the reverted #1032 fix (both the direct and the
+> LAUNDERED shapes) with byte-exact restore verified by digest, plus a
+> planted-violation toggle-off and a negative control. The figure was WRONG
+> TWICE before it was right: first 8780 from a miscount of helper functions as
+> tests, then 8779 after measuring — and back to 8780 once independent review
+> added the negative control. The count is now MEASURED, never derived.
+> Prior 8776: #1031 S1 advanced-intake DORMANT merge — prior 8744, +32
+> across `test_advanced_intake.py` (realism guard + delivery floor + the #1041
+> identity-idempotency and floor-then-guard ordering lock driven through the real
+> generate_plan), `test_plan_handler.py` (the three #1042 dormancy locks over the
+> REAL config loader + the fail-open close), and `test_acceptance_clarify.py`;
+> measured on merged main `72c0990c`, app down, models present. Flag ships false.
+> Prior 8744: #1050 ledger-candidate gate — prior 8735, +9 from
+> `test_ledger_candidate_discipline.py` (every ledger "tuning candidate" names a
+> `#NNN` or an explicit `no-ticket:` reason with a word floor; BLOCK-scoped, not
+> line-windowed; whitespace-normalised so a hard-wrapped phrase is still seen;
+> planted-violation toggle-off; both honest forms as negative controls; a
+> different-block ticket must NOT satisfy a candidate). The gate FAILED on its
+> first run against the live ledger, catching three unreferenced candidate
+> blocks — two un-ticketed since the seed run (now #1049). An independent review
+> then found the first implementation 25% blind to wrapped phrases and ~83%
+> ineffective on its line window; rebuilt, and the reviewer's own plant-everywhere
+> experiment went 16.8% -> 65.9% caught with all four realistic placements caught.
+> Round 2 then fixed a FALSE POSITIVE (a nested sub-bullet reference was refused;
+> only a top-level bullet starts a block now) and corrected a wrong characterisation
+> of the residual in the round-1 commit message - measured 0 of 221 misses matched
+> the stated mechanism, the true one being its mirror image.
+> Measured 8742 with a battery run CONCURRENT (467s vs the usual ~230s); 0 failed
+> / 0 skipped, and re-measured uncontended on merged main.
+> Prior 8735: #1032 job-oracle requirements channel — prior 8733, +2 from
+> `test_acceptance_clarify.py` (the clarified-requirements block reaches the
+> MULTI-task job-oracle authoring prompt verbatim, captured from the real
+> prompt rather than asserted on the argument, vacuity-guarded; plus the
+> no-requirements byte-identity proof by prompt EQUALITY across the two
+> no-requirements paths). Mutant proven: reverting the one argument turns the
+> first lock RED and correctly leaves the second GREEN.
+> Prior 8733: #989 wave-1 scope ceiling — prior 8711, +22: **21** from the
+> new `test_wave1_scope_ceiling.py` (scope-ceiling composition reaching ROOT tasks,
+> <2-task exemption, shared/ambiguous-ownership permitting, plan-time
+> contract-coverage warn-loud on both oracle origins, added-only scope-sprawl
+> finding, evidence control-stripping) + **1** from `test_integration_gate.py` (the
+> exact-sequence dep-delta ref pin that replaced a provably weaker re-pinned lock —
+> review round 1, F1); measured clean on merged main `49988be8`, app down.
+> Prior 8711: #1006 tool-call status — prior 8695, +16 from
+> `test_eval_harness.py` (TestToolCallStatus: closed-pair detection incl.
+> unclosed-mention-stays-a-fail, full baseline transition matrix, offline-path
+> equivalence, resolved-binding drift lock); measured clean on merged main
+> `e28c255a`, app down.
+> Prior 8695: #877 revise repo-path fix — prior 8694, +1 from
+> `test_dispatch_coordinator.py` (revise-minted tasks carry the plan-time
+> resolved repo path; production-shaped fixture, toggle-off proven red);
+> measured clean on merged main `9c972dcc`, app down.
+> Prior 8694: #1022 gate-spec restoration — prior 8692, +2 from
+> `test_doctrine_freshness.py` (comprehension-gate section-list pin on every
+> gate-stating surface + toggle-off proof); measured clean on merged main
+> `c6d1926a`, app down.
+> Prior 8692: #1003 order-probe — prior 8690, +2 from `test_oracle_qa.py`
+> (coverage-map order-independence, both injection hooks, vacuity-guarded).
+> Prior 8690: the six-merge overnight cluster — prior 8653, +37 measured
+> on merged main (never summed per-branch): #1001 trend locks, #1008 the
+> battery-plans suite, #1010 baseline-validation locks, #1004 corpus integrity,
+> #795 stopword locks.
+> Prior 8653: #1009 unwired-generator-is-a-skip (+2 from
+> `test_eval_oracle_quality.py` — unwired generator does not fail the run; a
+> generator that RAISES is still an ERROR, never a skip).
+> Prior 8651: #1000 hardware-tier baseline teeth (+14, `test_eval_harness.py` —
+> unbaselined-failure regression ×2 statuses, first-pass not-a-regression,
+> recorded-known-failure unchanged, non-canonical baseline status ×6,
+> non-string baseline status is a harness error ×4).
+> Prior 8637: the #965 oracle-unfit attribution fix (+9, `test_integration_gate.py`).
+> Prior 8628: the #994 doc-rot gate (+34 from `test_doc_pointers_and_banners.py`).
+> Prior 8594: deferral-discipline (+28, `9ecad198`); 8566: #978 pair; 8555: #927.
+> Clean env = models present, app down, TERM-bearing shell.
+> An ISOLATED WORKTREE cannot confirm the 0-skipped half of this figure: without
+> the gitignored models it reports 21 env-skips (20 `services/semantic_router/
+> tests/test_router.py` needing bge-small-en-v1.5 ONNX, 1 `test_benchmark_kv_
+> cache_sweep.py` needing the 14B `config.json`). Benign and bounded — but it
+> means a worktree-measured figure is PROVISIONAL: the passed count is real,
+> the 0-skipped claim is not yet evidence. Confirm it with a full run on merged
+> main and correct this line if it differs (#1000, 2026-07-20).
+> The merging session updates this line + `CLAUDE.md <status_snapshot>` in the same
+> commit that changes counts — the freshness gate enforces agreement.
+> NOTE: that gate compares these two surfaces only to EACH OTHER (#970), so a
+> wrong-but-consistent pair passes silently — re-measure, never copy the other file.)*
+
+**Documented environmental deltas (benign only because named and bounded):**
+non-elevated shell → 2 symlink skips · isolated worktree without the gitignored models →
+~21 router env-skips · live app on :5001 → 7 skips · PowerShell tool shell → 3
+false-fails (TERM / PYTHONIOENCODING) · a `PYTHONUNBUFFERED`/`-u` override → 2
+`launcher/tests/test_import_side_effects.py` false-fails (2026-07-21 — do not add
+output-buffering overrides to gate invocations). An unexplained skip is a defect.
+
+**Deselected tiers** run at their own dev-machine ceremonies: `@hardware` (model-loaded,
+real Arc 140V), `@winui` (GUI harness), `@slow` (socket E2E). Model-quality eval gate:
+`python -m evals.run --suite all` — committed baselines, regression exit codes with teeth.
+
+**History:** every prior baseline chapter and the Sprint-8-era named-scope tables live in
+[`docs/archive/testing/baseline_history.md`](archive/testing/baseline_history.md) — do
+NOT append chapters here; the live line above and the shipping ticket are the record.
 
 ---
 
@@ -52,17 +188,14 @@
 
 | Activity | Required Scope | Notes |
 |----------|----------------|-------|
-| Single-service code change | SERVICE + REGRESSION | Run targeted first, then regression |
-| Shared library change | REGRESSION | Shared code impacts all consumers |
-| Cross-service change | REGRESSION | Any change touching 2+ services |
-| Code-change milestone gate | REGRESSION | Standard EA quality gate |
-| Runtime / E2E validation | SLOW or FULL | When testing against live services |
-| Task closure gate | FULL | All tests including slow must pass |
-| Phase closure gate | FULL | All tests including slow must pass |
-| Quick smoke check during dev | UNIT | Fastest feedback loop |
+| Single-service code change | targeted service tests, then the standing gate | Run targeted first for fast feedback |
+| Shared library change | standing gate | Shared code impacts all consumers |
+| Cross-service change | standing gate | Any change touching 2+ services |
+| Merge quality gate | standing gate | Branch gate-green before merge; re-run on merged main after |
+| Runtime / E2E validation | `slow` tier or on-hardware | When testing against live services |
+| Quick smoke check during dev | targeted paths | Fastest feedback loop |
 
-> **Default scope for SDO-generated EA prompts:** REGRESSION, unless the milestone explicitly
-> requires FULL (runtime validation or task/phase closure).
+> Dispatched/briefed work states its scope in the brief; default is the standing gate.
 
 ---
 
@@ -183,59 +316,34 @@ prompt-flow preflight as a default boot gate), #621 (the WinUI GUI automation ha
 objective named by the Lead Architect: *production stability and speedy development with as little
 human involvement as is reasonable.*
 
+**Structural spawn-surface ratchet (#774 sub-task 4, 2026-07-17).** `tests/integration/test_no_new_raw_spawn_sites.py` is a deny-by-default gate in the standing selection: it AST-scans production `shared/` / `services/` / `launcher/` code and FAILS LOUD if any raw `subprocess.*` / `os.spawn*` / `os.system` call site is not in its documented allowlist, forcing new spawns through the blessed `shared/procspawn.py` helper (the lesson-219 Windows-stdio scar family). The allowlist is a ratchet — it only shrinks as #774 sub-task 2 migrates the known `shared/fleet/*` sites onto the helper. Test trees and `procspawn.py` itself are scoped out (documented in the test's SCOPE note).
+
+**Doctrine-freshness ratchet (#945 D8, 2026-07-19).** `tests/security/test_doctrine_freshness.py`
+is a deny-by-default gate over the always-loaded doctrine surfaces: it FAILS if this document's
+§1 live figure and `CLAUDE.md <status_snapshot>` disagree, if `.github/copilot-instructions.md`
+pins a test count, if `docs/sprints/ACTIVE_SPRINT.md`'s refresh date falls >14 days behind the
+latest main commit, if a hot doctrine file exceeds its size budget, or if a retired-world term
+re-enters an always-loaded surface (small documented allowlist in the test). One-time cleanups
+rot; this is the structure that keeps them clean — every frozen doc the 2026-07-18 audit found
+had a retired role as its stated owner.
+
 ---
 
-## 3. Canonical Baseline
+## 3. Baseline Management
 
-### Current Baseline
-
-| Scope | Passed | Skipped | Deselected | Notes |
-|-------|--------|---------|------------|-------|
-| UNIT | 755 | 2 | — | No launcher / no integration |
-| FOCUSED | 791 | 2 | — | Adds 36 launcher tests vs. UNIT |
-| REGRESSION | 755 | 2 | 80 | 80 slow tests deselected by default |
-| FULL | 835 | 2 | — | Requires live Orchestrator VM |
-| SLOW | 80 collected | — | — | Requires live runtime to pass |
-| SERVICE | Varies | — | — | Parameterized — run per service |
-
-### Baseline Provenance
-
-| Field | Value |
-|-------|-------|
-| Branch at establishment | `feature/p5-task6-test-governance` |
-| main HEAD at Task 6 start | `103dfe6` |
-| Date | 2026-04-18 |
-| Ledger entry | Entry 38 |
-| Verification method | Empirical runs of all scope commands |
-
-FULL scope baseline (835/2) is from Task 5 M5.5 pre-streamlining gate (Entry 37) and confirmed
-by verifying that `-m "slow or not slow"` successfully overrides the default `addopts` marker
-filter (override syntax confirmed working 2026-04-18).
-
-### Update Policy
-
-- Baseline MUST be updated whenever tests are added, removed, or reclassified.
-- The EA that changes test counts MUST update this section as part of their milestone commit.
-- `.github/copilot-instructions.md` baseline MUST stay in sync with this document.
-  **This document is the canonical source of truth.**
-- Stale baselines are a governance violation.
-- **Re-baselining scope rule:** When an EA adds, removes, or reclassifies tests, they MUST
-  re-run ALL scopes that could be affected — not just the scope used during development.
-  Example: adding a unit test affects UNIT, FOCUSED, REGRESSION, and FULL. The EA must run
-  each affected scope, capture the summary line, and update every baseline row that changed.
-  This prevents drift where an EA adds tests but only updates one row.
-
-### Pre-Existing Skips
-
-Two tests are permanently skipped (pre-existing since Task 4, accepted):
-
-| Test | Reason |
-|------|--------|
-| `test_build_prompt_does_not_contain_no_think` | Qwen3 thinking suppression constants intentionally deferred |
-| `test_stop_token_ids_constants_defined` | Qwen3 stop token constants intentionally deferred |
-
-These skips are accepted and do not constitute failures. They will be resolved when the
-deferred constants work is scheduled.
+- **The live figure lives in exactly two places:** §1's `LIVE_GATE_BASELINE` line and
+  `CLAUDE.md <status_snapshot>`. The merging session that changes test counts updates BOTH in
+  the same commit. Everything else (briefs, tickets, this doc's other sections,
+  `.github/copilot-instructions.md`) POINTS at those two — pinning a count elsewhere is a
+  governance violation, now gate-enforced.
+- **Re-baselining scope rule:** when tests are added, removed, or reclassified, re-run the
+  standing gate (branch AND merged main), capture the summary line in the commit/ticket, and
+  update the two live-figure surfaces.
+- **Baselines are evidence:** an eval baseline once encoded a parser bug as expected behavior.
+  Cross-check baselines on substrate changes; re-measure known-fail cases at every hardware
+  ceremony.
+- Historic baselines (the growth chapters, the Sprint-8 named-scope tables, that era's accepted
+  skips): [`docs/archive/testing/baseline_history.md`](archive/testing/baseline_history.md).
 
 ---
 
@@ -269,7 +377,7 @@ Application rule: Apply at module level via `pytestmark`, not per-test.
 
 1. New markers MUST be registered in root `pyproject.toml` with a description.
 2. New markers MUST have documented default behavior (selected or deselected).
-3. Adding a marker that changes default selection MUST update the baseline table above.
+3. Adding a marker that changes default selection MUST update §1's live baseline line.
 4. Marker names: lowercase, single word, descriptive.
 5. Any new marker requires an update to this document.
 
@@ -277,7 +385,7 @@ Application rule: Apply at module level via `pytestmark`, not per-test.
 
 ## 5. Gate-Checking Order
 
-All EA milestones follow this order. Do not skip or reorder.
+All merges follow this order. Do not skip or reorder.
 
 ### Gate 1 — COMPILE
 
@@ -291,33 +399,21 @@ All EA milestones follow this order. Do not skip or reorder.
 
 | Field | Value |
 |-------|-------|
-| Command | Use the scope defined in the EA prompt (default: REGRESSION) |
-| Pass criteria | (a) Zero new failures; (b) pass count ≥ baseline for the scope used; (c) no new skips without documented justification |
+| Command | The standing gate (§1), unless the work's brief names a different scope |
+| Pass criteria | (a) Zero new failures; (b) pass count ≥ the live baseline; (c) no new skips without documented justification |
 | Fail action | **STOP** — diagnose and fix before proceeding |
-| Evidence | Capture the pytest summary line in the commit message and/or ledger entry |
+| Evidence | Capture the pytest summary line in the commit message and/or ticket |
 
 ### Gate 3 — REGRESSION *(test infrastructure changes only)*
 
 Required when test files are added/removed/renamed, markers changed, or `pyproject.toml`
-test config modified.
+test config modified: re-run the standing gate on the merged tree and update §1's live
+line if counts changed.
 
-| Field | Value |
-|-------|-------|
-| Command | FULL scope: `pytest -m "slow or not slow" shared/ services/ tests/ --tb=short -q` |
-| Pass criteria | Total pass count matches FULL baseline (835 passed, 2 skipped) |
-| Fail action | **STOP** — the test infrastructure change broke something |
+### Relationship to `.github/copilot-instructions.md`
 
-### Relationship to `copilot-instructions.md`
-
-The `copilot-instructions.md` gate-checking order (Compile → Test → Oracle) is the top-level
-rule. This document provides the detailed implementation of the TEST gate: which scope to use,
-pass criteria, and evidence requirements.
-
-### SDO Prompt Integration
-
-- Every SDO-generated EA prompt MUST specify which test scope to use in its `<quality_gate>` section.
-- Default is REGRESSION unless the milestone involves runtime validation or task/phase closure.
-- The EA MUST capture and report the exact pytest summary line.
+That file is the compressed mirror for non-Claude coding agents. It carries the gate
+COMMAND and points at §1 for the figure — it never pins a count (gate-enforced).
 
 ---
 
@@ -366,7 +462,7 @@ Do NOT invent new conventions. Follow the established patterns above.
   dependencies: IPC sockets, file I/O, network calls, hardware interfaces. They run without
   any running services.
 - **Integration tests** (`tests/integration/`) test real cross-service interaction and MUST
-  receive the `slow` marker (module-level `pytestmark`).
+  receive the `slow` marker (module-level `pytestmark`) when they meet §4's criteria.
 - No test should require manual setup or external state beyond what pytest fixtures provide.
 
 ### Coverage Expectation
@@ -375,20 +471,13 @@ No numeric coverage target (avoids over-engineering).
 
 Gate rule: Every public function or class added or modified MUST have at least one test
 exercising its primary (happy) path AND at least one test exercising its error/edge path.
-This is enforced by code review (SDO or Lead Architect), not by tooling.
+This is enforced by code review, not by tooling.
 
 ---
 
 ## 7. Stale Artifacts
 
-The following root-level files are historical snapshots and are **NOT authoritative**.
-Do not use them for current baselines.
-
-| File | Era | Content | Status |
-|------|-----|---------|--------|
-| `pytest_baseline.txt` | Phase 3 closure | 670 passed | STALE |
-| `pytest_output.txt` | Task 4 era | 786 collected | STALE |
-| `pytest_m53_gate.txt` | Task 5 M5.3 | 835 passed | Superseded by this document |
-| `pytest_m54_gate.txt` | Task 5 M5.4 | 835 passed | Superseded by this document |
-
-The canonical source of truth for all test baselines is this document (`docs/TEST_GOVERNANCE.md`).
+The historical root-level pytest snapshots (`pytest_baseline.txt`, `pytest_output.txt`,
+`pytest_m53_gate.txt`, `pytest_m54_gate.txt`) were archived to `docs/archive/root-debris/`
+on 2026-07-19 (#945 D6). They were never authoritative; the canonical source of truth for
+all test baselines is this document's §1 live line.

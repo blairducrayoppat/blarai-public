@@ -19,10 +19,10 @@ fingerprint suitable for replay.
 ## Prerequisites
 
 - [STYLE.md](STYLE.md) — binding governance template.
-- [ADR-010](../adrs/ADR-010-Policy-Agent-GPU-Classification.md) —
+- [ADR-010](../adrs/ADR-010-PA-Device-Allocation-GPU-Classification.md) —
   Policy Agent classification on GPU; motivates the adjudication
   log events.
-- [ADR-011](../adrs/ADR-011-Policy-Agent-GPU-NPU-Retirement.md) —
+- [ADR-011](../adrs/ADR-011-All-LLM-Inference-GPU-NPU-Retirement.md) —
   GPU-only inference; motivates the model-load and generation log
   events.
 - **ADR-absence note**: no ADR directly governs BlarAI's logging

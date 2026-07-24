@@ -1,8 +1,8 @@
 # BlarAI Image Generation — Operator Guide
 
 UC-010 Local Generative Imaging (ADR-033). A plain-language reference for the
-operator: what the three commands do, the **bounds** that aren't obvious, what
-the model is good and bad at, and the tuning knobs. Written for a non-developer.
+operator: what the commands do, the **bounds** that aren't obvious, what the
+models are good and bad at, and the tuning knobs. Written for a non-developer.
 
 > Companion docs: `uc010_image_gen_go_live.md` (the one-time activation ceremony)
 > and `services/assistant_orchestrator/config/default.toml` `[image_generation]`
@@ -10,11 +10,14 @@ the model is good and bad at, and the tuning knobs. Written for a non-developer.
 
 ---
 
-## 1. The three commands
+## 1. The commands
 
 | Command | What it does | Notes |
 |---|---|---|
-| `/imagine <prompt>` | Text → image, from scratch | Your main tool. |
+| `/imagine <prompt>` | Text → image, from scratch | Your main tool. Photoreal. |
+| `/illustrate <prompt>` | Text → **crisp flat-vector illustration** | Uses a separate illustration model. Just describe the subject — the flat style is added for you. |
+| `/cartoon <prompt>` | Text → **soft cartoon** | Same model as `/illustrate` plus a style adapter applied at runtime. If the adapter cannot load it falls back to the flat-vector look rather than failing. |
+| `/images` | List / delete stored images | Housekeeping for the encrypted image store. |
 | `/edit <seed> <prompt>` | Image + text → image (img2img) | `<seed>` is a **local** image — a `blarai-img://<id>` reference, an absolute local file path, or a bare filename under `userdata/`. **Never a URL** (image generation does zero network egress — a URL seed is refused). A prompt must follow the seed. |
 | `/save <id> <path>` | Writes the decrypted PNG to a local file | This is how you get an image out of the encrypted store to view it. `<id>` is the 32-character id from the `blarai-img://…` reference (or the full reference). Refuses network/UNC destinations. |
 
@@ -44,9 +47,9 @@ Every generated image is referenced as `blarai-img://<32-hex-id>` and stored
 | Strong at | Weak at — and the fix |
 |---|---|
 | Single photoreal subjects | **Multiple distinct subjects** — it tends to drop or merge a secondary one. Fix: describe each concretely, place them "in the foreground," and re-roll a few times (generation is random — some seeds include them, some don't). |
-| Faces that **fill the frame** — portraits and close-ups look excellent | **Small faces in wide shots** — a face that's only \~50 pixels in a 1024² frame has too few pixels and comes out mushy. Fix: frame the subject closer, or use hires-fix (§5). |
+| Faces that **fill the frame** — portraits and close-ups look excellent | **Small faces in wide shots** — a face that's only \~50 pixels in a 1024² frame has too few pixels and comes out mushy. Fix: frame the subject closer. (Hires-fix was the other remedy, but it is **off by default** for memory reasons — §6.) |
 | Realistic scenes, materials, lighting, fabric | **Abstract / unknown things** ("aliens of an unknown species") — with no strong mental image it substitutes humans or sci-fi clichés. Fix: describe them concretely ("tall grey-skinned humanoids with smooth elongated heads and large black almond-shaped eyes"). |
-| Photorealism (it is a photoreal model) | **Cartoons and named characters.** "flying like Superman" made it draw the *actual* Superman (cape and all); cartoon subjects come out painterly/realistic. Fix: describe the *look and pose*, never name a character. |
+| Photorealism (`/imagine` uses a photoreal model) | **Named characters.** "flying like Superman" made it draw the *actual* Superman, cape and all. Fix: describe the *look and pose*, never name a character. **For cartoons, don't fight `/imagine` — use `/cartoon` or `/illustrate`**, which run a different model built for it (§1). Cartoon subjects asked of `/imagine` come out painterly/realistic. |
 
 ---
 
@@ -79,7 +82,7 @@ quality/behavior dials — none change what the model *can* do, only how it rend
 | `guidance_scale` | `7.0` | How literally it obeys the prompt. **Sweet spot 5–8.** Lower (\~4–5) = more natural, photoreal; higher (\~8–9) = more literal adherence but can look over-saturated / "fried." Range 0–30. |
 | `steps` | `30` | Denoising steps. **Useful range \~25–40.** This is NOT a few-step model — very low values (e.g. 6) produce **pure noise**. More steps = slightly more detail, slower. |
 | `negative_prompt` | (quality terms) | Steers *away* from the common artifacts (bad hands, blur, watermarks, bad anatomy). It is **quality-only** — it contains **no content/subject terms**, so it does **not** re-censor the model. Edit it freely; set to `""` to disable. A per-`/imagine` negative would override it. |
-| `hires_enabled` | `true` | The hires-fix second pass (§6). Set `false` for fast drafts. |
+| `hires_enabled` | **`false`** | The hires-fix second pass (§6). **Off by default since 2026-07-02** — at the shipped `hires_max_edge`/`hires_factor` it exhausts system RAM on this box (§6). Turning it on is opting into that risk; read §6 first. |
 | `hires_factor` | `1.5` | Upscale multiple for the refine pass (1.0–4.0). Lower to `1.25` if you hit the memory fallback (§6). |
 | `hires_strength` | `0.4` | How much the refine pass changes the image (low = preserve composition, just add detail). |
 | `hires_max_edge` | `1536` | Hard cap on the refined image's longest edge — a memory safety limit. |
@@ -90,23 +93,50 @@ quality/behavior dials — none change what the model *can* do, only how it rend
 
 - **Resolution:** 1024×1024 is the native and best size; it is capped there.
   Going higher risks duplicated/garbled features and a lot more memory.
-- **Time:** roughly **30–50 s** for a base image; **\~90–100 s+ with hires-fix on**
-  (it does a second pass plus a model swap).
-- **The memory ceiling is real.** The machine has **31.3 GB** shared between the
-  CPU and the GPU. The always-loaded 14B chat model holds \~14–17 GB of that, so
-  image generation runs in what's left. A full hires-fix pass at 1536² needs
-  \~26 GB on its own, which does **not** fit alongside the resident 14B.
-- **Hires-fix is fail-soft.** If the refine pass runs out of memory, it
-  **silently returns the base (un-refined) image** rather than failing the whole
-  generation. So if an image unexpectedly comes out at plain/base quality, that's
-  why. (In `launcher.log` you'll see a `hires-fix refine` line followed by a
-  fall-back.) **Status:** a rework is in progress so an explicit `/imagine`
-  temporarily frees the 14B for the duration of the generate (then reloads it),
-  which lets hires-fix run cleanly co-resident. Until that lands, hires quality is
-  reliable only when the 14B isn't competing for memory.
+- **Time:** measured live in-app `/imagine` turns run **\~50–60 s** for a base
+  image (50.7 / 56.0 / 58.6 s); cold end-to-end runs recorded 43.8 s photoreal,
+  39.8 s illustration, 60.6 s cartoon. **Budget about a minute** — no end-to-end
+  turn on record matches the "30 s" this guide used to claim. (The *generate step
+  alone* is faster — a 20-step run measured \~30 s — but you never see it in
+  isolation: SDXL is evicted after every image, so each `/imagine` reloads the
+  pipeline, then generates, then stores the encrypted result.)
+  Hires-fix is **off by default**
+  (see below); when it was on it roughly doubled that, and in the measured failure
+  case took \~209 s.
+- **The memory ceiling is real, and base generation runs close to it.** The
+  machine has a **31.3 GiB** ceiling shared between the CPU and the GPU. (All the
+  figures in this bullet are GiB, so they can be compared against each other and
+  the ceiling.) Evicting the always-loaded 14B frees roughly **8 GiB** when it was
+  freshly built; after it has been reloaded during a session an evict returns
+  \~11 GiB, but the extra is transient state the reload path allocates, not the
+  model itself, and it is all returned. So the resident 14B is about **8 GiB of the
+  budget**. The recorded phase-0 gate for a base 1024² generate **with the 14B held
+  resident** peaked at **26.0 GiB, leaving 5.3 GiB headroom**. A later live session
+  measured a tighter peak still: **\~29.1 GiB in use with only \~2.1–2.6 GiB
+  available** during `/imagine`. Treat base generation as fitting, but not
+  comfortably.
+- **Hires-fix is OFF by default, and that is a deliberate safety decision.**
+  `hires_enabled = false` since 2026-07-02, set after an operator live-verify on
+  this exact box. What was measured: the 1536² refine drove system RAM to **100%
+  (8 MB available)** *even with the 14B evicted* — so the earlier idea that
+  evicting the 14B would let hires run cleanly co-resident was tested and did not
+  hold. That generate took **\~209 s** (past the 175 s UI failsafe, producing a
+  false "timed out" while the image had in fact been made), and it left the
+  process degraded: the next `/save` reported "Insufficient memory" with 22 GB
+  actually free. Base 1024² is fast and stable by comparison — but as the bullet
+  above records, it is not running with lots of room to spare, which is exactly
+  why the extra buffers of a 1536² refine had nowhere to go.
+- **If you want to re-enable it**, do not just flip `hires_enabled`. Lower the
+  ceiling first — `hires_max_edge = 1280`, `hires_factor = 1.25` — and re-measure
+  RAM headroom. The shipped `1536` / `1.5` values are the ones that failed.
+- **Hires-fix is fail-soft when it does run.** If the refine pass runs out of
+  memory it **silently returns the base (un-refined) image** rather than failing
+  the whole generation. So if an image unexpectedly comes out at plain/base
+  quality, that is why — in `launcher.log` you will see a `hires-fix refine` line
+  followed by a fall-back.
 - **Timeout:** a very long generation can exceed the app's wait window and show a
-  "timed out" message even though the image was generated and stored — the
-  timeout is being raised to accommodate the two-pass hires path.
+  "timed out" message even though the image was generated and stored. With hires
+  off, base generations sit well inside the window.
 
 ---
 

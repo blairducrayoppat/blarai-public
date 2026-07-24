@@ -33,11 +33,14 @@ def test_run_setup_creates_every_bucket_and_label_on_a_fresh_project():
 
     for title in cs.KANBAN_BUCKETS:
         assert results[f"bucket:{title}"] is not None
-    for title, _color in cs.CLASSES_OF_SERVICE:
+    for title, _color in cs.SETUP_LABELS:
         assert results[f"label:{title}"] is not None
+    # #887: the provenance label (Battery/Test) is provisioned alongside the
+    # class-of-service labels — the runtime resolves it by name.
+    assert results["label:Battery/Test"] is not None
 
     assert len(fake._buckets[(7, 2)]) == len(cs.KANBAN_BUCKETS)
-    assert len(fake._labels) == len(cs.CLASSES_OF_SERVICE)
+    assert len(fake._labels) == len(cs.SETUP_LABELS)
 
 
 def test_run_setup_is_idempotent_across_two_runs():
@@ -47,7 +50,7 @@ def test_run_setup_is_idempotent_across_two_runs():
 
     assert first == second  # SAME ids both times — nothing re-created
     assert len(fake._buckets[(7, 2)]) == len(cs.KANBAN_BUCKETS)  # not doubled
-    assert len(fake._labels) == len(cs.CLASSES_OF_SERVICE)  # not doubled
+    assert len(fake._labels) == len(cs.SETUP_LABELS)  # not doubled
 
 
 def test_run_setup_only_creates_the_missing_items():
@@ -63,7 +66,7 @@ def test_run_setup_only_creates_the_missing_items():
     assert results["bucket:Backlog"] == 999  # found, not re-created
     assert results["label:Expedite"] == 888  # found, not re-created
     assert len(fake._buckets[(7, 2)]) == len(cs.KANBAN_BUCKETS)  # still exactly 5
-    assert len(fake._labels) == len(cs.CLASSES_OF_SERVICE)  # still exactly 4
+    assert len(fake._labels) == len(cs.SETUP_LABELS)  # no dup of the pre-existing
 
 
 def test_run_setup_reports_failure_per_step_without_crashing():
@@ -72,7 +75,7 @@ def test_run_setup_reports_failure_per_step_without_crashing():
     assert all(v is None for v in results.values())
     assert set(results.keys()) == {
         *(f"bucket:{t}" for t in cs.KANBAN_BUCKETS),
-        *(f"label:{t}" for t, _ in cs.CLASSES_OF_SERVICE),
+        *(f"label:{t}" for t, _ in cs.SETUP_LABELS),
     }
 
 
@@ -90,10 +93,12 @@ def test_find_orphans_flags_unrecognized_bucket_and_label():
     orphans = cs.find_orphans(7, 2, transport=fake)
     assert orphans["buckets"] == ["Someday/Maybe"]
     assert orphans["labels"] == ["Wontfix"]
+    # #887: Battery/Test is a KNOWN provenance label — never flagged as an orphan.
+    assert cs.PROVENANCE_LABELS[0][0] not in orphans["labels"]
 
     # Never removed — orphan-flagging is report-only.
     assert len(fake._buckets[(7, 2)]) == len(cs.KANBAN_BUCKETS) + 1
-    assert len(fake._labels) == len(cs.CLASSES_OF_SERVICE) + 1
+    assert len(fake._labels) == len(cs.SETUP_LABELS) + 1
 
 
 def test_find_orphans_empty_on_a_clean_migrated_project():

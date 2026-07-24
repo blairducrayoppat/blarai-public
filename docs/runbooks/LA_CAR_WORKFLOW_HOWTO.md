@@ -1,12 +1,24 @@
 # How to Run a Corrective Action — Lead Architect Guide
 
-> **Who this is for**: you, the Lead Architect (LA), when you've found an issue in a Fleet Report and want it fixed.
+> # ⛔ RETIRED — NOTHING READS `[CAR]` ANY MORE
 >
-> **What you'll learn**: the full Corrective Action Report (CAR) workflow — from flagging an issue, to reviewing Co-Lead's remediation plan, to approving it, to verifying the fix.
+> **If you write `[CAR]` in a Vikunja comment today, nobody and nothing will respond. Ever.**
 >
-> **How long the whole cycle takes**: about 20–40 minutes of your active time spread across 1–3 hours (fleet does most of the work in between your touches).
+> This guide promises a remediation plan "within about 15 minutes (Co-Lead's next scheduled wake
+> cycle)". That agent no longer runs. Verified 2026-07-19 — `Wake Co-Lead Architect`,
+> `Wake SDO` and `Wake EA Code` are all **Disabled** scheduled tasks, and they are disabled
+> deliberately: the autonomous EA/SDO/Co-Lead fleet was retired. The peer-review lattice this guide
+> describes ("peer review catches the common mistakes") is not watching anything.
+>
+> **What to do instead:** tell your Claude session directly, in plain language. Say what looks wrong
+> and what you expected. It diagnoses, fixes, and reports back in the same conversation — no flag
+> syntax, no waiting, no separate approval round. Anything worth keeping becomes a Vikunja ticket so
+> it survives the session.
+>
+> **Kept only as historical record** of how corrective actions worked under the retired fleet. Every
+> instruction below is inert. Do not follow any of it.
 
-Before reading this, read [LA_FLEET_REPORTS_HOWTO.md](LA_FLEET_REPORTS_HOWTO.md) first — it covers basic report-reading and the point where you decide to flag something.
+Before reading this, read [LA_FLEET_REPORTS_HOWTO.md](LA_FLEET_REPORTS_HOWTO.md) first — it covers basic report-reading and the point where you decide to flag something. **That guide is retired too and carries the same warning.**
 
 ---
 

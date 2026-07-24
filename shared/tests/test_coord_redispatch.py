@@ -129,6 +129,42 @@ class TestVerdictContract:
 
 
 # ---------------------------------------------------------------------------
+# #887 — a synthetic battery/test park is non-actionable (stages nothing)
+# ---------------------------------------------------------------------------
+
+
+class TestTestOriginNonActionable:
+    def test_battery_repo_stages_nothing_even_for_parked(self, store, topology) -> None:
+        """A ``battery-*`` sandbox park never becomes a redispatch proposal — the
+        ruler refuses it BEFORE the SG check or the store are touched (its honest
+        park was its deliverable; it feeds #855 grading, not proposals)."""
+        result = _cycle(store, topology, [_outcome()], repo_id="battery-calc")
+        assert result.staged == () and result.deduped == ()
+        assert len(result.ineligible) == 1
+        assert "test-origin" in result.ineligible[0].reason
+        assert "battery-calc" in result.ineligible[0].reason
+        assert store.list_active() == []  # nothing ever reached the store
+
+    def test_battery_repo_marks_every_outcome_non_actionable(self, store, topology) -> None:
+        """EVERY outcome of a test-origin run is non-actionable, regardless of
+        result word (a battery park, a battery merge, etc.)."""
+        outcomes = [
+            _outcome(task="t-parked"),
+            _outcome(task="t-merged", result="MERGED", detail="merged"),
+        ]
+        result = _cycle(store, topology, outcomes, repo_id="battery-textstats")
+        assert result.staged == ()
+        assert {s.task for s in result.ineligible} == {"t-parked", "t-merged"}
+        assert store.list_active() == []
+
+    def test_non_battery_repo_still_stages(self, store, topology) -> None:
+        """The guard is scoped to the reserved prefix — a real workspace repo is
+        untouched by it (the back-compat contrast)."""
+        result = _cycle(store, topology, [_outcome()], repo_id="myapp")
+        assert len(result.staged) == 1
+
+
+# ---------------------------------------------------------------------------
 # Eligibility — only PARKED stages
 # ---------------------------------------------------------------------------
 

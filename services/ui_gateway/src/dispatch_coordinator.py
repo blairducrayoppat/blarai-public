@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,6 +58,34 @@ from shared.fleet.acceptance import AcceptanceSpec, PlanResult
 from shared.ttl_dict import TtlDict
 
 logger = logging.getLogger(__name__)
+
+#: Vocabulary that signals the operator is trying to change the plan's CRITERIA
+#: or SCOPE — which ``/dispatch revise`` structurally CANNOT touch (#1055). Revise
+#: edits the TASK list only; acceptance criteria are set by the goal and are
+#: immutable across a revision. When a no-op revise carried this vocabulary, the
+#: honest answer is "criteria are set by the goal — reject + re-dispatch to change
+#: scope", NOT "try describing the change differently" (which loops forever,
+#: because no rephrasing lets revise edit a criterion).
+#:
+#: DELIBERATELY NARROW, and the narrowing is the point (pre-merge review F1/F2):
+#: revise DOES add/remove/reorder/re-scope TASKS, so "feature", "features",
+#: "check", "checks" and bare "acceptance" are TASK words — matching them told an
+#: operator dropping a task to reject the whole plan, which is false. The only
+#: terms kept are ones that rarely mean a task: ``criteria``/``criterion``,
+#: ``requirement(s)``, ``scope``, and the ``drop/remove … the goal`` construction
+#: (the LA's live phrasing, "drop the goal-setting …", fires via ``goal``). A MISS
+#: just yields the generic message (harmless); a false positive misdiagnoses a
+#: real task edit (the dangerous direction here), so this errs toward missing.
+_CRITERIA_SCOPE_SIGNALS = re.compile(
+    r"\b(?:criteri(?:a|on)|requirements?|scope|"
+    r"(?:drop|remove|delete|cut|get\s+rid\s+of)\s+(?:the\s+)?goal)\b",
+    re.IGNORECASE,
+)
+
+
+def _feedback_targets_criteria(feedback: str) -> bool:
+    """True when revise feedback reads as a criteria/scope change, not a task edit."""
+    return bool(_CRITERIA_SCOPE_SIGNALS.search(feedback or ""))
 
 _PREFIX = "/dispatch"
 
@@ -89,6 +118,10 @@ class PendingDispatch:
     tasks: list = field(default_factory=list)  # compiled {repo,task,prompt}
     spec: AcceptanceSpec = field(default_factory=lambda: AcceptanceSpec(goal=""))
     ecosystem: str = "unknown"
+    #: #888: the scaffold's behaviour-GATED ecosystem (``node``/``python``, else ``""``) when the
+    #: run will scaffold a fresh repo — drives the plan card's honest coverage disclosure across
+    #: re-renders (revise / revise-failed). Empty preserves the pre-#888 warning byte-for-byte.
+    scaffold_ecosystem: str = ""
     submitted_at: str = ""
     #: #820: how many times this pending plan has been REVISED by operator feedback. Each
     #: successful revision REPLACES this slot (the old plan is tombstoned) with the count
@@ -122,6 +155,9 @@ class PendingClarification:
     spec: AcceptanceSpec = field(default_factory=lambda: AcceptanceSpec(goal=""))
     question: dict = field(default_factory=dict)  # {question, options:[{label, surface}]}
     ecosystem: str = "unknown"
+    #: #888: the scaffold's behaviour-GATED ecosystem, carried so the post-answer preview shows
+    #: the honest coverage disclosure (see :class:`PendingDispatch`). Empty == today's warning.
+    scaffold_ecosystem: str = ""
     fell_back: bool = False
     submitted_at: str = ""
 
@@ -509,6 +545,17 @@ class DispatchCoordinator:
         if clarifications:
             spec = replace(spec, clarifications=tuple(clarifications))
 
+        # #888: a New-Project repo is an empty README shell at PLAN time, so ecosystem sniffs
+        # ``unknown`` and the card would wrongly warn "I couldn't tell the language" — yet the
+        # run's OWN scaffold pins the language minutes later and the behaviour checks DO run.
+        # When the repo will actually be scaffolded (no project markers yet) AND the build signal
+        # maps to a behaviour-GATED scaffold (node/python), resolve that ecosystem so the preview
+        # states the run's truth. Existing repos and non-gated surfaces yield "" -> honest warning
+        # preserved. This is a disclosure fix — it NEVER widens a real coverage claim.
+        scaffold_ecosystem = ""
+        if ecosystem == "unknown" and acc.repo_will_scaffold(repo_path):
+            scaffold_ecosystem = acc.scaffold_gated_ecosystem(spec.build_plan)
+
         # Increment 4 — the confidence-gated clarifying question. If (and ONLY if) the 14B
         # flagged a genuinely ambiguous platform fork, the SYSTEM (never the model) asks ONE
         # curated question BEFORE the normal approval preview. resolve_clarifying_question is
@@ -524,6 +571,7 @@ class DispatchCoordinator:
                 spec=spec,
                 question=question,
                 ecosystem=ecosystem,
+                scaffold_ecosystem=scaffold_ecosystem,
                 fell_back=plan.fell_back,
                 submitted_at=datetime.now(timezone.utc).isoformat(),
             )
@@ -531,7 +579,8 @@ class DispatchCoordinator:
 
         return self._finalize_pending(
             session_id, run_id=rid, repo=repo, goal=goal,
-            tasks=plan.tasks, spec=spec, ecosystem=ecosystem, fell_back=plan.fell_back,
+            tasks=plan.tasks, spec=spec, ecosystem=ecosystem,
+            scaffold_ecosystem=scaffold_ecosystem, fell_back=plan.fell_back,
         )
 
     # ── CREATE + PLAN: /dispatch new <name> | <goal>  (#712) ──────────────
@@ -601,7 +650,7 @@ class DispatchCoordinator:
     def _finalize_pending(
         self, session_id: str, *, run_id: str, repo: str, goal: str,
         tasks: list, spec: AcceptanceSpec, ecosystem: str, fell_back: bool,
-        clarified_note: str = "", revision_count: int = 0,
+        scaffold_ecosystem: str = "", clarified_note: str = "", revision_count: int = 0,
     ) -> str:
         """Store the approval-pending dispatch + render the normal PLAN preview.
 
@@ -618,13 +667,15 @@ class DispatchCoordinator:
             tasks=tasks,
             spec=spec,
             ecosystem=ecosystem,
+            scaffold_ecosystem=scaffold_ecosystem,
             submitted_at=datetime.now(timezone.utc).isoformat(),
             revision_count=revision_count,
         )
         # Signal the gateway to attach Approve/Reject buttons to this preview (#712).
         self._last_action[session_id] = "dispatch_plan"
         preview = acc.render_criteria_preview(
-            spec, ecosystem=ecosystem, tasks=tasks, revise_hint=self._revise_hint(revision_count)
+            spec, ecosystem=ecosystem, tasks=tasks, revise_hint=self._revise_hint(revision_count),
+            scaffold_ecosystem=scaffold_ecosystem,
         )
         if fell_back:
             # Honesty: the 14B couldn't fully parse the goal, so the plan is a thin
@@ -685,7 +736,7 @@ class DispatchCoordinator:
                 session_id, run_id=clarifying.run_id, repo=clarifying.repo,
                 goal=clarifying.goal, tasks=fallback_tasks, spec=clarifying.spec,
                 ecosystem=clarifying.ecosystem, fell_back=clarifying.fell_back,
-                clarified_note=note,
+                scaffold_ecosystem=clarifying.scaffold_ecosystem, clarified_note=note,
             )
 
         chosen = options[idx]
@@ -708,12 +759,21 @@ class DispatchCoordinator:
         refined_tasks = acc._thread_build_fields(
             [dict(t) for t in clarifying.tasks], refined_spec
         )
+        # #888: the fork just resolved ambiguous -> a real device surface, so RE-derive the
+        # scaffold's gated ecosystem for the RESOLVED surface (a resolves-to-web fresh repo now
+        # earns the honest "checks will run" disclosure instead of the blind warning). Only when
+        # detection was blind AND a scaffold will run; else "" keeps today's warning.
+        scaffold_eco = ""
+        if clarifying.ecosystem == "unknown" and acc.repo_will_scaffold(
+            self._repo_path(clarifying.repo)
+        ):
+            scaffold_eco = acc.scaffold_gated_ecosystem(refined_plan)
         note = f"Got it — building it for: {chosen_label}."
         return self._finalize_pending(
             session_id, run_id=clarifying.run_id, repo=clarifying.repo,
             goal=clarifying.goal, tasks=refined_tasks, spec=refined_spec,
             ecosystem=clarifying.ecosystem, fell_back=clarifying.fell_back,
-            clarified_note=note,
+            scaffold_ecosystem=scaffold_eco, clarified_note=note,
         )
 
     @staticmethod
@@ -801,7 +861,7 @@ class DispatchCoordinator:
         feature_tasks = [t for t in pending.tasks if t.get("task") != acc.ACCEPTANCE_TASK_SLUG]
         test_tasks = [t for t in pending.tasks if t.get("task") == acc.ACCEPTANCE_TASK_SLUG]
         if not feature_tasks:
-            return self._revise_failed(session_id, pending, "there are no editable steps")
+            return self._revise_failed(session_id, pending, "there are no editable steps", feedback)
         titles = [acc._humanize_task_name(t) for t in feature_tasks]
 
         # The revise request rides the goal (feedback + current titles) over the SAME plan seam
@@ -813,9 +873,15 @@ class DispatchCoordinator:
             # plan is left completely intact (revise never mutates until it fully succeeds).
             return plan.message
         ops = _revise.ops_from_dicts(plan.revision)
-        outcome = _revise.apply_revision_ops(feature_tasks, ops, repo=pending.repo)
+        # Task dicts carry the plan-time RESOLVED repo path (decompose_request mints
+        # ``str(projects_dir / repo)``) — a minted add/revise task must match, or the
+        # execute-time forbidden-root guard refuses the bare name resolved against the
+        # AO process cwd (~/BlarAI).
+        outcome = _revise.apply_revision_ops(
+            feature_tasks, ops, repo=str(self._repo_path(pending.repo))
+        )
         if outcome is None or not outcome.changed:
-            return self._revise_failed(session_id, pending, None)
+            return self._revise_failed(session_id, pending, None, feedback)
 
         # Thread build fields onto the revised feature tasks (idempotent for the kept ones — the
         # spec is unchanged), then re-attach the preserved acceptance-tests task LAST.
@@ -839,18 +905,45 @@ class DispatchCoordinator:
         return self._finalize_pending(
             session_id, run_id=pending.run_id, repo=pending.repo, goal=pending.goal,
             tasks=revised_tasks, spec=new_spec, ecosystem=pending.ecosystem, fell_back=False,
+            scaffold_ecosystem=pending.scaffold_ecosystem,
             clarified_note=delta, revision_count=pending.revision_count + 1,
         )
 
     def _revise_failed(
-        self, session_id: str, pending: PendingDispatch, reason: "str | None"
+        self,
+        session_id: str,
+        pending: PendingDispatch,
+        reason: "str | None",
+        feedback: str = "",
     ) -> str:
         """Fail-soft (#820): re-render the ORIGINAL plan card with an honest "couldn't apply
         that" note. The pending plan is UNCHANGED — not tombstoned, revision count not consumed —
         so the operator can rephrase, approve, or reject. Touches the slot so an actively-engaged
-        plan isn't reaped mid-refine."""
+        plan isn't reaped mid-refine.
+
+        #1055: when the no-op is because the feedback asked to change CRITERIA or SCOPE — which
+        revise structurally cannot do (it edits tasks, never the goal-set criteria) — say so
+        plainly and route to reject + re-dispatch, instead of "describe it differently", which
+        for a criteria change can never succeed no matter the wording."""
         self._pending.touch(session_id)
         self._last_action[session_id] = "dispatch_plan"
+        # Only the genuine no-op path (reason is None) gets the criteria message.
+        # A structural reason like "there are no editable steps" is accurate and
+        # kept — the criteria branch must not discard it (pre-merge review F3).
+        if reason is None and _feedback_targets_criteria(feedback):
+            note = (
+                "I couldn't change that through revise — revise edits the plan's STEPS, but that "
+                "reads like a change to the acceptance criteria or scope (what the build is "
+                "checked against), which are set by the goal and can't be edited on a pending "
+                "plan. To change the scope or criteria, reply /dispatch reject and start a new "
+                "dispatch with a tighter goal. Or /dispatch approve to build the plan as shown."
+            )
+            preview = acc.render_criteria_preview(
+                pending.spec, ecosystem=pending.ecosystem, tasks=pending.tasks,
+                revise_hint=self._revise_hint(pending.revision_count),
+                scaffold_ecosystem=pending.scaffold_ecosystem,
+            )
+            return note + "\n\n" + preview
         note = (
             "I couldn't turn that into a change to the plan"
             + (f" ({reason})" if reason else "")
@@ -860,6 +953,7 @@ class DispatchCoordinator:
         preview = acc.render_criteria_preview(
             pending.spec, ecosystem=pending.ecosystem, tasks=pending.tasks,
             revise_hint=self._revise_hint(pending.revision_count),
+            scaffold_ecosystem=pending.scaffold_ecosystem,
         )
         return note + "\n\n" + preview
 

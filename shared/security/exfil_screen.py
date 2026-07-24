@@ -1,13 +1,15 @@
 r"""Outbound exfiltration screen — block-on-detection (ADR-027 §4).
 
-STAGED / DORMANT (Sprint 17, Vikunja #628 / criterion C3, stream H-b). This module
-is the *mechanism* that screens an outbound payload for secrets and Personally
-Identifiable Information (PII) **before** it leaves the host — even to an
-allowlisted endpoint. It changes NO runtime behaviour this sprint: the air-gap
-stays welded (the egress allowlist remains loopback + vsock only, ADR-020), so
-nothing is ever screened in production until the first web feature ships under
-#556. It exists now so the Tier-3 egress build is *complete* and locked the day
-egress is enabled — not bolted on under deadline.
+This module is the *mechanism* that screens an outbound payload for secrets and
+Personally Identifiable Information (PII) **before** it leaves the host — even to
+an allowlisted endpoint (ADR-027 §4, Vikunja #628 / criterion C3, stream H-b).
+
+Its reach is a function of the egress allowlist, not of a date: the egress guard
+tags a socket for screening only when its destination is an allowlisted EXTERNAL
+endpoint, so with an empty allowlist nothing is screened, and every endpoint the
+allowlist names has its outbound payloads screened on every send. Read which
+endpoints are live from the runtime wiring and the per-scope runbooks under
+``docs/runbooks/`` — never from this docstring.
 
 What it does (ADR-027 §4 — "screen every outbound payload, block on detection"):
   - :func:`screen` examines a payload and returns a :class:`Detection`. On any
@@ -349,9 +351,9 @@ def screen_and_enforce(payload: Any) -> Detection:
 def wire_into_egress_guard() -> None:
     """Register :func:`screen` as the egress-guard outbound screener at arm time.
 
-    This is the runtime wiring (Vikunja #634) that turns the built-and-tested
-    exfil screen from a module with no caller into the live outbound-payload
-    screener (ADR-027 rule 4). The launcher calls this once, around
+    This is the runtime wiring (Vikunja #634) that makes the built-and-tested
+    exfil screen the live outbound-payload screener (ADR-027 rule 4). The
+    launcher calls this once, around
     ``egress_guard.arm()``, at the real process entry.
 
     The wiring is via the documented **arm-hook seam**, NOT a direct
@@ -369,12 +371,12 @@ def wire_into_egress_guard() -> None:
     ``register_screener`` both de-duplicate, so a second call (or a re-import) does
     not stack a second screener.
 
-    SAFETY (dormant today): registering the screener does NOT enable any external
-    egress and does NOT screen internal traffic. The egress guard only invokes the
-    screener for sockets connected to a vetted EXTERNAL-allowlisted endpoint; with
-    the external allowlist empty (the production baseline this sprint), no socket
-    is ever tagged, so the registered screener is a behavior-free no-op until a web
-    feature ships post-#556 and widens the allowlist.
+    SAFETY: registering the screener does NOT enable any external egress and does
+    NOT screen internal traffic. The egress guard only invokes the screener for
+    sockets connected to a vetted EXTERNAL-allowlisted endpoint, so registration is
+    allowlist-scoped in both directions: with the external allowlist empty no
+    socket is ever tagged and the registered screener is a behavior-free no-op;
+    each widen brings exactly that endpoint's sends under the screen.
     """
     from shared.security import egress_guard
 

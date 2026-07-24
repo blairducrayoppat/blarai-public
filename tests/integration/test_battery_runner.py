@@ -691,6 +691,206 @@ def test_reensure_real_socket_only_when_certs_absent(tmp_path):
         srv.close()
 
 
+#: A properly-framed TLS fatal alert record: handshake_failure (content-type 21,
+#: legacy version 0x0303, length 2, level fatal, description 40). A client that
+#: reads this mid-handshake raises ssl.SSLError DETERMINISTICALLY — unlike raw
+#: garbage bytes, whose close/RST teardown races the client's read on Windows
+#: loopback and intermittently surfaces ConnectionResetError ('unreachable')
+#: instead (the ~25% flake adversarial review caught, then a residual race
+#: survived the first hold-open fix — the alert record removes the race class).
+_TLS_FATAL_HANDSHAKE_FAILURE = b"\x15\x03\x03\x00\x02\x02\x28"
+
+
+def _spawn_plain_server(*, hang: bool):
+    """A loopback NON-TLS server: accepts, then either stays SILENT (*hang* — the
+    client's TLS handshake times out, the post-swap cold-load shape) or answers the
+    ClientHello with a framed fatal TLS alert (a protocol-level SSLError — a TLS
+    failure that is NOT a verification failure). Returns ``(port, stop_fn)``."""
+    import socket as _socket
+    import threading
+
+    srv = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    srv.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(8)
+    srv.settimeout(0.5)
+    port = srv.getsockname()[1]
+    stop = threading.Event()
+
+    def _serve() -> None:
+        while not stop.is_set():
+            try:
+                raw, _ = srv.accept()
+            except _socket.timeout:
+                continue
+            except OSError:
+                break
+            try:
+                if hang:
+                    stop.wait(timeout=10.0)  # never answer the ClientHello
+                else:
+                    raw.recv(64)             # swallow (part of) the ClientHello…
+                    # …answer with a VALID fatal alert record (see the constant
+                    # above — deterministic SSLError, no RST race), then HOLD
+                    # the connection open until the client errors and closes.
+                    raw.sendall(_TLS_FATAL_HANDSHAKE_FAILURE)
+                    raw.settimeout(10.0)
+                    try:
+                        raw.recv(1)
+                    except OSError:
+                        pass
+            except OSError:
+                pass
+            finally:
+                try:
+                    raw.close()
+                except OSError:
+                    pass
+
+    t = threading.Thread(target=_serve, daemon=True)
+    t.start()
+
+    def _stop() -> None:
+        stop.set()
+        srv.close()
+        t.join(timeout=2.0)
+
+    return port, _stop
+
+
+def test_probe_ao_mtls_names_the_failure_reason(tmp_path):
+    """#906: the probe NAMES its outcome — only a verification failure is cert
+    drift. The night-20260714 runner log labeled every probe failure 'cert drift',
+    which sent the diagnosis at the wrong cause; these pin the taxonomy."""
+    from shared.security.cert_provisioning import (
+        CA_CERT_NAME,
+        GATEWAY_CLIENT_CERT_NAME,
+        GATEWAY_CLIENT_KEY_NAME,
+        PA_SERVER_CERT_NAME,
+        PA_SERVER_KEY_NAME,
+        provision_per_boot_certs,
+    )
+
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    provision_per_boot_certs(certs_dir=a)
+    provision_per_boot_certs(certs_dir=b)  # a different CA (the drift)
+
+    client_cert = a / GATEWAY_CLIENT_CERT_NAME
+    client_key = a / GATEWAY_CLIENT_KEY_NAME
+    port, stop = _spawn_mtls_server(a / PA_SERVER_CERT_NAME, a / PA_SERVER_KEY_NAME)
+    try:
+        assert bat.probe_ao_mtls(port, client_cert, client_key,
+                                 a / CA_CERT_NAME) == bat.AO_MTLS_HEALTHY
+        assert bat.probe_ao_mtls(port, client_cert, client_key,
+                                 b / CA_CERT_NAME) == bat.AO_MTLS_VERIFY_FAILED
+    finally:
+        stop()
+    # The just-closed port refuses -> unreachable, NOT drift.
+    assert bat.probe_ao_mtls(port, client_cert, client_key,
+                             a / CA_CERT_NAME) == bat.AO_MTLS_UNREACHABLE
+    # Absent certs -> unprobeable, never raises.
+    assert bat.probe_ao_mtls(port, tmp_path / "nope.pem", tmp_path / "no.key",
+                             a / CA_CERT_NAME) == bat.AO_MTLS_UNPROBEABLE
+    # The boolean wrapper agrees with the taxonomy (compat for every caller).
+    assert bat.ao_mtls_healthy(port, client_cert, client_key, a / CA_CERT_NAME) is False
+
+
+def test_probe_ao_mtls_timeout_and_peer_failures_are_never_drift(tmp_path):
+    """#906: the NON-drift failure shapes seen at real job boundaries — a
+    handshake that TIMES OUT (post-swap cold-load: the box is GPU/CPU-saturated
+    and the AO cannot answer the ClientHello in time) and a peer that kills the
+    handshake — are named as themselves, never as cert drift.
+
+    The timeout classification is pinned EXACTLY. The kill-the-handshake case is
+    pinned to the {tls-error, unreachable} UNION: empirically (12-run loops on
+    this box), Windows loopback races the peer's alert/close against the
+    client's in-handshake read, so the SAME server behavior truthfully surfaces
+    as either an SSLError (read the alert -> tls-error) or a
+    ConnectionResetError (RST won -> unreachable). Both are honest non-drift,
+    non-timeout classifications; asserting one exact winner was a ~25-40% flake
+    (caught in adversarial review, confirmed against two server variants). The
+    discrimination that is a CONTROL — never verify-failed, never timeout — is
+    asserted exactly."""
+    from shared.security.cert_provisioning import (
+        CA_CERT_NAME,
+        GATEWAY_CLIENT_CERT_NAME,
+        GATEWAY_CLIENT_KEY_NAME,
+        provision_per_boot_certs,
+    )
+
+    certs = tmp_path / "certs"
+    provision_per_boot_certs(certs_dir=certs)
+    client_cert = certs / GATEWAY_CLIENT_CERT_NAME
+    client_key = certs / GATEWAY_CLIENT_KEY_NAME
+    ca = certs / CA_CERT_NAME
+
+    port, stop = _spawn_plain_server(hang=True)
+    try:
+        assert bat.probe_ao_mtls(port, client_cert, client_key, ca,
+                                 timeout_s=1.0) == bat.AO_MTLS_TIMEOUT
+    finally:
+        stop()
+
+    port, stop = _spawn_plain_server(hang=False)
+    try:
+        reason = bat.probe_ao_mtls(port, client_cert, client_key, ca, timeout_s=2.0)
+        assert reason in {bat.AO_MTLS_TLS_ERROR, bat.AO_MTLS_UNREACHABLE}
+        assert reason != bat.AO_MTLS_VERIFY_FAILED  # NEVER drift
+        assert reason != bat.AO_MTLS_TIMEOUT        # and never a timeout mislabel
+    finally:
+        stop()
+
+
+def test_reensure_real_log_distinguishes_drift_from_non_drift(tmp_path):
+    """#906: the ensure-ao READINESS log claims 'cert drift' ONLY on a real
+    verification failure. Any other probe failure names its reason instead —
+    the night-20260714 log said 'cert drift' for every shape, and a mislabeled
+    control message is a silent-degradation defect (fail-loud means honest)."""
+    from shared.security.cert_provisioning import (
+        PA_SERVER_CERT_NAME,
+        PA_SERVER_KEY_NAME,
+        provision_per_boot_certs,
+    )
+
+    server_certs = tmp_path / "server" / "certs"
+    drift_certs = tmp_path / "drift" / "certs"
+    provision_per_boot_certs(certs_dir=server_certs)
+    provision_per_boot_certs(certs_dir=drift_certs)
+
+    # A REAL verification failure -> the drift message.
+    drift_lines: list[str] = []
+    port, stop = _spawn_mtls_server(server_certs / PA_SERVER_CERT_NAME,
+                                    server_certs / PA_SERVER_KEY_NAME)
+    try:
+        drifted = bat.AoReensurer.real(port=port, repo_root=tmp_path,
+                                       reboot_log_dir=tmp_path, certs_dir=drift_certs,
+                                       log=drift_lines.append)
+        assert drifted.ready() is False
+    finally:
+        stop()
+    assert any("cert drift" in ln for ln in drift_lines)
+
+    # A NON-verify TLS failure with MATCHING certs -> named reason, never 'drift'.
+    other_lines: list[str] = []
+    port, stop = _spawn_plain_server(hang=False)
+    try:
+        not_tls = bat.AoReensurer.real(port=port, repo_root=tmp_path,
+                                       reboot_log_dir=tmp_path, certs_dir=server_certs,
+                                       log=other_lines.append)
+        assert not_tls.ready() is False  # still fail-closed NOT ready
+    finally:
+        stop()
+    assert not any("cert drift" in ln for ln in other_lines)
+    # The named reason is either honest transport outcome of the killed
+    # handshake (see the union rationale on the probe test above) — what
+    # matters here is that a reason IS named and it is not the drift claim.
+    assert any(
+        f"({bat.AO_MTLS_TLS_ERROR})" in ln or f"({bat.AO_MTLS_UNREACHABLE})" in ln
+        for ln in other_lines
+    )
+
+
 async def test_run_battery_calls_ensure_ao_before_each_job(tmp_path):
     cards = bat.load_cards(_SPEC_DIR)
     picked = [cards["B1"], cards["B2"]]
@@ -1351,3 +1551,305 @@ def test_run_budget_field_is_validated():
                for e in validate_card({**base, "run_budget_s": -1}))
     assert any("run_budget_s" in e
                for e in validate_card({**base, "run_budget_s": "6h"}))
+
+
+# ===========================================================================
+# #1058 — sandbox-freshness precondition (lesson 225's third-instance control)
+# ===========================================================================
+#
+# The gate must be proven BOTH ways (the "every control is tested off" rule):
+# engaged, a dirty sandbox is refused BEFORE any per-card spend (no re-ensure,
+# no dispatch — the refusal costs the card, never the night); toggled off, the
+# same dirty sandbox sails through — proving the block above comes from THIS
+# control and nothing else. All fixtures are throwaway tmp_path repos; no test
+# reads or writes the operator's real battery sandboxes.
+
+
+def _git(repo, *args):
+    import subprocess
+
+    cp = subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.email=t@local", "-c", "user.name=t",
+         "-c", "commit.gpgsign=false", *args],
+        capture_output=True, text=True,
+    )
+    assert cp.returncode == 0, f"git {' '.join(args)} failed: {cp.stderr}"
+
+
+def _make_sandbox(projects_dir, name, subjects):
+    """A throwaway fixture sandbox: git init + one empty commit per subject."""
+    repo = Path(projects_dir) / name
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-q")
+    for subject in subjects:
+        _git(repo, "commit", "-q", "--allow-empty", "-m", subject)
+    return repo
+
+
+def _freshness_card(repo_name):
+    """A REAL loaded card (B1) retargeted at a fixture sandbox, so only the
+    freshness axis is under test."""
+    card = dict(bat.load_cards(_SPEC_DIR)["B1"])
+    card["repo"] = repo_name
+    return card
+
+
+class _SpyHarness:
+    """The live-shaped surface run_battery reads (.config, .overall_timeout_s,
+    run_job) with dispatch RECORDED — the gate's whole claim is about whether
+    run_job is reached, so the spy is the reachability instrument, not a mock
+    of the behavior under test (the gate itself runs for real)."""
+
+    def __init__(self, cfg):
+        self.config = cfg
+        self.overall_timeout_s = 0.0
+        self.dispatched: list[str] = []
+
+    async def run_job(self, job):
+        from tools.dispatch_harness.report import JobReport
+
+        self.dispatched.append(job.repo)
+        return JobReport(repo=job.repo, goal=job.goal, verdict="COMPLETE",
+                         outcome="MERGED")
+
+
+def _live_cfg(tmp_path):
+    from shared.fleet.dispatch import FleetDispatchConfig
+
+    return FleetDispatchConfig(
+        scripts_dir=tmp_path / "s", queue_path=tmp_path / "state" / "q.json",
+        runs_dir=tmp_path / "state" / "runs",
+        projects_dir=tmp_path / "projects")
+
+
+# ---- the probe (unit surface) ---------------------------------------------
+
+
+def test_probe_classifies_fresh_dirty_and_the_deny_by_default_subject(tmp_path):
+    fresh = _make_sandbox(tmp_path, "battery-fresh", [
+        "init battery sandbox",
+        "seed: acceptance oracle (protected; the coder codes against this)"])
+    got = bat.probe_sandbox_freshness(fresh)
+    assert got.state == bat.SANDBOX_FRESH and got.commit_count == 2
+
+    dirty = _make_sandbox(tmp_path, "battery-dirty", [
+        "init battery sandbox", "agent: build the widget"])
+    got = bat.probe_sandbox_freshness(dirty)
+    assert got.state == bat.SANDBOX_DIRTY
+    assert got.agent_commits == 1
+    assert "agent: build the widget" in got.offending
+
+    # Deny-by-default: an unrecognized subject is prior work even WITHOUT the
+    # `agent:` prefix — freshness is an allowlist, never an agent-blocklist.
+    odd = _make_sandbox(tmp_path, "battery-odd", [
+        "init battery sandbox", "polish the readme"])
+    got = bat.probe_sandbox_freshness(odd)
+    assert got.state == bat.SANDBOX_DIRTY and got.agent_commits == 0
+    assert "polish the readme" in got.offending
+
+
+def test_probe_reads_all_refs_so_a_parked_branch_dirties(tmp_path):
+    # A PARKED run leaves its work on an unmerged branch: HEAD's history looks
+    # seed-only, and only a --all probe sees the prior work.
+    repo = _make_sandbox(tmp_path, "battery-parked", ["init battery sandbox"])
+    _git(repo, "switch", "-q", "-c", "task-1")
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "agent: parked task work")
+    _git(repo, "switch", "-q", "-")
+    got = bat.probe_sandbox_freshness(repo)
+    assert got.state == bat.SANDBOX_DIRTY and got.agent_commits == 1
+
+
+def test_probe_unborn_head_is_fresh_by_construction(tmp_path):
+    repo = _make_sandbox(tmp_path, "battery-unborn", [])
+    got = bat.probe_sandbox_freshness(repo)
+    assert got.state == bat.SANDBOX_FRESH and got.commit_count == 0
+
+
+def test_probe_fails_closed_on_every_unreadable_shape(tmp_path, monkeypatch):
+    # Missing dir.
+    got = bat.probe_sandbox_freshness(tmp_path / "battery-nowhere")
+    assert got.state == bat.SANDBOX_UNDETERMINED and "missing" in got.detail
+
+    # A dir with no repository at its ROOT — even under a parent repo whose
+    # history looks fresh: the anchor keeps git from walking UP and probing the
+    # wrong subject (the parent's history says nothing about this sandbox).
+    outer = _make_sandbox(tmp_path, "outer", ["init battery sandbox"])
+    unanchored = outer / "battery-anchor"
+    unanchored.mkdir()
+    got = bat.probe_sandbox_freshness(unanchored)
+    assert got.state == bat.SANDBOX_UNDETERMINED
+    assert "no git repository at the sandbox root" in got.detail
+
+    # A corrupt repo (a .git that git itself refuses) is refused, not waved on.
+    broken = tmp_path / "battery-broken"
+    (broken / ".git").mkdir(parents=True)
+    got = bat.probe_sandbox_freshness(broken)
+    assert got.state == bat.SANDBOX_UNDETERMINED and "git log failed" in got.detail
+
+    # A wedged git (timeout) reads UNDETERMINED — the bound protects the
+    # runner; it never converts into a pass.
+    import subprocess as _sp
+
+    repo = _make_sandbox(tmp_path, "battery-slow", ["init battery sandbox"])
+
+    def _hang(*_a, **_k):
+        raise _sp.TimeoutExpired(cmd="git", timeout=1)
+
+    monkeypatch.setattr(bat.subprocess, "run", _hang)
+    got = bat.probe_sandbox_freshness(repo)
+    assert got.state == bat.SANDBOX_UNDETERMINED and "TimeoutExpired" in got.detail
+
+
+# ---- the gate, engaged (deny-by-default, refusal before any spend) --------
+
+
+async def test_dirty_sandbox_is_refused_before_any_spend(tmp_path):
+    cfg = _live_cfg(tmp_path)
+    _make_sandbox(cfg.projects_dir, "battery-gatecase", [
+        "init battery sandbox", "agent: build the widget"])
+    harness = _SpyHarness(cfg)
+    ensured: list[str] = []
+    summary = await bat.run_battery(
+        harness, [_freshness_card("battery-gatecase")], out_dir=tmp_path / "out",
+        dry_run=False, log=lambda *_: None,
+        ensure_ao=lambda job_id: (ensured.append(job_id) or True))
+    # Refused BEFORE the spend: no AO re-ensure (a possible launcher boot +
+    # model load), no dispatch.
+    assert harness.dispatched == []
+    assert ensured == []
+    assert summary.stalled == 1 and summary.exit_code() == 1
+    card = summary.scorecards[0]
+    assert card.verdict == "STALLED" and card.attribution == "HARNESS"
+    assert "sandbox-freshness gate (#1058)" in card.notes
+    assert bat.SANDBOX_OPT_OUT_FLAG in card.notes  # the off-ramp is named
+    # The condition rides the written record (the fail-loud disk artifact).
+    written = sc.read_scorecard(tmp_path / "out" / "B1.scorecard.json")
+    assert written.evidence["sandbox_freshness"] == bat.SANDBOX_DIRTY
+    assert written.evidence["sandbox_agent_commits"] == "1"
+    assert written.evidence["sandbox_commit_count"] == "2"
+    assert "agent: build the widget" in written.evidence["sandbox_offending_subjects"]
+    assert "sandbox_opt_out" not in written.evidence  # no opt-out was engaged
+
+
+async def test_fresh_sandbox_proceeds_and_the_condition_rides_the_record(tmp_path):
+    cfg = _live_cfg(tmp_path)
+    _make_sandbox(cfg.projects_dir, "battery-cleanpass", ["init battery sandbox"])
+    harness = _SpyHarness(cfg)
+    await bat.run_battery(
+        harness, [_freshness_card("battery-cleanpass")], out_dir=tmp_path / "out",
+        dry_run=False, log=lambda *_: None)
+    assert harness.dispatched == ["battery-cleanpass"]
+    written = sc.read_scorecard(tmp_path / "out" / "B1.scorecard.json")
+    assert written.evidence["sandbox_freshness"] == bat.SANDBOX_FRESH
+    assert written.evidence["sandbox_commit_count"] == "1"
+    assert "sandbox_opt_out" not in written.evidence
+
+
+async def test_undetermined_sandbox_refuses_even_with_the_opt_out(tmp_path):
+    # Fail-closed: the opt-out covers a DETERMINED dirty condition (which the
+    # scorecard can then record); it can never waive a history nobody read.
+    cfg = _live_cfg(tmp_path)
+    cfg.projects_dir.mkdir(parents=True)  # exists, but the sandbox does not
+    harness = _SpyHarness(cfg)
+    summary = await bat.run_battery(
+        harness, [_freshness_card("battery-ghost")], out_dir=tmp_path / "out",
+        dry_run=False, log=lambda *_: None, allow_dirty_sandbox=True)
+    assert harness.dispatched == []
+    assert summary.stalled == 1
+    written = sc.read_scorecard(tmp_path / "out" / "B1.scorecard.json")
+    assert written.evidence["sandbox_freshness"] == bat.SANDBOX_UNDETERMINED
+    assert "sandbox_probe_detail" in written.evidence
+    # The engaged-but-insufficient flag is still recorded — the record is honest
+    # about the condition the run was ATTEMPTED under.
+    assert written.evidence["sandbox_opt_out"] == bat.SANDBOX_OPT_OUT_FLAG
+
+
+# ---- the opt-out (explicit, recorded — never silent) ----------------------
+
+
+async def test_dirty_opt_out_dispatches_and_records_the_condition(tmp_path):
+    cfg = _live_cfg(tmp_path)
+    _make_sandbox(cfg.projects_dir, "battery-experiment", [
+        "init battery sandbox", "agent: prior run work"])
+    harness = _SpyHarness(cfg)
+    loglines: list[str] = []
+    await bat.run_battery(
+        harness, [_freshness_card("battery-experiment")], out_dir=tmp_path / "out",
+        dry_run=False, log=loglines.append, allow_dirty_sandbox=True)
+    assert harness.dispatched == ["battery-experiment"]  # the experiment ran
+    assert any("RECORDED" in ln and bat.SANDBOX_OPT_OUT_FLAG in ln
+               for ln in loglines)  # loud, never silent
+    written = sc.read_scorecard(tmp_path / "out" / "B1.scorecard.json")
+    assert written.evidence["sandbox_freshness"] == bat.SANDBOX_DIRTY
+    assert written.evidence["sandbox_agent_commits"] == "1"
+    assert written.evidence["sandbox_opt_out"] == bat.SANDBOX_OPT_OUT_FLAG
+
+
+# ---- the toggle-off proof --------------------------------------------------
+
+
+async def test_toggle_off_dirty_sandbox_sails_through(tmp_path, monkeypatch):
+    """With the control OFF (probe forced fresh), the SAME dirty sandbox that
+    test_dirty_sandbox_is_refused_before_any_spend proves blocked is dispatched
+    — so the engaged-case refusal comes from THIS control and nothing else
+    (distinguishing "secure" from "test can't reach it")."""
+    cfg = _live_cfg(tmp_path)
+    _make_sandbox(cfg.projects_dir, "battery-gatecase", [
+        "init battery sandbox", "agent: build the widget"])
+    harness = _SpyHarness(cfg)
+    monkeypatch.setattr(
+        bat, "probe_sandbox_freshness",
+        lambda *_a, **_k: bat.SandboxFreshness(bat.SANDBOX_FRESH, commit_count=1))
+    summary = await bat.run_battery(
+        harness, [_freshness_card("battery-gatecase")], out_dir=tmp_path / "out",
+        dry_run=False, log=lambda *_: None)
+    assert harness.dispatched == ["battery-gatecase"]  # nothing else blocks it
+    assert "sandbox-freshness gate" not in (summary.scorecards[0].notes or "")
+
+
+# ---- CLI wiring (reachability: the gate exists on the real live path) -----
+
+
+def test_cli_opt_out_flag_defaults_to_deny():
+    p = bat._build_parser()
+    assert p.parse_args(["--jobs", "B1"]).allow_dirty_sandbox is False
+    assert p.parse_args(["--jobs", "B1", "--allow-dirty-sandbox"]).allow_dirty_sandbox
+
+
+def test_main_live_path_reaches_the_gate_and_threads_the_opt_out(tmp_path, monkeypatch):
+    """Drive the REAL CLI entry point (main) down the live (non-dry-run) branch
+    and prove the gate fires there — a control reachable only from run_battery's
+    signature would be built-but-wired-into-nothing. Harness CONSTRUCTION is
+    substituted (a real for_live dials the live AO on this box); everything from
+    argv to the gate to the written scorecard is the production path."""
+    from types import SimpleNamespace
+
+    cfg = _live_cfg(tmp_path)
+    _make_sandbox(cfg.projects_dir, "battery-clicase", [
+        "init battery sandbox", "agent: stale work"])
+    # A one-card spec dir: the REAL B1 card retargeted at the fixture sandbox.
+    spec_dir = tmp_path / "spec"
+    spec_dir.mkdir()
+    card = json.loads((_SPEC_DIR / "B1.json").read_text(encoding="utf-8"))
+    card["repo"] = "battery-clicase"
+    (spec_dir / "B1.json").write_text(json.dumps(card), encoding="utf-8")
+
+    spy = _SpyHarness(cfg)
+    monkeypatch.setattr(bat, "load_harness_config", lambda *_: SimpleNamespace(
+        port=59999, agentic_setup_dir=str(tmp_path), projects_dir=str(cfg.projects_dir),
+        fleet_dispatch_enabled=True, swap_run_budget_s=60.0))
+    monkeypatch.setattr(bat, "DispatchHarness", SimpleNamespace(
+        for_live=lambda **_kw: spy))
+
+    rc = bat.main(["--jobs", "B1", "--spec-dir", str(spec_dir),
+                   "--out", str(tmp_path / "out1"), "--dev-mode"])
+    assert rc == 1 and spy.dispatched == []  # refused, loudly, on the CLI path
+    written = sc.read_scorecard(tmp_path / "out1" / "B1.scorecard.json")
+    assert written.evidence["sandbox_freshness"] == bat.SANDBOX_DIRTY
+
+    rc = bat.main(["--jobs", "B1", "--spec-dir", str(spec_dir),
+                   "--out", str(tmp_path / "out2"), "--dev-mode",
+                   "--allow-dirty-sandbox"])
+    assert spy.dispatched == ["battery-clicase"]  # the flag threads through
+    written = sc.read_scorecard(tmp_path / "out2" / "B1.scorecard.json")
+    assert written.evidence["sandbox_opt_out"] == bat.SANDBOX_OPT_OUT_FLAG

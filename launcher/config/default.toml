@@ -15,10 +15,17 @@
 # unavailable — URL-mode ingest then REFUSES (the cleaner's fail-closed
 # refusal; ADR-030's named anti-pattern is silently falling back to host-side
 # parsing, which this config can never express).
+#
+# Ceremony-flag truth convention (#1060): ceremony-gated keys carry a
+# machine-checked capabilities(...) declaration — see the convention note in
+# services/assistant_orchestrator/config/default.toml; gate:
+# tests/security/test_config_comment_truth.py.
 
 [guest_parser]
 # Master switch.  false → launcher never touches the VM for the parser and
 # is_available() is False (capability refused, boot unaffected).
+# capabilities(guest_parser.enabled):
+#   guest-parser-service = launcher/guest_parser.py::GuestParserManager
 enabled = false
 
 # Hyper-V VM that homes the parser (the existing BlarAI-Orchestrator guest —
@@ -97,6 +104,8 @@ resident = true
 # (the health probe + the content parse round-trip + the version bridge all read
 # these), so activation is config-only — no code change.  Partial material
 # (some-but-not-all) is rejected by the transport's own mTLS validation.
+# capabilities(guest_parser.mtls_cert):
+#   parse-channel-mtls-client-context = shared/ipc/vsock.py::create_client_ssl_context
 mtls_cert = ""
 mtls_key = ""
 mtls_ca = ""

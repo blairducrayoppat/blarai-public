@@ -25,7 +25,7 @@ at the end of **Governance Content**.
   AO TOML surface enumerated in §2. **ADR-absence note**: no direct
   ADR or DEC anchors the 13 AO constraints; see **Open Questions**
   for the ADR-candidate gap.
-- [ADR-011](../adrs/ADR-011-Policy-Agent-GPU-NPU-Retirement.md) — "All
+- [ADR-011](../adrs/ADR-011-All-LLM-Inference-GPU-NPU-Retirement.md) — "All
   LLM inference on GPU." The `device = GPU` TOML constraint encodes
   this ADR; cited per STYLE.md's closest-relevant rule as the one
   ADR that a config constraint directly reflects.

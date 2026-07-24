@@ -15,14 +15,24 @@ engine evals/oracle_checks.py) into the standing gate:
   C. Suite semantics over the REAL golden file — offline cases green, the
      model case hardware-skipped, malformed cases fail-closed.
   D. Honest hardware posture — include_hardware without an injected
-     generator reports ERROR naming the #765 live-slot step, never a faked
-     measurement (the real-generator wiring is deliberately not built yet).
+     generator reports SKIPPED_HARDWARE naming the #765 live-slot step: never
+     attempted, so never a faked measurement (the real-generator wiring is
+     deliberately not built yet). A generator that RAISES still reports ERROR
+     — attempted-and-failed is a different fact from could-not-attempt, and
+     collapsing the two would let an unloadable model exit 0 (#1009).
   E. Contract + criteria-coverage checks — the ticket's remaining two
      offline static-check bullets: the #752-F3 import/contract class
      (reused verbatim from the real #821 production check, locked as the
      SAME function object, not a copy) and the criteria-coverage lexical
      heuristic (a genuine gap flags, a real-world tier filter holds, and
      the documented paraphrase blind spot is pinned, not hidden).
+  F. Negative controls — the two DEFECT classes #765 exists to make visible
+     are caught by the SUITE itself: an UNSOUND oracle (fails correct code)
+     and a SENSITIVITY-blind oracle (passes a broken mutant), each driven
+     through the real ``run_suite`` path over a temp golden file, surface as
+     a FAILING case rather than a silent pass. Sections B/C prove the engine
+     classifies correctly and the known-good oracle has teeth; F proves the
+     other direction — that a *bad* oracle does not slip through.
 
 (The generic per-suite locks — golden loads, baseline compares clean, exit
 codes — fire from tests/integration/test_eval_harness.py, which
@@ -31,6 +41,7 @@ parametrizes over SUITE_NAMES and now includes oracle_quality.)
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -38,7 +49,7 @@ import pytest
 from evals import oracle_checks as oc
 from evals.loader import GoldenDataError
 from evals.suites.oracle_quality import _FIXTURES_DIR, run_suite
-from evals.types import CaseStatus
+from evals.types import CaseResult, CaseStatus
 from shared.fleet import oracle_qa as fleet_oracle_qa
 
 _REFERENCE = _FIXTURES_DIR / "b2_reference"
@@ -157,11 +168,46 @@ def test_malformed_case_fails_closed(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
-def test_hardware_without_generator_is_honest_error():
+def test_hardware_without_generator_is_an_honest_skip():
+    # #1009 (was: honest ERROR). No generator injected means the case was
+    # never ATTEMPTED — a wiring fact known before execution — so the honest
+    # status is a skip, not a failure. The posture #765 wanted is intact:
+    # nothing is faked, the reason is carried, and a skip never counts toward
+    # the pass rate. What changed is that once #1000 gave unbaselined failures
+    # teeth, ERROR here failed every --include-hardware run and invited the
+    # operator to baseline an unwired harness slot as a "known deficiency" —
+    # the laundering #1000 exists to prevent.
     report = run_suite(include_hardware=True)
     model = {r.case_id: r for r in report.results}["oq-model-b2-job-001"]
-    assert model.status is CaseStatus.ERROR
+    assert model.status is CaseStatus.SKIPPED_HARDWARE
     assert "#765" in model.detail and "oracle_generator" in model.detail
+
+
+def test_hardware_without_generator_does_not_fail_the_run():
+    # The operational point of #1009, locked: a suite whose only model case is
+    # unwired must compare CLEAN against its committed baseline (which records
+    # that case as skipped_hardware), so a ceremony's exit code carries
+    # model-quality meaning instead of harness-wiring noise.
+    from evals.baseline import compare, load_baseline
+
+    report = run_suite(include_hardware=True)
+    comparison = compare(report, load_baseline("oracle_quality"))
+    assert not comparison.has_regressions, comparison.regressions
+
+
+def test_generator_exception_is_still_an_error_not_a_skip():
+    # The other half of #1009, and the half that matters most: a generator
+    # that RAISES was attempted and failed. Converting this to a skip would
+    # mean a box where the 14B cannot load reports every model case as skipped
+    # and exits 0 — the 2026-07-07 shape re-entering through the fix built to
+    # stop it. "Could not attempt" and "attempted and failed" must never share
+    # a status.
+    def _boom(_goal_id: str) -> str:
+        raise RuntimeError("model failed to load")
+
+    report = run_suite(include_hardware=True, oracle_generator=_boom)
+    model = {r.case_id: r for r in report.results}["oq-model-b2-job-001"]
+    assert model.status is CaseStatus.ERROR
 
 
 def test_hardware_with_injected_generator_runs_the_real_machinery():
@@ -280,3 +326,73 @@ def test_malformed_criteria_coverage_case_fails_closed(tmp_path: Path):
     )
     with pytest.raises(GoldenDataError, match="criteria"):
         run_suite(bad)
+
+
+# ---------------------------------------------------------------------------
+# F. Negative controls — BOTH defect classes are caught by the SUITE
+#
+#    The committed golden set (oq-sound-*/oq-sens-*) pins KNOWN-GOOD oracles
+#    behaving well: the positive controls. Those cannot, on their own, prove
+#    the suite would CATCH a bad oracle — a suite that rubber-stamps every
+#    oracle also passes every positive control. These two tests close that
+#    gap: a deliberately DEFECTIVE oracle, run through the same real
+#    ``run_suite`` path over a one-case temp golden file, must come back
+#    FAIL. The golden shapes are identical to the committed cases; only the
+#    oracle's quality changes. (Engine-level classification is already locked
+#    in sections B/D; this is the suite-verdict layer — the signal #765 makes
+#    visible: an oracle defect that used to file, invisibly, under coder
+#    attribution.)
+# ---------------------------------------------------------------------------
+
+
+def _run_one_case(tmp_path: Path, case: dict) -> CaseResult:
+    """Write a single-case golden file, run the real suite, return the result."""
+    golden = tmp_path / "golden.jsonl"
+    golden.write_text(json.dumps(case) + "\n", encoding="utf-8")
+    report = run_suite(golden)
+    assert len(report.results) == 1, report
+    return report.results[0]
+
+
+def test_soundness_defect_is_caught_by_suite(tmp_path: Path):
+    # An UNSOUND oracle asserts a falsehood about CORRECT code: tokenize('a b')
+    # really returns ['a', 'b'], so this test fails the frozen known-good
+    # reference. A soundness case expects run_status=passed, so the defect
+    # surfaces as a FAILING case — exactly the oracle that would have parked a
+    # good job and blamed the coder.
+    result = _run_one_case(tmp_path, {
+        "id": "oq-neg-sound", "mode": "offline", "category": "soundness",
+        "description": "unsound oracle punishes correct code",
+        "reference": "b2_reference",
+        "oracle_inline": (
+            "from app.tokenize import tokenize\n\n"
+            "def test_wrong_expectation():\n"
+            "    assert tokenize('a b') == ['WRONG']\n"
+        ),
+        "expect": {"run_status": "passed"},
+    })
+    assert result.status is CaseStatus.FAIL, result
+    assert result.actual["run_status"] == oc.RUN_FAILED
+
+
+def test_sensitivity_defect_is_caught_by_suite(tmp_path: Path):
+    # A SENSITIVITY-blind oracle tests only tokenize, so it stays green even
+    # when word_frequencies is broken (the mutation returns {}). A sensitivity
+    # case expects run_status=failed against the mutant; this weak oracle
+    # PASSES it, so the blind spot surfaces as a FAILING case — the silent
+    # direction (a weak oracle passing broken code) made loud.
+    result = _run_one_case(tmp_path, {
+        "id": "oq-neg-sens", "mode": "offline", "category": "sensitivity",
+        "description": "weak oracle is blind to the word_frequencies break",
+        "reference": "b2_reference",
+        "oracle_inline": (
+            "from app.tokenize import tokenize\n\n"
+            "def test_only_tokenize():\n"
+            "    assert tokenize('a b') == ['a', 'b']\n"
+        ),
+        "mutations": [{"file": "app/word_frequencies.py",
+                       "append": "def word_frequencies(tokens):\n    return {}\n"}],
+        "expect": {"run_status": "failed"},
+    })
+    assert result.status is CaseStatus.FAIL, result
+    assert result.actual["run_status"] == oc.RUN_PASSED

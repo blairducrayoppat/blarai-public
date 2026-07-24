@@ -1,5 +1,25 @@
 # web_search Go-Live Runbook
 
+<!-- doc-rot gate (#994): the config flag(s) gating this ceremony. The EXECUTED banner below must agree with their LIVE state in services/assistant_orchestrator/config/default.toml — read there, never from this doc. -->
+<!-- Gating-flag: [web_search].enabled -->
+
+> ## ⚠ THIS CEREMONY HAS ALREADY BEEN PERFORMED — 2026-07-02 (#719)
+>
+> **`web_search` is LIVE.** `[web_search] enabled = true` in
+> `services/assistant_orchestrator/config/default.toml`, the deterministic egress
+> allowlist holds `kagi.com` as its sole entry, and the DPAPI-sealed key is
+> provisioned. Do **not** work through the steps below as though they are
+> pending — Step 6's first outbound request happened on 2026-07-02.
+>
+> This document is retained as the **procedure of record**: it is what was done,
+> and it is the reference for the documented RE-WELD path (flip the flag false +
+> restart; empty the allowlist; delete the key blob — each independently
+> sufficient). Read every step below in the past tense unless you are
+> deliberately re-welding or re-running the ceremony after a re-weld.
+>
+> Live posture is read from `default.toml` and the allowlist symbol, never from
+> this file.
+
 **Allowlist → tripwire re-baseline → key → flag → boot → one benign query →
 full-chain verify → evidence.** ADR-024 (W4) + ADR-027 §2/Am.1. For the Lead
 Architect (non-developer-friendly). This is the SEPARATE, LA-present ceremony
@@ -12,11 +32,13 @@ request.
 > Kagi results, fetched through the ONE egress door
 > (`shared/security/guarded_fetch.py`) with the URL adjudicated by the
 > deterministic Policy-Agent rules at TWO layers (the tool loop's D4 dispatch
-> check AND the door itself — both reading the SAME single allowlist), results
-> grounded as **UNTRUSTED_EXTERNAL** (datamarked, Layer-3 action-locking,
-> Stage-5 leakage-screened). It does NOT light up UC-003 URL ingest, images, or
-> any other egress consumer — those have their own ceremonies and their own
-> locks.
+> check AND the door itself), results grounded as **UNTRUSTED_EXTERNAL**
+> (datamarked, Layer-3 action-locking, Stage-5 leakage-screened). It does NOT
+> light up UC-003 URL ingest, images, or any other egress consumer — those have
+> their own ceremonies and their own locks.
+
+> **The two layers read the same allowlist only when the deterministic
+> adjudicator holds the door's slot — see [Known gap: #977](#known-gap-977).**
 
 ## What is ALREADY BUILT (the #719 Part B build — verify, don't build)
 
@@ -35,8 +57,11 @@ request.
   door's deterministic URL adjudicator if none is registered.
 - **D4** (LA decision, #719 c.1298): the tool loop's #570 dispatch CAR for
   `web_search` carries the REAL endpoint URL, so RULE 3 + the deterministic
-  egress allowlist govern the loop as well as the door — ONE allowlist source
-  (`DeterministicPolicyChecker._EGRESS_ALLOWLIST`), no second list.
+  egress allowlist govern the loop as well as the door. The LOOP layer always
+  adjudicates against `DeterministicPolicyChecker._EGRESS_ALLOWLIST`. The DOOR
+  layer adjudicates against whatever allowlist its registered adjudicator
+  supplies — the same set when the deterministic adjudicator holds the slot, a
+  different one otherwise ([#977](#known-gap-977)).
 - Eval locks: `gov-pf-007` (the endpoint is RULE-3-DENIED while the allowlist
   is empty — the go-live tripwire THIS ceremony flips) and `gov-adj-008` (the
   loop-level D4 denial while dormant).
@@ -97,14 +122,26 @@ branch**, never a live-tree edit:
 
 ## Step 2 — gov-pf-007 reviewed baseline refresh (the tripwire flip)
 
-`evals/golden/governance.jsonl` case `gov-pf-007` pins: *the Kagi endpoint is
-DENIED by RULE 3 while the allowlist is empty*. Step 1 flips its outcome to
-ALLOW (`expected: null`) — update the case's `expected` and description to pin
-the NEW posture (allowlisted host auto-approved, logged, exfil-screen applies
-at send), and name the old→new verdict in the commit message. Case
-`gov-adj-008` (the D4 loop-level denial) flips identically — update it in the
-same commit. Run the eval gate and the standing gate; both must be green
-before merge. Merge the branch per normal review.
+**DONE 2026-07-02 — `gov-pf-007` has already been re-baselined.** It now pins
+the LIVE posture: *the Kagi v1 endpoint is auto-approved by the ADR-027 egress
+carve-out (`kagi.com` = the allowlist's sole entry; approval logged, exfil-screen
+applies at send)*, with any other external host still RULE-3 denied
+(`gov-pf-001` pins the off-list deny). `gov-adj-008` was flipped in the same
+change. Confirm against `evals/golden/governance.jsonl` itself, not against this
+paragraph.
+
+What the step *was*, for the re-weld path and the record: the case previously
+pinned *the Kagi endpoint is DENIED by RULE 3 while the allowlist is empty* —
+that was the go-live tripwire, and it fired exactly as designed. Step 1 flips
+its outcome to ALLOW (`expected: null`); update the case's `expected` and
+description to pin the new posture, and name the old→new verdict in the commit
+message. `gov-adj-008` flips identically, in the same commit. Run the eval gate
+and the standing gate; both must be green before merge.
+
+**A re-weld reverses this step**: emptying the allowlist returns both cases to
+their DENY expectations, so the re-baseline has to be reversed in the same
+change or the eval gate fails — which is the tripwire doing its job in the
+other direction.
 
 ## Step 3 — Key placement (LA, at the keyboard — the key never touches chat, logs, or git)
 
@@ -258,13 +295,38 @@ Any ONE of these restores dormancy; do them in this order until comfortable:
 Each is independently sufficient; together they restore the shipped
 triple-lock. Record the re-weld and its reason on #719.
 
+## Known gap: #977
+
+**OPEN — not fixed. Read this before asserting the two layers agree.**
+
+The egress door has exactly ONE adjudicator slot
+(`guarded_fetch.register_url_adjudicator`; `register_url_ingest_adjudicator`
+calls straight through to it). Registration is first-wins: the AO registers the
+deterministic kagi-only adjudicator only `if active_url_adjudicator() is None`.
+
+So in a session booted with `--go-live` (URL ingest), the launcher fills that
+slot first with the operator "paste = consent" factory, which **rebuilds the
+egress allowlist per-CAR from the CAR's own URL**. In that mode the door layer
+no longer checks against `_EGRESS_ALLOWLIST` — it authorizes whatever host the
+request names, and the claim that both layers read the same allowlist is FALSE.
+
+What is lost is the door's INDEPENDENCE, not the boundary itself: the D4 loop
+check still adjudicates `web_search` against `_EGRESS_ALLOWLIST = {"kagi.com"}`,
+the `web_search` CAR's URL is a constant, and the envelope, socket guard and
+exfil screen remain in series. No reachable exploit path is claimed. But
+defence-in-depth silently drops a layer in that mode, and nothing announces it.
+
+Until #977 ships a structural check, this is a MANUAL verification: in any
+session where both postures are live, confirm which adjudicator holds the slot.
+
 ## Out of scope (separate events)
 
 - UC-003 `/ingest <url>` text go-live (its own runbook + adjudicator wiring —
-  note both go-lives share the door's SINGLE adjudicator slot: whichever
-  ceremony runs second must verify the registered adjudicator serves both
-  postures, and the operator "paste = consent" factory vs the standing
-  allowlist is an LA call at that point).
+  both go-lives share the door's SINGLE adjudicator slot, so whichever ceremony
+  runs second must verify the registered adjudicator serves both postures; the
+  operator "paste = consent" factory vs the standing allowlist is an LA call at
+  that point. See [Known gap: #977](#known-gap-977) — the combination is
+  currently checked by vigilance, not by a control).
 - Display-only images (BED-1 purpose-deny + `[knowledge].images_enabled`).
 - `summarize_url` / the W3 agentic multi-step search loop (W5 defenses not
   yet live — the shipped runner is single-shot search + grounded results).

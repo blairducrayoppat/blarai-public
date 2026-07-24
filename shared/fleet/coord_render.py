@@ -38,6 +38,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from shared.fleet import coord_lifecycle as cl
 from shared.fleet import vikunja_bridge as vb
 from shared.fleet import work_state as ws
 
@@ -109,8 +110,17 @@ def render_project(pw: ws.ProjectWorkState) -> list[str]:
         return lines
 
     summary = pw.summary.items[0]
+    # #887: the operator's headline open-count covers REAL work; when synthetic
+    # battery/test tickets are present, surface their count ALONGSIDE — never
+    # folded into — the real count (``pw.flow.open_count`` is the partitioned
+    # headline real-open, authoritative over the summary rollup's all-open).
+    test_open = pw.test_flow.open_count if pw.test_flow is not None else 0
+    if test_open > 0 and pw.flow is not None:
+        open_desc = f"{pw.flow.open_count} open (real) + {test_open} test-class"
+    else:
+        open_desc = f"{summary['open']} open"
     lines.append(
-        f"  {summary['open']} open / {summary['total']} total"
+        f"  {open_desc} / {summary['total']} total"
         + _render_labels(summary.get("labels", {}))
     )
 
@@ -140,6 +150,18 @@ def render_project(pw: ws.ProjectWorkState) -> list[str]:
                 for a in pw.flow.aging_outliers[:_MAX_OUTLIERS_SHOWN]
             )
             lines.append(f"  aging outliers: {names}")
+
+    # #887: the SYNTHETIC test class on its OWN line — surfaced (never hidden),
+    # explicitly marked non-actionable and off the headline so the operator reads
+    # the battery park for what it is, not as real unfinished business. The class
+    # name is BlarAI's own constant, never attacker-influenced.
+    if pw.test_flow is not None and pw.test_flow.open_count > 0:
+        lines.append(
+            f"  test-class ({cl.TEST_CLASS_LABEL} — non-actionable, off headline): "
+            f"{pw.test_flow.open_count} open, "
+            f"oldest {_fmt_duration(pw.test_flow.oldest_age_seconds)}, "
+            f"mean age {_fmt_duration(pw.test_flow.mean_age_seconds)}"
+        )
 
     return lines
 

@@ -1,0 +1,101 @@
+{
+  "ticket": "#900",
+  "measurement": "memory_reclaim_shared_14b_unload",
+  "route": "B \u2014 launcher-shape build_shared_pipeline harness driving the real unload()/lazy-reload entry points (route A impossible: production [image_generation].hires_enabled=false)",
+  "timestamp": "2026-07-16T17:03:27",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "gpu_driver": "32.0.101.8826",
+  "model": {
+    "target": "models\\qwen3-14b\\openvino-int4-gpu",
+    "target_precision": "INT4",
+    "draft": "models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "draft_precision": "INT8 (pruned 6-layer)",
+    "kv_cache_precision": "unset (FP16 default)",
+    "prefix_caching": true
+  },
+  "methodology": "3 unload cycles + 1 release_gpu_for_exit; 8.0s settle around each evict; probe armed via set_reclaim_probe_enabled(True); samples harvested from the wired MEM_RECLAIM instrumentation (In-Use = Total \u2212 Available, never working-set); box lean (BlarAI down, guest VM off, OVMS down).",
+  "environment": {
+    "box_state_at_start": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": false,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 19.45,
+      "captured_utc": "2026-07-17T00:00:57Z"
+    },
+    "box_state_at_end": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": false,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 19.0,
+      "captured_utc": "2026-07-17T00:03:31Z"
+    }
+  },
+  "reload_seconds": [
+    20.0,
+    21.9,
+    21.9
+  ],
+  "samples": [
+    {
+      "op": "shared_pipeline.14b.unload",
+      "in_use_before_mb": 22531.0,
+      "in_use_after_mb": 14073.0,
+      "reclaimed_mb": 8458.0,
+      "available_before_mb": 11103.0,
+      "available_after_mb": 19560.0,
+      "proc_rss_delta_mb": -8408.0
+    },
+    {
+      "op": "shared_pipeline.14b.unload",
+      "in_use_before_mb": 25582.0,
+      "in_use_after_mb": 13653.0,
+      "reclaimed_mb": 11929.0,
+      "available_before_mb": 8052.0,
+      "available_after_mb": 19981.0,
+      "proc_rss_delta_mb": -11862.0
+    },
+    {
+      "op": "shared_pipeline.14b.unload",
+      "in_use_before_mb": 25575.0,
+      "in_use_after_mb": 13745.0,
+      "reclaimed_mb": 11830.0,
+      "available_before_mb": 8058.0,
+      "available_after_mb": 19889.0,
+      "proc_rss_delta_mb": -11750.0
+    },
+    {
+      "op": "shared_pipeline.14b.release_gpu_for_exit",
+      "in_use_before_mb": 25502.0,
+      "in_use_after_mb": 13582.0,
+      "reclaimed_mb": 11920.0,
+      "available_before_mb": 8131.0,
+      "available_after_mb": 20052.0,
+      "proc_rss_delta_mb": -11864.0
+    }
+  ],
+  "median_reclaimed_mb_by_op": {
+    "shared_pipeline.14b.unload": 11830.0,
+    "shared_pipeline.14b.release_gpu_for_exit": 11920.0
+  },
+  "interpretation": "median reclaimed ~9700 MB => memory returns to Windows on evict; ~0/negative => driver retains it (openvino #33896 signature on Arc 140V)",
+  "not_measured": [
+    "the app-integrated route-A trigger (a production hires-fix generate) \u2014 [image_generation].hires_enabled=false in production config since the 1536\u00b2 RAM-spiral incident, so the in-app 14B evict path has no live trigger",
+    "image_gen.sdxl.unload / vlm.unload / substrate.embed_cache.unload \u2014 recorded separately in the live-app session (same evening)",
+    "the reload-side RAM trajectory (only the evict is bracketed by the probe)",
+    "other GPU driver versions (single installed driver)",
+    "short-lived-process isolation / blob-cache mitigation variants (the post-measurement follow-ons #900 tees up)"
+  ]
+}

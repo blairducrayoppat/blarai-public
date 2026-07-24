@@ -1,0 +1,17 @@
+{
+  "label": "cold",
+  "model": "gemma-4-26B-A4B-it-int4-ov",
+  "device": "GPU",
+  "cache_dir": "C:/Users/mrbla/AppData/Local/Temp/claude/C--Users-mrbla-BlarAI/c2208ed6-8634-48d8-8d40-16120e76f595/scratchpad/gemma4probe/ovcache",
+  "cache_bytes_before_gb": 0.0,
+  "baseline_host_in_use_gb": 7.323,
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "load_seconds": 200.52,
+  "after_load_host_in_use_gb": 21.495,
+  "steady_delta_gb": 14.172,
+  "peak_host_in_use_gb": 31.323,
+  "transient_delta_gb": 24.0,
+  "vision_seconds": 3.38,
+  "vision_text": "{\"render\": \"broken\", \"reason\": \"The text is overlapping with the blue header lines, and the layout is not properly spaced.\"}",
+  "cache_bytes_after_gb": 14.279
+}

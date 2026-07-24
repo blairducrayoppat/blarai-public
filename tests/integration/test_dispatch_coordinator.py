@@ -9,6 +9,8 @@ injected fakes — the real AO-IPC wiring is the deferred go-live step.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from services.ui_gateway.src.dispatch_coordinator import (
@@ -747,6 +749,45 @@ async def test_create_and_plan_creates_repo_then_plans(tmp_path):
     assert coord.pop_action_kind("s") == ""
 
 
+def _web_spec():
+    # A spec carrying a ``web`` build-signal (the New-Project common case) — its scaffold pins
+    # node, so the plan card should promise the behaviour checks WILL run once scaffolded (#888).
+    return AcceptanceSpec(
+        "a page",
+        (AcceptanceCriterion("c1", "the project builds", "build", ""),
+         AcceptanceCriterion("c2", "shows a greeting", "behavior", "assert greet()=='hi'")),
+        build_plan={"surface": "web", "language_hint": None, "complexity": "simple", "components": []},
+    )
+
+
+@pytest.mark.asyncio
+async def test_new_project_web_dispatch_states_checks_will_run(tmp_path):
+    # #888 seam regression: a New-Project repo is a README-only shell at PLAN time, so ecosystem
+    # sniffs unknown — but the run's own web scaffold pins node and the checks DO run. The card
+    # must state that truth, NOT the false-pessimistic "couldn't tell the language" warning.
+    repo_dir = _cfg(tmp_path).projects_dir / "webapp"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "README.md").write_text("# webapp", encoding="utf-8")
+    coord = _coord(tmp_path, plan_fn=_fake_plan(spec=_web_spec()))
+    reply = await coord.handle_command("s", DispatchCommand(kind="run", repo="webapp", goal="a page"))
+    assert "WILL run" in reply
+    assert "couldn't tell this project's language" not in reply
+
+
+@pytest.mark.asyncio
+async def test_existing_unclassifiable_repo_keeps_honest_warning(tmp_path):
+    # The guard rail: an EXISTING repo whose contents defeat detection (a cpp marker -> ecosystem
+    # unknown, but a scaffold will NOT run) keeps the honest warning — the disclosure never
+    # over-claims coverage for a repo the fleet won't scaffold.
+    repo_dir = _cfg(tmp_path).projects_dir / "cppapp"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.10)", encoding="utf-8")
+    coord = _coord(tmp_path, plan_fn=_fake_plan(spec=_web_spec()))
+    reply = await coord.handle_command("s", DispatchCommand(kind="run", repo="cppapp", goal="a page"))
+    assert "couldn't tell this project's language" in reply
+    assert "WILL run" not in reply
+
+
 @pytest.mark.asyncio
 async def test_create_refuses_empty_goal(tmp_path):
     coord = _coord(tmp_path, plan_fn=_fake_plan())
@@ -966,6 +1007,83 @@ async def test_revise_renders_delta_and_stays_approvable(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_revise_criteria_feedback_gets_honest_message_not_rephrase_loop(tmp_path):
+    """#1055: revise edits TASKS, never criteria. When a no-op revise carried
+    criteria/scope vocabulary, the operator must be told plainly that criteria are
+    set by the goal (reject + re-dispatch), NOT sent into a 'describe it
+    differently' loop that can never edit a criterion — the live bug the LA hit.
+
+    A revise returning zero ops is the no-change path; the feedback names criteria.
+    """
+    coord = _coord(tmp_path, plan_fn=_revising_plan(revision=[]))
+    await _plan_todo(coord)
+    reply = await _send(
+        coord, "s", "/dispatch revise drop the goal-setting and history requirements"
+    )
+    assert "acceptance criteria or scope" in reply
+    assert "reply /dispatch reject and start a new dispatch" in reply
+    # the dead-end loop instruction must NOT be shown for a criteria change
+    assert "describing the change differently" not in reply
+    # still recoverable — the plan is unchanged and approvable
+    assert "/dispatch approve" in reply
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "feedback",
+    [
+        # pre-merge review F1: task-REMOVAL vocabulary — revise removes/re-scopes
+        # tasks, so these are task edits and MUST get the generic message, not
+        # "reject the whole plan". Each of these misfired to the criteria message
+        # before the detector was narrowed.
+        "do the export step first",
+        "remove the feature",
+        "drop the feature",
+        "get rid of the feature",
+        "cut the check",
+        "delete the check",
+        "remove features nobody asked for",
+        "remove the login feature",
+        # F2: bare 'acceptance' over-matched the acceptance-tests TASK.
+        "the acceptance test task should run first",
+    ],
+)
+async def test_revise_task_feedback_no_change_keeps_the_generic_message(tmp_path, feedback):
+    """The #1055 branch must NOT false-positive: genuine task-edit feedback that
+    yielded no ops still gets the generic 'describe it differently' message,
+    because rephrasing a task change CAN succeed. Locks the pre-merge review's
+    exact false-positive corpus (F1/F2)."""
+    coord = _coord(tmp_path, plan_fn=_revising_plan(revision=[]))
+    await _plan_todo(coord)
+    reply = await _send(coord, "s", f"/dispatch revise {feedback}")
+    assert "describing the change differently" in reply, feedback
+    assert "acceptance criteria or scope" not in reply, feedback
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "feedback",
+    [
+        "drop the goal-setting and history requirements",  # the LA's live phrasing
+        "drop the goal-setting, progress, and historical-data features",
+        "narrow the scope to just the tracker",  # F4: scope now fires
+        "reduce the scope",
+        "remove the login requirement",
+        "these criteria are too broad",
+    ],
+)
+async def test_revise_true_criteria_feedback_gets_the_honest_message(tmp_path, feedback):
+    """Criteria/scope intents still route to the honest message after narrowing —
+    the LA's live phrasing fires via 'goal'/'requirements', scope-narrowing via
+    'scope'."""
+    coord = _coord(tmp_path, plan_fn=_revising_plan(revision=[]))
+    await _plan_todo(coord)
+    reply = await _send(coord, "s", f"/dispatch revise {feedback}")
+    assert "acceptance criteria or scope" in reply, feedback
+    assert "describing the change differently" not in reply, feedback
+
+
+@pytest.mark.asyncio
 async def test_revise_keeps_untouched_task_byte_stable(tmp_path):
     coord = _coord(tmp_path, plan_fn=_revising_plan())
     await _plan_todo(coord)
@@ -978,6 +1096,58 @@ async def test_revise_keeps_untouched_task_byte_stable(tmp_path):
     kept = next(t for t in revised if t["task"] == "build-tracker")
     orig_tracker = next(t for t in orig if t["task"] == "build-tracker")
     assert kept == orig_tracker
+
+
+@pytest.mark.asyncio
+async def test_revise_minted_tasks_carry_projects_rooted_repo(tmp_path):
+    """Regression lock (#877 live-caught 2026-07-21): a revised/added task must carry the
+    PLAN-TIME RESOLVED repo path, exactly as ``decompose_request`` mints it
+    (``str(projects_dir / repo)``). The first live revise minted the BARE NAME instead;
+    at EXECUTE the swap validator resolved it against the AO process cwd (~/BlarAI) and
+    the forbidden-root guard refused the whole dispatch. The prior fixtures carried
+    bare-name repos too — mock-shape divergence — so this fixture mirrors the REAL plan
+    shape at the seam."""
+    cfg = _cfg(tmp_path)
+    spec = _spec()
+    resolved = str(cfg.projects_dir / "todo")  # decompose_request's exact derivation
+    base = [
+        {"repo": resolved, "task": "build-login", "prompt": "P1"},
+        {"repo": resolved, "task": "build-tracker", "prompt": "P2"},
+    ]
+
+    async def plan_fn(repo, goal):
+        if _revise.REVISE_SENTINEL in goal:
+            return PlanResult(ok=True, revision=[
+                {"op": "add", "task": "csv-export", "prompt": "add a CSV export button"},
+                {"op": "keep", "ref": 2},
+            ])
+        return PlanResult(
+            ok=True,
+            tasks=_acc._thread_build_fields([dict(t) for t in base], spec),
+            spec=spec, message="planned",
+        )
+
+    coord = DispatchCoordinator(
+        config=cfg, enabled=True, plan_fn=plan_fn, mint_run_id=lambda: "RID-DET",
+    )
+    await _plan_todo(coord)
+    await _send(coord, "s", "/dispatch revise add a csv export")
+    revised = coord.pending_for("s").tasks
+    minted = next((t for t in revised if t["task"] == "csv-export"), None)
+    assert minted is not None  # the minted task is present
+    # Byte-equality with decompose_request's derivation — pins against a future
+    # divergently-normalized mint (mixed repo strings inside one plan).
+    assert minted["repo"] == resolved
+    for task in revised:
+        repo_path = Path(str(task["repo"]))
+        assert repo_path.is_absolute(), (
+            f"task {task['task']!r} carries a non-absolute repo {task['repo']!r} — "
+            "at EXECUTE this resolves against the AO cwd and the forbidden-root "
+            "guard refuses the dispatch"
+        )
+        assert repo_path.resolve().is_relative_to(cfg.projects_dir.resolve()), (
+            f"task {task['task']!r} repo {task['repo']!r} is not under projects_dir"
+        )
 
 
 @pytest.mark.asyncio

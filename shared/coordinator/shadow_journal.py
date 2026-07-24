@@ -39,10 +39,14 @@ Deterministic timestamps: ``append`` REQUIRES the caller to inject ``now``
 engine's clock-free discipline so #855's fixture-board grading is
 reproducible to the microsecond.
 
-DORMANCY: this module has NO live consumer. Nothing in a production boot path
-constructs a :class:`ShadowJournal` today (the limb-6 launcher factory wires it
-later, dormant behind ``[coordinator].heartbeat_enabled``). Importing this
-module arms nothing and changes no behavior.
+REACHABILITY: importing this module arms nothing — it defines a store and
+constructs none. A :class:`ShadowJournal` is built by the heartbeat cycle
+(:func:`shared.coordinator.heartbeat.build_shadow_journal`) only when
+``[coordinator].enabled`` AND ``[coordinator].heartbeat_enabled`` are both set;
+with either false nothing constructs it. Read those flags from
+``services/assistant_orchestrator/config/default.toml`` — never from here.
+Provisioning is fail-closed: a journal that cannot be created REFUSES to start
+the cycle rather than running unjournalled.
 """
 
 from __future__ import annotations

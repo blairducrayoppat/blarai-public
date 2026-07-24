@@ -34,6 +34,7 @@ def _fake_model(
     assumptions_json: str = "[]",
     build_plan_json: str = "",
     oracle_py: str = "",
+    oracle_node: str = "",
     asset_specs_json: str = "[]",
 ):
     """A generate_fn that answers the decompose / criteria / assumptions / build-plan / oracle /
@@ -44,10 +45,12 @@ def _fake_model(
     to its prompt. ``assumptions_json`` defaults to ``"[]"`` (no assumptions — the fully-specified-goal
     posture). ``build_plan_json`` defaults to ``""`` so a test that does not care about the
     build-signal gets none parseable -> ``build_plan is None`` (the no-signal == today's
-    behavior). ``oracle_py`` defaults to ``""`` so a test that does not exercise the #690 oracle
-    gets none (the model returns no code -> the oracle is '' -> today's fold-the-tests-in path).
-    ``asset_specs_json`` defaults to ``"[]"`` (no image assets — and the asset call fires ONLY for a
-    visual surface, so a test with no/non-visual build_plan never reaches it -> SEAM A dormant).
+    behavior). ``oracle_py``/``oracle_node`` default to ``""`` so a test that does not exercise the
+    #690/#697 oracle gets none (the model returns no code -> the oracle is '' -> today's
+    fold-the-tests-in path); the python oracle prompt says "pytest test file" and the node one
+    "node:test", so the two route apart. ``asset_specs_json`` defaults to ``"[]"`` (no image assets
+    — and the asset call fires ONLY for a visual surface, so a test with no/non-visual build_plan
+    never reaches it -> SEAM A dormant).
     """
 
     def gen(prompt: str) -> str:
@@ -59,6 +62,8 @@ def _fake_model(
             return build_plan_json
         if "pytest test file" in prompt:
             return oracle_py
+        if "node:test" in prompt:
+            return oracle_node
         if "image assets this product should DISPLAY" in prompt:
             return asset_specs_json
         return tasks_json
@@ -82,6 +87,30 @@ _ORACLE_PY = (
 #: A python build-signal (surface=command-line, language_hint=python) so the #690 oracle fires.
 _PY_BUILD_PLAN = json.dumps(
     {"surface": "command-line", "candidates": [], "language_hint": "python",
+     "complexity": "simple", "components": []}
+)
+
+#: A small, valid node:test oracle the fake model can emit (#697): the node_oracle_valid shape
+#: check needs a ``node:test`` import + at least one ``test(``/``it(`` block, and the coder's
+#: import contract is surfaced from the ``../src`` import. No trailing newline (the JS extractor
+#: strips surrounding whitespace, so the round-trip is exact).
+_ORACLE_NODE = (
+    "import test from 'node:test';\n"
+    "import assert from 'node:assert';\n"
+    "import { addDays } from '../src/calendar.mjs';\n"
+    "\n"
+    "test('leap day crossing', () => {\n"
+    "  assert.deepStrictEqual(addDays(2024, 2, 28, 1), [2024, 3, 1]);\n"
+    "});\n"
+    "\n"
+    "test('year boundary', () => {\n"
+    "  assert.deepStrictEqual(addDays(2023, 12, 31, 1), [2024, 1, 1]);\n"
+    "});"
+)
+
+#: A node build-signal (surface=web, language_hint=node) so the #697 per-task oracle fires.
+_NODE_BUILD_PLAN = json.dumps(
+    {"surface": "web", "candidates": [], "language_hint": "node",
      "complexity": "simple", "components": []}
 )
 
@@ -468,6 +497,63 @@ def test_compile_prompts_with_oracle_codes_against_seeded_file():
     assert out[0]["acceptance_test_path"] == acc.ACCEPTANCE_ORACLE_PATH
 
 
+def test_compile_prompts_python_contract_asserts_neutral_seed_not_core():
+    # #1036/#1048 companion: the seeded python skeleton is NEUTRAL — app/__init__.py plus
+    # smoke tests; app/core.py no longer exists. Neither the coder contract line nor the
+    # oracle-authoring template may assert the retired starter module as a live premise (a
+    # prompt premised on a file that is not on disk misdirects the coder AND the oracle).
+    oracle = (
+        "from app.days import add_days\n"
+        "\n\n"
+        "def test_leap_day_crossing():\n"
+        "    assert add_days(2024, 2, 28, 1) == (2024, 3, 1)"
+    )
+    tasks = [{"repo": "R", "task": "only", "prompt": "build add_days"}]
+    spec = AcceptanceSpec(
+        goal="calendar math",
+        criteria=(AcceptanceCriterion("c1", "Feb 28 + 1 day is Mar 1 in 2024", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "simple", "components": []},
+    )
+    out = acc.compile_prompts(tasks, spec, oracle_code=oracle)
+    prompt = out[0]["prompt"]
+    # the all-under-app contract branch DID fire (this is the string under test) ...
+    assert "`app.days.add_days`" in prompt and "EXISTING `app` package" in prompt
+    # ... and it states the truthful premise: the coder AUTHORS app/<name>.py submodules.
+    assert "`app/<name>.py` submodule" in prompt and "no starter module" in prompt.replace("\n", " ")
+    # [kill] the retired starter module is never asserted as a live premise — not by the
+    # contract line, and not by the oracle-authoring template.
+    assert "app/core.py" not in prompt and "app.core" not in prompt
+    assert "app.core" not in acc._ORACLE_TEMPLATE and "app/core.py" not in acc._ORACLE_TEMPLATE
+
+
+def test_compile_prompts_node_oracle_codes_against_seeded_mjs():
+    # #697: a NODE single feature + an oracle -> the coder codes against the seeded .mjs file (NOT
+    # its own tests), the task carries the node code + the .mjs path, and the concrete ../src
+    # import is surfaced as the module contract (the node mirror of the #752 F3 plumbing loop).
+    tasks = [{"repo": "R", "task": "only", "prompt": "build addDays"}]
+    spec = AcceptanceSpec(
+        goal="calendar math",
+        criteria=(AcceptanceCriterion("c1", "Feb 28 + 1 day is Mar 1 in 2024", "behavior", ""),),
+        build_plan={"surface": "web", "language_hint": "node",
+                    "complexity": "simple", "components": []},
+    )
+    out = acc.compile_prompts(tasks, spec, oracle_code=_ORACLE_NODE)
+    assert len(out) == 1                                               # single feature, no extra task
+    prompt = out[0]["prompt"]
+    assert prompt.startswith("build addDays")                         # feature instruction kept
+    assert "DO NOT EDIT" in prompt and acc.ACCEPTANCE_ORACLE_PATH_NODE in prompt
+    assert "node --test" in prompt                                    # node runner, not pytest
+    assert "../src/calendar.mjs" in prompt                            # import contract surfaced
+    assert "Write automated tests" not in prompt                     # codes against the oracle
+    # the oracle rides the task at the .mjs path so the fleet seeds/restores it per candidate
+    assert out[0]["acceptance_test_code"] == _ORACLE_NODE
+    assert out[0]["acceptance_test_path"] == acc.ACCEPTANCE_ORACLE_PATH_NODE
+    # #697 guard: the python pytest path is NEVER stamped on a node task (a mutant seeding the .py
+    # path would make the fleet run the .mjs oracle under pytest and always fail on collection).
+    assert out[0]["acceptance_test_path"] != acc.ACCEPTANCE_ORACLE_PATH
+
+
 def test_compile_prompts_without_oracle_has_no_oracle_fields():
     # [kill] absent oracle -> today's fold-the-tests-in behavior, and NO acceptance_test_* keys
     # leak onto the task (a mutant that always-stamps them would ship an empty oracle to seed).
@@ -545,18 +631,137 @@ def test_generate_acceptance_oracle_handles_UNCLOSED_fence():
     _ast.parse(code)                                               # and it is valid python now
 
 
-def test_generate_acceptance_oracle_non_python_is_empty():
-    # [kill] the oracle is pytest -> python ONLY. A dotnet/node/unknown hint returns '' (today's
-    # behavior), never seeds a pytest file into a project that may not be python.
-    for hint in ("dotnet", "node", None):
+def test_generate_acceptance_oracle_build_only_ecosystem_is_empty():
+    # [kill] the per-task oracle fires only for a gate-RUN ecosystem (python pytest / node:test).
+    # A build-only ecosystem (dotnet/cpp/powershell) returns '' (today's fold-the-tests-in
+    # behavior), never seeds a test file a foreign gate cannot run. #697 adds node but must NOT
+    # widen the door to a build-only hint (a mutant that returned an oracle here would flip this).
+    for hint in ("dotnet", "cpp", "powershell"):
         spec = AcceptanceSpec(
             goal="g", criteria=(AcceptanceCriterion("c1", "x is y", "behavior", ""),),
-            build_plan={"surface": "web", "language_hint": hint,
+            build_plan={"surface": "desktop-gui", "language_hint": hint,
                         "complexity": "simple", "components": []},
         )
         assert acc.generate_acceptance_oracle(
             "g", spec, [{"prompt": "p"}], generate_fn=lambda p: _ORACLE_PY
         ) == ""
+
+
+def test_generate_acceptance_oracle_unclassified_non_web_is_empty():
+    # [kill] an UNCLASSIFIED language (hint None) with a NON-web surface stays fail-closed to '' —
+    # only a web surface (the node:http/node:test scaffold) routes a hintless goal to node (#697).
+    # A command-line goal with no language hint gets NO oracle, byte-identical to pre-#697.
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "x is y", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": None,
+                    "complexity": "simple", "components": []},
+    )
+    assert acc.generate_acceptance_oracle(
+        "g", spec, [{"prompt": "p"}], generate_fn=lambda p: _ORACLE_NODE
+    ) == ""
+
+
+def test_generate_acceptance_oracle_node_happy():
+    # #697: an explicit node hint yields the node:test oracle (the .mjs analogue of the python
+    # scorecard). The node structural gate needs a node:test import + a test/it block.
+    spec = AcceptanceSpec(
+        goal="calendar math",
+        criteria=(AcceptanceCriterion("c1", "Feb 28 + 1 is Mar 1 in 2024", "behavior", ""),),
+        build_plan={"surface": "web", "language_hint": "node",
+                    "complexity": "simple", "components": []},
+    )
+    tasks = [{"repo": "R", "task": "only", "prompt": "build addDays"}]
+    code = acc.generate_acceptance_oracle("calendar math", spec, tasks,
+                                          generate_fn=lambda p: _ORACLE_NODE)
+    assert code == _ORACLE_NODE
+    assert "node:test" in code and "test(" in code                    # a real, runnable oracle
+
+
+def test_generate_acceptance_oracle_node_web_surface_no_hint():
+    # #697: a WEB surface with NO language hint routes to node — the fleet's web scaffold is the
+    # node:http + node:test seed, so the integrated tree is node-testable (matches the job oracle's
+    # decision exactly; this is the case that used to fall back / go python-shaped).
+    spec = AcceptanceSpec(
+        goal="a web app",
+        criteria=(AcceptanceCriterion("c1", "the API returns 200", "behavior", ""),),
+        build_plan={"surface": "web", "language_hint": None,
+                    "complexity": "simple", "components": []},
+    )
+    code = acc.generate_acceptance_oracle("a web app", spec, [{"prompt": "p"}],
+                                          generate_fn=lambda p: _ORACLE_NODE)
+    assert code == _ORACLE_NODE
+
+
+def test_generate_acceptance_oracle_node_prompt_uses_node_template():
+    # #697: the node oracle prompt must ask for a node:test file (NOT a pytest one) — otherwise the
+    # model writes python and the .mjs seed is garbage. Capture the prompt the generate_fn sees.
+    seen = {}
+
+    def gen(prompt: str) -> str:
+        seen["prompt"] = prompt
+        return _ORACLE_NODE
+
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "adds two numbers", "behavior", ""),),
+        build_plan={"surface": "web", "language_hint": "node",
+                    "complexity": "simple", "components": []},
+    )
+    acc.generate_acceptance_oracle("g", spec, [{"prompt": "build add"}], generate_fn=gen)
+    p = seen["prompt"]
+    assert "node:test" in p and "../src/" in p                        # node scaffold pinned
+    assert "pytest" not in p                                          # never the python template
+    assert "adds two numbers" in p and "build add" in p               # criteria + task carried
+
+
+def test_generate_acceptance_oracle_node_strips_markdown_fences():
+    # A small model wraps node code in ```javascript fences despite the instruction; strip them.
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "x is y", "behavior", ""),),
+        build_plan={"surface": "web", "language_hint": "node",
+                    "complexity": "simple", "components": []},
+    )
+    fenced = "Here you go:\n```javascript\n" + _ORACLE_NODE + "\n```\n"
+    code = acc.generate_acceptance_oracle("g", spec, [{"prompt": "p"}], generate_fn=lambda p: fenced)
+    assert code.startswith("import test from 'node:test'")
+    assert "```" not in code and "Here you go" not in code
+
+
+def test_generate_acceptance_oracle_node_junk_is_empty():
+    # [kill] node output that lacks the node:test import (or any test block) would 'pass' vacuously
+    # -> rejected fail-closed to '' (never seed a scorecard that asserts nothing).
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "x is y", "behavior", ""),),
+        build_plan={"surface": "web", "language_hint": "node",
+                    "complexity": "simple", "components": []},
+    )
+    for junk in ("console.log('hi');", "import assert from 'node:assert';\n// no tests here"):
+        assert acc.generate_acceptance_oracle(
+            "g", spec, [{"prompt": "p"}], generate_fn=lambda p, j=junk: j
+        ) == ""
+
+
+def test_oracle_ecosystem_decision_table():
+    # #697: the SINGLE ecosystem resolver shared by the per-task and job oracles — lock the table
+    # so the two can never disagree on what a project's tests are written in.
+    def eco(**bp):
+        return acc._oracle_ecosystem(AcceptanceSpec("g", (), build_plan=bp))
+
+    assert eco(language_hint="python", surface="command-line") == "python"
+    assert eco(language_hint="python", surface="web") == "python"          # explicit python wins
+    assert eco(language_hint="node", surface="web") == "node"
+    assert eco(language_hint="node", surface="command-line") == "node"     # explicit node, any surface
+    assert eco(language_hint=None, surface="web") == "node"                 # web scaffold == node
+    # #886 seam (NIT-1): web-static is NOT web — the match is exact `== "web"`, never startswith.
+    # A hintless static-web goal has NO node test runner, so it must resolve to None (no oracle),
+    # not node. Locks the seam so a `surface.startswith("web")` mutant fails here.
+    assert eco(language_hint=None, surface="web-static") is None
+    assert eco(language_hint="node", surface="web-static") == "node"        # explicit node hint still wins (OBS-1)
+    assert eco(language_hint=None, surface="command-line") is None         # hintless non-web: fail-closed
+    assert eco(language_hint="dotnet", surface="desktop-gui") is None      # build-only
+    assert eco(language_hint="cpp", surface="cli") is None
+    assert eco() is None                                                    # empty build_plan
+    # build_plan absent entirely (None) -> None, never raises
+    assert acc._oracle_ecosystem(AcceptanceSpec("g", ())) is None
 
 
 def test_generate_acceptance_oracle_no_build_plan_is_empty():
@@ -1637,6 +1842,207 @@ def test_generate_plan_no_build_signal_is_byte_identical_to_today(tmp_path):
     assert "Building this as:" not in preview        # no platform line for an unclassified goal
 
 
+# ---- #886: static-web scaffold-fit (a static ask must NOT get the server seed) --------
+
+_WEB_BUILD_PLAN = json.dumps(
+    {"surface": "web", "candidates": [], "language_hint": None,
+     "complexity": "simple", "components": []}
+)
+
+
+def test_refine_web_static_narrows_web_on_static_signals():
+    # A ``web`` signal + any explicit static/no-backend/single-file phrasing -> ``web-static``
+    # (so the fleet seeds a lone static page, not the full-stack skeleton whose fetch hangs).
+    base = {"surface": "web", "language_hint": None, "complexity": "simple", "components": []}
+    static_goals = [
+        "a static site, no build step, one index.html, opens in a browser",
+        "a single-file web page with no frameworks",
+        "just plain HTML that opens in the browser",
+        "a webpage with no server, client-side only",
+        "one html file I can double-check — no build tools",
+    ]
+    for goal in static_goals:
+        out = acc._refine_web_static(dict(base), goal)
+        assert out["surface"] == "web-static", goal
+        # a fresh copy — never mutates the input
+        assert base["surface"] == "web"
+
+
+def test_refine_web_static_leaves_ordinary_server_web_goal_alone():
+    # A normal server/full-stack web ask (no static signal) STAYS ``web`` — no over-narrowing.
+    base = {"surface": "web", "language_hint": None, "complexity": "moderate", "components": []}
+    for goal in [
+        "a web app to track expenses with user login and a database",
+        "a REST API and a front-end that talks to it",
+        "a website for my bakery with an order form",
+    ]:
+        assert acc._refine_web_static(dict(base), goal)["surface"] == "web", goal
+
+
+def test_refine_web_static_ignores_server_static_and_serverless():
+    # "static assets/files" describes a SERVER serving static content, and "serverless" is a
+    # cloud-function backend — neither is a static SITE, so both STAY ``web`` (no mis-narrow).
+    base = {"surface": "web", "language_hint": None, "complexity": "moderate", "components": []}
+    for goal in [
+        "a web app that serves static assets from a CDN",
+        "a site that loads static files from the server",
+        "a serverless web app on AWS Lambda",
+    ]:
+        assert acc._refine_web_static(dict(base), goal)["surface"] == "web", goal
+
+
+def test_refine_web_static_only_touches_web_surface():
+    # A static signal on a NON-web surface (or unknown/ambiguous/None) changes nothing.
+    for surface in ("unknown", "ambiguous", "desktop-gui", "command-line", "mobile"):
+        bp = {"surface": surface, "language_hint": None, "complexity": "simple", "components": []}
+        assert acc._refine_web_static(dict(bp), "static, one file, opens in a browser")["surface"] == surface
+    assert acc._refine_web_static(None, "static one file") is None
+
+
+def test_generate_plan_static_web_goal_threads_web_static(tmp_path):
+    # END-TO-END #886 regression: a 14B that classifies ``web`` + a goal with static signals ->
+    # spec.build_plan surface ``web-static`` AND that value threaded onto the compiled task, so
+    # the fleet seeds the static scaffold (no server/fetch) instead of the full-stack skeleton.
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    gen = _fake_model(
+        tasks_json=json.dumps([{"task": "make-page", "prompt": "build the page"}]),
+        criteria_json=json.dumps([{"text": "the page shows a greeting", "tier": "behavior", "check": ""}]),
+        build_plan_json=_WEB_BUILD_PLAN,
+    )
+    res = acc.generate_plan(
+        "a static one-page site, no build step, one index.html that opens in a browser",
+        repo, generate_fn=gen, projects_dir=projects,
+    )
+    assert res.ok
+    assert res.spec.build_plan["surface"] == "web-static"
+    assert res.tasks[0]["surface"] == "web-static"      # the fleet reads $t.surface
+    # the preview names it as a static page, not a full web app
+    preview = acc.render_criteria_preview(res.spec, ecosystem="unknown", tasks=res.tasks)
+    assert "single-page web page" in preview
+
+
+def test_generate_plan_dynamic_web_goal_stays_web(tmp_path):
+    # The control: an ordinary web goal (no static signal) still lands ``web`` end-to-end, so the
+    # full-stack scaffold is unchanged for the common case (the refiner is opt-in, not a blanket).
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    gen = _fake_model(
+        tasks_json=json.dumps([{"task": "make-app", "prompt": "build the app"}]),
+        criteria_json=json.dumps([{"text": "it lists items", "tier": "behavior", "check": ""}]),
+        build_plan_json=_WEB_BUILD_PLAN,
+    )
+    res = acc.generate_plan(
+        "a web app to track my expenses with a login", repo, generate_fn=gen, projects_dir=projects,
+    )
+    assert res.spec.build_plan["surface"] == "web"
+    assert res.tasks[0]["surface"] == "web"
+
+
+def test_web_static_friendly_surface_and_task_threading():
+    # web-static renders a distinct friendly line and threads through _task_build_fields intact
+    # (it is a real, valid surface — never coerced to unknown like the ambiguous sentinel).
+    spec = AcceptanceSpec(
+        "g", (AcceptanceCriterion("c1", "it builds", "build", ""),),
+        build_plan={"surface": "web-static", "language_hint": None, "complexity": "simple", "components": []},
+    )
+    out = acc.render_criteria_preview(spec, ecosystem="unknown")
+    assert "Building this as: a single-page web page (opens straight in a browser)." in out
+    threaded = acc.compile_prompts([{"repo": "R", "task": "only", "prompt": "p"}], spec)
+    assert threaded[0]["surface"] == "web-static"
+
+
+def test_build_plan_emission_schema_surface_enum_excludes_web_static():
+    # The model's build-signal grammar enum stays the pre-#886 set — web-static is a deterministic
+    # refiner output, never a model emission, so the schema (and its byte-identity) is unchanged.
+    schema = acc.build_plan_emission_json_schema()
+    surface_enum = schema["properties"]["surface"]["enum"]
+    assert "web-static" not in surface_enum
+    assert surface_enum == sorted(
+        {"desktop-gui", "web", "mobile", "command-line", "automation", "library",
+         "unknown", "ambiguous"}
+    )
+    # web-static is also never offered as a platform-fork candidate
+    assert "web-static" not in schema["properties"]["candidates"]["items"]["enum"]
+
+
+# ---- #888: honest coverage disclosure on New-Project (fresh-scaffold) dispatches -------
+
+
+def test_scaffold_gated_ecosystem_maps_only_gated_scaffolds():
+    def bp(surface, hint=None):
+        return {"surface": surface, "language_hint": hint, "complexity": "simple", "components": []}
+    assert acc.scaffold_gated_ecosystem(bp("web")) == "node"
+    assert acc.scaffold_gated_ecosystem(bp("command-line")) == "python"       # house default
+    assert acc.scaffold_gated_ecosystem(bp("command-line", "node")) == "node"
+    assert acc.scaffold_gated_ecosystem(bp("library")) == "python"
+    # non-gated scaffolds (or no signal) -> "" (the honest warning stands)
+    for surface in ("desktop-gui", "mobile", "automation", "web-static", "unknown", "ambiguous"):
+        assert acc.scaffold_gated_ecosystem(bp(surface)) == "", surface
+    assert acc.scaffold_gated_ecosystem(bp("command-line", "dotnet")) == ""
+    assert acc.scaffold_gated_ecosystem(None) == ""
+
+
+def test_repo_will_scaffold_detects_fresh_vs_existing(tmp_path):
+    fresh = tmp_path / "fresh"
+    fresh.mkdir()
+    (fresh / "README.md").write_text("# hi", encoding="utf-8")
+    assert acc.repo_will_scaffold(fresh) is True                  # README-only shell -> scaffolds
+    (fresh / "package.json").write_text("{}", encoding="utf-8")
+    assert acc.repo_will_scaffold(fresh) is False                 # a manifest -> no seed
+    nested = tmp_path / "nested"
+    (nested / "src").mkdir(parents=True)
+    (nested / "src" / "App.csproj").write_text("<Project/>", encoding="utf-8")
+    assert acc.repo_will_scaffold(nested) is False                # one-level-deep marker counts
+    # MINOR-2 (reviewer-886-888): the fleet's $hasProj is -Recurse, so a marker buried >=2 dirs
+    # deep with NO root manifest (a monorepo shape) ALSO makes the fleet skip seeding. A shallow
+    # check would return True here and the card would over-claim "checks will run" for a scaffold
+    # that never runs — so repo_will_scaffold must match $hasProj recursively.
+    monorepo = tmp_path / "monorepo"
+    (monorepo / "packages" / "app").mkdir(parents=True)
+    (monorepo / "README.md").write_text("# monorepo", encoding="utf-8")
+    (monorepo / "packages" / "app" / "package.json").write_text("{}", encoding="utf-8")
+    assert acc.repo_will_scaffold(monorepo) is False              # deep marker, no root -> no seed
+    # an existing repo whose contents defeat detection (cpp marker) -> NOT a scaffold target
+    cpp = tmp_path / "cpp"
+    cpp.mkdir()
+    (cpp / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.10)", encoding="utf-8")
+    assert acc.repo_will_scaffold(cpp) is False
+
+
+def test_preview_unknown_ecosystem_with_gated_scaffold_states_the_truth():
+    # #888: detection was blind (empty shell) but the run WILL scaffold a node/python project, so
+    # the card states the checks WILL run — NOT the false "couldn't tell the language" warning.
+    spec = AcceptanceSpec("a page", (AcceptanceCriterion("c1", "it builds", "build", ""),))
+    out = acc.render_criteria_preview(spec, ecosystem="unknown", scaffold_ecosystem="node")
+    assert "WILL run" in out
+    assert "JavaScript (Node)" in out
+    assert "couldn't tell this project's language" not in out
+    py = acc.render_criteria_preview(spec, ecosystem="unknown", scaffold_ecosystem="python")
+    assert "WILL run" in py and "Python" in py
+
+
+def test_preview_unknown_ecosystem_without_scaffold_preserves_warning_byte_for_byte():
+    # No scaffold ecosystem (unknown surface / existing repo / non-gated scaffold) -> the honest
+    # warning is preserved EXACTLY (byte-for-byte with the pre-#888 default caller).
+    spec = AcceptanceSpec("a thing", (AcceptanceCriterion("c1", "it builds", "build", ""),))
+    default = acc.render_criteria_preview(spec, ecosystem="unknown")
+    explicit_empty = acc.render_criteria_preview(spec, ecosystem="unknown", scaffold_ecosystem="")
+    assert default == explicit_empty
+    assert "couldn't tell this project's language" in default
+    # a non-gated scaffold ecosystem (e.g. web-static resolves to "") also keeps the warning
+    assert "WILL run" not in default
+
+
+def test_preview_scaffold_ecosystem_ignored_when_detection_succeeded():
+    # scaffold_ecosystem is a fallback for the BLIND (unknown) case ONLY; a repo whose ecosystem
+    # detected as dotnet still gets the dotnet caveat, never the node/python "will run" line.
+    spec = AcceptanceSpec("a C# app", (AcceptanceCriterion("c1", "2+3=5", "behavior", ""),))
+    out = acc.render_criteria_preview(spec, ecosystem="dotnet", scaffold_ecosystem="node")
+    assert "does not run .NET tests" in out
+    assert "WILL run" not in out
+
+
 def test_generate_plan_seeds_oracle_for_python_single_feature(tmp_path):
     # #690 end-to-end: a single PYTHON feature task + a valid 14B oracle -> the lone task is told
     # to code against the seeded, protected file (NOT to write its own tests) and carries the
@@ -1656,6 +2062,48 @@ def test_generate_plan_seeds_oracle_for_python_single_feature(tmp_path):
     assert only["acceptance_test_path"] == acc.ACCEPTANCE_ORACLE_PATH
     assert "DO NOT EDIT" in only["prompt"]
     assert "Write automated tests" not in only["prompt"]            # codes against the oracle instead
+
+
+def test_generate_plan_seeds_node_oracle_for_node_single_feature(tmp_path):
+    # #697 end-to-end: a single NODE feature task + a valid 14B node:test oracle -> the lone task
+    # codes against the seeded, protected .mjs file (NOT its own tests) and carries the node code
+    # + the .mjs path so the fleet seeds it into every best-of-N candidate + restores it. The
+    # per-task oracle only fires for len==1, so this exercises the single-task node shape.
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    gen = _fake_model(
+        tasks_json=json.dumps([{"task": "add-days", "prompt": "Implement addDays(y,m,d,n)"}]),
+        criteria_json=json.dumps([{"text": "Feb 28 + 1 is Mar 1 in 2024", "tier": "behavior", "check": ""}]),
+        build_plan_json=_NODE_BUILD_PLAN,
+        oracle_node=_ORACLE_NODE,
+    )
+    res = acc.generate_plan("calendar math in node", repo, generate_fn=gen, projects_dir=projects)
+    assert res.ok and len(res.tasks) == 1
+    only = res.tasks[0]
+    assert only["acceptance_test_code"] == _ORACLE_NODE
+    assert only["acceptance_test_path"] == acc.ACCEPTANCE_ORACLE_PATH_NODE
+    assert only["language_hint"] == "node"                          # build-signal threaded through
+    assert "DO NOT EDIT" in only["prompt"] and "node --test" in only["prompt"]
+    assert "Write automated tests" not in only["prompt"]            # codes against the oracle instead
+
+
+def test_generate_plan_node_oracle_junk_falls_back_to_folded_tests(tmp_path):
+    # [kill] a node goal whose 14B oracle is JUNK (no node:test import) falls back to today's
+    # fold-the-tests-in behavior — never seeds an empty/garbage .mjs oracle. node IS behavior-gated,
+    # so the folded test block is still added (unlike a build-only ecosystem).
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    gen = _fake_model(
+        tasks_json=json.dumps([{"task": "add-days", "prompt": "Implement addDays"}]),
+        criteria_json=json.dumps([{"text": "Feb 28 + 1 is Mar 1 in 2024", "tier": "behavior", "check": ""}]),
+        build_plan_json=_NODE_BUILD_PLAN,
+        oracle_node="console.log('not a test at all')",             # junk -> '' -> fall back
+    )
+    res = acc.generate_plan("calendar math in node", repo, generate_fn=gen, projects_dir=projects)
+    assert res.ok and len(res.tasks) == 1
+    assert "acceptance_test_code" not in res.tasks[0]               # no oracle stamped
+    assert "Write automated tests" in res.tasks[0]["prompt"]        # today's folded behavior
+    assert "Feb 28 + 1 is Mar 1 in 2024" in res.tasks[0]["prompt"]
 
 
 def test_generate_plan_oracle_junk_falls_back_to_folded_tests(tmp_path):

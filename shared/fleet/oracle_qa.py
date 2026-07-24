@@ -54,7 +54,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from shared.fleet import grade_env
 
@@ -496,16 +496,60 @@ def _is_first_party(top: str) -> bool:
     return bool(top) and top not in _stdlib_roots()
 
 
-def _spec_corpus(spec) -> str:
-    """The lowercased text the SPEC actually states — the goal + every criterion's text
-    and check — as one searchable blob. The invented-RETURN check tests whether a demanded
-    magic string is GROUNDED here; a value the requirements never mention is the B4n2
-    invention. Fail-soft: a spec without criteria yields the goal alone (or '')."""
+def _spec_corpus(spec, operator_answers: "Sequence[str] | None" = ()) -> str:
+    """The lowercased REQUIREMENT TEXT THE CODER WAS ALSO GIVEN — as one searchable blob.
+    The invented-RETURN check tests whether a demanded magic string is GROUNDED here; a
+    value that reached only the oracle is the B4n2 invention.
+
+    THE ADMISSION RULE, and it is NOT "the operator wrote it". A source belongs here when
+    it is BOTH:
+
+      1. **Requirement content the CODER was also given** — the finding's whole meaning is
+         "this oracle demands a value the coder was never told about", so a value the coder
+         saw cannot blindside them and excusing it is right no matter who phrased it. This
+         is why a criterion qualifies even though the 14B WRITES the criteria
+         (``generate_plan`` step 2 — the model proposes, ``rule_spec`` disposes):
+         :func:`compile_prompts` puts every criterion's ``text``/``check`` verbatim into the
+         coder's task prompt, so a criterion naming ``'Ledgered'`` genuinely instructed the
+         coder to produce it.
+      2. **A statement of what to build, not house framing.** Both parties also see our own
+         prose — the requirements block's fixed header, its ``(assumed)`` tags — and that
+         prose demands nothing. Admitting it grounds the judge on "person", "build",
+         "requirements", excusing an oracle that asserts our own boilerplate back at us.
+
+    Clarify QUESTIONS fail BOTH tests, which is what makes them the sharp case: the model
+    writes them, they routinely name a candidate value ("Should this return 'Saved'?"), and
+    :func:`shared.fleet.clarify.compose_requirements_block` renders ANSWERS only — so a
+    question reaches the oracle author and never the coder. Admitting one lets the model
+    launder its own invention into its own excuse, and excuses an assertion the operator's
+    answer explicitly REFUSED.
+
+    Rule 2 is why ``operator_answers`` is a SEQUENCE OF ANSWERS and never rendered prompt
+    text; a caller holding a block extracts them with
+    :func:`shared.fleet.clarify.operator_answers_from_block`.
+
+    Sources, all optional:
+
+      * ``spec.goal`` + every criterion's ``text``/``check`` — the spec as compiled into the
+        coder's prompts;
+      * ``spec.clarifications`` (#819) — each record's ``answer`` only;
+      * ``operator_answers`` — the answers behind an enriched planning seed. ``spec.goal``
+        is deliberately the CLEAN goal, so a caller that authored the oracle from an
+        enriched seed MUST supply these, or the oracle is judged against a narrower corpus
+        than it was written from and convicted for asserting what the operator asked for
+        (#1043). Absent means "the operator supplied nothing extra", never "judge loosely".
+
+    Fail-soft throughout: a spec with no sources yields ``''`` (which disables the check —
+    never invent a false invention)."""
     parts: list[str] = [str(getattr(spec, "goal", "") or "")]
+    parts.extend(str(a or "") for a in (operator_answers or ()))
     for c in getattr(spec, "criteria", ()) or ():
         parts.append(str(getattr(c, "text", "") or ""))
         parts.append(str(getattr(c, "check", "") or ""))
-    return " ".join(parts).lower()
+    for cl in getattr(spec, "clarifications", ()) or ():
+        if isinstance(cl, dict):
+            parts.append(str(cl.get("answer", "") or ""))
+    return " ".join(p for p in parts if p).lower()
 
 
 def scan_invented_return_contracts(code: str, spec_corpus: str) -> list[OracleFinding]:
@@ -1226,9 +1270,18 @@ def validate_authored_oracle(
     structured_generate_fn: "Callable[[str, str], str] | None" = None,
     reauthor: bool = True,
     criterion_subjects: "dict[str, set[str]] | None" = None,
+    operator_answers: "Sequence[str] | None" = (),
 ) -> OracleQAResult:
     """PLAN-time validation (14B resident) — the static AST stages + the criterion→test
     traceability matrix, with a bounded single-focus REGENERATION loop.
+
+    ``operator_answers`` are the operator's clarified ANSWERS (#819) behind the planning
+    seed the oracle was authored from — answer strings, never the rendered requirements
+    block, whose house prose would ground the judge on words the operator never used. They
+    let the invented-return scanner see what the author saw: ``spec.goal`` is the clean goal
+    by design, so an oracle authored from an enriched seed would otherwise be judged against
+    a narrower corpus than it was written from and convicted for asserting what the operator
+    asked for (#1043). Empty == the operator supplied nothing extra.
 
     Deep QA is python-only; a node oracle returns validated-but-unscanned with a
     ``language: node`` stamp (the taxonomy defects are all python; there is no ast for
@@ -1253,7 +1306,7 @@ def validate_authored_oracle(
 
     test_criteria = [c for c in getattr(spec, "criteria", ()) if c.tier in _test_tiers()]
     exports, modules = _declared_symbols(tasks)
-    spec_corpus = _spec_corpus(spec)
+    spec_corpus = _spec_corpus(spec, operator_answers)
     # #826 — thread the callable-level subjects into the #821 traceability seam. When the
     # caller did not supply an explicit map, bind every test-tier criterion to the plan's
     # DECLARED export callables, so a criterion counts as covered only when a declared test

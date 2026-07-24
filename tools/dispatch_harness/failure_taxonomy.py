@@ -522,29 +522,63 @@ def compute_trend(current_failure_classes: dict, history: "list[dict] | None") -
     }
 
 
+#: The trailing ``YYYYMMDD-HHMMSS`` stamp on a dated run-root name. Stripping it yields
+#: the run's naming FAMILY (``night-20260716-230002`` -> ``night-``; a bare stamp -> ``""``)
+#: so the night KPI never absorbs ``daytime-*`` / ad-hoc proof runs parked in the same root.
+_RUN_STAMP_RE = re.compile(r"\d{8}-\d{6}$")
+
+
+def _run_root(summary_path: Path) -> Path:
+    """The dated run root that owns a ``battery-summary.json``: its parent, or its
+    grandparent when the summary sits under a ``scorecards/`` subdir (the nightly
+    runner's ``--out <night>/scorecards`` shape)."""
+    parent = summary_path.parent
+    return parent.parent if parent.name == "scorecards" else parent
+
+
 def load_history(out_dir: "str | Path | None", *, limit: int = 14) -> list[dict]:
     """Best-effort prior-night history for the trend: the ``failure_taxonomy`` aggregate
-    of each sibling ``battery-summary.json`` under ``out_dir``'s parent (the dated-stamp
-    run roots sort chronologically), the CURRENT ``out_dir`` excluded, newest last, capped
-    at *limit* nights. Fail-soft -> ``[]`` (the trend then shows an honest first-night
-    baseline)."""
+    of each SAME-FAMILY sibling run's ``battery-summary.json`` under the battery root.
+
+    ``out_dir`` is wherever the CURRENT summary lands — either the dated run root itself
+    or its ``scorecards/`` subdir (the nightly runner's ``--out <night>/scorecards``
+    shape) — so the battery root is the run root's parent, NOT ``out_dir``'s parent.
+    Both summary depths are searched (``*/battery-summary.json`` and
+    ``*/scorecards/battery-summary.json``); a run root carrying both counts once.
+    Same-family = identical run-root name once the datetime stamp is stripped
+    (:data:`_RUN_STAMP_RE`), so ``night-*`` history is never polluted by ``daytime-*``
+    or ad-hoc proof runs. Dated names sort chronologically; the CURRENT run is excluded,
+    newest last, capped at *limit* nights. Fail-soft -> ``[]`` (the trend then shows an
+    honest first-night baseline)."""
     if not out_dir:
         return []
     try:
         here = Path(out_dir).resolve()
-        parent = here.parent
-        if not parent.is_dir():
+        run_root = here.parent if here.name == "scorecards" else here
+        battery_root = run_root.parent
+        if not battery_root.is_dir():
             return []
-        summaries = sorted(parent.glob("*/battery-summary.json"))
+        summaries = sorted(
+            set(battery_root.glob("*/battery-summary.json"))
+            | set(battery_root.glob("*/scorecards/battery-summary.json")),
+            key=lambda p: (_run_root(p).name, str(p)),  # chronological; deterministic tiebreak
+        )
     except OSError:
         return []
+    family = _RUN_STAMP_RE.sub("", run_root.name)
     out: list[dict] = []
+    seen_roots: set[Path] = set()
     for path in summaries:
         try:
-            if path.parent.resolve() == here:
-                continue  # the current night is not its own history
+            root = _run_root(path).resolve()
         except OSError:
             continue
+        if root == run_root:
+            continue  # the current night is not its own history
+        if _RUN_STAMP_RE.sub("", root.name) != family:
+            continue  # ad-hoc / daytime families stay out of the night KPI
+        if root in seen_roots:
+            continue  # a run root carrying summaries at both depths counts once
         data = _read_json(path)
         if not data:
             continue
@@ -554,7 +588,8 @@ def load_history(out_dir: "str | Path | None", *, limit: int = 14) -> list[dict]
         fc = tax.get("failure_classes")
         if not isinstance(fc, dict):
             continue
-        out.append({"label": path.parent.name, "failure_classes": fc})
+        seen_roots.add(root)
+        out.append({"label": root.name, "failure_classes": fc})
     return out[-limit:]
 
 

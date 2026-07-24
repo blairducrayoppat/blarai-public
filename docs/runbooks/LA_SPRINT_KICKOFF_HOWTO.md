@@ -1,5 +1,48 @@
 # How to Kick Off a New Sprint — Lead Architect Guide
 
+> ## SUPERSEDED — `/sprint-kickoff` was rewritten on 2026-07-19. Read the command, not this guide.
+>
+> The authoritative description of what `/sprint-kickoff` does is
+> [`.claude/commands/sprint-kickoff.md`](../../.claude/commands/sprint-kickoff.md).
+> The command was rewritten by the #945 D7 doc restructure (commit `28dd039a`),
+> which stripped the retired fleet personas and paperwork. This guide was written
+> against the old shape and has **not** been rewritten to match — a partial
+> refresh would make the stale remainder look maintained, so it is flagged whole.
+>
+> **The four things here that would actually cost you something:**
+>
+> 1. **"You can now close the Claude Code session. The fleet takes over."** — §7.
+>    False, and the most expensive error in this file. The persona fleet this
+>    refers to (EA / SDO / Co-Lead, on scheduled wakes) is retired, and nothing
+>    picks a sprint up on its own. The same session drives the whole arc after the
+>    gate: build → test → commit → merge → ticket closed → journal. **Closing the
+>    session abandons the sprint.**
+>
+>    (A headless *coding* fleet does still exist and is live — but a session
+>    invokes it deliberately via `/dispatch` for a scoped coding job. It is not a
+>    thing that takes a sprint over while you are away.)
+> 2. **The comprehension gate is missing entirely.** The current command's Phase 2
+>    presents the full `CLAUDE.md` gate — ROLE & AUTHORITY / CONTEXT / GOAL /
+>    TASK + PLAN / SCOPE / INHERITED CONSTRAINTS / RISKS + DECISION POINTS /
+>    ASSUMPTIONS & AMBIGUITIES / OPEN QUESTIONS — and then **stops and waits for
+>    you**. This guide describes an "approve the SDV" step instead. The gate is
+>    your real decision point.
+> 3. **No Strategic Design Vision (SDV) is produced.** The command writes a
+>    lightweight `kickoff-brief.md` in plain prose. Everything here about 14 SDV
+>    sections, SDV frontmatter, committing the SDV, and `Gate:Pending-Human`
+>    label flips describes work that no longer happens.
+> 4. **§8 "What happens autonomously after sign-off" is void.** SDO wakes, EA
+>    Code, the peer-review lattice, the Fleet Reports inbox and
+>    `docs/scheduled/ea_queue/` are all retired; `docs/scheduled/` does not exist.
+>
+> **Also:** the `claude.exe` path in §4 pins version `2.1.111`, which is not
+> installed. And there is a second invocation mode this guide never mentions —
+> `/sprint-kickoff --from-tickets <id,id,…> "<theme>"` — which is how
+> `/sprint-discovery` now hands off.
+>
+> Kept for historical reference. The dead links below are left as-is rather than
+> repointed, because the procedures they belong to are themselves retired.
+
 > **Who this is for**: you, the Lead Architect (LA), at the moment a new sprint is starting. This is your single biggest strategic touchpoint — the Strategic Design Vision (SDV) you sign off here is the contract the fleet measures itself against for the entire sprint.
 >
 > **What you'll learn**: when a sprint kickoff is triggered, where exactly to do the kickoff (which app, which window), how to use the `/sprint-kickoff` slash command, how to iterate the SDV to sign-off, and what happens after.

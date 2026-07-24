@@ -1,16 +1,35 @@
 # Lead Architect Operations Index
 
+> ## ⚠ PARTIALLY RETIRED — the autonomous fleet described below no longer runs
+>
+> **Verified 2026-07-20 (#979 R3).** The autonomous **EA / SDO / Co-Lead / Sprint
+> Auditor** fleet — every row marked "Autonomous … every 15 min scheduled wake"
+> below — was **retired**; those scheduled wake tasks are Disabled. BlarAI
+> development is now done by **interactive Claude sessions plus the headless
+> coding-dispatch fleet** (`C:/Users/mrbla/agentic-setup`, brief at
+> `docs/blarai-headless-coding-agent-brief.md`), NOT by a self-waking agent cast.
+>
+> What is still live and correct: the **LA-invoked** agents driven by slash
+> commands — `/sprint-kickoff`, `/sprint-discovery`, `/sprint-debrief` — and the
+> operational runbooks this index links to (reboot checklist, disaster recovery,
+> the ceremony guides). When in doubt about how BlarAI runs today, ask the Claude
+> session directly; do not trust a "15-minute wake" promise on this page.
+>
+> Dead links left in place below are struck through with their replacement named.
+
 > **Who this is for**: you, the Lead Architect (LA). This is your single-point-of-entry into every runbook in `docs/runbooks/`.
 >
 > **How to use**: skim the "When X happens, read Y" table. Click through. Each runbook is self-contained and novice-friendly.
 >
-> **Last updated**: 2026-04-21 (DEC-15 + sprint-boundary agents landed).
+> **Last updated**: 2026-07-20 (#979 R3 — autonomous-fleet sections marked retired; dead pointers neutralised). Prior substantive revision 2026-04-21.
 
 ---
 
 ## The mental model in 30 seconds
 
-BlarAI runs on a **fleet of autonomous agents** (EA, SDO, Co-Lead, Sprint Auditor) that execute work between **sprint boundaries**. You (LA) are in the loop at three kinds of moments:
+*(Historical framing — see the retirement banner above. The autonomous EA/SDO/Co-Lead/Sprint-Auditor fleet described here no longer runs; development is now Claude sessions + headless dispatch. The LA-in-the-loop moments below still hold.)*
+
+BlarAI development ran, at the time this page was written, on a **fleet of autonomous agents** (EA, SDO, Co-Lead, Sprint Auditor) executing work between **sprint boundaries**. You (LA) are in the loop at three kinds of moments:
 
 1. **Sprint boundaries** — kicking off, debriefing, discovering what's next.
 2. **Per-milestone reports** — reading what the fleet produced and optionally flagging issues.
@@ -66,27 +85,29 @@ These are the two runbooks you'll use most day-to-day. Fleet Reports is your inb
 |---|---|
 | You just rebooted your laptop and want to verify the fleet came back up | [LA_REBOOT_CHECKLIST.md](LA_REBOOT_CHECKLIST.md) |
 | The laptop died / is being reformatted and you need to rebuild EVERYTHING from backups | [DISASTER_RECOVERY_RESTORE.md](DISASTER_RECOVERY_RESTORE.md) (master; a copy rides the OneDrive backup root, refreshed nightly) |
-| You need to pause the fleet, register scheduled tasks, rotate credentials, or do any install-level work | [AUTONOMOUS_FLEET_OPERATIONS.md](AUTONOMOUS_FLEET_OPERATIONS.md) |
-| You see a stash backlog, working tree on the wrong branch, an orphaned EA worktree, or a merge-gate ESCALATE on a path mismatch | [../governance/fleet-hygiene.md](../governance/fleet-hygiene.md) (Recovery procedures R1-R6) |
-| You're about to change `wake_launcher.ps1`, `tools/autonomy_budget/`, or anything that affects how the fleet manages working-tree state | [../governance/fleet-hygiene.md](../governance/fleet-hygiene.md) (drift catalogue + stash policy + worktree topology) |
+| You need to pause the fleet, register scheduled tasks, rotate credentials, or do any install-level work | [../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md](../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md) *(RETIRED runbook — describes the old scheduled fleet; today ask the Claude session directly)* |
+| ~~You see a stash backlog, orphaned EA worktree, or a merge-gate path-mismatch ESCALATE~~ | ~~`../governance/fleet-hygiene.md`~~ **RETIRED (file absent) — these were autonomous-fleet failure modes; today ask the Claude session, which owns its own git hygiene** |
+| ~~You're about to change `wake_launcher.ps1`, `tools/autonomy_budget/`, or fleet working-tree state~~ | ~~`../governance/fleet-hygiene.md`~~ **RETIRED (file absent) — the autonomous fleet those paths served no longer runs** |
 | You're troubleshooting something that doesn't fit the above | Ask Claude Desktop — describe symptoms, let it diagnose |
 
 ---
 
 ## The agent cast (who does what)
 
+The **Autonomous** rows are RETIRED — those scheduled wakes are Disabled (verified 2026-07-20). They are kept here struck through so a reader who remembers them sees they are gone, not merely undocumented. The **LA-invoked** rows are live.
+
 | Agent | Interactive or autonomous? | Output | When |
 |---|---|---|---|
-| **EA Code** (Execution Agent) | Autonomous | Code / test / doc commits per milestone | Every 15 min scheduled wake |
-| **SDO** (Strategic Development Orchestrator) | Autonomous | EA prompts + milestone reviews | Every 15 min scheduled wake |
-| **Co-Lead Architect** (autonomous) | Autonomous | SDO continuation XMLs + sprint transitions + merge decisions | Every 15 min scheduled wake |
+| ~~**EA Code** (Execution Agent)~~ | ~~Autonomous~~ | ~~Code / test / doc commits per milestone~~ | **RETIRED — replaced by headless dispatch** |
+| ~~**SDO** (Strategic Development Orchestrator)~~ | ~~Autonomous~~ | ~~EA prompts + milestone reviews~~ | **RETIRED** |
+| ~~**Co-Lead Architect** (autonomous)~~ | ~~Autonomous~~ | ~~SDO continuation XMLs + sprint transitions + merge decisions~~ | **RETIRED** |
 | **Co-Lead Architect** (interactive) | LA-invoked | SDV authoring collaboration | `/sprint-kickoff` |
-| **Sprint Auditor** | Autonomous | SWAGR documents | Every 15 min scheduled wake |
+| ~~**Sprint Auditor**~~ | ~~Autonomous~~ | ~~SWAGR documents~~ | **RETIRED** |
 | **Business Analyst / Product Discovery** | LA-invoked | Vikunja tickets | `/sprint-discovery` |
 | **Sprint Debriefer** | LA-invoked | Guidance + decisions (no artifact) | `/sprint-debrief` |
 | **LA Configuration Agent (me, talking to you now)** | LA-invoked (interactive Claude Code / Desktop) | Anything the LA asks, ad-hoc | Always available |
 
-Behind each role is a **wake template** at `docs/scheduled/wake_templates/` (for scheduled agents) OR a **slash command prompt** at `.claude/commands/` (for LA-invoked agents). Those are the canonical role specs if you want to dig deeper.
+Behind each **live** (LA-invoked) role is a **slash command prompt** at `.claude/commands/` — the canonical role spec. *(The old `docs/scheduled/wake_templates/` for the autonomous agents is gone with the fleet; the path is absent.)*
 
 ---
 
@@ -113,18 +134,21 @@ Three files, three purposes. Never hardcode anything that can be derived from th
 
 | File | What it tells you | How agents use it |
 |---|---|---|
-| `docs/active_tasks.yaml` | Which sprint is currently active (via `sprint_id`) | Every scheduled agent reads this at wake |
-| `docs/sprints/ACTIVE_SPRINT.md` | Human-readable sprint state + historic archive | LA and interactive agents reference |
-| `CLAUDE.md` | Project-wide convention (DEC-15 derivation rules, etc.) | Loaded automatically in every Claude Code session |
+| `docs/sprints/ACTIVE_SPRINT.md` | Which sprint is active — the living pointer | Read at grounding by every session; staleness is gate-enforced |
+| Vikunja (`http://localhost:3456`) | Ticket-level truth: what is open, doing, done | The live work queue; the LA steers from this board |
+| `CLAUDE.md` | Project-wide convention and standing directives | Loaded automatically in every Claude Code session |
 
-When in doubt, read these three.
+When in doubt, read these three. For what is actually *running* — which flags
+are live, which capabilities are enabled — read
+`services/assistant_orchestrator/config/default.toml`, never a document's
+description of it.
 
 ---
 
 ## Escape hatches
 
 - **Something looks broken, I don't know where to start** → open Claude Desktop or Claude Code, describe symptoms, let the agent diagnose. This is always OK.
-- **I want to pause everything** → [AUTONOMOUS_FLEET_OPERATIONS.md §23](AUTONOMOUS_FLEET_OPERATIONS.md#23-agents-task-manager-the-one-command-way-to-pause-resume-or-reinterval) is the simplest path (one PowerShell command). §13/§14 describe the deeper Python-level pause mechanism. Or ask Claude Desktop: *"Pause the fleet."*
+- **I want to pause everything** → ask the Claude session: *"Pause the fleet."* (The old scheduled-fleet pause runbook is retired: [../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md](../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md).)
 - **I want to understand something not in these runbooks** → no runbook is exhaustive; ask Claude Desktop or Claude Code directly. The runbooks cover the common cases.
 
 ---

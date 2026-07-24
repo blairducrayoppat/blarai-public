@@ -1,0 +1,65 @@
+{
+  "purpose": "openvino.genai PR #4139 on-hardware verification (feeds #3937)",
+  "timestamp": "2026-07-16T21:23:28",
+  "hardware": "Intel Core Ultra 7 258V / Arc 140V, driver 32.0.101.8826, Win11 26200",
+  "openvino_version": "2026.4.0-22479-f7a1b8249a9",
+  "openvino_genai_version": "2026.4.0.0-1-f3e59fb36bf-feat/thinking-suppression",
+  "genai_source": "PlanteAmigor/openvino.genai@feat/thinking-suppression (PR #4139), built from source",
+  "model": "OpenVINO/Qwen3.6-35B-A3B-int4-ov (official, INT4_ASYM g64, VLMPipeline)",
+  "prompt": "How many bytes are in one kilobyte?",
+  "max_new_tokens": 220,
+  "conditions": {
+    "A_default": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_300": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n",
+      "seconds": 20.9,
+      "full_output_sha256": "492c6a247f87b494e6e2cd77c4816cb115171e1c48740983bef7336ffef24ebb",
+      "full_output_len": 698,
+      "full_output": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n   - In computing, \"kilobyte\" has two common definitions:\n     - Decimal (SI standard): 1 KB = 1,000 bytes\n     - Binary (traditional computing/IEC standard): 1 KiB = 1,024 bytes\n   - Historically, in computing contexts, 1 KB = 1,024 bytes was standard.\n   - Modern standards (SI, IEC) define:\n     - 1 kilobyte (KB) = 1,000 bytes\n     - 1 kibibyte (KiB) = 1,024 bytes\n   - However, in common usage"
+    },
+    "B_enable_thinking_false_no_ids": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_300": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n",
+      "seconds": 20.5,
+      "full_output_sha256": "492c6a247f87b494e6e2cd77c4816cb115171e1c48740983bef7336ffef24ebb",
+      "full_output_len": 698,
+      "full_output": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n   - In computing, \"kilobyte\" has two common definitions:\n     - Decimal (SI standard): 1 KB = 1,000 bytes\n     - Binary (traditional computing/IEC standard): 1 KiB = 1,024 bytes\n   - Historically, in computing contexts, 1 KB = 1,024 bytes was standard.\n   - Modern standards (SI, IEC) define:\n     - 1 kilobyte (KB) = 1,000 bytes\n     - 1 kibibyte (KiB) = 1,024 bytes\n   - However, in common usage"
+    },
+    "B2_enable_thinking_false_with_ids": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_300": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n",
+      "seconds": 20.6,
+      "full_output_sha256": "492c6a247f87b494e6e2cd77c4816cb115171e1c48740983bef7336ffef24ebb",
+      "full_output_len": 698,
+      "full_output": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n   - In computing, \"kilobyte\" has two common definitions:\n     - Decimal (SI standard): 1 KB = 1,000 bytes\n     - Binary (traditional computing/IEC standard): 1 KiB = 1,024 bytes\n   - Historically, in computing contexts, 1 KB = 1,024 bytes was standard.\n   - Modern standards (SI, IEC) define:\n     - 1 kilobyte (KB) = 1,000 bytes\n     - 1 kibibyte (KiB) = 1,024 bytes\n   - However, in common usage"
+    },
+    "C2_reasoning_budget_32_with_ids": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_300": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n",
+      "seconds": 20.5,
+      "full_output_sha256": "492c6a247f87b494e6e2cd77c4816cb115171e1c48740983bef7336ffef24ebb",
+      "full_output_len": 698,
+      "full_output": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n   - In computing, \"kilobyte\" has two common definitions:\n     - Decimal (SI standard): 1 KB = 1,000 bytes\n     - Binary (traditional computing/IEC standard): 1 KiB = 1,024 bytes\n   - Historically, in computing contexts, 1 KB = 1,024 bytes was standard.\n   - Modern standards (SI, IEC) define:\n     - 1 kilobyte (KB) = 1,000 bytes\n     - 1 kibibyte (KiB) = 1,024 bytes\n   - However, in common usage"
+    }
+  },
+  "generation_config_thinking_fields": [
+    "enable_thinking",
+    "reasoning_budget_tokens",
+    "thinking_end_token_id",
+    "thinking_start_token_id"
+  ],
+  "load_seconds": 31.6,
+  "think_token_ids": {
+    "<think>": 248068,
+    "</think>": 248069
+  },
+  "verdict": "DOES NOT SUPPRESS on this model even with explicit token IDs \u2014 inspect texts"
+}

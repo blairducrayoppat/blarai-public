@@ -6,6 +6,7 @@
     "pass_rate": 1.0,
     "passed": 35,
     "skipped_hardware": 0,
+    "tool_calls": 0,
     "total": 35
   },
   "cases": {
@@ -45,7 +46,7 @@
     "pa-mdl-012": "pass",
     "pa-mdl-013": "pass"
   },
-  "generated_at": "2026-07-02T20:15:34.678825+00:00",
-  "git_sha": "8504f44",
+  "generated_at": "2026-07-22T00:05:10.663904+00:00",
+  "git_sha": "94d506d7",
   "suite": "pa_classification"
 }

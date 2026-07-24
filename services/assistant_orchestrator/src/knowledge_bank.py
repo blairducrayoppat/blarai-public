@@ -486,16 +486,62 @@ def _normalize_source_ref(source_ref: str) -> bytes:
     return source_ref.strip().encode("utf-8")
 
 
+# Stopwords excluded from the FTS keyword limb (#795): a conservative,
+# dependency-free English function-word set — articles/determiners, pronouns,
+# auxiliaries/copulas, conjunctions/subordinators, prepositions/particles,
+# plus the contraction fragments ``\w+`` tokenization produces ("don't" →
+# "don", "t").  Membership is checked case-insensitively.  Collision-prone
+# words are deliberately ABSENT ("may" the month, "won" the verb, "just" as
+# in just-in-time): a missed stopword costs one noise term; a wrongly
+# filtered content word silently blinds the keyword limb.
+_FTS_STOPWORDS: frozenset[str] = frozenset(
+    (
+        # Articles + determiners
+        "a", "an", "the", "this", "that", "these", "those", "each", "every",
+        "few", "more", "most", "other", "some", "such", "both", "all", "any",
+        "same", "own", "no", "not", "nor", "only", "very", "too",
+        # Pronouns
+        "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you",
+        "your", "yours", "yourself", "yourselves", "he", "him", "his",
+        "himself", "she", "her", "hers", "herself", "it", "its", "itself",
+        "they", "them", "their", "theirs", "themselves", "what", "which",
+        "who", "whom",
+        # Auxiliaries + copulas
+        "am", "is", "are", "was", "were", "be", "been", "being", "have",
+        "has", "had", "having", "do", "does", "did", "doing", "can", "could",
+        "will", "would", "shall", "should", "might", "must",
+        # Conjunctions + subordinators
+        "and", "but", "or", "if", "because", "as", "until", "unless",
+        "while", "than", "then", "once", "when", "where", "why", "how",
+        "whether", "although", "though",
+        # Prepositions + particles
+        "of", "at", "by", "for", "with", "about", "against", "between",
+        "into", "through", "during", "before", "after", "above", "below",
+        "to", "from", "up", "down", "in", "out", "on", "off", "over",
+        "under", "again", "further", "here", "there",
+        # Contraction fragments left behind by \w+ tokenization
+        "s", "t", "d", "ll", "m", "re", "ve",
+    )
+)
+
+
 def _fts_match_expr(query: str) -> str:
     """Build a safe FTS5 MATCH expression from free-form query text.
 
     Every alphanumeric word is double-quoted (FTS5 string syntax — quoting
     neutralises operators like ``NEAR``/``*``/``-``) and OR-joined so any
-    overlapping term contributes to BM25.  Returns ``""`` when the query
-    carries no indexable words (caller skips the lexical limb).
+    overlapping term contributes to BM25.  Stopwords are dropped first
+    (#795): common function words otherwise flood the keyword limb with
+    noise matches that rank-fusion then ranks above signal.  Fail-safe
+    contract: a query whose indexable words are ALL stopwords keeps its
+    full unfiltered expression — the filter never turns a matchable query
+    into an empty MATCH, so the keyword limb still answers when it is the
+    only limb running.  Returns ``""`` when the query carries no indexable
+    words at all (caller skips the lexical limb).
     """
     words = re.findall(r"\w+", query, flags=re.UNICODE)
-    return " OR ".join(f'"{w}"' for w in words)
+    content = [w for w in words if w.lower() not in _FTS_STOPWORDS]
+    return " OR ".join(f'"{w}"' for w in (content or words))
 
 
 def _guard_embed_input(texts: object) -> list[str]:

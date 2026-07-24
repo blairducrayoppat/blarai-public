@@ -83,6 +83,10 @@ public sealed partial class MainWindow : Window
         // ride the SAME PREFERENCE_WRITE door (P8) — the model never re-supplies
         // the body, only the 16-hex token crosses.
         "/remember-confirm", "/remember-dismiss",
+        // Coordinator read surface (#843 C1, ADR-039 §2.10) — parsed by the
+        // GATEWAY (transport.py -> coord_coordinator), READ-ONLY compose; gated
+        // backend-side by [coordinator].enabled (false -> clear disabled notice).
+        "/coord",
     };
 
     private static bool IsBackendCommand(string text)

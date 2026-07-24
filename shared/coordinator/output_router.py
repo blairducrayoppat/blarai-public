@@ -56,9 +56,10 @@ graduation earns its first LIVE comment as a fresh episode (the shadow-era
 fingerprint would otherwise suppress it). Limb 6 wires the recorded mode from
 the liveness stamp.
 
-DORMANCY: no production boot path constructs an :class:`OutputRouter` today —
-the limb-6 ``build_heartbeat`` factory (behind ``[coordinator].heartbeat_enabled``,
-default false) wires it later. Importing this module arms nothing.
+REACHABILITY: an :class:`OutputRouter` is constructed by the ``build_heartbeat``
+factory, which builds nothing while ``[coordinator].heartbeat_enabled`` is false (the
+dormant default). Whether its output reaches the board or the shadow journal is
+decided by the recorded mode, not by this module. Importing this module arms nothing.
 """
 
 from __future__ import annotations

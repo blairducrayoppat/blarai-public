@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from evals.loader import GoldenDataError, golden_path, load_golden
+from evals.model_target import Capability, ModelTarget
 from evals.types import CaseResult, CaseStatus, SuiteReport
 
 SUITE_NAME: str = "pa_classification"
@@ -122,6 +123,8 @@ def make_deterministic_classifier() -> Callable[[dict[str, Any]], tuple[str, str
 
 def make_real_gpu_classifier(
     model_dir: Path,
+    *,
+    speculative_decoding_enabled: bool | None = None,
 ) -> Callable[[dict[str, Any]], tuple[str, str | None]]:
     """Build the model-in-the-loop classifier (Arc 140V required).
 
@@ -130,6 +133,13 @@ def make_real_gpu_classifier(
     classification -> ``adjudicate`` decision matrix. This is the
     production classification path; misses here are the measurable form
     of ISS-3.
+
+    Args:
+        model_dir: The PA model directory to load.
+        speculative_decoding_enabled: When ``None`` (the default), construct
+            ``PolicyGPUInference`` EXACTLY as before (byte-identical). A #931
+            ``text-llm`` override passes the declared speculative-decode
+            contract explicitly.
 
     Raises:
         FileNotFoundError: If the model directory is absent (the model is
@@ -145,7 +155,13 @@ def make_real_gpu_classifier(
 
     if not model_dir.exists():
         raise FileNotFoundError(f"PA model directory not found: {model_dir}")
-    gpu = PolicyGPUInference(str(model_dir))
+    if speculative_decoding_enabled is None:
+        gpu = PolicyGPUInference(str(model_dir))
+    else:
+        gpu = PolicyGPUInference(
+            str(model_dir),
+            speculative_decoding_enabled=speculative_decoding_enabled,
+        )
     if not gpu.load_model():
         raise RuntimeError(f"PA model failed to load from {model_dir}")
 
@@ -249,11 +265,27 @@ def _evaluate_case(
     )
 
 
+# A ``multimodal-vlm`` #931 override targets a natively multimodal checkpoint
+# that OpenVINO GenAI serves through a VLMPipeline. The PA classifier path is
+# ``PolicyGPUInference`` (LLMPipeline-bound: ``classify_car`` formats a
+# classification prompt and parses a verdict), so a faithful VLM PA classifier
+# is a distinct build, not a one-line pipeline swap. Until it lands, VLM model
+# cases here are SKIPPED (loud, explained) so an ``--suite all`` VLM parity run
+# stays usable and never silently mis-pipelines PA. See #931 follow-on.
+_VLM_PA_NOT_WIRED_DETAIL: str = (
+    "multimodal-vlm capability is not wired for the PA classifier "
+    "(PolicyGPUInference is LLMPipeline-bound) — skipped, not mis-pipelined "
+    "(#931 follow-on). Use --capability text-llm for a dense PA override, or the "
+    "answer_quality suite for VLM answer-parity."
+)
+
+
 def run_suite(
     golden_file: Path | None = None,
     *,
     include_hardware: bool = False,
     hardware_classifier: Callable[[dict[str, Any]], tuple[str, str | None]] | None = None,
+    model_target: ModelTarget | None = None,
 ) -> SuiteReport:
     """Run the PA classification suite.
 
@@ -265,6 +297,12 @@ def run_suite(
         hardware_classifier: Injectable classifier for model-mode cases
             (built via :func:`make_real_gpu_classifier` when None and
             ``include_hardware`` is True).
+        model_target: The #931 OPT-IN hardware model-target override. ``None``
+            keeps the byte-identical default 14B path. A ``text-llm`` target
+            loads its directory (honoring the speculative-decode contract)
+            through the same ``PolicyGPUInference`` path. A ``multimodal-vlm``
+            target SKIPS the model cases (loud, explained) — the VLM PA
+            classifier is a #931 follow-on.
 
     Returns:
         SuiteReport with one CaseResult per golden case.
@@ -275,6 +313,10 @@ def run_suite(
     report = SuiteReport(suite=SUITE_NAME)
     deterministic_classify = make_deterministic_classifier()
     model_classify = hardware_classifier
+    vlm_target = (
+        model_target is not None
+        and model_target.capability is Capability.MULTIMODAL_VLM
+    )
 
     for case in cases:
         problem = _validate_case(case)
@@ -293,10 +335,33 @@ def run_suite(
                     )
                 )
                 continue
+            if vlm_target and hardware_classifier is None:
+                report.results.append(
+                    CaseResult(
+                        case_id=str(case["id"]),
+                        status=CaseStatus.SKIPPED_HARDWARE,
+                        description=str(case.get("description", "")),
+                        expected=str(case["label"]),
+                        detail=_VLM_PA_NOT_WIRED_DETAIL,
+                    )
+                )
+                continue
             if model_classify is None:
-                model_classify = make_real_gpu_classifier(default_model_dir())
+                model_classify = make_real_gpu_classifier(
+                    _resolve_model_dir(model_target),
+                    speculative_decoding_enabled=(
+                        model_target.speculative_decode
+                        if model_target is not None
+                        else None
+                    ),
+                )
             report.results.append(_evaluate_case(case, model_classify))
         else:
             report.results.append(_evaluate_case(case, deterministic_classify))
 
     return report
+
+
+def _resolve_model_dir(model_target: ModelTarget | None) -> Path:
+    """The PA model directory to load: the #931 override's, else the default 14B."""
+    return model_target.model_dir if model_target is not None else default_model_dir()

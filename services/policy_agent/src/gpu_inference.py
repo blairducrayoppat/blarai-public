@@ -383,7 +383,7 @@ class DeterministicPolicyChecker:
         re.IGNORECASE,
     )
 
-    # --- ADR-027 §2 egress carve-out (STAGED / DORMANT, Sprint 17 #628 / C3) ---
+    # --- ADR-027 §2 egress carve-out (#628 / C3) ---
     # The DENY_EXTERNAL_NETWORK rule (RULE 3) is the single source of truth for
     # the air-gap deny — enforced both at the PA boundary AND at the AO tool loop
     # (services/assistant_orchestrator/src/entrypoint.py:_adjudicate_tool_dispatch).
@@ -466,14 +466,17 @@ class DeterministicPolicyChecker:
 
         Args:
             car: The action request to evaluate.
-            egress_allowlist: ADR-027 §2 egress carve-out (STAGED/DORMANT). When
-                a CAR resource is an external-network URL whose host is in this
-                allowlist, RULE 3 auto-approves it (returns ``None`` to ALLOW —
-                no per-call user confirmation) instead of denying. ``None``
-                (the default, and the only value the live runtime passes this
-                sprint) uses the EMPTY class default, so every external URL is
-                denied — the air-gap stays welded. Tests inject a value to
-                exercise the auto-approve mechanism.
+            egress_allowlist: ADR-027 §2 egress carve-out. When a CAR resource is
+                an external-network URL whose host is in this allowlist, RULE 3
+                auto-approves it (returns ``None`` to ALLOW — no per-call user
+                confirmation) instead of denying. ``None`` means "use the class
+                default" (:data:`_EGRESS_ALLOWLIST`, the authority for which hosts
+                are vetted); an EMPTY allowlist — passed or defaulted — denies
+                every external URL. Only web schemes are ever auto-approved, so a
+                listed host reached over ftp/ws/gopher still denies. Callers may
+                inject a different set: tests exercise the mechanism, and the
+                operator ingest factory passes a one-entry, per-CAR allowlist so a
+                pasted URL authorizes exactly its own host.
 
         Returns:
             ("DENY", rule_name), ("ESCALATE", rule_name), or None.
@@ -521,16 +524,15 @@ class DeterministicPolicyChecker:
             # posixpath.normpath corrupts scheme delimiters (e.g. "http://" →
             # "http:/"), so the raw resource is used here, not _candidates.
             #
-            # ADR-027 §2 carve-out (STAGED/DORMANT): an external URL whose HOST
-            # is on the egress allowlist is auto-approved — the PA adjudicates it
-            # (allow, returns None) and the call is logged below; there is NO
-            # per-call user confirmation (ADR-027 §2). Everything off-list stays
-            # hard-denied. The allowlist is EMPTY by default (the live posture
-            # this sprint), so this branch never fires in production: every
-            # external URL still hits the DENY — the air-gap is welded. Stream
-            # H-a widens the allowlist when a web feature ships under #556; the
-            # outbound payload is then screened by shared.security.exfil_screen
-            # (ADR-027 §4) before it leaves, independent of this allow.
+            # ADR-027 §2 carve-out: an external URL whose HOST is on the egress
+            # allowlist is auto-approved — the PA adjudicates it (allow, returns
+            # None) and the call is logged below; there is NO per-call user
+            # confirmation (ADR-027 §2). Everything off-list stays hard-denied.
+            # The allowlist alone decides whether this branch can fire: empty ->
+            # it never fires and every external URL hits the DENY below. The
+            # allow is never the last word — an approved payload is still screened
+            # by shared.security.exfil_screen (ADR-027 §4) before it leaves, and
+            # the egress guard still gates the socket, independent of this call.
             if any(resource.startswith(s) for s in cls._EXTERNAL_NETWORK_SCHEMES):
                 if cls._is_allowlisted_egress(resource, egress_allowlist):
                     logger.info(
@@ -698,6 +700,7 @@ class PolicyGPUInference:
         draft_model_dir: str | None = None,
         speculative_decoding_enabled: bool = _SPECULATIVE_DECODING_ENABLED_DEFAULT,
         shared_pipeline: SharedInferencePipeline | None = None,
+        require_signed_draft_manifest: bool = False,
     ) -> None:
         self._model_dir = Path(model_dir)
         self._device = device
@@ -707,6 +710,15 @@ class PolicyGPUInference:
             Path(draft_model_dir) if draft_model_dir else Path(DRAFT_MODEL_OV_PATH)
         )
         self._speculative_decoding_enabled = speculative_decoding_enabled
+        # FUT-05 / #917 — the DRAFT-manifest signature posture for the STANDALONE
+        # path (the only path that builds its own draft; the shared-pipeline path
+        # is verified by the launcher's build_shared_pipeline). Kept SEPARATE from
+        # the 14B's manifest gate because the spec-decode draft is NON-AUTHORITATIVE
+        # (proposals the signed 14B re-verifies), so its signature enforcement is an
+        # independently-flippable defense-in-depth layer. Default False = dormant =
+        # digest-only (the draft .sig is not consulted; the digest is still
+        # enforced). Sourced from [security].require_signed_draft_manifest (PA config).
+        self._require_signed_draft_manifest = require_signed_draft_manifest
         # Optional unified-model attachment (ADR-012 §2.1, single
         # compilation, shared weights). When provided, load_model() skips
         # the LLMPipeline construction and references the launcher-built
@@ -736,6 +748,70 @@ class PolicyGPUInference:
         return self._device
 
     # -- Model lifecycle ----------------------------------------------------
+
+    def _verify_draft_integrity(self) -> bool:
+        """Verify the STANDALONE draft weight against its manifest before load.
+
+        FUT-05 / #917. The standalone path (see :meth:`load_model`) builds its own
+        speculative-decoding draft, so — unlike the shared-pipeline path, which the
+        launcher's ``build_shared_pipeline`` already verifies — it must verify the
+        draft itself, at parity with the 14B target's Step-1 sweep. Trust boundary:
+        a draft weight file on disk the PA is about to compile onto the GPU.
+
+          * ``require_signed_draft_manifest`` False (dormant, the shipped default):
+            DIGEST-ONLY. The draft ``.sig`` is NOT consulted
+            (``verify_weight_integrity(require_signed=False)`` takes the bare
+            ``load_manifest`` path), but the manifest digest IS enforced — a tampered
+            draft weight is still caught. A draft manifest that is ABSENT means the
+            draft loads WITHOUT a digest check (the pre-#917 behaviour) but LOUDLY
+            (WARNING), never silently (principle 11).
+          * ``require_signed_draft_manifest`` True (enforced, LA-flipped only after
+            the on-chip signing ceremony): the manifest MUST be present and carry a
+            valid TPM ``.sig``; a missing manifest, missing ``.sig``, or invalid
+            ``.sig`` FAILS CLOSED — exactly as ``require_signed_manifest`` gates the
+            14B target. Enforcing before the draft is signed would refuse to boot,
+            which is why the flag ships dormant and separate from the 14B's.
+
+        Returns True to proceed with the draft load, False to refuse (Fail-Closed).
+        """
+        draft_manifest = self._draft_model_dir / "manifest.json"
+        draft_bin = self._draft_model_dir / "openvino_model.bin"
+
+        if not draft_manifest.exists():
+            if self._require_signed_draft_manifest:
+                logger.error(
+                    "PA draft manifest REQUIRED (require_signed_draft_manifest=true) "
+                    "but not found at %s — refusing to load the draft (Fail-Closed).",
+                    draft_manifest,
+                )
+                return False
+            logger.warning(
+                "PA draft manifest not found at %s — the draft loads WITHOUT "
+                "integrity verification (dormant posture). Stage + sign the draft "
+                "and flip [security].require_signed_draft_manifest to enforce.",
+                draft_manifest,
+            )
+            return True
+
+        result = verify_weight_integrity(
+            model_path=str(draft_bin),
+            manifest_path=str(draft_manifest),
+            require_signed=self._require_signed_draft_manifest,
+        )
+        if not result.verified:
+            logger.error(
+                "PA draft weight integrity FAILED (require_signed=%s): %s — refusing "
+                "to load the draft (Fail-Closed).",
+                self._require_signed_draft_manifest,
+                result.error,
+            )
+            return False
+        logger.info(
+            "PA draft weight integrity verified (%s, require_signed=%s).",
+            draft_bin,
+            self._require_signed_draft_manifest,
+        )
+        return True
 
     def load_model(self) -> bool:
         """Load and initialize the model for GPU inference.
@@ -817,9 +893,14 @@ class PolicyGPUInference:
                 "PA attached to shared LLMPipeline (single-compilation path).",
             )
         else:
-            # Standalone path — PA builds its own LLMPipeline. Preserved
-            # for tests and as fallback when the launcher's shared-pipeline
-            # build fails.
+            # Standalone path — PA builds its own LLMPipeline (target + its own
+            # draft). Reached when no shared pipeline is injected: the PA test
+            # suite and the guest startup-smoke ceremony
+            # (scripts/guest/guest_startup_smoke.py). NOT the host-mode production
+            # path — the launcher always injects the shared, already-verified
+            # pipeline and ABORTS (it does not fall back here) if that build fails.
+            # Because this path builds its OWN draft, the draft integrity check
+            # (_verify_draft_integrity, FUT-05 / #917) lives here, not upstream.
             try:
                 config: dict[str, str] = {
                     "PERFORMANCE_HINT": "LATENCY",
@@ -835,6 +916,13 @@ class PolicyGPUInference:
                 if self._speculative_decoding_enabled:
                     draft_model_xml = self._draft_model_dir / "openvino_model.xml"
                     if draft_model_xml.exists():
+                        # FUT-05 / #917 — verify the draft weight BEFORE loading it.
+                        # The standalone path builds its OWN draft (the shared-pipeline
+                        # path is verified by the launcher's build_shared_pipeline), so
+                        # it owns the check. Fail-Closed: a failed check refuses to load
+                        # the draft (and the whole standalone pipeline).
+                        if not self._verify_draft_integrity():
+                            return False
                         pipeline_kwargs["draft_model"] = ov_genai.draft_model(
                             str(self._draft_model_dir), self._device,
                         )

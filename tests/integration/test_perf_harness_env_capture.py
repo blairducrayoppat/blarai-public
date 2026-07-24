@@ -51,6 +51,7 @@ _REQUIRED_DICT_KEYS = {"environment", "box_state_at_start", "box_state_at_end"}
 _HARNESSES: tuple[str, ...] = (
     "scripts/benchmark_vlm_text_inference.py",
     "scripts/benchmark_spec_decode_ab.py",
+    "scripts/benchmark_vlm_longcontext.py",
 )
 
 

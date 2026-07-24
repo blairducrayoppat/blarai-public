@@ -1,0 +1,38 @@
+{
+  "purpose": "openvino.genai PR #4139 on-hardware verification (feeds #3937)",
+  "timestamp": "2026-07-16T21:09:06",
+  "hardware": "Intel Core Ultra 7 258V / Arc 140V, driver 32.0.101.8826, Win11 26200",
+  "openvino_version": "2026.4.0-22479-f7a1b8249a9",
+  "openvino_genai_version": "2026.4.0.0-1-f3e59fb36bf-feat/thinking-suppression",
+  "genai_source": "PlanteAmigor/openvino.genai@feat/thinking-suppression (PR #4139), built from source",
+  "model": "OpenVINO/Qwen3.6-35B-A3B-int4-ov (official, INT4_ASYM g64, VLMPipeline)",
+  "prompt": "How many bytes are in one kilobyte?",
+  "max_new_tokens": 220,
+  "conditions": {
+    "A_default": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_300": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n",
+      "seconds": 23.3
+    },
+    "B_enable_thinking_false": {
+      "thinking_detected": true,
+      "has_close_think_tag": false,
+      "leading_narration": true,
+      "first_300": "Here's a thinking process:\n\n1.  **Identify the User's Question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the Core Concept**: This is about data storage units, specifically the relationship between bytes and kilobytes (KB).\n\n3.  **Identify the Ambiguity/Context**: \n",
+      "seconds": 20.7
+    },
+    "C_reasoning_budget_32": {
+      "error": "Check 'thinking_start_token_id >= 0 && thinking_end_token_id >= 0' failed at C:\\Users\\mrbla\\builds\\genai-pr4139\\src\\cpp\\src\\generation_config.cpp:321:\nthinking_start_token_id and thinking_end_token_id must both be set when reasoning_budget_tokens is enabled (>= 0).\n"
+    }
+  },
+  "generation_config_thinking_fields": [
+    "enable_thinking",
+    "reasoning_budget_tokens",
+    "thinking_end_token_id",
+    "thinking_start_token_id"
+  ],
+  "load_seconds": 41.2,
+  "verdict": "INCONCLUSIVE \u2014 inspect condition texts"
+}

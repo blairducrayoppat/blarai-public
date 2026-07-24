@@ -1,0 +1,358 @@
+<title>BlarAI Decisions Digest — 2026-07-18</title>
+<style>
+  :root {
+    --paper: #f7f6f2;
+    --ink: #22282b;
+    --muted: #5c6a6e;
+    --line: #d8d9d2;
+    --accent: #1f6f66;
+    --accent-soft: #e3edea;
+    --decide: #9a6b13;
+    --decide-soft: #f4e9d3;
+    --confirm: #1f6f66;
+    --confirm-soft: #ddebe7;
+    --info: #5c6a6e;
+    --info-soft: #e6e8e3;
+    --blocked: #6d4f7d;
+    --blocked-soft: #eae2ee;
+    --card: #fffefb;
+    --answer-bg: #eef2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171d1f;
+      --ink: #e3e2da;
+      --muted: #9aa8ab;
+      --line: #313a3d;
+      --accent: #5fb3a5;
+      --accent-soft: #1e2e2b;
+      --decide: #d3a04a;
+      --decide-soft: #33290f;
+      --confirm: #5fb3a5;
+      --confirm-soft: #16302b;
+      --info: #9aa8ab;
+      --info-soft: #242b2d;
+      --blocked: #b795c9;
+      --blocked-soft: #2c2233;
+      --card: #1d2426;
+      --answer-bg: #212b26;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f7f6f2; --ink: #22282b; --muted: #5c6a6e; --line: #d8d9d2;
+    --accent: #1f6f66; --accent-soft: #e3edea;
+    --decide: #9a6b13; --decide-soft: #f4e9d3;
+    --confirm: #1f6f66; --confirm-soft: #ddebe7;
+    --info: #5c6a6e; --info-soft: #e6e8e3;
+    --blocked: #6d4f7d; --blocked-soft: #eae2ee;
+    --card: #fffefb; --answer-bg: #eef2ee;
+  }
+  :root[data-theme="dark"] {
+    --paper: #171d1f; --ink: #e3e2da; --muted: #9aa8ab; --line: #313a3d;
+    --accent: #5fb3a5; --accent-soft: #1e2e2b;
+    --decide: #d3a04a; --decide-soft: #33290f;
+    --confirm: #5fb3a5; --confirm-soft: #16302b;
+    --info: #9aa8ab; --info-soft: #242b2d;
+    --blocked: #b795c9; --blocked-soft: #2c2233;
+    --card: #1d2426; --answer-bg: #212b26;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, "Times New Roman", serif;
+    font-size: 1.06rem;
+    line-height: 1.62;
+    margin: 0;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+  .sheet { max-width: 46rem; margin: 0 auto; }
+  .eyebrow, .chip, th, .kicker, .answer-label {
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  h1 {
+    font-size: 1.9rem;
+    line-height: 1.2;
+    margin: 0.4rem 0 0.6rem;
+    text-wrap: balance;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 1.35rem;
+    line-height: 1.25;
+    margin: 0 0 0.35rem;
+    text-wrap: balance;
+    font-weight: 600;
+  }
+  h3 {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    color: var(--muted);
+    margin: 1.5rem 0 0.4rem;
+    font-weight: 600;
+  }
+  p { margin: 0.6rem 0; }
+  .lede { color: var(--muted); font-size: 1.02rem; margin-top: 0; }
+  .chip {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.6rem;
+    border-radius: 3px;
+    vertical-align: middle;
+  }
+  .chip.decide  { background: var(--decide-soft);  color: var(--decide); }
+  .chip.confirm { background: var(--confirm-soft); color: var(--confirm); }
+  .chip.info    { background: var(--info-soft);    color: var(--info); }
+  .chip.blocked { background: var(--blocked-soft); color: var(--blocked); }
+  .glance {
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 6px;
+    margin: 1.8rem 0 0;
+    overflow-x: auto;
+  }
+  .glance table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  .glance th {
+    text-align: left;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding: 0.7rem 0.9rem 0.3rem;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .glance td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .glance tr:last-child td { border-bottom: none; }
+  .glance td:first-child { white-space: nowrap; font-family: Consolas, ui-monospace, monospace; font-size: 0.88rem; color: var(--muted); }
+  section.screen {
+    margin-top: 3.2rem;
+    padding-top: 2.2rem;
+    border-top: 2px solid var(--line);
+  }
+  .kicker {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+  }
+  .kicker .ticket { font-family: Consolas, ui-monospace, monospace; font-size: 0.88rem; color: var(--muted); }
+  .teach {
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    margin: 1rem 0;
+  }
+  .teach p { margin: 0.45rem 0; }
+  .teach .kicker-inline {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 0.25rem;
+  }
+  ul { margin: 0.5rem 0 0.8rem; padding-left: 1.3rem; }
+  li { margin: 0.35rem 0; }
+  .option { margin: 0.8rem 0; padding-left: 1rem; border-left: 3px solid var(--line); }
+  .option.rec { border-left-color: var(--accent); }
+  .option b { font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.95rem; }
+  .option .rec-tag {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent);
+    margin-left: 0.45rem;
+  }
+  .answer {
+    background: var(--answer-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.85rem 1.1rem;
+    margin-top: 1.4rem;
+  }
+  .answer-label {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 0.3rem;
+  }
+  .answer p { margin: 0.3rem 0; }
+  .footnote { color: var(--muted); font-size: 0.9rem; margin-top: 0.8rem; }
+  .provenance {
+    margin-top: 3.5rem; padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.88rem;
+  }
+  em { font-style: italic; }
+  table.mini { border-collapse: collapse; margin: 0.6rem 0; font-size: 0.95rem; }
+  table.mini td, table.mini th { padding: 0.3rem 0.8rem 0.3rem 0; text-align: left; vertical-align: top; }
+  table.mini th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+  .num { font-variant-numeric: tabular-nums; }
+</style>
+
+<div class="sheet">
+  <header>
+    <span class="eyebrow">BlarAI · Governance briefing · Saturday 2026-07-18</span>
+    <h1>Decisions digest: what needs your answer, and what doesn't</h1>
+    <p class="lede">Four items from the board, sorted by what they actually ask of you. One needs a real decision. One needs a one-word confirmation. Two need nothing — they're here so you can see the state of play and the reasoning, which is itself the point: a decision queue only works when "decidable now" is kept separate from "waiting on evidence."</p>
+
+    <div class="glance">
+      <table>
+        <tr><th>Ticket</th><th>Topic</th><th>What it needs from you</th></tr>
+        <tr>
+          <td>#940</td>
+          <td>Custom, accented voices (voice cloning)</td>
+          <td><span class="chip decide">Your decision</span>&nbsp; Pick a direction — recommendation: park it</td>
+        </tr>
+        <tr>
+          <td>#939</td>
+          <td>The "always answer in English" rule being ignored</td>
+          <td><span class="chip confirm">Confirm</span>&nbsp; Deferral until the next model — your stated direction</td>
+        </tr>
+        <tr>
+          <td>#927</td>
+          <td>Overnight job time-budgets</td>
+          <td><span class="chip info">No action</span>&nbsp; You decided Thursday; built, lands Sunday night</td>
+        </tr>
+        <tr>
+          <td>#930</td>
+          <td>One model to replace three (the 35B consolidation)</td>
+          <td><span class="chip blocked">Not decidable yet</span>&nbsp; Blocked upstream; watch plan in place</td>
+        </tr>
+      </table>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <section class="screen">
+    <div class="kicker">
+      <span class="ticket">#940</span>
+      <span class="chip decide">Your decision</span>
+    </div>
+    <h2>Should BlarAI pursue custom, accented voices — and if so, when?</h2>
+
+    <div class="teach">
+      <span class="kicker-inline">The concept: voice cloning</span>
+      <p>BlarAI currently speaks through <em>Kokoro</em>, a small local text-to-speech model with 54 stock voices — all of them American or British English. Thursday's audition confirmed none of them is the voice you want, and none can be. A different local model, <em>XTTS&nbsp;v2</em>, works another way: give it a clean one-minute recording of any voice and it speaks new text <em>in that voice</em> — this is voice cloning. The test workbench we built proves it runs on this machine and sounds more natural than Kokoro.</p>
+      <p>Two things Thursday taught us: <b>clone quality is dominated by the reference recording</b> (your phone clip produced a robotic clone — the recording was the problem, not the method), and <b>there is no ready-made pack of the accents you want</b>. Each accent — Scottish, Irish, Australian, Turkish, Ukrainian — means sourcing a clean, properly licensed voice sample individually. Scottish and Irish exist in a research archive (VCTK, free with attribution); the rest come from Mozilla's Common Voice collection (public domain), each a separate fetch-and-try.</p>
+    </div>
+
+    <h3>The governance frame — two separate decisions, only one asked today</h3>
+    <p>Exploring voices in the workbench changes nothing inside BlarAI. Putting a cloning engine <em>into</em> BlarAI is a capability change — a heavier model, new software dependencies, and voice licensing obligations — and would come back to you later as its own go-live ceremony, security-reviewed like everything else. The guardrail you set Thursday already binds all of it: only freely licensed or consented voices, never a clone of a real person without consent. Today's question is only about the research direction.</p>
+
+    <h3>Your options</h3>
+    <div class="option rec">
+      <b>A — Park it.</b><span class="rec-tag">Recommended</span>
+      <p>Keep the workbench (about a gigabyte on disk, zero upkeep), do nothing now, revisit when the voice program comes back around. Nothing is lost — the findings, the working setup, and the sourcing plan are all recorded on the ticket. My reasoning: today's pace fix (#853, shipping separately) removes the one complaint you could actually hear, and your own insight from Thursday — that "character" comes mostly from <em>personality</em> (word choice, attitude) rather than voice timbre — points at a cheaper, higher-leverage lever first.</p>
+    </div>
+    <div class="option">
+      <b>B — Pursue the accents now.</b>
+      <p>Per-accent sample sourcing and clone trials as background work — a few sessions spread over coming weeks, ending in an audition for you. Adoption into BlarAI would still be a separate, later decision.</p>
+    </div>
+    <div class="option">
+      <b>C — Drop the direction.</b>
+      <p>Delete the workbench, keep the written findings. Frees the disk; restarting later means rebuilding the setup (about an evening's work).</p>
+    </div>
+    <p class="footnote">Also on the table, but <em>not</em> asked today: persona design — the warm-witty and steady-heroic personality sketches from Thursday. If voice character matters to you, that is the lever I would pull before any accent work. Say the word and it becomes its own ticket.</p>
+
+    <div class="answer">
+      <span class="answer-label">How to answer</span>
+      <p>One line does it: <b>"Park"</b>, <b>"Pursue — start with ⟨accent⟩"</b>, or <b>"Drop"</b>. If you'd like the persona-design ticket opened, add <b>"and open the persona ticket."</b></p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="screen">
+    <div class="kicker">
+      <span class="ticket">#939</span>
+      <span class="chip confirm">Confirm</span>
+    </div>
+    <h2>The assistant ignores your "always answer in English" rule — fix deferred until the next model</h2>
+
+    <p>Thursday's live test confirmed the defect is real: with the rule stored and active, a French question still gets a French answer. The investigation cleared the machinery — saving, editing, and injecting the rule into every conversation all verified working. What fails is the model itself: mirroring the language you write in is one of a small language model's strongest instincts, and a written instruction loses to it. Rewording the rule more strictly changed nothing, which proves wording isn't the lever.</p>
+
+    <div class="teach">
+      <span class="kicker-inline">Why deferring is the disciplined move</span>
+      <p>Rule-following of this kind lives in the model, not the plumbing — and the resident model is likely to be replaced (the Qwen3.6 direction, screen 4). Training or prompt-engineering obedience into a model on its way out is work thrown away. Instead, a permanent test case now rides in the evaluation suite: a French question paired with your English rule, marked as a <em>known failure</em>. The day a new model or fix closes the gap, that test flips green on its own — the re-evaluation is built into the system rather than left to memory. This is the same pattern the project uses everywhere: encode the promise as a test, then let the test keep the promise.</p>
+    </div>
+
+    <p class="footnote">Transparency note: during Thursday's testing your stored preference was edited to the stricter wording "Always respond in English, even if I write to you in another language." That edit is live in your preference store; the original wording is preserved in the audit history.</p>
+
+    <div class="answer">
+      <span class="answer-label">How to answer</span>
+      <p><b>"Confirmed"</b> keeps the deferral. If the day-to-day annoyance is worse than it looked, say so — there is an interim guard we could build sooner (a check that detects a wrong-language reply and regenerates it — a deterministic wrapper around the model, no retraining), at the cost of pulling effort forward.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="screen">
+    <div class="kicker">
+      <span class="ticket">#927</span>
+      <span class="chip info">No action</span>
+    </div>
+    <h2>Overnight job time-budgets: you decided this Thursday — here's what's built and when it lands</h2>
+
+    <p>For the record, the shape of the decision you made: the overnight battery gives every coding job the same stopwatch — three hours. The new coherence check proved that a multi-wave job (one that builds in several passes) needs four to four-and-a-half — so those jobs were being starved, stopped mid-flight by the clock rather than by any real failure. Two levers existed: raise <em>every</em> job's stopwatch (which arithmetic showed would demand a 25-hour night against your fixed 16-hour ceiling) or give <em>only the big jobs</em> bigger stopwatches. You chose per-job budgets, ceiling untouched.</p>
+
+    <h3>Where it stands</h3>
+    <ul>
+      <li><b>Built and verified:</b> budgets set on the two multi-wave cards only (the flashcards job B4 → 4½&nbsp;hours; B2 → ~4¼), the long-term timeout registry updated in the same change per your instruction, and the targeted tests green. Smaller jobs keep the default.</li>
+      <li><b>Held on a branch, by design:</b> battery-path changes land one per night. Tonight is assigned to a different branch (which also delivers the coherence-checking tool itself); this change merges <b>Sunday night at the earliest</b>.</li>
+      <li><b>One carried risk, named:</b> the 4-hour floor figure was <em>inferred</em> while the checking tool wasn't yet on the main branch. The merge session must confirm it against the tool's real formula before landing — that instruction is on the ticket, and it is Sunday's job, not today's.</li>
+    </ul>
+
+    <div class="answer">
+      <span class="answer-label">How to answer</span>
+      <p>Nothing. This screen exists so the board never knows something you don't.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section class="screen">
+    <div class="kicker">
+      <span class="ticket">#930 · #923 · #769</span>
+      <span class="chip blocked">Not decidable yet</span>
+    </div>
+    <h2>One model to replace three? Genuinely blocked — here's the honest state and the watch plan</h2>
+
+    <div class="teach">
+      <span class="kicker-inline">The concept: consolidation onto a Mixture-of-Experts model</span>
+      <p>Today BlarAI's brain is <em>Qwen3-14B</em> for text plus a separate vision model, swapped in and out of memory as needed. The candidate to replace both is <em>Qwen3.6-35B-A3B</em> — a <b>Mixture-of-Experts</b> model: 35 billion parameters organized into specialist groups, of which only about 3 billion are consulted for any given word. Think of a firm with 35 specialists where each question is routed to the three relevant people — big-firm expertise at small-team speed. One resident model would handle chat <em>and</em> vision with no swapping, at the cost of more memory held at rest (~19&nbsp;GB versus the 14B's ~8).</p>
+    </div>
+
+    <h3>What the evidence says so far — favorable, but partial</h3>
+    <ul>
+      <li>Your own side-by-side judgment: the 35B gave <b>better vision answers</b> than the dedicated vision model — and ran <b>faster per turn</b> on this laptop.</li>
+      <li>Speed is confirmed healthy with the official build (~35 tokens/second — the earlier alarming number traced to a bad community conversion, not the model).</li>
+      <li>The official build handles images — confirmed.</li>
+      <li>On the standard 40-question answer-quality exam it passed 22 — <em>but about 12 of the 18 failures carry one bug's fingerprints rather than bad answers</em> (see below). The underlying content was frequently right.</li>
+    </ul>
+
+    <h3>The blocker — and why it's a governance problem, not a cosmetic one</h3>
+    <p>Models like this "think out loud" before answering. Normally the thinking is wrapped in markers so BlarAI strips it before you see the reply. On this model, the runtime <b>ignores the thinking off-switch and omits the markers</b> — private reasoning leaks into replies, and, more seriously, BlarAI's Policy Agent (the gate that adjudicates every risky action) <em>relies</em> on that off-switch to get clean, classifiable output. A control surface the trust spine depends on doesn't work on this model today. A fix exists upstream — pull request #4139 to Intel's OpenVINO GenAI runtime, where we've posted supporting test data — but it has not been merged.</p>
+
+    <h3>Why no decision today</h3>
+    <p>This is a capability change, a quality change, and an architecture amendment in one — and every quality number we hold was measured <em>through a known defect</em>. Deciding now would mean judging the model by its symptoms. The disciplined sequence: the fix lands upstream → the exam re-runs clean → the genuine failures (a handful of prompt-injection and grounding misses) are isolated from the bug's artifacts → you get a complete decision package. Two further items ride in that package: parity checks for the Policy Agent's classification duties, and re-establishing the speed technique (speculative decoding) the current 14B enjoys and the newcomer would initially lose.</p>
+
+    <h3>The watch plan</h3>
+    <p>Ticket <b>#923</b> checks the upstream fix on <b>2026-07-30</b>. When it merges: clean re-run, isolation of the real failures, then the decision comes to you properly. Nothing is stalled that could be moving — the waiting is the correct state.</p>
+
+    <div class="answer">
+      <span class="answer-label">How to answer</span>
+      <p>Nothing today. If you want the watch checked more often than the 30th, say so.</p>
+    </div>
+  </section>
+
+  <div class="provenance">
+    <p><b>Sources and depth.</b> Every screen compresses a fuller record: tickets #940, #939, #927 (with #833), and #930/#923/#769 hold the dense technical detail, measured numbers, and evidence files. Your answers to this digest get recorded on those tickets, so the board — not this page — remains the system of record. Prepared 2026-07-18 by the Saturday session; part of the BlarAI governance practice of separating decidable questions from evidence-blocked ones before they reach the decision-maker.</p>
+  </div>
+</div>

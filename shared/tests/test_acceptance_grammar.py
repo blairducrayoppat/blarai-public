@@ -151,9 +151,12 @@ def test_assumptions_schema_mirrors_parser_contract():
 def test_build_plan_schema_mirrors_parser_enums():
     schema = acc.build_plan_emission_json_schema()
     props = schema["properties"]
-    # surface: the FULL enum incl. the unknown + ambiguous sentinels (the model may flag).
-    assert props["surface"]["enum"] == sorted(acc.SURFACE_VALUES)
+    # surface: the MODEL-emittable enum incl. the unknown + ambiguous sentinels (the model may
+    # flag). ``web-static`` is EXCLUDED — it is a deterministic goal-refiner output (#886), never
+    # a model emission, so the grammar enum stays the pre-#886 set (_MODEL_SURFACE_VALUES).
+    assert props["surface"]["enum"] == sorted(acc._MODEL_SURFACE_VALUES)
     assert "ambiguous" in props["surface"]["enum"]
+    assert "web-static" not in props["surface"]["enum"]
     # candidates: REAL buildable surfaces only — never the sentinels.
     cand_enum = props["candidates"]["items"]["enum"]
     assert cand_enum == sorted(acc._REAL_SURFACES)

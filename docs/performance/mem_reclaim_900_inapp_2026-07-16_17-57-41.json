@@ -1,0 +1,167 @@
+{
+  "ticket": "#900",
+  "measurement": "memory_reclaim_inapp_evict_paths",
+  "route": "live BlarAI (production launcher boot, BLARAI_MEM_RECLAIM_PROBE=1), driven by a second mTLS TransportGateway client through the real :5001 prompt/imagine corridors",
+  "timestamp": "2026-07-16T17:57:39",
+  "methodology": "1 text turn + 3 /imagine turns (SDXL evicts in the caller's finally) + 3 photo-describe turns (VLM evicts after) + idle past [substrate].embed_cache_idle_unload_s (900 s); 10.0s settle between turns; samples are the wired MEM_RECLAIM lines appended to launcher.log during the session (In-Use = Total \u2212 Available, never working sets).",
+  "environment": {
+    "box_state_at_start": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": true,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 8.57,
+      "captured_utc": "2026-07-17T00:36:08Z"
+    },
+    "box_state_at_end": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": true,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 11.59,
+      "captured_utc": "2026-07-17T00:57:41Z"
+    }
+  },
+  "drive": {
+    "session_id": "probe900-173616",
+    "turns": [
+      {
+        "label": "text-1",
+        "seconds": 16.7,
+        "reply_head": ""
+      },
+      {
+        "label": "imagine-1",
+        "seconds": 56.0,
+        "reply_head": "![generated image](blarai-img://73597770f87e4af4ab9330245aa2f166)\n\nImage generated (blarai-img://73597770f87e4af4ab9330245aa2f166). It renders inline in the app"
+      },
+      {
+        "label": "imagine-2",
+        "seconds": 58.6,
+        "reply_head": "![generated image](blarai-img://fa36714fe12549eab399a13d233f97ff)\n\nImage generated (blarai-img://fa36714fe12549eab399a13d233f97ff). It renders inline in the app"
+      },
+      {
+        "label": "imagine-3",
+        "seconds": 50.7,
+        "reply_head": "![generated image](blarai-img://c7ab9f862d3644f49bca8243c0d298c2)\n\nImage generated (blarai-img://c7ab9f862d3644f49bca8243c0d298c2). It renders inline in the app"
+      },
+      {
+        "label": "describe-1",
+        "seconds": 28.5,
+        "reply_head": ""
+      },
+      {
+        "label": "describe-2",
+        "seconds": 22.1,
+        "reply_head": ""
+      },
+      {
+        "label": "describe-3",
+        "seconds": 20.0,
+        "reply_head": ""
+      }
+    ]
+  },
+  "samples": [
+    {
+      "op": "substrate.embed_cache.unload",
+      "in_use_before_mb": 24943.0,
+      "in_use_after_mb": 24943.0,
+      "reclaimed_mb": 0.0,
+      "available_before_mb": 8691.0,
+      "available_after_mb": 8691.0,
+      "proc_rss_delta_mb": 0.0,
+      "extra": "vectors=177"
+    },
+    {
+      "op": "image_gen.sdxl.unload",
+      "in_use_before_mb": 31217.0,
+      "in_use_after_mb": 29921.0,
+      "reclaimed_mb": 1296.0,
+      "available_before_mb": 2416.0,
+      "available_after_mb": 3712.0,
+      "proc_rss_delta_mb": -1295.0,
+      "extra": "model=sdxl variant=photoreal-sdxl kind=text2image"
+    },
+    {
+      "op": "image_gen.sdxl.unload",
+      "in_use_before_mb": 31336.0,
+      "in_use_after_mb": 29939.0,
+      "reclaimed_mb": 1397.0,
+      "available_before_mb": 2298.0,
+      "available_after_mb": 3694.0,
+      "proc_rss_delta_mb": -1393.0,
+      "extra": "model=sdxl variant=photoreal-sdxl kind=text2image"
+    },
+    {
+      "op": "image_gen.sdxl.unload",
+      "in_use_before_mb": 30800.0,
+      "in_use_after_mb": 29453.0,
+      "reclaimed_mb": 1347.0,
+      "available_before_mb": 2834.0,
+      "available_after_mb": 4181.0,
+      "proc_rss_delta_mb": -1329.0,
+      "extra": "model=sdxl variant=photoreal-sdxl kind=text2image"
+    },
+    {
+      "op": "vlm.unload",
+      "in_use_before_mb": 28013.0,
+      "in_use_after_mb": 27122.0,
+      "reclaimed_mb": 890.0,
+      "available_before_mb": 5621.0,
+      "available_after_mb": 6511.0,
+      "proc_rss_delta_mb": -864.0,
+      "extra": "model=qwen3-vl"
+    },
+    {
+      "op": "vlm.unload",
+      "in_use_before_mb": 27356.0,
+      "in_use_after_mb": 25746.0,
+      "reclaimed_mb": 1610.0,
+      "available_before_mb": 6277.0,
+      "available_after_mb": 7887.0,
+      "proc_rss_delta_mb": -1599.0,
+      "extra": "model=qwen3-vl"
+    },
+    {
+      "op": "vlm.unload",
+      "in_use_before_mb": 27553.0,
+      "in_use_after_mb": 25955.0,
+      "reclaimed_mb": 1598.0,
+      "available_before_mb": 6080.0,
+      "available_after_mb": 7678.0,
+      "proc_rss_delta_mb": -1588.0,
+      "extra": "model=qwen3-vl"
+    },
+    {
+      "op": "substrate.embed_cache.unload",
+      "in_use_before_mb": 21188.0,
+      "in_use_after_mb": 21188.0,
+      "reclaimed_mb": 0.0,
+      "available_before_mb": 12446.0,
+      "available_after_mb": 12446.0,
+      "proc_rss_delta_mb": 0.0,
+      "extra": "vectors=181"
+    }
+  ],
+  "median_reclaimed_mb_by_op": {
+    "substrate.embed_cache.unload": 0.0,
+    "image_gen.sdxl.unload": 1347.0,
+    "vlm.unload": 1598.0
+  },
+  "not_measured": [
+    "the 14B mid-life evict via the in-app route (hires_enabled=false in production \u2014 measured separately via the route-B harness, same day)",
+    "shared_pipeline.14b.release_gpu_for_exit under a model swap (no dispatch tonight)",
+    "co-resident contention beyond the production-designed SDXL/VLM residency patterns"
+  ]
+}

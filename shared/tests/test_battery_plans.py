@@ -11,11 +11,18 @@ builds the graph (>=4 edges, >=3 waves) instead of degrading.
 The whole seam runs model-free and GPU-free (the ``generate_fn`` is injected); the one
 subprocess test grades the REAL shipped oracle against a reference ``app`` package to prove F2
 has teeth and that ``from app.tokenize import ...`` resolves under the driver's grade mechanism.
+
+The B4 section (#1008) locks the flashcards MIXED card the same way — plus the defect class
+that forced it: the 14B-generated job oracle called ``data_storage.load_cards()`` without ever
+importing ``data_storage`` (NameError at grade time, seven consecutive nights, the grader's own
+crash charged to the coder). Every REGISTERED card oracle is AST-checked for unresolved names,
+and B4's authored contract is asserted 1:1 with the oracle's imports (#989 c.2299).
 """
 
 from __future__ import annotations
 
 import ast
+import builtins
 import json
 import subprocess
 import sys
@@ -309,14 +316,14 @@ def test_resolve_override_none_for_non_battery_repo(tmp_path):
     ) is None
 
 
-def test_resolve_override_none_for_non_diamond_battery_card(tmp_path):
+def test_resolve_override_none_for_unhandled_shape_battery_card(tmp_path):
     spec = tmp_path / "spec"
     spec.mkdir()
-    (spec / "B4.json").write_text(json.dumps({
-        "schema": "battery-card/v1", "id": "B4", "repo": "battery-b4-linear",
+    (spec / "B0.json").write_text(json.dumps({
+        "schema": "battery-card/v1", "id": "B0", "repo": "battery-b0-linear",
         "shape": "linear", "units": 3, "goal": "a plain linear job"}), encoding="utf-8")
     assert battery_plans.resolve_plan_override(
-        "battery-b4-linear", projects_dir=tmp_path, spec_dir=spec
+        "battery-b0-linear", projects_dir=tmp_path, spec_dir=spec
     ) is None
 
 
@@ -435,3 +442,298 @@ def test_build_job_plan_builds_the_diamond_graph_not_the_flat_degrade(tmp_path):
     assert all(JOB_ORACLE_CODE_KEY not in t for t in cleaned)
     # The persisted artifact re-loads clean through the hash-verifying store.
     assert so.plan_path(config).is_file()
+
+
+# ---------------------------------------------------------------------------
+# B4 (#1008) — the flashcards MIXED plan + oracle, and the unresolved-name lock
+# ---------------------------------------------------------------------------
+
+# The five `app`-package B4 module names — the 1:1 import-contract surface: each build arm
+# creates exactly one of these, and the job oracle imports exactly these five.
+_B4_APP_MODULES = ("data_storage", "deck_import", "card_entry", "quiz_engine", "score_tracker")
+
+
+def _flashcards_override(repo: Path) -> DecompositionOverride:
+    return DecompositionOverride(
+        tasks=battery_plans.build_flashcards_mixed(str(repo)),
+        job_oracle_code=battery_plans._FLASHCARDS_JOB_ORACLE_PY,
+        job_oracle_path=JOB_ORACLE_PATH_PYTHON,
+    )
+
+
+def test_flashcards_decomposition_is_a_5_arm_4_wave_mixed_graph():
+    arms = battery_plans.build_flashcards_mixed("C:/x/battery-b4-flashcards-cli")
+    assert [t["task"] for t in arms] == [
+        "store-cards", "import-deck", "add-card", "quiz", "track-scores"]
+    # store -> {import, add} -> quiz -> track : exactly 5 edges, exactly 4 waves — the
+    # card's min_dependency_edges:4 / expects_waves_gte:3, both cleared with margin.
+    assert _edges(arms) == 5
+    waves = compute_waves([{"id": t["task"], "depends_on": t["depends_on"]} for t in arms])
+    assert waves == [["store-cards"], ["add-card", "import-deck"], ["quiz"], ["track-scores"]]
+    by_id = {t["task"]: t for t in arms}
+    assert by_id["store-cards"]["depends_on"] == []
+    assert by_id["import-deck"]["depends_on"] == ["store-cards"]
+    assert by_id["add-card"]["depends_on"] == ["store-cards"]
+    assert set(by_id["quiz"]["depends_on"]) == {"import-deck", "add-card"}
+    assert by_id["track-scores"]["depends_on"] == ["quiz"]
+
+
+def test_flashcards_arms_use_the_app_package_convention():
+    arms = battery_plans.build_flashcards_mixed("/repo")
+    all_creates = [c for t in arms for c in t["contract"]["creates"]]
+    # Every created module lives under `app` except the CLI face, which only the LAST arm
+    # creates (once every module it wires exists — the parallel wave-2 siblings must never
+    # share a file, or their worktree merges collide).
+    assert "app/__init__.py" in all_creates
+    assert "cli.py" in all_creates
+    for mod in _B4_APP_MODULES:
+        assert f"app/{mod}.py" in all_creates, f"missing app/{mod}.py in arm contracts"
+    assert all(c.startswith("app/") or c == "cli.py" for c in all_creates)
+    for t in arms:
+        assert t["contract"]["creates"] and t["contract"]["exports"]
+        assert isinstance(t["contract"]["notes"], str)
+    assert all(t["repo"] == "/repo" for t in arms)
+    assert "cli.py" in arms[-1]["contract"]["creates"]
+    assert all("cli.py" not in t["contract"]["creates"] for t in arms[:-1])
+
+
+def _unresolved_names(code: str) -> set[str]:
+    """Names LOADED somewhere in *code* but bound nowhere in it — any import, def, parameter,
+    assignment, exception name, or comprehension target counts as a binding, scope-blind.
+    Deliberately an over-approximation of binding (a name bound in one function counts for
+    all), so it can miss a cross-scope bug — but it exactly catches the #1008 class: a module
+    referenced at a call site (``data_storage.load_cards()``) that no statement ever binds."""
+    tree = ast.parse(code)
+    bound: set[str] = set(dir(builtins))
+    loaded: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            bound.update((a.asname or a.name).split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            bound.update(a.asname or a.name for a in node.names)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            bound.add(node.name)
+        elif isinstance(node, ast.arg):
+            bound.add(node.arg)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            bound.add(node.name)
+        elif isinstance(node, ast.Name):
+            if isinstance(node.ctx, ast.Load):
+                loaded.add(node.id)
+            else:  # Store/Del — assignments, for/with targets, comprehension targets
+                bound.add(node.id)
+    return loaded - bound
+
+
+@pytest.mark.parametrize("card_id", sorted(battery_plans._PLAN_BUILDERS))
+def test_registered_job_oracles_import_every_name_they_reference(card_id):
+    """THE #1008 regression lock: B4's model-generated oracle called
+    ``data_storage.load_cards()`` without importing ``data_storage`` — NameError at grade
+    time, "3 failed, 3 passed", seven consecutive nights, the grader's own crash charged to
+    the coder. No REGISTERED card oracle may load a name it never binds, so the bare-
+    NameError class cannot reseed through this registry."""
+    _builder, oracle_code = battery_plans._PLAN_BUILDERS[card_id]
+    missing = _unresolved_names(oracle_code)
+    assert not missing, (
+        f"{card_id} job oracle references name(s) it never imports/binds: {sorted(missing)}"
+    )
+
+
+def test_flashcards_contract_is_1_to_1_with_the_oracle_imports():
+    """#989 c.2299: oracle import-contract coverage (modules ÷ build tasks) predicts clean
+    wave distribution — and B4's model-generated contract omitted wave 1's own module. The
+    authored plan must be a bijection: the oracle imports exactly the app modules the arms
+    create, and each arm creates exactly ONE oracle-imported module."""
+    arms = battery_plans.build_flashcards_mixed("/repo")
+    tree = ast.parse(battery_plans._FLASHCARDS_JOB_ORACLE_PY)
+    oracle_modules = {
+        node.module.split(".", 1)[1]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module and node.module.startswith("app.")
+    }
+    assert oracle_modules == set(_B4_APP_MODULES)
+    owners: dict[str, str] = {}
+    for t in arms:
+        owned = [
+            c[len("app/"):-len(".py")]
+            for c in t["contract"]["creates"]
+            if c.startswith("app/") and c.endswith(".py") and c != "app/__init__.py"
+        ]
+        assert len(owned) == 1, f"arm {t['task']!r} must own exactly one app module: {owned}"
+        assert owned[0] not in owners, f"module {owned[0]!r} owned by two arms"
+        owners[owned[0]] = t["task"]
+    assert set(owners) == oracle_modules
+
+
+def test_resolve_override_fires_for_the_real_b4_card(tmp_path):
+    # Uses the committed evals/battery/B4.json (default spec dir) — the mixed shape must
+    # resolve, or B4 keeps regenerating the broken model-written oracle #1008 replaced.
+    ov = battery_plans.resolve_plan_override(
+        "battery-b4-flashcards-cli", projects_dir=tmp_path
+    )
+    assert ov is not None, (
+        "B4 mixed card must get an override — without it plan generation regenerates the "
+        "broken model-written oracle (#1008: NameError on the unimported data_storage)"
+    )
+    assert len(ov.tasks) == 5, f"B4 mixed must have exactly 5 arms, got {len(ov.tasks)}"
+    assert ov.job_oracle_path == JOB_ORACLE_PATH_PYTHON
+    assert "from app.data_storage import save_cards, load_cards" in ov.job_oracle_code
+    assert all(
+        t["repo"] == str(tmp_path / "battery-b4-flashcards-cli") for t in ov.tasks
+    )
+
+
+def _write_reference_flashcards(repo: Path, *, storage_body: str, quiz_body: str) -> None:
+    """A CORRECT reference implementation of the five arms (parametrised so a test can inject
+    a BROKEN storage/quiz arm to prove the oracle has teeth)."""
+    app = repo / "app"
+    app.mkdir(parents=True, exist_ok=True)
+    (app / "__init__.py").write_text("", encoding="utf-8")
+    (app / "data_storage.py").write_text(storage_body, encoding="utf-8")
+    (app / "deck_import.py").write_text(
+        "from app.data_storage import load_cards, save_cards\n\n\n"
+        "def import_deck(file_path, data_path=None):\n"
+        "    cards = load_cards(path=data_path)\n"
+        "    count = 0\n"
+        "    with open(file_path, 'r', encoding='utf-8') as f:\n"
+        "        for line in f:\n"
+        "            line = line.strip()\n"
+        "            if not line or '|' not in line:\n"
+        "                continue\n"
+        "            question, answer = line.split('|', 1)\n"
+        "            cards.append({'question': question.strip(), 'answer': answer.strip()})\n"
+        "            count += 1\n"
+        "    save_cards(cards, path=data_path)\n"
+        "    return count\n",
+        encoding="utf-8",
+    )
+    (app / "card_entry.py").write_text(
+        "from app.data_storage import load_cards, save_cards\n\n\n"
+        "def add_card(question, answer, data_path=None):\n"
+        "    if not isinstance(question, str) or not question.strip():\n"
+        "        raise ValueError('question must be a non-empty string')\n"
+        "    if not isinstance(answer, str) or not answer.strip():\n"
+        "        raise ValueError('answer must be a non-empty string')\n"
+        "    cards = load_cards(path=data_path)\n"
+        "    cards.append({'question': question, 'answer': answer})\n"
+        "    save_cards(cards, path=data_path)\n",
+        encoding="utf-8",
+    )
+    (app / "quiz_engine.py").write_text(quiz_body, encoding="utf-8")
+    (app / "score_tracker.py").write_text(
+        "import json\n"
+        "import os\n\n\n"
+        "def load_scores(scores_path=None):\n"
+        "    target = scores_path or 'scores.json'\n"
+        "    if not os.path.exists(target):\n"
+        "        return []\n"
+        "    with open(target, 'r', encoding='utf-8') as f:\n"
+        "        content = f.read().strip()\n"
+        "    return json.loads(content) if content else []\n\n\n"
+        "def record_score(correct, asked, scores_path=None):\n"
+        "    target = scores_path or 'scores.json'\n"
+        "    scores = load_scores(scores_path=target)\n"
+        "    scores.append({'correct': correct, 'asked': asked})\n"
+        "    with open(target, 'w', encoding='utf-8') as f:\n"
+        "        json.dump(scores, f)\n",
+        encoding="utf-8",
+    )
+    tests_dir = repo / "tests"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (tests_dir / "test_job_acceptance.py").write_text(
+        battery_plans._FLASHCARDS_JOB_ORACLE_PY, encoding="utf-8"
+    )
+
+
+_B4_GOOD_STORAGE = (
+    "import json\n"
+    "import os\n\n\n"
+    "def save_cards(cards, path=None):\n"
+    "    target = path or 'cards.json'\n"
+    "    with open(target, 'w', encoding='utf-8') as f:\n"
+    "        json.dump(cards, f)\n\n\n"
+    "def load_cards(path=None):\n"
+    "    target = path or 'cards.json'\n"
+    "    if not os.path.exists(target):\n"
+    "        return []\n"
+    "    with open(target, 'r', encoding='utf-8') as f:\n"
+    "        content = f.read().strip()\n"
+    "    return json.loads(content) if content else []\n"
+)
+# A storage arm that never persists — the between-sessions promise is broken.
+_B4_BROKEN_STORAGE = (
+    "def save_cards(cards, path=None):\n"
+    "    pass\n\n\n"
+    "def load_cards(path=None):\n"
+    "    return []\n"
+)
+_B4_GOOD_QUIZ = (
+    "from app.data_storage import load_cards\n\n\n"
+    "def run_quiz(answer_fn, data_path=None):\n"
+    "    cards = load_cards(path=data_path)\n"
+    "    correct = 0\n"
+    "    for card in cards:\n"
+    "        given = str(answer_fn(card['question']))\n"
+    "        if given.strip().lower() == str(card['answer']).strip().lower():\n"
+    "            correct += 1\n"
+    "    return {'asked': len(cards), 'correct': correct}\n"
+)
+# A quiz arm that never checks the answer — every quiz scores zero.
+_B4_BROKEN_QUIZ = (
+    "from app.data_storage import load_cards\n\n\n"
+    "def run_quiz(answer_fn, data_path=None):\n"
+    "    cards = load_cards(path=data_path)\n"
+    "    for card in cards:\n"
+    "        answer_fn(card['question'])\n"
+    "    return {'asked': len(cards), 'correct': 0}\n"
+)
+
+
+def test_flashcards_job_oracle_grades_the_integrated_flow(tmp_path):
+    # (1) A CORRECT integrated tree passes — the app-package imports resolve (data_storage
+    #     INCLUDED, the #1008 defect) and persist/import/add/quiz/score all hold.
+    good = _mk_repo(tmp_path, "good")
+    _write_reference_flashcards(good, storage_body=_B4_GOOD_STORAGE, quiz_body=_B4_GOOD_QUIZ)
+    res_ok = _run_oracle(good)
+    assert res_ok.returncode == 0, f"correct impl should pass:\n{res_ok.stdout}\n{res_ok.stderr}"
+
+    # (2) A quiz that never checks answers fails — the quiz behaviour is graded, not smoke.
+    quiz_broken = _mk_repo(tmp_path, "quiz_broken")
+    _write_reference_flashcards(
+        quiz_broken, storage_body=_B4_GOOD_STORAGE, quiz_body=_B4_BROKEN_QUIZ
+    )
+    res_quiz = _run_oracle(quiz_broken)
+    assert res_quiz.returncode != 0, f"a non-checking quiz must fail:\n{res_quiz.stdout}"
+
+    # (3) A storage arm that never persists fails — the between-sessions promise is graded.
+    storage_broken = _mk_repo(tmp_path, "storage_broken")
+    _write_reference_flashcards(
+        storage_broken, storage_body=_B4_BROKEN_STORAGE, quiz_body=_B4_GOOD_QUIZ
+    )
+    res_store = _run_oracle(storage_broken)
+    assert res_store.returncode != 0, f"a non-persisting store must fail:\n{res_store.stdout}"
+
+
+def test_build_job_plan_builds_the_mixed_graph_for_b4(tmp_path):
+    """The B4 analogue of the diamond graph test: the authored mixed plan flows through
+    generate_plan + build_job_plan un-degraded, meeting the card's expected_outcome floor
+    (min_dependency_edges:4, expects_waves_gte:3) with the job oracle pinned."""
+    repo = _mk_repo(tmp_path, "battery-b4-flashcards-cli")
+    plan_result = generate_plan(
+        "a flashcard study program", "battery-b4-flashcards-cli",
+        generate_fn=_fake_gen, projects_dir=tmp_path,
+        decomposition_override=_flashcards_override(repo),
+    )
+    assert plan_result.ok and len(plan_result.tasks) >= 2 and not plan_result.fell_back
+    assert plan_result.tasks[-1].get(JOB_ORACLE_PATH_KEY) == JOB_ORACLE_PATH_PYTHON
+
+    config = _swap_config(tmp_path)
+    plan, store, degraded, cleaned = so.build_job_plan(config, "RB4", plan_result.tasks)
+
+    assert plan is not None and store is not None
+    assert degraded is False
+    assert _edges(plan.tasks) >= 4
+    assert len(_waves(plan.tasks)) >= 3
+    assert plan.job_acceptance.oracle_path == JOB_ORACLE_PATH_PYTHON
+    assert all(JOB_ORACLE_CODE_KEY not in t for t in cleaned)

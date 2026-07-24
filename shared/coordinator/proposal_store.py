@@ -35,11 +35,11 @@ STAGED proposals back to DRAFT, ADR-039 §2.12.5 "back to drafts with a note"). 
 writes are single-row atomic SQLite commits (WAL), so there is no half-written
 proposal to repair; the only time-dependent convergence is TTL.
 
-DORMANCY: this module has NO live consumer. Nothing in a production boot path
-constructs a :class:`ProposalStore` today (C2's redispatch limb and C3's heartbeat
-wire it in later, dormant behind ``[coordinator]`` flags). Importing this module
-arms nothing and changes no behavior — exactly like
-:mod:`shared.fleet.coord_lifecycle` and :mod:`shared.coordinator.governed_core`.
+REACHABILITY: a :class:`ProposalStore` is constructed ONLY through the fail-closed
+factory :func:`build_proposal_store`, which the heartbeat cycle calls when the
+``[coordinator]`` flags gating it are set (dormant default: off). Importing this
+module arms nothing and changes no behavior — construction is what a flag gates, not
+import.
 """
 
 from __future__ import annotations

@@ -287,6 +287,25 @@ class _VikunjaClient:
     def add_comment(self, task_id: int, comment: str) -> None:
         self._call("PUT", f"/tasks/{task_id}/comments", body={"comment": comment})
 
+    def find_label_id(self, title: str) -> int | None:
+        """The id of the GLOBAL label whose title EXACTLY equals *title*, or
+        ``None``. Runtime read-only resolution (never a create — label CREATION is
+        the operator-run migration's job, ADR-039 §2.12.11; the runtime bridge only
+        ATTACHES an already-provisioned label, resolving its id BY NAME so a
+        re-migrated board needs no code change)."""
+        for label in self.list_labels():
+            if isinstance(label, Mapping) and str(label.get("title", "")) == title:
+                try:
+                    return int(label["id"])  # type: ignore[index]
+                except (KeyError, TypeError, ValueError):
+                    continue
+        return None
+
+    def add_label_to_task(self, task_id: int, label_id: int) -> None:
+        """Attach the GLOBAL label *label_id* to *task_id* (Vikunja v2.3.0
+        ``PUT /tasks/{id}/labels`` — "Add a label to a task")."""
+        self._call("PUT", f"/tasks/{task_id}/labels", body={"label_id": label_id})
+
     def move_task_to_bucket(
         self, project_id: int, view_id: int, bucket_id: int, task_id: int
     ) -> None:
@@ -464,19 +483,66 @@ def _client(transport: Transport | None) -> _VikunjaClient:
     )
 
 
+def _stamp_service_class(
+    client: "_VikunjaClient", ticket_id: int, label_title: str
+) -> None:
+    """Attach the *label_title* class-of-service / provenance label to a FRESHLY
+    CREATED job ticket (#887), resolving the label id BY NAME (never hardcoded,
+    ADR-039 §2.12.11) and NEVER creating it — label creation is the operator-run
+    substrate migration's job; the runtime bridge has no write path to workflow
+    STRUCTURE.
+
+    Fail-soft IN ISOLATION: this swallows its OWN errors so a labeling failure can
+    never propagate up and make the caller believe the ticket itself failed (which
+    would suppress the outcome comment). A missing label (migration not yet run)
+    degrades #887's partition to today's behavior — the ticket lands UNLABELED on
+    the operator's headline — the honest, non-destructive direction: it never HIDES
+    a ticket, only fails to mark one."""
+    try:
+        label_id = client.find_label_id(label_title)
+        if label_id is None:
+            logger.warning(
+                "vikunja_bridge: class-of-service label %r not found (run the "
+                "coordinator setup migration) — job ticket %s left unlabeled",
+                label_title,
+                ticket_id,
+            )
+            return
+        client.add_label_to_task(ticket_id, label_id)
+    except Exception as exc:  # noqa: BLE001 — a label miss never loses the ticket
+        logger.warning(
+            "vikunja_bridge: failed to stamp label %r on ticket %s (fail-soft): %s",
+            label_title,
+            ticket_id,
+            exc,
+        )
+
+
 def ensure_job_ticket(
     cfg: BridgeConfig,
     run_id: str,
     goal: str,
     repo: str,
     *,
+    service_class_label: str | None = None,
     transport: Transport | None = None,
 ) -> int | None:
     """Find-or-create the durable ticket for fleet run *run_id* (idempotent by the
     ``[fleet-job <run_id>]`` title marker) and return its id, or ``None``.
 
     ``None`` means "did not post": the bridge is off, the project id is unset, or
-    a fail-soft error occurred (a Vikunja outage must never affect the run)."""
+    a fail-soft error occurred (a Vikunja outage must never affect the run).
+
+    *service_class_label* (#887): when a NEW ticket is created, stamp it with this
+    name-resolved class-of-service / provenance label (e.g.
+    :data:`shared.fleet.coord_lifecycle.TEST_CLASS_LABEL` for a battery/test job).
+    It MUST be a TRUSTED structured value the CALLER controls (a module constant),
+    never derived from the untrusted ``goal``/``repo`` text — a mislabel that hides
+    real work from the operator's headline is the failure this parameter's contract
+    exists to prevent. ``None`` (the default — every real-dispatch caller) leaves
+    the ticket unlabeled, byte-identical to the pre-#887 behavior. Applied ONLY on
+    CREATE: an already-existing ticket (idempotent re-report) is returned untouched,
+    so labeling costs exactly one extra call per new ticket and none thereafter."""
     project_id = _bridge_target(cfg)
     if project_id is None:
         return None
@@ -488,7 +554,12 @@ def ensure_job_ticket(
         if existing is not None:
             return existing
         title = f"{marker} {_clip(goal, 120)}".rstrip()
-        return client.create_task(project_id, title, _job_ticket_body(run_id, goal, repo))
+        ticket_id = client.create_task(
+            project_id, title, _job_ticket_body(run_id, goal, repo)
+        )
+        if service_class_label:
+            _stamp_service_class(client, ticket_id, service_class_label)
+        return ticket_id
     except Exception as exc:  # noqa: BLE001 — fail-soft: ticket I/O never affects a run
         logger.warning("vikunja_bridge ensure_job_ticket failed (fail-soft): %s", exc)
         return None

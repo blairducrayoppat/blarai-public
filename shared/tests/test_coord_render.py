@@ -297,6 +297,62 @@ def test_flow_metrics_rendered_when_present():
 
 
 # ---------------------------------------------------------------------------
+# #887 — test-class partition in the render (headline vs surfaced test class)
+# ---------------------------------------------------------------------------
+
+
+def _flow(*, open_count, oldest=None, mean=None, throughput=0):
+    return fm.FlowMetrics(
+        computed_at=_NOW.isoformat(), age_basis_field="created", open_count=open_count,
+        ages=(), oldest_age_seconds=oldest, mean_age_seconds=mean,
+        cycle_times_seconds=(), mean_cycle_time_seconds=None,
+        throughput_window_start="", throughput_window_end="", throughput_count=throughput,
+        aging_outliers=(),
+    )
+
+
+def test_test_class_surfaced_on_its_own_line_off_the_headline():
+    """A synthetic test park is SURFACED (never hidden) on its own line, marked
+    non-actionable — and kept out of the headline open-count."""
+    headline = _flow(open_count=2, oldest=10 * 86400, mean=5 * 86400, throughput=1)
+    test_flow = _flow(open_count=3, oldest=40 * 86400, mean=20 * 86400)
+    board = _board_result(("Ready", [{"id": 1, "title": "real"}]))
+    summary = vb.ReadResult(
+        status=vb.ReadStatus.OK,
+        items=({"project_id": 7, "total": 6, "open": 5, "done": 1, "labels": {}},),
+    )
+    pw = ws.ProjectWorkState(
+        name="Coder Jobs", project_id=7, board=board, summary=summary,
+        flow=headline, test_flow=test_flow,
+    )
+    text = "\n".join(cr.render_project(pw))
+    # Headline open-count is REAL work (2), test surfaced alongside (3), not folded in.
+    assert "2 open (real) + 3 test-class / 6 total" in text
+    # The dedicated, explicitly-non-actionable test-class line is present.
+    assert "test-class (Battery/Test — non-actionable, off headline): 3 open" in text
+
+
+def test_no_test_class_line_or_annotation_when_absent():
+    """Back-compat: with no test tickets the summary line and flow are unchanged
+    (byte-identical to the pre-#887 render)."""
+    headline = _flow(open_count=1, oldest=1 * 86400, mean=1 * 86400, throughput=0)
+    test_flow = _flow(open_count=0)  # partition present but empty
+    board = _board_result(("Ready", [{"id": 1, "title": "real"}]))
+    summary = vb.ReadResult(
+        status=vb.ReadStatus.OK,
+        items=({"project_id": 7, "total": 1, "open": 1, "done": 0, "labels": {}},),
+    )
+    pw = ws.ProjectWorkState(
+        name="Coder Jobs", project_id=7, board=board, summary=summary,
+        flow=headline, test_flow=test_flow,
+    )
+    text = "\n".join(cr.render_project(pw))
+    assert "1 open / 1 total" in text        # unchanged summary line
+    assert "test-class" not in text          # no synthetic line
+    assert "(real)" not in text
+
+
+# ---------------------------------------------------------------------------
 # STALLS rollup (#844 C2) — deduped by the ONE seen-set, injection-safe
 # ---------------------------------------------------------------------------
 

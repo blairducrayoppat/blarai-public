@@ -170,11 +170,99 @@ def read_campaign_state(path: Path | None) -> TriStateRead[Any]:
     return _read_json_file(path)
 
 
+#: #882: scorecard task ``status`` → the classified :class:`TaskOutcome.result`
+#: token existing consumers test against (``RESULT_MERGED`` / ``RESULT_PARKED``,
+#: ``REDISPATCH_ELIGIBLE_RESULTS``). Status is the state truth — a park is a park
+#: whatever its cause (BUILD, TIMEOUT); the cause token rides ``detail``.
+_SCORECARD_STATUS_RESULT: Mapping[str, str] = {
+    "merged": "MERGED",
+    "parked": "PARKED",
+    "skipped": "SKIPPED",
+}
+
+
+def outcomes_from_scorecard(scorecard: Any) -> "tuple[TaskOutcome, ...] | None":
+    """#882: per-task outcomes from an ALREADY-PARSED ``scorecard.json`` document —
+    the WHOLE-JOB truth. ``SUMMARY.txt`` is rewritten PER WAVE in plan-graph (M2)
+    mode and at run end lists only the final wave, so a parked earlier wave was
+    invisible to every outcomes consumer (redispatch eligibility, the harvest
+    parked flag) — observed live 2026-07-14 on run 20260714-191219-bd.
+
+    PURE (no I/O) and public, mirroring
+    :func:`shared.coordinator.heartbeat_cycle.oracle_passed_from_scorecard`: the
+    two functions are the complete scorecard→facts derivation, so any consumer
+    grading or re-deriving a run's outcomes uses the SAME code the live harvest
+    does rather than re-implementing the status/result precedence below (a
+    re-implementation that reads ``result`` alone silently misses a
+    ``status: "parked"`` task whose cause token is ``NOTHING``).
+    :func:`_outcomes_from_scorecard` is the file-reading shell over this.
+
+    TWO writer shapes, both supported (review MAJOR-1): plan-graph scorecards carry
+    the state in per-task ``status`` (mapped via :data:`_SCORECARD_STATUS_RESULT`;
+    the cause token like TIMEOUT rides ``detail``); FLAT scorecards
+    (``build_flat_scorecard``, swap_driver — every single-task dispatch, incl. a
+    coordinator redispatch) write ``status: ""`` and carry the ALREADY-classified
+    ``dispatch._classify_result`` token in ``result`` — used verbatim (an
+    unrecognized token flows through and is ineligible at every consumer, the
+    fail-closed direction). A never-started plan-graph task (status ``pending``)
+    surfaces as UNKNOWN — deliberately visible, unlike its silent absence from
+    SUMMARY. Note ``TaskOutcome.outcome`` on this path carries the scorecard
+    status word (``parked``), not run-fleet's SUMMARY word (``processed``) — no
+    consumer reads ``.outcome`` today; ``.result`` is the contract.
+
+    ``None`` = no USABLE outcomes (malformed / no tasks / zero parseable entries)
+    → a caller falls back to SUMMARY parsing. Returning an empty tuple here would
+    silently defeat that fallback (review MAJOR-1)."""
+    tasks = scorecard.get("tasks") if isinstance(scorecard, Mapping) else None
+    if not isinstance(tasks, list):
+        return None
+    outcomes: list[TaskOutcome] = []
+    for entry in tasks:
+        if not isinstance(entry, Mapping):
+            continue
+        task = str(entry.get("id") or "").strip()
+        status = str(entry.get("status") or "").strip().lower()
+        cause = str(entry.get("result") or "").strip()
+        detail = str(entry.get("detail") or "").strip()
+        if not task:
+            continue
+        if status:
+            result = _SCORECARD_STATUS_RESULT.get(status, "UNKNOWN")
+            if cause and cause.upper() != result and cause not in detail:
+                detail = f"{cause}: {detail}" if detail else cause
+        elif cause:
+            result = cause.upper()
+        else:
+            continue  # neither status nor result — unusable entry
+        outcomes.append(
+            TaskOutcome(task=task, outcome=status or "scorecard", result=result, detail=detail)
+        )
+    return tuple(outcomes) if outcomes else None
+
+
+def _outcomes_from_scorecard(
+    config: FleetDispatchConfig, run_id: str
+) -> "tuple[TaskOutcome, ...] | None":
+    """The file-reading shell over :func:`outcomes_from_scorecard`.
+
+    ``None`` = no USABLE outcomes (absent / unreadable / malformed / no tasks /
+    zero parseable entries) → the caller falls back to SUMMARY parsing."""
+    path = config.runs_dir / run_id / "scorecard.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return outcomes_from_scorecard(data)
+
+
 def read_latest_run_summary(
     config: FleetDispatchConfig,
 ) -> TriStateRead["tuple[str, tuple[TaskOutcome, ...]]"]:
-    """The latest run's id + parsed per-task outcomes
-    (:func:`shared.fleet.dispatch.parse_summary` over its ``SUMMARY.txt``).
+    """The latest run's id + per-task outcomes — scorecard-first (#882), falling
+    back to :func:`shared.fleet.dispatch.parse_summary` over its ``SUMMARY.txt``
+    when no usable scorecard exists (pre-M2 runs, still-running runs).
 
     ``EMPTY`` — no run has ever produced output yet: either no run exists at
     all, or the latest run's ``SUMMARY.txt`` hasn't been written (still
@@ -184,6 +272,10 @@ def read_latest_run_summary(
     run_id = fleet.latest_run_id(config=config)
     if not run_id:
         return TriStateRead(status=vb.ReadStatus.EMPTY, value=None)
+    scorecard_outcomes = _outcomes_from_scorecard(config, run_id)
+    if scorecard_outcomes is not None:
+        status = vb.ReadStatus.OK if scorecard_outcomes else vb.ReadStatus.EMPTY
+        return TriStateRead(status=status, value=(run_id, scorecard_outcomes))
     summary_path = config.runs_dir / run_id / "SUMMARY.txt"
     if not summary_path.is_file():
         return TriStateRead(status=vb.ReadStatus.EMPTY, value=(run_id, ()))
@@ -258,11 +350,22 @@ class ProjectWorkState:
     remove, exactly the conflation ADR-039 §2.12.6 forbids)."""
     stalls: tuple[cl.StallSignal, ...] = ()
     """Per-class aging-outlier stalls
-    (:func:`shared.fleet.coord_lifecycle.detect_stalls`) over this project's OPEN
-    tasks — the principled, class-relative stall detection the C2 stall-comments
+    (:func:`shared.fleet.coord_lifecycle.detect_stalls`) over this project's REAL
+    open tasks — the principled, class-relative stall detection the C2 stall-comments
     limb consumes, DISTINCT from ``flow.aging_outliers`` (project-wide age, not
-    class-relative). Empty when the board is UNREACHABLE (no stalls over an unknown
-    board — the same honesty as ``flow=None``)."""
+    class-relative). #887: synthetic battery/test tickets are EXCLUDED from this
+    ACTIONABLE channel (a synthetic park must never generate an operator stall
+    comment); their aging is still surfaced via ``test_flow``. Empty when the board
+    is UNREACHABLE (no stalls over an unknown board — the same honesty as
+    ``flow=None``)."""
+    test_flow: fm.FlowMetrics | None = None
+    """#887: flow metrics over this project's SYNTHETIC battery/test-labelled
+    (:data:`shared.fleet.coord_lifecycle.TEST_CLASS_LABEL`) open+done tasks,
+    computed identically to ``flow`` but kept OFF the operator's headline — a
+    synthetic park (its honest park WAS the deliverable) must not inflate the
+    open-count / oldest / mean the ``/coord`` surface steers by. ``None`` exactly
+    when ``flow`` is ``None`` (board UNREACHABLE — no partition over an unknown
+    board). SURFACED on its own ``/coord`` line, never hidden."""
 
 
 def read_project_work_state(
@@ -320,23 +423,35 @@ def read_project_work_state(
     else:
         open_for_age = open_tasks
         effective_basis = age_basis_field
-    flow = fm.compute_flow_metrics(
+    # #887: partition the flow metrics into the operator's actionable HEADLINE
+    # (REAL work) and the surfaced-but-non-actionable TEST class (synthetic
+    # battery/test tickets). ``flow`` becomes the headline; ``test_flow`` carries
+    # the test partition, shown on its own /coord line. With ZERO test tickets the
+    # headline is byte-identical to the pre-#887 whole-board computation.
+    partitioned = fm.compute_partitioned_flow_metrics(
         open_for_age,
         all_tasks,
+        is_test_class=cl.is_test_class,
         now=now,
         window_start=now - flow_window,
         window_end=now,
         age_basis_field=effective_basis,
     )
+    flow = partitioned.headline
+    test_flow = partitioned.test_class
     # Per-class aging-outlier stall detection over the SAME open-task population
-    # (the data is already in hand — no extra fetch). Pure + fail-soft: an
-    # unparseable age drops that item from the statistic, never raises.
+    # (the data is already in hand — no extra fetch), EXCLUDING synthetic test
+    # tickets: a battery/test park must never generate an operator stall comment
+    # (the actionable channel) — its aging is surfaced via ``test_flow`` instead.
+    # Pure + fail-soft: an unparseable age drops that item from the statistic,
+    # never raises.
+    real_open_for_age = [t for t in open_for_age if not cl.is_test_class(t)]
     stalls = tuple(
-        cl.detect_stalls(open_for_age, now=now, age_basis_field=effective_basis)
+        cl.detect_stalls(real_open_for_age, now=now, age_basis_field=effective_basis)
     )
     return ProjectWorkState(
         name=name, project_id=project_id, board=board, summary=summary, flow=flow,
-        stalls=stalls,
+        stalls=stalls, test_flow=test_flow,
     )
 
 

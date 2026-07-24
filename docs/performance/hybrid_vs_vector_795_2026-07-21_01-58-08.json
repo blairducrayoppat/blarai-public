@@ -1,0 +1,477 @@
+{
+  "measurement": "hybrid_vs_vector_retrieval_795",
+  "ticket": "#795",
+  "timestamp": "2026-07-21T01:58:08",
+  "encoder": "BAAI/bge-small-en-v1.5 ONNX fp16 (384-dim), mean-pool + L2-norm, 512-token document window",
+  "retrieval_surface": "services.assistant_orchestrator.src.knowledge_bank.EncryptedKnowledgeBank (real store; cosine + FTS5 BM25, RRF k=60)",
+  "requested_device": "NPU",
+  "active_device": "CPU",
+  "backend": "ort-cpu",
+  "rrf_k": 60,
+  "load_s": 4.994,
+  "ingest_s": 0.472,
+  "environment": {
+    "python": "3.11.9",
+    "os": "Windows 10.26200",
+    "onnxruntime": "1.24.2",
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "devices": {
+      "CPU": {
+        "name": "Intel(R) Core(TM) Ultra 7 258V"
+      },
+      "GPU": {
+        "name": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)"
+      },
+      "NPU": {
+        "name": "Intel(R) AI Boost",
+        "driver": "1004778"
+      }
+    }
+  },
+  "corpus": {
+    "path": "docs/research/fixtures/knowledge_retrieval_ab.json",
+    "n_docs": 35,
+    "n_chunks": 35,
+    "n_queries": 24,
+    "probes": {
+      "lexical": 8,
+      "neutral": 8,
+      "vector": 8
+    }
+  },
+  "methodology": {
+    "labelling": "single gold doc per query; docs sized < CHUNK_CHARS so 1 doc == 1 chunk, so recall@k is doc-level hit@k.",
+    "limbs": "all three rankings reconstructed from the bank's OWN in-RAM caches with the SAME query embedding, _fts_match_expr, and RRF_K as retrieve(); the hybrid ranking is cross-checked == bank.retrieve() per query.",
+    "metrics": "recall@{1,3,4,5,10} and MRR (reciprocal rank of the first gold), per limb, overall + per probe class.",
+    "rrf_production_crosscheck_mismatches": 0,
+    "queries_with_empty_bm25": 1
+  },
+  "results_overall": {
+    "vector": {
+      "recall@1": 0.9583,
+      "recall@3": 1.0,
+      "recall@4": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 0.9792,
+      "n": 24,
+      "found_any": 24
+    },
+    "bm25": {
+      "recall@1": 0.7083,
+      "recall@3": 0.7917,
+      "recall@4": 0.8333,
+      "recall@5": 0.8333,
+      "recall@10": 0.8333,
+      "mrr": 0.7604,
+      "n": 24,
+      "found_any": 20
+    },
+    "hybrid_rrf": {
+      "recall@1": 0.875,
+      "recall@3": 0.9167,
+      "recall@4": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 0.9167,
+      "n": 24,
+      "found_any": 24
+    }
+  },
+  "results_by_probe": {
+    "vector": {
+      "vector": {
+        "recall@1": 0.875,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.9375,
+        "n": 8,
+        "found_any": 8
+      },
+      "bm25": {
+        "recall@1": 0.125,
+        "recall@3": 0.375,
+        "recall@4": 0.5,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr": 0.2812,
+        "n": 8,
+        "found_any": 4
+      },
+      "hybrid_rrf": {
+        "recall@1": 0.625,
+        "recall@3": 0.75,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 0.75,
+        "n": 8,
+        "found_any": 8
+      }
+    },
+    "lexical": {
+      "vector": {
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "n": 8,
+        "found_any": 8
+      },
+      "bm25": {
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "n": 8,
+        "found_any": 8
+      },
+      "hybrid_rrf": {
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "n": 8,
+        "found_any": 8
+      }
+    },
+    "neutral": {
+      "vector": {
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "n": 8,
+        "found_any": 8
+      },
+      "bm25": {
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "n": 8,
+        "found_any": 8
+      },
+      "hybrid_rrf": {
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@4": 1.0,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr": 1.0,
+        "n": 8,
+        "found_any": 8
+      }
+    }
+  },
+  "per_query": [
+    {
+      "id": "q01",
+      "probe": "vector",
+      "query": "which medicine do I take for cholesterol?",
+      "gold": [
+        "d06"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 3
+    },
+    {
+      "id": "q02",
+      "probe": "vector",
+      "query": "how do I get my coding setup working again?",
+      "gold": [
+        "d12"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": null,
+      "rank_hybrid_rrf": 2,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q03",
+      "probe": "vector",
+      "query": "what seat do I prefer on planes?",
+      "gold": [
+        "d08"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 2,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q04",
+      "probe": "vector",
+      "query": "when should I renew my travel document?",
+      "gold": [
+        "d04"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 4,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 4
+    },
+    {
+      "id": "q05",
+      "probe": "vector",
+      "query": "what foods are unsafe for me to eat?",
+      "gold": [
+        "d07"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": null,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 0
+    },
+    {
+      "id": "q06",
+      "probe": "vector",
+      "query": "how cold does the house get overnight?",
+      "gold": [
+        "d28"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 2,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q07",
+      "probe": "vector",
+      "query": "who do I reach out to if something goes wrong?",
+      "gold": [
+        "d27"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": null,
+      "rank_hybrid_rrf": 4,
+      "bm25_returned": 3
+    },
+    {
+      "id": "q08",
+      "probe": "vector",
+      "query": "what should play while I make dinner?",
+      "gold": [
+        "d23"
+      ],
+      "rank_vector": 2,
+      "rank_bm25": null,
+      "rank_hybrid_rrf": 4,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q09",
+      "probe": "lexical",
+      "query": "TN-760 toner cartridge",
+      "gold": [
+        "d25"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q10",
+      "probe": "lexical",
+      "query": "ed25519 SSH key",
+      "gold": [
+        "d29"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 3
+    },
+    {
+      "id": "q11",
+      "probe": "lexical",
+      "query": "Kestrel Mutual policy",
+      "gold": [
+        "d26"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q12",
+      "probe": "lexical",
+      "query": "Dr. Okafor appointment",
+      "gold": [
+        "d17"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q13",
+      "probe": "lexical",
+      "query": "Brandt and Cole accountant",
+      "gold": [
+        "d31"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q14",
+      "probe": "lexical",
+      "query": "ducray.dev registrar renewal",
+      "gold": [
+        "d35"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 3
+    },
+    {
+      "id": "q15",
+      "probe": "lexical",
+      "query": "TrueNAS Scale Vault",
+      "gold": [
+        "d01"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q16",
+      "probe": "lexical",
+      "query": "Ubiquiti Dream Machine Nightingale",
+      "gold": [
+        "d02"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q17",
+      "probe": "neutral",
+      "query": "when is my next dentist cleaning?",
+      "gold": [
+        "d17"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q18",
+      "probe": "neutral",
+      "query": "how often do I water the fiddle-leaf fig?",
+      "gold": [
+        "d16"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q19",
+      "probe": "neutral",
+      "query": "what interest rate is my mortgage?",
+      "gold": [
+        "d10"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q20",
+      "probe": "neutral",
+      "query": "wedding anniversary date",
+      "gold": [
+        "d09"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q21",
+      "probe": "neutral",
+      "query": "where is the guest wifi password?",
+      "gold": [
+        "d18"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q22",
+      "probe": "neutral",
+      "query": "miles between oil changes on the Subaru",
+      "gold": [
+        "d03"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    },
+    {
+      "id": "q23",
+      "probe": "neutral",
+      "query": "what GPU is in the workstation?",
+      "gold": [
+        "d11"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 1
+    },
+    {
+      "id": "q24",
+      "probe": "neutral",
+      "query": "nightly backup schedule to the Vault",
+      "gold": [
+        "d15"
+      ],
+      "rank_vector": 1,
+      "rank_bm25": 1,
+      "rank_hybrid_rrf": 1,
+      "bm25_returned": 2
+    }
+  ],
+  "not_measured": [
+    "co-resident Qwen3-14B contention (encoder run in isolation; the GPU is reserved by another workstream).",
+    "multi-chunk documents and long-article chunking effects (fixture docs are single-chunk by design for clean labelling).",
+    "MMR diversity pass / min-score floor / retrieval-time recency boost (study row 5 - the episodic-tier tuning follow-on, out of scope).",
+    "the operator's real ingested corpus (this is a synthetic labelled set; production knowledge.db content differs).",
+    "weighted-score fusion (0.7/0.3) as an alternative to RRF - the study already recommends keeping RRF; this A/B measures limb contribution, not the fusion-rule choice.",
+    "graded relevance / multiple gold docs per query (single-gold binary relevance only)."
+  ]
+}

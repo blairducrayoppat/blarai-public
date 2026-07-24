@@ -1116,6 +1116,396 @@ class TestClientSSLContextReuse:
 
 
 # ─────────────────────────────────────────────────────────────────
+# #906: the #805 cache must FOLLOW a cert re-mint. A long-lived gateway (the
+# battery runner holds ONE all night) outlives AO launcher reboots; a
+# swap-restore relaunch re-mints certs/ under it, and a context cached across
+# that re-mint burned the next PLAN with CERTIFICATE_VERIFY_FAILED —
+# night-20260714 B2/B5/B7, one job per re-mint.
+# ─────────────────────────────────────────────────────────────────
+
+
+class _FakeSSLContextVerifyFails906:
+    """Stand-in context whose handshake fails VERIFICATION specifically
+    (``ssl.SSLCertVerificationError``) — the stale-generation shape #906's
+    bounded retry exists for (distinct from the plain ``SSLError`` above)."""
+
+    def __init__(self) -> None:
+        self.wrap_calls = 0
+
+    def wrap_socket(self, sock: object, server_side: bool = False) -> object:
+        import ssl
+
+        self.wrap_calls += 1
+        raise ssl.SSLCertVerificationError(
+            1, "certificate verify failed: certificate signature failure (test)"
+        )
+
+
+class TestClientSSLContextFollowsRemint:
+    """#906: the cached client context is keyed to the ON-DISK cert generation
+    ((mtime_ns,size) fingerprint) and a verify failure earns exactly one
+    rebuild-and-retry — so a re-mint under a live gateway costs zero failed
+    operations instead of one burned job."""
+
+    def _patch_connect_env_seq(
+        self, monkeypatch: pytest.MonkeyPatch, results: list[object]
+    ) -> dict[str, int]:
+        """Like TestClientSSLContextReuse._patch_connect_env, but the factory
+        returns results[i] on its i-th call (last one repeats)."""
+        import services.ui_gateway.src.transport as transport_module
+
+        counter = {"factory": 0}
+
+        def _fake_factory(cert: str, key: str, ca: str) -> object:
+            idx = min(counter["factory"], len(results) - 1)
+            counter["factory"] += 1
+            return results[idx]
+
+        monkeypatch.setattr(
+            "shared.ipc.vsock.create_client_ssl_context", _fake_factory
+        )
+        monkeypatch.setattr(
+            transport_module._socket_mod, "socket", _FakeRawSocket805
+        )
+        monkeypatch.setattr(transport_module, "VsockTransport", _FakeTransport805)
+        return counter
+
+    @staticmethod
+    def _write_generation(certs_dir, tag: str, t_ns: int) -> tuple[str, str, str]:
+        """Write a (cert,key,ca) file triple with a pinned mtime — one on-disk
+        'generation'. Re-writing with a different t_ns is the re-mint."""
+        import os
+
+        paths = []
+        for name in ("c.pem", "k.pem", "ca.pem"):
+            p = certs_dir / name
+            p.write_text(f"{tag}:{name}", encoding="utf-8")
+            os.utime(p, ns=(t_ns, t_ns))
+            paths.append(str(p))
+        return tuple(paths)  # type: ignore[return-value]
+
+    def test_same_generation_reuses_across_connections(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With REAL cert files present and unchanged, the #805 reuse survives
+        the #906 fingerprint check — two connections, one context build."""
+        fake_ctx = _FakeSSLContext805()
+        counter = self._patch_connect_env_seq(monkeypatch, [fake_ctx])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_host_loopback_mtls() is not None
+        assert gw._connect_host_loopback_mtls() is not None
+        assert counter["factory"] == 1  # the #805 win is intact
+        assert fake_ctx.wrap_calls == 2
+
+    def test_cert_remint_rebuilds_the_cached_context(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Rewriting the cert files (new mtime = a re-mint) makes the NEXT
+        connect rebuild the context BEFORE any handshake — the stale context is
+        never offered to the server (the night-20260714 defect: it was, and the
+        job burned)."""
+        gen_a_ctx = _FakeSSLContext805()
+        gen_b_ctx = _FakeSSLContext805()
+        counter = self._patch_connect_env_seq(monkeypatch, [gen_a_ctx, gen_b_ctx])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_host_loopback_mtls() is not None
+        assert counter["factory"] == 1
+        assert gw._client_ssl_ctx is gen_a_ctx
+
+        # THE RE-MINT: same paths, new content + mtime (generation B).
+        self._write_generation(tmp_path, "gen-b", 2_000_000_000)
+
+        assert gw._connect_host_loopback_mtls() is not None
+        assert counter["factory"] == 2               # rebuilt on the generation change
+        assert gw._client_ssl_ctx is gen_b_ctx        # the NEW context is cached
+        assert gen_a_ctx.wrap_calls == 1              # the stale context was NOT reused
+        assert gen_b_ctx.wrap_calls == 1
+
+    def test_unknown_generation_keeps_serving_the_cache(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Paths that cannot be stat'd (absent / mid-mint) are an UNKNOWN
+        generation, not a CHANGED one — the cached context keeps serving (the
+        exact pre-#906 semantics; staleness is not provable and a rebuild could
+        not read the files anyway). Pins the #805-compat behavior the other
+        tests in TestClientSSLContextReuse rely on."""
+        fake_ctx = _FakeSSLContext805()
+        counter = self._patch_connect_env_seq(monkeypatch, [fake_ctx])
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path="absent-c.pem", mtls_key_path="absent-k.pem",
+            ca_cert_path="absent-ca.pem",
+        )
+
+        assert gw._connect_host_loopback_mtls() is not None
+        assert gw._connect_host_loopback_mtls() is not None
+        assert counter["factory"] == 1
+
+    def test_verify_failure_rebuilds_and_retries_once(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The stat-then-mint race residue: a VERIFICATION failure drops the
+        cache, rebuilds from disk, and retries ONCE — the caller's operation
+        SUCCEEDS instead of burning (verification is re-run in full against the
+        freshly-read CA; nothing is relaxed)."""
+        stale = _FakeSSLContextVerifyFails906()
+        fresh = _FakeSSLContext805()
+        counter = self._patch_connect_env_seq(monkeypatch, [stale, fresh])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_host_loopback_mtls() is not None  # the SAME call succeeds
+        assert counter["factory"] == 2   # stale build + the one retry rebuild
+        assert stale.wrap_calls == 1
+        assert fresh.wrap_calls == 1
+        assert gw._client_ssl_ctx is fresh
+
+    def test_verify_failure_retry_is_bounded(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A GENUINE trust mismatch (verification still fails after the rebuild)
+        stays a loud failure — exactly one retry, never a loop."""
+        counter = self._patch_connect_env_seq(
+            monkeypatch,
+            [_FakeSSLContextVerifyFails906(), _FakeSSLContextVerifyFails906()],
+        )
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_host_loopback_mtls() is None  # fail-closed after 1 retry
+        assert counter["factory"] == 2  # never a third build
+
+    def test_timeout_does_not_retry(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A handshake TIMEOUT never earns the retry — the no-timeout-doubling
+        guarantee, pinned explicitly (review nit): one attempt, fail-closed."""
+
+        class _TimesOut:
+            def __init__(self) -> None:
+                self.wrap_calls = 0
+
+            def wrap_socket(self, sock: object, server_side: bool = False) -> object:
+                self.wrap_calls += 1
+                raise TimeoutError("The handshake operation timed out (test)")
+
+        hanging = _TimesOut()
+        counter = self._patch_connect_env_seq(monkeypatch, [hanging])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_host_loopback_mtls() is None
+        assert hanging.wrap_calls == 1  # ONE attempt — a timeout is never doubled
+        assert counter["factory"] == 1
+
+    def test_non_verify_ssl_error_does_not_retry(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Only VERIFICATION failures earn the retry — a plain SSLError (protocol
+        /record-layer) keeps the pre-#906 single-attempt behavior (no timeout or
+        failure doubling)."""
+        failing = _FakeSSLContextWrapFails805()  # plain ssl.SSLError
+        counter = self._patch_connect_env_seq(monkeypatch, [failing])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_host_loopback_mtls() is None
+        assert failing.wrap_calls == 1  # ONE attempt — no retry for non-verify errors
+        assert counter["factory"] == 1
+
+    # -- #907: AF_HYPERV (guest-mode) parity for the #906 verify-failure retry --
+    # The guest-topology connect path (#615) got the generation-fingerprint
+    # rebuild from #906 (it shares _client_ssl_context) but NOT the bounded
+    # verify-failure retry, which lived only on the host-loopback path. These
+    # pin the parity fix: same VERIFY-only, retry-once, never-on-timeout shape.
+
+    def test_hyperv_verify_failure_rebuilds_and_retries_once(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A guest-mode (AF_HYPERV) verification failure drops the cache,
+        rebuilds from disk, and retries ONCE — the connect SUCCEEDS instead of
+        burning, exactly as the host path (verification re-run in full)."""
+        stale = _FakeSSLContextVerifyFails906()
+        fresh = _FakeSSLContext805()
+        counter = self._patch_connect_env_seq(monkeypatch, [stale, fresh])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=False, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_hyperv() is not None  # the SAME call succeeds
+        assert counter["factory"] == 2           # stale build + one retry rebuild
+        assert stale.wrap_calls == 1
+        assert fresh.wrap_calls == 1
+        assert gw._client_ssl_ctx is fresh
+
+    def test_hyperv_verify_failure_retry_is_bounded(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A genuine guest-mode trust mismatch stays a loud failure — exactly
+        one retry, never a loop."""
+        counter = self._patch_connect_env_seq(
+            monkeypatch,
+            [_FakeSSLContextVerifyFails906(), _FakeSSLContextVerifyFails906()],
+        )
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=False, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_hyperv() is None  # fail-closed after 1 retry
+        assert counter["factory"] == 2       # never a third build
+
+    def test_hyperv_timeout_does_not_retry(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A guest-mode handshake TIMEOUT never earns the retry — no timeout
+        doubling on the AF_HYPERV path either."""
+
+        class _TimesOut:
+            def __init__(self) -> None:
+                self.wrap_calls = 0
+
+            def wrap_socket(self, sock: object, server_side: bool = False) -> object:
+                self.wrap_calls += 1
+                raise TimeoutError("The handshake operation timed out (test)")
+
+        hanging = _TimesOut()
+        counter = self._patch_connect_env_seq(monkeypatch, [hanging])
+        cert, key, ca = self._write_generation(tmp_path, "gen-a", 1_000_000_000)
+        gw = TransportGateway(
+            dev_mode=False, host_mode=False, port=5001,
+            mtls_cert_path=cert, mtls_key_path=key, ca_cert_path=ca,
+        )
+
+        assert gw._connect_hyperv() is None
+        assert hanging.wrap_calls == 1  # ONE attempt — a timeout is never doubled
+        assert counter["factory"] == 1
+
+
+class TestGatewayFollowsRemintLive:
+    """#906 real-seam lock: a REAL TransportGateway, REAL per-boot certs
+    (shared.security.cert_provisioning), a REAL loopback TLS server — the exact
+    night-20260714 sequence in miniature. Pre-#906 code fails the second
+    connect (the burned job); the fix makes it succeed."""
+
+    def test_gateway_survives_a_cert_remint_between_connections(self, tmp_path) -> None:
+        import socket as _socket
+        import ssl as _ssl
+        import threading
+
+        from shared.security.cert_provisioning import (
+            CA_CERT_NAME,
+            GATEWAY_CLIENT_CERT_NAME,
+            GATEWAY_CLIENT_KEY_NAME,
+            PA_SERVER_CERT_NAME,
+            PA_SERVER_KEY_NAME,
+            provision_per_boot_certs,
+        )
+
+        certs = tmp_path / "certs"
+
+        def _server_ctx() -> _ssl.SSLContext:
+            ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(
+                certfile=str(certs / PA_SERVER_CERT_NAME),
+                keyfile=str(certs / PA_SERVER_KEY_NAME),
+            )
+            return ctx
+
+        provision_per_boot_certs(certs_dir=certs)  # generation A
+        holder = {"ctx": _server_ctx()}            # the live AO presents leaf A
+
+        srv = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+        srv.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(8)
+        srv.settimeout(0.5)
+        port = srv.getsockname()[1]
+        stop = threading.Event()
+
+        def _serve() -> None:
+            while not stop.is_set():
+                try:
+                    raw, _ = srv.accept()
+                except _socket.timeout:
+                    continue
+                except OSError:
+                    break
+                try:
+                    with holder["ctx"].wrap_socket(raw, server_side=True) as ss:
+                        ss.recv(1)  # hold until the client closes post-handshake
+                except (OSError, _ssl.SSLError):
+                    pass
+
+        t = threading.Thread(target=_serve, daemon=True)
+        t.start()
+
+        gw = TransportGateway(
+            dev_mode=False, host_mode=True, port=port,
+            mtls_cert_path=str(certs / GATEWAY_CLIENT_CERT_NAME),
+            mtls_key_path=str(certs / GATEWAY_CLIENT_KEY_NAME),
+            ca_cert_path=str(certs / CA_CERT_NAME),
+        )
+        t1 = t2 = None
+        try:
+            t1 = gw._connect_host_loopback_mtls(timeout_s=5.0)
+            assert t1 is not None, "sanity: the generation-A connect must succeed"
+            # The gateway is connection-per-message: the PLAN that burned on the
+            # real night opened a FRESH connection (the prior one long closed).
+            # Close t1 so the single-threaded test server is free to accept the
+            # next handshake — holding it open would only test server backlog.
+            t1.close()
+
+            # THE RE-MINT: a swap-restore relaunch rewrites the SAME certs dir
+            # with a fresh CA + leaves, and the relaunched AO presents the new leaf.
+            provision_per_boot_certs(certs_dir=certs)  # generation B
+            holder["ctx"] = _server_ctx()
+
+            t2 = gw._connect_host_loopback_mtls(timeout_s=5.0)
+            assert t2 is not None, (
+                "the connect after a cert re-mint must succeed — pre-#906 the "
+                "gateway offered its stale cached context, died "
+                "CERTIFICATE_VERIFY_FAILED, and the battery burned one job per "
+                "re-mint (night-20260714 B2/B5/B7)"
+            )
+        finally:
+            stop.set()
+            srv.close()
+            t.join(timeout=2.0)
+            for transport in (t1, t2):
+                if transport is not None:
+                    try:
+                        transport.close()
+                    except Exception:  # noqa: BLE001 — teardown must never mask the assert
+                        pass
+
+
+# ─────────────────────────────────────────────────────────────────
 # WI-14: tool_call_buffer exact-boundary overflow test
 # ─────────────────────────────────────────────────────────────────
 

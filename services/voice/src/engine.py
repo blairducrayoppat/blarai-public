@@ -29,13 +29,15 @@ logger = logging.getLogger(__name__)
 # Kokoro emits 24 kHz; default to a non-robotic female voice (ADR-017 §2.2).
 KOKORO_SAMPLE_RATE: int = 24000
 DEFAULT_VOICE: str = "af_heart"
-# Kokoro at 1.0 is draggy; 1.2 read as natural. The User-Operator wanted a
-# faster recital — 1.8 proved too fast by ear, settled on 1.5 (2026-06-04).
+# The 2026-06-04 by-ear 1.5 measured ≈307 WPM on the #853 audition script —
+# ~2× a natural pace. Measured sweep: 0.80→162, 0.90→189, 1.00→208 WPM against
+# a ~150–180 comfort band; the User-Operator picked 0.90 ≈ 189 WPM by ear,
+# deliberately a hair fast (2026-07-17, #853 c.2189).
 # This constant IS the effective playback rate: the WinUI synthesize payload
 # carries only {text, voice} (BackendClient.SynthesizeAsync), so the dispatcher
 # passes speed=None and synthesize_stream falls back here — verified across the
 # boundary, not assumed (lesson 6). Tunable by ear.
-DEFAULT_SPEED: float = 1.5
+DEFAULT_SPEED: float = 0.90
 
 # Split on sentence-final punctuation while keeping the delimiter, so each chunk
 # is a natural prosodic unit. Falls back to the whole string if it has none.
@@ -181,7 +183,7 @@ class VoiceEngine:
 
         Voice falls back to the default when *voice* is unknown or omitted, so a
         stale UI selection can never hard-fail synthesis. *speed* defaults to
-        :data:`DEFAULT_SPEED` (a touch faster than Kokoro's draggy 1.0).
+        :data:`DEFAULT_SPEED` (the operator-audited ≈189 WPM pace, #853).
 
         Snapshots the Kokoro handle under the lock at entry so a concurrent
         :meth:`unload_tts` cannot drop the model partway through a multi-sentence

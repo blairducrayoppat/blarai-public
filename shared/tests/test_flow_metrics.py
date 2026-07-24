@@ -262,3 +262,85 @@ def test_naive_datetime_raises_not_silently_wrong():
     naive_now = datetime(2026, 7, 12, 12, 0, 0)  # no tzinfo
     with pytest.raises(TypeError):
         fm.compute_age({"id": 1, "created": "2026-07-01T00:00:00Z"}, now=naive_now)
+
+
+# ---------------------------------------------------------------------------
+# compute_partitioned_flow_metrics — the #887 headline / test-class split
+# ---------------------------------------------------------------------------
+
+
+def _win():
+    return datetime(2026, 7, 1, tzinfo=timezone.utc), datetime(2026, 7, 13, tzinfo=timezone.utc)
+
+
+def _is_test(task):
+    """A test-class predicate keyed on a marker field (stands in for the real
+    label-driven ``coord_lifecycle.is_test_class`` — flow_metrics is label-agnostic
+    and only applies the injected predicate)."""
+    return bool(task.get("_test"))
+
+
+def test_partition_splits_headline_from_test_class():
+    open_tasks = [
+        {"id": 1, "title": "real", "created": "2026-07-10T12:00:00Z", "done": False},
+        {"id": 2, "title": "synthetic", "created": "2026-06-01T12:00:00Z", "done": False, "_test": True},
+    ]
+    done_tasks = [
+        {"id": 3, "title": "real-done", "done": True,
+         "created": "2026-07-01T00:00:00Z", "done_at": "2026-07-03T00:00:00Z"},
+        {"id": 4, "title": "synthetic-done", "done": True, "_test": True,
+         "created": "2026-07-01T00:00:00Z", "done_at": "2026-07-05T00:00:00Z"},
+    ]
+    ws_, we_ = _win()
+    part = fm.compute_partitioned_flow_metrics(
+        open_tasks, open_tasks + done_tasks, is_test_class=_is_test,
+        now=_NOW, window_start=ws_, window_end=we_,
+    )
+    # Headline covers REAL work only.
+    assert part.headline.open_count == 1
+    assert part.headline.ages[0].title == "real"
+    assert part.headline.throughput_count == 1  # only the real done task
+    # Test class carries exactly the synthetic work — surfaced, not dropped.
+    assert part.test_class.open_count == 1
+    assert part.test_class.ages[0].title == "synthetic"
+    assert part.test_class.throughput_count == 1
+
+
+def test_partition_headline_byte_identical_with_no_test_tasks():
+    """The #887 back-compat lock: with ZERO test tickets the headline equals a
+    plain compute_flow_metrics over the whole board."""
+    open_tasks = [
+        {"id": 1, "title": "a", "created": "2026-07-10T12:00:00Z", "done": False},
+        {"id": 2, "title": "b", "created": "2026-06-20T12:00:00Z", "done": False},
+    ]
+    done_tasks = [
+        {"id": 3, "done": True, "created": "2026-07-01T00:00:00Z", "done_at": "2026-07-04T00:00:00Z"},
+    ]
+    ws_, we_ = _win()
+    all_tasks = open_tasks + done_tasks
+    part = fm.compute_partitioned_flow_metrics(
+        open_tasks, all_tasks, is_test_class=lambda t: False,
+        now=_NOW, window_start=ws_, window_end=we_,
+    )
+    plain = fm.compute_flow_metrics(
+        open_tasks, all_tasks, now=_NOW, window_start=ws_, window_end=we_,
+    )
+    assert part.headline == plain
+    assert part.test_class.open_count == 0
+    assert part.test_class.throughput_count == 0
+
+
+def test_partition_predicate_fault_keeps_ticket_on_headline():
+    """A predicate that RAISES must not hide a ticket — it stays on the actionable
+    headline (the conservative direction)."""
+    def _boom(task):
+        raise RuntimeError("classifier fault")
+
+    open_tasks = [{"id": 1, "title": "x", "created": "2026-07-10T12:00:00Z", "done": False}]
+    ws_, we_ = _win()
+    part = fm.compute_partitioned_flow_metrics(
+        open_tasks, open_tasks, is_test_class=_boom,
+        now=_NOW, window_start=ws_, window_end=we_,
+    )
+    assert part.headline.open_count == 1   # visible on the headline, never hidden
+    assert part.test_class.open_count == 0

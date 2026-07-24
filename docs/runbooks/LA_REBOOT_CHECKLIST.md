@@ -84,7 +84,7 @@ Only bother with this if you want explicit confirmation. Open a terminal (PowerS
 Get-Content 'C:\Users\mrbla\devplatform\tools\autonomy_budget\state.json' | Select-String 'fleet_paused'
 ```
 
-You should see: `"fleet_paused": false,`. If it says `true`, the fleet is paused (someone — you or an earlier fleet event — paused it). That's fine; it just means no agent activity until you resume. See [AUTONOMOUS_FLEET_OPERATIONS.md §14](AUTONOMOUS_FLEET_OPERATIONS.md#14-resume-the-fleet) to resume.
+You should see: `"fleet_paused": false,`. If it says `true`, the fleet is paused (someone — you or an earlier fleet event — paused it). That's fine; it just means no agent activity until you resume. See [AUTONOMOUS_FLEET_OPERATIONS.md §14](../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md#14-resume-the-fleet) to resume.
 
 ### Step 3.5 — That's it
 
@@ -122,7 +122,7 @@ If Vikunja isn't auto-starting across multiple reboots, the shortcut may have be
 
 1. Press `Win + R`, type `shell:startup`, press Enter.
 2. You should see a shortcut named `Vikunja (BlarAI)` in the folder.
-3. If missing: recreate per [AUTONOMOUS_FLEET_OPERATIONS.md §2](AUTONOMOUS_FLEET_OPERATIONS.md#2-install-vikunja-autostart-shortcut-path).
+3. If missing: recreate per [AUTONOMOUS_FLEET_OPERATIONS.md §2](../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md#2-install-vikunja-autostart-shortcut-path).
 
 ### Option D — Ask Claude Desktop
 
@@ -142,15 +142,33 @@ Open PowerShell and run:
 Get-ScheduledTask -TaskPath '\BlarAI\' | Format-Table TaskName, State
 ```
 
-You should see 10 tasks, all with State = `Ready`. If any say `Disabled`, that's why they're not firing. If all are `Ready` but nothing's happening, the fleet is probably paused (see §3.4).
+> ## ⛔ DO NOT run a blanket "enable everything" here
+>
+> This section used to say you should see 10 tasks all `Ready`, and to re-enable any that were
+> `Disabled`. **Both halves are now wrong and the second one is harmful.**
+>
+> Verified 2026-07-19 — the real roster is **15 tasks: 6 Ready, 9 Disabled**, and the 9 Disabled
+> ones are **disabled on purpose**. They are the retired autonomous fleet: Wake EA Code, Wake SDO,
+> Wake Co-Lead Architect, Sprint Auditor, Daily Digest, Dashboard Maintainer, Toast Watchdog,
+> Weekly Summary, Welcome Back Poll.
+>
+> `Get-ScheduledTask -TaskPath '\BlarAI\' | Enable-ScheduledTask` would **resurrect all nine** on
+> their old 15-minute wake schedules, against a repository they no longer match. Disabled is the
+> correct state for them.
 
-### If tasks are Disabled
+**What "healthy" actually looks like:** these 6 tasks `Ready` —
+`BlarAI-M2-Battery-Nightly`, `BlarAI-Coder-Leg`, `Agents Cadence Monitor`, `Escalation Watchdog`,
+`Gate Stale Cleaner`, `Credentials Rotation Reminder` — and everything else `Disabled`.
 
-Re-enable them:
+### If one of those 6 is Disabled
+
+Enable **only** the one you mean, by name:
 
 ```powershell
-Get-ScheduledTask -TaskPath '\BlarAI\' | Enable-ScheduledTask
+Enable-ScheduledTask -TaskPath '\BlarAI\' -TaskName 'BlarAI-M2-Battery-Nightly'
 ```
+
+Never pipe the whole path into `Enable-ScheduledTask`.
 
 ### If tasks are Ready but fleet seems stuck
 
@@ -205,6 +223,6 @@ This captures the full fleet state in one output. Paste it to Claude Desktop wit
 
 ## See also
 
-- [AUTONOMOUS_FLEET_OPERATIONS.md](AUTONOMOUS_FLEET_OPERATIONS.md) — main fleet operations runbook (pause/resume, task registration, etc.).
+- [AUTONOMOUS_FLEET_OPERATIONS.md](../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md) — main fleet operations runbook (pause/resume, task registration, etc.).
 - [LA_FLEET_REPORTS_HOWTO.md](LA_FLEET_REPORTS_HOWTO.md) — how to read reports once fleet is running.
 - [LA_CAR_WORKFLOW_HOWTO.md](LA_CAR_WORKFLOW_HOWTO.md) — the corrective-action workflow when you find an issue.

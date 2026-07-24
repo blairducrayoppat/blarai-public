@@ -498,40 +498,11 @@ def _extract_pdf_text(path: Path, filename: str) -> str:
 # deterministic layer is delimiter neutralization in the context manager, and
 # the output backstop is the PGOV delimiter-echo check.
 
-# (description, pattern) -- description is surfaced to the user if the pattern hits.
-_INJECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("an instruction to ignore prior instructions",
-     re.compile(r"(?i)\bignore\s+(?:\w+\s+){0,3}(?:instruction|prompt|context|rule|direction)s?\b")),
-    ("an instruction to disregard prior instructions",
-     re.compile(r"(?i)\bdisregard\s+(?:\w+\s+){0,3}(?:instruction|prompt|context|rule|direction)s?\b")),
-    ("an instruction to override prior instructions",
-     re.compile(r"(?i)\boverride\s+(?:\w+\s+){0,3}(?:instruction|prompt|rule)s?\b")),
-    ("a role-reassignment attempt (\"you are now ...\")",
-     re.compile(r"(?i)\byou\s+are\s+now\b")),
-    ("a reference to the \"system prompt\"",
-     re.compile(r"(?i)\bsystem\s+prompt\b")),
-    ("a new- or updated-instructions directive",
-     re.compile(r"(?i)\b(?:new|updated|revised)\s+(?:instruction|directive)s?\b")),
-    ("a \"reply only with ...\" directive",
-     re.compile(r"(?i)\b(?:reply|respond|answer|output|say|print)\s+(?:only|exclusively)\s+with\b")),
-    ("a forged internal framing token (<|...|>)",
-     re.compile(r"<\|[A-Za-z0-9_]+\|>")),
-]
-
-
-def scan_for_injection(text: str) -> list[str]:
-    """Heuristically scan document content for prompt-injection patterns.
-
-    Args:
-        text: Document content to scan.
-
-    Returns:
-        Human-readable descriptions of suspicious patterns found, deduplicated
-        and in a stable order. An empty list means nothing matched. This is a
-        warning signal for the user -- not a load-blocking guard.
-    """
-    found: list[str] = []
-    for description, pattern in _INJECTION_PATTERNS:
-        if pattern.search(text) and description not in found:
-            found.append(description)
-    return found
+# #896: the pattern table + scan function moved to shared.security.injection_scan
+# (the architectural home — guarded_fetch, the cleaner, and the web-search loop
+# all consume the same detector). Re-exported here byte-compatibly so this
+# module's public surface (and every existing import of it) is unchanged.
+from shared.security.injection_scan import (  # noqa: E402,F401 — re-export, see above
+    _INJECTION_PATTERNS,
+    scan_for_injection,
+)

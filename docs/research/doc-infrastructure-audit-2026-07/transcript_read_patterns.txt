@@ -1,0 +1,185 @@
+parsed 771 transcripts, 214497 lines, 0 bad, 3s
+task/agent spawns: 507
+
+== tool totals ==
+   10511  Bash
+    8668  Read
+    5310  Edit
+    3689  PowerShell
+    3650  Grep
+    1506  Write
+    1167  WebSearch
+    1152  WebFetch
+    1083  Glob
+    1044  mcp__vikunja__add_task_comment
+     918  ToolSearch
+     699  mcp__vikunja__get_task
+     508  SendMessage
+     507  Agent
+     294  TaskUpdate
+     275  mcp__vikunja__create_task
+     259  mcp__vikunja__list_task_comments
+     221  mcp__vikunja__complete_task
+     175  StructuredOutput
+     172  TaskCreate
+
+== doctrine-named files ==
+   16 rd (   3 full/  13 part)   12 gr   46 ed   1 wr  18 sess    9 recent  claude.md
+  103 rd (   0 full/ 103 part)   32 gr   79 ed   0 wr  36 sess   23 recent  build_journal.md
+   87 rd (   3 full/  84 part)   47 gr   30 ed   0 wr  44 sess   87 recent  lessons.md
+    9 rd (   2 full/   7 part)    4 gr    7 ed   2 wr  11 sess    9 recent  field_notes.md
+   49 rd (   3 full/  46 part)   25 gr   68 ed   0 wr  43 sess   23 recent  performance_log.md
+   25 rd (   2 full/  23 part)    3 gr   10 ed   0 wr  22 sess   25 recent  docs/test_governance.md
+   45 rd (   4 full/  41 part)   26 gr   39 ed   0 wr  32 sess   27 recent  docs/decision_register.md
+    0 rd (   0 full/   0 part)    0 gr    1 ed   0 wr   1 sess    0 recent  docs/implementation_plan.md
+    8 rd (   2 full/   6 part)    2 gr    0 ed   0 wr   5 sess    6 recent  use cases_final.md
+   15 rd (  15 full/   0 part)    0 gr    0 ed   0 wr  15 sess   15 recent  docs/sprints/active_sprint.md
+
+== top 40 by total reads ==
+  379 rd (   4 full/ 375 part)  153 gr  221 ed   0 wr 124 sess  209 recent  services/assistant_orchestrator/src/entrypoint.py
+  307 rd (  51 full/ 256 part)   95 gr  176 ed   1 wr 136 sess  232 recent  shared/fleet/swap_ops.py
+  261 rd (  47 full/ 214 part)   98 gr  202 ed   3 wr 110 sess  190 recent  shared/fleet/swap_driver.py
+  188 rd (  26 full/ 162 part)   72 gr  125 ed   1 wr  85 sess  114 recent  shared/fleet/acceptance.py
+  121 rd (  12 full/ 109 part)   64 gr   38 ed   0 wr  72 sess   76 recent  launcher/__main__.py
+  116 rd (  10 full/ 106 part)   55 gr   78 ed   0 wr  57 sess   53 recent  c:/users/mrbla/agentic-setup/scripts/fleet-lib.ps1
+  104 rd (  30 full/  74 part)   54 gr   42 ed   1 wr  92 sess   60 recent  shared/fleet/dispatch.py
+  103 rd (   0 full/ 103 part)   32 gr   79 ed   0 wr  36 sess   23 recent  build_journal.md
+  101 rd (  25 full/  76 part)   68 gr   60 ed   0 wr 109 sess   54 recent  services/assistant_orchestrator/config/default.toml
+   97 rd (  16 full/  81 part)   33 gr   60 ed   1 wr  44 sess   97 recent  tools/dispatch_harness/battery.py
+   95 rd (   7 full/  88 part)   37 gr   56 ed   0 wr  47 sess   66 recent  services/ui_gateway/src/transport.py
+   95 rd (  20 full/  75 part)   31 gr   47 ed   0 wr  55 sess   33 recent  c:/users/mrbla/agentic-setup/scripts/new-agent-task.ps1
+   92 rd (   4 full/  88 part)   22 gr   42 ed   0 wr  38 sess   63 recent  services/assistant_orchestrator/src/gpu_inference.py
+   87 rd (   3 full/  84 part)   47 gr   30 ed   0 wr  44 sess   87 recent  lessons.md
+   82 rd (  33 full/  49 part)   12 gr   68 ed   2 wr  55 sess   44 recent  shared/fleet/decompose.py
+   61 rd (  20 full/  41 part)   14 gr   58 ed   1 wr  41 sess   30 recent  tests/integration/test_swap_ops.py
+   52 rd (   1 full/  51 part)   19 gr   27 ed   1 wr  18 sess   13 recent  tests/integration/test_acceptance.py
+   49 rd (   3 full/  46 part)   25 gr   68 ed   0 wr  43 sess   23 recent  performance_log.md
+   48 rd (  15 full/  33 part)    5 gr   47 ed   3 wr  30 sess   19 recent  services/ui_gateway/src/dispatch_coordinator.py
+   47 rd (  20 full/  27 part)   10 gr   15 ed   1 wr  33 sess    6 recent  tests/integration/test_swap_driver.py
+   47 rd (   2 full/  45 part)   14 gr   26 ed   1 wr  21 sess   47 recent  shared/tests/test_integration_gate.py
+   45 rd (   4 full/  41 part)   26 gr   39 ed   0 wr  32 sess   27 recent  docs/decision_register.md
+   45 rd (  11 full/  34 part)   19 gr   36 ed   1 wr  36 sess   45 recent  shared/timeout_registry.py
+   43 rd (   5 full/  38 part)    5 gr   71 ed   2 wr  39 sess   25 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/memory.md
+   40 rd (  25 full/  15 part)    6 gr   17 ed   1 wr  40 sess   18 recent  shared/fleet/swap_state.py
+   38 rd (   7 full/  31 part)   21 gr   32 ed   0 wr  26 sess   12 recent  services/assistant_orchestrator/src/tools.py
+   34 rd (  14 full/  20 part)    4 gr    7 ed   0 wr  28 sess   23 recent  shared/inference/shared_pipeline.py
+   34 rd (   8 full/  26 part)   10 gr   30 ed   1 wr  20 sess   34 recent  shared/fleet/plan_graph.py
+   33 rd (  19 full/  14 part)   12 gr   11 ed   0 wr  33 sess   12 recent  c:/users/mrbla/agentic-setup/scripts/run-fleet.ps1
+   33 rd (  15 full/  18 part)    6 gr   19 ed   1 wr  27 sess   24 recent  tools/dispatch_harness/harness.py
+   30 rd (  15 full/  15 part)    8 gr   16 ed   1 wr  30 sess   30 recent  c:/users/mrbla/agentic-setup/scripts/run-battery-night.ps1
+   30 rd (   2 full/  28 part)   19 gr   25 ed   0 wr  23 sess   19 recent  shared/ipc/protocol.py
+   29 rd (   1 full/  28 part)    3 gr   30 ed   1 wr   5 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-critique-loop.ps1
+   28 rd (   1 full/  27 part)   19 gr    6 ed   0 wr  16 sess   24 recent  services/assistant_orchestrator/src/knowledge_bank.py
+   28 rd (  26 full/   2 part)    2 gr    7 ed   0 wr  26 sess   28 recent  docs/governance/handoff-brief-template.md
+   28 rd (   2 full/  26 part)   20 gr   11 ed   0 wr  19 sess   21 recent  services/assistant_orchestrator/src/context_manager.py
+   26 rd (  12 full/  14 part)    7 gr    8 ed   0 wr  23 sess   12 recent  c:/users/mrbla/agentic-setup/scripts/start-llm.ps1
+   25 rd (   3 full/  22 part)   15 gr   14 ed   0 wr  16 sess    5 recent  services/ui_winui/mainwindow.xaml.cs
+   25 rd (   2 full/  23 part)    3 gr   10 ed   0 wr  22 sess   25 recent  docs/test_governance.md
+   24 rd (   1 full/  23 part)    6 gr   25 ed   0 wr  17 sess   15 recent  services/assistant_orchestrator/src/pgov.py
+
+== top 25 by distinct sessions ==
+  307 rd (  51 full/ 256 part)   95 gr  176 ed   1 wr 136 sess  232 recent  shared/fleet/swap_ops.py
+  379 rd (   4 full/ 375 part)  153 gr  221 ed   0 wr 124 sess  209 recent  services/assistant_orchestrator/src/entrypoint.py
+    0 rd (   0 full/   0 part)  250 gr    0 ed   0 wr 112 sess    0 recent  c:/users/mrbla/blarai
+  261 rd (  47 full/ 214 part)   98 gr  202 ed   3 wr 110 sess  190 recent  shared/fleet/swap_driver.py
+  101 rd (  25 full/  76 part)   68 gr   60 ed   0 wr 109 sess   54 recent  services/assistant_orchestrator/config/default.toml
+  104 rd (  30 full/  74 part)   54 gr   42 ed   1 wr  92 sess   60 recent  shared/fleet/dispatch.py
+  188 rd (  26 full/ 162 part)   72 gr  125 ed   1 wr  85 sess  114 recent  shared/fleet/acceptance.py
+  121 rd (  12 full/ 109 part)   64 gr   38 ed   0 wr  72 sess   76 recent  launcher/__main__.py
+    0 rd (   0 full/   0 part)  109 gr    0 ed   0 wr  71 sess    0 recent  shared/fleet
+    0 rd (   0 full/   0 part)   86 gr    0 ed   0 wr  61 sess    0 recent  c:/users/mrbla/agentic-setup
+  116 rd (  10 full/ 106 part)   55 gr   78 ed   0 wr  57 sess   53 recent  c:/users/mrbla/agentic-setup/scripts/fleet-lib.ps1
+   82 rd (  33 full/  49 part)   12 gr   68 ed   2 wr  55 sess   44 recent  shared/fleet/decompose.py
+   95 rd (  20 full/  75 part)   31 gr   47 ed   0 wr  55 sess   33 recent  c:/users/mrbla/agentic-setup/scripts/new-agent-task.ps1
+    0 rd (   0 full/   0 part)   70 gr    0 ed   0 wr  51 sess    0 recent  shared
+    0 rd (   0 full/   0 part)   60 gr    0 ed   0 wr  48 sess    0 recent  services
+   95 rd (   7 full/  88 part)   37 gr   56 ed   0 wr  47 sess   66 recent  services/ui_gateway/src/transport.py
+   97 rd (  16 full/  81 part)   33 gr   60 ed   1 wr  44 sess   97 recent  tools/dispatch_harness/battery.py
+   87 rd (   3 full/  84 part)   47 gr   30 ed   0 wr  44 sess   87 recent  lessons.md
+   49 rd (   3 full/  46 part)   25 gr   68 ed   0 wr  43 sess   23 recent  performance_log.md
+   61 rd (  20 full/  41 part)   14 gr   58 ed   1 wr  41 sess   30 recent  tests/integration/test_swap_ops.py
+    0 rd (   0 full/   0 part)   64 gr    0 ed   0 wr  41 sess    0 recent  services/assistant_orchestrator/src
+   40 rd (  25 full/  15 part)    6 gr   17 ed   1 wr  40 sess   18 recent  shared/fleet/swap_state.py
+   43 rd (   5 full/  38 part)    5 gr   71 ed   2 wr  39 sess   25 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/memory.md
+   92 rd (   4 full/  88 part)   22 gr   42 ed   0 wr  38 sess   63 recent  services/assistant_orchestrator/src/gpu_inference.py
+  103 rd (   0 full/ 103 part)   32 gr   79 ed   0 wr  36 sess   23 recent  build_journal.md
+
+== external-path rollup (memory dir / agentic-setup / devplatform) ==
+  116 rd (  10 full/ 106 part)   55 gr   78 ed   0 wr  57 sess   53 recent  c:/users/mrbla/agentic-setup/scripts/fleet-lib.ps1
+   95 rd (  20 full/  75 part)   31 gr   47 ed   0 wr  55 sess   33 recent  c:/users/mrbla/agentic-setup/scripts/new-agent-task.ps1
+   43 rd (   5 full/  38 part)    5 gr   71 ed   2 wr  39 sess   25 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/memory.md
+   33 rd (  19 full/  14 part)   12 gr   11 ed   0 wr  33 sess   12 recent  c:/users/mrbla/agentic-setup/scripts/run-fleet.ps1
+   30 rd (  15 full/  15 part)    8 gr   16 ed   1 wr  30 sess   30 recent  c:/users/mrbla/agentic-setup/scripts/run-battery-night.ps1
+   29 rd (   1 full/  28 part)    3 gr   30 ed   1 wr   5 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-critique-loop.ps1
+   26 rd (  12 full/  14 part)    7 gr    8 ed   0 wr  23 sess   12 recent  c:/users/mrbla/agentic-setup/scripts/start-llm.ps1
+   21 rd (   4 full/  17 part)    6 gr   18 ed   0 wr   9 sess    4 recent  c:/users/mrbla/agentic-setup/docs/lessons-learned.md
+   20 rd (  19 full/   1 part)    0 gr    4 ed   2 wr  18 sess   20 recent  c:/users/mrbla/agentic-setup/state/battery-campaign.json
+   19 rd (   8 full/  11 part)    0 gr    7 ed   0 wr   7 sess    0 recent  c:/users/mrbla/.claude/projects/c--users-mrbla/memory/blarai-headless-coding-dispatch.md
+   18 rd (   8 full/  10 part)    4 gr   22 ed   1 wr  11 sess    6 recent  c:/users/mrbla/agentic-setup/scripts/critique-loop.ps1
+   18 rd (  14 full/   4 part)    2 gr    2 ed   0 wr  18 sess   10 recent  c:/users/mrbla/agentic-setup/configs/opencode.json
+   17 rd (   7 full/  10 part)    1 gr   16 ed   1 wr  11 sess    7 recent  c:/users/mrbla/agentic-setup/scripts/capture-app.ps1
+   16 rd (  16 full/   0 part)    2 gr    5 ed   0 wr  14 sess   16 recent  c:/users/mrbla/agentic-setup/configs/fleet-driver.json
+   13 rd (   7 full/   6 part)    1 gr    2 ed   0 wr  11 sess    6 recent  c:/users/mrbla/agentic-setup/docs/blarai-headless-coding-agent-brief.md
+   12 rd (   7 full/   5 part)    5 gr    3 ed   0 wr  10 sess    4 recent  c:/users/mrbla/agentic-setup/scripts/verify-project.ps1
+   10 rd (   9 full/   1 part)    0 gr    5 ed   1 wr   7 sess    1 recent  c:/users/mrbla/agentic-setup/build-infra/winui/reference/app.xaml.cs
+   10 rd (   9 full/   1 part)    0 gr    0 ed   0 wr  10 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/add-fleet-task.ps1
+    9 rd (   9 full/   0 part)    0 gr    1 ed   2 wr   9 sess    4 recent  c:/users/mrbla/agentic-setup/configs/agents/review.md
+    9 rd (   9 full/   0 part)    0 gr    0 ed   1 wr   9 sess    4 recent  c:/users/mrbla/agentic-setup/configs/agents/critic.md
+    9 rd (   6 full/   3 part)    1 gr    6 ed   1 wr   8 sess    5 recent  c:/users/mrbla/agentic-setup/scripts/critic-run.ps1
+    8 rd (   1 full/   7 part)    1 gr    4 ed   0 wr   6 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-retry.ps1
+    8 rd (   3 full/   5 part)    1 gr    8 ed   1 wr   7 sess    8 recent  c:/users/mrbla/agentic-setup/readme.md
+    8 rd (   3 full/   5 part)    0 gr    2 ed   0 wr   7 sess    3 recent  c:/users/mrbla/agentic-setup/blueprint.md
+    7 rd (   7 full/   0 part)    0 gr    8 ed   0 wr   7 sess    5 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/project_model_upgrade_watch.md
+    7 rd (   1 full/   6 part)    0 gr    6 ed   1 wr   3 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-bestofn-concurrent.ps1
+    7 rd (   5 full/   2 part)    0 gr    7 ed   1 wr   6 sess    1 recent  c:/users/mrbla/agentic-setup/docs/dispatch-build-signal-architecture.md
+    7 rd (   6 full/   1 part)    1 gr    1 ed   0 wr   8 sess    3 recent  c:/users/mrbla/agentic-setup/configs/agents.md
+    6 rd (   5 full/   1 part)    0 gr    0 ed   0 wr   5 sess    1 recent  c:/users/mrbla/agentic-setup/state/fleet-swap/current.json
+    6 rd (   5 full/   1 part)    0 gr    8 ed   2 wr   4 sess    0 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/project_uc010_illustration_model.md
+    6 rd (   4 full/   2 part)    0 gr    6 ed   0 wr   6 sess    4 recent  c:/users/mrbla/agentic-setup/scripts/control-panel.ps1
+    6 rd (   4 full/   2 part)    1 gr    1 ed   1 wr   7 sess    6 recent  c:/users/mrbla/agentic-setup/scripts/publish-public-snapshot.ps1
+    6 rd (   1 full/   5 part)    2 gr    9 ed   0 wr   4 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-complexity.ps1
+    6 rd (   2 full/   4 part)    2 gr    5 ed   0 wr   6 sess    0 recent  c:/users/mrbla/agentic-setup/scripts/verify-struct.ps1
+    6 rd (   5 full/   1 part)    0 gr    0 ed   0 wr   6 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/sync-harness.ps1
+    5 rd (   5 full/   0 part)    0 gr    0 ed   0 wr   4 sess    5 recent  c:/users/mrbla/agentic-setup/state/battery/morning-report.md
+    5 rd (   3 full/   2 part)    3 gr    7 ed   0 wr   5 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-buildprofile.ps1
+    5 rd (   4 full/   1 part)    0 gr    0 ed   0 wr   4 sess    5 recent  c:/users/mrbla/agentic-setup/state/fleet-runs/20260706-142042-bd/run-fleet-compose-combined-report.log
+    5 rd (   5 full/   0 part)    0 gr    2 ed   0 wr   5 sess    0 recent  c:/users/mrbla/agentic-setup/build-infra/winui/reference/minimalwinui.csproj
+    5 rd (   5 full/   0 part)    0 gr    4 ed   1 wr   6 sess    1 recent  c:/users/mrbla/agentic-setup/configs/opencode-plugins/command-timeout.js
+    5 rd (   4 full/   1 part)    1 gr    0 ed   0 wr   6 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/secret-scan.ps1
+    5 rd (   4 full/   1 part)    0 gr    0 ed   0 wr   5 sess    1 recent  c:/users/mrbla/agentic-setup/docs/dispatch-la-handoff-start-here.md
+    5 rd (   4 full/   1 part)    2 gr    2 ed   0 wr   6 sess    5 recent  c:/users/mrbla/agentic-setup/scripts/verify-fleet-driver.ps1
+    5 rd (   1 full/   4 part)    1 gr    0 ed   0 wr   2 sess    5 recent  c:/users/mrbla/agentic-setup/state/fleet-runs/20260716-234039-bd/swap-progress.log
+    5 rd (   5 full/   0 part)    0 gr    0 ed   1 wr   6 sess    5 recent  c:/users/mrbla/agentic-setup/configs/opencode-version-pin.json
+    4 rd (   3 full/   1 part)    2 gr    2 ed   0 wr   5 sess    2 recent  c:/users/mrbla/devplatform/claude.md
+    4 rd (   4 full/   0 part)    0 gr    0 ed   0 wr   4 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/stop-llm.ps1
+    4 rd (   4 full/   0 part)    0 gr    0 ed   1 wr   4 sess    0 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/project_dispatch_memory_namespace_pointer.md
+    4 rd (   2 full/   2 part)    0 gr    5 ed   0 wr   4 sess    0 recent  c:/users/mrbla/agentic-setup/scripts/verify-merge-decision.ps1
+    4 rd (   4 full/   0 part)    0 gr    6 ed   1 wr   4 sess    4 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/project_763_land_after_campaign.md
+    4 rd (   2 full/   2 part)    0 gr    6 ed   1 wr   5 sess    4 recent  c:/users/mrbla/agentic-setup/scripts/backup-system.ps1
+    4 rd (   4 full/   0 part)    0 gr    0 ed   1 wr   4 sess    0 recent  c:/users/mrbla/agentic-setup/build-infra/winui/reference/mainwindow.xaml.cs
+    4 rd (   2 full/   2 part)    0 gr    3 ed   1 wr   3 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-capture.ps1
+    4 rd (   2 full/   2 part)    0 gr    0 ed   0 wr   4 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/watchdog.ps1
+    4 rd (   0 full/   4 part)    0 gr   11 ed   0 wr   1 sess    4 recent  c:/users/mrbla/agentic-setup-wt-775b/scripts/provision-coder-account.ps1
+    3 rd (   1 full/   2 part)    0 gr    3 ed   0 wr   3 sess    1 recent  c:/users/mrbla/agentic-setup/scripts/verify-scaffold.ps1
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    3 recent  c:/users/mrbla/agentic-setup/state/fleet-runs/20260706-142042-bd/swap-progress.log
+    3 rd (   3 full/   0 part)    0 gr    2 ed   2 wr   5 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/verify-critic-diff.ps1
+    3 rd (   3 full/   0 part)    0 gr    0 ed   2 wr   4 sess    0 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/project-headless-coding-dispatch-build-complete.md
+    3 rd (   2 full/   1 part)    0 gr    0 ed   0 wr   2 sess    0 recent  c:/users/mrbla/agentic-setup/state/fleet-runs/20260622-171422-bd/journal.log
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    1 recent  c:/users/mrbla/agentic-setup/state/fleet-queue.json
+    3 rd (   3 full/   0 part)    0 gr    3 ed   1 wr   4 sess    2 recent  c:/users/mrbla/agentic-setup/scripts/verify-bestofn.ps1
+    3 rd (   2 full/   1 part)    1 gr    0 ed   0 wr   4 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/verify-box-state.ps1
+    3 rd (   2 full/   1 part)    0 gr    0 ed   0 wr   3 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/box-state.ps1
+    3 rd (   3 full/   0 part)    0 gr    1 ed   0 wr   3 sess    0 recent  c:/users/mrbla/agentic-setup/scripts/01-install-opencode.ps1
+    3 rd (   3 full/   0 part)    0 gr    0 ed   1 wr   3 sess    0 recent  c:/users/mrbla/agentic-setup/build-infra/winui/reference/mainwindow.xaml
+    3 rd (   2 full/   1 part)    0 gr    2 ed   3 wr   3 sess    3 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/memory/feedback_default_aggressive_parallel_execution.md
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/verify-battery-task-settings.ps1
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    1 recent  c:/users/mrbla/agentic-setup/configs/opencode-plugins/readme.md
+    3 rd (   2 full/   1 part)    0 gr    0 ed   1 wr   4 sess    3 recent  c:/users/mrbla/agentic-setup/scripts/verify-opencode-pin.ps1
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    3 recent  c:/users/mrbla/agentic-setup/configs/model-profiles.json
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    0 recent  c:/users/mrbla/agentic-setup/bench/readme.md
+    3 rd (   3 full/   0 part)    0 gr    0 ed   0 wr   3 sess    1 recent  c:/users/mrbla/agentic-setup/configs/fleet-queue.sample.json
+    3 rd (   3 full/   0 part)    0 gr    2 ed   1 wr   4 sess    3 recent  c:/users/mrbla/agentic-setup/state/acp-spike/results.md
+    3 rd (   0 full/   3 part)    3 gr    0 ed   0 wr   1 sess    3 recent  c:/users/mrbla/agentic-setup/state/decompose-debug-20260710.log
+    3 rd (   0 full/   3 part)    0 gr    5 ed   0 wr   1 sess    3 recent  c:/users/mrbla/agentic-setup-wt-775c/scripts/verify-coder-containment.ps1
+    3 rd (   0 full/   3 part)    2 gr    2 ed   0 wr   1 sess    3 recent  c:/users/mrbla/agentic-setup-wt-694reap/scripts/fleet-lib.ps1
+    3 rd (   1 full/   2 part)    0 gr    0 ed   0 wr   1 sess    3 recent  c:/users/mrbla/.claude/projects/c--users-mrbla-blarai/e8f3fea8-900f-483c-a0ca-887d36baa264/tool-results/bf3zi6rzk.txt

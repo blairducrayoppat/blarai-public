@@ -108,6 +108,16 @@ class PolicyAgentEntrypointConfig:
     is FAIL-CLOSED.  Defaults to False (capability built; off until LA flips it).
     Set via [security].require_signed_manifest in the service config (FUT-04)."""
 
+    require_signed_draft_manifest: bool = False
+    """DRAFT-manifest signature posture for the STANDALONE path (FUT-05 / #917).
+    When True, the speculative-decoding draft's manifest MUST carry a valid TPM
+    .sig or the standalone PA build FAILS CLOSED; when False (dormant, the shipped
+    default) the draft is verified DIGEST-ONLY (.sig not consulted, digest still
+    enforced). Kept SEPARATE from require_signed_manifest because the draft is
+    NON-AUTHORITATIVE (the signed 14B re-verifies every token). Set via
+    [security].require_signed_draft_manifest. Only the standalone/fallback path
+    reads it; the host-mode shared pipeline is gated by the AO config's copy."""
+
     audit_log_path: Path | None = None
     """Filesystem path for the tamper-evident adjudication audit stream
     (Sprint 13 / Domain 7).  When None, the entrypoint resolves a default under
@@ -375,6 +385,7 @@ class PolicyAgentService:
                 ),
                 speculative_decoding_enabled=resolved.speculative_decoding_enabled,
                 shared_pipeline=self._shared_pipeline,
+                require_signed_draft_manifest=resolved.require_signed_draft_manifest,
             )
             if not inference.load_model():
                 boot_context["error_code"] = "PA_MODEL_LOAD_FAILED"
@@ -647,6 +658,12 @@ class PolicyAgentService:
 
         # require_signed_manifest defaults False — capability built, off until LA flips.
         require_signed_manifest = bool(security.get("require_signed_manifest", False))
+        # require_signed_draft_manifest (FUT-05 / #917) — the STANDALONE-path draft's
+        # signature posture, defaults False (dormant = digest-only). Independent of
+        # the 14B flag (the draft is non-authoritative).
+        require_signed_draft_manifest = bool(
+            security.get("require_signed_draft_manifest", False)
+        )
 
         # Tamper-evident audit stream (Sprint 13 / Domain 7).  Default path lives
         # under the service data dir so the live PA always has a durable forensic
@@ -727,6 +744,7 @@ class PolicyAgentService:
             vsock_config=vsock_config,
             deployment_mode=self._deployment_mode,
             require_signed_manifest=require_signed_manifest,
+            require_signed_draft_manifest=require_signed_draft_manifest,
             audit_log_path=audit_log_path,
             audit_hmac_key_id=audit_hmac_key_id,
             audit_max_active_bytes=audit_max_active_bytes,

@@ -1,6 +1,6 @@
 ---
-description: LA-driven Sprint kickoff — drafts the Strategic Design Vision (SDV) interactively with Co-Lead Architect persona, iterates to LA sign-off, commits to main, and closes the Pending-Human gate. Covers DEC-15 protocol end-to-end in one session. Two modes: fresh sprint (`<sprint_id> "<theme>"`) or promote a draft from BlarAI Drafts (`--promote-draft <draft_id>`).
-argument-hint: <sprint_id> "<theme>" [context]   |   --promote-draft <draft_id>
+description: Sprint Kickoff — the one Lead-Architect-in-the-loop moment that opens a sprint. Grounds on live project state, helps the LA pick and scope a cluster of Vikunja tickets, presents a single comprehension gate, and — only after he confirms — opens the sprint and drives it through the normal build → test → merge → ticket → journal arc. Two modes: fresh scope (`<sprint_id> "<theme>"`) or assemble from existing backlog tickets (`--from-tickets <id,id,...> "<theme>"`).
+argument-hint: <sprint_id> "<theme>" [context]   |   --from-tickets <id,id,...> "<theme>"
 allowed-tools:
   - Read
   - Write
@@ -8,171 +8,97 @@ allowed-tools:
   - Glob
   - Grep
   - Bash
+  - Agent
+  - Task
+  - mcp__vikunja__project_summary
+  - mcp__vikunja__get_task
+  - mcp__vikunja__list_tasks
+  - mcp__vikunja__search_tasks
+  - mcp__vikunja__list_labels
+  - mcp__vikunja__add_label_to_task
+  - mcp__vikunja__add_task_comment
+  - mcp__vikunja__create_task
 ---
 
-# Sprint Kickoff — Co-Lead Architect mode
+# Sprint Kickoff
 
-You are now acting as the BlarAI **Co-Lead Architect** in an interactive LA-collaboration session. This slash command is a Sprint Kickoff — the single LA-in-the-loop strategic design moment at the start of each sprint per DEC-15.
+A **sprint** here is just a named, scoped cluster of Vikunja tickets with one kickoff gate at the front and one debrief at the end. This command opens that cluster. It does NOT put you in a new persona — you remain the session defined by `CLAUDE.md`, running its standard grounding → comprehension-gate → full-arc protocol. "LA" throughout means the Lead Architect: the non-technical project owner who owns the WHY; you own the HOW.
 
-## Two invocation modes
+The kickoff is the single LA-in-the-loop moment at a sprint's start: you help him choose and shape the work, you present one gate, he confirms, then you build.
 
-Inspect `$ARGUMENTS` before any other action:
+## Invocation
 
-### Mode A — Fresh sprint (default)
+Inspect `$ARGUMENTS` first:
 
-```
-/sprint-kickoff <sprint_id> "<theme>" [optional: additional context]
-```
-- `$1` = sprint_id (int; e.g. `10`)
-- `$2` = theme (quoted string; e.g. `"Test governance hardening"`)
-- `$3+` = optional additional context the LA wants you to consider
+- **Fresh scope (default)** — `/sprint-kickoff <sprint_id> "<theme>" [context]`
+  - `$1` = sprint_id (integer, e.g. `19`); `$2` = theme (quoted); `$3+` = optional context.
+- **Assemble from existing tickets** — `/sprint-kickoff --from-tickets <id,id,...> "<theme>"`
+  - Use when `/sprint-discovery` or the backlog already holds the tickets this sprint should tackle. Read each named ticket with `mcp__vikunja__get_task` and treat them as the scope seed.
 
-The kickoff creates a fresh tracking task in **BlarAI Core Development** (Project 3, the sprint-tracking project) and proceeds with SDV authoring.
+If `sprint_id` is omitted or ambiguous, derive the next number from `docs/sprints/` (highest `sprint_N/` + 1) and confirm it with the LA during the gate — never guess silently.
 
-### Mode B — Promote a draft
+## Phase 0 — Ground yourself (silent; before any LA-facing message)
 
-```
-/sprint-kickoff --promote-draft <draft_id>
-```
-- `$1` = literal `--promote-draft`
-- `$2` = Vikunja task id of a draft in **BlarAI Drafts** (Project 9)
+Run the `CLAUDE.md` session-start grounding, reading on disk, never from a summary:
 
-The kickoff:
-1. Reads the draft via `mcp__vikunja__get_task($2)`. Verifies `project_id == 9` and the `Status:Draft` label (id 20) is present. If either check fails: STOP, tell the LA, do not proceed (the draft must be in BlarAI Drafts to promote, otherwise this is the wrong path).
-2. Asks LA: *"Confirm sprint_id (next available is N), and any theme refinement beyond the draft's title?"*
-3. Once LA confirms: moves the draft to BlarAI Core Development (Project 3) via Vikunja API (or, if cross-project move isn't supported in this Vikunja version, creates a new Project-3 task that copies the draft body and links the draft id, then archives the draft).
-4. Removes label `Status:Draft` (id 20). Adds label `Status:Sprint-Ready` (id 21). Adds the standard tracking-task labels (`Active`, etc.).
-5. Proceeds with the rest of this kickoff flow (Phase 0 onward) using the promoted draft as scope context.
+1. `CLAUDE.md` — standing doctrine (you are re-confirming it, not assuming it).
+2. `git log --oneline main` + `git status` — real HEAD and in-flight work. Untracked files are likely another session's; do not touch or stage them.
+3. `mcp__vikunja__project_summary` — the live work queue.
+4. `docs/sprints/ACTIVE_SPRINT.md` + `docs/TEST_GOVERNANCE.md` §1 — current sprint pointer and gate scope/baseline.
+5. `docs/DECISION_REGISTER.md`, plus any ticket, ADR (Architecture Decision Record), or brief the theme or `--from-tickets` names — read them fully.
+6. The last completed sprint's `docs/sprints/sprint_<prev>/` close-out note, if present — what shipped, what carried over. Carry-overs are the strongest signal for this sprint's scope.
 
-The promote path is preferred when one draft cleanly captures the sprint scope. For multi-draft sprints, use Mode A and reference draft IDs in `$3+` context.
+Summarize none of this back yet. This is your own preparation.
 
-## Your mission
+## Phase 1 — Help the LA scope the cluster
 
-Produce `docs/sprints/sprint_<sprint_id>/strategic_design_vision.md` populated with real, context-aware content per the canonical template. Iterate with the LA until they sign off. Then commit, close the Pending-Human gate on the sprint tracking task, and return a clean summary.
+Post ONE message that helps him decide, in plain language, acronyms spelled out on first use:
 
-## Phase 0 — Context loading (silent, before first LA-facing message)
+- **Echo** the sprint number, theme, and any named tickets/context back to him.
+- **Predecessor digest** (≤6 sentences): what the last sprint delivered, what it missed, what carried over. If there is no prior close-out note, say so plainly and work without that baseline.
+- **Grounding observations** (2–5 bullets): non-obvious things from Phase 0 he may want to weigh — decisions already awaiting him, recent ADRs, known-risk areas, backlog tickets that fit the theme. Mark any idea he did not ask for `[PROPOSED]`.
+- **Proposed ticket cluster**: the concrete Vikunja tickets you would pull into this sprint (existing ids + any you would create), each with a one-line "why it's in scope." This is the sprint's shape — cheap to redirect now, before you invest.
+- **Questions for the LA** (only ones he can answer): scope in/out, priorities, and any capability / quality / security-posture calls. Never a technical implementation question — you own those; research and decide them yourself.
 
-Read these in order. Summarize nothing back to LA yet; this is your own preparation:
+Then let him react and adjust the cluster with you. Iterate here as long as he wants; this phase is free.
 
-1. `CLAUDE.md` — confirm DEC-15 convention is still current.
-2. `docs/DEC15_SPRINT_STRATEGIC_REVIEW_PROPOSAL_v1.xml` — the authoritative design.
-3. `docs/sprints/_templates/strategic_design_vision_template.md` — the template to fill.
-4. `docs/sprints/ACTIVE_SPRINT.md` — current roster state.
-5. `docs/active_tasks.yaml` — predecessor sprint_id + continuation path.
-6. Predecessor artifacts (if present):
-   - `docs/sprints/sprint_<predecessor>/strategic_completion_report.md` — what the last sprint actually delivered.
-   - `docs/sprints/sprint_<predecessor>/Strategic_Work_Analysis_and_Gap_Report_Sprint_<predecessor>_*.md` — the auditor's gap review. **This is the most valuable input — it tells you what went wrong or was missed last time, which informs this sprint's scope.**
-   - `docs/sprints/sprint_<predecessor>/strategic_design_vision.md` — for pattern consistency with predecessor SDV style.
-7. `docs/claude_projects/01_CO_LEAD_ARCHITECT_INSTRUCTIONS.md` — your canonical role definition.
-8. `docs/POST_OPERATIONAL_MATURATION_LEDGER.md` tail 50 entries — recent ledger activity.
-9. Current main branch state: `git log --oneline -10 main`, `git status --short`.
-10. Open Vikunja `Gate:Pending-Human` tasks (via `mcp__vikunja__list_tasks` filtered) — any strategic inputs waiting for LA attention that might influence this sprint's scope.
+## Phase 2 — The comprehension gate (single, then STOP)
 
-## Phase 1 — First LA-facing message
+When the cluster is settled, present the `CLAUDE.md` comprehension gate in your own words — substantive and substrate-grounded (built from what you read in Phase 0, naming the surfaces; a paraphrase of the kickoff prompt is NOT a gate), mature-not-minimal, sized to the sprint, no point-count cap:
 
-After loading, post a **single, well-structured message** to the LA with this shape:
+1. **ROLE & AUTHORITY** — who you are for this sprint; which calls you make yourself vs. which are his.
+2. **CONTEXT** — where the project stands, as relevant to this sprint (proves grounding).
+3. **GOAL** — what the sprint achieves and why he wants it.
+4. **TASK + PLAN** — the ticket cluster, the order you'll work it, the resources (subagents, worktree builders, local scripts) you'll spend, and what a closed sprint looks like.
+5. **SCOPE** — explicitly in, explicitly out.
+6. **INHERITED CONSTRAINTS** — the standing rules that bind this sprint's work (dormant-merge, fleet-pause, LOCALAPPDATA redirect, …) — only the ones that apply.
+7. **RISKS + DECISION POINTS** — what could go wrong; which capability / quality / security-posture flips you expect to escalate to him mid-sprint.
+8. **ASSUMPTIONS & AMBIGUITIES** — your own reads: what you are assuming, what the theme left open, how you resolved each.
+9. **OPEN QUESTIONS** — only ones a non-technical LA can answer.
 
-### 1. Confirmation echo
+Then **STOP AND WAIT** for his explicit confirmation. Do not combine the gate and any downstream work in one turn. Authorization to do the work is not authorization to skip the gate.
 
-Restate back to the LA what you understand:
-- Sprint number being kicked off: `$1`
-- Stated theme: `$2`
-- Any additional context: `$3+` (empty is fine)
+## Phase 3 — Open the sprint, then drive the arc
 
-### 2. Predecessor digest (≤8 sentences)
+Only after he confirms:
 
-What the predecessor sprint accomplished, what it missed, what the SWAGR flagged as carry-overs. Ground the new sprint in that reality. If predecessor has no SDV/SCR/SWAGR (pre-DEC-15 sprints like Sprint 7), say so plainly and note you're working without that baseline.
+1. Create `docs/sprints/sprint_$1/` and write a lightweight **kickoff brief** there (`kickoff-brief.md`) capturing the agreed goal, the ticket cluster, scope in/out, and the decision points you flagged — plain prose, no heavyweight template, just the shape he approved. Leave it as a working-tree file; it ships with the sprint's normal commits.
+2. In Vikunja: mark each in-scope ticket "Doing" with a one-line comment, and update `docs/sprints/ACTIVE_SPRINT.md` to point at this sprint. Use canonical label names — verify via `mcp__vikunja__list_labels`, never invent variants.
+3. Drive the normal autonomy arc from `CLAUDE.md` — build → test → commit (feature branch) → merge to main → ticket closed citing the shipping SHA → journal entry → regression lock — fanning out subagents and worktree builders across disjoint tickets. Every ship is one atomic motion. Anything that is a new capability, a quality change, or a security/governance posture flip merges DORMANT behind a config flag and waits for his go-live ceremony; work inside an already-approved capability ships LIVE.
 
-### 3. Strategic context observations (2-5 bullets)
+Do not return to him for permission on technical choices or obvious next steps. After the gate, the only legitimate stops are the genuine decision-boundary escalations named in `CLAUDE.md`.
 
-Non-obvious things you noticed during context loading that LA may want to consider for scope. Open Pending-Human items. Unresolved ledger issues. Recent ADR changes. Known-risk areas the fleet is operating near.
+## Rules
 
-### 4. Proposed SDV skeleton
+- **One gate, at the front.** Never manufacture mid-sprint approval gates; the real decision-boundary escalations are not gates, and remain mandatory.
+- **Never ask the LA a technical question.** Research, decide, report the decision in plain language.
+- **Never commit work directly to main.** Feature branches only; the sole main commit is the reviewed, gate-green merge with its atomic ticket + journal companions. No destructive git, ever.
+- **If he changes the sprint_id mid-kickoff**, re-point cleanly before writing anything under the old number.
+- **Outputs longer than ~30 lines** go to a workspace file with a short chat pointer — his attention is a managed resource.
+- No praise or commendation sections anywhere.
 
-An **outline** (not the full draft yet) of how you'd populate each of the 14 SDV sections given the theme + context. Use the exact section headings from the template. For each section, 1-3 sentences saying what you'd write.
+## See also
 
-**Do not author the full SDV in this first message.** The outline is a cheap iteration surface — LA can redirect whole sections before you invest in full prose.
-
-### 5. Specific questions for LA
-
-3-7 pointed questions whose answers you need before drafting the full SDV. Prefer concrete either/or framings over open-ended. Example: *"Do you want this sprint to include any code changes, or stay strictly docs/governance like Sprint 7 did?"* rather than *"What's the scope?"*
-
-### 6. Proposed next action
-
-"Answer my questions; I'll then draft the full SDV. Estimated size: ~`<N>` lines. Expected iterations: 2-3 rounds."
-
-## Phase 2 — LA response → full SDV draft
-
-When LA answers Phase 1 questions (and possibly redirects the outline):
-
-1. Acknowledge the redirects explicitly so LA knows you heard them.
-2. Create `docs/sprints/sprint_$1/` directory if missing (via Bash `mkdir -p`).
-3. Author the SDV in full using the template. Every section populated — NO `TODO` or placeholder text. If a section is genuinely not applicable for this sprint, write `N/A — <one-sentence reason>` rather than skipping.
-4. Frontmatter fields:
-   - `sprint_id: $1`
-   - `sprint_name` from $2 (or refined if LA redirected)
-   - `predecessor_sprint_id` from roster
-   - `vikunja_tracking_task_id` — LOOK UP via `mcp__vikunja__list_tasks` filtered to the new sprint's tracking task (Co-Lead's Phase 3 should have created it; if not, flag and ask LA).
-   - `start_date` = today
-   - `target_completion_date` = LA's honest estimate (ask if they haven't said)
-   - `la_approved_on`, `la_approved_by` = LEAVE EMPTY (filled at sign-off)
-   - `co_lead_drafted_on` = now (ISO 8601)
-   - `co_lead_commit_when_drafted` = `git rev-parse HEAD` output
-   - `sdv_version: 1`
-5. Write to `docs/sprints/sprint_$1/strategic_design_vision.md`.
-6. Post a message to LA: *"SDV draft v1 written to `<path>`. Please read and tell me: (a) sections that are exactly right, (b) sections that need a rewrite, (c) sections to delete/add."*
-
-## Phase 3 — Iterate
-
-For each LA revision request:
-1. Apply the change via `Edit` tool.
-2. Increment `sdv_version` in frontmatter + add a row to the revision log table at the bottom.
-3. Post back: *"v`<N+1>` written. Diff summary: `<bulleted list of changes>`."*
-
-Continue until LA says some form of "approved" / "sign off" / "looks good, commit it".
-
-## Phase 4 — LA sign-off + commit
-
-On sign-off:
-
-1. Fill frontmatter `la_approved_on` with current ISO-8601 timestamp, `la_approved_by: "blarai"`.
-2. Stage + commit:
-   ```bash
-   git add docs/sprints/sprint_$1/strategic_design_vision.md
-   git commit -m "[sprint:kickoff] Sprint $1 SDV signed off by LA
-
-   Theme: $2
-   Predecessor: Sprint <M>
-   Tracking task: #<id>
-   SDV version at signoff: <N>"
-   ```
-3. Update `docs/sprints/ACTIVE_SPRINT.md` to reflect the newly-signed SDV (Artifacts table: mark SDV ✅ instead of ❌). Stage + commit.
-4. Close `Gate:Pending-Human` on the sprint tracking task:
-   - `mcp__vikunja__remove_label_from_task(task_id=<id>, label_id=11)` (Gate:Pending-Human).
-   - `mcp__vikunja__add_label_to_task(task_id=<id>, label_id=12)` (Gate:Approved).
-   - `mcp__vikunja__add_task_comment(task_id=<id>, comment="[agent:co_lead] SDV signed off by LA; Sprint <N> underway. SDV path: docs/sprints/sprint_<N>/strategic_design_vision.md")`.
-5. Emit a DEC-13 Fleet Reports task announcing sprint kickoff (standard report-emission pattern, priority 2, assigned to `blarai`).
-
-## Phase 5 — Closing message to LA
-
-A compact summary:
-- ✅ SDV signed + committed as `<commit hash>`.
-- ✅ Active Sprint pointer updated.
-- ✅ Gate:Pending-Human closed.
-- Next autonomous work: SDO's next scheduled wake will consult the new SDV via Phase 2 Step 2.0 and author EA-1's prompt into `docs/scheduled/ea_queue/staging/`. You don't need to do anything until the first Fleet Reports task for EA-1 shows up.
-
-## Safety rules (non-negotiable)
-
-- **NEVER write an SDV without reading the template first.** Section drift breaks the SCR/SWAGR pipeline.
-- **NEVER commit before LA sign-off.** No "commit this first draft just in case." Wait for explicit approval language.
-- **NEVER skip frontmatter fields.** Every field has downstream consumers (Sprint Auditor, Co-Lead SCR generation, roster resolution).
-- **NEVER close Gate:Pending-Human before the commit lands.** The ordering matters: commit SDV → update pointer → close gate → emit Fleet Reports task. Keeps the audit trail linear.
-- **If LA changes sprint_id mid-session**: abort cleanly, do not partially-commit under the wrong id. Ask LA to restart the skill with the corrected arg.
-- **If predecessor SWAGR flagged CRITICAL gaps that this sprint should address but LA's theme doesn't mention them**: explicitly raise the gap in your Phase 1 outline and ask whether this sprint should carry it.
-
-## Links
-
-- [docs/DEC15_SPRINT_STRATEGIC_REVIEW_PROPOSAL_v1.xml](../../docs/DEC15_SPRINT_STRATEGIC_REVIEW_PROPOSAL_v1.xml)
-- [docs/sprints/_templates/strategic_design_vision_template.md](../../docs/sprints/_templates/strategic_design_vision_template.md)
-- [docs/runbooks/LA_SPRINT_KICKOFF_HOWTO.md](../../docs/runbooks/LA_SPRINT_KICKOFF_HOWTO.md) (human-friendly LA-facing runbook)
-- [docs/claude_projects/01_CO_LEAD_ARCHITECT_INSTRUCTIONS.md](../../docs/claude_projects/01_CO_LEAD_ARCHITECT_INSTRUCTIONS.md)
+- [./sprint-discovery.md](./sprint-discovery.md) — shapes the tickets a kickoff assembles.
+- [./sprint-debrief.md](./sprint-debrief.md) — closes the sprint this one opens.
+- [../../CLAUDE.md](../../CLAUDE.md) — the session doctrine this command runs under.

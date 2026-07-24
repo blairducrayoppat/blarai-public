@@ -1,5 +1,45 @@
 # How to Run a Sprint Debrief — Lead Architect Guide
 
+> ## SUPERSEDED — `/sprint-debrief` was rewritten on 2026-07-19. Read the command, not this guide.
+>
+> The authoritative description of what `/sprint-debrief` does is
+> [`.claude/commands/sprint-debrief.md`](../../.claude/commands/sprint-debrief.md).
+> The command was rewritten by the #945 D7 doc restructure (commit `28dd039a`).
+> This guide was written against the old shape and has **not** been rewritten to
+> match; it is flagged whole rather than partially refreshed.
+>
+> **What is now wrong here:**
+>
+> 1. **"Debrief is read-only. It does not write artifacts."** **False.** The
+>    debrief now writes `docs/sprints/sprint_<id>/close-out-note.md` on every run;
+>    `Write` is among the command's allowed tools. If you tell the agent it is
+>    breaking its own rules by writing that file, you will be stopping it doing
+>    exactly what it is supposed to do.
+> 2. **You will not get a nine-section message in chat.** The walkthrough goes to
+>    the close-out note **as a file**, in seven sections (Orientation · What it
+>    was for · What actually shipped · Headline findings · Impact on dependencies ·
+>    Open carry-overs · Decisions awaiting the LA). Chat gets 5–10 lines plus the
+>    path. The section numbers used throughout this guide do not map to that note,
+>    so its troubleshooting advice ("tell it: you skipped §5") is wrong — open the
+>    note instead.
+> 3. **The agent leaves the note uncommitted on purpose.** It stays a working-tree
+>    file and ships with the sprint's normal commits later — so do not expect a
+>    commit of its own at debrief time, and do not ask the agent to commit it.
+> 4. **There is no fleet to pause.** The "offer to help you pause the fleet by
+>    setting `pause_after_current` / `fleet_paused` in `state.json`" path is void:
+>    no such file exists anywhere in the repo, and the retired persona fleet it
+>    referred to has no running wake tasks to pause.
+> 5. **SCR / SWAGR / Sprint Auditor / milestone reports are retired.** The
+>    debrief's inputs are now the kickoff brief, the journal, `PERFORMANCE_LOG.md`
+>    and the real performance data, closed tickets, and git log.
+>
+> **Also:** the `claude.exe` path pinned here is version `2.1.111`, which is not
+> installed.
+>
+> Still accurate: omitting the argument defaults to the most-recently-completed
+> sprint; resume with `/sprint-debrief <N>`; start a fresh session for the next
+> kickoff.
+
 > **Who this is for**: you, the Lead Architect (LA), at the moment a sprint has just completed and you want to understand what happened and decide what to do next.
 >
 > **What you'll learn**: when a debrief is worth running, how to launch the `/sprint-debrief` slash command, how to navigate the interactive Q&A, and how to transition cleanly into the next workstream.

@@ -422,6 +422,69 @@ class TestInferenceErrors:
 
 
 # ---------------------------------------------------------------------------
+# Test: Token-count semantics (#895)
+# ---------------------------------------------------------------------------
+
+
+class TestTokenCountSemantics:
+    """#895 (residual of #806): token_count/tokens measure the think-STRIPPED
+    visible response, never the raw generated token stream.
+
+    The bare-string ``generate()`` path returns a plain ``str`` with no token
+    count, and the only pipeline-reported count
+    (``perf_metrics.get_num_generated_tokens``) would include the ``<think>``
+    reasoning + special tokens that ADR-012 strips before the turn is stored.
+    ``token_count`` drives context-window budget eviction
+    (``context_manager.add_turn`` -> ``trim_to_budget``), so it must reflect the
+    stored, stripped turn. These tests FAIL LOUDLY if the count is ever
+    re-sourced from a think-inclusive / raw generated count — the exact
+    regressing "optimization" #895 investigated and deliberately rejected.
+    """
+
+    def _run(self, raw_output: str) -> GenerationResult:
+        engine = _make_mock_engine()
+        # A real Qwen3 turn interleaves a hidden <think> block that ADR-012
+        # strips (line ~1508) before the response is counted and stored.
+        engine._pipeline.generate.return_value = raw_output
+        config = GenerationConfig(do_sample=False)
+        return engine.generate(input_ids=[1], config=config)
+
+    def test_token_count_excludes_think_block(self) -> None:
+        # _FakeTokenizer tokenizes whitespace pieces; the visible "10 20 30" is
+        # 3 tokens. The <think> block (4 pieces) must NOT be counted.
+        result = self._run("<think> 5 5 5 5 </think> 10 20 30")
+        assert result.error is None
+        assert result.text == "10 20 30"
+        assert result.tokens == [10, 20, 30]
+        assert result.token_count == 3
+
+    def test_think_block_size_does_not_change_count(self) -> None:
+        # Identical visible text -> identical count, regardless of how much the
+        # model "thought". A count sourced from the raw generated tokens would
+        # differ between these two and fail here.
+        short = self._run("<think> 9 </think> 10 20 30")
+        long = self._run("<think> 9 9 9 9 9 9 9 9 </think> 10 20 30")
+        assert short.text == long.text == "10 20 30"
+        assert short.token_count == 3
+        assert long.token_count == 3
+        assert short.token_count == long.token_count
+
+    def test_count_matches_visible_not_raw(self) -> None:
+        # Make the contrast explicit: tokenizing the RAW output yields strictly
+        # more tokens than the reported count, proving the count is post-strip.
+        raw_output = "<think> 5 5 5 5 5 5 </think> 10 20 30"
+        engine = _make_mock_engine()
+        raw_encoded = engine._tokenizer(raw_output, return_tensors="np")
+        raw_token_count = len(raw_encoded["input_ids"][0])
+        engine._pipeline.generate.return_value = raw_output
+        result = engine.generate(
+            input_ids=[1], config=GenerationConfig(do_sample=False)
+        )
+        assert result.token_count == 3
+        assert result.token_count < raw_token_count
+
+
+# ---------------------------------------------------------------------------
 # Test: Chat Template Formatting (_format_chat_prompt)
 # ---------------------------------------------------------------------------
 

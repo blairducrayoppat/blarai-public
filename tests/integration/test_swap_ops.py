@@ -967,9 +967,9 @@ def test_real_run_critic_passes_base_ref_only_when_given(tmp_path, monkeypatch):
         seen["cmd"] = list(cmd)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("VERDICT: MERGE", encoding="utf-8")
-        return True
+        return True, 0          # #1076: (ok, byte offset of THIS lap's output)
 
-    monkeypatch.setattr(so, "_run_to_logfile", fake_run)
+    monkeypatch.setattr(so, "_run_to_logfile_at", fake_run)
     cfg = _cfg(tmp_path)
 
     so.real_run_critic(cfg, "RID", "C:/app", "main", "sha-base")
@@ -1202,6 +1202,7 @@ def test_run_swap_stamps_driver_pid_into_state(tmp_path, monkeypatch):
     state = ss.read_swap_state(so.swap_state_path(cfg))
     assert state.driver_pid == os.getpid()          # THIS process was the driver
     assert state.driver_pid_created > 0.0           # psutil create-time recorded
+    assert state.driver_image != ""                 # #902: image stamp recorded too
     assert ss.driver_alive(state) is True           # and the real probe agrees it is live
 
 
@@ -1295,9 +1296,9 @@ def test_real_run_design_loop_parses_and_maps_json(tmp_path, monkeypatch):
             '"LayoutHard":false,"CaptureTier":"web","Ok":true,'
             '"RuntimeHard":true,"RuntimeCaptured":true}\n',
             encoding="utf-8")
-        return True
+        return True, 0          # #1076: (ok, byte offset of THIS lap's output)
 
-    monkeypatch.setattr(so, "_run_to_logfile", fake_logfile)
+    monkeypatch.setattr(so, "_run_to_logfile_at", fake_logfile)
     out = so.real_run_design_loop(cfg, "RID-9", "C:/proj/app", "a landing page", '["hero"]')
     # #823: the browser-runtime channel round-trips through the coercion (a captured hard hit).
     assert out == {"should_iterate": True, "needs_work": True, "feedback": "tighten the hero",
@@ -1322,9 +1323,9 @@ def test_real_run_design_loop_single_quote_escaped(tmp_path, monkeypatch):
         seen["cmd"] = cmd
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("{}", encoding="utf-8")
-        return True
+        return True, 0          # #1076: (ok, byte offset of THIS lap's output)
 
-    monkeypatch.setattr(so, "_run_to_logfile", fake_logfile)
+    monkeypatch.setattr(so, "_run_to_logfile_at", fake_logfile)
     so.real_run_design_loop(cfg, "R", "C:/proj/app", "Tony's bakery", "[]")
     joined = " ".join(seen["cmd"])
     assert "-Goal 'Tony''s bakery'" in joined            # the quote is doubled inside the arg
@@ -1333,7 +1334,8 @@ def test_real_run_design_loop_single_quote_escaped(tmp_path, monkeypatch):
 
 def test_real_run_design_loop_fail_soft_on_nonzero_exit(tmp_path, monkeypatch):
     cfg = so.build_default_config(str(tmp_path / "agentic"), str(tmp_path / "projects"))
-    monkeypatch.setattr(so, "_run_to_logfile", lambda *a, **k: False)   # non-zero exit / timeout
+    monkeypatch.setattr(so, "_run_to_logfile_at",
+                        lambda *a, **k: (False, 0))   # non-zero exit / timeout
     out = so.real_run_design_loop(cfg, "R", "C:/proj/app", "g", "[]")
     # ok=False (#740 c.1717): an unavailable critique must never read as a real,
     # satisfied review — the driver's clean-ending verdict reclass keys on ok.
@@ -1350,9 +1352,9 @@ def test_real_run_design_loop_fail_soft_on_unparseable(tmp_path, monkeypatch):
     def fake_logfile(cmd, *, log_path, timeout_s, **_kw):
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("no json on any line here\n", encoding="utf-8")
-        return True
+        return True, 0          # #1076: (ok, byte offset of THIS lap's output)
 
-    monkeypatch.setattr(so, "_run_to_logfile", fake_logfile)
+    monkeypatch.setattr(so, "_run_to_logfile_at", fake_logfile)
     out = so.real_run_design_loop(cfg, "R", "C:/proj/app", "g", "[]")
     assert out["feedback"] == "design critique unavailable"   # unparseable -> fail-soft default
     assert out["should_iterate"] is False

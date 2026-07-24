@@ -24,6 +24,21 @@ dev_mode = false  # Set to true ONLY for local development without hardware atte
 # With false: missing .sig is permitted (WARNING emitted); present-but-invalid .sig
 # is still FAIL-CLOSED.  With true: missing OR invalid .sig blocks boot entirely.
 require_signed_manifest = true
+# FUT-05 / #917: TPM-signed DRAFT-manifest verification for the STANDALONE path.
+# The PA standalone/fallback pipeline (gpu_inference._verify_draft_integrity) builds
+# its OWN speculative-decoding draft and now verifies it against its manifest before
+# load, at parity with the 14B target above. This flag is READ by that path (unlike
+# the removed #107 placeholder, which nothing read).
+#   false (dormant, shipped default): DIGEST-ONLY — the draft .sig is NOT consulted,
+#     but the digest IS enforced (a tampered draft weight is caught). An absent draft
+#     manifest loads the draft unverified but LOUDLY (WARNING), never silently.
+#   true (enforced, LA flips only after the on-chip signing ceremony): a missing OR
+#     invalid draft .sig FAILS CLOSED. Kept SEPARATE from require_signed_manifest
+#     because the draft is NON-AUTHORITATIVE (the signed 14B re-verifies every token);
+#     enforcing before the draft is signed would refuse to boot.
+# NOTE: this gates ONLY the PA standalone/fallback draft. The host-mode shared
+# pipeline's draft is gated by the AO config's own require_signed_draft_manifest.
+require_signed_draft_manifest = true
 
 # --- Audit-log segmented retention (ISS-607 / ADR-029) ---------------------
 # "Segmented keep-everything with a bounded working set": the full forensic

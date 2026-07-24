@@ -104,6 +104,55 @@ class TestClassifyServiceClass:
 
 
 # ---------------------------------------------------------------------------
+# #887 — synthetic battery/test provenance (orthogonal to class of service)
+# ---------------------------------------------------------------------------
+
+
+class TestTestClassProvenance:
+    def test_is_test_class_detects_the_label(self) -> None:
+        assert cl.is_test_class(_task(1, labels=[cl.TEST_CLASS_LABEL])) is True
+
+    def test_is_test_class_false_without_the_label(self) -> None:
+        assert cl.is_test_class(_task(1)) is False
+        assert cl.is_test_class(_task(1, labels=["Standard", "Security"])) is False
+
+    def test_is_test_class_null_labels_field_is_fail_soft(self) -> None:
+        assert cl.is_test_class({"id": 1, "labels": None}) is False
+
+    def test_orthogonal_to_class_of_service(self) -> None:
+        """A Battery/Test ticket STILL has a class of service — the provenance
+        marker never overrides classification (they are different axes)."""
+        t = _task(1, labels=[cl.TEST_CLASS_LABEL])
+        assert cl.is_test_class(t) is True
+        assert cl.classify_service_class(t) is cl.ServiceClass.STANDARD  # default
+        t2 = _task(2, labels=[cl.TEST_CLASS_LABEL, "Expedite"])
+        assert cl.is_test_class(t2) is True
+        assert cl.classify_service_class(t2) is cl.ServiceClass.EXPEDITE
+
+    def test_test_label_is_not_a_class_of_service(self) -> None:
+        assert cl.TEST_CLASS_LABEL not in {sc.value for sc in cl.ServiceClass}
+
+    def test_is_test_origin_repo_matches_battery_prefix(self) -> None:
+        assert cl.is_test_origin_repo("battery-calc") is True
+        assert cl.is_test_origin_repo("/some/projects/battery-textstats") is True
+        assert cl.is_test_origin_repo("myapp") is False
+        assert cl.is_test_origin_repo("/some/projects/myapp") is False
+
+    def test_is_test_origin_repo_fail_soft(self) -> None:
+        assert cl.is_test_origin_repo(None) is False
+        assert cl.is_test_origin_repo("") is False
+        assert cl.is_test_origin_repo("   ") is False
+
+    def test_test_origin_prefix_pinned_to_battery_plans(self) -> None:
+        """The redispatch guard's prefix and the plan-override resolver's sandbox
+        prefix must never drift — they both name the SAME synthetic sandbox
+        namespace (``battery-``)."""
+        from shared.fleet import battery_plans
+
+        assert cl.TEST_ORIGIN_REPO_PREFIX == battery_plans._SANDBOX_REPO_PREFIX
+
+
+# ---------------------------------------------------------------------------
 # board movement — the "forged done" lock
 # ---------------------------------------------------------------------------
 

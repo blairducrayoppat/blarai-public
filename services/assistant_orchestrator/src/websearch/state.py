@@ -129,6 +129,11 @@ class SearchState:
                               completes; set to an error message on failure).
         citations:            Ordered list of Citation objects referenced in
                               final_answer; empty on failure.
+        session_token:        Per-session 8-hex datamark token (#909), minted
+                              at search start and prefixed onto every line of
+                              untrusted web content in the LLM prompts so an
+                              injected instruction cannot masquerade as trusted
+                              text. None only on the degraded/test path.
     """
 
     question: str
@@ -142,3 +147,4 @@ class SearchState:
     visited_urls: set[str] = field(default_factory=set)
     final_answer: str = ""
     citations: list[Citation] = field(default_factory=list)
+    session_token: str | None = None

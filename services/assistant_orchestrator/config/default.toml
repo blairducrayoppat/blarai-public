@@ -1,6 +1,18 @@
 # Assistant Orchestrator Configuration — Default Profile
 # USE-CASE-004: Conversational Generation Engine
 # Updated: ADR-011 — GPU inference (NPU retired from P1 Core Loop)
+#
+# CEREMONY-FLAG TRUTH CONVENTION (#1060, lesson 47; gate:
+# tests/security/test_config_comment_truth.py). A flag flipped — or staged to
+# be flipped — at an LA go-live ceremony carries, directly above its
+# assignment line, a machine-checked declaration of the capabilities it gates:
+#     capabilities(<section>.<key>):
+#       <name> = <runtime-path>.py::<symbol>
+# The gate resolves every entry against the real codebase (file + symbol must
+# exist in runtime code) and fails the standing gate, by name, on a claim the
+# code does not contain. English prose is NOT machine-verified — the
+# declaration is the authoritative claim list; keep it true in the same
+# change that changes what the flag gates.
 
 [runtime]
 deployment_mode = "host"
@@ -178,6 +190,9 @@ staging_max_bytes = 262144
 # the 4th weld lock for UC-003 Workstream B (display-only images) — image fetch
 # is dormant until this is flipped AND the egress door is opened (separate LA
 # go-live ceremony).
+# capabilities(knowledge.images_enabled):
+#   image-ingest-binary-fetch = shared/security/guarded_fetch.py::fetch_external_binary
+#   image-ingest-staging = shared/security/image_staging.py::write_staged_image
 images_enabled = false
 
 [web_search]
@@ -194,7 +209,26 @@ images_enabled = false
 # flipping this back to false (+ restart) is re-weld step 1 — the runner
 # never registers. Steps 2 (empty the allowlist) and 3 (delete the key blob)
 # are each independently sufficient; see the runbook.
+# capabilities(web_search.enabled):
+#   kagi-search-adapter = services/assistant_orchestrator/src/websearch/live_adapter.py::LiveKagiAdapter
 enabled = true
+# #727 — FAIL-CLOSED response-PARSE guard (security hardening; strengthen-only,
+# no posture change). The live adapter decodes Kagi's HTTP reply with stdlib
+# json.loads, which has NO size and NO recursion-depth limit; a pathological or
+# man-in-the-middle'd response could resource-exhaust the host DURING parsing.
+# These two ADDITIVE caps are validated BEFORE json.loads and, on violation,
+# fail CLOSED to the deterministic "no results" (never a raise), logging WHY.
+# They are a SECOND, INDEPENDENT lock DOWNSTREAM of the egress door's 8 MiB
+# on-the-wire byte cap (shared/security/guarded_fetch.py _MAX_BODY_BYTES) — the
+# door bounds what crosses the network; these bound what the adapter will PARSE
+# — and are deliberately TIGHTER (a real Kagi v1 search reply is a few KB and
+# nests ~5 deep). A missing OR invalid value falls back to the safe compiled-in
+# default (live_adapter.DEFAULT_MAX_*), so the guard is NEVER silently disarmed.
+#   max_response_bytes: reject a decoded response larger than this (2 MiB = 2*1024*1024,
+#                       well under the 8 MiB door cap).
+#   max_parse_depth:    reject JSON nested deeper than this many brace/bracket levels.
+max_response_bytes = 2097152
+max_parse_depth = 12
 
 [egress]
 # ADR-023 Amendment 4 (#723 rung 3) — the turn-scoped Windows-Hello egress
@@ -222,21 +256,25 @@ fingerprint_timeout_s = 120.0
 [image_generation]
 # UC-010 Local Generative Imaging (ADR-033) — local text->image + image+text->image
 # on the Arc 140V via an uncensored SDXL-INT8 finetune (RealVisXL V5.0).
-# DORMANT: ships enabled=false AND the model is gitignored (absent), so
-# is_available() is False and nothing ever loads.  Going live is a SEPARATE
-# LA-present ceremony (one-time operator content attestation -> flip enabled ->
-# verify LIVE on the GPU), never a runtime decision (ADR-033 §dormancy/go-live).
+# Dormant default is enabled=false; the model is also gitignored, so on a checkout
+# without weights is_available() is False and nothing loads regardless of the flag.
+# Enabling it is a SEPARATE LA-present ceremony (one-time operator content
+# attestation -> flip enabled -> verify LIVE on the GPU), never a runtime decision
+# (ADR-033 §dormancy/go-live).
 # Content safety is governance + the go-live attestation, NOT a classifier:
 # uncensored for all LEGAL content; the immovable legal boundary is the
 # operator's sole documented responsibility + a deliberate ACCEPTED-RISK
 # (ADR-033 §content-safety).
+# capabilities(image_generation.enabled):
+#   text-to-image = shared/inference/image_gen.py::generate_text2image
+#   image-to-image = shared/inference/image_gen.py::generate_image2image
 enabled = true   # GO-LIVE 2026-06-16 (#666): flipped after VERIFIED TPM-signed manifest + the recorded content attestation (ledger 20260616_182807). require_signed_manifest stays true.
 # ADR-023 Amendment 4 (#723 rung 2, DORMANT seam): bounded wait (seconds) for the
 # operator's one-click answer on a per-generation-batch approval, on expiry DENIED
-# (fail-closed). UNUSED today — the in-loop generate_image is a no-op directive
-# shim (nothing to approve; it is lock-exempt), so no real model-initiated
-# generation is gated; this activates only when a real generator tool is added to
-# tools._GEN_APPROVAL_TOOLS + a verifier is registered.
+# (fail-closed). This gates only tools listed in tools._GEN_APPROVAL_TOOLS with a
+# verifier registered; `generate_image` is a directive shim that points at
+# /imagine (nothing to approve; lock-exempt), so it is not gated by this. Which
+# tools are in that set is read from tools.py, never restated here.
 tool_approval_timeout_s = 120.0
 # Model-agnostic dir (a later checkpoint swap is config, not a rewrite).  The
 # diffusers-OV INT8 layout (unet/ text_encoder*/ vae_*/ tokenizer*/ scheduler/
@@ -299,14 +337,13 @@ idle_unload_s = 60
 # stage + sign the manifest before flipping enabled. DORMANT-SAFE: verify fires
 # only when enabled=true AND the model is present, so it never engages on the
 # shipped (enabled=false, model-absent) default.
+# capabilities(image_generation.require_signed_manifest):
+#   nested-manifest-signature-gate = shared/inference/image_gen.py::_verify_weights
 require_signed_manifest = true
 # UC-010 image STYLE is selected PER REQUEST (#703): the chat command sets the
 # style on the IMAGE_GEN_REQUEST — /imagine→photoreal (the SDXL above),
 # /illustrate→flat-vector (base SDXL below, no LoRA), /cartoon→cartoon (the SAME
-# base SDXL + the flat-vector LoRA applied at RUNTIME, never fused). The
-# model_variant key below is a DEPRECATED back-compat no-op (kept only so an old
-# config still validates); it no longer selects the model.
-model_variant = "photoreal-sdxl"
+# base SDXL + the flat-vector LoRA applied at RUNTIME, never fused).
 # Illustration model — base Stable Diffusion XL 1.0, OV INT8 (#703). SHARED by
 # /illustrate (no LoRA) AND /cartoon (+ runtime LoRA). models/ is gitignored ⇒
 # absent on a clean checkout. Manifest staged by
@@ -331,11 +368,15 @@ illustration_lora_sha256 = "b4c8132f85ab7d75f5789eaf0054153a6011b505719f1253fb7d
 # coder; it calls the fleet's documented entry points (add-fleet-task.ps1 /
 # run-fleet.ps1) against the operator's OTHER project repos (the fleet refuses
 # ~/BlarAI). Local host subprocess only — NO network egress.
-# DORMANT: ships enabled=false. With this false /dispatch returns a clear disabled
-# notice and NO subprocess is ever spawned. Increment 2 adds the 14B-driven task
-# decomposition + the host-level model-swap automation (the 14B and the fleet's 30B
-# cannot co-reside — milestone 1); both stay dormant behind this same flag.
-enabled = true
+# Dormant default is false: with this false /dispatch returns a clear disabled
+# notice and NO subprocess is ever spawned. Increment 2's 14B-driven task
+# decomposition + host-level model-swap automation (the 14B and the fleet's 30B
+# cannot co-reside — milestone 1) sit behind this same flag.
+# capabilities(fleet_dispatch.enabled):
+#   enqueue-coding-task = shared/fleet/dispatch.py::enqueue_task
+#   run-fleet = shared/fleet/dispatch.py::run_fleet
+#   read-run-summary = shared/fleet/dispatch.py::read_summary
+enabled = true   # GO-LIVE 2026-06-27 (#670): flipped by 20c95530 "make the dispatch LIVE". Local subprocess only; no egress.
 
 # #819 — requirements-clarification stage. When true (the default, proven-defaults-live)
 # an interactive /dispatch whose goal is underspecified is asked a FEW targeted, plain-
@@ -357,6 +398,44 @@ clarify = true
 # lost plan). Revision is OPERATOR-INITIATED only, so a battery/headless run never revises.
 # Set false to refuse `/dispatch revise` (accept/reject unchanged). Set false to disable.
 revise = true
+
+# #1031 — the ADVANCED INTAKE front (staged specification), SLICE S1 ONLY.
+#
+# THIS COMMENT IS THE CEREMONY'S PRIMARY ARTIFACT — what the operator reads before flipping
+# the key — so it describes ONLY what the flag does today. An earlier version described the
+# whole S1–S4 programme as though S1 shipped it: the operator would have enabled "blocking
+# coverage enforcement" and a "wider interview" and received neither. Caught by independent
+# pre-merge review before the ceremony ran (#1042).
+#
+# WHAT true DOES TODAY — two deterministic rulers over the criteria list, and nothing else:
+#   1. REALISM GUARD — a criterion claiming an objective tier whose `check` is EMPTY is
+#      demoted to human-judged. ONLY the empty case: the wider ambition (demote any check
+#      "naming no runnable verification") was WITHDRAWN during review, because a substring
+#      allowlist over free-form English cannot decide runnability. Never promotes, never
+#      manufactures a check, never auto-passes.
+#   2. DELIVERY FLOOR — a web / web-static spec gains a machine-gated SMOKE criterion
+#      asserting the served page loads.
+#
+# WHAT IT DOES NOT DO — all still unbuilt (S2–S4), none of it enabled by this key:
+#   * NO wider elicitation interview — the clarify stage is untouched.
+#   * NO co-authored acceptance criteria — the criteria prompt is untouched.
+#   * NO 1:1 oracle import contract — oracle authoring is untouched.
+#   * The plan-time coverage check stays WARN-LOUD in both modes; it never blocks approval.
+#
+# WENT LIVE at the LA-present go-live ceremony 2026-07-22 (#1031), flipped from its shipped
+# default. Reverting is a full undo: set this back to false and restart, and the next plan is
+# byte-identical to the prior behaviour (demonstrated by digest across 7 scenarios), because
+# these two rulers only shape the plan at plan time and touch nothing already built. Its
+# go-live was an LA ceremony, not a proven-defaults flip, because it is a new capability on
+# the operator-facing front. Procedure of record: docs/runbooks/advanced_intake_go_live.md.
+#
+# VALIDATED, NOT COERCED (#1042): only an explicit boolean `true` enables this. A quoted
+# "false" — the shape a hand-edited rollback takes — previously coerced to TRUE and silently
+# engaged the capability; it and every other non-boolean value now resolve false.
+# capabilities(fleet_dispatch.advanced_intake):
+#   empty-check-realism-guard = shared/fleet/acceptance.py::_apply_realism_guard
+#   web-delivery-floor = shared/fleet/acceptance.py::_ensure_delivery_floor
+advanced_intake = true   # GO-LIVE 2026-07-22 (#1031): the two intake rulers act on every non-card dispatch
 
 # Increment-2 swap: pre-load headroom gate — GiB of free RAM required after BlarAI
 # fully steps aside, before the 30B is loaded. 20 GiB (LA-set 2026-07-09, #777) —
@@ -428,10 +507,16 @@ plan_graph = true
 # ONLY, never heartbeats. Loopback-only (:3456), FAIL-SOFT (a Vikunja outage
 # never affects a run), and it is dispatch-side dev tooling — the sealed AO
 # runtime grows NO new egress (the socket lives under tools/, not the runtime).
-# DEFAULT OFF until the supervised live proof; even on, an unset project id (0)
-# refuses to post.
-vikunja_bridge = false
-vikunja_bridge_project_id = 0
+# FLIPPED ON 2026-07-14 at the LA-present end-to-end supervised proof (the
+# condition it shipped gated on; same ceremony session as the heartbeat shadow
+# go-live — DECISION_REGISTER same change). Target: the "BlarAI Coder Jobs"
+# project (id 12), kanban substrate created by the operator-run
+# coordinator_setup migration. Even on, an unset project id (0) refuses to post.
+# capabilities(fleet_dispatch.vikunja_bridge):
+#   job-ticket-create = shared/fleet/vikunja_bridge.py::ensure_job_ticket
+#   job-outcome-post = shared/fleet/vikunja_bridge.py::post_outcome
+vikunja_bridge = true
+vikunja_bridge_project_id = 12
 
 # #744 guest-certified oracle (plan §10.3, the S4 residual): when true, the swap
 # driver re-runs the JOB-level acceptance oracle inside the NIC-less Alpine guest
@@ -447,7 +532,25 @@ vikunja_bridge_project_id = 0
 # directions (a passed AND a failed round-trip) before this flip. Fail-soft:
 # an unreachable guest is an honest not-run in guest-oracle.json — never a
 # verdict change, never a blocked 14B restore.
+# capabilities(fleet_dispatch.guest_oracle_enabled):
+#   guest-oracle-rerun = shared/fleet/swap_ops.py::real_run_guest_oracle
 guest_oracle_enabled = true
+
+# #1049 already-satisfied pre-check (dispatch-quality-ledger tuning candidate a):
+# when true, the swap driver grades the JOB acceptance oracle against the current
+# integrated tree BEFORE dispatching each plan-graph wave (only once at least one
+# task has merged and no wave gate has failed). A PASS records every still-pending
+# task as an HONEST SKIP — reason + oracle evidence on the task rows and
+# evidence.already_satisfied on the scorecard — and spends no coder candidate
+# (the measured 2026-07-14 seed run burned ~27 min of 30B GPU re-discovering
+# work wave 1 had already delivered). Recorded as a SKIP, never as a pass; the
+# finish-line oracle still grades the tree independently, and only its own pass
+# can make the job GREEN. FAIL-CLOSED: anything but an explicit oracle pass
+# (failed / not-run / machinery error) dispatches the wave exactly as before;
+# false = the driver never consults the pre-check seam (byte-identical legacy).
+# Battery-path instrument change — merged in its OWN attribution window per the
+# #740 cadence (docs/runbooks/battery_cadence_and_targeted_runs.md).
+already_satisfied_precheck = true
 
 # ─────────────────────────────────────────────────────────────────────────────
 # [coordinator] — the self-governance boundary + Coordinator program (ADR-039).
@@ -471,9 +574,21 @@ guest_oracle_enabled = true
 # surface is constructed and /coord returns a clear disabled notice, NEVER touching
 # Vikunja or fleet state (checked before either is reached). C1 wires the read
 # surface behind this.
-enabled = false
-# C3 (#845) bounded wake cycle. Dormant default off.
-heartbeat_enabled = false
+# FLIPPED TRUE at the LA-present go-live ceremony 2026-07-15 (#843/#878 phase 1;
+# DECISION_REGISTER same change): the READ-ONLY /coord status surface activates.
+# The graduated-autonomy ladder (enabled_auto_classes below) stays EMPTY — this
+# flip grants ZERO write/action authority.
+# capabilities(coordinator.enabled):
+#   coord-status-read-surface = shared/fleet/coord_render.py::render_status
+enabled = true
+# C3 (#845) bounded wake cycle. FLIPPED TRUE at the LA-present heartbeat shadow
+# go-live ceremony 2026-07-14 (#841/#845; DECISION_REGISTER same change): cycles
+# run every heartbeat_interval_s, ALL operator/board-visible output diverted to
+# the born-encrypted shadow journal while shadow_mode below stays true — live
+# output remains double-locked behind the separate #855 graduation ceremony.
+# capabilities(coordinator.heartbeat_enabled):
+#   heartbeat-wake-cycle = shared/coordinator/heartbeat.py::build_heartbeat
+heartbeat_enabled = true
 # ── C3 heartbeat cadence (#845, design doc §8.3/§9 — ALL inert while
 # heartbeat_enabled=false). AC-power cycle interval (seconds; registered in
 # shared/timeout_registry.py); on battery or an undeterminable power state the
@@ -488,7 +603,11 @@ heartbeat_enabled = false
 heartbeat_interval_s = 900
 heartbeat_battery_multiplier = 4
 heartbeat_boot_grace_s = 300
-overnight_window = "23:00-09:00"
+# 09:00→07:00 end (LA cadence decision 2026-07-15, #841 c.1928): the 09:00 end
+# encoded "operator sleeps to ~9", disproved by his actual schedule. Safety
+# unchanged — battery-power and swap-in-flight each independently force
+# deterministic-only regardless of this window.
+overnight_window = "23:00-07:00"
 operator_absent = false
 # C3 (#845) §7 output-router mode. true (default): every operator-visible and
 # board-visible heartbeat effect is diverted to the born-encrypted shadow journal
@@ -499,6 +618,9 @@ operator_absent = false
 # independent locks on live output (§7.1). Resolution is fail-closed toward
 # TRUE: a missing or mistyped value resolves true (shadow is the safe
 # direction); only an explicit boolean false goes live.
+# capabilities(coordinator.shadow_mode):
+#   shadow-output-diversion = shared/coordinator/output_router.py::OutputRouter
+#   shadow-journal-store = shared/coordinator/shadow_journal.py::ShadowJournal
 shadow_mode = true
 # C4 (#846) work-origination proposals. Dormant default off.
 work_origination_enabled = false
@@ -511,6 +633,8 @@ work_origination_enabled = false
 # live — is stopped fast via the SAME stop/abort machinery the budget watchdog
 # uses (teardown-inert, honest doom-stop labeling). Elapsed time alone is NEVER
 # the doom signal.
+# capabilities(coordinator.swap_doom_checks_enabled):
+#   doom-watchdog = shared/fleet/doom_check.py::run_doom_watchdog
 swap_doom_checks_enabled = false
 # Control 7 — signed policy verification (mirrors [security].require_signed_manifest).
 # false (dormant default): an unsigned/absent policy file is permitted with a WARNING,
@@ -518,6 +642,8 @@ swap_doom_checks_enabled = false
 # signature is still FAIL-CLOSED (no silent downgrade). true: a missing/invalid policy
 # signature refuses to start. The TPM-signed positive path is an operator ceremony,
 # identical in status to the weight manifest's signing.
+# capabilities(coordinator.require_signed_policy):
+#   signed-policy-verification = shared/coordinator/policy.py::verify_policy_integrity
 require_signed_policy = false
 # Path to the signed policy file (control 7). Empty (dormant default) = compiled-in
 # governed-core defaults are authoritative.
@@ -526,6 +652,8 @@ policy_path = ""
 # is propose-only until an LA go-live ceremony adds it here (each a DECISION_REGISTER
 # row + a per-class Agents-Rule-of-Two re-analysis, ADR-039 §2.10). Multi-operator
 # default: nothing an operator can click hands BlarAI a write path to itself.
+# capabilities(coordinator.enabled_auto_classes):
+#   autonomy-ladder-all-off-predicate = shared/coordinator/config.py::autonomy_all_off
 enabled_auto_classes = []
 #
 # ── C1 read-surface keys (#843, ADR-039 §2.10). READ-ONLY: `/coord status`
@@ -542,7 +670,11 @@ enabled_auto_classes = []
 # (tools/dispatch_harness/coordinator_setup.py — discover-or-create, never run by
 # BlarAI itself). TOML inline-table form, e.g.:
 #   projects = { "Coder Jobs" = 7 }
-projects = {}
+# The coordinator's observation scope (display name → Vikunja project id; ids
+# resolved by the operator, never hardcoded downstream — ADR-039 §2.12.11).
+# Set 2026-07-14 with the #749 bridge flip: the heartbeat's shadow cycles
+# observe the coder-jobs board the bridge writes.
+projects = { "Coder Jobs" = 12 }
 # An optional path to a battery-campaign-state JSON file (tri-state read —
 # shared/fleet/work_state.read_campaign_state). Empty (the default) reads as a benign
 # EMPTY, never a failure: no campaign-state file with a stable schema is produced
@@ -554,12 +686,38 @@ battery_campaign_state_path = ""
 [security]
 fail_closed = true
 dev_mode = false
+# capabilities(security.jwt_ca_cert_path):
+#   pa-jwt-signature-validation = shared/crypto/jwt_validator.py::AgenticJWTValidator
 jwt_ca_cert_path = "certs/pa_public.pem"   # ADR-021: PA JWT public key (ceremony-generated, per-chip, gitignored)
-# FUT-04 / ADR-018: TPM-signed manifest verification.  Off by default — the capability
-# is built but the LA must run the provisioning ceremony first, then flip this to true.
+# FUT-04 / ADR-018: TPM-signed manifest verification.  Dormant default is false;
+# enabling it requires the LA's provisioning ceremony to have run first.
 # With false: missing .sig is permitted (WARNING emitted); present-but-invalid .sig
 # is still FAIL-CLOSED.  With true: missing OR invalid .sig blocks boot entirely.
+# capabilities(security.require_signed_manifest):
+#   weight-manifest-signature-verification = shared/models/manifest_signer.py::verify_manifest_signature
 require_signed_manifest = true
+# FUT-05 / ADR-018 / #107: TPM-signed verification of the SPECULATIVE-DECODING
+# DRAFT manifest, kept SEPARATE from require_signed_manifest above because the
+# draft is NON-AUTHORITATIVE — in spec-decode the draft only PROPOSES tokens the
+# signed+verified 14B target re-verifies, so a tampered draft degrades SPEED, not
+# output integrity. Threaded into the launcher's shared-pipeline build
+# (build_shared_pipeline require_signed_draft) for the ONE draft the launcher
+# actually verifies (DRAFT_MODEL_OV_PATH = qwen3-0.6b-pruned-6l). This flag lives
+# ONLY in this (AO) config — the launcher reads it here; a copy in the PA config
+# would be read by nothing. The PA standalone/fallback draft is out of scope (no
+# verifier), tracked in #917.
+# Dormant default (false): the draft is DIGEST-verified only (the .sig is NOT
+# consulted; the digest is still enforced, so a tampered draft weight is caught) —
+# boot-safe on an UNSIGNED draft. With true: a missing OR invalid draft .sig fails
+# closed (parity with require_signed_manifest for the 14B).
+# Enabling it (LA ceremony, after the 14B pattern): (1) stage+sign the 14B + this
+# draft with the SAME BlarAI-Manifest-Signing key —
+#   python -m shared.security.provision_manifest_signing_key; (2) verify on-chip;
+#   (3) flip this to true. Enforcing this on a still-unsigned draft would break
+# boot, which is exactly why it is a SEPARATE flag from the 14B's, flipped later.
+# capabilities(security.require_signed_draft_manifest):
+#   draft-manifest-signature-gate = shared/inference/shared_pipeline.py::build_shared_pipeline
+require_signed_draft_manifest = true   # GO-LIVE 2026-07-18 (#107): flipped by 6fbfc67f after the draft was staged+signed on-chip; missing OR invalid draft .sig now blocks boot.
 
 [ipc]
 vsock_cid = 2

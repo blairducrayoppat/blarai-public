@@ -175,9 +175,19 @@ class TestDormancy:
         err = validate_repo(bad, projects)
         assert err is not None and "forbidden" in err
 
-    def test_shipped_toml_coordinator_section_is_all_off(self) -> None:
-        """The ``[coordinator]`` section shipped in default.toml resolves fully off —
-        the dormant surface is documented but grants nothing."""
+    def test_shipped_toml_coordinator_posture(self) -> None:
+        """The shipped ``[coordinator]`` posture — the go-live tripwire.
+
+        Pre-2026-07-14 this asserted ALL-off. Two sanctioned flips since, each
+        an LA-present ceremony with a DECISION_REGISTER row in the same change:
+        ``heartbeat_enabled`` TRUE (2026-07-14 heartbeat shadow go-live; shadow
+        cycles run with ``shadow_mode = true`` — locked by its own test above —
+        keeping every operator/board-visible effect in the born-encrypted
+        journal until the separate #855 graduation ceremony), and ``enabled``
+        TRUE (2026-07-15 /coord read-surface go-live, #843/#878 phase 1 — the
+        READ-ONLY status compose; grants zero write/action authority, the
+        autonomy ladder stays empty). EVERYTHING ELSE stays off: any other flag
+        going true in the shipped file fails here until its own ceremony."""
         toml_path = (
             repo_root_from_module()
             / "services"
@@ -186,11 +196,13 @@ class TestDormancy:
             / "default.toml"
         )
         data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
-        assert "coordinator" in data, "the dormant [coordinator] section should be documented"
+        assert "coordinator" in data, "the [coordinator] section should be documented"
         cfg = CoordinatorConfig.from_toml(data["coordinator"])
-        assert cfg.enabled is False
-        assert cfg.heartbeat_enabled is False
+        assert cfg.enabled is True  # the 2026-07-15 /coord read-surface ceremony flip
+        assert cfg.heartbeat_enabled is True  # the 2026-07-14 ceremony flip
+        assert cfg.shadow_mode is True  # the #855 lock — live output still welded
         assert cfg.work_origination_enabled is False
         assert cfg.swap_doom_checks_enabled is False
         assert cfg.require_signed_policy is False
+        assert cfg.operator_absent is False
         assert cfg.autonomy_all_off() is True

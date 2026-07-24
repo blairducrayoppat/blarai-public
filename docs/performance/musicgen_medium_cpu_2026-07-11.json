@@ -1,0 +1,37 @@
+{
+  "date": "2026-07-11",
+  "context": "BlarAI vision-trailer dev-side prototype (docs/handoffs/trailer-music-capability-handoff-20260711.md) — local MusicGen generation trial informing the #858 Cinematic Studio music-tier decision. Scratch tooling only (scratchpad/gen_music.py); not a BlarAI runtime capability.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Arc 140V (Xe2) — NOT used, this run is the CPU-only leg",
+    "ram_gb": 32
+  },
+  "software": {
+    "python": "3.11 (isolated venv, scratchpad/musicgen/venv)",
+    "torch": "2.13.0+cpu",
+    "transformers": "5.13.1",
+    "numpy": "2.4.6",
+    "soundfile": "0.14.0",
+    "backend": "HuggingFace transformers.MusicgenForConditionalGeneration, device=cpu, threads=8 (default)"
+  },
+  "model": "facebook/musicgen-medium",
+  "methodology": "Single 15s clip, seed=42, guidance_scale=3.0 (default), do_sample=True, prompt='epic cinematic trailer score, sweeping orchestral strings, heroic brass, building percussion, tension and triumph'. Model loaded fresh (cold cache already warm on disk from a prior download); one generation call, no batching.",
+  "results": {
+    "model_load_s": 4.5,
+    "target_audio_s": 15.0,
+    "actual_audio_s": 14.9,
+    "compute_s": 1073.5,
+    "rate_s_audio_per_min_compute": 0.83
+  },
+  "comparison_prior": {
+    "musicgen_small_cpu": "prior dev-side smoke test (not re-measured to this rigor) suggested roughly ~2 s-audio/min-compute on the same box; medium is markedly slower, consistent with its larger parameter count"
+  },
+  "implication": "At 0.83 s-audio/min-compute, a full ~90s cinematic track would cost roughly 108 minutes of CPU compute — impractical for iterative use. The Arc/OpenVINO GPU export path (optimum-cli export openvino --model facebook/musicgen-<tier> --weight-format int8, then device=GPU) is required for production-viable generation of the full track, not merely an optimization.",
+  "not_measured": [
+    "musicgen-medium (or any tier) on Arc 140V via OpenVINO INT8/INT4",
+    "musicgen-large tier (fits disk at ~13GB but not attempted here, CPU impractical)",
+    "co-resident 14B / OVMS contention during generation",
+    "perceptual quality A/B judgment (operator's call, sample delivered same session)",
+    "multi-seed variance (single seed=42 run only)"
+  ]
+}

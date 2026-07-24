@@ -172,6 +172,76 @@ def test_enqueue_fails_when_script_missing(tmp_path):
     assert not res.ok and "not installed" in res.message
 
 
+def _capture_run(seen: dict):
+    """A subprocess.run stub that records the argv and returns success."""
+
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd
+
+        class _R:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return _R()
+
+    return fake_run
+
+
+def test_enqueue_forwards_rich_plan_fields(tmp_path, monkeypatch):
+    # #698: the deterministic enqueue path must carry the rich PLAN-time signal —
+    # the build signal (surface/complexity/language_hint), the VLM-critique inputs
+    # (goal/visual_criteria_json), and the #690 shared acceptance oracle
+    # (acceptance_test_code/acceptance_test_path) — not just {repo,task,prompt,model}.
+    # Each field forwards to add-fleet-task.ps1 under the -Param name that writes the
+    # queue key run-fleet.ps1 reads. Mocked subprocess: this locks BlarAI's half of
+    # the cross-repo contract (the queue-write + the run-fleet read are locked on the
+    # agentic-setup side).
+    cfg = _cfg(tmp_path)
+    repo = _make_repo(cfg)
+    seen: dict = {}
+    monkeypatch.setattr(subprocess, "run", _capture_run(seen))
+    res = enqueue_task(
+        str(repo), "make-calc", "Build a calculator.", config=cfg,
+        model="qwen", surface="desktop-gui", complexity="moderate",
+        language_hint="python", goal="a calculator that looks like a rocket",
+        visual_criteria_json='["the buttons are large"]',
+        acceptance_test_code="def test_it():\n    assert add(2, 2) == 4\n",
+        acceptance_test_path="tests/test_acceptance.py",
+    )
+    assert res.ok, res.message
+    cmd = seen["cmd"]
+    # Each flag is present AND immediately followed by its exact value.
+    for flag, value in [
+        ("-Model", "qwen"),
+        ("-Surface", "desktop-gui"),
+        ("-Complexity", "moderate"),
+        ("-LanguageHint", "python"),
+        ("-Goal", "a calculator that looks like a rocket"),
+        ("-VisualCriteriaJson", '["the buttons are large"]'),
+        ("-AcceptanceTestCode", "def test_it():\n    assert add(2, 2) == 4\n"),
+        ("-AcceptanceTestPath", "tests/test_acceptance.py"),
+    ]:
+        assert flag in cmd, f"{flag} missing from enqueue cmd"
+        assert cmd[cmd.index(flag) + 1] == value, f"{flag} value not adjacent in cmd"
+
+
+def test_enqueue_omits_absent_rich_fields(tmp_path, monkeypatch):
+    # #698: an empty field is OMITTED — a bare enqueue stays byte-identical to the
+    # pre-#698 {repo,task,prompt,queue} cmd, so the dormant helper's default path is
+    # unchanged. Guards against a regression that always emits empty -Flag '' pairs.
+    cfg = _cfg(tmp_path)
+    repo = _make_repo(cfg)
+    seen: dict = {}
+    monkeypatch.setattr(subprocess, "run", _capture_run(seen))
+    res = enqueue_task(str(repo), "t", "p", config=cfg)
+    assert res.ok, res.message
+    cmd = seen["cmd"]
+    for flag in ("-Model", "-Surface", "-Complexity", "-LanguageHint", "-Goal",
+                 "-VisualCriteriaJson", "-AcceptanceTestCode", "-AcceptanceTestPath"):
+        assert flag not in cmd, f"{flag} should be omitted when its field is empty"
+
+
 # ---- run_fleet (mocked Popen) ---------------------------------------------
 
 
@@ -254,6 +324,54 @@ def test_latest_run_id(tmp_path):
     (cfg.runs_dir / "20260101-000000-bd").mkdir()
     (cfg.runs_dir / "20260102-000000-bd").mkdir()
     assert latest_run_id(config=cfg) == "20260102-000000-bd"
+
+
+def test_latest_run_id_ignores_non_run_shaped_dirs(tmp_path):
+    """#881 regression (2026-07-14): letter-named scratch in runs_dir
+    (selftest-*/regr-*) outsorts every timestamp name forever and blinded the
+    coordinator's whole latest-run view. A foreign dir must NEVER win."""
+    cfg = _cfg(tmp_path)
+    (cfg.runs_dir / "20260714-191219-bd").mkdir()
+    (cfg.runs_dir / "20260713-003141-bd-flakererun").mkdir()  # scratch, excluded
+    (cfg.runs_dir / "selftest-8df957").mkdir()
+    (cfg.runs_dir / "regr-f8dcef").mkdir()
+    (cfg.runs_dir / "live-negatives-20260706-000634").mkdir()
+    assert latest_run_id(config=cfg) == "20260714-191219-bd"
+
+
+def test_latest_run_id_skips_flakererun_sibling_of_the_newest_run(tmp_path):
+    """#953 regression (2026-07-19, #881's sibling): the oracle-flake scratch
+    dir ``<run>-bd-flakererun`` shares its base run's timestamp prefix, so
+    under the old PREFIX shape-match it WON the lexical sort — and, carrying
+    no scorecard and no SUMMARY.txt, read as still-running forever. Proven
+    live: B4-class runs invisible to harvest two nights running. The sibling
+    must never outrank its own base run."""
+    cfg = _cfg(tmp_path)
+    (cfg.runs_dir / "20260719-002208-bd").mkdir()
+    (cfg.runs_dir / "20260719-002208-bd-flakererun").mkdir()
+    (cfg.runs_dir / "20260718-230141-bd").mkdir()
+    assert latest_run_id(config=cfg) == "20260719-002208-bd"
+
+
+def test_run_id_shape_matches_what_the_minter_mints(tmp_path):
+    """#953 drift lock: the reader's shape gate is bound to ``new_run_id()`` —
+    a future mint-suffix change that the anchored pattern would not resolve
+    fails HERE at the gate, not silently in production as harvest blindness."""
+    from shared.fleet.dispatch import _RUN_ID_SHAPE, new_run_id
+
+    assert _RUN_ID_SHAPE.match(new_run_id())
+    # Legacy pre-M2 bare-timestamp dirs must stay resolvable too.
+    assert _RUN_ID_SHAPE.match("20260614-220041")
+    # The scratch sibling shape must NOT be resolvable.
+    assert not _RUN_ID_SHAPE.match("20260719-002208-bd-flakererun")
+
+
+def test_latest_run_id_none_when_only_foreign_dirs(tmp_path):
+    """#881: an all-scratch runs_dir means NO run has ever happened — never
+    report scratch as a run."""
+    cfg = _cfg(tmp_path)
+    (cfg.runs_dir / "selftest-8df957").mkdir()
+    assert latest_run_id(config=cfg) is None
 
 
 def test_slugify_task():

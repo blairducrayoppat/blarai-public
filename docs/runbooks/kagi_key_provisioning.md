@@ -123,18 +123,94 @@ It is:
 
 ## 4. Fail-Closed Behaviour
 
-The web-search skill worker calls `load_kagi_api_key()` at startup.  The
-fail-closed contract is:
+There is **no separate web-search worker process**. The key is loaded once during
+Assistant-Orchestrator boot, and what a missing or unusable key stops is the
+*registration of the web_search runner* — not the service.
+
+The shipped contract lives in `_maybe_register_web_search`
+(`services/assistant_orchestrator/src/entrypoint.py:5548`, called at `:1640`).
+It loads the key via `load_wrapped_kagi_key()`
+(`shared/secrets/kagi_key_loader.py:105`), which **catches every load failure and
+returns `None`** — "every load failure is dormancy, never a crash". So the
+`KagiKey*` exceptions below are raised by the underlying store
+(`shared/secrets/dpapi_store.py`) but never reach the caller:
 
 | Condition | Behaviour |
 |---|---|
-| Blob file absent | `KagiKeyNotProvisioned` raised; worker refuses to start |
-| DPAPI decryption fails (wrong user / machine / corrupt blob) | `KagiKeyDecryptError` raised; worker refuses to start |
-| `pywin32` not available (non-Windows environment) | `RuntimeError` raised at the first call; no silent fallback |
+| Blob file absent | `KagiKeyNotProvisioned` raised internally, swallowed; loader returns `None`, so the live runner is **not registered**. The AO boots normally with web_search **structurally dormant** — a `web_search` call returns the deterministic "unavailable" notice. |
+| DPAPI decryption fails (wrong user / machine / corrupt blob) | `KagiKeyDecryptError` raised internally, swallowed; same outcome — not registered, AO boots, web_search dormant. |
+| `[web_search].enabled` is `false` | Runner not registered regardless of the key. Either condition missing is sufficient. |
+| `pywin32` not available (non-Windows environment) | `RuntimeError` from the store; also swallowed on this path. No silent *fallback* — the outcome is dormancy, not a degraded live runner. |
 
-There is no soft-degradation path.  The worker does not start in a degraded mode
-without the key.  This mirrors the fail-closed posture of the Policy Agent's TPM
-signing-key check (ADR-021).
+Practical consequence: **a bad key produces no error banner at boot.** It looks
+like a healthy AO in which web search happens to be unavailable. Diagnose it by
+the "unavailable" notice, and by the load-failure line in the log (which records
+the exception type only, never key material).
+
+> **Do not read "the AO still boots" as a soft-degradation path.** It is the
+> opposite: the failure mode is *structural absence* — the runner object is never
+> registered, so with no usable key there is no code path from the model to the
+> network at all. That is a stronger posture than a registered-but-erroring
+> runner, not a weaker one.
+>
+> What is **not** true is that the service refuses to start. Earlier revisions of
+> this runbook said the worker "refuses to start"; it does not, and an operator
+> who provisions a bad key should expect a healthy AO with web search quietly
+> unavailable, **not** a boot failure. If you are diagnosing a missing key, look
+> for the dormant-notice behaviour, not for a crash.
+
+> **Be clear about what is open today: with a valid key, this reaches the
+> internet.** Do not read the fail-closed language above as "egress is still
+> welded" — it is not. The ADR-027 egress allowlist was **activated on 2026-07-02**
+> at the web_search go-live ceremony and holds one standing entry, `kagi.com`
+> (`_EGRESS_ALLOWLIST = frozenset({"kagi.com"})`,
+> `services/policy_agent/src/gpu_inference.py`), read by both egress layers — the
+> tool-loop dispatch check and the `guarded_fetch` door.
+>
+> So the live posture is: for `web_search`, `kagi.com` is the only reachable host —
+> RULE 3 denies every other one — and a `web_search` with a provisioned key does
+> make a real outbound request to Kagi, **gated by the fingerprint envelope
+> described below** (which covers a bounded window of queries per touch, not each
+> query individually — read the next paragraph, the distinction matters).
+>
+> Two precision notes, because a flat "everything else is blocked" would be too
+> strong. RULE 3 is allowlist-*parameterised*, not a fixed block: the `/ingest`
+> path supplies its own one-entry allowlist built from the URL you pasted, so for
+> that path RULE 3 approves the host you chose. That is the design, and it is
+> dormant at rest (`[guest_parser].enabled = false`). The universal-deny statement
+> above is therefore about the `web_search` path specifically.
+>
+> **The key is necessary but not sufficient.** A third, independent lock sits in
+> front of every model-initiated outbound call: the turn-scoped Windows-Hello
+> egress envelope (`[egress]` in the AO config, ADR-023 Amendment 4). It has no
+> enable flag — it is always on. On the first egress of a turn a fingerprint
+> prompt fires showing the exact query; one touch covers up to
+> `searches_per_fingerprint` (default 3) searches for that question, and every
+> subsequent query is disclosed live in chat as it leaves. It is fail-closed: no
+> verifier, a cancel, or a timeout (`fingerprint_timeout_s = 120.0`) refuses the
+> egress and ends the turn with nothing sent. It runs **in addition to** the
+> deterministic controls above, never instead of them.
+>
+> So provisioning a key here does not silently open the network: **no
+> model-initiated web search leaves this machine without either a fingerprint on
+> that exact query, or a live in-chat disclosure under a window you already
+> fingerprinted** — bounded at `searches_per_fingerprint` (default 3). Be precise
+> about what that means: you fingerprint the *first* query of a turn and see it
+> in the dialog; the 2nd and 3rd leave on that one touch, each disclosed in chat
+> as it goes, with no second prompt. Set `searches_per_fingerprint = 1` if you
+> want a fingerprint on literally every outbound query.
+>
+> That is the scope of the guarantee, and it is deliberately not broader —
+> operator-typed egress (`/ingest <url>`) is consented by the act of pasting the
+> URL, not by a fingerprint (ADR-027 Amendment 1 rejected a Hello prompt there as
+> merely re-confirming intent you already expressed). That path is dormant at
+> rest behind `[guest_parser].enabled = false`. The `--probe` diagnostic also
+> reaches Kagi without the envelope; it is operator-run. Those three — the
+> envelope-gated `web_search`, `/ingest`, and `--probe` — are the only paths in
+> shipped runtime code that reach the network.
+>
+> The re-weld procedure (removing the allowlist entry) is in
+> `docs/runbooks/web_search_go_live.md`.
 
 ---
 
@@ -152,18 +228,27 @@ The script will:
 3. Verify the round-trip with the new key.
 4. Report success without echoing the key.
 
-No restart of already-running workers is required if the worker re-reads the key
-at each call (which the design prescribes — keys are not cached in module-level
-variables).  If the worker caches the key at startup, restart it after rotation.
+> **Rotation requires a restart of the Assistant Orchestrator.** The key is read
+> once at boot and captured by the live adapter at construction
+> (`services/assistant_orchestrator/src/websearch/live_adapter.py:254-262` takes
+> `api_key: KagiApiKey` and stores it as `self._api_key`); every request then uses
+> that held value. It is **not** re-read per call.
+>
+> So overwriting the blob does nothing to a running AO — it will keep presenting
+> the old key to Kagi until it is restarted. After rotating, restart the backend
+> and confirm a search works. (An earlier revision of this runbook said no restart
+> was needed "if the worker re-reads the key at each call, which the design
+> prescribes". The shipped adapter does not do that.)
 
 To revoke a key without replacing it (emergency revocation):
 1. Revoke the token in the Kagi API management panel (Settings → API → delete
    the token).
 2. The blob on disk becomes inert — it decrypts to a revoked key that Kagi will
    reject.
-3. Optionally delete the blob file to trigger `KagiKeyNotProvisioned` on the
-   next worker start, which makes the revocation observable at the BlarAI level
-   as well.
+3. Optionally delete the blob file. On the next AO restart the live runner is
+   then not registered at all (§4), so web_search goes structurally dormant —
+   which makes the revocation observable at the BlarAI level as well. Note this
+   takes effect at the **restart**, not the moment you delete the file.
 
 ---
 

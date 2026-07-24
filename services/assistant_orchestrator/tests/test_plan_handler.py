@@ -52,13 +52,17 @@ class _PlanHarness:
     a stub resolved-config.
     """
 
-    def __init__(self, fake_gen, projects_root, *, enabled=True, clarify=True, revise=True) -> None:
+    def __init__(self, fake_gen, projects_root, *, enabled=True, clarify=True, revise=True,
+                 advanced_intake=False) -> None:
         self._framer = MessageFramer()
         self._fake_gen = fake_gen
         self._resolved_config = SimpleNamespace(
             fleet_dispatch_enabled=enabled,
             fleet_dispatch_clarify_enabled=clarify,
             fleet_dispatch_revise_enabled=revise,
+            # #1031: dormant default here too — the harness must mirror production's
+            # fail-closed posture, or a wiring regression would pass unnoticed.
+            fleet_dispatch_advanced_intake_enabled=advanced_intake,
             fleet_dispatch_agentic_setup_dir="",
             fleet_dispatch_projects_dir=str(projects_root),
         )
@@ -74,6 +78,9 @@ class _PlanHarness:
     )
     fleet_dispatch_revise_enabled = (
         AssistantOrchestratorService.fleet_dispatch_revise_enabled
+    )
+    fleet_dispatch_advanced_intake_enabled = (
+        AssistantOrchestratorService.fleet_dispatch_advanced_intake_enabled
     )
     fleet_dispatch_agentic_setup_dir = (
         AssistantOrchestratorService.fleet_dispatch_agentic_setup_dir
@@ -369,3 +376,180 @@ def test_plan_handler_normal_goal_has_no_revision(tmp_path):
     assert h._handle_plan_request(t, "rid1", {"repo": repo, "goal": "a calculator"})
     payload = h._framer.decode_plan_result(t.sent[0])
     assert payload["ok"] is True and payload["revision"] == [] and payload["tasks"]
+
+
+# ---------------------------------------------------------------------------
+# #1031 S1 — the advanced-intake flag's REACHABILITY through the real handler.
+#
+# The spec-floor behaviour itself is unit-tested in shared/tests/test_advanced_intake.py.
+# What these two pin is the thing unit tests structurally cannot: that the config flag
+# actually ARRIVES at generate_plan. A flag defined, parsed, and resolved but never threaded
+# is the built-but-wired-into-nothing class — it would leave every behaviour test green while
+# the operator-facing feature did nothing at all.
+# ---------------------------------------------------------------------------
+
+
+def _web_gen(prompt: str) -> str:
+    """A 14B stand-in for a WEB product — the surface the delivery floor keys on.
+
+    Deliberately emits a criterion CLAIMING build tier with an EMPTY check, so both S1
+    rulers have something to act on: the realism guard should demote it, and the delivery
+    floor should then add a real machine-gated delivery criterion."""
+    if "ACCEPTANCE CRITERIA" in prompt:
+        return json.dumps([{"text": "the project builds", "tier": "build", "check": ""}])
+    if "Classify what KIND of software" in prompt:
+        return json.dumps({"surface": "web", "candidates": [], "language_hint": None,
+                           "complexity": "simple", "components": []})
+    return json.dumps([{"task": "build-page", "prompt": "build the page"}])
+
+
+def _criteria_of(payload):
+    return payload["criteria"]["criteria"]
+
+
+def test_advanced_intake_flag_reaches_generate_plan(tmp_path):
+    """Flag ON at the CONFIG layer ⇒ the spec that comes back out of the handler carries
+    the delivery floor. This is the wiring proof, not a behaviour proof."""
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_web_gen, projects, advanced_intake=True)
+    t = _FakeTransport()
+    assert h._handle_plan_request(t, "rid-ai-on", {"repo": repo, "goal": "a habit tracker page"})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    assert payload["ok"] is True
+    criteria = _criteria_of(payload)
+    assert any(c["tier"] == "smoke" and "loads" in c["text"].lower() for c in criteria), \
+        "advanced_intake=True did not reach generate_plan — the delivery floor never fired"
+    assert not any(c["tier"] == "build" for c in criteria), \
+        "the empty-check build criterion should have been demoted by the realism guard"
+
+
+def test_advanced_intake_defaults_off_through_the_handler(tmp_path):
+    """The toggle-off half, at the wiring layer: the harness's DEFAULT is dormant (mirroring
+    production), and the spec is then today's — no floor, and the weak criterion keeps its
+    claimed build tier. Without this, the test above could pass on unconditional behaviour."""
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    h = _PlanHarness(_web_gen, projects)  # no advanced_intake= ⇒ dormant, as in production
+    t = _FakeTransport()
+    assert h._handle_plan_request(t, "rid-ai-off", {"repo": repo, "goal": "a habit tracker page"})
+    payload = h._framer.decode_plan_result(t.sent[0])
+    criteria = _criteria_of(payload)
+    assert any(c["tier"] == "build" for c in criteria)
+    assert not any(c["tier"] == "smoke" and "loads" in c["text"].lower() for c in criteria)
+
+
+# ---------------------------------------------------------------------------
+# #1042 — the DORMANCY locks. The pre-merge review found all three "fail-closed
+# default sites" unlocked: mutants flipping the dataclass default, the TOML parse
+# default, and both resolved-property fallbacks each turned the capability ON and
+# the whole 39-test suite stayed green. `_PlanHarness` cannot reach them — it builds
+# a SimpleNamespace where the attribute is always present and `_resolved_config` is
+# never None, so the test above pins the HARNESS's Python default argument, not any
+# production default. It is a real WIRING lock; it was never a DORMANCY lock.
+#
+# For a branch whose entire justification for merging now is "it ships DORMANT behind
+# a config flag", the dormancy IS the control — and `<security_by_design>` 12 requires
+# every control ship with a proof it fails when disengaged.
+# ---------------------------------------------------------------------------
+
+
+def _config_tree(tmp_path, *, advanced_intake_line: "str | None"):
+    """A real shipped default.toml copied into the nesting `_load_entrypoint_config`
+    expects (`<root>/services/assistant_orchestrator/config/default.toml`), with the
+    advanced_intake line REPLACED or REMOVED. Driving the real loader over a real file
+    is the point: a stub would reproduce exactly the blind spot this closes."""
+    import re
+    from pathlib import Path
+
+    real = Path(__file__).resolve().parents[1] / "config" / "default.toml"
+    text = real.read_text(encoding="utf-8")
+    pattern = re.compile(r"^advanced_intake\s*=.*$", re.M)
+    assert pattern.search(text), "advanced_intake key missing from the shipped config"
+    text = pattern.sub("", text) if advanced_intake_line is None else pattern.sub(
+        advanced_intake_line, text)
+
+    cfg_dir = tmp_path / "services" / "assistant_orchestrator" / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    dest = cfg_dir / "default.toml"
+    dest.write_text(text, encoding="utf-8")
+    return dest
+
+
+def _resolve_advanced_intake(tmp_path, advanced_intake_line):
+    """Run the REAL `_load_entrypoint_config` over that tree and return the resolved flag."""
+    from shared.runtime_config import resolve_deployment_mode
+
+    cfg_path = _config_tree(tmp_path, advanced_intake_line=advanced_intake_line)
+    # A minimal stand-in carrying exactly the attributes _load_entrypoint_config reads —
+    # the same unbound-method binding the rest of this file uses. Everything security- or
+    # path-related is bound to the REAL methods so nothing about the parse is faked; only
+    # the config PATH is redirected.
+    svc = SimpleNamespace(
+        _deployment_mode=resolve_deployment_mode("host"),
+        _dev_mode_override=None,
+    )
+    svc._resolve_config_path = lambda: cfg_path
+    svc._validate_config_data = (
+        lambda data, path: AssistantOrchestratorService._validate_config_data(svc, data, path))
+    svc._resolve_path = AssistantOrchestratorService._resolve_path  # staticmethod
+    svc._validate_security_material = lambda *a, **k: None  # cert/key material is not under test
+    loaded = AssistantOrchestratorService._load_entrypoint_config(svc)
+    return loaded.fleet_dispatch_advanced_intake_enabled
+
+
+def test_dormancy_dataclass_default_is_false():
+    """Site 1 of 3 — the dataclass field default. Mutant M26 flipped this to True and the
+    whole suite stayed green."""
+    from services.assistant_orchestrator.src.entrypoint import (
+        AssistantOrchestratorEntrypointConfig,
+    )
+
+    field = AssistantOrchestratorEntrypointConfig.__dataclass_fields__[
+        "fleet_dispatch_advanced_intake_enabled"]
+    assert field.default is False
+
+
+def test_dormancy_toml_parse_resolves_false_for_absent_and_for_garbage(tmp_path):
+    """Sites 2 — the TOML parse, driven through the REAL loader over a REAL shipped config.
+
+    The absent-key half is what the branch always claimed. The garbage half is the defect
+    the review found: `bool()` COERCES, `_validate_config_data` type-checks zero
+    [fleet_dispatch] keys, so `advanced_intake = "false"` — the shape a hand-edited rollback
+    takes — resolved TRUE and silently engaged a ceremony-gated capability."""
+    assert _resolve_advanced_intake(tmp_path, None) is False              # key absent
+    assert _resolve_advanced_intake(tmp_path, "advanced_intake = false") is False  # shipped
+    assert _resolve_advanced_intake(tmp_path, "advanced_intake = true") is True    # the only ON
+
+    # Every one of these resolved TRUE before #1042. None may engage the front.
+    for line in (
+        'advanced_intake = "false"',
+        'advanced_intake = "0"',
+        'advanced_intake = "off"',
+        'advanced_intake = "no"',
+        "advanced_intake = 1",
+        "advanced_intake = [false]",
+        'advanced_intake = "true"',   # even the truthy-LOOKING string is not a boolean
+    ):
+        assert _resolve_advanced_intake(tmp_path, line) is False, f"FAIL-OPEN on: {line}"
+
+
+def test_dormancy_resolved_property_fallbacks_are_false():
+    """Site 3 — both resolved-property fallbacks. Mutant M24 flipped them to True and
+    survived. Covers: no resolved config at all (a pre-start() read), and a resolved config
+    that lacks the attribute entirely."""
+    prop = AssistantOrchestratorService.fleet_dispatch_advanced_intake_enabled.fget
+
+    svc = SimpleNamespace(_resolved_config=None)
+    assert prop(svc) is False                                   # pre-start()
+
+    svc = SimpleNamespace(_resolved_config=SimpleNamespace())
+    assert prop(svc) is False                                   # attribute absent
+
+    # And the property validates rather than coerces, like the parse site.
+    svc = SimpleNamespace(_resolved_config=SimpleNamespace(
+        fleet_dispatch_advanced_intake_enabled="false"))
+    assert prop(svc) is False
+    svc = SimpleNamespace(_resolved_config=SimpleNamespace(
+        fleet_dispatch_advanced_intake_enabled=True))
+    assert prop(svc) is True

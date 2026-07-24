@@ -2,7 +2,7 @@
 
 **Purpose**: Keep BlarAI development moving when Claude Code's Bash tool or direct git access degrades.
 
-**Source of authority**: Friction point §5.10 (`docs/CLAUDE_WORKFLOW_OPTIMIZATION_D7.md`) and environmental note in `docs/CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml` §12. First documented during v2.0 Configuration Agent session (F-3 incident, ledger Entry 43 era); reconfirmed during Domain 7 session when Bash became silently non-responsive.
+**Source of authority**: Friction point §5.10 (`devplatform\docs\CLAUDE_WORKFLOW_OPTIMIZATION_D7.md`) and environmental note in `devplatform\docs\CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml` §12. **Both live in the devplatform repo (`C:\Users\mrbla\devplatform`), not in BlarAI** — they moved with the platform extraction (`3e73484a`, 2026-04-30), and devplatform is being sunset, so treat them as historical reference. First documented during v2.0 Configuration Agent session (F-3 incident, ledger Entry 43 era); reconfirmed during Domain 7 session when Bash became silently non-responsive.
 
 **When to apply**: the Claude Code Bash tool exits non-zero with no output, or git invocations fail with `ENOENT` / `not recognized`, or any F-3-class fork error surfaces (`dofork child -1 / 0xC0000142 / errno 11`).
 
@@ -13,7 +13,7 @@
 | Symptom | Likely cause |
 |---|---|
 | Bash tool exits 1 with no output on `pwd` / `ls` / `git status` | Harness-level Bash failure; possibly F-3 class |
-| `dofork child -1 / 0xC0000142 / errno 11` in Bash output | F-3 — Cygwin/MSYS2 fork error (see [F3_BASH_FORK_ERROR_RUNBOOK.md](../F3_BASH_FORK_ERROR_RUNBOOK.md)) |
+| `dofork child -1 / 0xC0000142 / errno 11` in Bash output | F-3 — Cygwin/MSYS2 fork error (see [F3_BASH_FORK_ERROR_RUNBOOK.md](../archive/2026/phase5-prompts/F3_BASH_FORK_ERROR_RUNBOOK.md)) |
 | `git: The term 'git' is not recognized` in PowerShell | Canonical `C:\Program Files\Git\cmd\git.exe` missing from PATH or uninstalled |
 | `spawn C:\Program Files\Git\cmd\git.exe ENOENT` in VS Code Source Control errors | Same — Git for Windows binary absent from canonical path |
 
@@ -83,7 +83,7 @@ If the Agent's environment can reach a git binary — even if Bash is broken —
 | Priority | Binary | Path | When to use |
 |---|---|---|---|
 | 1 | Git for Windows (canonical) | `C:\Program Files\Git\cmd\git.exe` | First choice. The canonical install. Version 2.54.0 as of 2026-04-20. |
-| 2 | GitHub Desktop's bundled git | `C:\Users\mrbla\AppData\Local\GitHubDesktop\app-<version>\resources\app\git\cmd\git.exe` | Fallback if (1) is missing or unreachable. Legitimate install mentioned in [F3_BASH_FORK_ERROR_RUNBOOK.md](../F3_BASH_FORK_ERROR_RUNBOOK.md) §8. |
+| 2 | GitHub Desktop's bundled git | `C:\Users\mrbla\AppData\Local\GitHubDesktop\app-<version>\resources\app\git\cmd\git.exe` | Fallback if (1) is missing or unreachable. Legitimate install mentioned in [F3_BASH_FORK_ERROR_RUNBOOK.md](../archive/2026/phase5-prompts/F3_BASH_FORK_ERROR_RUNBOOK.md) §8. |
 | 3 | WSL bash + Linux git | `C:\Windows\System32\wsl.exe -- git ...` | Last resort. WSL mount namespace does not understand Windows worktree `.git` file pointers; may require `GIT_DIR`/`GIT_WORK_TREE` overrides. |
 | — | **AI Playground portable-git** | `C:\Users\mrbla\AppData\Local\Programs\AI Playground\resources\portable-git\bin\git.exe` | **DO NOT USE.** Excluded per Lead Architect standing rule 2026-04-20. AI Playground is unrelated to BlarAI work. |
 
@@ -135,11 +135,11 @@ The handshake is **not** a credential escape hatch.
 
 ## 6. Cross-references
 
-- [F-3 Bash Fork Error Runbook](../F3_BASH_FORK_ERROR_RUNBOOK.md) — root-cause runbook for F-3 class.
+- [F-3 Bash Fork Error Runbook](../archive/2026/phase5-prompts/F3_BASH_FORK_ERROR_RUNBOOK.md) — root-cause runbook for F-3 class. (Archived; it is no longer at the docs root.)
 - [MCP Refresh Drill](MCP_REFRESH_DRILL.md) — sibling runbook for MCP tool-surface degradation.
 - [MCP Config Sync](MCP_CONFIG_SYNC.md) — sibling runbook for keeping the three MCP config files aligned.
-- §5.10 in [CLAUDE_WORKFLOW_OPTIMIZATION_D7.md](../CLAUDE_WORKFLOW_OPTIMIZATION_D7.md) — friction inventory entry this runbook resolves.
-- [CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml](../CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml) §12 environmental notes.
+- §5.10 in `devplatform\docs\CLAUDE_WORKFLOW_OPTIMIZATION_D7.md` — friction inventory entry this runbook resolves. (**devplatform** repo, not BlarAI.)
+- `devplatform\docs\CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml` §12 environmental notes. (**devplatform** repo, not BlarAI.)
 
 ---
 

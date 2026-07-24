@@ -93,6 +93,11 @@ class _ExecHarness:
     fleet_dispatch_guest_oracle_enabled = (
         AssistantOrchestratorService.fleet_dispatch_guest_oracle_enabled
     )
+    # #1049: the EXECUTE handler threads the already-satisfied pre-check knob the
+    # same way; no key on the SimpleNamespace resolves False (fail-closed).
+    fleet_dispatch_already_satisfied_precheck = (
+        AssistantOrchestratorService.fleet_dispatch_already_satisfied_precheck
+    )
     swap_min_free_gb = AssistantOrchestratorService.swap_min_free_gb
     step_aside_grace_s = AssistantOrchestratorService.step_aside_grace_s
 
@@ -335,3 +340,56 @@ def test_default_toml_ships_guest_oracle_enabled():
     with toml_path.open("rb") as fh:
         cfg = tomllib.load(fh)
     assert cfg["fleet_dispatch"]["guest_oracle_enabled"] is True
+
+
+# ---- #1049 already-satisfied pre-check knob ---------------------------------
+
+
+def test_already_satisfied_precheck_resolver_fail_closed_defaults():
+    # Fail-closed at every layer: cfg None (early boot), a missing key, and an
+    # explicit false ALL resolve to False; only an explicit true enables.
+    fget = AssistantOrchestratorService.fleet_dispatch_already_satisfied_precheck.fget
+
+    assert fget(SimpleNamespace(_resolved_config=None)) is False
+    assert fget(SimpleNamespace(_resolved_config=SimpleNamespace())) is False
+    assert fget(SimpleNamespace(_resolved_config=SimpleNamespace(
+        fleet_dispatch_already_satisfied_precheck=False))) is False
+    assert fget(SimpleNamespace(_resolved_config=SimpleNamespace(
+        fleet_dispatch_already_satisfied_precheck=True))) is True
+
+
+def test_execute_threads_already_satisfied_precheck_into_fleet_config(tmp_path):
+    # The EXECUTE handler builds the fleet config with already_satisfied_precheck
+    # resolved from [fleet_dispatch].already_satisfied_precheck — the value the
+    # spec then carries to the detached driver (#1049).
+    events: list = []
+    h = _ExecHarness(tmp_path, fire_result=_ok(), step_aside=lambda: events.append("step_aside"))
+    t = _FakeTransport(events)
+    h._handle_execute_request(t, "rid", {"session_id": "s", "run_id": "RID-DET",
+                                         "tasks": [{"repo": "R", "task": "a", "prompt": "p"}]})
+    assert h._fire_calls[0]["config"].already_satisfied_precheck is False
+
+    events2: list = []
+    h2 = _ExecHarness(tmp_path, fire_result=_ok(), step_aside=lambda: events2.append("step_aside"))
+    h2._resolved_config.fleet_dispatch_already_satisfied_precheck = True
+    t2 = _FakeTransport(events2)
+    h2._handle_execute_request(t2, "rid", {"session_id": "s", "run_id": "RID-DET",
+                                           "tasks": [{"repo": "R", "task": "a", "prompt": "p"}]})
+    assert h2._fire_calls[0]["config"].already_satisfied_precheck is True
+
+
+def test_default_toml_ships_already_satisfied_precheck_on():
+    # The #1049 pre-check's shipped posture is ENABLED: the default is on so the
+    # battery window that lands it measures the feature, and only an explicit
+    # config flip disables it (the proven-features-default-LIVE rule). This lock
+    # pins that posture the same way the guest-oracle lock above pins its own —
+    # a silent flip back off is a regression. Sequencing/cadence live on ticket
+    # #1049 and docs/runbooks/battery_cadence_and_targeted_runs.md, not here.
+    import tomllib
+    from pathlib import Path
+
+    toml_path = (Path(entrypoint.__file__).resolve().parents[1]
+                 / "config" / "default.toml")
+    with toml_path.open("rb") as fh:
+        cfg = tomllib.load(fh)
+    assert cfg["fleet_dispatch"]["already_satisfied_precheck"] is True

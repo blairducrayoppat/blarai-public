@@ -27,7 +27,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import IO, Callable
 
 from shared.fleet import grade_env
 from shared.fleet import static_pregate
@@ -303,6 +303,172 @@ def real_wait_ready(host: str = "127.0.0.1", port: int = 8000,
     return False
 
 
+def _attempt_banner() -> str:
+    """The one-line separator stamped between two attempts sharing a log file (#1076).
+
+    Deliberately plain prose with no verdict/error vocabulary: this text lands inside
+    files that ``_parse_critic_result`` (``VERDICT:``), ``_parse_design_loop_json``
+    (a bare ``{...}`` line), ``swap_driver``'s best-of-N regex, and
+    ``tools/dispatch_harness/failure_taxonomy``'s fingerprints all read, so it must not
+    be mistakable for any signal they classify on."""
+    return ("\n===== a further attempt at this step begins here "
+            f"({time.strftime('%Y-%m-%d %H:%M:%S')}) =====\n")
+
+
+#: Growth ceiling for an appended log before one generation is rolled aside (#1076 F4).
+#: Nearly every path here is RUN-scoped and dies with its run dir, but one is not:
+#: ``tools/dispatch_harness/probe.py`` calls ``real_load_30b(config, run_id="")``, which
+#: resolves to ``<runs_dir>/start-llm.log`` — outside any run dir, rewritten once per
+#: battery-admission probe. Truncation used to bound it nightly; appending does not, and
+#: nothing prunes it. 8 MiB is ~3000 nights at the measured 1.4–2.9 KiB per probe while
+#: sitting far above any single run's real output, so the roll is unreachable on a
+#: run-scoped path and the append-vs-truncate behaviour there is unchanged in practice.
+_LOG_ROLL_BYTES = 8 * 1024 * 1024
+
+
+def _roll_oversized_log(log_path: Path) -> None:
+    """Move an over-ceiling log aside to ``<path>.prev`` so growth is bounded at ~2x the
+    ceiling without ever silently deleting the most recent evidence (#1076 F4).
+
+    The ``.prev`` suffix goes AFTER the extension on purpose: ``run-fleet-x.log.prev``
+    does not match the ``run-fleet-*.log`` glob and ``design-critique.log.prev`` is not
+    the exact path the liveness readers stat, so a rolled generation is invisible to every
+    existing consumer instead of being double-counted by the aggregating ones. One
+    generation only — a second roll overwrites the first, which is the honest trade at a
+    ceiling this size. Fail-soft: any error leaves the log alone and appending continues.
+
+    For a forensic reader: above the ceiling this is the ONLY thing still holding the
+    earlier attempts, and it holds them somewhere the ordinary tools will not show you.
+    Invisibility to the globs is the point — nothing double-counts a rolled generation —
+    but it means a hunt for a missing attempt has to ask for the ``.prev`` sibling by
+    name. Unreachable in practice on a run-scoped path: the largest real log measured
+    19.8 KiB against an 8 MiB ceiling, ~400x of headroom."""
+    try:
+        if log_path.stat().st_size < _LOG_ROLL_BYTES:
+            return
+    except OSError:
+        return
+    try:
+        os.replace(log_path, log_path.with_name(log_path.name + ".prev"))
+    except OSError:  # pragma: no cover — a locked/held file just keeps growing
+        pass
+
+
+def _open_append_log(log_path: Path) -> "tuple[IO[str], int]":
+    """Open *log_path* for APPEND for one attempt's child output, never truncating an
+    earlier attempt's record (#1076). Returns ``(handle, offset)`` — the byte offset at
+    which THIS attempt's output begins.
+
+    The defect this closes: the path template is one file per task/phase
+    (``run-fleet-<slug>.log``, ``design-critique.log``, …) while every fix cycle
+    re-runs the SAME step inside the SAME run, so a truncating open destroyed the record
+    of the failure the retry exists to repair. Measured on run ``20260723-001147-bd``:
+    ``run-fleet-add-card.log`` held only the 9-line refused re-run, and the original
+    attempt's git error — the sole evidence of what actually broke — was gone (#1066
+    could not establish it).
+
+    APPEND rather than a suffixed sibling (``.2.log``) on purpose, and the reason is a
+    CONTRACT, not a headcount: a per-run log path is an INTERFACE. Readers outside this
+    module bind to it two ways — by exact filename (mtime as a run-is-alive signal) and by
+    a capped glob over ``run-fleet-*.log`` — so a second attempt writing to a NEW filename
+    would freeze a liveness signal while a healthy step is still running, which is the
+    run-killing direction to be wrong in. Grep the repo for a log's basename before
+    changing where it is written; that search, not a number recorded here, is the
+    authority on who reads it. One growing file satisfies both binding styles, keeps the
+    record chronological, and leaves a SINGLE-attempt run byte-identical to before — only
+    a re-dispatch behaves differently.
+
+    The offset is what makes append safe for the parsing callers: ``real_run_critic`` and
+    ``real_run_design_loop`` read their verdict back out of this file, and a whole-file
+    read after an append could return the PREVIOUS attempt's verdict when this attempt
+    produced none. :func:`_read_log_from` slices from the offset so a parse can only ever
+    see the bytes this attempt wrote. Fail-soft: a banner or stat failure degrades the
+    separator or the offset, never the run.
+
+    NOT concurrency-safe, and never was: two writers opening the same path race, and a
+    measured four-way concurrent write keeps only one payload. That is unchanged from the
+    truncating open (which loses identically) and no caller reaches here concurrently —
+    the driver spawns these one at a time. Do not read APPEND as a licence to write this
+    path from two places; making that safe needs a lock, not a mode flag.
+
+    Counting caveat for anything that AGGREGATES these logs: a per-task file now holds
+    every attempt, so a reader summing matches across it counts them all rather than only
+    the surviving one (see ``swap_driver._samples_consumed_from_run_dir``)."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    _roll_oversized_log(log_path)
+    try:
+        prior = log_path.stat().st_size
+    except OSError:
+        prior = 0
+    if prior:
+        try:
+            with open(log_path, "a", encoding="utf-8", errors="replace") as banner:
+                banner.write(_attempt_banner())
+        except OSError:
+            pass
+    fh = open(log_path, "a", encoding="utf-8", errors="replace")
+    try:
+        offset = os.fstat(fh.fileno()).st_size
+    except OSError:  # pragma: no cover — fstat on a just-opened handle
+        offset = prior
+    return fh, offset
+
+
+def _read_log_from(log_path: Path, offset: int) -> str:
+    """THIS attempt's slice of an appended logfile — the bytes from *offset* on (#1076).
+
+    Read as bytes and decoded here (never ``read_text`` + a character slice): *offset* is
+    a byte count from :func:`_open_append_log`, and the two do not coincide once the
+    child emits non-ASCII. Fail-soft: any error yields ``''``, which every caller already
+    treats as an unparseable result and answers with its fallback."""
+    try:
+        with open(log_path, "rb") as fh:
+            fh.seek(max(0, int(offset)))
+            return fh.read().decode("utf-8", errors="replace")
+    except (OSError, ValueError):
+        return ""
+
+
+def _run_to_logfile_at(
+    cmd: list[str],
+    *,
+    log_path: Path,
+    timeout_s: float,
+    run=subprocess.run,
+) -> "tuple[bool, int]":
+    """:func:`_run_to_logfile` plus the byte offset at which this attempt's output starts.
+
+    Returns ``(ok, offset)``. Callers that read the logfile back for a verdict MUST use
+    this form and slice with :func:`_read_log_from`; callers that only want the exit
+    status keep the plain ``_run_to_logfile`` wrapper below. The offset is 0 whenever the
+    file could not be opened at all, so a fail-closed caller reads an empty slice."""
+    offset = 0
+    try:
+        fh, offset = _open_append_log(log_path)
+        with fh:
+            # #761: CREATE_NO_WINDOW — this pwsh child is a console-subsystem exe born
+            # to the console-less (pythonw-spawned) driver; without the flag Windows
+            # allocates it a fresh VISIBLE console. Safe: -NonInteractive, stdin
+            # DEVNULL, output file-redirected (the 2026-07-06 Textual hidden-console
+            # crash constraint applies only to python-launcher spawns, never pwsh).
+            cp = run(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=fh,
+                stderr=subprocess.STDOUT,
+                close_fds=True,
+                timeout=timeout_s,
+                creationflags=_NO_WINDOW,
+            )
+        return cp.returncode == 0, offset
+    except subprocess.TimeoutExpired:
+        return False, offset
+    except OSError:
+        return False, offset
+    except Exception:  # noqa: BLE001 — fail-closed: any error is a load failure
+        return False, offset
+
+
 def _run_to_logfile(
     cmd: list[str],
     *,
@@ -320,31 +486,11 @@ def _run_to_logfile(
     start-llm has already loaded the 30B and exited (run-2: the 30B reached AVAILABLE,
     the driver hung at "loading the 30B"). Writing to a real FILE means there is no pipe
     to keep open — a grandchild holding the file handle is harmless. ``run`` is injected
-    for tests; the start-llm output is preserved in ``log_path`` for diagnosis."""
-    try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(log_path, "w", encoding="utf-8", errors="replace") as fh:
-            # #761: CREATE_NO_WINDOW — this pwsh child is a console-subsystem exe born
-            # to the console-less (pythonw-spawned) driver; without the flag Windows
-            # allocates it a fresh VISIBLE console. Safe: -NonInteractive, stdin
-            # DEVNULL, output file-redirected (the 2026-07-06 Textual hidden-console
-            # crash constraint applies only to python-launcher spawns, never pwsh).
-            cp = run(
-                cmd,
-                stdin=subprocess.DEVNULL,
-                stdout=fh,
-                stderr=subprocess.STDOUT,
-                close_fds=True,
-                timeout=timeout_s,
-                creationflags=_NO_WINDOW,
-            )
-        return cp.returncode == 0
-    except subprocess.TimeoutExpired:
-        return False
-    except OSError:
-        return False
-    except Exception:  # noqa: BLE001 — fail-closed: any error is a load failure
-        return False
+    for tests; the output is preserved in ``log_path`` for diagnosis — APPENDED, so a
+    repeated step (a critic lap, a design lap, the exec-smoke fix cycle, a reloaded 30B)
+    never erases the earlier attempt it exists to repair (#1076)."""
+    ok, _offset = _run_to_logfile_at(cmd, log_path=log_path, timeout_s=timeout_s, run=run)
+    return ok
 
 
 def _run_to_logfile_tree(
@@ -366,14 +512,19 @@ def _run_to_logfile_tree(
     ``ok = (returncode == 0)``, fail-closed; ``timed_out`` is True ONLY for the tree-kill branch
     (#757: the kill must be REPORTED so the caller can label the outcome honestly, not swallowed
     into a generic False that reads like a normal failure). ``popen`` / ``terminate_tree``
-    injected for tests."""
+    injected for tests.
+
+    #1076: the log is APPENDED (:func:`_open_append_log`), because the layout and exec-smoke
+    fix cycles re-dispatch the SAME task inside the SAME run onto the SAME
+    ``run-fleet-<slug>.log`` — truncating there destroyed the first attempt's console output,
+    the only record of why the repair was needed at all."""
     if terminate_tree is None:
         from shared.fleet.proc_tree import terminate_process_tree
         terminate_tree = terminate_process_tree
     proc = None
     try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(log_path, "w", encoding="utf-8", errors="replace") as fh:
+        fh, _offset = _open_append_log(log_path)
+        with fh:
             # #761: CREATE_NO_WINDOW — same rationale as _run_to_logfile: run-fleet's
             # pwsh subtree is console-subsystem under a console-less driver, and a
             # LONG-LIVED visible console (hours) is the exact accidental-close hazard
@@ -678,14 +829,14 @@ def real_run_design_loop(
         cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-Command", command]
         base = (config.runs_dir / run_id) if run_id else config.runs_dir
         log_path = base / "design-critique.log"
-        ok = _run_to_logfile(cmd, log_path=log_path, timeout_s=DESIGN_LOOP_TIMEOUT_S)
+        # #1076: the design phase LOOPS (a lap per critique round, all onto this one path),
+        # so the log is appended and the verdict is parsed from THIS lap's slice only —
+        # a whole-file read would let lap N inherit lap N-1's ShouldIterate when lap N
+        # printed no JSON at all.
+        ok, offset = _run_to_logfile_at(cmd, log_path=log_path, timeout_s=DESIGN_LOOP_TIMEOUT_S)
         if not ok:
             return dict(_DESIGN_LOOP_FALLBACK)
-        try:
-            text = log_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            return dict(_DESIGN_LOOP_FALLBACK)
-        data = _parse_design_loop_json(text)
+        data = _parse_design_loop_json(_read_log_from(log_path, offset))
         if data is None:
             return dict(_DESIGN_LOOP_FALLBACK)
         return _coerce_design_loop_result(data)
@@ -737,14 +888,13 @@ def real_run_critic(
             cmd += ["-BaseRef", base_sha]
         base = (config.runs_dir / run_id) if run_id else config.runs_dir
         log_path = base / "critic-run.log"
-        ok = _run_to_logfile(cmd, log_path=log_path, timeout_s=CRITIC_RUN_TIMEOUT_S)
+        # #1076: the critic phase LOOPS (a lap per fix round, all onto this one path), so the
+        # log is appended and the VERDICT is parsed from THIS lap's slice only — a whole-file
+        # read would let a lap that produced no verdict inherit the previous lap's.
+        ok, offset = _run_to_logfile_at(cmd, log_path=log_path, timeout_s=CRITIC_RUN_TIMEOUT_S)
         if not ok:
             return dict(_CRITIC_FALLBACK)
-        try:
-            text = log_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            return dict(_CRITIC_FALLBACK)
-        data = _parse_critic_result(text)
+        data = _parse_critic_result(_read_log_from(log_path, offset))
         if data is None:
             return dict(_CRITIC_FALLBACK)
         return data
@@ -762,6 +912,10 @@ _DELTA_SOURCE_SUFFIXES = (".py", ".mjs", ".js")
 #: Per-file read ceiling for signature extraction (a generated source file beyond this
 #: is documentation-scale; its signatures are not worth the read).
 _DELTA_MAX_FILE_BYTES = 262_144
+#: Per-read bound on ONE dep-delta git diff (registered: shared/timeout_registry.py).
+#: real_dep_delta runs up to TWO sequential reads per call (the full name-only diff +
+#: the #989 --diff-filter=A added-only diff), so its worst wall is 2× this bound.
+DEP_DELTA_GIT_TIMEOUT_S = 30.0
 
 
 def real_repo_head(repo: str) -> str:
@@ -776,6 +930,13 @@ def real_dep_delta(repo: str, base_ref: str, merge_ref: str) -> dict:
     """The W3 as-built delta: ``git diff --name-only base..merge`` + STRUCTURAL
     signature extraction (``context_pack.extract_signatures`` — Python ast / mjs
     export-line regex; never comments, docstrings, or bodies — §10 S2/N6).
+
+    ``added`` (#989) is the ADDED-only subset (``--diff-filter=A``, a second plumbing
+    read over the same refs) — the scope-sprawl recorder keys on file CREATION, so an
+    edit to a sibling-owned file is never counted as sprawl. The key is present only
+    when that read succeeds (``[]`` is a measured "no adds"; an ABSENT key is
+    "unmeasured" — the recorder then records nothing). The ``files`` read and its
+    output are byte-identical with or without it.
 
     The refs come from our own ``real_repo_head`` reads, but are re-validated as hex
     anyway (defense-in-depth: nothing that is not a commit hash reaches the git argv).
@@ -793,7 +954,8 @@ def real_dep_delta(repo: str, base_ref: str, merge_ref: str) -> dict:
         if not _HEX_REF_RE.match(base) or not _HEX_REF_RE.match(merge) or base == merge:
             return {}
         ok, out, _err = _safe_run(
-            ["git", "-C", str(repo), "diff", "--name-only", f"{base}..{merge}"], 30.0)
+            ["git", "-C", str(repo), "diff", "--name-only", f"{base}..{merge}"],
+            DEP_DELTA_GIT_TIMEOUT_S)
         if not ok:
             return {}
         files = [ln.strip() for ln in (out or "").splitlines() if ln.strip()][:24]
@@ -811,7 +973,14 @@ def real_dep_delta(repo: str, base_ref: str, merge_ref: str) -> dict:
             signatures.extend(_cp.extract_signatures(rel, source))
             if len(signatures) >= 48:
                 break
-        return {"files": files, "signatures": signatures[:48]}
+        delta = {"files": files, "signatures": signatures[:48]}
+        ok_added, out_added, _err = _safe_run(
+            ["git", "-C", str(repo), "diff", "--name-only", "--diff-filter=A",
+             f"{base}..{merge}"], DEP_DELTA_GIT_TIMEOUT_S)
+        if ok_added:
+            delta["added"] = [
+                ln.strip() for ln in (out_added or "").splitlines() if ln.strip()][:24]
+        return delta
     except Exception:  # noqa: BLE001 — fail-soft: a delta failure degrades the pack only
         return {}
 
@@ -2928,6 +3097,7 @@ def build_swap_ops(
         cancel_requested=lambda: cancel_path(config).exists(),
         disarm_watchdog=lambda: _rm(sentinel_path(config)),
         stop_ovms=real_stop_ovms,
+        post_job_ticket=build_job_ticket_poster(config, run_id),
         write_report=lambda rid, outs: write_cumulative_report(config, rid, outs),
         restart_launcher=restart_launcher,
         # #750 fix 1: readiness must PROVE the AO is serving and staying up — a stability
@@ -2993,6 +3163,14 @@ def build_swap_ops(
         # in a fresh hermetic harness; a fail->pass FLIP stamps oracle_flaky (BUILD ->
         # VERIFY). A PASS / not-run is byte-identical to real_run_job_oracle (untouched).
         run_job_oracle=lambda repo, rel: real_run_job_oracle_flake_checked(
+            config, run_id, repo, rel, job_oracle_code),
+        # #1049: the already-satisfied pre-check — the SAME restore-before-grade
+        # oracle instrument, as a SINGLE run (no flake differential: the
+        # differential protects convictions, and a non-passing pre-check convicts
+        # nobody — the wave just dispatches). Wired unconditionally; the driver
+        # only CALLS it when [fleet_dispatch].already_satisfied_precheck rides
+        # the spec as true, and only a literal "passed" ever skips a wave.
+        precheck_job_oracle=lambda repo, rel: real_run_job_oracle(
             config, run_id, repo, rel, job_oracle_code),
         # #822: the symbol-level import-contract probe on the integrated tree — resolve
         # every first-party module/export the job oracle imports EXACTLY as the oracle
@@ -3176,6 +3354,19 @@ def prepare_and_launch_swap(
         # #744: the [fleet_dispatch].guest_oracle_enabled knob rides the spec the same
         # way. False (the default) = the driver never touches the guest-oracle seams.
         "guest_oracle_enabled": bool(getattr(config, "guest_oracle_enabled", False)),
+        # #1049: the [fleet_dispatch].already_satisfied_precheck knob rides the spec
+        # the same way. False (the default) = the driver never consults the
+        # pre-check seam — byte-identical legacy dispatch.
+        "already_satisfied_precheck": bool(
+            getattr(config, "already_satisfied_precheck", False)),
+        # #749: the durable-ticket knobs ride the spec to the detached driver's
+        # REPORT leg (wired 2026-07-14 at the LA-present supervised proof — the
+        # seam's named unblock). Absent keys resolve off/0 fail-closed, so a
+        # pre-#749 spec re-read after a crash recovery posts nothing.
+        "vikunja_bridge": bool(getattr(config, "vikunja_bridge", False)),
+        "vikunja_bridge_project_id": int(
+            getattr(config, "vikunja_bridge_project_id", 0) or 0
+        ),
     }
     spec_path = swap_dir(config) / "spec.json"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3340,6 +3531,42 @@ def build_job_plan(
     return (plan, store, validation.degraded, stamped)
 
 
+def build_job_ticket_poster(
+    config: FleetDispatchConfig, run_id: str
+) -> "Callable[[dict], None]":
+    """#749 driver-side REPORT leg — the ``SwapOps.post_job_ticket`` callable.
+
+    Wired 2026-07-14 at the LA-present supervised proof (the seam's named
+    unblock condition; the AO-side knob threading and the bridge itself shipped
+    earlier, dormant). Find-or-create the run's durable ticket
+    (``[fleet-job <run_id>]``, idempotent) and post the scorecard outcome —
+    the FALSE-DONE-shaped close gate (GREEN + oracle-passed closes; PARKED/
+    STALLED stay open) lives in the bridge, not here. Wholly fail-soft AND
+    doubly gated: the bridge's ``_bridge_target`` resolves a disabled knob or
+    an unset project id to a silent no-op, and every network touch is
+    loopback-pinned + swallow-all inside the bridge. ``goal``/``repo`` come
+    from the swap state's own dispatch-written task record at post time —
+    structured fields, never run-report text (the same provenance rule as
+    #844's redispatch)."""
+
+    def _post(scorecard: dict) -> None:
+        from shared.fleet import vikunja_bridge as vb
+
+        goal = repo = ""
+        try:
+            state = ss.read_swap_state(swap_state_path(config))
+            if state is not None and state.tasks:
+                goal = str(state.tasks[0].get("task", "") or "")
+                repo = str(state.tasks[0].get("repo", "") or "")
+        except Exception:  # noqa: BLE001 — a torn state costs only the title text
+            pass
+        ticket_id = vb.ensure_job_ticket(config, run_id, goal, repo)
+        if ticket_id is not None:
+            vb.post_outcome(config, ticket_id, scorecard)
+
+    return _post
+
+
 def build_doom_watchdog(
     spec: dict,
     config: FleetDispatchConfig,
@@ -3401,6 +3628,13 @@ def run_swap(spec_path: Path):
         # #744: absent key -> False (fail-closed dormancy; pre-#744 spec files
         # re-read after a crash recovery resolve to the legacy behavior).
         guest_oracle_enabled=bool(spec.get("guest_oracle_enabled", False)),
+        # #1049: absent key -> False (same fail-closed direction; a pre-#1049
+        # spec re-read after a crash recovery dispatches every wave normally).
+        already_satisfied_precheck=bool(spec.get("already_satisfied_precheck", False)),
+        # #749: absent keys -> off/0 (same fail-closed direction) — the driver's
+        # REPORT leg posts nothing unless the AO-resolved knobs rode this spec.
+        vikunja_bridge=bool(spec.get("vikunja_bridge", False)),
+        vikunja_bridge_project_id=int(spec.get("vikunja_bridge_project_id", 0) or 0),
     )
     state = ss.read_swap_state(swap_state_path(config))
     tasks = state.tasks if state else []
@@ -3413,15 +3647,22 @@ def run_swap(spec_path: Path):
         from dataclasses import replace as _dc_replace
 
         created = 0.0
+        image = ""
         try:
             import psutil
 
-            created = float(psutil.Process(os.getpid()).create_time())
+            _me = psutil.Process(os.getpid())
+            created = float(_me.create_time())
+            # #902 second identity axis: the image name lets the reconciler prove a
+            # recycled pid is NOT this driver even without a create-time read.
+            image = _me.name() or ""
         except Exception:  # noqa: BLE001 — pid-only still guards (narrow reuse window)
             created = 0.0
+            image = ""
         try:
             ss.write_swap_state(
-                _dc_replace(state, driver_pid=os.getpid(), driver_pid_created=created),
+                _dc_replace(state, driver_pid=os.getpid(), driver_pid_created=created,
+                            driver_image=image),
                 path=swap_state_path(config),
             )
         except OSError:
@@ -3465,6 +3706,7 @@ def run_swap(spec_path: Path):
         gate_gb=float(spec.get("gate_gb", 20.0)), budget_watchdog=watchdog,
         plan=plan, plan_store=store, plan_degraded=degraded,
         guest_oracle_enabled=config.guest_oracle_enabled,
+        already_satisfied_precheck=config.already_satisfied_precheck,
         # #790: the SAME <runs_dir>/<run_id> directory real_run_task already writes
         # each task's run-fleet-<slug>.log into (line ~2515 above) — lets the REPORT
         # phase recover samples_consumed from the real per-task logs instead of the

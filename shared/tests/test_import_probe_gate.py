@@ -230,6 +230,125 @@ def test_probe_relative_import_is_skipped_not_failed(tmp_path):
 
 
 # ===========================================================================
+# #790 sub-task 5 — the B4 false park (night 20260716-001549-bd): a package
+# whose LAZY __init__.py re-exports nothing over REAL submodule files satisfies
+# the oracle's `from pkg import sub` (CPython _handle_fromlist imports the
+# submodule), so it must satisfy the probe. The pre-fix hasattr-only check
+# reported every contract name absent and parked an oracle-importable tree.
+# ===========================================================================
+
+
+def _seed_b4_duplicate_tree(repo: Path) -> None:
+    """B4's EXACT as-built shape (repos-archived/battery-b4-flashcards-cli): the
+    generic seeded ``app/`` scaffold twin (stale placeholder core + a tests/test_core
+    importing ``app.core``) BESIDE the real ``flashcard_app/`` package whose lazy
+    ``__init__`` binds nothing — every contract name is a real submodule FILE."""
+    (repo / "app").mkdir()
+    (repo / "app" / "__init__.py").write_text(
+        '"""app -- the project\'s package."""\n__version__ = "0.1.0"\n',
+        encoding="utf-8")
+    (repo / "app" / "core.py").write_text(
+        "def summarize(numbers):\n"
+        "    return {'count': float(len(numbers))}\n", encoding="utf-8")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_core.py").write_text(
+        "from app.core import summarize\n\n\n"
+        "def test_empty():\n    assert summarize([])['count'] == 0.0\n",
+        encoding="utf-8")
+    pkg = repo / "flashcard_app"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(
+        '"""\nflashcard_app -- the project\'s main package.\n'
+        'Import modules as `from flashcard_app import module_name`.\n"""\n\n'
+        '__version__ = "0.1.0"\n', encoding="utf-8")
+    for sub in ("card_manager", "quiz_engine", "score_tracker", "main",
+                "data_storage"):
+        (pkg / f"{sub}.py").write_text(
+            f"def {sub}_entry():\n    return 0\n", encoding="utf-8")
+
+
+_B4_TARGETS = [
+    {"kind": "py", "module": "flashcard_app", "level": 0,
+     "names": ["card_manager", "quiz_engine", "score_tracker", "main"],
+     "raw": "from flashcard_app import card_manager, quiz_engine, "
+            "score_tracker, main"},
+]
+
+
+def test_probe_b4_lazy_init_package_submodules_are_contract_met(tmp_path):
+    """THE B4 regression lock: the duplicate-tree shape with a lazy package __init__
+    resolves GREEN — real python's `from flashcard_app import card_manager` imports
+    the submodule, so the probe (H4: probe == oracle import semantics) must too.
+    FAILS on the pre-fix hasattr-only probe with all 4 names 'absent'."""
+    repo = _mk_repo(tmp_path / "b4dup")
+    _seed_b4_duplicate_tree(repo)
+    v = _run_python_probe(repo, _B4_TARGETS)
+    assert v["ok"] is True and v["_exit"] == 0 and v["unresolved"] == []
+
+
+def test_probe_package_name_neither_attr_nor_submodule_still_named(tmp_path):
+    """Mutation-kill (the fallback must not fail-open): a package whose contract name
+    is neither an attribute NOR a real submodule stays a NAMED miss, with the
+    submodule attempt's failure appended to the stub-module reason."""
+    repo = _mk_repo(tmp_path / "pkgmiss")
+    pkg = repo / "flashcard_app"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    v = _run_python_probe(repo, [
+        {"kind": "py", "module": "flashcard_app", "level": 0,
+         "names": ["card_manager"],
+         "raw": "from flashcard_app import card_manager"}])
+    assert v["ok"] is False and v["_exit"] == 1
+    miss = v["unresolved"][0]
+    assert miss["name"] == "card_manager"
+    assert "export 'card_manager' is absent" in miss["reason"]
+    assert "not an importable submodule" in miss["reason"]
+
+
+def test_probe_eager_init_with_broken_submodule_fails_honestly(tmp_path):
+    """The inverse lock: an EAGER __init__ (`from . import broken`) over a raising
+    submodule fails the WHOLE package in real python too — the probe stays honestly
+    red ('does not resolve'); the submodule fallback never papers over real breakage."""
+    repo = _mk_repo(tmp_path / "eager")
+    pkg = repo / "flashcard_app"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("from . import broken\n", encoding="utf-8")
+    (pkg / "broken.py").write_text("raise ImportError('boom')\n", encoding="utf-8")
+    v = _run_python_probe(repo, [
+        {"kind": "py", "module": "flashcard_app", "level": 0, "names": ["broken"],
+         "raw": "from flashcard_app import broken"}])
+    assert v["ok"] is False and v["_exit"] == 1
+    assert "does not resolve" in v["unresolved"][0]["reason"]
+
+
+# ===========================================================================
+# #790 sub-task 5 — canonical_package_from_contract: the ONE package root the
+# scaffold seeder names the skeleton after (ambiguity ⇒ "" ⇒ legacy seed)
+# ===========================================================================
+
+
+def test_canonical_package_from_contract_shapes():
+    from shared.fleet.context_pack import canonical_package_from_contract as cpc
+    # the B4 contract → its one root
+    assert cpc(["from flashcard_app import card_manager, quiz_engine, "
+                "score_tracker, main"]) == "flashcard_app"
+    # several lines, one root (from + plain import forms)
+    assert cpc(["from app.core import summarize", "import app.report"]) == "app"
+    # two distinct roots — ambiguous, the seeder must not guess
+    assert cpc(["from cli import main", "from storage import save"]) == ""
+    # node contract lines carry quoted specifiers — never a python root
+    assert cpc(["import { addExpense } from '../src/storage.mjs'"]) == ""
+    assert cpc(["import slug from './src/slugify.js'"]) == ""
+    # relative import: no identifier follows the keyword — skipped
+    assert cpc(["from . import helper"]) == ""
+    # empty / None / junk are ""
+    assert cpc([]) == "" and cpc(None) == "" and cpc(["not an import"]) == ""
+    # deterministic
+    assert cpc(["from flashcard_app import main"]) == cpc(
+        ["from flashcard_app import main"])
+
+
+# ===========================================================================
 # CONFTEST-IN-TREE lock (real pytest) — the H1 linchpin proof: a coder conftest
 # that force-passes the oracle is IGNORED under the clean recipe, but GAMES a
 # bare `python -m pytest`. Uses the test env's own pytest (no uv, no skip).

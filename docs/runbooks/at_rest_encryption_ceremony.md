@@ -1,8 +1,28 @@
 # Runbook: At-Rest Encryption Ceremony (ADR-025, Sprint 14)
 
+<!-- doc-rot gate (#994): this ceremony's executed-state is evidenced OUTSIDE default.toml (DEK keystore-file existence, BLARAI_DEK_KEYSTORE), so it declares a Gating-state rather than a config flag; its EXECUTED banner is required unconditionally. -->
+<!-- Gating-state: keystore -->
+
 **Scope:** BlarAI at-rest encryption (`substrate.db` + `sessions.db`) + the tamper-evident audit stream.
 **Modules:** `shared/security/provision_dek_keystore.py`, `tpm_sealer.py`, `tpm_signer.py`, `dek_envelope.py`
-**Status:** READY — run **once** on the deployment host, before the first production-posture boot with real data.
+**Status:** ✅ **EXECUTED — this ceremony has already been run on this machine. DO NOT RUN IT AGAIN.**
+
+> ## ⛔ STOP — DO NOT DELETE `substrate.db` OR `sessions.db`
+>
+> This runbook was written *before* the ceremony ran, when those databases held only throwaway
+> test data. **That is no longer true.** They now hold your real, encrypted knowledge base and
+> conversation history, and they are backed up nightly as production state
+> (`DISASTER_RECOVERY_RESTORE.md`).
+>
+> Verified 2026-07-19: the DEK keystore is provisioned (`BLARAI_DEK_KEYSTORE` set, file present),
+> `substrate.db` 843,776 bytes and `sessions.db` 331,776 bytes, both written the same day.
+>
+> **Deleting them destroys real data with no recovery path from this runbook.** The recovery key
+> this ceremony printed unseals the *encryption*; it does not restore deleted files. Restoring from
+> backup is `DISASTER_RECOVERY_RESTORE.md`, not this document.
+>
+> Everything below is kept as the **historical record of a completed ceremony** — read it to
+> understand what was set up and why. It is not a to-do list.
 **Who runs it:** the Lead Architect (you), on the real machine, in a private terminal. **Not an agent** — see §0.
 
 ---
@@ -87,20 +107,21 @@ match exactly what the ceremony printed.)
 
 ---
 
-## 4. Existing dev data — wipe fresh, or migrate (your call)
+## 4. Existing dev data — SETTLED AT CEREMONY TIME, no action remains
 
-Your current `substrate.db` / `sessions.db` hold only disposable build-phase dev/test data — there is no real
-sensitive data yet (this is *why* the sprint was well-timed, not urgent).
+⛔ **There is no live instruction in this section. Do not act on it.**
 
-- **Recommended — start fresh, born-encrypted:** delete the old dev databases; the stores create new,
-  encrypted databases on first run. Every byte of real data is then encrypted from its first write, with no
-  plaintext ever having existed.
-- **Or — migrate the existing dev rows in place:** the encryption modules include an idempotent migration
-  (encrypt-in-place + a `VACUUM` scrub that leaves no plaintext in freed pages). This is engineering
-  correctness / a real-shaped test, not a rescue (there's nothing sensitive to rescue). Tell Claude if you
-  want this run; it's a one-off and does not touch the recovery key.
+At ceremony time these databases held only throwaway build-phase data, and the choice was between
+starting fresh born-encrypted or migrating the existing rows in place. That decision was made when
+the ceremony ran and is closed.
 
-Either path is valid — the choice is yours.
+**Today `substrate.db` and `sessions.db` are live production stores holding real encrypted data.**
+Neither path in the original text applies to them, and the "start fresh" one would destroy data.
+The migration tooling referenced here was for pre-ceremony rows; it is not a maintenance operation
+and must not be run against the live stores.
+
+If you need to move, rebuild, or recover these databases, the procedure is
+`DISASTER_RECOVERY_RESTORE.md` — not this runbook.
 
 ---
 

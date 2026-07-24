@@ -1,0 +1,138 @@
+{
+  "record_type": "model_comparison",
+  "title": "Visual screenshot checking: Gemma 4 E4B / 26B-A4B vs the incumbent Qwen3-VL-8B",
+  "date": "2026-07-22",
+  "ticket": "#1005",
+  "prior_records": [
+    "gemma4-instrument-probe-2026-07-22.json (text-grader probe)",
+    "gemma4-vision-instrument-probe-2026-07-22.json (Gemma vision + RAM)"
+  ],
+  "question": "Is any Gemma 4 variant good enough at visual screenshot checking to displace a Qwen3-VL-8B swap in the testing path?",
+  "author": "Claude Opus 4.8 research subagent, dev-side probe",
+  "disposition": "Qwen3-VL-8B was loaded STRICTLY READ-ONLY by pointing openvino_genai.VLMPipeline at the existing IR directory. No weight file, manifest, signature or config was modified, re-converted or re-quantised. No runtime config/.toml/services edits. BlarAI stayed down; battery scheduled task untouched. Nothing installed into the runtime .venv.",
+
+  "headline_finding": {
+    "severity": "HIGHEST IN THIS PROBE",
+    "statement": "The INCUMBENT Qwen3-VL-8B FAILS the layout-regression question, and it fails in the UNSAFE direction - it calls a visibly broken page 'ok'. This is the same blind spot E4B was disqualified for. BlarAI's current/planned visual checking therefore carries that blind spot today.",
+    "evidence": "cook_broken.png (stylesheet stripped, header element deleted). Qwen3-VL-8B answered {\"render\": \"ok\", \"reason\": \"The page appears correctly rendered with clear headings, numbered points, and readable text. The layout is consistent and well-structured, with no visible styling or layout issues.\"} Deterministic across repeat runs and reproduced in two independent probe passes.",
+    "consequence": "A screenshot check built on Qwen3-VL-8B would PASS a page whose stylesheet failed to load. Detecting a blatant Error-500 page it does fine; detecting 'renders but styled wrong' it does not."
+  },
+
+  "hardware": {
+    "cpu": "Intel(R) Core(TM) Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU, Xe2)",
+    "memory": "32 GB LPDDR5X, 31.323 GB effective ceiling, shared CPU/GPU",
+    "gpu_driver_version": "32.0.101.8826",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a",
+    "pipeline_class": "openvino_genai.VLMPipeline",
+    "generation": "do_sample=False (greedy), max_new_tokens=96, identical prompt text for every model"
+  },
+
+  "method": {
+    "like_for_like": "Same subjects, same four graded questions, same prompt phrasing, same script (vision_probe.py) for all three models. No prompt was tuned for any model.",
+    "subjects": {
+      "cook_ok.png": "cook_test.html rendered headless (Edge, 1280x900): dark theme, centred title, styled headings. GROUND TRUTH rendered ok / title present.",
+      "cook_broken.png": "same document with <style> stripped AND <header> deleted: unstyled white/Times, full-bleed, title heading absent. GROUND TRUTH broken / title absent.",
+      "blarai_lighthouse3.png": "non-UI control (UC-010 generated art), unscored description."
+    },
+    "graded_questions": 4,
+    "determinism": "each question asked twice per run; models also re-run in independent passes",
+    "memory": "EXTERNAL detached PowerShell sampler (250-400 ms) for absolute peak in-use and minimum available, plus an in-process 100 ms sampler. In-Use = TotalPhys - AvailPhys.",
+    "supplementary": "A second 4-SUBJECT render-discrimination battery (2 correct, 2 broken) was added because a 2-subject set cannot separate capability from answer bias."
+  },
+
+  "comparison_table": {
+    "note": "accuracy_4q = the four graded questions on cook_ok/cook_broken. render_battery_4subj = the supplementary 2-correct/2-broken discrimination set. Peak/min-available are external-sampler figures except where noted.",
+    "gemma-4-E4B-it-int4-ov": {
+      "accuracy_4q": "3/4",
+      "render_battery_4subj": "not run (LA had already ruled E4B out)",
+      "determinism": "5/5 byte-identical",
+      "load_seconds": 8.9,
+      "steady_delta_gb": 6.375,
+      "absolute_peak_in_use_gb": 20.947,
+      "min_available_gb": 10.376,
+      "headroom_at_peak_gb": 10.376,
+      "per_question_seconds": "0.68 - 3.88",
+      "peak_source": "in-process sampler (external pass not run for E4B)",
+      "cook_broken_render": "ok  -> WRONG (unsafe direction)"
+    },
+    "gemma-4-26B-A4B-it-int4-ov": {
+      "accuracy_4q": "4/4",
+      "render_battery_4subj": "3/4",
+      "determinism": "5/5 byte-identical; identical across independent loads",
+      "load_seconds": "35.3 - 50.7 (uncached)",
+      "steady_delta_gb": "13.27 - 15.18",
+      "absolute_peak_in_use_gb": "31.312 / 31.318 / 31.323",
+      "min_available_gb": "0.005 - 0.012",
+      "headroom_at_peak_gb": "0.005 - 0.011",
+      "per_question_seconds": "1.46 - 4.07",
+      "cook_broken_render": "broken -> CORRECT VERDICT, but the stated reason is fabricated ('text is overlapping with the blue header lines' - no overlap exists in that image)"
+    },
+    "qwen3-vl-8b-instruct-int4-ov_INCUMBENT": {
+      "accuracy_4q": "3/4",
+      "render_battery_4subj": "3/4",
+      "determinism": "5/5 byte-identical; reproduced across two independent passes",
+      "load_seconds": "8.35 - 13.30",
+      "steady_delta_gb": "5.67 - 5.95",
+      "absolute_peak_in_use_gb": 16.095,
+      "min_available_gb": 15.228,
+      "headroom_at_peak_gb": 15.228,
+      "per_question_seconds": "1.05 - 5.48",
+      "cook_broken_render": "ok -> WRONG (unsafe direction)"
+    }
+  },
+
+  "render_discrimination_battery": {
+    "purpose": "2 correctly-rendered + 2 broken subjects. An always-'ok' model scores 2/4; an always-'broken' model also scores 2/4. Only genuine discrimination reaches 4/4.",
+    "subjects_added": {
+      "good2.png": "clean styled 'Deployment Dashboard' page. GROUND TRUTH ok.",
+      "page_error.png": "near-blank page showing 'Error 500: Internal Server Error' + a TypeError. GROUND TRUTH broken."
+    },
+    "qwen3-vl-8b": {
+      "score": "3/4",
+      "answer_spread": {"ok": 3, "broken": 1},
+      "bias": "toward OK - too permissive",
+      "misses": "cook_broken (unstyled page called ok)",
+      "reason_quality": "every stated reason was accurate and grounded in what is actually on screen; no hallucination observed"
+    },
+    "gemma-4-26B-A4B": {
+      "score": "3/4",
+      "answer_spread": {"ok": 1, "broken": 3},
+      "bias": "toward BROKEN - false alarms on healthy pages",
+      "misses": "good2 (a clean dashboard called broken)",
+      "reason_quality": "HALLUCINATES. On good2 it reported 'a large block of nonsensical text/characters (\"This is a screenshot of a web page...\") overlapping the content' - it described the PROMPT TEXT as visible image content. Its correct cook_broken verdict also cited non-existent overlap."
+    },
+    "read": "Both land on 3/4 but fail in OPPOSITE directions. The 26B's earlier 4/4 on the narrower 4-question set was partly an artefact of its broken-leaning bias meeting a set containing one broken subject."
+  },
+
+  "three_direct_answers": {
+    "q1_does_qwen3vl8b_get_cook_broken_right": "NO. It answers 'ok'. Deterministic, reproduced across two independent passes.",
+    "q2_any_reason_to_prefer_26B": "Not applicable as posed (it assumed the incumbent passes). Assessed anyway: NO sufficient reason. The 26B does win the narrow 4-question set 4/4 vs 3/4, but on the wider discrimination set both score 3/4, and the 26B costs ~2.6x the steady RAM (13.3-15.2 GB vs 5.7-6.0 GB), 3-6x the load time, pins peak memory to the ceiling with 5-11 MB spare, and hallucinates image content. That is not a trade worth making for zero net accuracy.",
+    "q3_direction_of_incumbent_failure": "IT FAILS IN THE UNSAFE DIRECTION - it declares a broken page healthy, exactly as E4B did. Flagged as the most consequential finding of this probe."
+  },
+
+  "what_was_NOT_measured": [
+    "Sample size remains 4 graded questions on 2 UI subjects (plus a 4-subject render set). This is a failure SHAPE, not a rate, for EVERY model in the table. The comparison table must not be read as implying more precision than that.",
+    "Real WinUI product screenshots - the documented black-capture gotcha makes them unreachable without running the app, which was out of scope. All UI subjects are headless-rendered HTML.",
+    "Prompt sensitivity - one phrasing per question, deliberately identical across models. A prompt explicitly naming CSS/stylesheet/layout might change several of these results and was not tried.",
+    "Qwen3-VL-8B on the text/juror battery, on E4B's text tasks, or with images beyond these four.",
+    "E4B external-sampler memory pass (its peak figure is in-process; E4B was already ruled out).",
+    "The 31B - download was started and then HALTED on instruction; never loaded or measured. Nothing is claimed about it.",
+    "Any measurement with the Qwen3-14B co-resident."
+  ],
+  "resting_on_documentation_alone": [
+    "The 31B's size and behaviour - not downloaded, not run, no claim made.",
+    "INT4 quantisation parameters for all IRs - HF model cards; weights not inspected.",
+    "'EXPERIMENTAL / not fully validated with OpenVINO' status of the Gemma IRs - HF model cards."
+  ],
+  "artifacts_executed_against": [
+    "C:/Users/mrbla/BlarAI/models/qwen3-vl-8b-instruct/openvino-int4-ov (READ-ONLY, production artefact, unmodified)",
+    "OpenVINO/gemma-4-26b-a4b-it-int4-ov (13.634 GB measured)",
+    "OpenVINO/gemma-4-E4B-it-int4-ov (6.016 GB)",
+    "subjects: cook_ok.png, cook_broken.png, good2.png, page_error.png, blarai_lighthouse3.png"
+  ]
+}

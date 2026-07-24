@@ -114,6 +114,44 @@ CLASSES_OF_SERVICE: tuple[tuple[str, str], ...] = (
 #: to Intangible (which would silently de-prioritize un-triaged work).
 DEFAULT_SERVICE_CLASS: ServiceClass = ServiceClass.STANDARD
 
+# ---------------------------------------------------------------------------
+# Provenance marker — the SYNTHETIC battery/test class of work (#887).
+#
+# ORTHOGONAL to the class-of-service axis above: a battery/test-originated job
+# ticket is not a low-PRIORITY class of real work — it is NOT REAL WORK (its
+# honest park was its deliverable). Overloading the "Intangible" class of
+# service would conflate genuine low-priority maintenance/docs (which belongs on
+# the operator's headline) with synthetic parks (which does not), so this is a
+# SEPARATE label on its own axis. Name-resolved at runtime exactly like the
+# classes of service (never a hardcoded id — the stale-label-id lesson) and
+# created by the SAME operator-run substrate migration.
+# ---------------------------------------------------------------------------
+
+#: The provenance label marking a synthetic battery/test-originated job ticket
+#: (#887). The exact Vikunja label title (name-resolved, never an id).
+TEST_CLASS_LABEL: str = "Battery/Test"
+
+#: Board-legible color for :data:`TEST_CLASS_LABEL` — a muted blue-gray, visually
+#: distinct from every class-of-service hue so a test ticket reads as an aside,
+#: never as one of the four service classes.
+TEST_CLASS_LABEL_COLOR: str = "455a64"
+
+#: Provenance labels the operator-run substrate migration creates and the runtime
+#: reasons over — kept SEPARATE from :data:`CLASSES_OF_SERVICE` so partitioning the
+#: operator's headline by "is this synthetic test work?" never entangles the
+#: class-of-service axis (an Intangible maintenance ticket is REAL work and stays
+#: on the headline).
+PROVENANCE_LABELS: tuple[tuple[str, str], ...] = (
+    (TEST_CLASS_LABEL, TEST_CLASS_LABEL_COLOR),
+)
+
+#: The reserved repo-name prefix for a synthetic battery/test sandbox dispatch
+#: (#887 / #752). Mirrors ``shared.fleet.battery_plans._SANDBOX_REPO_PREFIX`` BY
+#: VALUE (a battery card may live ONLY in a ``battery-<slug>`` sandbox repo) — the
+#: two are pinned equal by ``test_coord_lifecycle`` so the redispatch ruler's
+#: test-origin guard and the plan-override resolver can never drift apart.
+TEST_ORIGIN_REPO_PREFIX: str = "battery-"
+
 
 def _label_titles(task: Mapping[str, Any]) -> frozenset[str]:
     """The set of label titles on *task* (case-sensitive, Vikunja's own form).
@@ -148,6 +186,35 @@ def classify_service_class(task: Mapping[str, Any]) -> ServiceClass:
         if service_class.value in titles:
             return service_class
     return DEFAULT_SERVICE_CLASS
+
+
+def is_test_class(task: Mapping[str, Any]) -> bool:
+    """True iff *task* carries the :data:`TEST_CLASS_LABEL` provenance label — a
+    synthetic battery/test-originated ticket (#887), never real actionable work.
+
+    Reuses the SAME fail-soft label extraction as :func:`classify_service_class`
+    (a ``null``/malformed ``labels`` field yields ``False``, never a crash — label
+    data is ticket-adjacent untrusted input, ADR-039 §2.7). ORTHOGONAL to
+    :func:`classify_service_class`: a test ticket still HAS a class of service
+    (Standard by default); this predicate answers the DIFFERENT question of
+    whether the ticket is real work at all — the partition the operator's headline
+    flow numbers exclude and the actionable stall/redispatch rulers treat as
+    non-actionable evidence."""
+    return TEST_CLASS_LABEL in _label_titles(task)
+
+
+def is_test_origin_repo(repo_id: "str | None") -> bool:
+    """True iff *repo_id* names a synthetic battery/test sandbox repo (its final
+    path component starts with :data:`TEST_ORIGIN_REPO_PREFIX`).
+
+    The TRUSTED structured signal the redispatch ruler uses to treat a park as
+    non-actionable evidence (#887): a ``battery-*`` repo is a synthetic sandbox
+    whose honest park was its deliverable, never real unfinished business to
+    redispatch. Accepts both the bare id (``battery-calc``) and a path ending in
+    it. Fail-soft: a non-string/blank id is not test-origin (``False``)."""
+    if not isinstance(repo_id, str) or not repo_id.strip():
+        return False
+    return Path(repo_id.strip()).name.startswith(TEST_ORIGIN_REPO_PREFIX)
 
 
 # ---------------------------------------------------------------------------

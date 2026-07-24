@@ -16,9 +16,11 @@ W3 surface:
     WebSearchConfig   -- loop configuration (max_passes, concurrency, etc.)
     LLMText           -- narrow Protocol for LLM dependency injection
     run_web_search    -- top-level async entry point for the agentic loop
-    injection_scan_passthrough -- W5 seam (no-op in W3)
+    injection_scan    -- ADR-013 Layer-2 scan on fetched pages (live, #896)
     WebSearchSkill    -- explicit /search <question> skill handler
-    handle_search_command -- functional async entry point
+    handle_search_command -- functional async entry point (RAW, ungrounded)
+    handle_search_command_grounded -- functional relay grounding UNTRUSTED_WEB
+                                      (the sanctioned operator relay, #913)
 """
 
 from __future__ import annotations
@@ -41,12 +43,13 @@ from services.assistant_orchestrator.src.websearch.state import (
 )
 from services.assistant_orchestrator.src.websearch.loop import (
     LLMText,
-    injection_scan_passthrough,
+    injection_scan,
     run_web_search,
 )
 from services.assistant_orchestrator.src.websearch.dispatch import (
     WebSearchSkill,
     handle_search_command,
+    handle_search_command_grounded,
 )
 
 __all__ = [
@@ -64,9 +67,10 @@ __all__ = [
     "WebSearchConfig",
     # W3 loop
     "LLMText",
-    "injection_scan_passthrough",
+    "injection_scan",
     "run_web_search",
     # W3 dispatch
     "WebSearchSkill",
     "handle_search_command",
+    "handle_search_command_grounded",
 ]

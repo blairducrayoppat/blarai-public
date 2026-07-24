@@ -70,6 +70,16 @@ BACKEND_PASSTHROUGH_SLASH_COMMANDS: tuple[str, ...] = (
     # body).  The WinUI proposal card's Save/Dismiss buttons emit exactly these.
     "/remember-confirm",
     "/remember-dismiss",
+    # Coordinator read surface (#843 C1, ADR-039 §2.10): ``/coord status`` composes
+    # a READ-ONLY work-state snapshot (fleet-swap state + queue + latest run +
+    # battery campaign + configured boards + flow metrics).  Parsed by the GATEWAY
+    # (transport.py -> coord_coordinator); gated BACKEND-side by
+    # ``[coordinator].enabled`` — with the flag false the backend answers a clear
+    # disabled notice.  The command must always travel; the WinUI never decides.
+    # (Missing from this SSOT until the 2026-07-15 go-live ceremony, where the LA
+    # typed /coord and got "Unknown command" — the third instance of the
+    # hand-copy-drop class this constant exists to kill.)
+    "/coord",
 )
 
 __all__ = ["BACKEND_PASSTHROUGH_SLASH_COMMANDS"]

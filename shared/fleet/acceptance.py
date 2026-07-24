@@ -38,14 +38,18 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
 from shared.fleet import clarify as _clarify
 from shared.fleet import revise as _revise
+from shared.fleet.context_pack import contract_coverage
 from shared.fleet.decompose import DEFAULT_MAX_TASKS, DecomposeResult, decompose_request
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tiers
@@ -75,6 +79,16 @@ ACCEPTANCE_TASK_SLUG = "acceptance-tests"
 #: own self-written tests. ``tests/`` is the layout the seeded python skeleton already uses,
 #: and a top-level import (``from calendar_math import add_days``) resolves from there.
 ACCEPTANCE_ORACLE_PATH = "tests/test_acceptance.py"
+
+#: The per-task NODE:test oracle path (#697) — the ``.mjs`` sibling of
+#: :data:`ACCEPTANCE_ORACLE_PATH`, mirroring the job-level convention
+#: (:data:`JOB_ORACLE_PATH_NODE`). The path EXTENSION is the ecosystem signal the fleet's
+#: per-task seed + grade keys on (``.py`` -> pytest, ``.mjs`` -> ``node --test``), exactly as
+#: the job oracle path does — so a node single-feature task grades its best-of-N candidates
+#: against a byte-identical node:test scorecard instead of python-shaped self-written tests.
+#: ``tests/`` is the layout the seeded node skeleton uses; a ``../src/<module>.mjs`` import
+#: resolves from there.
+ACCEPTANCE_ORACLE_PATH_NODE = "tests/acceptance.test.mjs"
 
 #: Ecosystems whose behavior/smoke tests actually RUN in the fleet gate. .NET is
 #: BUILD-ONLY (``dotnet build`` runs, but there is no ``dotnet test``).
@@ -114,7 +128,7 @@ _MIN_CRITERION_LEN = 5
 #: curated clarifying question. It is NOT a buildable surface and (deliberately) carries no
 #: ``_SURFACE_FRIENDLY`` entry, so it never renders a "Building this as" preview line.
 SURFACE_VALUES: frozenset[str] = frozenset({
-    "desktop-gui", "web", "mobile", "command-line", "automation", "library",
+    "desktop-gui", "web", "web-static", "mobile", "command-line", "automation", "library",
     "unknown", "ambiguous",
 })
 #: The fail-closed sentinel for an unclassifiable / malformed surface.
@@ -124,12 +138,31 @@ SURFACE_UNKNOWN = "unknown"
 #: ``unknown`` = "couldn't classify at all" (no scaffold, today's behavior); ``ambiguous``
 #: = "classified the KIND but the platform forks, here are the candidates" (ask one question).
 SURFACE_AMBIGUOUS = "ambiguous"
+#: The static-web VARIANT of ``web`` (#886) — a single static ``index.html`` with NO node
+#: server and NO ``fetch`` wiring, so it works offline as a plain ``file://`` page. It is a
+#: BUILD-VARIANT of the ``web`` PLATFORM, not a distinct device, so it is NOT a platform-fork
+#: candidate (see :data:`_REAL_SURFACES`) and the 14B never EMITS it — the deterministic goal
+#: refiner :func:`_refine_web_static` narrows ``web`` -> ``web-static`` when the goal carries
+#: explicit static/no-backend signals. The fleet maps it to the ``web-static`` scaffold (a lone
+#: static page); an un-updated fleet's ``Resolve-BuildProfile`` default arm no-ops it to the
+#: safe no-seed path — never the wrong full-stack seed.
+SURFACE_WEB_STATIC = "web-static"
 
 #: The REAL, buildable surface enum — the only values a ``candidates`` entry may take (and
 #: the only values an ``apply_clarification`` answer may resolve to). ``unknown`` and
-#: ``ambiguous`` are sentinels, NOT buildable surfaces, so they are excluded: a candidate
-#: list containing them (or any garbage) is filtered down to the real members fail-closed.
-_REAL_SURFACES: frozenset[str] = SURFACE_VALUES - {SURFACE_UNKNOWN, SURFACE_AMBIGUOUS}
+#: ``ambiguous`` are sentinels, NOT buildable surfaces, so they are excluded; ``web-static``
+#: is a build-VARIANT of ``web`` (not a device platform), so it is excluded too — the platform
+#: clarify fork never offers it, and a candidate list carrying it (or any garbage) is filtered
+#: down to the real device surfaces fail-closed.
+_REAL_SURFACES: frozenset[str] = SURFACE_VALUES - {
+    SURFACE_UNKNOWN, SURFACE_AMBIGUOUS, SURFACE_WEB_STATIC,
+}
+
+#: The surfaces the 14B may EMIT — the build-signal model's enum. ``web-static`` is produced
+#: ONLY by the deterministic goal refiner (:func:`_refine_web_static`), never by the model, so
+#: it is excluded here to keep the build-signal prompt + grammar schema (and every existing
+#: build-signal test) byte-identical to before #886.
+_MODEL_SURFACE_VALUES: frozenset[str] = SURFACE_VALUES - {SURFACE_WEB_STATIC}
 
 #: Hard cap on ambiguity candidates carried from one goal (a small fork-set; keeps the wire
 #: small and the curated decision map tractable). The platform case is 3 (desktop/web/phone).
@@ -166,6 +199,7 @@ DEFAULT_MAX_COMPONENTS = 8
 _SURFACE_FRIENDLY: dict[str, str] = {
     "desktop-gui": "a Windows desktop app",
     "web": "a web app",
+    "web-static": "a single-page web page (opens straight in a browser)",
     "mobile": "an Android app",
     "command-line": "a command-line tool",
     "automation": "a system-automation script",
@@ -1075,6 +1109,61 @@ def _parse_build_plan(
     return plan
 
 
+#: Explicit "static / no-backend / single-file web" signals in a GOAL (#886). Each alternative
+#: names an ABSENCE of a build step or a server, OR a single-file / plain-HTML shape, OR the
+#: "just open it in a browser" delivery — the things that distinguish a lone static ``index.html``
+#: from the full-stack node skeleton. Deliberately keyed on those specifics rather than a bare
+#: mention of "web"/"page" (every web goal has those), so an ordinary server web goal is NOT
+#: mis-narrowed. Case-insensitive; hyphen/space tolerant.
+_STATIC_WEB_RE = re.compile(
+    r"(?i)(?:"
+    # "static" — but NOT "static assets/files/folder/content" (those describe a SERVER serving
+    # static files, not a static SITE), so an ordinary server web app is not mis-narrowed.
+    r"\bstatic\b(?!\s+(?:assets?|files?|folder|directory|dir|content|resources?))"
+    r"|\bno[\s-]+build(?:\s+step|\s+tools?|\s+process)?\b"   # no build / no build step / tools
+    r"|\bwithout\s+(?:a\s+)?build\b"
+    r"|\bno[\s-]+bundler\b"
+    r"|\bno[\s-]+frameworks?\b|\bwithout\s+(?:a\s+)?framework\b"  # no framework(s)
+    # "no server" / "no backend" — a genuine no-backend signal. ("serverless" is DELIBERATELY
+    # excluded: it means a cloud-function backend, not a static page.)
+    r"|\bno[\s-]+server\b|\bwithout\s+(?:a\s+)?server\b"
+    r"|\bno[\s-]+back[\s-]?end\b|\bclient[\s-]?side\s+only\b"     # no backend / client-side only
+    r"|\b(?:single|one)[\s-]+(?:html\s+)?file\b"        # single file / one html file
+    r"|\b(?:single|one)\s+index\.html\b"                # one index.html
+    r"|\bplain\s+html\b|\bvanilla\s+(?:html|js|javascript)\b|\bjust\s+html\b"
+    r"|\bopens?\s+(?:it\s+)?(?:in|straight\s+in)\s+(?:a|the|your)\s+(?:web\s+)?browser\b"
+    r"|\bruns?\s+(?:in|straight\s+in)\s+(?:a|the|your)\s+(?:web\s+)?browser\b"
+    r"|\bfile://"
+    r")"
+)
+
+
+def _refine_web_static(build_plan: dict | None, goal: str) -> dict | None:
+    """Deterministically narrow a ``web`` build-signal to ``web-static`` when the GOAL carries
+    explicit static / no-backend / single-file signals (#886). The model PROPOSES the ``web``
+    platform; this DISPOSES the build VARIANT — mirroring every other ruler in this module, and
+    kept deterministic (not a 9th surface the small model must learn) so a static ask reliably
+    avoids the full-stack seed whose ``fetch('/api/health')`` hangs forever on a ``file://`` page.
+
+    NARROWS ``web`` -> ``web-static`` ONLY (a fresh copy, ``candidates`` never present on a clear
+    surface). Every other surface — ``unknown`` (no scaffold), ``ambiguous`` (the platform fork
+    resolves the device FIRST), ``desktop-gui``/``mobile``/``command-line``/… — is returned
+    UNCHANGED, as is a ``web`` goal with no static signal (today's full-stack path) and a
+    ``None``/non-dict build_plan. Pure, fail-closed, never raises.
+
+    Directionality note: a false NARROW (a server ask mis-read as static) only DROPS the seed's
+    server files — recoverable, the coder still adds them — whereas the bug this fixes seeds a
+    server the static page can never reach. But the signals above are specific enough that an
+    ordinary server web goal does not trip them; the refiner errs toward leaving ``web`` alone."""
+    if not isinstance(build_plan, dict) or build_plan.get("surface") != "web":
+        return build_plan
+    if not _STATIC_WEB_RE.search(goal or ""):
+        return build_plan
+    refined = dict(build_plan)
+    refined["surface"] = SURFACE_WEB_STATIC
+    return refined
+
+
 def _parse_criteria(text: str, *, max_criteria: int) -> list[dict]:
     """Best-effort parse of the model output into ``[{text, tier, check}]``; ``[]`` on failure."""
     if not text:
@@ -1219,7 +1308,10 @@ def build_plan_emission_json_schema(
     return {
         "type": "object",
         "properties": {
-            "surface": {"enum": sorted(SURFACE_VALUES)},
+            # ``_MODEL_SURFACE_VALUES`` (NOT ``SURFACE_VALUES``): ``web-static`` is a
+            # deterministic goal-refiner output, never a model emission, so the grammar enum
+            # stays the original set — this schema is byte-identical to before #886.
+            "surface": {"enum": sorted(_MODEL_SURFACE_VALUES)},
             "candidates": {
                 "type": "array",
                 "items": {"enum": sorted(_REAL_SURFACES)},
@@ -1339,12 +1431,199 @@ def _ensure_test_floor(spec: AcceptanceSpec) -> AcceptanceSpec:
         tier=TIER_SMOKE,
         check="A basic smoke test exercises the main entry point without error.",
     )
-    return AcceptanceSpec(
-        goal=spec.goal,
-        criteria=spec.criteria + (smoke,),
-        assumptions=spec.assumptions,   # carry the product assumptions across the copy
-        build_plan=spec.build_plan,     # carry the build-signal across the copy (#674)
+    # #1042 L5-1: replace() rather than a field-by-field rebuild. This predates S1, but S1's
+    # realism guard now DELEGATES here when a demotion would leave zero test-tier criteria,
+    # so the same dropped-field class became reachable through the new gate. Carrying four of
+    # six fields by hand is how asset_specs and clarifications went missing; replace() makes
+    # it impossible and covers any field added later.
+    return replace(spec, criteria=spec.criteria + (smoke,))
+
+
+# ---------------------------------------------------------------------------
+# #1031 S1 — the advanced-intake spec floors. BOTH are deterministic rulers in the
+# established house pattern (the model PROPOSES, the ruler DISPOSES) and BOTH run only
+# under ``advanced_intake``; with the flag off ``generate_plan`` is byte-identical.
+# ---------------------------------------------------------------------------
+
+#: Surfaces whose deliverable is a SERVED PAGE — the shapes that need a delivery floor.
+#: ``web`` has no module-level constant (it lives only inside :data:`SURFACE_VALUES`), so it
+#: is written literally here rather than inventing a new name for one call site. An
+#: ``ambiguous`` surface is DELIBERATELY excluded (#1041 review N3): clarify resolves it to a
+#: concrete surface before the floor matters, and fail-closed exclusion here is correct — a
+#: floor injected under ambiguity could target a surface the operator never chose.
+_DELIVERY_FLOOR_SURFACES: frozenset[str] = frozenset({"web", SURFACE_WEB_STATIC})
+
+#: The reserved id the delivery floor injects under (#1041). Identity, not prose, is what
+#: makes the floor idempotent: re-running over an already-floored spec is a no-op because
+#: THIS id is present, never because some criterion's wording looked delivery-ish. Reserved
+#: - the 14B is never asked to author an id, so it cannot collide.
+DELIVERY_FLOOR_ID: str = "delivery-floor"
+
+#: The reserved repo-name prefix for a synthetic battery/test sandbox dispatch. Mirrors
+#: ``shared.fleet.battery_plans._SANDBOX_REPO_PREFIX`` BY VALUE — ``battery_plans`` imports
+#: FROM this module, so importing it back would be an import cycle; the identical constraint
+#: produced the same mirror at ``coord_lifecycle.TEST_ORIGIN_REPO_PREFIX``. A gate test pins
+#: all three equal so they can never drift.
+_CARD_SANDBOX_REPO_PREFIX = "battery-"
+
+
+def _is_card_driven(repo: str, decomposition_override: "DecompositionOverride | None") -> bool:
+    """True when this dispatch is driven by a frozen battery/test CARD, not by an operator.
+
+    **Why this is NOT simply ``decomposition_override is not None``** — that was the author's
+    first predicate and it is wrong, caught in pre-merge review. An override is produced only
+    for a card whose SHAPE is handled AND whose id has a registered arm builder
+    (``battery_plans._PLAN_BUILDERS`` / ``_HANDLED_SHAPES``) — today B1, B2 and B4 alone.
+    Every other card — B3, B5, B6, B7, B8, **including BOTH web cards** — reaches
+    ``generate_plan`` with ``override=None``, so a predicate keyed on the override leaves five
+    frozen cards exposed, and the delivery floor fires on exactly the web ones. Measured over
+    the real cards in ``evals/battery/``, not reasoned about.
+
+    The repo prefix is the reliable signal: a battery card may live ONLY in a
+    ``battery-<slug>`` sandbox — the nightly runner throws on a card whose repo lacks the
+    prefix, and ``battery_plans`` enforces the same. Belt AND braces: either signal marks the
+    dispatch card-driven, so a card shape that later GAINS an arm builder stays covered.
+
+    #1042 (review nit R1-a): matches on the repo's BASENAME, like both mirrors
+    (``coord_lifecycle.is_test_origin_repo`` uses ``Path(repo_id).name``). A bare-name repo is
+    what production passes today, so the previous raw-string match was not observably wrong —
+    but it diverged from the mirrors it is pinned equal to, and a path-shaped repo id
+    (``projects/battery-b5-habit-web``) would have missed the prefix and un-suppressed a frozen
+    card. Fail-safe direction and cheap, so it is aligned rather than argued about."""
+    if decomposition_override is not None:
+        return True
+    from pathlib import PurePath
+
+    name = PurePath(str(repo or "").strip().replace("\\", "/")).name
+    return name.lower().startswith(_CARD_SANDBOX_REPO_PREFIX)
+
+def _check_names_a_mechanism(check: str) -> bool:
+    """True when a criterion's ``check`` states ANYTHING at all as its verification.
+
+    **This deliberately detects only the UNAMBIGUOUS case — an absent check.** The first
+    implementation tried to detect "names a mechanically runnable verification" with a
+    substring allowlist (``test``/``assert``/``run``/``import``/``log``/``serve``…), and
+    pre-merge review demolished it in BOTH directions:
+
+    * it DEMOTED genuinely checkable criteria, including the two worked examples in this
+      file's OWN :data:`_CRITERIA_TEMPLATE` — "2 + 3 shows 5" and "divide-by-zero shows an
+      error". A model following the shipped prompt was the guard's primary victim, which is
+      the centre of the distribution, not its edge;
+    * it KEPT pure-judgment criteria on common-English substring collisions — ``import`` in
+      "important", ``log`` in "login"/"logo", ``serve`` in "observe", ``function`` in
+      "functionality", ``test`` in "latest".
+
+    A bare substring list over free-form English cannot decide runnability, and dressing one
+    up as a control is a false-confidence surface. So the ambition is withdrawn rather than
+    tuned: an EMPTY check is a criterion claiming machine verification while naming no
+    verification whatsoever, which needs no natural-language judgement to detect and is a
+    real defect class on its own. Deciding runnability from prose is a model-assisted or
+    schema-level problem and belongs to a later slice, not to a regex."""
+    return bool((check or "").strip())
+
+
+def _apply_realism_guard(spec: AcceptanceSpec) -> AcceptanceSpec:
+    """#1031 S1 (2): a criterion CLAIMING a machine-gated tier whose ``check`` names no
+    runnable verification is DEMOTED to ``human`` — never dressed up with a manufactured
+    check, and never auto-passed.
+
+    This is the check-realism defect class (quality-ledger dimension 2) closed at authoring
+    time: a spec that claims the fleet will verify something it cannot verify produces a
+    build graded against a check that does not exist. Demoting is the honest move — the
+    criterion survives, the operator judges it, and nothing silently claims machine
+    verification it does not have.
+
+    It never promotes, never edits ``text``, and never invents a ``check``.
+
+    **NEVER-ZERO-TESTS INVARIANT (pre-merge review, BLOCKER-3).** ``TIER_HUMAN`` is not in
+    :data:`TEST_TIERS`, and THREE consumers filter on exactly that set and bail when it is
+    empty: ``compile_prompts`` (the coder is then told nothing about tests), the per-task
+    acceptance oracle, and the JOB-level oracle. So an unguarded demotion could take a spec
+    from "has machine verification" to NONE — deleting the job oracle, and with it the #989
+    coverage contract this very feature exists to make hold by construction. Measured through
+    the real ``compile_prompts``: one behavior criterion demoted ⇒ ``TEST_TIERS=[]`` ⇒ the
+    coder prompt stops mentioning tests at all.
+
+    Therefore: if a demotion would empty the test tiers of a spec that HAD them, the
+    never-zero-tests floor is re-established afterwards (:func:`_ensure_test_floor`). The
+    demotion still happens — claiming machine verification you do not have is the dishonesty
+    being fixed — but the spec may not silently fall below the floor as a side effect.
+    Re-flooring cannot loop: the floor's own check is non-empty, so the guard would keep it.
+    Note that moving this ruler BEFORE step 2b would not have fixed it — that floor is gated
+    on ``decomposed.collapsed_test_intent`` and does not fire for most specs."""
+    demoted = tuple(
+        replace(c, tier=TIER_HUMAN)
+        if (c.tier in OBJECTIVE_TIERS and not _check_names_a_mechanism(c.check))
+        else c
+        for c in spec.criteria
     )
+    if demoted == spec.criteria:
+        return spec
+    # #1042 L5-1: replace(), NOT a field-by-field rebuild. AcceptanceSpec has SIX fields;
+    # naming four silently dropped asset_specs (UC-010) and clarifications (#819), and a
+    # seventh field added later would be dropped by default with no test noticing. Harmless
+    # today only because both attach after this gate — a distance of one reordering, and this
+    # hook has already been reordered once. replace() makes the class impossible.
+    out = replace(spec, criteria=demoted)
+    if any(c.tier in TEST_TIERS for c in spec.criteria) and not any(
+        c.tier in TEST_TIERS for c in out.criteria
+    ):
+        out = _ensure_test_floor(out)
+    return out
+
+
+def _ensure_delivery_floor(spec: AcceptanceSpec) -> AcceptanceSpec:
+    """#1031 S1 (1): a WEB-target spec must carry a machine-gated criterion asserting the
+    thing is actually DELIVERED — the served page loads and shows its content.
+
+    The #1025 class, promoted from a post-hoc executability floor to an AUTHORED criterion.
+    Measured motivation: the Bill Splitter run built every module, resolved every import,
+    passed every code-level gate — and served a page the browser could not load. Logic-level
+    green, user-level nothing. A criterion that rides the spec reaches the coder as a test
+    instruction (``TIER_SMOKE`` is in :data:`TEST_TIERS`) instead of being discovered after
+    the build.
+
+    Deterministic and idempotent by IDENTITY (#1041): injected when the surface is a served
+    page and a criterion with the reserved id :data:`DELIVERY_FLOOR_ID` is not already
+    present. It does NOT inspect what the criteria SAY.
+
+    That is the whole redesign, and it is a simplification. The first version suppressed
+    itself when an existing criterion "already named delivery", decided by substring-matching
+    model-authored English — the same technique this file's realism guard had already
+    DELETED as unworkable (see :func:`_check_names_a_mechanism`), surviving here with a worse
+    failure direction: a false positive silently disabled the floor for the whole spec, and
+    ordinary web criteria triggered it ("Each page loads at most 5 entries per scroll"). Pre-merge
+    review measured three separate defects in that one predicate — a ``build``-tier criterion
+    could suppress the floor while never reaching the coder as a test (``build`` is outside
+    :data:`TEST_TIERS`), 8 of the 9 markers were never exercised in either direction, and the
+    "load-bearing guard-then-floor ordering" it justified had stopped holding.
+
+    The trade this makes deliberately: if the model ALSO authors a delivery criterion, the
+    spec now carries two rather than one. Redundant, cheap, and visible. The alternative —
+    guessing from prose whether a criterion means delivery — is the thing that silently
+    removed the guarantee this function exists to provide. A duplicate criterion costs a test;
+    a false suppression costs the feature.
+
+    The reserved id also retires the positional ``c{n+1}`` scheme, which could collide when
+    criteria ids are non-sequential (review nit N1)."""
+    surface = ""
+    if isinstance(spec.build_plan, dict):
+        surface = str(spec.build_plan.get("surface", "") or "").strip().lower()
+    if surface not in _DELIVERY_FLOOR_SURFACES:
+        return spec
+    if any(c.id == DELIVERY_FLOOR_ID for c in spec.criteria):
+        return spec
+    floor = AcceptanceCriterion(
+        id=DELIVERY_FLOOR_ID,
+        text="The served page loads and displays its main content.",
+        tier=TIER_SMOKE,
+        check=(
+            "Serve the built page and assert it renders its expected top-level content — "
+            "not an empty body, a blank page, or a module/asset load error."
+        ),
+    )
+    # #1042 L5-1: replace() — see _apply_realism_guard. Carries all six fields by construction.
+    return replace(spec, criteria=spec.criteria + (floor,))
 
 
 # ---------------------------------------------------------------------------
@@ -1442,8 +1721,8 @@ def _oracle_import_contract(oracle_code: str) -> list[str]:
     a missing or renamed one is a ``ModuleNotFoundError`` at pytest collection, so the oracle
     never runs and the job scores RED on import-plumbing, not the coder's logic).
 
-    ``from app.core import summarize, mean`` -> ``["app.core.summarize", "app.core.mean"]``;
-    ``import app.core`` -> ``["app.core"]``. Test-runner deps and the standard library
+    ``from app.stats import summarize, mean`` -> ``["app.stats.summarize", "app.stats.mean"]``;
+    ``import app.stats`` -> ``["app.stats"]``. Test-runner deps and the standard library
     (:data:`_ORACLE_NON_API_ROOTS`) are excluded; RELATIVE imports (``from . import x``) live
     inside ``tests/`` and are not a public module, so they are skipped. Order-preserving and
     de-duplicated. Fail-soft: anything that will not ``ast.parse`` returns ``[]`` (the generic
@@ -1470,7 +1749,7 @@ def _oracle_import_contract(oracle_code: str) -> list[str]:
             if not module or module.split(".", 1)[0] in _ORACLE_NON_API_ROOTS:
                 continue
             for alias in node.names:
-                # ``from app.core import *`` — no concrete symbol; fall back to the module name
+                # ``from app.stats import *`` — no concrete symbol; fall back to the module name
                 _add(module if alias.name == "*" else f"{module}.{alias.name}")
         elif isinstance(node, ast.Import):
             for alias in node.names:
@@ -1501,6 +1780,66 @@ def _oracle_signature_contract_line(oracle_code: str) -> str:
         "\nThe acceptance tests CALL these functions with these argument shapes, so build "
         f"each to accept exactly that call: {joined}. A different signature (a wrong number "
         "of arguments, or a missing keyword) fails the assertion even when the name resolves."
+    )
+
+
+def _oracle_ecosystem(spec: "AcceptanceSpec") -> "str | None":
+    """``"python"`` | ``"node"`` | ``None`` (fail-closed) from the goal's build-signal — the
+    SINGLE ecosystem decision shared by the per-task (#690/#697) AND job (#740) oracles, so the
+    two never disagree on what a project's tests are written in.
+
+    ``python`` ⇐ an explicit ``language_hint == "python"``. ``node`` ⇐ an explicit ``node``
+    hint OR a ``web`` surface with NO other hint (the fleet's web scaffold is the node:http +
+    node:test seed, so a web tree is node-testable). Everything else — absent/dotnet/cpp/
+    powershell/unknown, or an unclassified non-web surface — gets ``None``: a build-only or
+    unrecognised ecosystem stays honestly UNVERIFIED by an oracle, never seeded a test file its
+    gate cannot run. ``build_plan`` absent (the 14B couldn't classify) -> ``None``."""
+    bp = spec.build_plan if isinstance(getattr(spec, "build_plan", None), dict) else {}
+    hint = bp.get("language_hint")
+    surface = bp.get("surface")
+    if hint == "python":
+        return "python"
+    if hint == "node" or (hint is None and surface == "web"):
+        return "node"
+    return None
+
+
+def _node_oracle_block(oracle_code: str) -> str:
+    """The prompt block that points a NODE single-feature coder at the seeded, protected
+    ``node:test`` acceptance oracle (#697) — the ``.mjs`` analogue of the python oracle block
+    built inline in :func:`compile_prompts`. The coder CODES AGAINST the protected file (never
+    writes its own tests); the fleet seeds it into every best-of-N candidate and restores it
+    before grading, so every candidate is judged by the byte-identical scorecard.
+
+    The oracle's concrete first-party imports (its ``../src`` module surface, via
+    :func:`context_pack.extract_import_contract`) are surfaced as a HARD contract so the coder
+    builds EXACTLY the modules + exports the acceptance file collects — the node mirror of the
+    #752 F3 import-plumbing loop (a missing/renamed module fails the whole file at load, scoring
+    the attempt zero on plumbing, not logic). Fail-soft: no derivable import -> generic guidance
+    (the ``src/`` instruction below still stands)."""
+    from shared.fleet import context_pack
+
+    contract = context_pack.extract_import_contract(ACCEPTANCE_ORACLE_PATH_NODE, oracle_code)
+    contract_line = ""
+    if contract:
+        joined = "; ".join(f"`{s}`" for s in contract)
+        contract_line = (
+            "\nYour code MUST provide EXACTLY these importable modules and their exports, because "
+            f"the protected acceptance file imports them: {joined}. Build each named `../src/` "
+            "module with the exact exported names it binds; if any module or export is missing or "
+            "renamed, the test file fails to LOAD and the whole attempt errors on an import, not "
+            "on your logic."
+        )
+    return (
+        "--- Acceptance tests (DO NOT EDIT) ---\n"
+        f"A protected acceptance-test file `{ACCEPTANCE_ORACLE_PATH_NODE}` is ALREADY in this "
+        "project (it runs under `node --test`). It IS the specification for this task. Make "
+        "EVERY test in it pass: create exactly the `src/` module(s) and export(s) it imports, "
+        "with the behavior its assertions require. Do NOT edit, weaken, delete, rename, or skip "
+        "any test in that file — it is restored to the original before grading, so changing it "
+        "cannot help and only wastes the attempt. You may add new code files freely; you may NOT "
+        "modify that test file."
+        + contract_line
     )
 
 
@@ -1537,13 +1876,17 @@ def compile_prompts(
     reach the fleet queue write (#674) — stamped at the SINGLE exit so all three shapes
     (no-test passthrough, folded-single, dedicated-final) carry them uniformly.
 
-    #690 — the shared ORACLE: when ``oracle_code`` is supplied (a 14B-written spec-derived
-    pytest file, python single-feature only — see :func:`generate_acceptance_oracle`), the lone
-    feature task is told to CODE AGAINST that seeded, protected oracle instead of writing its
-    own tests, and carries ``acceptance_test_code`` + ``acceptance_test_path`` so the fleet can
-    seed it into every best-of-N candidate and restore it before the gate (every candidate is
-    then judged by the byte-identical scorecard). Empty ``oracle_code`` (every existing caller,
-    and any non-python/multi-feature shape) is byte-identical to today's behavior.
+    #690/#697 — the shared ORACLE: when ``oracle_code`` is supplied (a 14B-written spec-derived
+    test file, single-feature only — see :func:`generate_acceptance_oracle`), the lone feature
+    task is told to CODE AGAINST that seeded, protected oracle instead of writing its own tests,
+    and carries ``acceptance_test_code`` + ``acceptance_test_path`` so the fleet can seed it into
+    every best-of-N candidate and restore it before the gate (every candidate is then judged by
+    the byte-identical scorecard). The ecosystem is resolved from the SAME build-signal that
+    authored the oracle (:func:`_oracle_ecosystem`): python seeds the pytest oracle at
+    :data:`ACCEPTANCE_ORACLE_PATH`, node the node:test oracle at
+    :data:`ACCEPTANCE_ORACLE_PATH_NODE` (#697), so the seed PATH extension matches the oracle's
+    language. Empty ``oracle_code`` (every existing caller, and any multi-feature shape) is
+    byte-identical to today's behavior.
     """
     feature = [dict(t) for t in tasks]
     test_criteria = [c for c in spec.criteria if c.tier in TEST_TIERS]
@@ -1568,21 +1911,35 @@ def compile_prompts(
     # oracle is single-feature MVP); a junk/absent oracle is '' and never reaches here.
     if oracle_code and len(feature) == 1:
         only = feature[0]
+        # #697 — a NODE single-feature task codes against a seeded node:test oracle (the .mjs
+        # analogue of the python block below). The ecosystem is resolved from the SAME
+        # build-signal the plan used to AUTHOR the oracle (generate_acceptance_oracle), so the
+        # oracle CODE and the seed PATH extension never disagree. Any non-node ecosystem (python,
+        # or the unreachable None/unknown, since generate returns '' there) keeps the python path
+        # below byte-identical to pre-#697.
+        if _oracle_ecosystem(spec) == "node":
+            only["prompt"] = f"{only['prompt']}\n\n{_node_oracle_block(oracle_code)}"
+            only["acceptance_test_code"] = oracle_code
+            only["acceptance_test_path"] = ACCEPTANCE_ORACLE_PATH_NODE
+            return _thread_build_fields(feature, spec)
         # #752 F3 — close the import-plumbing loop: parse the CONCRETE symbols the protected
         # oracle imports and state them to the coder as a HARD public-API contract, so the
         # coder's modules match exactly what the acceptance file collects. Without this the
         # oracle could import a module the coder never created -> ModuleNotFoundError at pytest
         # collection -> the oracle never runs and the job scores RED on plumbing, not logic
-        # (B2's failure). The template already pins the oracle to `app`; this holds even if the
-        # oracle's names drift. Fail-soft: no parseable first-party import -> generic guidance.
+        # (B2's failure). The template already pins the oracle to `app` — the neutral seeded
+        # skeleton whose modules the coder AUTHORS (#1036/#1048: the old app/core.py starter
+        # module no longer exists, so the contract must never point at it). Fail-soft: no
+        # parseable first-party import -> generic guidance.
         contract = _oracle_import_contract(oracle_code)
         contract_line = ""
         if contract:
             joined = ", ".join(f"`{s}`" for s in contract)
             all_under_app = all(s == "app" or s.startswith("app.") for s in contract)
             where = (
-                " These belong in the project's EXISTING `app` package — extend `app/core.py` "
-                "or add an `app/<name>.py` submodule; do NOT start a second top-level package."
+                " These belong in the project's EXISTING `app` package — author each as an "
+                "`app/<name>.py` submodule (the seeded package is a neutral skeleton with no "
+                "starter module); do NOT start a second top-level package."
                 if all_under_app
                 else ""
             )
@@ -1752,6 +2109,65 @@ def detect_ecosystem(repo: Path) -> str:
     return "unknown"
 
 
+#: Project-marker files whose PRESENCE makes the fleet SKIP scaffold seeding — a RECURSIVE mirror
+#: of ``new-agent-task.ps1``'s ``$hasProj`` gate (``Get-ChildItem -Recurse``, all depths). When any
+#: is present at ANY depth the fleet leaves the repo as-is, so the #888 surface->scaffold-ecosystem
+#: disclosure must NOT fire.
+_SCAFFOLD_MARKER_GLOBS: tuple[str, ...] = (
+    "*.csproj", "*.sln", "pyproject.toml", "package.json", "CMakeLists.txt", "*.vcxproj",
+)
+
+
+def repo_will_scaffold(repo: Path) -> bool:
+    """True iff a FRESH dispatch of ``repo`` will have a scaffold SEEDED into it — i.e. the repo
+    carries NO project-marker file yet (mirrors ``new-agent-task.ps1``'s ``$hasProj`` gate).
+
+    The #888 plan-card coverage disclosure uses this so it only states the scaffold's ecosystem
+    when a scaffold will ACTUALLY run: a New-Project repo (README-only shell) returns True; an
+    existing project with a manifest returns False (its real language governs, no seed). Recursive
+    (all depths), mirroring ``new-agent-task.ps1``'s ``$hasProj`` (``Get-ChildItem -Recurse``)
+    EXACTLY — a marker buried deep (e.g. a monorepo ``packages/app/package.json`` with no root
+    manifest) makes the fleet SKIP seeding, so this must too; a shallow check would over-claim
+    "checks will run" for a scaffold that never runs. Fail-closed: any OSError -> False (keep the
+    honest warning)."""
+    try:
+        repo = Path(repo)
+        for pattern in _SCAFFOLD_MARKER_GLOBS:
+            if any(repo.rglob(pattern)):
+                return False
+        return True
+    except OSError:
+        return False
+
+
+def scaffold_gated_ecosystem(build_plan: dict | None) -> str:
+    """The behavior-GATED ecosystem (``python`` | ``node``) the fleet's scaffold will produce for
+    this build-signal, or ``""`` when the scaffold is NOT gate-run (#888).
+
+    Mirrors agentic-setup's ``Resolve-BuildProfile`` scaffold->ecosystem for EXACTLY the surfaces
+    whose seeded tests actually run in the fleet gate (:data:`BEHAVIOR_GATED_ECOSYSTEMS`): ``web``
+    -> the node skeleton; ``command-line``/``library`` -> the python scaffold by default (or node
+    when ``language_hint`` says so). Every other surface — ``desktop-gui``/``mobile``/
+    ``automation``/``web-static`` (a lone static page with no test runner), a dotnet/cpp/powershell
+    language hint, ``unknown``/``ambiguous``, or no signal — returns ``""``, so the plan card keeps
+    its honest "not auto-checked" disclosure. Pure, fail-closed, never raises; used ONLY for the
+    coverage-DISCLOSURE wording and ONLY when :func:`repo_will_scaffold` — it NEVER widens real
+    oracle coverage."""
+    if not isinstance(build_plan, dict):
+        return ""
+    surface = build_plan.get("surface")
+    if surface == "web":
+        return "node"
+    if surface in ("command-line", "library"):
+        hint = build_plan.get("language_hint")
+        if hint in (None, "python"):
+            return "python"
+        if hint == "node":
+            return "node"
+        return ""  # dotnet/cpp/powershell scaffolds are not behavior-gated
+    return ""  # desktop-gui / mobile / automation / web-static / unknown / ambiguous
+
+
 def _package_scripts(repo: Path) -> dict:
     try:
         data = json.loads((repo / "package.json").read_text(encoding="utf-8"))
@@ -1795,6 +2211,14 @@ _STATUS_LABEL = {
     STATUS_FAILED: "FAIL",
     STATUS_UNVERIFIED: "NOT AUTO-CHECKED — verify yourself",
     STATUS_EYEBALL: "your eyeball",
+}
+
+#: Operator-facing names for a scaffold ecosystem (#888 coverage disclosure) — the novice
+#: doesn't know "node". Only the behavior-gated ecosystems need an entry (the disclosure fires
+#: for those alone); an absent key falls back to the raw name.
+_ECOSYSTEM_FRIENDLY: dict[str, str] = {
+    "node": "a JavaScript (Node) project",
+    "python": "a Python project",
 }
 
 
@@ -1848,6 +2272,7 @@ def render_criteria_preview(
     ecosystem: str = "unknown",
     tasks: list | None = None,
     revise_hint: str = "",
+    scaffold_ecosystem: str = "",
 ) -> str:
     """The confirm-time preview the operator approves (PLAN -> WAIT).
 
@@ -1877,6 +2302,17 @@ def render_criteria_preview(
     free-text revise verb (the coordinator supplies the exact phrasing incl. the honest
     remaining-revision count). Empty (every pre-#820 caller, and a plan at its revision cap)
     renders the original approve/reject-only footer byte-identically.
+
+    ``scaffold_ecosystem`` (#888) fixes the false-pessimistic coverage warning on New-Project
+    dispatches. At PLAN time a New-Project repo is an empty README shell, so ``ecosystem`` sniffs
+    ``unknown`` and the card wrongly warns "I couldn't tell the language" — but the run's own
+    scaffold pins the language minutes later and the behaviour checks DO run. When the coordinator
+    resolves the scaffold's behaviour-GATED ecosystem (``node``/``python``, via
+    :func:`scaffold_gated_ecosystem`, and ONLY when :func:`repo_will_scaffold`) and passes it here,
+    the ``unknown``-ecosystem branch states the run's truth instead. Empty ``""`` (every existing
+    caller, an unknown/none surface, an existing repo, or a non-gated scaffold like ``web-static``)
+    preserves the honest warning BYTE-FOR-BYTE — this is a coverage-DISCLOSURE fix and NEVER widens
+    an actual coverage claim.
     """
     lines = [f"Here's what I'll treat as DONE for: {spec.goal}", ""]
     friendly = _friendly_surface(spec)
@@ -1928,12 +2364,23 @@ def render_criteria_preview(
             'verify by eye. A clean report means "it compiled," not "the math is right."',
         ]
     elif ecosystem == "unknown":
-        lines += [
-            "",
-            "Heads up: I couldn't tell this project's language, so the automatic "
-            'behavior checks may not run — treat a clean report as "it built" and '
-            "verify the behavior yourself.",
-        ]
+        if scaffold_ecosystem in BEHAVIOR_GATED_ECOSYSTEMS:
+            # New-Project truth (#888): detection was blind on the empty shell, but the run WILL
+            # scaffold a behaviour-gated project, so the checks WILL run. State that, don't warn.
+            friendly_eco = _ECOSYSTEM_FRIENDLY.get(scaffold_ecosystem, scaffold_ecosystem)
+            lines += [
+                "",
+                f"Heads up: I'll set this up as {friendly_eco}, so the automatic behavior "
+                "checks WILL run once it's built — a clean report means the behavior was "
+                "tested, not just that it compiled.",
+            ]
+        else:
+            lines += [
+                "",
+                "Heads up: I couldn't tell this project's language, so the automatic "
+                'behavior checks may not run — treat a clean report as "it built" and '
+                "verify the behavior yourself.",
+            ]
 
     # #820: when the plan is revisable, the footer also offers the free-text refine verb (the
     # coordinator supplies the exact phrasing incl. the honest remaining-revisions count). An
@@ -2017,10 +2464,10 @@ _ORACLE_TEMPLATE = (
     "implementation below must satisfy. Return ONLY Python code — no prose, no markdown fences.\n"
     "RULES:\n"
     "- Write ONLY tests, never the implementation. The project ALREADY contains a Python "
-    "package named `app` (its `app/core.py` holds the starter module) and the implementer "
-    "EXTENDS that package — so IMPORT everything you test FROM `app`: `from app.core import "
-    "<fn>` for the main module, or `from app.<module> import <fn>` for a submodule you name "
-    "after the behavior. Do NOT invent a new top-level module (a name like `calendar_math` or "
+    "package named `app` — a neutral seeded skeleton (`app/__init__.py` plus passing smoke "
+    "tests, no starter module) whose modules the implementer AUTHORS — so IMPORT everything "
+    "you test FROM `app`: `from app.<module> import <fn>`, naming the module after the "
+    "behavior. Do NOT invent a new top-level module (a name like `calendar_math` or "
     "`text_analyzer` will not exist on disk, so pytest cannot even collect the file and every "
     "test fails on the import). Choose the function names from the criteria; the implementer "
     "is told to create EXACTLY the `app` module(s) and functions your tests import.\n"
@@ -2032,6 +2479,36 @@ _ORACLE_TEMPLATE = (
     "it over many auto-generated inputs.\n"
     "- Name each test function `test_<behavior>`; make the file self-contained and importable; "
     "add the obvious edge cases the criteria imply.\n\n"
+    "Implementation the tests must hold against:\n{task_prompt}\n\n"
+    "Criteria to assert (the REQUIRED behavior of each):\n{criteria}\n"
+)
+
+#: The NODE:test analogue of :data:`_ORACLE_TEMPLATE` (#697) — the single-feature per-task
+#: scorecard for a node/web goal. Mirrors the python template's shape (import from the seeded
+#: scaffold, assert REQUIRED behavior, self-contained) but pins the node scaffold layout: the
+#: implementer builds under ``src/`` and the oracle lives in ``tests/``, so imports are
+#: ``../src/<module>.mjs`` relative paths (the same convention as the job node template and the
+#: fleet's web scaffold). Uses the built-in ``node:test`` runner + ``node:assert`` — no external
+#: deps, matching the job-level ``node --test`` convention. Doubled braces escape ``str.format``.
+_ORACLE_TEMPLATE_NODE = (
+    "Write a COMPLETE JavaScript (ESM) test file using the built-in `node:test` runner: the "
+    "executable ACCEPTANCE TESTS the implementation below must satisfy. Return ONLY JavaScript "
+    "code — no prose, no markdown fences.\n"
+    "RULES:\n"
+    "- Start with: import test from 'node:test'; import assert from 'node:assert';\n"
+    "- Write ONLY tests, never the implementation. The implementer builds this app's modules "
+    "under `src/`, and this test file lives in `tests/` — so IMPORT everything you test with a "
+    "RELATIVE path into `../src/`: `import {{ <fn> }} from '../src/<module>.mjs';`, choosing the "
+    "`<module>` file name and the `<fn>` export names from the criteria. Do NOT import a bare "
+    "package name or any path outside `../src/` (a module that does not exist on disk fails to "
+    "load and every test errors before it runs). The implementer is told to create EXACTLY the "
+    "`src/` module(s) and exports your tests import.\n"
+    "- Derive every assertion from the criteria below — assert the behavior each criterion "
+    "REQUIRES, with concrete example inputs and expected outputs. Never assert what some "
+    "implementation merely happens to do (a test that mirrors the code proves nothing).\n"
+    "- Use `test('...', () => {{ ... }})` blocks with `assert` from `node:assert`; name each "
+    "after the behavior; make the file self-contained; add the obvious edge cases the criteria "
+    "imply; use no external dependencies.\n\n"
     "Implementation the tests must hold against:\n{task_prompt}\n\n"
     "Criteria to assert (the REQUIRED behavior of each):\n{criteria}\n"
 )
@@ -2163,8 +2640,10 @@ def generate_acceptance_oracle(
     *,
     generate_fn: Callable[[str], str],
 ) -> str:
-    """PLAN-time: the 14B writes ONE spec-derived, spec-blind pytest ORACLE (#690) — the shared
-    scorecard every best-of-N candidate codes against and is judged by.
+    """PLAN-time: the 14B writes ONE spec-derived, spec-blind ORACLE (#690/#697) — the shared
+    scorecard every best-of-N candidate codes against and is judged by. A PYTHON goal gets a
+    pytest oracle; a NODE goal gets a ``node:test`` oracle (#697); both mirror the same
+    single-feature structure and the SAME fail-closed contract.
 
     CROSS-MODEL by construction: this runs while the 14B is resident, BEFORE the 30B coder ever
     sees the task, so the coder never authors the tests that grade it (sidesteps the self-test
@@ -2172,26 +2651,29 @@ def generate_acceptance_oracle(
     the ruler disposed) plus the lone feature task's prompt, so the oracle's import names align
     with what the coder is told to build.
 
-    Returns the oracle's Python source, or ``''`` (fall back to today's fold-the-tests-in
-    behavior, BYTE-IDENTICAL) when ANY of these holds — all fail-closed, never raising:
+    The returned CODE is python or node source per ecosystem; the caller
+    (:func:`compile_prompts`) resolves the SAME ecosystem (:func:`_oracle_ecosystem`) to pick the
+    seed PATH, so code and path never disagree. Returns ``''`` (fall back to today's
+    fold-the-tests-in behavior, BYTE-IDENTICAL) when ANY of these holds — all fail-closed, never
+    raising:
 
       * no tasks (nothing to align names against);
-      * the project is not PYTHON (the oracle is pytest; ``language_hint`` must be ``"python"`` —
-        an absent/unknown/other hint keeps today's behavior; node is a tracked follow-up);
+      * no python/node ecosystem resolves (:func:`_oracle_ecosystem` — a build-only .NET/cpp goal,
+        or an unclassified non-web surface, stays honestly UNVERIFIED by an oracle, never seeded a
+        test file its gate cannot run);
       * there are no behavior/smoke criteria to assert (an oracle adds nothing over the build gate);
-      * the model output does not parse as Python, or defines no ``test`` function (junk);
+      * python: the model output does not parse as Python or defines no ``test`` function (junk);
+        node: it lacks the ``node:test`` import or any ``test(``/``it(`` block (would pass vacuously);
       * the model call itself raises.
 
     The model call is injected so this is fully testable without the GPU."""
     if not tasks:
         return ""
-    language_hint = (
-        spec.build_plan.get("language_hint") if getattr(spec, "build_plan", None) else None
-    )
-    if language_hint != "python":
-        # MVP: a pytest oracle only fires for an explicitly-python goal. Every other ecosystem
-        # (and an unclassified one) keeps today's fold-the-tests-in behavior — fail-closed,
-        # never seed a pytest file into a project that may not be python.
+    ecosystem = _oracle_ecosystem(spec)
+    if ecosystem is None:
+        # A per-task oracle only fires for an ecosystem whose gate RUNS the tests (python pytest /
+        # node:test). Every build-only or unclassified ecosystem keeps today's fold-the-tests-in
+        # behavior — fail-closed, never seed a test file a foreign gate cannot run.
         return ""
     test_criteria = [c for c in spec.criteria if c.tier in TEST_TIERS]
     if not test_criteria:
@@ -2201,12 +2683,21 @@ def generate_acceptance_oracle(
         for c in test_criteria
     )
     task_prompt = str(tasks[0].get("prompt", "")).strip() or goal
+    template = _ORACLE_TEMPLATE if ecosystem == "python" else _ORACLE_TEMPLATE_NODE
     try:
         raw = generate_fn(
-            _ORACLE_TEMPLATE.format(task_prompt=task_prompt, criteria=criteria_block)
+            template.format(task_prompt=task_prompt, criteria=criteria_block)
         )
     except Exception:  # noqa: BLE001 — an oracle-gen failure must not crash the plan
         return ""
+    if ecosystem == "node":
+        # node: no ast.parse for JS — the deliberately-conservative shape check (a node:test
+        # import + at least one test/it block) is the fail-closed gate, mirroring the job node
+        # oracle. A file failing it would 'pass' vacuously, so it is rejected.
+        code = _extract_js_code(raw)
+        if not _node_oracle_valid(code):
+            return ""
+        return code
     code = _extract_python_code(raw)
     if not code:
         return ""
@@ -2343,18 +2834,16 @@ def _node_oracle_valid(code: str) -> bool:
 def _job_oracle_target(spec: "AcceptanceSpec") -> "tuple[str, str] | None":
     """``(ecosystem, oracle_rel_path)`` for the job oracle, or ``None`` (fail-closed).
 
-    python ⇐ an explicit ``language_hint == "python"``; node ⇐ an explicit ``node``
-    hint OR a ``web`` surface with NO other hint (the fleet's web scaffold is the
-    node:http + node:test seed, so a web job's integrated tree is node-testable —
-    the Stage-2 shape). Everything else (absent/dotnet/cpp/powershell/unknown) gets
-    NO job oracle — build-only ecosystems stay honestly UNVERIFIED, never a false
-    gate."""
-    bp = spec.build_plan if isinstance(spec.build_plan, dict) else {}
-    hint = bp.get("language_hint")
-    surface = bp.get("surface")
-    if hint == "python":
+    Ecosystem is the SHARED :func:`_oracle_ecosystem` decision (identical to the per-task
+    oracle, #697): python ⇐ ``language_hint == "python"``; node ⇐ an explicit ``node`` hint OR a
+    ``web`` surface with no other hint (the fleet's web scaffold is the node:http + node:test
+    seed). Everything else (absent/dotnet/cpp/powershell/unknown) gets NO job oracle —
+    build-only ecosystems stay honestly UNVERIFIED, never a false gate. This maps that ecosystem
+    onto the pinned JOB oracle paths."""
+    ecosystem = _oracle_ecosystem(spec)
+    if ecosystem == "python":
         return ("python", JOB_ORACLE_PATH_PYTHON)
-    if hint == "node" or (hint is None and surface == "web"):
+    if ecosystem == "node":
         return ("node", JOB_ORACLE_PATH_NODE)
     return None
 
@@ -2395,6 +2884,12 @@ def generate_job_acceptance_oracle(
     the criterion→test traceability matrix, and the bounded regeneration loop — wraps this
     in :func:`author_and_qa_job_oracle`; ``generate_plan`` calls THAT so every dispatch
     oracle is validated before it seeds.
+
+    ``goal`` is the PLANNING SEED, not necessarily the bare request: the caller passes the
+    goal plus any clarified requirements (#819), exactly as the single-task
+    :func:`generate_acceptance_oracle` receives it. The two must agree — an exam authored
+    from different text than the coder builds to grades a job against a spec nobody was
+    given. A dispatch with no clarified requirements passes the bare goal.
 
     Returns ``(code, repo_relative_path)`` or ``("", "")`` — all fail-closed, never
     raising — when ANY of these holds:
@@ -2471,9 +2966,21 @@ def author_and_qa_job_oracle(
     generate_fn: Callable[[str], str],
     structured_generate_fn: "Callable[[str, str], str] | None" = None,
     reauthor: bool = True,
+    operator_answers: "Sequence[str] | None" = (),
 ) -> tuple[str, str, dict]:
     """PLAN-time: author the job oracle (:func:`generate_job_acceptance_oracle`) AND run
     it through the QUALITY-3 (#821) validation gate before it seeds.
+
+    ``goal`` is the PLANNING SEED (the goal plus any clarified requirements), the same
+    contract :func:`generate_job_acceptance_oracle` states — it is what the oracle is
+    AUTHORED from, and it is PROMPT text.
+
+    ``operator_answers`` is what the gate GROUNDS on: the operator's answers as data, never
+    the rendered requirements block. The two are deliberately different objects — the author
+    should see the house framing ("build to them"), the judge must not, because grounding is
+    authority and those words are ours, not the operator's (#1043). A caller holding only a
+    rendered block extracts these with
+    :func:`shared.fleet.clarify.operator_answers_from_block`.
 
     Returns ``(oracle_code, rel_path, qa_evidence)``. On a clean or SOFT-only validation
     the (possibly regenerated) code is returned with a ``seed``/``seed-partial`` evidence
@@ -2500,6 +3007,12 @@ def author_and_qa_job_oracle(
             code, ecosystem, spec, tasks,
             generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
             reauthor=reauthor,
+            # #1043: ground the judge on what the OPERATOR said. Deliberately NOT ``goal``:
+            # that is the rendered seed, and its house header would grant authority to words
+            # ("person", "build", "requirements") the operator never used. ``spec.goal`` is
+            # the clean goal, so without these the scanner convicts the oracle for asserting
+            # a value the operator supplied.
+            operator_answers=operator_answers,
         )
         if result.verdict == "refuse":
             return ("", "", result.to_evidence())
@@ -2550,6 +3063,58 @@ def extract_job_oracle_qa(tasks: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _plan_contract_coverage_warning(
+    tasks: list[dict], oracle_rel: str, oracle_code: str
+) -> str:
+    """The plan-time contract-coverage warning (#989), or ``''`` when clean or not
+    computable.
+
+    Coverage (``context_pack.contract_coverage``) is the measured predictor of clean
+    wave-1 scope distribution: a build task whose contract owns NO module the job
+    oracle imports has no anchored slice of the final app and tends to build ALL of
+    it, and an oracle import no task owns is a module no task is ever told to build
+    (the B4 shape). WARN-LOUD, deliberately never a refusal: a coverage gap makes the
+    plan RISKY, not unrunnable — this seam handles every oracle defect fail-soft with
+    loud evidence (the oracle-QA gate, the seed-time fail-to-pass gate), and refusing
+    the plan would silently change what a dispatch can do, which is a capability call
+    this layer must not make. Fail-soft but never SILENT: a derivation crash yields
+    ``''`` (the plan proceeds; the check is advisory, not a gate) and is logged as
+    coverage-UNMEASURED — an absent measurement, never a clean bill."""
+    try:
+        coverage = contract_coverage(tasks, oracle_rel, oracle_code)
+    except Exception as exc:  # noqa: BLE001 — an advisory check must never sink a plan request
+        logger.warning(
+            "generate_plan: contract-coverage check crashed (%s: %s) — coverage is "
+            "UNMEASURED for this plan (fail-soft; not a clean bill).",
+            type(exc).__name__, exc,
+        )
+        return ""
+    if not coverage:
+        return ""
+    parts: list[str] = []
+    uncovered = coverage["uncovered_tasks"]
+    orphans = coverage["orphan_imports"]
+    if uncovered:
+        listed = ", ".join(uncovered[:6]) + (" …" if len(uncovered) > 6 else "")
+        parts.append(
+            f"build task(s) {listed} own NO module the job-acceptance oracle imports "
+            "(an unanchored task tends to build far beyond its slice)"
+        )
+    if orphans:
+        listed = "; ".join(f"`{m}`" for m in orphans[:6]) + (" …" if len(orphans) > 6 else "")
+        parts.append(
+            f"oracle import(s) {listed} match NO build task's contract "
+            "(no task is told to build them)"
+        )
+    if not parts:
+        return ""
+    return (
+        "CONTRACT-COVERAGE WARNING: " + "; ".join(parts)
+        + f" — {coverage['tasks']} build task(s) against {coverage['targets']} "
+        "oracle import target(s)."
+    )
+
+
 def generate_plan(
     idea: str,
     repo: str,
@@ -2566,6 +3131,7 @@ def generate_plan(
     requirements: str = "",
     max_questions: int = _clarify.DEFAULT_MAX_QUESTIONS,
     revise: bool = False,
+    advanced_intake: bool = False,
 ) -> PlanResult:
     """The 14B-resident PLAN step: decompose into tasks + an AcceptanceSpec, validate both,
     compile the criteria into the task prompts.
@@ -2780,16 +3346,56 @@ def generate_plan(
             raw_build_plan = ""
     build_plan = _parse_build_plan(raw_build_plan)
     if build_plan is not None:
+        # #886: deterministically narrow a ``web`` signal to ``web-static`` when the goal (incl.
+        # any clarified requirements — hence ``planning_seed``) carries explicit static/no-backend
+        # signals, so the fleet seeds a lone static page instead of the full-stack skeleton whose
+        # server fetch hangs a ``file://`` page. A non-web signal / no static signal is unchanged.
+        build_plan = _refine_web_static(build_plan, planning_seed)
         spec = AcceptanceSpec(
             goal=spec.goal, criteria=spec.criteria, assumptions=spec.assumptions,
             build_plan=build_plan,
         )
 
-    # 2e. Acceptance-test ORACLE (#690) — the shared, spec-derived scorecard for best-of-N. The
-    # 14B writes ONE spec-blind pytest file (CROSS-MODEL: the 30B coder never authors the tests
+    # 2e-i. #1031 S1 — the ADVANCED-INTAKE spec floors, at the ONE flag gate point.
+    # Placed HERE, after the build-signal is attached, and not beside the test floor at 2b:
+    # the delivery floor reads ``spec.build_plan.surface``, which does not exist until the
+    # build-signal call above. (Found by driving the real function — at 2b the surface is
+    # always empty, so the floor silently never fired while every unit test on the helper
+    # passed. The seam, not the parts.)
+    # ORDER IS FLOOR-THEN-GUARD, and it is load-bearing — #1041 review corrected an earlier
+    # comment here that claimed the order no longer mattered. It does, but not the way the
+    # ORIGINAL S1 comment claimed. The old story ("guard demotes a fake claim so the floor
+    # then injects a real one") is dead: the floor is idempotent by reserved id now and never
+    # reads criteria wording. The REAL coupling is the guard's never-zero-tests invariant. If
+    # the guard runs first and demotes a web spec's only test-tier criterion, TEST_TIERS is
+    # momentarily empty and _ensure_test_floor injects a generic "runs without crashing" smoke
+    # BEFORE the delivery floor lands — a redundant criterion, since "the served page loads"
+    # subsumes it for a web target. Running the FLOOR first means the delivery criterion is
+    # already present when the guard demotes, TEST_TIERS is never empty, and no generic smoke
+    # appears. Floor-then-guard yields the cleaner spec, so that is the shipped order.
+    # (Review measured 258 inputs where the two orders differ; the difference is always benign
+    # — both orders keep a machine-gated delivery criterion and never-zero-tests holds either
+    # way — but it is a difference, so it is LOCKED, not asserted away. See
+    # test_gate_order_is_floor_then_guard_THROUGH_generate_plan.)
+    # ``advanced_intake=False`` ⇒ byte-identical to today.
+    # SELF-SUPPRESSES FOR ANY CARD-DRIVEN DISPATCH (``_is_card_driven``): a battery card IS
+    # the spec, frozen for cross-night comparability, and injecting a delivery criterion into
+    # B5's exam would silently change the instrument mid-campaign — the exact confound the
+    # #989 A/B was protected from. A card's criteria are the card author's, never this
+    # ruler's. NOTE the predicate is NOT ``decomposition_override is None``: that was the
+    # first attempt and review measured it leaving FIVE frozen cards exposed (B3, B5, B6, B7,
+    # B8 — both web cards among them), because an override is only built for the three cards
+    # with registered arm builders. See ``_is_card_driven``.
+    if advanced_intake and not _is_card_driven(repo, decomposition_override):
+        spec = _ensure_delivery_floor(spec)
+        spec = _apply_realism_guard(spec)
+
+    # 2e. Acceptance-test ORACLE (#690/#697) — the shared, spec-derived scorecard for best-of-N.
+    # The 14B writes ONE spec-blind test file (CROSS-MODEL: the 30B coder never authors the tests
     # that grade it), seeded into every candidate's worktree and restored before the gate so all
-    # candidates are judged by the byte-identical tests. Scoped to the lone PYTHON feature task
-    # (the MVP — the case best-of-N + self-written tests collide worst). Only ATTEMPTED for a
+    # candidates are judged by the byte-identical tests. Scoped to the lone feature task (the MVP
+    # — the case best-of-N + self-written tests collide worst); python gets a pytest oracle, node
+    # a node:test oracle (#697), by the shared _oracle_ecosystem decision. Only ATTEMPTED for a
     # single task (avoids a wasted GPU call on the multi-task shape, which keeps the dedicated
     # acceptance task); fail-closed to '' (== today's fold-the-tests-in behavior) for any other
     # ecosystem/shape or a junk emission, so a missing oracle never changes today's plan.
@@ -2845,10 +3451,36 @@ def generate_plan(
         job_oracle_code = decomposition_override.job_oracle_code
         job_oracle_path = decomposition_override.job_oracle_path
     elif len(decomposed.tasks) >= 2:
+        # #1032: ``planning_seed``, NOT the clean ``goal`` — the SAME argument the single-task
+        # oracle receives at 2e. This function's own docstring promises the clarified
+        # requirements thread into "both oracles"; passing ``goal`` here delivered that for the
+        # single-task shape only, so a MULTI-task dispatch authored its job exam blind to the
+        # operator's answers (they reached it indirectly, via derived criteria/contracts). The
+        # exam is what the whole job is graded against — authoring it from a different text than
+        # the coder builds to is the defect. A dispatch WITHOUT requirements has
+        # ``planning_seed == goal``, so that path stays byte-identical.
         job_oracle_code, job_oracle_path, job_oracle_qa = author_and_qa_job_oracle(
-            goal, spec, decomposed.tasks, generate_fn=generate_fn,
+            planning_seed, spec, decomposed.tasks, generate_fn=generate_fn,
             structured_generate_fn=structured_generate_fn,
+            # #1043: the QA gate grounds on the operator's ANSWERS, extracted from the block
+            # rather than the block itself — the rendered prose is ours, and grounding on it
+            # would excuse an oracle asserting our own header words. Empty ``req`` -> ().
+            operator_answers=_clarify.operator_answers_from_block(req),
         )
+
+    # 2h. Plan-time CONTRACT-COVERAGE check (#989): every build task must OWN at least
+    # one module the job oracle imports, and every oracle import an owning task —
+    # computed over BOTH oracle origins (14B-authored and caller-authorised) from data
+    # this function already holds. Surfaced LOUDLY at plan time — the AO log AND the
+    # PlanResult message the operator preview renders — and deliberately warn-loud,
+    # never a refusal (rationale in _plan_contract_coverage_warning). Scoped to the
+    # multi-task job-oracle shape: a single-task plan owns everything by construction.
+    coverage_warning = ""
+    if job_oracle_code and job_oracle_path and len(decomposed.tasks) >= 2:
+        coverage_warning = _plan_contract_coverage_warning(
+            decomposed.tasks, job_oracle_path, job_oracle_code)
+        if coverage_warning:
+            logger.warning("generate_plan: %s", coverage_warning)
 
     # 3. Compile behavior/smoke criteria into the task prompts (fleet schema unchanged). The
     # goal-level build-signal fields are threaded onto each task here (compile_prompts). When an
@@ -2875,5 +3507,8 @@ def generate_plan(
         tasks=tasks,
         spec=spec,
         fell_back=decomposed.fell_back,
-        message=f"Planned {len(tasks)} task(s) with {len(spec.criteria)} acceptance criteria.",
+        message=(
+            f"Planned {len(tasks)} task(s) with {len(spec.criteria)} acceptance criteria."
+            + (f" {coverage_warning}" if coverage_warning else "")
+        ),
     )

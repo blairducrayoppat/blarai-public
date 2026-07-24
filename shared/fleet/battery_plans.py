@@ -12,7 +12,8 @@ THE SEAM (Vikunja #752 F1/F2, "Seam 2"). Rather than change the general 14B deco
 would risk false-splits on genuinely-simple real fleet jobs — the CARD's declared shape
 AUTHORIZES a pre-built decomposition + job oracle for BATTERY jobs ONLY. The AO's PLAN handler
 consults :func:`resolve_plan_override` with the dispatched repo; for a sandbox ``battery-*`` repo
-whose card declares a carded shape (``"diamond"`` or ``"chain"``) with ``units >= 2`` it returns a
+whose card declares a carded shape (``"diamond"``, ``"chain"``, or ``"mixed"``) with
+``units >= 2`` it returns a
 generic :class:`~shared.fleet.acceptance.DecompositionOverride` that ``generate_plan`` uses in
 place of the 14B decompose + job-oracle generation. Every NON-battery repo returns ``None``
 IMMEDIATELY (a name that does not start with ``battery-`` never even reads a card), so production
@@ -39,6 +40,21 @@ gate skips the oracle). 14 consecutive nights: oracle_status=not-run, verdict PA
 pattern as B2: a card-authorised explicit plan with known module paths so the oracle can import
 deterministically. The chain is storage→add→list; the oracle tests only ``app.storage`` (the
 stable public interface the other two tasks build on).
+
+WHY B4 NEEDS AN OVERRIDE (2026-07-21, #1008). B4 is a 5-task Python CLI mixed graph. The 14B's
+plan-time JOB-oracle generation is deterministically broken for this goal: the generated oracle
+called ``data_storage.load_cards()``/``save_cards()`` without ever importing ``data_storage``
+(NameError at grade time — "3 failed, 3 passed" for seven consecutive nights, byte-identical
+through run 20260719-233631-bd and 20260720-235311-bd, the grader's own crash charged to the
+coder), and the import contract the build tasks saw omitted that same wave-1 module, so no task
+was ever told to own it (oracle import-contract coverage is the #989 c.2299 predictor of clean
+wave distribution). The #965 oracle-QA layer cannot police this class: on the seventh night it
+ran two regeneration rounds and re-emitted the broken exam unchanged, and its import-contract
+checker scored the missing import clean (it validates imports-within-declared, never
+used-but-never-bound). A deterministic oracle needs a deterministic import surface, and only an
+authored plan pins the module layout the oracle imports — so B4 gets the same card-authorised
+pattern as B1/B2: each build task owns exactly one ``app`` module and the job oracle imports
+exactly those modules (a 1:1 import contract, ``data_storage`` included).
 """
 
 from __future__ import annotations
@@ -395,14 +411,275 @@ def test_list_expenses_newest_first() -> None:
 '''
 
 
+def build_flashcards_mixed(repo_target: str) -> list[dict]:
+    """The B4 flashcards-study 5-arm MIXED decomposition (#1008).
+
+    ``store-cards`` -> {``import-deck``, ``add-card``} -> ``quiz`` -> ``track-scores`` — 5
+    dependency edges, 4 waves (the card's ``min_dependency_edges: 4`` / ``expects_waves_gte: 3``
+    with margin). Storage feeds both card-entry commands; those two are PARALLEL siblings, so
+    each owns ONLY its own module (two wave-2 worktrees must never collide on a shared file);
+    the quiz fans IN from both entry doors (cards exist through either); the score tracker
+    follows the quiz. The CLI face (``cli.py``) is created by the LAST arm, when every module
+    it wires already exists.
+
+    Every arm owns exactly ONE ``app`` module and the job oracle imports exactly those five —
+    the 1:1 import contract that B4's model-generated plan lacked (#1008: the oracle called
+    ``data_storage`` without importing it, and the contract never named it). Every
+    state-bearing function takes an explicit optional path (``path``/``data_path``/
+    ``scores_path``) so the oracle can grade against temp stores, and the quiz consumes a
+    dependency-injected ``answer_fn`` so nothing reads interactive stdin under pytest.
+    """
+    return [
+        {
+            "repo": repo_target,
+            "task": "store-cards",
+            "prompt": (
+                "Build the persistence layer for a flashcard study program in this repo: a "
+                "Python module app/data_storage.py that keeps the cards saved between "
+                "sessions. Make app/ an importable package (add app/__init__.py). The module "
+                "must export two functions: (1) save_cards(cards, path=None) — writes the "
+                "full list of card dicts (each {'question': str, 'answer': str}) to a JSON "
+                "file; the file is cards.json in the working directory unless a non-None path "
+                "names another file; (2) load_cards(path=None) -> list[dict] — reads the "
+                "saved cards back from the same file and returns them in saved order; return "
+                "[] when the file is absent or empty. Include pytest unit tests in "
+                "tests/test_data_storage.py."
+            ),
+            "depends_on": [],
+            "contract": {
+                "creates": ["app/__init__.py", "app/data_storage.py"],
+                "exports": [
+                    "save_cards(cards, path=None)",
+                    "load_cards(path=None) -> list[dict]",
+                ],
+                "notes": (
+                    "cards.json (or the explicit path): a JSON list of "
+                    "{question: str, answer: str}. load_cards() returns saved order; "
+                    "[] when the file is absent or empty."
+                ),
+            },
+        },
+        {
+            "repo": repo_target,
+            "task": "import-deck",
+            "prompt": (
+                "Build the deck-import command for the flashcard study program: a Python "
+                "module app/deck_import.py exporting import_deck(file_path, data_path=None) "
+                "-> int that brings in a whole deck of cards at once from a plain-text file. "
+                "Each non-empty line of the file is one card written as question|answer — "
+                "split on the FIRST '|', strip surrounding whitespace from both parts, and "
+                "skip lines with no '|'. Append the imported cards to the already-saved cards "
+                "using load_cards/save_cards from app.data_storage — never reimplement "
+                "storage — passing data_path through, and return how many cards were "
+                "imported. Include pytest unit tests in tests/test_deck_import.py."
+            ),
+            "depends_on": ["store-cards"],
+            "contract": {
+                "creates": ["app/deck_import.py"],
+                "exports": ["import_deck(file_path, data_path=None) -> int"],
+                "notes": (
+                    "One card per non-empty 'question|answer' line (first '|' splits; both "
+                    "parts stripped; no-'|' lines skipped). Appends via app.data_storage and "
+                    "returns the count imported."
+                ),
+            },
+        },
+        {
+            "repo": repo_target,
+            "task": "add-card",
+            "prompt": (
+                "Build the single-card entry command for the flashcard study program: a "
+                "Python module app/card_entry.py exporting "
+                "add_card(question, answer, data_path=None) that validates the inputs "
+                "(question and answer must be non-empty strings — raise ValueError with a "
+                "clear message otherwise) and appends {'question': question, 'answer': "
+                "answer} to the saved cards using load_cards/save_cards from "
+                "app.data_storage — never reimplement storage — passing data_path through. "
+                "Include pytest unit tests in tests/test_card_entry.py."
+            ),
+            "depends_on": ["store-cards"],
+            "contract": {
+                "creates": ["app/card_entry.py"],
+                "exports": ["add_card(question, answer, data_path=None)"],
+                "notes": (
+                    "Validates non-empty strings (ValueError otherwise), then appends the "
+                    "card via app.data_storage."
+                ),
+            },
+        },
+        {
+            "repo": repo_target,
+            "task": "quiz",
+            "prompt": (
+                "Build the quiz engine for the flashcard study program: a Python module "
+                "app/quiz_engine.py exporting run_quiz(answer_fn, data_path=None) -> dict "
+                "that loads the saved cards via app.data_storage.load_cards (passing "
+                "data_path through — never reimplement storage), asks each card by calling "
+                "answer_fn(question) to obtain the user's answer, and checks it against the "
+                "card's stored answer — a match ignores letter case and surrounding "
+                "whitespace. Return {'asked': <number of cards asked>, 'correct': <number "
+                "answered correctly>}. answer_fn is dependency-injected: the CLI passes "
+                "input, tests pass a stub — never call input() inside this module. Include "
+                "pytest unit tests in tests/test_quiz_engine.py."
+            ),
+            "depends_on": ["import-deck", "add-card"],
+            "contract": {
+                "creates": ["app/quiz_engine.py"],
+                "exports": ["run_quiz(answer_fn, data_path=None) -> dict"],
+                "notes": (
+                    "Loads cards via app.data_storage; answer_fn(question) supplies each "
+                    "answer (dependency-injected — no stdin); a match ignores case and "
+                    "surrounding whitespace; returns {'asked': int, 'correct': int}."
+                ),
+            },
+        },
+        {
+            "repo": repo_target,
+            "task": "track-scores",
+            "prompt": (
+                "Build the score tracking and the command-line face for the flashcard study "
+                "program. (1) A Python module app/score_tracker.py exporting "
+                "record_score(correct, asked, scores_path=None) — appends {'correct': "
+                "correct, 'asked': asked} to a JSON scores file (scores.json in the working "
+                "directory unless a non-None scores_path names another file) — and "
+                "load_scores(scores_path=None) -> list[dict] — returns every recorded score "
+                "oldest-first so progress over time is visible; return [] when the file is "
+                "absent or empty. (2) The CLI entry point cli.py wiring the whole program: "
+                "python cli.py import <file> calls app.deck_import.import_deck; python "
+                "cli.py add <question> <answer> calls app.card_entry.add_card; python cli.py "
+                "quiz runs app.quiz_engine.run_quiz with the built-in input as answer_fn, "
+                "prints the result, and records it via record_score; python cli.py scores "
+                "prints each recorded score in order. Import everything from the app package "
+                "— never reimplement it. Include pytest unit tests in "
+                "tests/test_score_tracker.py (test the module functions; the interactive "
+                "quiz command itself is not unit-tested)."
+            ),
+            "depends_on": ["quiz"],
+            "contract": {
+                "creates": ["app/score_tracker.py", "cli.py"],
+                "exports": [
+                    "record_score(correct, asked, scores_path=None)",
+                    "load_scores(scores_path=None) -> list[dict]",
+                ],
+                "notes": (
+                    "scores.json (or the explicit scores_path): a JSON list of "
+                    "{correct: int, asked: int}, oldest-first. cli.py wires the "
+                    "import/add/quiz/scores subcommands over the app package."
+                ),
+            },
+        },
+    ]
+
+
+#: The B4 JOB-level acceptance oracle (#1008) — graded once on the final integrated tree after
+#: all five arms merge. It imports EVERY module it calls (the defect this replaces: the
+#: 14B-generated oracle called ``data_storage.load_cards()`` without importing ``data_storage``
+#: — NameError at grade time, seven consecutive nights, the grader's own crash charged to the
+#: coder). All state lives under pytest's ``tmp_path`` (never a repo-shared JSON store) and the
+#: quiz consumes an injected ``answer_fn`` (pytest's captured stdin kills naive ``input()``
+#: tests). Authored here (not model-written) because the card authorises the mixed shape.
+_FLASHCARDS_JOB_ORACLE_PY = '''\
+"""Job-level acceptance oracle for the B4 flashcards mixed graph (#1008).
+
+Graded once on the final integrated tree after all five arms merge. Imports each arm's
+public interface from the ``app`` package (the 1:1 import contract: every module this file
+calls is imported, and each is created by exactly one build task) and asserts the
+integrated study flow — persist -> import/add -> quiz -> score. All state lives under
+pytest's ``tmp_path``; the quiz consumes an injected answer function, never stdin.
+"""
+import pytest
+
+from app.data_storage import save_cards, load_cards
+from app.deck_import import import_deck
+from app.card_entry import add_card
+from app.quiz_engine import run_quiz
+from app.score_tracker import record_score, load_scores
+
+
+def test_cards_persist_between_sessions(tmp_path):
+    """Saved cards must still be there when loaded back (the between-sessions promise)."""
+    data = str(tmp_path / "cards.json")
+    save_cards([{"question": "What is 2+2?", "answer": "4"}], path=data)
+    loaded = load_cards(path=data)
+    assert len(loaded) == 1
+    assert loaded[0]["question"] == "What is 2+2?"
+    assert loaded[0]["answer"] == "4"
+
+
+def test_load_cards_empty_store_is_empty_list(tmp_path):
+    assert load_cards(path=str(tmp_path / "missing.json")) == []
+
+
+def test_import_deck_brings_in_a_whole_file(tmp_path):
+    deck = tmp_path / "deck.txt"
+    deck.write_text("Q1|A1\\nQ2|A2\\n", encoding="utf-8")
+    data = str(tmp_path / "cards.json")
+    imported = import_deck(str(deck), data_path=data)
+    assert imported == 2
+    questions = [c["question"] for c in load_cards(path=data)]
+    assert "Q1" in questions and "Q2" in questions
+
+
+def test_add_card_appends_to_the_saved_cards(tmp_path):
+    data = str(tmp_path / "cards.json")
+    add_card("Capital of France?", "Paris", data_path=data)
+    loaded = load_cards(path=data)
+    assert len(loaded) == 1
+    assert loaded[0]["question"] == "Capital of France?"
+    assert loaded[0]["answer"] == "Paris"
+
+
+def test_add_card_rejects_empty_input(tmp_path):
+    data = str(tmp_path / "cards.json")
+    with pytest.raises(ValueError):
+        add_card("", "Paris", data_path=data)
+    with pytest.raises(ValueError):
+        add_card("Capital of France?", "", data_path=data)
+
+
+def test_quiz_checks_answers_and_counts_correct(tmp_path):
+    data = str(tmp_path / "cards.json")
+    save_cards(
+        [
+            {"question": "What is 2+2?", "answer": "4"},
+            {"question": "Capital of France?", "answer": "Paris"},
+        ],
+        path=data,
+    )
+    answers = {"What is 2+2?": "4", "Capital of France?": "London"}
+    result = run_quiz(lambda question: answers[question], data_path=data)
+    assert result["asked"] == 2
+    assert result["correct"] == 1
+
+
+def test_quiz_match_ignores_case_and_surrounding_whitespace(tmp_path):
+    data = str(tmp_path / "cards.json")
+    save_cards([{"question": "Capital of France?", "answer": "Paris"}], path=data)
+    result = run_quiz(lambda question: "  paris ", data_path=data)
+    assert result["correct"] == 1
+
+
+def test_scores_kept_over_time_in_order(tmp_path):
+    """Recorded scores accumulate oldest-first so progress over time is visible."""
+    scores = str(tmp_path / "scores.json")
+    record_score(1, 3, scores_path=scores)
+    record_score(3, 3, scores_path=scores)
+    loaded = load_scores(scores_path=scores)
+    assert len(loaded) == 2
+    assert [s["correct"] for s in loaded] == [1, 3]
+    assert [s["asked"] for s in loaded] == [3, 3]
+'''
+
+
 #: Registry of carded plan builders, keyed by card id. A card WITHOUT a registered builder
 #: resolves to ``None`` (fail-closed — never inject a shape we cannot author). Adding support
 #: for a new card is a one-line addition here plus its own builder + oracle constant.
-#: Covers diamond (B2) and chain (B1) shapes; see :func:`resolve_plan_override` for the
-#: accepted shape list.
+#: Covers diamond (B2), chain (B1), and mixed (B4) shapes; see :func:`resolve_plan_override`
+#: for the accepted shape list.
 _PLAN_BUILDERS = {
     "B1": (build_expense_tracker_chain, _EXPENSE_TRACKER_JOB_ORACLE_PY),
     "B2": (build_text_stats_diamond, _TEXT_STATS_JOB_ORACLE_PY),
+    "B4": (build_flashcards_mixed, _FLASHCARDS_JOB_ORACLE_PY),
 }
 
 # Back-compat alias so tests / any import that still references _DIAMOND_BUILDERS keeps working.
@@ -446,7 +723,8 @@ def resolve_plan_override(
     """Return the card-authorised :class:`DecompositionOverride` for *repo*, or ``None``.
 
     Fires ONLY for a sandbox ``battery-*`` repo whose card declares a carded shape
-    (``"diamond"`` or ``"chain"``) with ``units >= 2`` AND has a registered arm builder
+    (``"diamond"``, ``"chain"``, or ``"mixed"``) with ``units >= 2`` AND has a registered arm
+    builder
     (:data:`_PLAN_BUILDERS`). Every other repo — every production/operator dispatch — returns
     ``None``, and a name that does not start with ``battery-`` returns immediately WITHOUT reading
     any card (production plan generation is byte-identical + zero-cost). Wholly fail-soft: any
@@ -456,8 +734,8 @@ def resolve_plan_override(
     absolute repo, mirroring :func:`~shared.fleet.decompose.decompose_request`). ``spec_dir``
     overrides the battery card directory (tests)."""
     # Carded shapes that this resolver handles. A card with shape NOT in this set falls
-    # through to the live 14B decompose path (the normal behaviour for "mixed", "flat", etc.).
-    _HANDLED_SHAPES = frozenset({"diamond", "chain"})
+    # through to the live 14B decompose path (the normal behaviour for "flat", "linear", etc.).
+    _HANDLED_SHAPES = frozenset({"diamond", "chain", "mixed"})
     try:
         name = Path(str(repo)).name
         if not name.startswith(_SANDBOX_REPO_PREFIX):

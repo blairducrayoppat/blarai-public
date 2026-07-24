@@ -26,9 +26,13 @@ identical to how the node oracle resolves them.
 
 **What a probe FAILURE means** (each names the exact entry — the signal B6n2 lacked):
   * module does not resolve from the repo root (B6n2 / B7n1 — the layout-drift class);
-  * module resolves but a contract-named export is ABSENT under ``getattr`` (the
-    stub/lazy/re-export evasion — C1: ``import cli_interface`` resolves but ``run_cli``
-    is a no-op / missing);
+  * module resolves but a contract-named export is ABSENT under ``getattr`` AND — for
+    a package — is not an importable in-repo SUBMODULE either (the stub-module evasion,
+    C1: ``import cli_interface`` resolves but ``run_cli`` is a no-op / missing). The
+    submodule fallback mirrors CPython's ``_handle_fromlist``: ``from pkg import name``
+    imports ``pkg.name`` when the attr is absent, so a LAZY package ``__init__.py``
+    over real submodule files is contract-MET, never a false red (the B4 false park,
+    night 20260716-001549-bd);
   * module resolves at a ``__file__`` OUTSIDE the repo (C2 — a site-packages / ``.pth``
     shadow of a first-party name);
   * #826 — a contract callable resolves but its SIGNATURE cannot accept the arity the
@@ -67,6 +71,28 @@ _MISSING = object()
 def _clip(text: str, cap: int = _REASON_MAX) -> str:
     """One-line, length-capped reason string (deterministic; no newlines into JSON)."""
     return " ".join(str(text).split())[:cap]
+
+
+def _probe_submodule(qualname: str, repo: Path) -> "str | None":
+    """Import *qualname* as a SUBMODULE — the ``from pkg import name`` fallback CPython's
+    ``_handle_fromlist`` performs when ``name`` is not an attribute of ``pkg``. Returns
+    ``None`` when it imports AND lives under *repo* (H3b containment), else a one-line
+    failure reason. A successful import binds the submodule on its parent package (the
+    import system sets the attr), so the #826 signature layer's getattr sees it too."""
+    try:
+        sub = importlib.import_module(qualname)
+    except BaseException as exc:  # noqa: BLE001 — ANY import failure is a real miss
+        return _clip(f"and '{qualname}' is not an importable submodule "
+                     f"({type(exc).__name__}: {exc})", cap=160)
+    subfile = getattr(sub, "__file__", None)
+    if subfile:
+        try:
+            if not Path(subfile).resolve().is_relative_to(repo):
+                return _clip(f"and submodule '{qualname}' resolves OUTSIDE the repo "
+                             f"at {subfile}", cap=160)
+        except Exception:  # noqa: BLE001 — an unreadable __file__ path is not a miss
+            return None
+    return None
 
 
 def _check_callable_arity(obj: object, sig: dict) -> "str | None":
@@ -179,20 +205,38 @@ def probe_python_targets(targets: list[dict], repo_root: "str | Path") -> dict:
                     continue
             except Exception:  # noqa: BLE001 — an unreadable __file__ path is not a miss
                 pass
-        # H3: each contract-named export must be present under getattr (closes the
-        # stub-module evasion — resolves but the export is absent/lazy/a no-op).
+        # H3: each contract-named export must be present under getattr — with the SAME
+        # submodule fallback a real ``from pkg import name`` performs (CPython
+        # ``_handle_fromlist``): when the attribute is absent and *mod* is a PACKAGE,
+        # python imports ``pkg.name`` as a submodule and binds it, so a lazy
+        # ``__init__.py`` (no eager re-exports) over real submodule files SATISFIES the
+        # oracle's import and must satisfy the probe (H4 cuts BOTH ways — probe-red on
+        # an oracle-green tree is a false park). The pre-fix hasattr-only check parked
+        # B4 on exactly this shape (night 20260716-001549-bd: ``flashcard_app/``
+        # carried every contract submodule; all four names reported absent; the fix
+        # cycle could not "fix" imports that already worked). Fallback ONLY for
+        # packages (``__path__``): a plain module has no submodules, so its absent
+        # attr stays the C1 stub-module miss, byte-identical reason.
         absent: set[str] = set()
         for name in names:
             if not name or name == "*":
                 continue
-            if not hasattr(mod, name):
-                absent.add(name)
-                unresolved.append({
-                    "raw": raw, "module": module, "name": name,
-                    "reason": _clip(
-                        f"module '{module}' resolves but export '{name}' is absent "
-                        "(stub/partial module — the import contract is unmet)"),
-                })
+            if hasattr(mod, name):
+                continue
+            sub_failure: "str | None" = None
+            if hasattr(mod, "__path__"):
+                sub_failure = _probe_submodule(f"{module}.{name}", repo)
+                if sub_failure is None:
+                    continue  # submodule imported in-repo — the contract entry is met
+            absent.add(name)
+            reason = (f"module '{module}' resolves but export '{name}' is absent "
+                      "(stub/partial module — the import contract is unmet)")
+            if sub_failure:
+                reason = f"{reason}; {sub_failure}"
+            unresolved.append({
+                "raw": raw, "module": module, "name": name,
+                "reason": _clip(reason),
+            })
         # #826: the SIGNATURE layer — each contract callable must accept the arity the
         # oracle CALLS it with (built-wrong-signature is the B4n2 park; #822 only proved
         # the name resolves). Probe, don't invoke: bind sentinels to inspect.signature.

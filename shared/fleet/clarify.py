@@ -351,12 +351,27 @@ def answered_from_free_text(
 REQUIREMENTS_SENTINEL = "\n\n[[BLARAI_CLARIFIED_REQUIREMENTS]]\n"
 
 
+#: The renderer's own boilerplate. Named constants because :func:`compose_requirements_block`
+#: and :func:`operator_answers_from_block` MUST agree on them: the block mixes house prose
+#: with the operator's words, and the extractor's whole job is telling them apart. Editing
+#: the wording here without the extractor seeing it would silently reclassify house prose as
+#: operator text (#1043 review F1).
+_REQUIREMENTS_HEADER = "The person clarified these requirements — build to them:"
+_ANSWER_BULLET = "- "
+_ASSUMED_TAG = "(assumed) "
+
+
 def compose_requirements_block(clarifications: "list[dict] | tuple[dict, ...]") -> str:
     """Render the clarifications into a COMPACT block for the planning prompts (the coder
     builds to these, the oracle checks them). Token-budget disciplined (P4/P9): one short
     line per clarification, an ``(assumed)`` tag on defaults the operator asked us to pick.
     ``""`` when there is nothing to add (a fully-specified goal / an empty reply) — the plan
-    is then byte-identical to today. Never raises."""
+    is then byte-identical to today. Never raises.
+
+    The output is PROMPT text: house prose plus the operator's words. Anything that needs
+    only the operator's words (a grounding corpus, where house prose would grant authority
+    to language the operator never used) must go through
+    :func:`operator_answers_from_block`, never this string."""
     lines: list[str] = []
     for c in clarifications or ():
         if not isinstance(c, dict):
@@ -364,11 +379,40 @@ def compose_requirements_block(clarifications: "list[dict] | tuple[dict, ...]") 
         answer = str(c.get("answer", "")).strip()
         if not answer:
             continue
-        prefix = "- (assumed) " if c.get("assumed") else "- "
+        prefix = _ANSWER_BULLET + (_ASSUMED_TAG if c.get("assumed") else "")
         lines.append(prefix + answer)
     if not lines:
         return ""
-    return "The person clarified these requirements — build to them:\n" + "\n".join(lines)
+    return _REQUIREMENTS_HEADER + "\n" + "\n".join(lines)
+
+
+def operator_answers_from_block(block: str) -> tuple[str, ...]:
+    """The OPERATOR-SUPPLIED text carried by a rendered requirements block, with this
+    module's own boilerplate stripped — the inverse of :func:`compose_requirements_block`
+    for the answer content (the questions are never rendered into the block at all).
+
+    Exists because the rendered block is prompt text: it opens with a fixed house header
+    and tags assumed answers, so a consumer that must not confer authority on words the
+    operator never used (:func:`shared.fleet.oracle_qa._spec_corpus`) cannot use the blob.
+    Feeding it the header instead grounds the judge on "person", "build", "requirements"
+    and friends — words no operator uttered (#1043 review F1).
+
+    Conservative in the safe direction: the ONLY things removed are the header line and the
+    bullet/``(assumed)`` markers this module itself wrote. Every other line survives
+    verbatim, so a multi-line operator answer keeps its continuation lines. Pure + total —
+    an empty/blank/header-less string yields ``()``, and it never raises."""
+    out: list[str] = []
+    for raw in (block or "").splitlines():
+        line = raw.strip()
+        if not line or line == _REQUIREMENTS_HEADER:
+            continue
+        if line.startswith(_ANSWER_BULLET):
+            line = line[len(_ANSWER_BULLET):].lstrip()
+            if line.startswith(_ASSUMED_TAG):
+                line = line[len(_ASSUMED_TAG):].lstrip()
+        if line:
+            out.append(line)
+    return tuple(out)
 
 
 def compose_planning_goal(goal: str, requirements_block: str) -> str:

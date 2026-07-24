@@ -1,0 +1,235 @@
+<title>Cut Off Mid-Sentence — Battery Morning Read, 2026-07-20</title>
+<style>
+  :root {
+    --paper: #f7f6f2;
+    --ink: #22282b;
+    --muted: #5c6a6e;
+    --line: #d8d9d2;
+    --accent: #1f6f66;
+    --accent-soft: #e3edea;
+    --good: #1f6f66;
+    --good-soft: #ddebe7;
+    --warn: #9a6b13;
+    --warn-soft: #f4e9d3;
+    --bad: #9a3b2f;
+    --bad-soft: #f3e0dc;
+    --card: #fffefb;
+    --answer-bg: #eef2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171d1f; --ink: #e3e2da; --muted: #9aa8ab; --line: #313a3d;
+      --accent: #5fb3a5; --accent-soft: #1e2e2b;
+      --good: #5fb3a5; --good-soft: #16302b;
+      --warn: #d3a04a; --warn-soft: #33290f;
+      --bad: #d98a7c; --bad-soft: #33201c;
+      --card: #1d2426; --answer-bg: #212b26;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f7f6f2; --ink: #22282b; --muted: #5c6a6e; --line: #d8d9d2;
+    --accent: #1f6f66; --accent-soft: #e3edea;
+    --good: #1f6f66; --good-soft: #ddebe7;
+    --warn: #9a6b13; --warn-soft: #f4e9d3;
+    --bad: #9a3b2f; --bad-soft: #f3e0dc;
+    --card: #fffefb; --answer-bg: #eef2ee;
+  }
+  :root[data-theme="dark"] {
+    --paper: #171d1f; --ink: #e3e2da; --muted: #9aa8ab; --line: #313a3d;
+    --accent: #5fb3a5; --accent-soft: #1e2e2b;
+    --good: #5fb3a5; --good-soft: #16302b;
+    --warn: #d3a04a; --warn-soft: #33290f;
+    --bad: #d98a7c; --bad-soft: #33201c;
+    --card: #1d2426; --answer-bg: #212b26;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: Charter, Georgia, "Times New Roman", serif;
+    font-size: 1.06rem; line-height: 1.62; margin: 0;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+  .sheet { max-width: 46rem; margin: 0 auto; }
+  .eyebrow, .chip, th, .kicker-inline, .answer-label { font-family: "Segoe UI", system-ui, sans-serif; }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em;
+    font-size: 0.72rem; font-weight: 600; color: var(--accent);
+  }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0.4rem 0 0.6rem; text-wrap: balance; font-weight: 600; }
+  h2 {
+    font-size: 1.3rem; line-height: 1.25; margin: 2.6rem 0 0.4rem;
+    padding-top: 1.8rem; border-top: 2px solid var(--line);
+    text-wrap: balance; font-weight: 600;
+  }
+  h3 {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.11em;
+    color: var(--muted); margin: 1.5rem 0 0.4rem; font-weight: 600;
+  }
+  p { margin: 0.6rem 0; }
+  .lede { color: var(--muted); font-size: 1.02rem; margin-top: 0; }
+  .chip {
+    display: inline-block; font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase;
+    padding: 0.18rem 0.6rem; border-radius: 3px; vertical-align: middle;
+  }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad  { background: var(--bad-soft);  color: var(--bad); }
+  .teach {
+    background: var(--accent-soft); border-radius: 6px;
+    padding: 0.9rem 1.1rem; margin: 1rem 0;
+    font-size: 0.98rem;
+  }
+  .teach .kicker-inline {
+    display: block; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.11em; color: var(--accent); font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+  .answer {
+    background: var(--answer-bg); border-left: 3px solid var(--accent);
+    padding: 0.9rem 1.1rem; margin: 1.2rem 0; border-radius: 0 5px 5px 0;
+  }
+  .answer.correction { border-left-color: var(--bad); background: var(--bad-soft); }
+  .answer.correction .answer-label { color: var(--bad); }
+  .answer-label {
+    display: block; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.11em; color: var(--accent); font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 1.1rem 0; font-size: 0.95rem; }
+  .scroller { overflow-x: auto; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .code {
+    font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.86rem;
+    background: var(--card); border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.75rem 0.9rem; overflow-x: auto; white-space: pre; margin: 0.9rem 0;
+  }
+  .provenance {
+    font-size: 0.84rem; color: var(--muted); border-top: 1px solid var(--line);
+    margin-top: 3rem; padding-top: 1rem;
+  }
+  strong { font-weight: 600; }
+  em.q { font-style: italic; color: var(--muted); }
+</style>
+
+<div class="sheet">
+
+<div class="eyebrow">Battery Morning Read · Monday 2026-07-20 · revised</div>
+<h1>Cut off mid-sentence, nine times</h1>
+<p class="lede">Last night's coding experiment produced no usable result. Finding out why took three attempts, and my second answer — the one I sent you this morning — was wrong. An independent check caught it. This is the corrected read, and the real cause is both simpler and more fixable than what I told you.</p>
+
+<div class="answer">
+  <span class="answer-label">The short answer</span>
+  <p style="margin-top:0"><strong>Two separate faults, one chronic and one acute.</strong></p>
+  <p><strong>Chronic:</strong> in our multi-part coding jobs, the <em>first</em> sub-task builds the entire application. Every downstream sub-task then has its nominal work already done. This happens on every night we have records for, across every job type — so our multi-part jobs have never really been testing multi-part building.</p>
+  <p><strong>Acute:</strong> last night the coder was cut off mid-work nine consecutive times by a one-character formatting mismatch. It was not deciding anything. It was being severed.</p>
+  <p style="margin-bottom:0">The change we were testing never ran. The experiment has no result and must be re-run — on a differently-shaped job, or it will measure the same starved sub-task again.</p>
+</div>
+
+<h2>First, what the battery is</h2>
+
+<p>Every night at 23:00 the machine gives your local coding assistant a small set of realistic programming jobs, from scratch, unattended, and grades them in the morning. It exists to answer one question over months: <em class="q">is the coding assistant actually getting better?</em> It is the odometer, not the engine.</p>
+
+<p>Last night ran two jobs. <strong>B2</strong> is a text-statistics toolkit. <strong>B4</strong> is a flashcard study program — the harder one, and the subject of this report.</p>
+
+<h2>The trap in the headline number</h2>
+
+<div class="scroller">
+<table>
+  <thead><tr><th>&nbsp;</th><th>Sat 07-18</th><th>Sun 07-19</th></tr></thead>
+  <tbody>
+    <tr><td>Sub-tasks completed</td><td class="num">6 of 6</td><td class="num">2 of 6</td></tr>
+    <tr><td>Elapsed</td><td class="num">8,894s</td><td class="num">2,416s</td></tr>
+    <tr><td>Final result</td><td><span class="chip bad">Failed</span></td><td><span class="chip bad">Failed</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Sunday looks 3.5 times faster. It was not — it did a third of the work and abandoned the job partway.</p>
+
+<div class="teach">
+  <span class="kicker-inline">The idea worth keeping</span>
+  In a column of elapsed times, <strong>“finished quickly” and “gave up early” are the same number.</strong> A duration means nothing without a measure of work completed alongside it.
+</div>
+
+<h2>Finding one: the job is finished before it starts</h2>
+
+<p>The flashcard job is deliberately split into six sub-tasks — save data, manage cards, run the quiz, track scores, build the command interface, write acceptance tests — so we can watch the assistant handle a build with real dependencies between parts.</p>
+
+<p><strong>The first sub-task builds the whole application.</strong> Asked only to handle saving data, it produced the card manager, the quiz engine, the score tracker and the main entry point. Verified as authored work, not merely as files lying around: the record is a comparison between two points in the project's own history, and the sandbox is rebuilt from empty every night. The first sub-task's commit added 170 lines across six files it was never asked to write.</p>
+
+<p>And this is not last night's quirk. Across <strong>every one of the 18 recorded runs</strong> — all job types, not just flashcards — the first sub-task produces multiple source files. Not one run has a first task delivering the single piece it was assigned.</p>
+
+<div class="teach">
+  <span class="kicker-inline">Why this matters more than one bad night</span>
+  We have been scoring these jobs as six deliverables. If the coder reasonably treats the request as one job and solves it in the first step, then every later sub-task is shadow-boxing, and the “<em>N of 6 completed</em>” figure has been measuring something other than capability — <strong>on every night in the archive.</strong> It changes how past results should be read, which is why it is the more important of today's two findings.
+</div>
+
+<p>There is a genuine open question underneath, and it is a design question rather than a bug: a coder that solves the whole problem early is arguably doing well. The defect may be that we ask for six things and grade six deliverables when the work is really one. Forcing artificial fragmentation could make the output worse. That decision deserves to be made deliberately.</p>
+
+<h2>Finding two: nine severances, one character</h2>
+
+<p>Here is where I went wrong this morning, so I will show you the reasoning rather than just the conclusion.</p>
+
+<p>I found that the sub-task which stopped had made <strong>13 actions, every one a read, and no edits</strong>, and that the file it was meant to create already existed. I concluded it had looked, seen the work was done, and correctly declined to redo it — and that the harness had punished it for that restraint. It was a tidy story and I sent it to you.</p>
+
+<p>It was wrong. The independent check read what the model actually <em>said</em>, which I had not done thoroughly enough. Every one of the nine attempts ends mid-sentence, announcing the next file it intends to open:</p>
+
+<div class="code">"Let me also check the score_tracker to see what's already implemented:"
+"Let me also check the main module to understand how the application flow works:"
+"I need to check the main.py to understand how the app is structured:"</div>
+
+<p>Nine for nine. Not one produced a concluding statement. There is no <em class="q">already implemented</em>, no <em class="q">nothing to do</em>, no summary of any kind. The model was still gathering information when it stopped.</p>
+
+<p><strong>The cause is a single character.</strong> When the model asks to use a tool it writes a marker. Ours expects the form <span class="code" style="display:inline;padding:0.1rem 0.3rem">function=read</span>. Last night the model wrote <span class="code" style="display:inline;padding:0.1rem 0.3rem">function/read</span> — a slash instead of an equals sign. The component that repairs malformed markers matches only on the equals form, so it found nothing to repair, passed back an empty result, and the loop ended. The model's request to read a file simply evaporated, and from outside that is indistinguishable from the model choosing to stop.</p>
+
+<p>Two details settle it beyond argument. The model had explicitly identified remaining work — it noted that the quiz function <em class="q">"doesn't seem to be fully implemented according to the requirements"</em>. And one attempt independently spotted the bug in our own grading script before being cut off. It was working, and working well, when it was severed.</p>
+
+<div class="answer correction">
+  <span class="answer-label">The correction, stated plainly</span>
+  <p style="margin-top:0">I told you this morning that the coder was <em>punished for being honest</em> — that it correctly recognised completed work and our scoring penalised it. <strong>That is not true and I withdraw it.</strong> The harness did not punish restraint; it recorded a mechanical failure that looks like restraint from the outside.</p>
+  <p style="margin-bottom:0">I also called Saturday's work busywork. Also wrong: Saturday's sub-task wrote a genuine improvement — it made an interactive function testable by allowing input to be supplied programmatically, and added real tests for it. It spent a long time finding that adjacent work because its assigned work was already done, but the work itself was legitimate.</p>
+</div>
+
+<h2>Why the experiment has no result</h2>
+
+<p>Last night was meant to test a change to how the coder's candidate work is filtered. The check confirmed directly: <strong>the part of that change which alters an outcome never executed.</strong> On the flashcard job no candidate produced the kind of file it acts on; on the text-statistics job it engaged but every file it examined was fine, so nothing was filtered. The change ran; its decision-making branch did not.</p>
+
+<p>So there is nothing to compare. The A/B must be re-run — and on a differently-shaped job, or it will simply measure the same starved sub-task again.</p>
+
+<p>One more thing worth knowing: <strong>neither night could have passed regardless of code quality.</strong> The script that grades the finished application is itself broken — it uses a component it never loads — and has been failing identically on every flashcard run since 2026-07-15. That is at least the sixth occurrence, not the third we believed. The fix is built and lands on its own night.</p>
+
+<h2>The safety check that has never once run</h2>
+
+<p>Separately, and found while investigating this morning's memory leak: the nightly run is supposed to refuse to start when free memory is too low, wait, and stand down at 04:00 rather than run badly.</p>
+
+<p><strong>That protection has never executed.</strong> The cause is one word: the logging helper was written in a form that, in this scripting language, quietly contributes to what the surrounding function <em>returns</em>. The memory check wrote a log line and then answered yes-or-no — and the log line joined the answer, producing a two-item list where a plain "no" was expected. A non-empty list counts as "yes". So the answer was always yes, and the waiting and the stand-down were unreachable from the day they were written.</p>
+
+<div class="teach">
+  <span class="kicker-inline">The idea worth keeping</span>
+  This is <strong>“built but wired into nothing”</strong> in its purest form. The protection existed, was correct, was documented, and had never once been consulted. <em>A control you have not watched refuse something is not yet known to work.</em> It is now fixed, and ships with a test that deliberately puts the bug back and proves the test then fails.
+</div>
+
+<p>The practical consequence: this morning's leaked assistant would <strong>not</strong> have skipped tonight — it would have let tonight run on a machine missing a third of its memory. A skipped night is a visible gap; a starved night produces plausible results that quietly mean less.</p>
+
+<h2>What changed today</h2>
+
+<p><strong>The overnight leak is structurally fixed.</strong> A copy of the assistant had been left running since 00:13 holding 11.6 GB with nothing owning it. The night now claims that slot before it measures memory and releases it after the morning report, and the next night reclaims anything still holding it. All four ways an assistant can get started are covered — I found the fourth by accidentally reproducing the leak myself while testing. Your coordinator evidence was preserved: 252 records before the stop, 252 after.</p>
+
+<p><strong>The time-budget correction landed</strong> — the red banner atop every morning report is gone, and the calendar cutoff is now double-locked. <strong>Documentation asserting protections we do not have was corrected</strong>, including three claims found after the first pass, one of which was a message telling you at every startup that a ceremony had not run when it had.</p>
+
+<p>Tonight's run is safe: memory is back to ~18.7 GB, and I tested the revived memory check against the real system to confirm it will let tonight proceed rather than wrongly stand down.</p>
+
+<h2>What happens next</h2>
+
+<p>The tool-call severance has a named fix site and is a small change — that goes first, because until it is fixed any night can lose its work the same way. The over-production question needs a decision from you rather than a patch: whether we re-grain these jobs so each sub-task has genuinely separate work, or accept that the coder solves them whole and grade them that way. And the A/B needs re-running once both are settled.</p>
+
+<div class="provenance">
+  <p><strong>Where this comes from.</strong> Job records and task logs for runs <span class="code" style="display:inline;padding:0.1rem 0.3rem">20260719-233631-bd</span> and <span class="code" style="display:inline;padding:0.1rem 0.3rem">20260719-002208-bd</span>; the coder's own transcripts for all nine attempts; the sandbox project's git history; the tool-call repair component's source; a sweep of the first sub-task's output across all 18 recorded runs; and the memory-admission rules read from source rather than inferred from logs.</p>
+  <p><strong>What is still not established.</strong> <em>Why</em> the model began writing the wrong character — the mechanism is fully traced but the trigger is unknown, and nothing on disk records the settings in use at the time. Whether the two remaining job types show the same over-production (they did not run in this window). What the right grain for these jobs actually is.</p>
+  <p><strong>Corrections inside this report.</strong> Two of my conclusions were overturned before this reached its final form. The first — that compiled leftover files had told the model its work was done — died when I tested it against the night that succeeded and found the same leftovers there. The second — that the coder was punished for correctly doing nothing — died under independent review, which read the transcripts more carefully than I had. I had sent you that second one already. The finding that survived both rounds is the over-production one, and it survived because it was checked against the project's own history rather than reasoned about.</p>
+</div>
+
+</div>

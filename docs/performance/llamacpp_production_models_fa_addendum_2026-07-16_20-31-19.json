@@ -1,0 +1,37 @@
+{
+  "ticket": "#769 item 1 ADDENDUM (same evening as the main record)",
+  "date": "2026-07-16",
+  "purpose": "flash-attn variants of the four production-model cells (llama-bench -fa 1, otherwise byte-identical protocol)",
+  "results_fa_on": {
+    "qwen3_14b": {
+      "vulkan": {
+        "prefill_pp512_toks": 255.06,
+        "prefill_pp512_stddev": 0.78,
+        "decode_tg128_toks": 7.53,
+        "decode_tg128_stddev": 0.03
+      },
+      "sycl": {
+        "prefill_pp512_toks": 80.1,
+        "prefill_pp512_stddev": 0.19,
+        "decode_tg128_toks": 2.19,
+        "decode_tg128_stddev": 0.01
+      }
+    },
+    "coder_30b_a3b": {
+      "vulkan": {
+        "prefill_pp512_toks": 402.88,
+        "prefill_pp512_stddev": 4.25,
+        "decode_tg128_toks": 26.12,
+        "decode_tg128_stddev": 0.17
+      },
+      "sycl": {
+        "prefill_pp512_toks": 122.81,
+        "prefill_pp512_stddev": 0.32,
+        "decode_tg128_toks": 7.76,
+        "decode_tg128_stddev": 0.05
+      }
+    }
+  },
+  "fa_off_reference": "docs/performance/llamacpp_production_models_769_2026-07-16_19-35-37.json",
+  "stability_note": "all four -fa cells completed without crashes (the historical Intel-iGPU flash-attn flakiness did not manifest on b9957 / driver 32.0.101.8826)"
+}

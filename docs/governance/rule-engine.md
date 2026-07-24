@@ -17,7 +17,7 @@ below are the audit contract.
 ## Prerequisites
 
 - [STYLE.md](STYLE.md) — binding governance template.
-- [ADR-010](../adrs/ADR-010-Policy-Agent-GPU-Classification.md) —
+- [ADR-010](../adrs/ADR-010-PA-Device-Allocation-GPU-Classification.md) —
   Policy Agent classification on GPU. ADR-010 is the load-bearing ADR
   for this doc: it mandates a **deterministic pipeline before any
   probabilistic stage** (see §3 below). ADR-010 does not mandate the

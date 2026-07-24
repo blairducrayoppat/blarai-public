@@ -35,7 +35,8 @@ Unseal order (ADR-025 §2.7)
 Design constraints (ADR-025, non-negotiable)
 --------------------------------------------
 - **Version byte** on every wrap record (``WRAP_VERSION``).  Rotation-ready per
-  ADR-025 §2.6.  The rotation *procedure* is out of scope this sprint.
+  ADR-025 §2.6.  This module provides the wrap format only; the rotation
+  *procedure* lives outside it.
 - **Recovery key is a 256-bit random key** — not a passphrase.  It wraps the
   DEK under AES-256-GCM (a fresh random nonce per wrap, NOT the same key used
   for field encryption; the recovery key has a single, distinct purpose).

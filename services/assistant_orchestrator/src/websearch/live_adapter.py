@@ -89,6 +89,24 @@ MAX_TITLE_CHARS: Final[int] = 200
 MAX_URL_CHARS: Final[int] = 500
 MAX_SNIPPET_CHARS: Final[int] = 400
 
+#: FAIL-CLOSED response-PARSE guard bounds (#727) — applied to the raw Kagi HTTP
+#: response BEFORE it is handed to stdlib ``json.loads``. ``json.loads`` has NO
+#: size bound and NO recursion-depth limit of its own, so a pathological or
+#: man-in-the-middle'd response (oversized, or pathologically deep) could
+#: exhaust host memory / the C-stack DURING parsing — before any of the
+#: fail-closed per-entry defenses in :func:`_parse_v1_search` ever run. These
+#: are a SECOND, INDEPENDENT lock DOWNSTREAM of the egress door's on-the-wire
+#: byte cap (:data:`shared.security.guarded_fetch._MAX_BODY_BYTES`, 8 MiB): the
+#: door bounds what crosses the network; these bound what THIS adapter will
+#: parse. They are deliberately TIGHTER than the door cap — a real Kagi v1
+#: search reply is a few KB and nests only ~5 deep — so a hostile response that
+#: slips through (or a future non-door caller) still fails closed to the empty
+#: result list (VALIDATE-BEFORE-TRUST + FAIL-CLOSED + DENY-BY-DEFAULT). They are
+#: the safe HARDCODED defaults so the guard is ALWAYS armed even if the
+#: [web_search] config plumbing is absent; the config keys only tune them.
+DEFAULT_MAX_RESPONSE_BYTES: Final[int] = 2 * 1024 * 1024  # 2 MiB (< the 8 MiB door cap)
+DEFAULT_MAX_PARSE_DEPTH: Final[int] = 12  # Kagi v1 nests ~5; 12 = generous but bounded
+
 # Collapse runs of whitespace (incl. newlines) when shaping snippet/title
 # text so a hostile result cannot fake the runner's line structure.
 _WS_RUN_RE: Final[re.Pattern[str]] = re.compile(r"\s+")
@@ -112,6 +130,49 @@ def _clip(text: str, max_chars: int) -> str:
     if len(flattened) <= max_chars:
         return flattened
     return flattened[: max_chars - 1] + "…"
+
+
+def _within_parse_depth(text: str, max_depth: int) -> bool:
+    """True iff JSON *text* nests no deeper than *max_depth* brace/bracket levels.
+
+    A deterministic, NON-RECURSIVE pre-scan run BEFORE :func:`json.loads` (#727).
+    The stdlib decoder has no depth bound of its own and descends (at the C
+    level) through every nesting level DURING parsing, so a deeply-nested body
+    can exhaust the stack / host memory before any Python code inspects it. An
+    ``object_hook`` / ``object_pairs_hook`` cannot prevent this — a hook fires
+    only as each container COMPLETES (after the recursion has already descended)
+    and never observes ARRAY nesting at all, so an ``[[[[…`` array bomb sails
+    straight past it. So we bound depth UP FRONT instead (validate-before-trust),
+    counting BOTH ``{`` and ``[``.
+
+    The scan is string- and escape-aware — a brace/bracket INSIDE a JSON string
+    literal is data, not structure, and does not count — and early-exits
+    ``False`` the instant nesting exceeds *max_depth*, so a depth-bomb is
+    rejected in O(max_depth) work rather than being scanned (let alone parsed) in
+    full. O(n) time, O(1) space, never raises.
+    """
+    depth = 0
+    in_string = False
+    escaped = False
+    for ch in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{" or ch == "[":
+            depth += 1
+            if depth > max_depth:
+                return False
+        elif ch == "}" or ch == "]":
+            if depth > 0:
+                depth -= 1
+    return True
 
 
 def _parse_v1_search(raw: dict[str, Any]) -> list[SearchResult]:
@@ -193,11 +254,36 @@ class LiveKagiAdapter(KagiAdapter):
         api_key: KagiApiKey,
         *,
         timeout_s: float = DEFAULT_SEARCH_TIMEOUT_S,
+        max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
+        max_parse_depth: int = DEFAULT_MAX_PARSE_DEPTH,
     ) -> None:
         if not isinstance(api_key, KagiApiKey):
             raise TypeError("LiveKagiAdapter requires a wrapped KagiApiKey")
         self._api_key = api_key
         self._timeout_s = float(timeout_s)
+        # #727 — fail-closed PARSE-guard bounds (see DEFAULT_MAX_* above). A
+        # non-positive / non-int value falls back to the vetted default rather
+        # than DISARMING the guard: a 0 byte-cap would reject every response and
+        # a <= 0 depth would too, so the guard must never be silently turned off
+        # by a bad value — it clamps to the safe default. (``bool`` is excluded
+        # explicitly: it is an ``int`` subclass, so ``True`` would slip through
+        # as a 1-byte / depth-1 cap.) The AO config layer validates these at
+        # boot as positive ints; this clamp is defense-in-depth for any direct
+        # construction.
+        self._max_response_bytes = (
+            int(max_response_bytes)
+            if isinstance(max_response_bytes, int)
+            and not isinstance(max_response_bytes, bool)
+            and max_response_bytes > 0
+            else DEFAULT_MAX_RESPONSE_BYTES
+        )
+        self._max_parse_depth = (
+            int(max_parse_depth)
+            if isinstance(max_parse_depth, int)
+            and not isinstance(max_parse_depth, bool)
+            and max_parse_depth > 0
+            else DEFAULT_MAX_PARSE_DEPTH
+        )
 
     def search_sync(
         self, query: str, limit: int = DEFAULT_SEARCH_LIMIT
@@ -261,11 +347,57 @@ class LiveKagiAdapter(KagiAdapter):
             )
             return []
 
+        # #727 — FAIL-CLOSED response-PARSE guard (validate-before-trust). Bound
+        # BOTH the size and the nesting depth of the raw response BEFORE handing
+        # it to ``json.loads`` (which has NO size or recursion-depth limit): a
+        # pathological or MITM'd reply could otherwise exhaust host memory / the
+        # C-stack DURING parsing, before the per-entry defenses in
+        # ``_parse_v1_search`` run. On violation, fail closed to ``[]`` via the
+        # SAME never-raise path as every other failure mode, logging WHY
+        # (fail-LOUD, secret-free). This is a SECOND, INDEPENDENT lock downstream
+        # of the door's 8 MiB on-the-wire cap, deliberately tighter — the door
+        # bounds the fetch; this bounds the parse.
+        body = result.content_text
+        body_bytes = len(body.encode("utf-8", errors="ignore"))
+        if body_bytes > self._max_response_bytes:
+            _LOG.warning(
+                "LiveKagiAdapter: search response is %d bytes, over the %d-byte "
+                "parse cap — rejected unparsed (no results, fail-closed)",
+                body_bytes,
+                self._max_response_bytes,
+            )
+            return []
+        if not _within_parse_depth(body, self._max_parse_depth):
+            _LOG.warning(
+                "LiveKagiAdapter: search response nests deeper than the max "
+                "parse depth of %d — rejected unparsed (no results, fail-closed)",
+                self._max_parse_depth,
+            )
+            return []
+
         try:
-            raw = json.loads(result.content_text)
+            raw = json.loads(body)
         except (json.JSONDecodeError, ValueError):
             _LOG.warning(
                 "LiveKagiAdapter: search response is not valid JSON — no results"
+            )
+            return []
+        except Exception as exc:  # noqa: BLE001 — the adapter NEVER raises
+            # #727 defense-in-depth backstop for the module's "never raises"
+            # contract. The pre-scan above rejects an over-deep body BEFORE
+            # json.loads, so this is unreachable in practice — but stdlib
+            # json.loads raises RecursionError on a deeply-nested body (and could
+            # raise MemoryError on a huge one), neither of which is a
+            # JSONDecodeError/ValueError. Catch them here so the never-raise
+            # guarantee rests on TWO independent locks, not the pre-scan alone
+            # (a hypothetical pre-scan miscount degrades to [] instead of
+            # escaping search_sync). Mirrors the egress-door-call handler's
+            # fail-closed `except Exception` idiom above. Fail-loud (secret-free
+            # type name), fail-closed to [].
+            _LOG.error(
+                "LiveKagiAdapter: json.loads raised %s — no results "
+                "(fail-closed, parse-guard backstop)",
+                type(exc).__name__,
             )
             return []
         if not isinstance(raw, dict):

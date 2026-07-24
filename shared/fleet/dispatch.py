@@ -83,6 +83,14 @@ class FleetDispatchConfig:
     proof) means the swap driver never touches the guest-oracle seams —
     byte-identical today-behavior. Resolved from
     ``[fleet_dispatch].guest_oracle_enabled``."""
+    already_satisfied_precheck: bool = False
+    """#1049 already-satisfied pre-check: before dispatching a wave (once at
+    least one task has merged), grade the job acceptance oracle against the
+    current integrated tree; a PASS records every still-pending task as an
+    HONEST SKIP — no coder candidate is spent on work a prior wave already
+    delivered. ``False`` (the fail-closed default for a spec missing the key)
+    means the driver never consults the pre-check seam — byte-identical legacy
+    behavior. Resolved from ``[fleet_dispatch].already_satisfied_precheck``."""
 
 
 @dataclass(frozen=True)
@@ -317,9 +325,38 @@ def enqueue_task(
     *,
     config: FleetDispatchConfig,
     model: str = "",
+    surface: str = "",
+    complexity: str = "",
+    language_hint: str = "",
+    goal: str = "",
+    visual_criteria_json: str = "",
+    acceptance_test_code: str = "",
+    acceptance_test_path: str = "",
 ) -> DispatchResult:
-    """Append one ``{repo,task,prompt,model?}`` task to the fleet queue via
-    ``add-fleet-task.ps1``. Validates the target repo first (fail-fast)."""
+    """Append one task to the fleet queue via ``add-fleet-task.ps1``. Validates
+    the target repo first (fail-fast).
+
+    Beyond ``{repo,task,prompt,model}``, the optional keyword fields are the rich
+    PLAN-time signal ``compile_prompts`` stamps onto each task dict: the build
+    signal (``surface``/``complexity``/``language_hint``), the VLM-critique inputs
+    (``goal``/``visual_criteria_json``), and the #690 shared acceptance oracle
+    (``acceptance_test_code``/``acceptance_test_path``). Each is forwarded to
+    ``add-fleet-task.ps1`` ONLY when non-empty, and persisted to the queue item
+    under the exact key names ``run-fleet.ps1`` reads (``$t.surface`` …
+    ``$t.acceptance_test_path``). An empty field is omitted, so a bare enqueue is
+    byte-identical to before.
+
+    #698: this closes the drop that made the deterministic ``enqueue_task`` path
+    lossy relative to the live swap path (which already carries every field via a
+    wholesale ``json.dumps`` of the task dict). ``enqueue_task`` has no production
+    caller today — it is the go-live EXECUTE-IPC enqueue (#670) — so this makes the
+    dormant helper field-complete before it is wired, not a live-path fix.
+
+    NOTE: ``acceptance_test_code`` is a whole (small, single-feature) pytest/node
+    file passed as one argv element — safe via vector argv (no shell), but bounded
+    by the OS command-line length ceiling. The high-volume path is the swap driver,
+    which writes the queue JSON directly; this helper is the deterministic enqueue.
+    """
     err = validate_repo(Path(repo), config.projects_dir)
     if err:
         return DispatchResult(ok=False, message=f"Could not enqueue — {err}.", error=err)
@@ -335,8 +372,21 @@ def enqueue_task(
         "-Repo", str(repo), "-Task", str(task), "-Prompt", str(prompt),
         "-Queue", str(config.queue_path),
     ]
-    if model:
-        cmd += ["-Model", str(model)]
+    # Forward each optional field ONLY when present, under the -Param name
+    # add-fleet-task.ps1 binds (which writes the queue key run-fleet.ps1 reads).
+    # Order mirrors the PLAN task-dict / run-fleet.ps1 read order.
+    for flag, value in (
+        ("-Model", model),
+        ("-Surface", surface),
+        ("-Complexity", complexity),
+        ("-LanguageHint", language_hint),
+        ("-Goal", goal),
+        ("-VisualCriteriaJson", visual_criteria_json),
+        ("-AcceptanceTestCode", acceptance_test_code),
+        ("-AcceptanceTestPath", acceptance_test_path),
+    ):
+        if value:
+            cmd += [flag, str(value)]
     ok, _out, err_txt = _safe_run(cmd, config.enqueue_timeout_s)
     if not ok:
         return DispatchResult(
@@ -416,10 +466,28 @@ def read_summary(*, config: FleetDispatchConfig, run_id: str) -> DispatchResult:
     return DispatchResult(ok=True, run_id=run_id, message=_format_report(run_id, parse_summary(text)))
 
 
+#: #881 + #953: run-fleet RunIds are a YYYYMMDD-HHMMSS stamp, bare (legacy,
+#: pre-M2) or with the ``-bd`` mint suffix (:func:`new_run_id`) — ANCHORED.
+#: #881 shape-gated the reader against foreign letter-named scratch (a June
+#: ``selftest-*`` dir outsorting every timestamp). #953 is its sibling: the
+#: old PREFIX match deliberately "permitted" ``-flakererun``, and that scratch
+#: sibling (``<run>-bd-flakererun``, no scorecard, no SUMMARY) WINS the sort
+#: over its own base run — reading as still-running forever and blinding
+#: harvest/redispatch/tripwire until a NEWER real run finished (proven live
+#: 2026-07-18 and 07-19; B4-class runs invisible two nights running). Only a
+#: name the minter can produce may resolve; the drift-lock test binds this
+#: pattern to ``new_run_id()``. Shape-gate at the reader: writers multiply.
+_RUN_ID_SHAPE = re.compile(r"^\d{8}-\d{6}(-bd)?$")
+
+
 def latest_run_id(*, config: FleetDispatchConfig) -> str | None:
-    """The most recent RunId under runs_dir (by name; run-fleet names sort by time)."""
+    """The most recent RunId under runs_dir (by name, run-shaped names only)."""
     try:
-        runs = [p.name for p in config.runs_dir.iterdir() if p.is_dir()]
+        runs = [
+            p.name
+            for p in config.runs_dir.iterdir()
+            if p.is_dir() and _RUN_ID_SHAPE.match(p.name)
+        ]
     except OSError:
         return None
     return sorted(runs)[-1] if runs else None
@@ -680,6 +748,7 @@ def build_default_config(
     vikunja_bridge: bool = False,
     vikunja_bridge_project_id: int = 0,
     guest_oracle_enabled: bool = False,
+    already_satisfied_precheck: bool = False,
 ) -> FleetDispatchConfig:
     """The fleet paths for this host. The two ROOTS are config-driven
     ([fleet_dispatch].agentic_setup_dir / projects_dir, threaded from the AO config);
@@ -688,9 +757,9 @@ def build_default_config(
     state\\ layout), so only the root is configurable, never the internal structure.
     ``plan_graph`` threads the M2 W1 knob ([fleet_dispatch].plan_graph, #740),
     ``vikunja_bridge`` / ``vikunja_bridge_project_id`` thread the #749 durable-ticket
-    knobs, and ``guest_oracle_enabled`` threads the #744 guest-certified-oracle knob —
-    all keyword-only with dormant defaults, so every existing caller is
-    byte-identical."""
+    knobs, ``guest_oracle_enabled`` threads the #744 guest-certified-oracle knob, and
+    ``already_satisfied_precheck`` threads the #1049 pre-dispatch skip knob — all
+    keyword-only with dormant defaults, so every existing caller is byte-identical."""
     setup = Path(agentic_setup_dir) if agentic_setup_dir else _AGENTIC_SETUP
     projects = Path(projects_dir) if projects_dir else _PROJECTS
     return FleetDispatchConfig(
@@ -702,4 +771,5 @@ def build_default_config(
         vikunja_bridge=vikunja_bridge,
         vikunja_bridge_project_id=vikunja_bridge_project_id,
         guest_oracle_enabled=guest_oracle_enabled,
+        already_satisfied_precheck=already_satisfied_precheck,
     )

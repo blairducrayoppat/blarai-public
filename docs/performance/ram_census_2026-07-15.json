@@ -1,0 +1,99 @@
+{
+  "title": "Host RAM census — firmware reservation + standing consumers + transient AI-load snapshot",
+  "date": "2026-07-15",
+  "ticket": "#897",
+  "purpose": "Baseline for the RAM-headroom study: quantify the firmware/hardware reservation, standing background consumers, and the memory shape of the host under a concurrent test-gate load, before selecting reclamation levers.",
+  "hardware": {
+    "machine": "ASUS ExpertBook P5405CSA",
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "ram": "32 GiB LPDDR5X on-package",
+    "gpu": "Intel Arc 140V iGPU (unified memory — GPU allocations draw from system RAM)",
+    "bios": "P5405CSA.328 (2025-11-16)"
+  },
+  "os": {
+    "name": "Windows 11 Pro",
+    "build": "26200",
+    "last_boot": "2026-07-15T09:49:33"
+  },
+  "methodology": {
+    "probes": [
+      "Win32_PhysicalMemory vs Win32_OperatingSystem.TotalVisibleMemorySize (hardware-reserved derivation)",
+      "perf counters \\Memory\\* (composition), \\GPU Adapter Memory(*)\\Shared Usage and \\GPU Process Memory(*)\\Shared Usage",
+      "Get-Process working-set/private-bytes grouped by process name; Win32_Process command lines",
+      "Get-MMAgent, Win32_DeviceGuard, Win32_PageFileUsage, Get-VM, Win32_StartupCommand"
+    ],
+    "conditions": "Interactive daytime session. A concurrent Claude session was running the standing pytest gate during part of the census — snapshots labeled 'under_load' vs 'near_idle'. All probes read-only; nothing was modified.",
+    "runs": "Single-pass census; GPU counters read three times (transience check)."
+  },
+  "measurements": {
+    "hardware_reserved_mb": 692.8,
+    "installed_gib": 32.0,
+    "visible_to_windows_gib": 31.323,
+    "memory_composition_near_idle": {
+      "in_use_gb": 16.31,
+      "available_gb": 15.01,
+      "note_in_use_includes_other_dev_sessions": "pytest gate (~2 GB), 3 Claude sessions (~2.6 GB private), Edge (~3.0 GB private)"
+    },
+    "memory_composition_mid_census_mb": {
+      "available_mbytes": 24280,
+      "committed": 16466,
+      "commit_limit": 51531,
+      "standby_normal_priority": 10317,
+      "standby_reserve": 693,
+      "modified": 20,
+      "free_and_zero": 13270,
+      "pool_nonpaged": 636,
+      "pool_paged": 793
+    },
+    "under_load_snapshot": {
+      "in_use_gb": 28.225,
+      "available_gb": 3.098,
+      "note": "Captured at 14:47 while another session's build/test load (with a transient full-model GPU load) was live — demonstrates the machine's real ceiling behavior."
+    },
+    "gpu_shared_usage_mb": {
+      "peak_observed_luid_level": 9743,
+      "after_transient_cleared": 408,
+      "note": "The 9.7 GB was a transient model load from the concurrent gate run: on this iGPU, a resident 14B INT4 model occupies ~9.7 GB of system RAM via GPU shared memory, invisible in process working sets."
+    },
+    "standing_consumers_private_mb": {
+      "python_14_procs_during_gate_run": 11535,
+      "msedge_149_procs": 3040,
+      "claude_3_sessions": 2594,
+      "bitdefender_bdservicehost_5_procs": 1044,
+      "vmmemCmZygote_commit_only": 776,
+      "svchost_80_procs": 437,
+      "dwm": 240,
+      "intel_endurance_gaming": 142
+    },
+    "windows_feature_state": {
+      "memory_compression": false,
+      "page_combining": false,
+      "sysmain": "Stopped/Disabled",
+      "wsearch": "Running/Automatic; Classic (user-folders-only) index scope; SearchIndexer 22 MB working set (live probe at census)",
+      "vbs_status": 2,
+      "vbs_services_running": [3, 4],
+      "vbs_note": "VBS running; services {3,4}; Credential Guard (1) and HVCI (2) not in the running list; Secure System process ~102 MB WS",
+      "pagefile": "auto-managed, C: allocated 19456 MB, current 5699 MB, peak 11750 MB",
+      "hyperv_vm": "BlarAI-Orchestrator OFF, DynamicMemoryEnabled=true, 0 MB assigned"
+    },
+    "startup_autolaunch_inventory": [
+      "Microsoft Edge (--no-startup-window --win-session-start = Startup Boost preload)",
+      "Microsoft Copilot (--no-startup-window)",
+      "OneDrive (/background)",
+      "KeePass (--preload)",
+      "Logi Tune (--tray)",
+      "Intel Endurance Gaming",
+      "Bitdefender bdagent",
+      "SecurityHealthSystray",
+      "Vikunja (BlarAI) [required — work-queue SSOT]"
+    ]
+  },
+  "not_measured": [
+    "Decomposition of the 692.8 MB hardware reservation (needs firmware-level tooling; researched separately)",
+    "Idle baseline with zero dev sessions running (all snapshots include this session + one concurrent gate-running session)",
+    "Secure-kernel/hypervisor RAM cost beyond the visible Secure System process",
+    "Memory Compression store size (process not visible from a non-elevated shell; compression is disabled anyway)",
+    "Per-lever savings (this census is the before-picture; levers are applied and re-measured separately)",
+    "NPU memory residency (embedding model idle-unloaded at census time)"
+  ]
+}

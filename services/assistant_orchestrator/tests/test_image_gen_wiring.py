@@ -385,49 +385,6 @@ def test_image_gen_quality_knobs_resolve_from_default_toml():
 # ---------------------------------------------------------------------------
 
 
-def test_image_gen_config_default_variant_is_photoreal_from_toml():
-    """The shipped default.toml selects the LIVE photoreal SDXL variant (the
-    dormant illustration model is opt-in only), and validation accepts it."""
-    import tomllib
-    from pathlib import Path
-
-    from services.assistant_orchestrator.src.entrypoint import (
-        AssistantOrchestratorService,
-    )
-    import shared.inference.image_gen as ig
-
-    svc = AssistantOrchestratorService.from_default_config()
-    cfgpath = Path("services/assistant_orchestrator/config/default.toml")
-    data = tomllib.loads(cfgpath.read_text(encoding="utf-8"))
-    svc._validate_config_data(data, cfgpath)  # no raise
-    assert (
-        data["image_generation"]["model_variant"] == ig.VARIANT_PHOTOREAL_SDXL
-    )
-
-
-def test_image_gen_config_rejects_unknown_variant():
-    """An unknown [image_generation].model_variant is rejected fail-closed with
-    the dedicated AO_CFG_IMAGE_GEN_VARIANT_INVALID code — a typo cannot silently
-    fall back to the wrong model."""
-    import copy
-    import tomllib
-    from pathlib import Path
-
-    from services.assistant_orchestrator.src.entrypoint import (
-        AssistantOrchestratorService,
-    )
-    from shared.runtime_config import ConfigResolutionError
-
-    svc = AssistantOrchestratorService.from_default_config()
-    cfgpath = Path("services/assistant_orchestrator/config/default.toml")
-    data = tomllib.loads(cfgpath.read_text(encoding="utf-8"))
-    bad = copy.deepcopy(data)
-    bad["image_generation"]["model_variant"] = "evil-model"
-    with pytest.raises(ConfigResolutionError) as excinfo:
-        svc._validate_config_data(bad, cfgpath)
-    assert excinfo.value.code == "AO_CFG_IMAGE_GEN_VARIANT_INVALID"
-
-
 def _fake_resolved_image_gen():
     """A SimpleNamespace carrying every image_gen_* field _image_gen_config_for_style
     reads (#703) — explicit so the style→model+adapter mapping is tested in
@@ -581,32 +538,6 @@ def test_handle_image_gen_request_threads_cartoon_style_to_configure(monkeypatch
     assert cfg.lora_adapter_sha256 == (
         "b4c8132f85ab7d75f5789eaf0054153a6011b505719f1253fb7d8837a498fe89"
     )
-
-
-def test_image_gen_model_variant_resolves_and_threads_to_module():
-    """[image_generation].model_variant resolves through the AO config and threads
-    into the image_gen module via configure() — so the module's resident-swap key
-    reads the SAME launcher-resolved variant."""
-    import tomllib
-    from pathlib import Path
-
-    import shared.inference.image_gen as ig
-
-    cfgpath = Path("services/assistant_orchestrator/config/default.toml")
-    data = tomllib.loads(cfgpath.read_text(encoding="utf-8"))
-    variant = str(
-        data["image_generation"].get(
-            "model_variant", ig.VARIANT_PHOTOREAL_SDXL
-        )
-    )
-    assert variant in ig.KNOWN_VARIANTS
-
-    saved = ig.current_config()
-    try:
-        ig.configure(ig.ImageGenConfig(model_variant=variant))
-        assert ig.current_config().model_variant == variant
-    finally:
-        ig.configure(saved)
 
 
 def test_image_gen_config_rejects_out_of_range_guidance_scale():

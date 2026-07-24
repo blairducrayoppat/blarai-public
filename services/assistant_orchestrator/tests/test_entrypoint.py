@@ -799,6 +799,52 @@ class TestAssistantOrchestratorConfigValidation:
             path, "AO_CFG_RESPONSE_DEPTH_MODE_INVALID"
         )
 
+    # ── [web_search] #727 parse-guard caps ─────────────────────────────
+    def test_web_search_max_response_bytes_non_positive_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """A non-positive parse-guard byte cap would DISARM the fail-closed
+        guard (reject-all) — surface it at boot, never coerce it silently."""
+        path = self._write_and_tweak(
+            tmp_path,
+            "cosine_similarity_threshold = 0.85",
+            "cosine_similarity_threshold = 0.85\n\n"
+            "[web_search]\nenabled = false\nmax_response_bytes = -5",
+        )
+        self._assert_start_fails_with_code(
+            path, "AO_CFG_WEB_SEARCH_PARSE_GUARD_INVALID"
+        )
+
+    def test_web_search_max_parse_depth_non_int_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        path = self._write_and_tweak(
+            tmp_path,
+            "cosine_similarity_threshold = 0.85",
+            "cosine_similarity_threshold = 0.85\n\n"
+            "[web_search]\nenabled = false\nmax_parse_depth = 12.5",
+        )
+        self._assert_start_fails_with_code(
+            path, "AO_CFG_WEB_SEARCH_PARSE_GUARD_INVALID"
+        )
+
+    def test_web_search_max_response_bytes_above_door_cap_rejected(
+        self, tmp_path: Path
+    ) -> None:
+        """#727 NIT 3 — a byte cap ABOVE the egress door's 8 MiB on-the-wire cap
+        would make the parse guard a silent no-op (the door truncates first).
+        Reject it LOUDLY at boot, never silently clamp — the parse guard must
+        stay a tighter, independent lock. 9 MiB (9437184) > the 8 MiB door cap."""
+        path = self._write_and_tweak(
+            tmp_path,
+            "cosine_similarity_threshold = 0.85",
+            "cosine_similarity_threshold = 0.85\n\n"
+            "[web_search]\nenabled = false\nmax_response_bytes = 9437184",
+        )
+        self._assert_start_fails_with_code(
+            path, "AO_CFG_WEB_SEARCH_PARSE_GUARD_INVALID"
+        )
+
 
 class TestJwtValidatorNonceAlignment:
     """#638 — the AO builds its JWT validator with a nonce window that OUTLASTS

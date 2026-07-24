@@ -188,6 +188,53 @@ def test_compose_requirements_block_empty():
     assert clarify.compose_requirements_block([{"answer": ""}]) == ""
 
 
+# ---- operator_answers_from_block — the inverse that keeps house prose out of ------
+# ---- the oracle-QA grounding corpus (#1043 review F1) -----------------------------
+
+
+def test_operator_answers_round_trip_through_the_real_composer():
+    """compose -> extract must return the ANSWERS and nothing else.
+
+    This is the anti-drift control: the extractor's job is separating the operator's words
+    from ours, so if the header wording or the bullet format changes and the extractor is
+    not updated, house prose starts flowing into a grounding corpus that treats presence as
+    authority. That is the defect this pair exists to prevent (#1043 review F1), so the
+    round-trip is asserted through the REAL renderer, never a hand-written string.
+    """
+    answers = ["on my computer", "a clean look", "show the word Saved after each entry"]
+    block = clarify.compose_requirements_block([
+        {"question": "q1", "answer": answers[0], "assumed": False},
+        {"question": "q2", "answer": answers[1], "assumed": True},
+        {"question": "q3", "answer": answers[2], "assumed": False},
+    ])
+    assert clarify.operator_answers_from_block(block) == tuple(answers)
+
+    # Nothing the renderer wrote survives: not the header, not the assumed tag.
+    joined = " ".join(clarify.operator_answers_from_block(block)).lower()
+    for house_word in ("person", "clarified", "requirements", "build to them", "assumed"):
+        assert house_word not in joined
+
+
+def test_operator_answers_from_block_is_total():
+    """Pure + total: nothing to extract yields (), and it never raises."""
+    assert clarify.operator_answers_from_block("") == ()
+    assert clarify.operator_answers_from_block("   \n  \n") == ()
+    assert clarify.operator_answers_from_block(None) == ()
+    # A header with no answers (not a shape the renderer emits) yields nothing.
+    assert clarify.operator_answers_from_block(clarify._REQUIREMENTS_HEADER) == ()
+    # Header-less text is kept verbatim — it is not ours, so it is the operator's.
+    assert clarify.operator_answers_from_block("just some words") == ("just some words",)
+
+
+def test_operator_answers_keeps_multi_line_answer_continuations():
+    """A free-text reply can contain newlines; only the FIRST line carries a bullet. The
+    continuation lines are still the operator's words and must survive, or a multi-line
+    answer would be partly stripped of its own grounding."""
+    block = clarify.compose_requirements_block(
+        [{"question": "q", "answer": "line one\nline two", "assumed": False}])
+    assert clarify.operator_answers_from_block(block) == ("line one", "line two")
+
+
 def test_compose_split_planning_goal_roundtrip():
     block = clarify.compose_requirements_block([{"question": "q", "answer": "on my computer", "assumed": False}])
     enriched = clarify.compose_planning_goal("a todo app", block)

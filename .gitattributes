@@ -6,3 +6,19 @@
 # bundle.sha256 LF fix in launcher/guest_parser.py guards at runtime.
 # (#655 Stage C; see docs/security/guest_parser_provisioning_record.md.)
 scripts/guest/** text eol=lf
+
+# Budgeted doctrine surfaces MUST check out with LF. Their byte budgets
+# (tests/security/test_doctrine_freshness.py SIZE_BUDGETS) are measured on the
+# working-tree file with stat().st_size, and were calibrated on LF content. On
+# Windows with core.autocrlf=true these otherwise check out CRLF, adding one
+# byte per line — enough to push CLAUDE.md (47,704 LF) over its 48,000 budget as
+# 48,021 CRLF, failing the size gate on a clean checkout while the committed blob
+# is fine. Pinning eol=lf removes the platform variable so the gate is
+# deterministic (structural-absence over a hope-the-tree-is-LF configuration).
+# Surfaced 2026-07-23 by the #1067 doctrine-figure merge; the handoff brief had
+# flagged it as "worth its own ticket".
+CLAUDE.md text eol=lf
+docs/TEST_GOVERNANCE.md text eol=lf
+docs/sprints/ACTIVE_SPRINT.md text eol=lf
+.github/copilot-instructions.md text eol=lf
+LESSONS.md text eol=lf

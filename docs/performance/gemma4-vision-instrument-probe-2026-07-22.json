@@ -1,0 +1,144 @@
+{
+  "record_type": "model_feasibility_probe",
+  "title": "Gemma 4 (E4B / 26B-A4B, INT4 OpenVINO IR) as a VISUAL SCREENSHOT-CHECKING instrument",
+  "date": "2026-07-22",
+  "ticket": "#1005",
+  "sibling_record": "gemma4-instrument-probe-2026-07-22.json (text-grader probe, same day, earlier)",
+  "question": "The purpose changed: Gemma 4 is now wanted for VISUAL SCREENSHOT CHECKING, potentially displacing a Qwen3-VL-8B swap in the testing path. 'Deliberately weaker is fine' NO LONGER APPLIES - it must be genuinely good. Which variant, if any, is good enough, and does the box hold it?",
+  "author": "Claude Opus 4.8 research subagent, dev-side probe",
+  "disposition": "Dev-side probe only. No runtime config, .toml, manifest or services/ file modified. Isolated probe venv; the runtime .venv was never pip-installed into. BlarAI was DOWN throughout; the battery scheduled task was not touched.",
+
+  "hardware": {
+    "cpu": "Intel(R) Core(TM) Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU, Xe2)",
+    "memory": "32 GB LPDDR5X, 31.323 GB effective ceiling, shared CPU/GPU",
+    "gpu_driver_version": "32.0.101.8826",
+    "gpu_driver_date": "2026-05-28",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a",
+    "python": "3.11.9",
+    "pipeline_class": "openvino_genai.VLMPipeline",
+    "image_path": "PIL -> numpy NHWC uint8 -> ov.Tensor, passed as images=[tensor]; inputs downscaled so the longest side is <=1280 px"
+  },
+
+  "box_lean_state": "Nothing on the permitted close-list (browsers, Slack/Teams/Discord/Spotify, OneDrive) was running - the box was ALREADY lean and no RAM could be reclaimed that way. Idle baseline in-use was ~9.1-10.5 GB across runs.",
+
+  "subjects": {
+    "note": "The repo images named as candidates were checked and REJECTED as primary subjects: blarai_lighthouse3.png and hand2.png are UC-010 GENERATED ART (a lighthouse seascape; three people at a cafe table), not UI screenshots, and docs/demo/ contains no images at all. Grading a screenshot-checker on generated art would measure the wrong capability. Ground-truth UI subjects were therefore built from cook_test.html (already in the repo root) and rendered headless via Microsoft Edge at 1280x900. All three subjects were visually inspected by the author before grading.",
+    "cook_ok.png": "Correctly rendered: dark theme, centred title heading 'How Complex Systems Fail', styled blue section headings, constrained max-width. GROUND TRUTH = rendered ok, title present.",
+    "cook_broken.png": "Same document with the <style> block stripped AND the <header> block deleted. Renders unstyled (white background, Times serif, full-bleed text, blue underlined links) with the title heading absent. Two independent, visually obvious defects. GROUND TRUTH = broken, title absent.",
+    "blarai_lighthouse3.png": "Non-UI control (UC-010 generated art), open-ended description."
+  },
+
+  "methodology": {
+    "memory_accounting": "In-Use = TotalPhys - AvailPhys via GlobalMemoryStatusEx. TWO independent samplers: (a) in-process thread at 100 ms, (b) an EXTERNAL detached PowerShell sampler at 400 ms writing to a log, so the absolute peak survives even if the probe process dies. The external sampler's absolute peak is the authoritative headroom figure.",
+    "generation_config": "do_sample=False (greedy), max_new_tokens=96.",
+    "run_counts": "Each question asked TWICE per model for determinism. The 26B was loaded and run TWICE end-to-end to test whether its near-ceiling peak was reproducible.",
+    "grading": "4 questions carry objective ground truth and are scored; the lighthouse description is unscored and judged qualitatively."
+  },
+
+  "results": {
+    "E4B_int4_GPU": {
+      "loads": true,
+      "load_seconds": 8.9,
+      "steady_load_delta_gb": 6.375,
+      "transient_peak_delta_gb": 11.491,
+      "residual_after_evict_gb": 1.358,
+      "per_question_seconds": "0.68 - 3.88",
+      "vision_accuracy": "3/4",
+      "determinism": "5/5 byte-identical",
+      "answers": {
+        "cook_ok/render": "ok (CORRECT) - 'The text is clearly legible and appears to be a standard, well-formatted page.'",
+        "cook_ok/title_visible": "yes (CORRECT)",
+        "cook_broken/render": "ok (WRONG - ground truth broken)",
+        "cook_broken/title_visible": "no (CORRECT)",
+        "lighthouse/describe": "'A lighthouse stands on a small island against a vibrant orange and dark cloud-filled sunset.' - accurate"
+      },
+      "failure_shape": "Not random. Element PRESENCE checks are reliable (it correctly saw the title present in one shot and absent in the other). Visual/LAYOUT regression detection FAILED: shown a page with its entire stylesheet removed, it answered 'ok' and justified it with 'clearly legible... well-formatted'. It reads text well and evaluates styling badly, and it errs toward declaring broken things healthy - the unsafe direction for a checker. Same direction as its text-grading miss in the sibling record (it missed an unguarded division)."
+    },
+
+    "26B_A4B_int4_GPU": {
+      "loads": true,
+      "on_disk_gb_MEASURED": 13.634,
+      "on_disk_gb_hf_metadata_claim": 14.3,
+      "largest_component": "openvino_language_model.bin 13.34 GB (monolithic); NO per-layer-embeddings file, unlike E2B/E4B",
+      "run_1": {
+        "load_seconds": 50.72,
+        "steady_load_delta_gb": 14.568,
+        "transient_peak_delta_gb": 22.094,
+        "residual_after_evict_gb": 0.908,
+        "absolute_peak_host_in_use_gb": 31.312,
+        "min_available_gb": 0.012,
+        "headroom_at_peak_gb": 0.011
+      },
+      "run_2": {
+        "steady_load_delta_gb": 13.273,
+        "transient_peak_delta_gb": 22.794,
+        "residual_after_evict_gb": -0.34,
+        "absolute_peak_host_in_use_gb": 31.318,
+        "min_available_gb": 0.005,
+        "headroom_at_peak_gb": 0.005
+      },
+      "per_question_seconds": "1.46 - 4.07",
+      "vision_accuracy": "4/4 (both runs)",
+      "determinism": "5/5 byte-identical (both runs); run-1 and run-2 answers also identical to each other",
+      "answers": {
+        "cook_ok/render": "ok (CORRECT) - 'The text is centered and legible, though the design is minimalist. There are no signs of broken layout or missing elements.'",
+        "cook_ok/title_visible": "yes (CORRECT)",
+        "cook_broken/render": "broken (CORRECT) - 'The text is overlapping with the blue header lines, and the layout is not properly spaced.'",
+        "cook_broken/title_visible": "no (CORRECT)",
+        "lighthouse/describe": "'A silhouette of a lighthouse stands on a small rocky island against a vibrant orange sunset sky.' - accurate, and more precise than E4B (adds silhouette, rocky)"
+      }
+    }
+  },
+
+  "transient_multiplier_finding": {
+    "question_posed": "Does the ~1.95x on-disk -> transient-peak multiplier measured on E2B/E4B hold for a mixture-of-experts model?",
+    "answer": "NO - it does not hold. The MoE model's multiplier is materially lower.",
+    "E2B": "4.062 GB on disk -> 7.977 GB transient = 1.964x",
+    "E4B": "6.016 GB on disk -> 11.740 GB transient = 1.951x",
+    "26B_A4B": "13.634 GB on disk -> 22.094 GB transient = 1.621x",
+    "consequence": "Extrapolating at 1.95x predicted ~26.6 GB transient and a confident non-fit. Actual was 22.09 GB and it DID load. The prediction was wrong in the optimistic direction - but see the headroom finding, which is the one that actually governs."
+  },
+
+  "headroom_finding_GOVERNING": {
+    "statement": "The 26B-A4B fits, but by 5-11 MEGABYTES, reproducibly, on an already-lean box with BlarAI DOWN.",
+    "evidence": "Two independent end-to-end loads peaked at 31.312 GB and 31.318 GB against a 31.323 GB ceiling; minimum available RAM hit 0.012 GB and 0.005 GB. Measured by an external sampler, not the probe process.",
+    "interpretation": "This is not headroom, it is total memory saturation that happened to survive. It loads because OpenVINO mmaps weights and Windows can evict standby pages under pressure, not because the memory is there. The 50.7 s load (vs 8.9 s for E4B, ~2.3x the weights) is consistent with heavy paging during load.",
+    "operational_read": "Any concurrent consumer - the resident Qwen3-14B, a browser, the WinUI app - removes the margin entirely. As a load-on-demand instrument it would require evicting the 14B first AND keeping the box otherwise idle, with essentially zero tolerance for anything else."
+  },
+
+  "31B_decision": {
+    "attempted": false,
+    "reason": "Three independent disqualifiers. (1) The stated precondition was '26B loaded with real headroom to spare' - it did not; 5-11 MB is not real headroom. (2) 17.4 GB on disk (HF metadata, unverified) at even the favourable 1.62x MoE multiplier extrapolates to ~28 GB transient delta on top of a ~9 GB idle baseline = ~37 GB required against a 31.323 GB ceiling; and the 31B is DENSE, so the favourable MoE multiplier is not the right one to apply anyway. (3) Downloading it would put this task at ~31 GB of additional downloads against a ~20 GB cap.",
+    "confidence": "The non-fit is an extrapolation, NOT a measurement. It was not attempted."
+  },
+
+  "what_was_NOT_measured": [
+    "Qwen3-VL-8B head-to-head on the SAME subjects. This probe establishes what Gemma 4 does; it does NOT compare it against the incumbent it might displace. That comparison is the actual decision input and it is missing.",
+    "Co-residency with Qwen3-14B - still never loaded alongside. Given the 26B peaks at the ceiling alone, co-residency is arithmetically impossible for the 26B and untested for E4B.",
+    "Sample size: 4 graded questions on 2 UI subjects per model. This establishes a failure SHAPE and a floor, not an accuracy RATE.",
+    "Prompt sensitivity - one phrasing per question. A sterner prompt naming CSS/layout explicitly might change E4B's miss; untested.",
+    "Real BlarAI application screenshots (WinUI). The UI subjects are a rendered HTML document, not the actual product surface. Per FIELD_NOTES the WinUI app captures black except via full-desktop capture, so this was out of reach without launching the app - which the brief forbade.",
+    "Text-mode regression on the 26B (the sibling record's juror battery was not re-run on it).",
+    "Sustained/thermal behaviour, power draw, long-context, audio input.",
+    "The 12B - still no pre-converted OpenVINO IR (re-verified against the OpenVINO HF org listing).",
+    "INT8/FP16 variants of any model."
+  ],
+
+  "artifacts_executed_against": [
+    "OpenVINO/gemma-4-E4B-it-int4-ov (6.016 GB, GPU, vision battery x2 runs)",
+    "OpenVINO/gemma-4-26b-a4b-it-int4-ov (13.634 GB MEASURED, GPU, full end-to-end x2 runs)",
+    "cook_test.html (repo root) rendered to cook_ok.png / cook_broken.png via headless Edge",
+    "blarai_lighthouse3.png, hand2.png (both inspected; hand2 not used)"
+  ],
+  "resting_on_documentation_alone": [
+    "The 31B's 17.4 GB size and therefore its non-fit - HF metadata plus extrapolation. NOT downloaded, NOT run.",
+    "INT4 quantisation parameters for the 26B - HF model card; weights not inspected.",
+    "The 'EXPERIMENTAL / not fully validated with OpenVINO' status of these IRs - HF model cards."
+  ],
+  "additional_downloaded_gb_this_task": 13.634
+}

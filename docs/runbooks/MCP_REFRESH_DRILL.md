@@ -2,7 +2,7 @@
 
 **Purpose**: Guarantee newly-installed or newly-upgraded MCP servers become visible to every agent surface that needs them.
 
-**Source of authority**: Friction point F-8 (`docs/CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml` §7) — Claude Chat locks the MCP tool surface at session start. Config changes do not propagate to existing sessions.
+**Source of authority**: Friction point F-8 (`devplatform\docs\CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml` §7 — in the **devplatform** repo, not this one) — Claude Chat locks the MCP tool surface at session start. Config changes do not propagate to existing sessions.
 
 **When to run**: after any of the following:
 
@@ -45,7 +45,7 @@ Some MCP servers require an external process to be running at refresh time (the 
 # Vikunja — check the binary is running
 Get-Process vikunja* -ErrorAction SilentlyContinue
 # If empty, start it:
-Start-Process 'C:\Users\mrbla\BlarAI\tools\vikunja\vikunja-v2.3.0-windows-4.0-amd64.exe'
+Start-Process 'C:\Users\mrbla\devplatform\tools\vikunja\vikunja-v2.3.0-windows-4.0-amd64.exe'
 ```
 
 ### Step 3 — Restart Claude Desktop
@@ -98,18 +98,23 @@ For non-trivial changes (new MCP server installation, credential rotation), add 
 | `tool_search(query="X")` returns no match in Chat after restart | Desktop restart didn't fully quit; stray tray icon | Use Task Manager → kill all `Claude.exe`. Then relaunch. |
 | Tools visible in Chat but calls hang | External dependency (Vikunja) not running | Start the dependency binary; retry. |
 | Tools visible in Chat but return authentication errors | Credential in config is stale or wrong | Rotate in source system; update all three config files; re-run drill. |
-| `.mcp.json` shows fewer servers than `claude_desktop_config.json` | By design — most Domain 6 Tier A+B MCPs are Chat-only per [ecosystem matrix](../CLAUDE_MCP_ECOSYSTEM_MATRIX.md) §6. Not a bug. | None — verify intent before adding to Code. |
+| `.mcp.json` shows fewer servers than `claude_desktop_config.json` | By design — most Domain 6 Tier A+B MCPs are Chat-only per the ecosystem matrix (`devplatform\docs\CLAUDE_MCP_ECOSYSTEM_MATRIX.md`) §6. Not a bug. | None — verify intent before adding to Code. |
 | VS Code shows "no MCP servers" | Copilot extension didn't reload | Command palette → "Developer: Reload Window". |
 
 ---
 
 ## Cross-references
 
-- [F-3 Bash Fork Error Runbook](../F3_BASH_FORK_ERROR_RUNBOOK.md) — orthogonal concern (Bash tool, not MCP surface), but recovery may overlap with environmental drift.
-- [Claude MCP Ecosystem Matrix](../CLAUDE_MCP_ECOSYSTEM_MATRIX.md) — authoritative MCP server roster + venue intentions (which MCP belongs in which config file).
+> Several documents this runbook was written against now live in the **devplatform**
+> repo (`C:\Users\mrbla\devplatform`), not in BlarAI — they moved with the platform
+> extraction (`3e73484a`, 2026-04-30). They are reference-only; devplatform is being
+> sunset. Paths below are repo-qualified so they resolve.
+
+- `F3_BASH_FORK_ERROR_RUNBOOK.md` — orthogonal concern (Bash tool, not MCP surface), but recovery may overlap with environmental drift. Archived in this repo at [`docs/archive/2026/phase5-prompts/F3_BASH_FORK_ERROR_RUNBOOK.md`](../archive/2026/phase5-prompts/F3_BASH_FORK_ERROR_RUNBOOK.md).
+- **Claude MCP Ecosystem Matrix** — authoritative MCP server roster + venue intentions (which MCP belongs in which config file). Now `devplatform\docs\CLAUDE_MCP_ECOSYSTEM_MATRIX.md`.
 - [Commit Handshake Pattern](COMMIT_HANDSHAKE_PATTERN.md) — sibling runbook for git-tool degradation.
 - [MCP Config Sync](MCP_CONFIG_SYNC.md) — sibling runbook for keeping the three config files consistent.
-- F-8 in [CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml](../CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml) §7.
+- F-8 §7 in `devplatform\docs\CLAUDE_DESKTOP_CONFIGURATION_AGENT_INITIATION_v3.0.xml`.
 
 ---
 

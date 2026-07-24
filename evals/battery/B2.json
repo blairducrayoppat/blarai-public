@@ -10,6 +10,8 @@
   "repo": "battery-b2-text-stats",
   "sandbox_only": true,
   "clarify_answer": "1",
+  "run_budget_s": 15000,
+  "run_budget_note": "#927 per-card run-budget (2026-07-17, LA-approved c.2156): B2 is the other active lean-campaign job (jobs=[B2,B4]) and a multi-wave card (4-unit diamond, expects_waves_gte 3), so its per-job budget must clear the coherence lock's C2 floor (the 14400 s 2-wave/best-of-2 minimum) that the 10800 s (3 h) default fails. 15000 s (~4.2 h) clears it with margin; B2 is a fast (~1 h wall-clock) canary, so this is an abort ceiling it never legitimately reaches, not a wait. Paired with B4's 16200 s the two per-card budgets sum to ~31200 s, keeping the derived RUN-phase floor (~33600 s / 9.3 h) well under the PT16H / 57600 s Task-Scheduler ceiling (C3 / #833 T4). A global default bump was rejected (it derives ~25 h at the 6-job campaign). Lesson 221.",
   "goal": "I would like a little toolkit that reads a piece of text and tells me things about it. It should first break the text into individual words. From those words I want two different counts worked out: how often each word appears, and which pairs of neighbouring words show up together most. Finally I want one tidy report that pulls both counts together so I can read all the findings in one place.",
   "rigs": [],
   "expected_outcome": {

@@ -1,0 +1,171 @@
+{
+  "record_type": "model_feasibility_probe",
+  "title": "Gemma 4 (E2B / E4B, INT4 OpenVINO IR) as an out-of-family grading instrument",
+  "date": "2026-07-22",
+  "ticket": "#1005",
+  "question": "Can any Gemma 4 variant run locally on this machine at all, on any device, and what does it cost in RAM? Instrument framing (independent grader), NOT a production-model swap.",
+  "author": "Claude Opus 4.8 research subagent, dev-side probe",
+  "disposition": "Dev-side probe only. No runtime config, .toml, manifest, or services/ file was read for write or modified. Probe ran in an isolated venv; the runtime .venv was never pip-installed into.",
+
+  "hardware": {
+    "cpu": "Intel(R) Core(TM) Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU, Xe2)",
+    "npu": "Intel(R) AI Boost",
+    "memory": "32 GB LPDDR5X, 31.323 GB effective ceiling (shared across CPU/GPU/NPU)",
+    "gpu_driver_version": "32.0.101.8826",
+    "gpu_driver_date": "2026-05-28",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+
+  "software": {
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a",
+    "python": "3.11.9",
+    "venv": "isolated probe venv under the session scratchpad; NOT the BlarAI runtime .venv",
+    "pipeline_class": "openvino_genai.VLMPipeline (Gemma 4 is registered as a VLM architecture: Gemma4ForConditionalGeneration / Gemma4UnifiedForConditionalGeneration)",
+    "note": "openvino_genai.VLMPipeline loads the pre-converted IR directly. The optimum-intel / transformers==5.5.0 / custom-branch requirement stated on the HF model card applies to the OVModelForVisualCausalLM export path, NOT to running an already-converted IR. Nothing from transformers or optimum was installed."
+  },
+
+  "models": [
+    {
+      "id": "OpenVINO/gemma-4-E2B-it-int4-ov",
+      "precision": "INT4 asymmetric, group size 128, ratio 1.0 (NNCF), per HF model card",
+      "on_disk_gb": 4.062,
+      "components": {
+        "openvino_language_model.bin_mb": 1315.7,
+        "openvino_text_embeddings_per_layer_model.bin_mb": 2240.5,
+        "openvino_text_embeddings_model.bin_mb": 384.5,
+        "openvino_vision_embeddings_model.bin_mb": 161.2
+      },
+      "hf_card_status": "EXPERIMENTAL MODEL - not fully validated with OpenVINO, exported from a custom optimum-intel branch"
+    },
+    {
+      "id": "OpenVINO/gemma-4-E4B-it-int4-ov",
+      "precision": "INT4 asymmetric, group size 128 (NNCF), per HF model card",
+      "on_disk_gb": 6.016,
+      "components": {
+        "openvino_language_model.bin_mb": 2611.2,
+        "openvino_text_embeddings_per_layer_model.bin_mb": 2688.5,
+        "openvino_text_embeddings_model.bin_mb": 640.5,
+        "openvino_vision_embeddings_model.bin_mb": 161.9
+      },
+      "hf_card_status": "EXPERIMENTAL MODEL - not fully validated with OpenVINO, exported from a custom optimum-intel branch"
+    }
+  ],
+
+  "methodology": {
+    "memory_accounting": "In-Use = TotalPhys - AvailPhys via GlobalMemoryStatusEx, host-wide, sampled on a 100 ms background thread for peaks. Process working set / private commit reported alongside via GetProcessMemoryInfo. Working-set numbers are secondary; host In-Use is the doctrine measure (ADR-005).",
+    "memory_caveat": "OpenVINO memory-maps weight .bin files. On the CPU device those pages land in the Windows standby list, which Windows counts inside 'Available' - so the CPU-device In-Use delta UNDERSTATES true footprint. The GPU-device numbers do not have this problem (weights are committed into the shared GPU allocation) and are the ones quoted below.",
+    "generation_config": "do_sample=False (greedy, temperature-0 equivalent, per project determinism mandate), max_new_tokens as noted per run. Text-only input; no image supplied.",
+    "prompt": "Short grader prompt (85 input tokens) asking for a one-line JSON verdict on a candidate answer.",
+    "run_counts": "Throughput/latency: single run per (model, device) cell. Determinism: 3 consecutive generations from one loaded pipeline. Juror battery: 6 cells (2 subjects x 3 lenses), each generated twice.",
+    "juror_battery": "Prompt shape copied verbatim from tools/dispatch_harness/green_quality/jury.py Juror.build_prompt - the real BlarAI green-quality rubric, not a toy - over one clean subject and one deliberately defective subject.",
+    "state": "Machine otherwise idle; Qwen3-14B NOT resident during any run; BlarAI app and launcher were not started."
+  },
+
+  "results": {
+    "gpu_arc_140v": {
+      "E2B_int4": {
+        "loads": true,
+        "load_seconds": 8.1,
+        "baseline_host_in_use_gb": 8.669,
+        "steady_host_in_use_after_load_gb": 13.184,
+        "steady_load_delta_gb": 4.515,
+        "transient_peak_host_in_use_gb": 16.646,
+        "transient_peak_delta_over_baseline_gb": 7.977,
+        "peak_process_working_set_gb": 8.099,
+        "host_in_use_after_evict_gb": 9.424,
+        "residual_after_evict_gb": 0.755,
+        "throughput_tokens_per_sec": 30.976,
+        "ttft_ms": 732.9,
+        "tpot_ms": 32.28,
+        "generated_tokens": 21,
+        "input_tokens": 85,
+        "output_valid": true,
+        "output_text": "{\"verdict\": \"pass\", \"reason\": \"Correctly identifies the capital and its significance\"}",
+        "determinism_3_runs": "3/3 byte-identical"
+      },
+      "E4B_int4": {
+        "loads": true,
+        "load_seconds": 14.94,
+        "baseline_host_in_use_gb": 8.788,
+        "steady_host_in_use_after_load_gb": 15.403,
+        "steady_load_delta_gb": 6.615,
+        "transient_peak_host_in_use_gb": 20.525,
+        "transient_peak_delta_over_baseline_gb": 11.737,
+        "peak_process_working_set_gb": 11.94,
+        "host_in_use_after_evict_gb": 9.582,
+        "residual_after_evict_gb": 0.794,
+        "throughput_tokens_per_sec": 18.107,
+        "ttft_ms": 767.9,
+        "tpot_ms": 55.23,
+        "generated_tokens": 27,
+        "input_tokens": 85,
+        "output_valid": true,
+        "output_text": "{\"verdict\": \"pass\", \"reason\": \"Correctly identifies the capital and provides a relevant reason for its significance.\"}",
+        "determinism_3_runs": "3/3 byte-identical"
+      }
+    },
+
+    "cpu": {
+      "E2B_int4": {
+        "loads": true,
+        "load_seconds": 3.2,
+        "throughput_tokens_per_sec": 26.046,
+        "ttft_ms": 3201.4,
+        "tpot_ms": 38.39,
+        "output_valid": false,
+        "DEFECT": "Output is corrupt and NON-DETERMINISTIC under greedy decoding. Across 3 identical runs (do_sample=False) the model produced 2 distinct outputs; 2 of 3 runs emitted only 2 characters ('{\"') while consuming the full 120-token budget without stopping, i.e. the remaining tokens decoded to nothing. A third run produced correct JSON. Separate earlier runs produced a third variant (21 chars). Tokenizer round-trip was verified clean on the same pipeline, so the detokenizer is not the fault - the model itself emits garbage token IDs on the CPU plugin.",
+        "determinism_3_runs": "2 distinct outputs of 3 runs - FAIL"
+      },
+      "E4B_int4": "NOT RUN - the CPU plugin defect was already established on E2B"
+    },
+
+    "npu": {
+      "E2B_int4": {
+        "loads": false,
+        "error": "RuntimeError: Exception from src/inference/src/cpp/core.cpp:120 -> plugin.cpp:54 -> intel_npu/src/plugin/src/plugin.cpp:673 -> compiler_adapter/src/compiler_impl.cpp:332: Compilation failed. vclAllocatedExecutableCreate3 result: 0x78000004 - [NPU_VCL] Compiler returned msg: Compilation failed"
+      }
+    },
+
+    "juror_battery_real_blarai_rubric": {
+      "device": "GPU",
+      "E4B_int4": {
+        "cells": 6,
+        "parseable_and_in_enum": "6/6",
+        "deterministic": "6/6",
+        "discriminates_clean_vs_defective": true,
+        "quality_note": "Grades were substantively correct: the clean CLI scored runnable_surface=yes / naming=clear; the defective module scored runnable_surface=no or only-by-writing-code, bad_input_handling=unchecked, naming_structure=mixed. Lens sensitivity was visible (the legibility lens returned different values than the correctness lens on the same subject), which is desirable for a diverse panel. It did NOT flag the unguarded division in the defective subject (correctness_probe=none in all cells) - a real miss."
+      },
+      "E2B_int4": {
+        "cells": 6,
+        "parseable_and_in_enum": "6/6",
+        "deterministic": "6/6",
+        "discriminates_clean_vs_defective": true,
+        "quality_note": "Format compliance equal to E4B, but judgment noticeably noisier: it scored the CLEAN subject correctness_probe=wrong and bad_input_handling=unchecked, and under one lens called a script with an argparse main() runnable_surface=no. Usable but lower-trust."
+      }
+    }
+  },
+
+  "what_was_NOT_measured": [
+    "Co-residency with Qwen3-14B. The 14B was never loaded during these runs; every number above is against an otherwise-idle box. The load-on-demand-then-evict pattern is INFERRED to fit from the transient peak, not demonstrated with the 14B present.",
+    "Long-context behaviour. All runs used an 85-token prompt. No context-scaling curve, no KV-cache growth measurement.",
+    "Image input. Gemma 4 is a VLM and the vision-embeddings sub-model was loaded, but no image was ever supplied. Vision is untested.",
+    "Audio input.",
+    "Accuracy against BlarAI's answer_quality golden set, or any swapped-judge re-scoring. The juror battery used two hand-written subjects, not the real corpus.",
+    "Sustained/thermal throughput. Single short generations only; no multi-minute load.",
+    "INT8 and FP16 variants (both exist on HF for E2B and E4B) - only INT4 was pulled.",
+    "E4B on the CPU device.",
+    "The 12B variant - no pre-converted OpenVINO IR exists (verified against the OpenVINO HF org listing), so it was out of reach of a download-and-run probe.",
+    "The 26B-A4B (14.3 GB) and 31B (17.4 GB) IRs - both exist but exceed the probe's download budget and would exceed the RAM envelope for a load-on-demand instrument.",
+    "Power draw / energy per token.",
+    "Speculative decoding - deliberately not attempted; irrelevant under the instrument framing."
+  ],
+
+  "artifacts_executed_against": [
+    "OpenVINO/gemma-4-E2B-it-int4-ov (downloaded, 4.062 GB, run on CPU + GPU + NPU-attempt)",
+    "OpenVINO/gemma-4-E4B-it-int4-ov (downloaded, 6.016 GB, run on GPU)",
+    "tools/dispatch_harness/green_quality/jury.py (read on disk; rubric prompt reproduced verbatim in the battery)"
+  ],
+  "total_downloaded_gb": 10.078
+}

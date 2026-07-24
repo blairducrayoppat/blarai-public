@@ -54,6 +54,21 @@ _MANIFEST_RELATIVE = _MODEL_DIR / "manifest.json"
 # Primary model binary — the one the manifest records a digest for.
 _PRIMARY_MODEL_BIN = _MODEL_DIR / "openvino_model.bin"
 
+# FUT-05 / #107 + #917 — the SERVED-AND-ENFORCED speculative-decoding DRAFT model
+# dirs, each signed with the SAME BlarAI-Manifest-Signing key and each verified by a
+# real code path (a manifest no code checks must never appear as ceremony
+# "coverage"):
+#   - qwen3-0.6b-pruned-6l/openvino-int8-gpu — the shared-pipeline draft
+#     (DRAFT_MODEL_OV_PATH), verified by build_shared_pipeline (#107).
+#   - qwen3-0.6b/openvino-int4-gpu — the PA standalone/fallback draft, verified by
+#     gpu_inference._verify_draft_integrity (#917).
+# Each dir is gitignored, so an absent draft is INFO (advisory), never a hard FAIL —
+# only a PRESENT draft whose weight digest mismatches its manifest is a FAIL.
+_DRAFT_MODEL_DIRS: tuple[Path, ...] = (
+    Path("models/qwen3-0.6b-pruned-6l/openvino-int8-gpu"),
+    Path("models/qwen3-0.6b/openvino-int4-gpu"),
+)
+
 # certs/pa_public.pem — produced by the JWT-key provisioning ceremony.
 _PA_PUBLIC_PEM = Path("certs/pa_public.pem")
 
@@ -284,6 +299,89 @@ def _check_manifest() -> tuple[bool, str]:
         )
 
 
+def _check_draft_manifests() -> list[tuple[bool, str]]:
+    """Check each SERVED speculative-decoding draft manifest (FUT-05 / #107).
+
+    One line per draft dir in ``_DRAFT_MODEL_DIRS``. Non-fatal by design (the
+    drafts are NON-AUTHORITATIVE and gitignored):
+
+      - Draft dir / manifest absent            → INFO (not on this box)
+      - Manifest present, no ``.sig`` yet       → INFO advisory ("not yet signed";
+            require_signed_draft_manifest is dormant until the ceremony signs it)
+      - Manifest present + ``.sig`` present      → INFO ("signed"); if the weight
+            binary is present its digest is verified — a MISMATCH is a FAIL
+      - Manifest present + weight present, digest mismatch → FAIL (real integrity
+            problem, surfaced even while the enforcement flag is dormant)
+    """
+    from shared.models.weight_integrity import compute_sha256, load_manifest
+
+    results: list[tuple[bool, str]] = []
+    for model_dir in _DRAFT_MODEL_DIRS:
+        label = f"Draft manifest ({model_dir.parent.name}/{model_dir.name})"
+        manifest = model_dir / "manifest.json"
+        sig = model_dir / "manifest.json.sig"
+        bin_path = model_dir / "openvino_model.bin"
+
+        if not manifest.exists():
+            results.append(
+                (True, _line(_INFO, f"{label:<35}— absent (gitignored / not on this box)"))
+            )
+            continue
+
+        signed = sig.exists()
+        sig_note = "signed (.sig present)" if signed else "NOT yet signed (.sig absent — dormant)"
+
+        # Verify the primary weight digest if the binary is present.
+        if bin_path.exists():
+            try:
+                digests = load_manifest(manifest)
+                if digests is None:
+                    results.append(
+                        (False, _line(_FAIL, f"{label:<35}— manifest failed to parse", str(manifest)))
+                    )
+                    continue
+                expected = digests.get(bin_path.name)
+                if expected is None:
+                    results.append(
+                        (
+                            False,
+                            _line(
+                                _FAIL,
+                                f"{label:<35}— no digest for {bin_path.name}",
+                                "Re-run the manifest stager for this draft.",
+                            ),
+                        )
+                    )
+                    continue
+                computed = compute_sha256(bin_path)
+                if computed == expected:
+                    results.append(
+                        (True, _line(_INFO, f"{label:<35}— {sig_note}; digest verified"))
+                    )
+                else:
+                    results.append(
+                        (
+                            False,
+                            _line(
+                                _FAIL,
+                                f"{label:<35}— DIGEST MISMATCH",
+                                f"Computed {computed[:16]}… != expected {expected[:16]}…. "
+                                "The draft weight may be corrupted/replaced; re-stage.",
+                            ),
+                        )
+                    )
+            except Exception as exc:  # noqa: BLE001 — advisory check, never a hard crash
+                results.append(
+                    (False, _line(_FAIL, f"{label:<35}— error during verify", str(exc)))
+                )
+        else:
+            # Manifest present but the weight is absent (gitignored) — advisory only.
+            results.append(
+                (True, _line(_INFO, f"{label:<35}— {sig_note}; weight absent (digest not verified)"))
+            )
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Main preflight runner
 # ---------------------------------------------------------------------------
@@ -322,6 +420,9 @@ def run_preflight() -> int:
     checks.append(_check_keystore(keystore_path))
     checks.append(_check_pa_public_pem())
     checks.append(_check_manifest())
+    # FUT-05 / #107 — the served spec-decode draft manifests (one line each;
+    # non-fatal on absence, FAIL only on a present-but-mismatched draft weight).
+    checks.extend(_check_draft_manifests())
 
     # --- Print results ---
     print("  Prerequisite Checklist")

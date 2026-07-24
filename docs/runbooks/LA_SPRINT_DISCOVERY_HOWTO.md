@@ -1,5 +1,56 @@
 # How to Run a Sprint Discovery Session — Lead Architect Guide
 
+> ## SUPERSEDED — `/sprint-discovery` was rewritten on 2026-07-19. Read the command, not this guide.
+>
+> The authoritative description of what `/sprint-discovery` does is
+> [`.claude/commands/sprint-discovery.md`](../../.claude/commands/sprint-discovery.md).
+> The command was rewritten by the #945 D7 doc restructure (commit `28dd039a`).
+> This guide was written against the old shape and has **not** been rewritten to
+> match; it is flagged whole rather than partially refreshed.
+>
+> **The one that matters most — the safety model is described backwards.** This
+> guide says tickets you file will be "picked up by the fleet autonomously" once
+> they carry the right labels, because "SDO's proactive scan catches them". That
+> is wrong twice: SDO is retired, and **no label makes a ticket run.** The current
+> boundary is structural — *nothing executes a ticket until `/sprint-kickoff`
+> pulls it into an active sprint* — which is what keeps drafts safe to edit.
+>
+> So a filed ticket sits until somebody picks it up. That can be a kickoff, or it
+> can be you or a session handling it directly in normal flow (the command's own
+> handoff explicitly offers an ad-hoc path with no kickoff needed). What will
+> **not** happen is a scheduled agent noticing it and starting work unprompted.
+>
+> **Also wrong:**
+>
+> - **The command can no longer edit or delete a ticket it created.**
+>   `update_task` and `delete_task` are not among its allowed tools, so the
+>   "just say: update ticket #X" instruction here will not work. Fix tickets in
+>   the Vikunja web UI instead.
+> - **The handoff form changed.** It is now
+>   `/sprint-kickoff --from-tickets <ids> "<theme>"`, started fresh. That mode
+>   makes the named tickets the scope seed; the positional form given here only
+>   passes the ids as free-text context.
+> - **There is a cap of roughly 15 tickets per session**, which this guide does
+>   not mention (so its "the agent proposed 20 tickets" troubleshooting cannot
+>   arise).
+> - **The `[agent:ba]` description prefix is gone**; what is required now is a
+>   work-type label (Testing, Architecture, Infrastructure, Documentation,
+>   Security) plus a plain statement that the ticket is a discovery draft.
+> - **Sizing is in tickets, not "EA milestones."** The current command asks for a
+>   rough count of tickets (small / medium / large each).
+> - **Do not rely on the numeric priority mapping given here.** The command says
+>   only to set priority deliberately and reserve the top urgency for real
+>   blockers; it pins no scale, and project doctrine deliberately keeps the
+>   numeric scale out of docs so it cannot drift. Check the board itself.
+> - **Tickets are not auto-assigned to you**; the command lacks the assignment
+>   tool despite its own text implying otherwise.
+> - **"The 9 Use Cases"** is stale — UC-010 (local image generation) is a
+>   deliberate tenth, recorded in `Use Cases_FINAL.md` and ADR-033.
+>
+> Still accurate: the hardware ceiling figure, the runtime-privacy mandate, that
+> structure is proposed in chat before any ticket is written, that each created
+> ticket id is read back to you, and that you re-run discovery after spikes.
+
 > **Who this is for**: you, the Lead Architect (LA), when you have an idea, a customer need, or a strategic direction you want to explore BEFORE committing to a sprint. You're wearing the Product Manager / voice-of-customer hat; the agent is the Business Analyst / technical translator.
 >
 > **What you'll learn**: when discovery is the right step (vs. going straight to kickoff), how to frame an exploratory conversation, how the agent grounds aspirational ideas, how Vikunja tickets get produced, and how you transition to `/sprint-kickoff` with confidence.

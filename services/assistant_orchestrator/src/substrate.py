@@ -27,7 +27,12 @@ Design decisions (recorded in ADR-016):
     plus a ``substrate_meta`` table for the embedding dimension/version.
   * **Vector search** is brute-force cosine over L2-normalised vectors (a single
     numpy matrix multiply). At a single user's scale — thousands of 384-dim
-    vectors — this is sub-millisecond and needs no extra dependency. HNSW
+    vectors — the matmul itself stays sub-millisecond at every corpus size and
+    needs no extra dependency; end-to-end ``retrieve()`` measures ~5 ms at 100
+    chunks to ~26 ms at 5000 (p95 ~28 ms; #542, PERFORMANCE_LOG 2026-06-04). The
+    end-to-end cost is a fixed per-query embed plus a read-and-scan of ALL N
+    stored vectors each call — that per-call scan is the part that grows with the
+    corpus; the top-k text row-fetch is constant and the matmul is sub-ms. HNSW
     (hnswlib) was the planned index but ships no wheel for this Python and would
     not build; brute-force is sufficient here and the search is kept behind a
     private method so an ANN index can slot in unchanged if scale ever demands.
@@ -900,16 +905,28 @@ class EncryptedSubstrateStore:
 
         Thread-safe: serialised by ``self._lock`` against retrieval/reload.
 
+        #900 memory-reclaim probe (OFF by default): brackets the zero+clear to
+        record the ``In-Use = Total − Available`` delta so the embedding-cache
+        idle-unload is measured alongside the two GPU-model evict paths. This path
+        frees CPU RAM (the decrypted vectors), so its delta is expected small
+        relative to the model evictions; no ``gc.collect()`` is added, so behaviour
+        is unchanged when the probe is off.
+
         Returns:
             ``True`` if this call performed an unload; ``False`` if it was a
             no-op (already unloaded).
         """
+        from shared.diagnostics import reclaim_probe
+
         with self._lock:
             if self._cache_unloaded:
                 return False
             n = len(self._embed_cache)
-            self._zero_and_clear_cache()
-            self._cache_unloaded = True
+            with reclaim_probe(
+                "substrate.embed_cache.unload", log=logger, vectors=n
+            ):
+                self._zero_and_clear_cache()
+                self._cache_unloaded = True
             logger.info(
                 "EncryptedSubstrateStore.unload_embed_cache: zeroed + dropped %d "
                 "cached embedding vector(s); will reload lazily on next retrieve",

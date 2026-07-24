@@ -1,5 +1,25 @@
 # Headless-Coding Dispatch Go-Live Runbook
 
+<!-- doc-rot gate (#994): the config flag(s) gating this ceremony. The EXECUTED banner below must agree with their LIVE state in services/assistant_orchestrator/config/default.toml — read there, never from this doc. -->
+<!-- Gating-flag: [fleet_dispatch].enabled -->
+
+> ## STATUS: EXECUTED — 2026-06-27. Do not re-run.
+>
+> This ceremony has already been performed. `[fleet_dispatch].enabled` is
+> **`true`** in `services/assistant_orchestrator/config/default.toml`; the flip
+> from `false` to `true` landed in commit `20c95530`
+> ("feat(dispatch): make the dispatch LIVE — fleet_dispatch.enabled=true").
+>
+> **What this means for you:** `/dispatch` is LIVE and will spawn a real coder
+> run today. The wiring described below is already in place. Everything written
+> in the present tense as "not yet connected" describes the pre-2026-06-27 state.
+>
+> **The flip warning below is therefore spent, not live.** Step 2 tells you to
+> flip the flag with the LA present; it is already flipped. Do not read that as
+> "still safe to flip" — there is nothing left to flip.
+>
+> This file is kept as the historical record of how dispatch was activated.
+
 **Wire → flip → first dispatch → eyeball.** ADR-034 (model swap) + ADR-035 (acceptance
 layer). For the Lead Architect (non-developer-friendly). This is the on-hardware session
 that takes headless-coding dispatch from DORMANT to live. The BUILD phase (increments
@@ -21,7 +41,11 @@ wiring + the first real run, which are only validatable on the box.
 ## Preconditions (verify BEFORE starting)
 
 1. `main` has increments 1+2+3 merged (the dormant subsystem). On-main standing gate is
-   green (4014/0 at the i3 merge `f8d0f5d` or later).
+   green. (This step used to pin `4014/0` at the i3 merge `f8d0f5d`. That figure was
+   accurate when written — the journal records `4014 passed / 0 failed / 0 skipped /
+   118 deselected` on main at that merge, dated 2026-06-22 — but it is long out of
+   date now and must not be compared against. The only figure kept in sync with the
+   gate is `docs/TEST_GOVERNANCE.md` §1's `LIVE_GATE_BASELINE` line — read that.)
 2. The agentic-setup fleet is installed and works **standalone**: `add-fleet-task.ps1`,
    `run-fleet.ps1`, and `start-llm.ps1 -Model coder-30b -Force` all run, and the 30B
    loads on the Arc 140V (this is the operator's existing coder fleet — confirm it works
@@ -40,9 +64,13 @@ wiring + the first real run, which are only validatable on the box.
 ## Step 1 — Wire the IPC (the deferred command-hookup — this is CODE, so branch + tests + journal)
 
 This connects the gateway's confirm flow to the resident 14B (PLAN) and to the swap driver
-(EXECUTE). Today `DispatchCoordinator` (`services/ui_gateway/src/dispatch_coordinator.py`,
-constructed at `services/ui_gateway/src/transport.py` \~line 367) ships with
-`plan_fn=None` / `execute_fn=None`. Inject both as AO round-trips (mirror how the
+(EXECUTE). `DispatchCoordinator` (`services/ui_gateway/src/dispatch_coordinator.py`,
+constructed in `services/ui_gateway/src/transport.py` — find it by symbol, not by
+line number; the runbook's original "\~line 367" is now 482) shipped **at the time
+this was written** with `plan_fn=None` / `execute_fn=None`. **That is no longer
+true: both are wired today** (`plan_fn=self._dispatch_plan_fn`,
+`execute_fn=self._dispatch_execute_fn`), which is what the go-live did. The
+injection described below is the work that was done, not work to do. Inject both as AO round-trips (mirror how the
 `ingest`/`imagine` coordinators reach the AO via their async `transport_call`):
 
 - **`plan_fn(repo, goal)`** → a new AO PLAN verb that runs
@@ -61,12 +89,17 @@ constructed at `services/ui_gateway/src/transport.py` \~line 367) ships with
   `/dispatch status` can render the honest report after the swap restart) — no extra work.
 
 While here, clear the two standing pre-go-live items:
-- **Promote the hardcoded paths:** `_AGENTIC_SETUP` / `_PROJECTS` in
-  `shared/fleet/dispatch.py` → `[fleet_dispatch]` config keys (scripts / state / projects
-  dirs), so the dispatch target isn't compiled in.
-- **Harden the acceptance prompt (Enhancement-1, partial):** change the `acceptance-tests`
-  task prompt in `acceptance.compile_prompts` to *"assert the criterion's REQUIRED behavior,
-  not whatever the code currently does."* The full red-first / mutation validation (confirm
+- ~~**Promote the hardcoded paths:** `_AGENTIC_SETUP` / `_PROJECTS` in
+  `shared/fleet/dispatch.py` → `[fleet_dispatch]` config keys.~~ **DONE** — the keys
+  exist (`[fleet_dispatch].agentic_setup_dir` / `projects_dir`, `default.toml:420-421`)
+  with env and TOML override over a compiled-in fallback. Listed here as pending
+  work in the original; it has since shipped.
+- **Harden the acceptance prompt (Enhancement-1, partial):** ~~change the
+  `acceptance-tests` task prompt in `acceptance.compile_prompts` to *"assert the
+  criterion's REQUIRED behavior, not whatever the code currently does."*~~ **The prompt
+  change is DONE** — `shared/fleet/acceptance.py` carries that anti-mirror instruction
+  verbatim inside `compile_prompts`, plus a property-test clause that goes further.
+  Only the remainder below is still open. The full red-first / mutation validation (confirm
   the test fails on broken code before trusting its pass) is the remaining Enhancement-1.
 
 Land Step 1 on a feature branch with tests (the PLAN/EXECUTE handlers, the skip-swap branch,

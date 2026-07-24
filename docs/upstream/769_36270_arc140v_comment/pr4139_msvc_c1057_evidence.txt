@@ -1,0 +1,18 @@
+PR #4139 (PlanteAmigor/openvino.genai@feat/thinking-suppression, tip f3e59fb) — MSVC compile
+failure evidence, captured 2026-07-16 ~20:55 PDT from the pre-patch build attempt (ninja,
+MSVC 14.44.35207, openvino 2026.4.0.0.dev nightly). build.log was overwritten by later
+attempts; these lines are preserved verbatim from the attempt-4 watcher capture.
+
+  FAILED: [code=2] src/cpp/CMakeFiles/openvino_genai_obj.dir/src/automatic_speech_recognition/models/qwen3-asr/decoder.cpp.obj
+  C:\Users\mrbla\builds\genai-pr4139\src\cpp\src\sampling/logit_processor.hpp(55): fatal error C1057: unexpected end of file in macro expansion
+
+  FAILED: [code=2] src/cpp/CMakeFiles/openvino_genai_obj.dir/src/automatic_speech_recognition/models/qwen3-asr/pipeline.cpp.obj
+  C:\Users\mrbla\builds\genai-pr4139\src\cpp\src\sampling/logit_processor.hpp(55): fatal error C1057: unexpected end of file in macro expansion
+
+  FAILED: [code=2] src/cpp/CMakeFiles/openvino_genai_obj.dir/src/automatic_speech_recognition/pipeline.cpp.obj
+  C:\Users\mrbla\builds\genai-pr4139\src\cpp\src\sampling/logit_processor.hpp(55): fatal error C1057: unexpected end of file in macro expansion
+
+Offending source line (pre-patch, logit_processor.hpp:55):
+  OPENVINO_ASSERT(structured_output_controller != nullptr || !sampling_params.is_structured_output_generation(), "Structured output controller is not set for structured output generation"
+  ^ missing closing ");" — the local one-character patch appended it; post-patch the wheel
+  built clean (ninja + MSVC 14.44 + openvino 2026.4 dev nightly).

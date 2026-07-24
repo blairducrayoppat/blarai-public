@@ -21,9 +21,14 @@ Design constraints honoured here:
 - No external network calls — the KagiAdapter interface is the only outbound
   surface; in W3 it is always MockKagiAdapter.
 
-W5 seams:
-  - injection_scan_passthrough() — no-op in W3; W5 replaces with real scanner.
-  - Prompts carry a _build_web_data_header() call (prompts.py) — no-op in W3.
+Untrusted-web defenses (ADR-024 §2.5 / ADR-013 — both LIVE):
+  - injection_scan() — #896: the ADR-013 Layer-2 heuristic scanner runs on
+    every fetched page before the learning-extraction LLM call
+    (flagged/unscannable pages truncated to 500 chars).
+  - Datamarking — #909: a per-session 8-hex token is minted at search start
+    and prefixed onto every web-content line in the extraction + synthesis
+    prompts, with a header telling the model to never obey marked lines
+    (prompts._build_web_data_header / _mark_web_lines).
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ import asyncio
 import json
 import logging
 import re
+import secrets
 from typing import Protocol, runtime_checkable
 
 from services.assistant_orchestrator.src.websearch.adapter import KagiAdapter
@@ -47,7 +53,7 @@ from services.assistant_orchestrator.src.websearch.state import (
 )
 from services.assistant_orchestrator.src.websearch.prompts import (
     DECOMPOSITION_PROMPT_TEMPLATE,
-    GAP_DETECTION_PROMPT,
+    build_gap_detection_prompt,
     build_learning_extraction_prompt,
     build_synthesis_prompt,
 )
@@ -96,30 +102,71 @@ class LLMText(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# W5 injection-scan seam (no-op in W3)
+# Injection scan (ADR-024 §2.5 / ADR-013 Layer 2 — live as of #896)
 # ---------------------------------------------------------------------------
 
+#: On a scan hit (or an unscannable page — see fail-closed note below), the
+#: flagged summary is truncated to this many characters before the LLM sees it:
+#: enough to show the title/intro, not enough to carry an injection buried in
+#: the body (ADR-024 §2.5).
+INJECTION_SCAN_TRUNCATE_CHARS: int = 500
 
-def injection_scan_passthrough(source: SummaryResult) -> SummaryResult:
-    """W5 SEAM: no-op passthrough in W3. Replaced by real scanner at W5.
 
-    W5 REPLACEMENT CONTRACT:
-        The real scanner checks source.summary for injection phrases per
-        ADR-024 §2.5 and ADR-013 Layer 2.  On a hit it:
-          - Logs a WARNING with source.url.
-          - Returns a new SummaryResult with summary truncated to 500 chars.
-        On no hit: returns source unchanged.
+def injection_scan(source: SummaryResult) -> SummaryResult:
+    """Heuristic prompt-injection scan on one fetched page (ADR-024 §2.5).
 
-        Signature must match:
-            def injection_scan(source: SummaryResult) -> SummaryResult: ...
+    Runs the ADR-013 Layer-2 phrase scanner (:mod:`shared.security.injection_scan`
+    — the same detector the document-load, guarded-fetch, and cleaner paths use)
+    over ``source.summary`` BEFORE the learning-extraction LLM call. On a hit:
+
+      - Logs a WARNING naming ``source.url`` and the matched pattern classes.
+      - Returns a new :class:`SummaryResult` with ``summary`` truncated to
+        :data:`INJECTION_SCAN_TRUNCATE_CHARS` characters.
+
+    On no hit: returns *source* unchanged. The user is not interrupted for
+    heuristic-only hits — this is one layer of defense-in-depth alongside the
+    live datamarking, the Layer-3 tool-action lock, and the Stage-5 leakage
+    screen (see #896 / #576).
+
+    FAIL-CLOSED (never fail-open): if the scanner itself errors, the page is
+    UNVERIFIABLE — it is treated as flagged (truncated) and an ERROR is logged
+    loudly, never passed through unscanned. A page too short to truncate is
+    still logged when flagged.
 
     Args:
         source: SummaryResult from KagiAdapter.summarize_url().
 
     Returns:
-        source unchanged (W3 no-op).
+        *source* unchanged when clean; a truncated replacement when flagged or
+        unscannable.
     """
-    return source
+    from shared.security.injection_scan import scan_for_injection
+
+    try:
+        hits = scan_for_injection(source.summary)
+    except Exception as exc:  # noqa: BLE001 — an unscannable page must not pass unscanned
+        _LOG.error(
+            "web-search injection scan ERRORED on %s (%s: %s) — failing CLOSED: "
+            "treating the page as flagged and truncating to %d chars.",
+            source.url, type(exc).__name__, exc, INJECTION_SCAN_TRUNCATE_CHARS,
+        )
+        return SummaryResult(
+            url=source.url,
+            summary=source.summary[:INJECTION_SCAN_TRUNCATE_CHARS],
+            tokens_used=source.tokens_used,
+        )
+    if not hits:
+        return source
+    _LOG.warning(
+        "web-search injection scan FLAGGED %s (%s) — truncating the page to "
+        "%d chars before the LLM sees it (ADR-024 §2.5).",
+        source.url, "; ".join(hits), INJECTION_SCAN_TRUNCATE_CHARS,
+    )
+    return SummaryResult(
+        url=source.url,
+        summary=source.summary[:INJECTION_SCAN_TRUNCATE_CHARS],
+        tokens_used=source.tokens_used,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +462,7 @@ def triage_sources(
 
 
 # ---------------------------------------------------------------------------
-# Step 4 — Content Extraction (with W5 scan seam)
+# Step 4 — Content Extraction (injection scan #896 + datamark #909)
 # Step 4b — Learning Extraction (serialised LLM calls)
 # ---------------------------------------------------------------------------
 
@@ -426,6 +473,7 @@ async def extract_learning_serialised(
     llm_sem: asyncio.Semaphore,
     question: str,
     search_result: SearchResult | None = None,
+    session_token: str | None = None,
 ) -> SourceLearning:
     """Step 4b: 14B distils one source into a SourceLearning.
 
@@ -441,6 +489,8 @@ async def extract_learning_serialised(
         question:      The user's original question (context for the 14B).
         search_result: Optional SearchResult that produced this URL
                        (used for title fallback when summary has no title).
+        session_token: Per-session datamark token (#909); prefixes every web
+                       content line in the prompt. None on the degraded path.
 
     Returns:
         A SourceLearning.  learning is "No relevant information found." if
@@ -453,7 +503,7 @@ async def extract_learning_serialised(
         url=summary.url,
         title=title,
         content=content,
-        session_token=None,  # W5 seam: None in W3
+        session_token=session_token,  # #909: datamark the web content lines
     )
     async with llm_sem:
         result = await asyncio.to_thread(llm.generate_text, prompt, 512)
@@ -500,9 +550,10 @@ async def detect_gaps(
     if state.pass_count >= state.max_passes:
         _LOG.debug("detect_gaps: pass_count=%d >= max_passes=%d — skipping", state.pass_count, state.max_passes)
         return None
-    prompt = GAP_DETECTION_PROMPT.format(
+    prompt = build_gap_detection_prompt(
         question=state.question,
         learnings=_format_learnings(learnings),
+        session_token=state.session_token,  # #911: datamark the findings block
     )
     async with llm_sem:
         result = await asyncio.to_thread(llm.generate_text, prompt, 256)
@@ -539,7 +590,7 @@ async def synthesise(
     prompt = build_synthesis_prompt(
         question=state.question,
         learnings_block=learnings_block,
-        session_token=None,  # W5 seam: None in W3
+        session_token=state.session_token,  # #909: datamark the findings lines
     )
     async with llm_sem:
         result = await asyncio.to_thread(llm.generate_text, prompt, 1024)
@@ -591,6 +642,11 @@ async def run_web_search(
         prefer_recent=cfg.prefer_recent,
         max_sources_per_pass=cfg.max_sources_per_pass,
         use_summarizer=cfg.use_summarizer,
+        # #909: mint the per-session datamark token ONCE at search start —
+        # every web-content line in the extraction + synthesis prompts is
+        # prefixed with it, and it is unknown to any fetched page, so an
+        # injected instruction cannot forge the marker to read as trusted.
+        session_token=secrets.token_hex(4),  # 8 hex chars (ADR-024 §2.5)
     )
     semaphore = asyncio.Semaphore(cfg.search_concurrency)
     llm_sem = asyncio.Semaphore(1)  # single GPU — serialise all inference
@@ -625,13 +681,14 @@ async def run_web_search(
                 _LOG.warning("run_web_search: pass %d produced no triaged sources", state.pass_count)
                 # Continue to gap-detect / synthesise with what we have.
             else:
-                # Step 4: Content extraction (W5 injection scan fires here).
+                # Step 4: Content extraction (the injection scan fires here).
                 raw_summaries = await asyncio.gather(
                     *[adapter.summarize_url(r.url) for r in selected]
                 )
-                # W5 seam: injection_scan_passthrough fires before learning extraction.
-                # In W3 this is a no-op; W5 replaces it with the real scanner.
-                scanned_summaries = [injection_scan_passthrough(rs) for rs in raw_summaries]
+                # Every fetched page is scanned BEFORE the learning-extraction
+                # LLM call (ADR-024 §2.5; live as of #896 — flagged pages are
+                # truncated, never passed whole to the model).
+                scanned_summaries = [injection_scan(rs) for rs in raw_summaries]
 
                 # Step 4b: Learning extraction (serialised via llm_sem).
                 # Build a (SummaryResult, SearchResult) pairing for title fallback.
@@ -644,6 +701,7 @@ async def run_web_search(
                             llm_sem=llm_sem,
                             question=state.question,
                             search_result=sr_map.get(ss.url),
+                            session_token=state.session_token,
                         )
                         for ss in scanned_summaries
                     ]

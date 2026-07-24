@@ -232,6 +232,16 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         review="Shrink toward the measured warm cost once live static-pregate runs record it; retire if the gate ever moves in-process (a pure-python AST parse instead of the ruff subprocess).",
     ),
     TimeoutEntry(
+        name="Dep-delta git diff (one as-built read; two sequential reads per call)",
+        module="shared.fleet.swap_ops",
+        attribute="DEP_DELTA_GIT_TIMEOUT_S",
+        seconds=30.0,
+        surface="swap driver → real_dep_delta git diff subprocess (context packs + the #989 scope-sprawl recorder)",
+        incident="design (#740 W3 as-built delta, a call-site 30 s literal since birth; NAMED + registered at #989, the change that ALTERED the budget — the added-only --diff-filter=A read doubled the call's worst wall to 2×30 s)",
+        rationale="One git diff over a small fresh-build repo is milliseconds; 30 s is the abort ceiling on a wedged git. The call runs up to TWO sequential bounded reads (name-only, then added-only), so the worst wall per merged task is 60 s — wholly fail-soft ({} / no `added` key), riding inside the 14400 s per-task ceiling and never on a control path (packs degrade to contract-only; the sprawl recorder records nothing).",
+        review="Shrink toward measured diff latency once live pack/sprawl runs record it; retire the second read if the two diffs ever collapse into one --name-status parse (must re-verify the files list stays byte-identical first).",
+    ),
+    TimeoutEntry(
         name="Guest oracle transport round-trip",
         module="shared.fleet.guest_oracle_transport",
         attribute="ORACLE_TRANSPORT_TIMEOUT_S_DEFAULT",
@@ -332,6 +342,16 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         review="Shrink toward the measured kill-to-port-free lag once the barrier runs live on the Arc 140V; retire only if the AO ever exposes a graceful cross-process shutdown signal that makes a forced tree-kill unnecessary in the common case.",
     ),
     TimeoutEntry(
+        name="Sandbox-freshness probe git bound (battery)",
+        module="tools.dispatch_harness.battery",
+        attribute="SANDBOX_PROBE_TIMEOUT_S",
+        seconds=30.0,
+        surface="battery runner → one sandbox git-history read before any per-card spend (#1058 gate)",
+        incident="#1058 / lesson 225 third instance — the 2026-07-21 17:19 direct-harness run launched onto a sandbox carrying four prior 'agent:' commits; the archive+re-init lives in the nightly WRAPPER, so direct invocations had no freshness guarantee and the baseline was confounded",
+        rationale="A battery sandbox's full --all history is tens of commits, read in well under a second; 30 s dwarfs any healthy read on the busy overnight box while still bounding a wedged git so the probe can never stall a night. A timeout classifies UNDETERMINED and the card is refused fail-closed — the bound protects the runner, never the gate's strictness.",
+        review="Shrink toward measured probe latency once the gate has run across a full campaign night; the value bounds a refusal path, so tightening is safe. Retire only if sandbox provisioning ever moves inside the runner (freshness by construction on every path).",
+    ),
+    TimeoutEntry(
         name="Per-card run-budget clamp (battery)",
         module="shared.fleet.swap_ops",
         attribute="CARD_RUN_BUDGET_MAX_S",
@@ -339,7 +359,7 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         surface="battery runner → AO driver watchdog (per-card override ceiling)",
         incident="#740 B3 re-grain — a card may declare its own run_budget_s (B3: 6 h vs the 3 h default); this clamps ANY card's request so a card cannot ask for an unbounded run",
         rationale="8 h covers the longest measured card (B3 ~6.5 h) with margin; a request above it is a typo or a runaway, not a real grain.",
-        review="Shrink toward the longest real card as more grains are measured; retire if per-card budgets ever move into a schema with its own bound.",
+        review="Shrink toward the longest real card as more grains are measured; retire if per-card budgets ever move into a schema with its own bound. #927 (2026-07-17) is the first use of this mechanism as a COHERENCE lever: per-card run_budget_s on the multi-wave cards clears the coherence lock's C2 floor (the 14400 s 2-wave/best-of-2 minimum the 10800 s default failed) while every per-card value stays below this 28800 s clamp and the active-campaign sum stays below the PT16H ceiling (the EXTERNAL Task-Scheduler backlog row's C3 pair).",
     ),
     TimeoutEntry(
         name="Per-card budget freshness window (battery)",
@@ -473,6 +493,16 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         incident="design (#845 C3 cadence limb, 2026-07-14; never bitten)",
         rationale="The heartbeat starts after the Step-6b prompt-flow preflight but must not compete with a boot's model compile/first-load tail, and the quiet-queue tripwire must not fire while the fleet/operator are still getting the morning started (false alarms retrain the operator to ignore the tripwire — the exact failure the schedule-aware design exists to prevent). 5 min clears every measured boot tail with margin.",
         review="Tune from shadow-mode telemetry (#855); a surfacing-cadence knob, never a kill. Live TOML override: [coordinator].heartbeat_boot_grace_s.",
+    ),
+    TimeoutEntry(
+        name="Coordinator heartbeat dead-man slack (stamp-deadline grace)",
+        module="shared.coordinator.deadman",
+        attribute="DEADMAN_SLACK_S",
+        seconds=120.0,
+        surface="launcher dead-man watchdog (#845 C3 limb 7) — trips when now exceeds the liveness stamp's OWN next_expected_by by this slack (DORMANT behind [coordinator].heartbeat_enabled; no heartbeat, no watchdog)",
+        incident="design (#845 C3 dead-man limb, 2026-07-14; never bitten) — the registered constant is the SLACK, not a computed threshold: the stamp declares its own deadline, so battery/overnight cadence stretching can never false-alarm (the design-review MAJOR that killed the fixed K×interval threshold)",
+        rationale="Must absorb one cycle's own runtime (compose + loopback Vikunja reads = seconds; a worst-case bounded draft = tens of seconds) plus thread-scheduling jitter, while still surfacing a genuinely wedged heartbeat within ~2 minutes of its self-declared deadline. Staleness-detection latency is an operator-notice quality, not a correctness bound — nothing kills on this value.",
+        review="Tune from #855 shadow-cycle telemetry (measured cycle durations); shrink only if the drafting cap shrinks at the heartbeat ceremony (the c.1894 decision point). Poll grain (DEADMAN_POLL_S 30.0) is below-registry per convention — see BACKLOG.",
     ),
     TimeoutEntry(
         name="Driver-integrated doom window (stop-doomed-fast no-progress grace)",
@@ -624,6 +654,11 @@ BACKLOG: tuple[tuple[str, str], ...] = (
      "DOOM_POLL_INTERVAL_S 5.0 / DOOM_CPU_SAMPLE_S 1.5 — poll/sample grain below registry value "
      "(mirrors the harness monitor's identical grains); DOOM_STALL_GRACE_S IS registered (#844, "
      "lockstep with RunMonitor.stall_grace_s)."),
+    ("shared/coordinator/deadman.py",
+     "DEADMAN_POLL_S 30.0 — poll grain below registry value (staleness-detection latency = poll + "
+     "slack; the quantity that matters, DEADMAN_SLACK_S, IS registered, #845 limb 7). Also "
+     "shared/coordinator/heartbeat.py _STOP_JOIN_S 5.0 — teardown join bound, grain-class (the "
+     "daemon flag is the real guarantee)."),
     ("services/ui_gateway/src/*",
      "streaming constants (chunk cadence / flush waits) — enumerate at the item-5 scan widening; the "
      "imagine 175 s fail-safe IS registered (it lives in services/ui_backend/src/dispatcher.py — the "
@@ -635,6 +670,32 @@ BACKLOG: tuple[tuple[str, str], ...] = (
     ("services/assistant_orchestrator/src/entrypoint.py",
      "_SESSION_REAP_INTERVAL_S 60.0 — the idle-session reaper's serve-loop check cadence (#801); poll "
      "grain below registry value. The TTLs it enforces ARE registered (the session idle-reap TTL family)."),
+    # ---- EXTERNAL window, un-importable — named permanently (#833, 2026-07-15) ----
+    ("EXTERNAL: Task Scheduler \\BlarAI\\BlarAI-M2-Battery-Nightly ExecutionTimeLimit",
+     "The nightly battery's OUTER wall-clock ceiling lives in Windows Task Scheduler, not a Python "
+     "constant, so it can NEVER be a registered TimeoutEntry (live_value has nothing to import) — it is "
+     "named here PERMANENTLY so the quarterly review walks its (window, budget) pair. The pair: this "
+     "ExecutionTimeLimit must DOMINATE the runner's own inner budgets = sum over the active campaign jobs "
+     "of each card's run_budget_s (default swap_run_budget_s 10800) + per-job re-ensure + fixed overhead. "
+     "That derivation is OWNED by tools/dispatch_harness/battery_execution_limit.py (arithmetic-locked in "
+     "tests/integration/test_battery_execution_limit.py) and enforced OUT-OF-BAND against the live task by "
+     "agentic-setup/scripts/verify-battery-task-settings.ps1, which fails loud when the ceiling drifts "
+     "below the derived floor. Incident: 2026-07-11 the then-PT10H ceiling tree-killed the runner 3 min "
+     "before the last job finished (#740 c.1734) — the invisible-taxonomy member (L217) that silently "
+     "overruled every registered inner budget (an unowned L221 window/budget pair). Finding (2026-07-15): "
+     "the current 6-job campaign derives a 68400 s (19.0 h) floor while the live ceiling is PT16H "
+     "(57600 s) — under by 3 h; the verify script reports this as a drift (a reliability/operator setting, "
+     "not a code defect). Disposition (#833/#927, LA-approved 2026-07-17 c.2156): the ceiling STAYS "
+     "PT16H; the lever is per-card run_budget_s on the multi-wave cards ONLY, never a global "
+     "swap_run_budget_s bump (that derives a ~25 h floor at the 6-job scale). The baseline 6-job campaign "
+     "is CLOSED (lean-trimmed to jobs=[B2,B4], #904); with B4 16200 s + B2 15000 s the lean campaign "
+     "derives a ~33600 s (9.3 h) floor, back UNDER PT16H (T4 GREEN). The paired coherence lock "
+     "agentic-setup/scripts/verify-battery-budget-coherence.ps1 (wired non-fatally into the nightly "
+     "preflight) is the teeth for this pair: C1 per-candidate ceiling >= idle (600 s), C2 per-job budget "
+     ">= the 14400 s 2-wave/best-of-2 floor (the 10800 s default's proven C2 FAIL), C3 the C2 fix still "
+     "fits under this PT16H ceiling. Any future campaign re-widening past the lean set must re-derive this "
+     "floor (verify-battery-task-settings.ps1 T4 fails loud below it) — per-card budgets provisioned across "
+     "a full job set can re-cross PT16H, the exact shape the per-card (not global) lever exists to avoid."),
 )
 
 

@@ -1,12 +1,12 @@
 {
   "aggregates": {
     "errors": 0,
-    "evaluated": 41,
+    "evaluated": 50,
     "failed": 0,
     "pass_rate": 1.0,
-    "passed": 41,
+    "passed": 50,
     "skipped_hardware": 0,
-    "total": 41
+    "total": 50
   },
   "cases": {
     "gov-adj-001": "pass",
@@ -18,7 +18,15 @@
     "gov-adj-007": "pass",
     "gov-adj-008": "pass",
     "gov-adj-009": "pass",
+    "gov-egr-001": "pass",
+    "gov-egr-002": "pass",
+    "gov-egr-003": "pass",
+    "gov-egr-004": "pass",
+    "gov-egr-005": "pass",
     "gov-esc-001": "pass",
+    "gov-gen-001": "pass",
+    "gov-gen-002": "pass",
+    "gov-gen-003": "pass",
     "gov-l3-001": "pass",
     "gov-l3-002": "pass",
     "gov-l3-003": "pass",
@@ -30,6 +38,7 @@
     "gov-l3-009": "pass",
     "gov-l3-010": "pass",
     "gov-l3-011": "pass",
+    "gov-l3-012": "pass",
     "gov-leak-001": "pass",
     "gov-leak-002": "pass",
     "gov-leak-003": "pass",
@@ -51,7 +60,7 @@
     "gov-tier-009": "pass",
     "gov-tier-010": "pass"
   },
-  "generated_at": "2026-07-03T02:16:47.436798+00:00",
-  "git_sha": "4846b28",
+  "generated_at": "2026-07-21T07:14:15.808426+00:00",
+  "git_sha": "752edd4e",
   "suite": "governance"
 }

@@ -92,6 +92,7 @@ from shared.coordinator.proposal_store import (
     ProposalStore,
     proposal_fingerprint,
 )
+from shared.fleet.coord_lifecycle import is_test_origin_repo
 from shared.fleet.dispatch import TaskOutcome
 
 logger = logging.getLogger(__name__)
@@ -290,6 +291,26 @@ def stage_redispatch_proposals(
     fail-closes EVERY eligible outcome in this cycle with the verdict's reason,
     and nothing reaches the store. Per-outcome store faults are fail-soft
     (recorded in ``errors``; the cycle proceeds)."""
+    # #887: a SYNTHETIC battery/test sandbox park is NON-ACTIONABLE evidence — its
+    # honest park WAS the deliverable, never real unfinished business. The ruler
+    # refuses to stage ANY proposal for a test-origin repo BEFORE the SG ruler or
+    # the store is ever touched; the trusted structured signal is the reserved
+    # ``battery-*`` repo id (never run-report text). The evidence still feeds #855
+    # grading via the surfaced snapshot — it just never becomes a proposal.
+    if is_test_origin_repo(repo_id):
+        return RedispatchCycleResult(
+            ineligible=tuple(
+                SkippedRedispatch(
+                    task=outcome.task,
+                    reason=(
+                        f"test-origin repo {repo_id!r} (battery-*) — non-actionable "
+                        "evidence; feeds #855 grading, never a redispatch proposal"
+                    ),
+                )
+                for outcome in outcomes
+            )
+        )
+
     ineligible: list[SkippedRedispatch] = []
     eligible: list[TaskOutcome] = []
     for outcome in outcomes:

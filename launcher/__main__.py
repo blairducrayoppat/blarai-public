@@ -1065,6 +1065,10 @@ _cleanup_started: bool = False
 # GPU/Level-Zero context before the force-exit so the incoming 30B loads onto a clean GPU
 # (#670 run-2 fix 2a): os._exit skips the OpenVINO destructors, so the release is explicit.
 _shared_pipeline: "SharedInferencePipeline | None" = None
+# C3 heartbeat (#845): None on every boot while [coordinator].heartbeat_enabled is
+# false (the build_heartbeat factory constructs NOTHING — structural absence, design
+# §3.2). Set in main() Step 6c; stopped FIRST in _cleanup (§3.1).
+_heartbeat = None  # type: ignore[var-annotated]
 
 
 def _release_14b_gpu() -> None:
@@ -1150,6 +1154,38 @@ def _cleanup_vm() -> None:
         )
 
 
+def _build_and_start_heartbeat(orchestrator_service, *, dev_mode: bool) -> None:
+    """Step 6c: build + start the C3 coordinator heartbeat (#845) — WRAPPED.
+
+    Module-level (not inline in ``main()``) so the launcher-side contract is
+    directly testable (review 8c18ed43 MINOR-5): a raising factory leaves boot
+    proceeding with ``_heartbeat = None``; a ``None`` factory result (the
+    dormant default — ``[coordinator].heartbeat_enabled`` false) starts
+    nothing; an enabled build starts the named daemon thread. The heartbeat
+    import stays FUNCTION-LOCAL (the #783 import-safety discipline: importing
+    ``launcher.__main__`` must never pull the coordinator machinery)."""
+    global _heartbeat
+    try:
+        from shared.coordinator.heartbeat import build_heartbeat
+
+        _heartbeat = build_heartbeat(
+            orchestrator_service,
+            cleanup_started=lambda: _cleanup_started,
+            dev_mode=dev_mode,
+        )
+        if _heartbeat is not None:
+            _heartbeat.start()
+            logger.info(
+                "Coordinator heartbeat thread started "
+                "([coordinator].heartbeat_enabled=true; shadow output routing)"
+            )
+    except Exception as exc:  # noqa: BLE001 — never block boot on the heartbeat
+        logger.error(
+            "Coordinator heartbeat construction failed (continuing boot): %s", exc
+        )
+        _heartbeat = None
+
+
 def _cleanup() -> None:
     """Graceful shutdown: stop services, VM, session store."""
     global _cleanup_started
@@ -1157,6 +1193,14 @@ def _cleanup() -> None:
     # out a slow teardown rather than force-killing a teardown that IS progressing).
     _cleanup_started = True
     logger.info("Cleanup: shutting down components")
+
+    # C3 heartbeat (#845) stops FIRST — before services stop, so a mid-cycle
+    # coordinator action can never race teardown (design §3.1; the loop also
+    # observes _cleanup_started, belt and suspenders). None on every boot while
+    # [coordinator].heartbeat_enabled is false.
+    if _heartbeat is not None:
+        logger.info("Cleanup: stopping coordinator heartbeat")
+        _heartbeat.stop()
 
     # #655 Stage C: stop the guest parser BEFORE the VM stop-on-exit policy
     # runs (#657) — a best-effort graceful signal when the parse channel has
@@ -1293,6 +1337,51 @@ def _resolve_kv_cache_precision(runtime_mode: DeploymentMode) -> str | None:
             exc,
         )
         return None
+
+
+def _resolve_require_signed_draft_manifest(runtime_mode: DeploymentMode) -> bool:
+    """Read ``[security].require_signed_draft_manifest`` from the AO config TOML.
+
+    FUT-05 / #107 — the DRAFT-manifest signature posture, threaded into the shared
+    LLMPipeline build's draft integrity check (``build_shared_pipeline(
+    require_signed_draft=...)``). Kept SEPARATE from the 14B's
+    ``[security].require_signed_manifest`` because the spec-decode drafts are
+    NON-AUTHORITATIVE (proposals the signed 14B target re-verifies), so their
+    signature enforcement is an independently-flippable defense-in-depth layer.
+
+    Default False (the shipped, dormant value) = byte-identical to the pre-#107
+    build: a DIGEST-only draft check. When dormant the draft ``.sig`` is NOT
+    consulted at all (``verify_weight_integrity(require_signed=False)`` takes the
+    bare ``load_manifest`` path, never entering ``verify_manifest_signature``), so
+    a present-but-invalid draft ``.sig`` is IGNORED, not fail-closed — the digest
+    is still enforced, so a tampered draft weight is still caught. Signature
+    enforcement begins only when this flag is True.
+
+    Fail-soft to False on a read error (fail-loud WARNING): the drafts are
+    non-authoritative AND the AO/PA construction later in THIS SAME boot loads the
+    SAME config and fails CLOSED if it is genuinely broken, so this read never
+    weakens the authoritative 14B gate and introduces no new boot-failure path.
+    Reads exactly the config the AO will load (``default.toml`` for HOST,
+    ``guest_runtime.toml`` for GUEST)."""
+    try:
+        service_root = resolve_service_root(
+            _ao_entrypoint.__file__, "services.assistant_orchestrator"
+        )
+        config_path = resolve_service_config_path(
+            service_root, deployment_mode=runtime_mode
+        )
+        with open(config_path, "rb") as config_file:
+            config_data = tomllib.load(config_file)
+        security_section = config_data.get("security", {})
+        return bool(security_section.get("require_signed_draft_manifest", False))
+    except Exception as exc:  # noqa: BLE001 — dormant non-authoritative posture, fail soft
+        logger.warning(
+            "Could not read [security].require_signed_draft_manifest; defaulting to "
+            "False (draft signature not enforced). The 14B gate is unaffected. "
+            "Reason: %s",
+            exc,
+        )
+        return False
 
 
 def main() -> int:
@@ -1652,6 +1741,10 @@ def main() -> int:
     # from the AO [gpu] config; None (the shipped default) leaves the build
     # byte-identical to the pre-2026.2 FP16 behaviour.
     _kv_cache_precision = _resolve_kv_cache_precision(runtime_mode)
+    # FUT-05 / #107: draft-manifest signature posture (dormant default False),
+    # kept separate from the 14B's require_signed_manifest (non-authoritative
+    # drafts). Flipped true only after the drafts are signed (LA ceremony).
+    _require_signed_draft = _resolve_require_signed_draft_manifest(runtime_mode)
     _shared_build = build_shared_pipeline(
         model_dir=_repo_root / TARGET_MODEL_OV_PATH,
         draft_model_dir=_repo_root / DRAFT_MODEL_OV_PATH,
@@ -1667,6 +1760,7 @@ def main() -> int:
         # documents the security frame). ADR-012 Amendment 3.
         model_priority="HIGH",
         kv_cache_precision=_kv_cache_precision,
+        require_signed_draft=_require_signed_draft,
     )
     if not _shared_build.ok:
         logger.error("Shared LLMPipeline build failed: %s", _shared_build.error)
@@ -2077,6 +2171,16 @@ def main() -> int:
         _step("Minimal prompt-flow preflight passed ✓")
         activation_evidence["steps"]["prompt_flow_ok"] = True
 
+    # ── Step 6c: Coordinator heartbeat (C3 #845, design §3.1/§3.2) ──
+    # DORMANT factory: build_heartbeat returns None unless the AO-resolved
+    # [coordinator].heartbeat_enabled is true (structural absence — no thread,
+    # no object; the OFF path never imports the cycle machinery). Started here,
+    # AFTER the Step-6b preflight (a heartbeat can never delay or fail boot)
+    # and immediately before the UI surface blocks; stopped FIRST in _cleanup.
+    _build_and_start_heartbeat(_orchestrator_service, dev_mode=_dev_mode)
+    if _heartbeat is not None:
+        _step("Coordinator heartbeat started (shadow-routed) ✓")
+
     # ── Step 7: Launch UI surface ─────────────────────────────────
     # Default is the Textual TUI (unchanged). BLARAI_UI=winui serves the
     # already-built gateway over the named pipe and runs the WinUI app
@@ -2291,7 +2395,116 @@ def request_egress_rearm_on_surface() -> bool:
     return False
 
 
+# ---------------------------------------------------------------------------
+# Crash-diagnostic hardening (#890) — a launcher that dies must leave a reason,
+# and must never die encoding its OWN startup output.
+# ---------------------------------------------------------------------------
+
+# faulthandler dump target; module-global so the handle outlives
+# _install_crash_diagnostics and faulthandler can write into it on a native fault.
+_faulthandler_file = None
+
+
+def _harden_stdio_encoding() -> None:
+    """Force UTF-8 on stdout/stderr so the launcher never dies encoding its own output.
+
+    The startup banner (:func:`_banner`) and step lines (:func:`_step`) print
+    box-drawing and arrow glyphs (U+2554.. ╔╗║╚╝, U+2192 →, U+2713 ✓). Under
+    ``pythonw`` with no console and no stderr redirect, ``sys.stderr`` defaults to the
+    cp1252 codec, and the FIRST such print raises ``UnicodeEncodeError`` — crashing the
+    launcher before startup (crash.log 2026-07-15 10:05:34 and 07:34:26; #890). The
+    "first launch fails, relaunch succeeds" pattern that bit repeatedly WAS this: a
+    relaunch that happened to give stderr a UTF-8-capable stream survived. Reconfiguring
+    to UTF-8 (``errors='backslashreplace'``) makes every launch path robust regardless of
+    how the process was started.
+
+    Fail-soft: a stream that is ``None`` or lacks ``reconfigure`` (already detached, or a
+    non-``TextIOWrapper``) is left as-is — the offending print then degrades, never the
+    launcher. Called at the REAL ``__main__`` entry only, NEVER at import (pytest owns
+    stdio during collection; #783 import-side-effect discipline).
+    """
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="backslashreplace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError, OSError):
+            # None / non-reconfigurable / detached stream — leave it as-is.
+            pass
+
+
+def _thread_excepthook(args) -> None:
+    """Route an uncaught exception in a launcher WORKER thread to crash.log + the logger.
+
+    The ``__main__`` guard below captures MAIN-thread crashes, but the launcher runs the
+    AO on a daemon thread plus the heartbeat and force-exit watchdogs; an exception in one
+    of those otherwise prints to a ``pythonw``-discarded stderr and vanishes. This mirrors
+    the main-thread handler's crash.log append so a dead worker thread ALSO leaves a
+    durable reason. ``SystemExit`` is a normal stop, not a crash. Fail-soft throughout — a
+    diagnostics path must never itself raise.
+    """
+    import traceback
+
+    if args.exc_type is not None and issubclass(args.exc_type, SystemExit):
+        return
+    thread_name = getattr(args.thread, "name", "?")
+    try:
+        logger.critical(
+            "UNCAUGHT exception in launcher thread %r — the thread died",
+            thread_name,
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+        )
+    except Exception:  # noqa: BLE001 — diagnostics must never break anything
+        pass
+    try:
+        crash_path = os.path.join(_LOG_DIR or ".", "crash.log")
+        with open(crash_path, "a", encoding="utf-8") as fh:
+            fh.write(
+                f"\n--- THREAD CRASH {time.strftime('%Y-%m-%d %H:%M:%S')} "
+                f"(thread={thread_name}) ---\n"
+            )
+            traceback.print_exception(
+                args.exc_type, args.exc_value, args.exc_traceback, file=fh
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _install_crash_diagnostics() -> None:
+    """Ensure a WORKER-thread crash or a native fault leaves a durable on-disk reason.
+
+    Extends the main-thread crash.log capture (the ``__main__`` guard below) to:
+      * worker-thread exceptions, via ``threading.excepthook`` → :func:`_thread_excepthook`
+        (the launcher's AO daemon / heartbeat / watchdog threads);
+      * native crashes (OpenVINO / GPU faults the Python handlers can't see), via
+        ``faulthandler`` dumping to the same crash.log.
+    Both append to ``%LOCALAPPDATA%/BlarAI/crash.log``. Fail-soft: any wiring error is
+    swallowed (diagnostics must never break boot). Real ``__main__`` entry only (#783).
+    """
+    global _faulthandler_file
+    try:
+        import faulthandler
+
+        # Idempotent: reuse the existing handle on a second call rather than rebinding
+        # (which would GC/close the prior fd out from under faulthandler).
+        if _faulthandler_file is None:
+            crash_path = os.path.join(_LOG_DIR or ".", "crash.log")
+            _faulthandler_file = open(crash_path, "a", encoding="utf-8")
+        faulthandler.enable(file=_faulthandler_file, all_threads=True)
+    except Exception:  # noqa: BLE001 — diagnostics must never break boot
+        pass
+    try:
+        threading.excepthook = _thread_excepthook
+    except Exception:  # noqa: BLE001
+        pass
+
+
 if __name__ == "__main__":
+    # #890: harden stdio + wire crash capture BEFORE anything prints. The startup
+    # banner prints non-cp1252 glyphs; under pythonw's default cp1252 stderr that
+    # raised UnicodeEncodeError and killed the launcher before boot (crash.log
+    # 2026-07-15 10:05:34 / 07:34:26). This also protects the crash handler's own
+    # prints below.
+    _harden_stdio_encoding()
+    _install_crash_diagnostics()
     try:
         # Tier-0 security (ADR-020 + ADR-027): arm the code-enforced egress
         # kill-switch before any runtime network activity. Installed here at the
@@ -2312,7 +2525,17 @@ if __name__ == "__main__":
         with open(_crash_log, "a", encoding="utf-8") as _f:
             _f.write(f"\n--- CRASH {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
             traceback.print_exc(file=_f)
-        print(f"\nFATAL ERROR — see {_crash_log}")
-        print(traceback.format_exc())
-        input("\n  Press Enter to exit…")
+        try:
+            # stdout may be cp1252/None and the traceback may embed the banner glyphs —
+            # crash.log already holds the reason, so never let these prints re-raise.
+            print(f"\nFATAL ERROR — see {_crash_log}")
+            print(traceback.format_exc())
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            input("\n  Press Enter to exit…")
+        except (EOFError, RuntimeError):
+            # No console/stdin (pythonw) — the reason is already in crash.log; don't
+            # let the crash handler itself raise a second, noisier traceback.
+            pass
         sys.exit(1)

@@ -200,9 +200,12 @@ def test_dependent_task_prompt_carries_context_pack(tmp_path):
     )
     _driver(tmp_path, ops, tasks, plan).run()
     prompts = {c[1]: c[2] for c in calls if isinstance(c, tuple) and c[0] == "task"}
-    # Roots get NO pack (byte-identical prompts).
-    assert prompts["storage"] == "build storage"
-    assert prompts["util"] == "build util"
+    # Roots get NO pack — no header, no instruction line. (They DO get the #989
+    # scope ceiling, which is contract-derived, not dependency-derived.)
+    assert prompts["storage"].startswith("build storage")
+    assert prompts["util"].startswith("build util")
+    assert PACK_INSTRUCTION not in prompts["storage"]
+    assert PACK_INSTRUCTION not in prompts["util"]
     # The dependent gets contract + as-built + the instruction, appended.
     assert prompts["report"].startswith("build report\n\n")
     assert "creates src/storage.py" in prompts["report"]
@@ -229,8 +232,19 @@ def test_pack_uses_recorded_merge_refs_for_dep_delta(tmp_path):
 
     ops = _ops(calls, repo_head=lambda _r: next(heads, ""), dep_delta=dep_delta)
     _driver(tmp_path, ops, tasks, plan).run()
-    # report depends on storage: delta must be bracketed by storage's (base, merge).
-    assert deltas == [("base1", "merge1")]
+    # The EXACT deterministic read sequence (single-threaded wave loop, stable
+    # order): the #989 sprawl recorder reads each merged task's OWN refs right
+    # after its merge (storage, then util), the PACK for report reads its
+    # DEPENDENCY storage's recorded refs — (base1, merge1) AGAIN, the load-bearing
+    # pin: a wrong-task lookup in _build_pack would surface here as a different
+    # pair (a membership/subset form provably could not catch that — review of
+    # e56138a0, F1) — and the sprawl recorder then reads report's own refs.
+    assert deltas == [
+        ("base1", "merge1"),   # sprawl read: storage's own merge
+        ("base2", "merge2"),   # sprawl read: util's own merge
+        ("base1", "merge1"),   # PACK for report: bracketed by DEP storage's refs
+        ("base3", "merge3"),   # sprawl read: report's own merge
+    ]
 
 
 def test_pack_degrades_to_contract_only_without_repo_head(tmp_path):
@@ -1355,6 +1369,281 @@ def test_flaky_oracle_scorecard_and_driver_attribute_verify(tmp_path):
     plain_sc = _run(False)
     assert plain_sc["verdict"] == "PARKED-HONEST" and plain_sc["attribution"] == "BUILD"
     assert "oracle_flaky" not in plain_sc["evidence"]
+
+
+# ---------------------------------------------------------------------------
+# Oracle FITNESS (oracle_unfit) — a grader that covered ZERO criteria graded
+# nothing, so its failures are evidence about ITSELF, not about the build.
+#
+# Founding evidence (both PARKED-HONEST [BUILD] with failure_class ORACLE-DEFECT
+# — the coder convicted of the grader's bug, twice):
+#   * run 20260719-002208-bd (card B4) — 6/6 build waves passed, import probe and
+#     layout gate clean, job oracle failed 4-of-6 (three NameErrors on a module the
+#     oracle never imports + an unwrapped SystemExit: 0), oracle-qa oracle_coverage
+#     "0/6", covered [].
+#   * 2026-07-16, same B4 card — docs/quality/dispatch-quality-ledger.md.
+# ---------------------------------------------------------------------------
+
+#: The measured B4 oracle-qa.json (run 20260719-002208-bd) — a blind grader that
+#: nevertheless issued a verdict. Kept verbatim as the positive control: the
+#: fitness predicate must call THIS unfit, or the class is not actually caught.
+_B4_UNFIT_ORACLE_QA = {
+    "validated": True,
+    "language": "python",
+    "verdict": "seed-partial",
+    "findings": {"invented_contract": 9, "traceability_gap": 12, "collectability": 0},
+    "findings_total": 21,
+    "regeneration": {"rounds": 2, "exhausted": False},
+    "oracle_coverage": "0/6",
+    "covered": [],
+    "uncovered": ["c2", "c3", "c4", "c5", "c7", "c8"],
+    "f2p_baseline": "not-run",
+    "collectability": "unconfirmed",
+}
+
+
+def _write_oracle_qa(run_dir: Path, payload) -> Path:
+    """Seed a run directory with an ``oracle-qa.json`` sidecar (raw text when
+    *payload* is a str, so malformed-JSON cases are expressible)."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    path = run_dir / "oracle-qa.json"
+    path.write_text(payload if isinstance(payload, str) else json.dumps(payload),
+                    encoding="utf-8")
+    return path
+
+
+def test_coverage_zero_predicate_parses_only_a_real_zero_numerator():
+    """The fitness parse, exhaustively. UNFIT is exactly ``"0/n"`` with n > 0;
+    every ambiguous or malformed input is NOT unfit, so a missing/garbled signal
+    can never silently re-tag a park (fail toward current behaviour)."""
+    assert sd._coverage_is_zero("0/6") is True
+    assert sd._coverage_is_zero("0/1") is True
+    assert sd._coverage_is_zero(" 0 / 6 ") is True  # tolerant of whitespace
+
+    # Fit graders — any covered criterion at all.
+    for fit in ("1/6", "3/6", "6/6", "1/1"):
+        assert sd._coverage_is_zero(fit) is False, fit
+
+    # Degenerate / unknown / malformed — never unfit.
+    for unknown in ("0/0", "unknown", "", "partial", "full", "0", "/6", "0/",
+                    "0/6/7", "-0/6", "0.0/6", "zero/six", "0/six", "n/a"):
+        assert sd._coverage_is_zero(unknown) is False, unknown
+
+    # Absent or wrong-typed — never unfit, never raises.
+    for absent in (None, 0, 0.0, [], {}, True, ["0/6"]):
+        assert sd._coverage_is_zero(absent) is False, absent
+
+    # Bounded: an absurdly long token is refused rather than parsed.
+    assert sd._coverage_is_zero("0/" + "9" * 200) is False
+
+
+def test_oracle_unfit_reads_the_runs_own_oracle_qa_sidecar(tmp_path):
+    """The run-dir read: the measured B4 sidecar is UNFIT; a covering grader is FIT;
+    and every absent/unreadable shape is FIT (never re-tag on missing data)."""
+    unfit_dir = tmp_path / "unfit"
+    _write_oracle_qa(unfit_dir, _B4_UNFIT_ORACLE_QA)
+    assert sd._oracle_unfit_from_run_dir(unfit_dir) is True
+    assert sd._oracle_unfit_from_run_dir(str(unfit_dir)) is True  # str path too
+
+    fit_dir = tmp_path / "fit"
+    _write_oracle_qa(fit_dir, {**_B4_UNFIT_ORACLE_QA,
+                               "oracle_coverage": "3/6", "covered": ["c2", "c3", "c4"]})
+    assert sd._oracle_unfit_from_run_dir(fit_dir) is False
+
+    # No run_dir at all / a directory with no sidecar / a sidecar with no stamp.
+    assert sd._oracle_unfit_from_run_dir(None) is False
+    assert sd._oracle_unfit_from_run_dir("") is False
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert sd._oracle_unfit_from_run_dir(empty) is False
+    assert sd._oracle_unfit_from_run_dir(tmp_path / "does-not-exist") is False
+    no_stamp = tmp_path / "nostamp"
+    _write_oracle_qa(no_stamp, {"validated": True, "language": "python"})
+    assert sd._oracle_unfit_from_run_dir(no_stamp) is False
+
+    # Unreadable / wrong-shaped payloads — fail-soft to FIT, never raise.
+    for name, payload in (("malformed", "{not json at all"),
+                          ("truncated", '{"oracle_coverage": "0/6"'),
+                          ("list", "[1, 2, 3]"),
+                          ("scalar", '"0/6"'),
+                          ("empty-file", ""),
+                          ("null-cov", '{"oracle_coverage": null}')):
+        bad = tmp_path / name
+        _write_oracle_qa(bad, payload)
+        assert sd._oracle_unfit_from_run_dir(bad) is False, name
+
+
+def test_verdict_unfit_oracle_reroutes_build_to_verify(tmp_path):
+    """The defect this closes: an all-merged tree whose JOB ORACLE covered ZERO
+    criteria is a grader that graded nothing — the park attribution moves BUILD ->
+    VERIFY. The verdict itself is unchanged: PARKED-HONEST in, PARKED-HONEST out."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="failed")
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=True) == (
+            "PARKED-HONEST", "VERIFY")
+
+
+def test_verdict_fit_oracle_on_a_failed_job_still_attributes_build(tmp_path):
+    """TOGGLE-OFF (the probe must be able to FAIL): with the lock disengaged — a FIT
+    grader, or no fitness finding at all — the very same failed job stays BUILD. Without
+    this the VERIFY assertion above proves only that the test can't reach the branch."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="failed")
+    # Explicitly fit.
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=False) == (
+            "PARKED-HONEST", "BUILD")
+    # Opt-in: the default is byte-identical to the pre-fix behaviour.
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[]) == ("PARKED-HONEST", "BUILD")
+
+
+def test_verdict_unknown_coverage_never_silently_retags(tmp_path):
+    """Unknown/absent coverage is NOT a fitness finding: the predicate returns False and
+    the park stays BUILD. Re-tagging on missing data would launder real build failures
+    into grader faults — the fix must fail toward the pre-existing attribution."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="failed")
+    for coverage in ("unknown", "0/0", "", "garbage"):
+        run_dir = tmp_path / f"cov-{coverage or 'blank'}".replace("/", "-")
+        _write_oracle_qa(run_dir, {**_B4_UNFIT_ORACLE_QA, "oracle_coverage": coverage})
+        unfit = sd._oracle_unfit_from_run_dir(run_dir)
+        assert unfit is False, coverage
+        assert sd.compute_job_verdict(
+            plan, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=unfit) == (
+                "PARKED-HONEST", "BUILD"), coverage
+
+
+def test_verdict_unfit_is_anchored_on_coverage_not_finding_counts(tmp_path):
+    """The rejected anchor, locked: ``invented_contract`` / ``traceability_gap`` are
+    CUMULATIVE across regeneration rounds and carry a known false-positive, so they must
+    NEVER drive attribution. A grader with the B4 finding counts but real coverage (3/6)
+    is FIT, and its failed job stays BUILD."""
+    noisy_but_covering = {**_B4_UNFIT_ORACLE_QA,
+                          "oracle_coverage": "3/6",
+                          "covered": ["c2", "c3", "c4"],
+                          "findings": {"invented_contract": 99, "traceability_gap": 99},
+                          "findings_total": 198}
+    run_dir = tmp_path / "noisy"
+    _write_oracle_qa(run_dir, noisy_but_covering)
+    assert sd._oracle_unfit_from_run_dir(run_dir) is False
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="failed")
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=False) == (
+            "PARKED-HONEST", "BUILD")
+
+
+def test_verdict_unfit_flag_never_reroutes_a_gate_failure(tmp_path):
+    """PRECEDENCE lock: a FAILED WAVE GATE is a build-integration instrument that oracle
+    coverage says nothing about, so it stays BUILD even when the oracle is also unfit —
+    the flag can only relabel a JOB-ORACLE park, never launder a gate failure."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="passed")
+    verdict, attribution = sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False,
+        wave_gates=[{"wave": 1, "status": "failed", "evidence": "x"}], oracle_unfit=True)
+    assert verdict == "PARKED-HONEST" and attribution == "BUILD"
+    # And with BOTH grader-fault flags set it is still the gate that decides.
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=False,
+        wave_gates=[{"wave": 1, "status": "failed", "evidence": "x"}],
+        oracle_flaky=True, oracle_unfit=True) == ("PARKED-HONEST", "BUILD")
+
+
+def test_verdict_unfit_flag_never_upgrades_a_verdict(tmp_path):
+    """The load-bearing safety property: ``oracle_unfit`` only ever RE-TAGS a park.
+
+    It can never mint GREEN out of a non-GREEN, never rescues a genuinely parked or
+    blocked task, never touches the stopped/cancelled/stalled classes — and it never
+    demotes a real pass either, so pass BANKING is unaffected (a GREEN's coverage
+    disclosure is the separate #832 green-audit authority, not this one)."""
+    plan = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="failed")
+    for gates in ([], [{"wave": 1, "status": "passed", "evidence": "x"}]):
+        verdict, _ = sd.compute_job_verdict(
+            plan, cancelled=False, stopped=False, wave_gates=gates, oracle_unfit=True)
+        assert verdict != "GREEN"
+
+    # A real build park stays a BUILD park.
+    parked = _verdict_plan(tmp_path, statuses={"a": "merged", "b": "parked"})
+    assert sd.compute_job_verdict(
+        parked, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=True) == (
+            "PARKED-HONEST", "BUILD")
+    blocked = _verdict_plan(tmp_path, statuses={"a": "merged", "b": "blocked"})
+    assert sd.compute_job_verdict(
+        blocked, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=True) == (
+            "PARKED-HONEST", "BUILD")
+
+    # Harness classes are untouched.
+    assert sd.compute_job_verdict(
+        plan, cancelled=False, stopped=True, wave_gates=[], oracle_unfit=True) == (
+            "STALLED", "HARNESS")
+    assert sd.compute_job_verdict(
+        plan, cancelled=True, stopped=False, wave_gates=[], oracle_unfit=True) == (
+            "PARKED-HONEST", "HARNESS")
+
+    # A PASSING oracle still banks GREEN — pass banking is unaffected.
+    passed = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="passed")
+    assert sd.compute_job_verdict(
+        passed, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=True) == (
+            "GREEN", "")
+
+    # An unrun oracle stays the merged-but-unverifiable STALLED class.
+    unrun = _verdict_plan(tmp_path, statuses={"a": "merged"}, acc_status="not-run")
+    assert sd.compute_job_verdict(
+        unrun, cancelled=False, stopped=False, wave_gates=[], oracle_unfit=True) == (
+            "STALLED", "VERIFY")
+
+
+def test_unfit_oracle_scorecard_and_driver_attribute_verify(tmp_path):
+    """REACHABILITY through the real driver seams — the lock that proves the predicate is
+    WIRED, not merely written (a pure function nothing calls is the built-into-nothing
+    shape). The driver reads the run's OWN oracle-qa.json off disk: the measured B4
+    sidecar drives PARKED-HONEST (VERIFY) with an ``oracle_unfit: true`` stamp, while the
+    identical run whose grader covered 3/6 still attributes BUILD."""
+    repo = _mk_repo(tmp_path)
+    tasks = _plan_tasks(repo)
+
+    def _run(name: str, oracle_qa) -> dict:
+        run_dir = tmp_path / name
+        if oracle_qa is not None:
+            _write_oracle_qa(run_dir, oracle_qa)
+        plan = _build_plan(tmp_path, tasks)
+        calls = []
+        oracle = {"status": "failed",
+                  "evidence": "nonzero exit; NameError: name 'data_storage' is not defined"}
+        ops = _ops(calls, run_job_oracle=lambda r, rel: (
+            calls.append(("job_oracle", r, rel)), dict(oracle))[1])
+        _driver(tmp_path, ops, tasks, plan, run_dir=run_dir).run()
+        return _scorecard(calls)
+
+    unfit_sc = _run("unfit-run", _B4_UNFIT_ORACLE_QA)
+    assert unfit_sc["verdict"] == "PARKED-HONEST" and unfit_sc["attribution"] == "VERIFY"
+    assert unfit_sc["evidence"]["oracle_unfit"] == "true"
+    assert unfit_sc["evidence"]["oracle_status"] == "failed"  # never mints a pass
+    assert "graded ZERO" in unfit_sc["notes"]
+
+    fit_sc = _run("fit-run", {**_B4_UNFIT_ORACLE_QA,
+                              "oracle_coverage": "4/6", "covered": ["c2", "c3", "c4", "c5"]})
+    assert fit_sc["verdict"] == "PARKED-HONEST" and fit_sc["attribution"] == "BUILD"
+    assert "oracle_unfit" not in fit_sc["evidence"]
+
+    # No sidecar at all (the pre-#821 shape): unchanged, still BUILD.
+    bare_sc = _run("bare-run", None)
+    assert bare_sc["verdict"] == "PARKED-HONEST" and bare_sc["attribution"] == "BUILD"
+    assert "oracle_unfit" not in bare_sc["evidence"]
+
+    # CROSS-LANE lock: the new evidence key must survive Lane V's REAL adopter. A
+    # scorecard the adopter refuses degrades to STALLED+HARNESS and takes the whole
+    # night's verdict with it — the exact d0294595 shape, where a newly-folded
+    # evidence value was rejected by the fail-closed writer on its first live run.
+    battery = pytest.importorskip("tools.dispatch_harness.battery")
+    from tools.dispatch_harness.report import JobReport
+
+    card = {"id": "B4", "repo": "battery-b4",
+            "expected_outcome": {"oracle": {"expected": True}}, "rigs": []}
+    report = JobReport(repo="battery-b4", goal="g", run_id="R1", wall_clock_s=1.0)
+    adopted = battery.adopt_driver_scorecard(
+        unfit_sc, card=card, report=report, dry_run=False)
+    assert adopted.verdict == "PARKED-HONEST", f"adoption degraded the card: {adopted.notes}"
+    assert adopted.attribution == "VERIFY"
+    assert adopted.evidence.get("oracle_unfit") == "true"
 
 
 # ---------------------------------------------------------------------------

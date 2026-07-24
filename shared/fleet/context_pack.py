@@ -382,6 +382,43 @@ def extract_import_contract(rel_path: str, source: str) -> list[str]:
     return []
 
 
+#: The leading top-level identifier of a PYTHON import line ("from X…" / "import X…").
+#: A node contract line never matches: its module position is a quoted specifier (and
+#: the whole line is refused by the quote check below before this regex runs).
+_CANONICAL_PACKAGE_RE = re.compile(r"^(?:from|import)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+
+
+def canonical_package_from_contract(contract: "list[str] | None") -> str:
+    """The ONE top-level python package/module root every job-oracle contract line
+    imports from, or ``""`` when no single root exists (#790 sub-task 5).
+
+    The scaffold seeder (agentic-setup ``Copy-ScaffoldInto``) historically seeded the
+    GENERIC ``app/`` skeleton into every fresh python target, so a plan-graph job whose
+    oracle imports ``flashcard_app`` grew TWO top-level trees — the stale ``app/`` twin
+    (placeholder ``core.py`` + a ``tests/test_core.py`` importing ``app.core``) beside
+    the real package — the B4 duplicate-scaffold defect (night 20260716-001549-bd).
+    This derivation rides each fleet task dict (``canonical_package``) so the seeder
+    names the skeleton's package after the oracle's contract and ONE canonical tree is
+    seeded and extended.
+
+    Deterministic + conservative (a miss seeds the legacy skeleton — never worse):
+    python import lines only (a quoted specifier marks a node line, skipped; a relative
+    import has no leading identifier after the keyword, skipped), and anything but
+    EXACTLY ONE distinct root yields ``""`` — two roots cannot both be the canonical
+    package, so the seeder must not guess between them."""
+    roots: set[str] = set()
+    for line in contract or []:
+        text = str(line or "").strip()
+        if not text or not _quote_free(text):
+            continue
+        match = _CANONICAL_PACKAGE_RE.match(text)
+        if match:
+            roots.add(match.group(1))
+    if len(roots) != 1:
+        return ""
+    return next(iter(roots))
+
+
 # ---------------------------------------------------------------------------
 # Job-oracle import PROBE targets (#822 H3/H3b/H4) — the STRUCTURED sibling of
 # extract_import_contract: the same first-party import surface, but as machine
@@ -574,6 +611,172 @@ def extract_import_probe_targets(rel_path: str, source: str) -> list[dict]:
     if low.endswith((".mjs", ".js")):
         return _node_probe_targets(source or "")
     return []
+
+
+# ---------------------------------------------------------------------------
+# PRECISE module-ownership keys (#790 defect 2) — shared by the driver's
+# unresolved-module -> owning-task resolution and the #989 coverage/sprawl checks
+# ---------------------------------------------------------------------------
+#
+# The pre-#790 owner resolution used a COARSE substring match: a python
+# ``app.word_frequencies`` collapsed to the token ``app`` (``rsplit('.',1)[0]``), which
+# is a substring of every ``app/``-package sibling's ``creates`` paths, so a fix cycle
+# re-ran a merged SIBLING while the task that actually OWNS the missing module was never
+# a candidate. These pure helpers map a module token / created-file path to identity
+# keys matched by EQUALITY, never substring. They live HERE (not the swap driver)
+# because ownership matching is consumed on both sides of the plan/run seam: the driver
+# (fix-cycle targeting, scope-sprawl findings) AND plan-time contract-coverage
+# (:func:`contract_coverage`, called from the acceptance layer, which the driver
+# imports — so the driver cannot be their home without a cycle).
+
+#: File extensions that are code modules (stripped when normalizing a path/module to its
+#: identity). A dotted python module tail (``app.word_frequencies``) is NOT an extension,
+#: so it survives normalization and is later reinterpreted as a package path.
+_CODE_EXTS = frozenset({"py", "pyi", "js", "mjs", "cjs", "ts", "tsx", "jsx"})
+
+
+def _drop_code_ext(path: str) -> str:
+    """Strip ONE trailing code extension (``.py``/``.js``/``.mjs``/…). Leaves a dotted
+    python-module tail like ``app.word_frequencies`` intact (``word_frequencies`` is not
+    a code extension), so it can be reinterpreted as the package path below."""
+    base, dot, ext = path.rpartition(".")
+    return base if (base and dot and ext.lower() in _CODE_EXTS) else path
+
+
+def normalize_module_token(token: str) -> str:
+    """A module token / node spec / file path -> forward-slash form, no leading ``./``
+    ``../`` relative prefix, no trailing code extension. (``../src/x.js`` -> ``src/x``.)"""
+    t = str(token or "").strip().replace("\\", "/")
+    while t.startswith("./") or t.startswith("../"):
+        t = t[t.index("/") + 1:]
+    return _drop_code_ext(t.strip("/"))
+
+
+def module_forms(token: str) -> set[str]:
+    """PRECISE ownership keys for ONE imported-module token — matched by EQUALITY
+    against a task's created-file forms, NEVER as a substring (the ``app``-substring bug).
+
+    A python dotted module ``app.word_frequencies`` yields the file path
+    ``app/word_frequencies`` and the leaf ``word_frequencies``; a node spec
+    ``../src/unit-converter-helper.js`` yields ``src/unit-converter-helper`` and the leaf
+    ``unit-converter-helper``. Deliberately does NOT emit a bare parent-package token
+    (``app``) — that coarse token is exactly what re-ran a sibling."""
+    t = normalize_module_token(token)
+    if not t:
+        return set()
+    forms = {t, t.rsplit("/", 1)[-1]}
+    if "/" not in t and "." in t:  # a python dotted module -> its file path + leaf
+        dotted = t.replace(".", "/")
+        forms |= {dotted, dotted.rsplit("/", 1)[-1]}
+    return {f.lower() for f in forms if f}
+
+
+def create_forms(path: str) -> set[str]:
+    """Ownership keys a task's contract ``creates`` entry answers to: its extensionless
+    path, its leaf basename, and each ANCESTOR PACKAGE directory as a segment-boundary
+    path prefix (so a bare-package import ``flashcard_app`` maps to the task that creates
+    ``flashcard_app/card_manager.py`` — the B4 shape). The package prefixes are whole path
+    segments, NEVER substrings, and a SPECIFIC module import never reduces to a bare parent
+    dir, so they cannot re-introduce the ``app``-substring false match."""
+    t = normalize_module_token(path)
+    if not t:
+        return set()
+    forms = {t, t.rsplit("/", 1)[-1]}
+    segments = t.split("/")
+    for i in range(1, len(segments)):  # ancestor package dirs: a, a/b, … (+ each leaf seg)
+        forms.add("/".join(segments[:i]))
+        forms.add(segments[i - 1])
+    return {f.lower() for f in forms if f}
+
+
+def export_symbol(entry: str) -> str:
+    """The bare symbol of a contract ``exports`` signature: ``convertUnit(a, b)`` ->
+    ``convertunit``; ``CardManager`` -> ``cardmanager`` (lowercased for case-insensitive
+    equality)."""
+    s = str(entry or "").strip()
+    for sep in ("(", " ", ":", "="):
+        s = s.split(sep, 1)[0]
+    return s.strip().lower()
+
+
+# ---------------------------------------------------------------------------
+# Plan-time contract coverage (#989) — does every build task own a slice of the
+# oracle's import surface, and does every oracle import have an owning task?
+# ---------------------------------------------------------------------------
+
+
+def contract_coverage(
+    tasks: "list[dict]", oracle_rel: str, oracle_code: str
+) -> "dict | None":
+    """Coverage between a multi-task plan's contracts and its job oracle's imports.
+
+    The measured predictor of clean wave-1 scope distribution (#989): a build task
+    whose contract owns NO module the job-acceptance oracle imports has no anchored
+    slice of the final app and tends to build ALL of it, and an oracle import that no
+    task's contract owns is a module no task is ever told to build (the B4 shape).
+
+    ``tasks`` are decompose-shaped dicts (``{task, contract: {creates, exports}}``);
+    the oracle side is the #822 probe-target surface
+    (:func:`extract_import_probe_targets`). Ownership is the PRECISE equality matching
+    of :func:`module_forms` / :func:`create_forms` / :func:`export_symbol` — never
+    substring. Relative oracle imports (``level > 0``) are skipped: they resolve inside
+    the test package, not to any task's deliverable.
+
+    Returns ``None`` when the check is NOT COMPUTABLE — no oracle code, or the oracle
+    names no first-party import target (an ABSENCE of a measurement, never a clean
+    bill; oracle absence is surfaced separately as job-acceptance not-run). Otherwise::
+
+        {"tasks": <build tasks checked>, "targets": <import targets checked>,
+         "uncovered_tasks": [task ids owning no target],
+         "orphan_imports": [raw import lines no task owns]}
+
+    Pure + deterministic: same inputs ⇒ same dict."""
+    usable: list[tuple[set[str], set[str], str]] = []
+    for target in extract_import_probe_targets(oracle_rel, oracle_code or ""):
+        if target.get("kind") == "py" and target.get("level"):
+            continue
+        path_keys = module_forms(str(target.get("module") or target.get("spec") or ""))
+        if not path_keys:
+            continue
+        symbol_keys = {
+            str(n).strip().lower()
+            for n in (target.get("names") or [])
+            if str(n).strip() and str(n).strip() != "*"
+        }
+        usable.append((path_keys, symbol_keys, str(target.get("raw") or "")))
+    if not usable:
+        return None
+    owned = [False] * len(usable)
+    uncovered: list[str] = []
+    n_tasks = 0
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        n_tasks += 1
+        raw_contract = task.get("contract")
+        contract = raw_contract if isinstance(raw_contract, dict) else {}
+        creates_raw = contract.get("creates")
+        exports_raw = contract.get("exports")
+        forms: set[str] = set()
+        for c in creates_raw if isinstance(creates_raw, list) else []:
+            forms |= create_forms(str(c))
+        symbols = {
+            export_symbol(str(e)) for e in (exports_raw if isinstance(exports_raw, list) else [])
+        }
+        symbols.discard("")
+        covered = False
+        for i, (path_keys, symbol_keys, _raw) in enumerate(usable):
+            if (forms & path_keys) or (symbols & symbol_keys):
+                covered = True
+                owned[i] = True
+        if not covered:
+            uncovered.append(str(task.get("task", "") or "?"))
+    return {
+        "tasks": n_tasks,
+        "targets": len(usable),
+        "uncovered_tasks": uncovered,
+        "orphan_imports": [raw for i, (_pk, _sk, raw) in enumerate(usable) if not owned[i]],
+    }
 
 
 # ---------------------------------------------------------------------------
