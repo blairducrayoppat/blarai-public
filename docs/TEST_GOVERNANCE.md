@@ -27,8 +27,11 @@ through. Always redirect `LOCALAPPDATA` (§2.6); run from a TERM-bearing shell w
 `PYTHONIOENCODING` override (the PowerShell tool shell false-fails 3 tests — bash is the
 proven runner).
 
-> **LIVE_GATE_BASELINE: 9047 passed / 0 failed / 0 skipped / 125 deselected**
-> *(as of 2026-07-23, #1067 v7 carve-out + honest grading instrument — prior 8919, +128:
+> **LIVE_GATE_BASELINE: 10011 passed / 0 failed / 0 skipped / 129 deselected**
+> *(as of 2026-07-30, MEASURED on merged main `4a978f09`, NOT derived — the full measurement
+> annotation lives in the primary repository's TEST_GOVERNANCE.md §1; this public mirror
+> carries the headline figure. Prior baseline: 2026-07-23, #1067 v7 carve-out + honest
+> grading instrument — prior 8919, +128:
 > MEASURED on merged main `c2316106` (primary LF checkout, models present, app down,
 > LOCALAPPDATA redirected, bash runner; 9047 passed / 0 failed / 0 skipped in 266 s),
 > NOT derived. The delta is the #1067 v7 guard suite grown for the carve-out plus the
