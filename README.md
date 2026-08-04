@@ -58,7 +58,7 @@ not roadmap intentions.
   rejected-with-argument — with dozens landed this month under `docs/reviews/`. New
   governance documents cover model-weight integrity verification, credential lifecycle,
   and document lifecycle.
-- **The standing test gate grew to 9047 passing / 0 failed / 0 skipped** on the merged
+- **The standing test gate grew to 10011 passing / 0 failed / 0 skipped** on the merged
   main line (hardware, WinUI, and slow tiers run at their own ceremonies), and the
   measured-performance dataset gained dozens of new captures — key/value-cache
   precision sweeps, coordinator shadow-precision, and more — under `docs/performance/`.
@@ -97,7 +97,7 @@ an Intel/OpenVINO-native stack tuned for Lunar Lake.
   (conversation) — one weight load, distinct KV-caches — so the security gate and
   the conversational agent never double the RAM cost.
 - **Speculative decoding.** A Qwen3-0.6B draft, pruned to 6 layers and quantized
-  INT8, drives speculative decoding for roughly 2× throughput. The pruned draft
+  INT8, drives speculative decoding at a measured 1.48–1.68× sustained throughput (July 2026 configuration; an earlier ~2× claim was walked back after re-measurement). The pruned draft
   was chosen over a full 0.6B draft specifically because it *streams* token by
   token — a deliberate trade of \~20% peak throughput for a responsive, live-typing
   feel on every reply.
@@ -217,8 +217,8 @@ controls rather than a per-item rubber-stamp.
   model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
-- **Standing test gate.** **9047 passed / 0 failed / 0 skipped / 125 deselected**
-  (live baseline, 2026-07-23), plus the
+- **Standing test gate.** **10011 passed / 0 failed / 0 skipped / 129 deselected**
+  (live baseline, 2026-07-30), plus the
   model-quality eval gate green, on the merged main line. Hardware, WinUI, and
   slow tiers are deselected from the standing gate and run separately. Test policy
   and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
