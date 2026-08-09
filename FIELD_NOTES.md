@@ -644,3 +644,76 @@ documented anywhere else.
 
 Symptom to recognise: a path-resolution function that returns fewer entries than its docstring
 promises, with no error. It is omitting what it cannot find, exactly as designed.
+
+### The battery scheduled task lives in `\BlarAI\`, not the task-scheduler root
+
+`Start-ScheduledTask -TaskName 'BlarAI-M2-Battery-Nightly'` fails with *"The system cannot find
+the file specified"*. So does `Get-ScheduledTaskInfo -TaskName …`. The task is registered under
+the **`\BlarAI\` folder**, so every by-name cmdlet needs `-TaskPath '\BlarAI\'`.
+
+`Get-ScheduledTask -TaskName …` finds it WITHOUT the path, which is what makes this confusing:
+one cmdlet resolves the bare name and its siblings do not. Piping the object
+(`$t | Get-ScheduledTaskInfo`) always works, because the object carries its own path.
+
+Only `BlarAI Public Snapshot` and `BlarAI System Backup` sit at the root. Everything else —
+`BlarAI-M2-Battery-Nightly`, `BlarAI-Coder-Leg`, the one-shots — is under `\BlarAI\`.
+
+**Never confirm a battery launch from a process-table match alone.** The obvious pattern
+(`CommandLine -match 'battery-bootstrap|run-battery-night'`) matches THE SAMPLING COMMAND
+ITSELF, so a failed trigger looks like a successful one. 2026-08-09: a `pwsh.exe` that appeared
+to be the battery was the query that went looking for it. Confirm with three independent
+witnesses — the task reporting `Running`, `CommandLine -like '*battery-bootstrap.ps1*'` on a
+process that is not `$PID`, and a NEW `night-*` directory on disk.
+
+### Battery logs contain verdict strings inside CONFIG PROSE — anchor your patterns
+
+`launcher.log` records why each card was excluded, and those exclusion reasons quote past
+verdicts verbatim. B3's reads: *"…STALLED [HARNESS] on the budget kill (night-20260707-230002)
+and no pass containing B3 at this grain can bank…"*
+
+A monitor grepping `STALLED \[[A-Z-]+\]` fires **90 seconds into a perfectly healthy run**, on
+prose describing a different card on a different night a month earlier.
+
+A real verdict always carries its card prefix:
+
+```
+[battery B9] STALLED [HARNESS] -> …\scorecards\B9.scorecard.json
+[battery B9] dispatching battery-b9-pottery-site …
+```
+
+So anchor on `\[battery [A-Za-z0-9]+\] (STALLED|GREEN|PARKED-HONEST|RECOVERED)`, never the bare
+verdict word. Same rule for anything reading these logs programmatically — the file is part
+narration, part record, and only the prefixed lines are the record.
+
+A watchdog that cries wolf gets muted, which is strictly worse than having none: the false
+alarm trains you to skim exactly the channel you built to be believed.
+
+### `night-*/ao-boot.log` is TRUNCATED — it records the failed first boot, never the one that works
+
+The battery's preflight boot fail-closes on a Policy Agent handshake after roughly four
+minutes, logs `entrypoint stopped` and `Cleanup: closing session store`, and the file ends.
+**Something else then brings the assistant up and does the entire night's work, writing nothing
+into the night directory.**
+
+Proof, from the 2026-08-07 GREEN run (`20260807-195617-bd`):
+
+```
+ao-boot.log last line   19:58:05   "Cleanup: closing session store"
+oracle-qa.json mtime    19:58:41   <- after the "shutdown"
+run-fleet-*.log mtimes  20:38 … 21:55   five coder tasks dispatched and merged
+scorecard wall_clock_s  11119 s (3 h 5 min), verdict GREEN
+```
+
+**Consequence: you cannot diagnose a battery night from `ao-boot.log`.** It looks IDENTICAL on
+a night that works and a night that stalls, because on both it contains only the first boot's
+death. On 2026-08-09 that file produced three separate confident wrong diagnoses in one
+session — an AttributeError, an interactive Textual UI, and a fail-closed PA handshake — every
+one of which turned out to be present on the successful night too.
+
+**When a log and the filesystem disagree, believe the filesystem.** File modification times in
+`state/fleet-runs/<run-id>/` are a side effect of doing the work; a log line is a claim about
+it. Comparing mtimes against the log's last line is what broke this open, after four hours of
+comparing logs to each other.
+
+Corollary for any battery diagnosis: establish what the run ACTUALLY did (run-dir mtimes,
+scorecard `wall_clock_s`, merged commits) before reading a word of any log.

@@ -471,8 +471,34 @@ the proof has a CADENCE — a control proven to fail once can still be edited in
 "the band-A reading recorded a detector that stopped detecting"); periodic planted-defect CANARY
 deliveries through the REAL pipeline re-prove the whole gate chain, which a one-time proof
 cannot.
-**Status: UNKNOWN — no gate has a systematic proven-to-fail record; the 2026-08-07 session
-evidence above is the only measurement.**
+**Status: PARTIAL as of 2026-08-09 — the RECORD exists and is enforced; the CADENCE does not.
+Re-measured, because this row read UNKNOWN while the mechanism it asks for was already live.**
+
+`shared/instrument_registry.py` carries **13 instruments**, and for each one the proven-to-fail
+pair is a REQUIRED, RESOLVED field — not a convention. It goes further than principle 12 asks,
+naming THREE cases rather than two: a `toggle_test` (a renderer refuses to report clean over an
+unmeasured result), a `seam_test` (the REAL entrypoint, driven for real, RETURNS unmeasured —
+it may not construct the result type, because that is where mocks lie), and a `quiet_test` (the
+instrument does NOT convict a healthy input, because a control that fires on correct
+configurations gets muted). `test_instrument_registry` fails if any named test is renamed or
+deleted, and `unclaimed_reads` surfaces BY NAME any unregistered grader wired into a registered
+renderer — so a new gate's choice is "register it or argue why it is not an instrument", never
+"nobody noticed". 143 tests, in `tests/security/`, inside the standing gate. Verified passing
+2026-08-09.
+
+So *"no gate has a systematic proven-to-fail record"* was false when written or has been false
+since; either way this row was sending readers to build something that exists. The same failure
+mode as an index line understating its own repo — and worth more than the correction, because a
+DoD row that undersells the system is as misleading as one that oversells it.
+
+**What is genuinely still missing, and it is the harder half.** The row asks for a CADENCE: *"a
+control proven to fail once can still be edited into silence later"* (#1142 — a README-marker
+lint neutralised by a seed-text change, so *"the band-A reading recorded a detector that stopped
+detecting"*). The registry proves each control could fail **at the moment its test was
+written**. Nothing re-proves the chain since. Periodic planted-defect CANARY deliveries through
+the REAL pipeline are unbuilt, and no instrument shipped 2026-08-08 (`link_lint`,
+`image_placement`) is registered yet — both carry toggle-proofs, neither is under the registry's
+teeth, and the registry's contract assumes a result type where those emit a dict.
 
 ### 15. The built product is EXERCISED, not just inspected
 
@@ -540,7 +566,40 @@ clean.
 1-16. DONE means: the dispatcher chooses HOW MANY independent candidates to build from the
 declared or measured difficulty of the task, the choice and its reason are recorded on the run,
 and hard tasks demonstrably get more attempts than trivial ones.
-**Status: UNKNOWN.**
+**Status: PARTIAL as of 2026-08-09 — the MECHANISM is live and predates this row; the
+DEMONSTRATION is not. Re-measured, because UNKNOWN was understating the repo.**
+
+`agentic-setup/scripts/fleet-lib.ps1::Resolve-PassBudget` already maps a coarse difficulty
+label onto the build-pass budget, which IS the best-of-N candidate count:
+
+```
+simple   -> 2 build / 1 review
+moderate -> 3 build / 2 review
+complex  -> 8 build / 3 review
+```
+
+Its own comment records the provenance: *"complex BUILD raised 5→8 on 2026-06-27, LA decision:
+more total best-of-N shots at hard tasks … Sampling is near-free locally; best-of-N coverage is
+the weak-model bottleneck."* A staged desktop-GUI surface floors BUILD at 5 regardless of label.
+An absent or unrecognised label keeps the caller's defaults, so the signal is backward
+compatible. `Add-ComplexityHint` additionally tells the coder the assessment *before pass 1*, as
+a calibration signal that never prescribes an implementation.
+
+The label is a SIGNAL from the upstream 14B, deliberately not a pass count — *"it is NOT a
+coder, so it sends a signal, never a pass count. The SYSTEM maps that label"* — which is the
+right split and worth preserving.
+
+**Recorded, partially.** A run's own JSON carries `"complexity": "moderate"` (verified on
+`20260807-195617-bd`), so the REASON is on the run. The resolved budget — the choice itself —
+is not: no run artifact records "8 build passes because complex". Half of this row's recording
+clause is met.
+
+**What is genuinely missing: the demonstration.** *"Hard tasks demonstrably get more attempts
+than trivial ones"* has never been measured. Nothing compares candidate counts across
+difficulty bands, and the sampler's own summary line only prints when a task's best-of-N loop
+actually drew more than one (`swap_driver.py:704`), so absence of the line is ambiguous between
+"drew one" and "did not report". Until a run banks the resolved budget beside the label, the
+correlation cannot be computed from banked state at all.
 
 ### 20. Decomposition is graded, not just performed
 

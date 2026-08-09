@@ -2,6 +2,16 @@
 
 **A personal, locally-run, security-first AI system engineered for decades of use on consumer hardware.**
 
+**&#9654; Watch it run (2 minutes):**
+
+https://github.com/user-attachments/assets/6df40e93-a4ec-4444-845b-27f71703acad
+
+*([streaming player](https://blairducrayoppat.github.io/blarai-public/demo.html) &middot; [1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-v1))*
+
+**&#9654; The vision film (66 seconds):**
+
+https://github.com/user-attachments/assets/9ffd473b-93e5-4763-a9ec-e12ac6afa10c
+
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
 local disk, and **zero external network dependency by default**. It is a
@@ -14,6 +24,52 @@ The design premise is uncompromising: a system that holds decades of a person's
 private data must assume every component can fail or be subverted, must fail
 *closed* when it does, and must be able to prove — cryptographically and in a
 tamper-evident audit trail — what it did and why.
+
+---
+
+## Recent advancements (as of August 2026)
+
+Highlights of what has landed on the main line since the previous public snapshot.
+Every item below corresponds to code, tests, or measurements in this repository —
+not roadmap intentions.
+
+- **A month spent discovering that the instruments measuring quality were
+  themselves unmeasured.** July added a substantial testing and evaluation
+  apparatus — a golden-set eval harness, an oracle-quality auditor, a
+  self-coordination layer, dozens of new verifiers — and then, methodically,
+  found that several of them had been reporting a pass they had never actually
+  earned. One safety gate had never executed a single time in its life, because
+  a logging call silently coerced its return value to always-true. A history
+  reader searched for "last night" inside the current night's own folder, so
+  eleven consecutive nights each measured a population of one. The pattern was
+  always the same shape: a control that fails silently, in the safe-looking
+  direction, renders identically to one that is working correctly. Every
+  instance found has shipped a structural fix plus a regression lock proven to
+  fail when the underlying defect is reintroduced — a lock nobody has watched
+  turn red is not yet a lock.
+- **An acceptance exam that could not fail, and what it cost.** The clearest
+  single specimen: a coding-fleet build was graded a clean pass, and only later
+  was it discovered that the "already satisfied" check behind that grade had
+  two silently-empty test bodies — an exam structurally incapable of failing
+  had certified a required page as already built when it did not exist. The
+  fix requires every acceptance check to first prove, against a known-bad
+  input, that it *can* fail before its "pass" is trusted at all.
+- **The first time a human actually used what the fleet built — and the gap
+  that revealed.** A review of a coder-fleet-built website surfaced three real
+  defects (a broken link, repeated placeholder images, mismatched product
+  descriptions) that four independent automated grading passes had all missed.
+  The fix is not "add a fifth grader" — it's a standing review loop that hands
+  the reviewer the original request back as an explicit checklist next to the
+  finished build, plus a link-check that would have caught the broken page in
+  seconds with no model involved at all.
+- **The headless coding-agent dispatch fleet is now a real overnight
+  capability** — decomposing a natural-language goal into a graph of tasks with
+  independently verifiable acceptance criteria, dispatching them to a local
+  coding fleet, and swapping the resident model to make room for it, all
+  without any component requiring network access.
+- **The standing test gate grew to 10,845 passing / 0 failed / 0 skipped** on
+  the merged main line (hardware, WinUI, and slow tiers run at their own
+  ceremonies) — more than double where it stood at the start of July.
 
 ---
 
@@ -174,10 +230,10 @@ controls rather than a per-item rubber-stamp.
   model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
-- **Standing test gate.** **10011 passed / 0 skipped / 129 deselected**, plus the
-  model-quality eval gate green, on the merged main line. Hardware, WinUI, and
-  slow tiers are deselected from the standing gate and run separately. Test policy
-  and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
+- **Standing test gate.** **10845 passed / 0 failed / 0 skipped / 133 deselected**,
+  plus the model-quality eval gate green, on the merged main line. Hardware, WinUI,
+  and slow tiers are deselected from the standing gate and run separately. Test
+  policy and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
 
 ---
 
