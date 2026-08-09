@@ -32,8 +32,22 @@ proven runner).
 > *(2026-08-08, when this file breached its 40,000-byte budget). Nothing was deleted; the
 > retractions and corrections are there in full.*
 >
-> **LIVE_GATE_BASELINE: 10843 passed / 0 failed / 0 skipped / 133 deselected**
-> *(**CONFIRMED on merged `main`** @ `88a634eb`, 2026-08-08, **started 22:04:53, finished
+> **LIVE_GATE_BASELINE: 10845 passed / 0 failed / 0 skipped / 133 deselected**
+> *(**CONFIRMED on merged `main`**, 2026-08-09, **started 04:59:07, finished 05:05:13**
+> local, **362.82 s** — assistant STOPPED, no dispatch, no battery. **+2 over 10843**:
+> `6e7a15bd` (#1352 — a dispatch-asset nicety crashed the Assistant Orchestrator and cost
+> the 2026-08-08 night; it degrades to no-asset now).*
+>
+> *This baseline is stamped after a RED gate, and the red is the lesson. Three
+> `test_image_placement.py` tests failed at 04:56 with nothing about the grader changed:
+> they asserted exact figures against `~/projects/battery-b9-pottery-site`, which the
+> overnight battery had rebuilt. **A working directory the fleet rewrites is
+> evidence-by-reference, and the reference moved while the tests slept** — capability 16
+> (#1318) committed by tests written to enforce it. Retargeted to a dated
+> `repos-archived/` snapshot with byte-identical findings. The rule: assert exact numbers
+> only against immutable artifacts.*
+>
+> *Previous: **10843** @ `88a634eb` — (2026-08-08, **started 22:04:53, finished
 > 22:12:28** local, **450.47 s** — primary checkout, assistant STOPPED, no dispatch, no
 > battery. **+33 over 10810**: `c9fc9633` (#1349, +5 — the grader stopped calling the
 > operator's own photographs pipeline waste) and `88a634eb` (#1348, +28 — requirement

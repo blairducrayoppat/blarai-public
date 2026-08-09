@@ -35,7 +35,20 @@ _ARCHIVED_SITE = Path(
 )
 
 #: The next night's build of the same shop: SIX products, THREE pictures (one per category).
-_LIVE_SITE = Path("C:/Users/mrbla/projects/battery-b9-pottery-site")
+#:
+#: THE ARCHIVED SNAPSHOT, not `~/projects/battery-b9-pottery-site`. These tests asserted exact
+#: figures against the live projects tree until 2026-08-09, when the overnight battery rebuilt
+#: it and three of them went red on main — the tree they were measuring is a working area the
+#: fleet rewrites every night, so the evidence under them expired while they slept.
+#:
+#: That is DoD capability 16 (#1318) committed by the very tests written to enforce it: a
+#: recorded result that cannot be re-derived. A dated `repos-archived/` snapshot CAN be, which
+#: is the whole reason the archive exists. Assert exact numbers only against immutable
+#: artifacts; a live working directory is evidence-by-reference, and the reference moves.
+_LIVE_SITE = Path(
+    "C:/Users/mrbla/agentic-setup/state/battery/night-20260808-230002/"
+    "repos-archived/battery-b9-pottery-site"
+)
 
 
 def _site(tmp_path: Path, files: dict[str, str]) -> Path:
@@ -110,7 +123,7 @@ def test_the_archived_shop_produces_no_false_positives() -> None:
     assert report["counts"]["items_with_missing_image"] == 0
 
 
-@pytest.mark.skipif(not _LIVE_SITE.is_dir(), reason="the projects tree is not present in this checkout")
+@pytest.mark.skipif(not _LIVE_SITE.is_dir(), reason="the 20260808-230002 battery archive is not present in this checkout")
 def test_the_next_nights_shop_still_repeats_one_picture() -> None:
     """One image per CATEGORY is still three products wearing one photograph.
 
@@ -137,7 +150,7 @@ def test_the_next_nights_shop_still_repeats_one_picture() -> None:
     assert not [f for f in report["findings"] if "logo.png" in f["reference"]]
 
 
-@pytest.mark.skipif(not _LIVE_SITE.is_dir(), reason="the projects tree is not present in this checkout")
+@pytest.mark.skipif(not _LIVE_SITE.is_dir(), reason="the 20260808-230002 battery archive is not present in this checkout")
 def test_the_generated_icons_nothing_ever_used_are_reported() -> None:
     """``icon-mug.png`` and ``icon-bowl.png`` cost ~76 s of GPU time each and are referenced nowhere.
 
