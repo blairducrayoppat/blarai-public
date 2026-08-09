@@ -18,6 +18,9 @@ from services.ui_gateway.src.dispatch_coordinator import (
     DispatchCoordinator,
     parse_dispatch_command,
 )
+from dataclasses import replace
+
+from shared.fleet import acceptance as acc
 from shared.fleet import dispatch as fleet
 from shared.fleet.acceptance import AcceptanceCriterion, AcceptanceSpec, PlanResult
 
@@ -540,16 +543,37 @@ def test_parse_goal_with_pipe_is_still_run_not_choose():
 async def test_ambiguous_plan_asks_the_curated_question_not_the_preview(tmp_path):
     # The 14B flagged ambiguity -> the coordinator asks the SYSTEM's curated question and does
     # NOT yet show the approval preview (no approval-pending slot; a clarification slot instead).
+    # Repo "app" does not exist -> an EMPTY/NEW project, so the menu carries NO phone
+    # option (#1161 review F3): a phone choice would mint an approvable plan for a build
+    # the corridor's own refusal says cannot exist.
     coord = _coord(tmp_path, plan_fn=_ambiguous_plan())
     reply = await coord.handle_command("s", DispatchCommand(kind="run", repo="app", goal="an app with buttons"))
     assert "Where will you mainly use this?" in reply
-    assert "1. On this computer" in reply and "2. In a web browser" in reply and "3. On a phone" in reply
+    assert "1. On this computer" in reply and "2. In a web browser" in reply
+    assert "On a phone" not in reply
     # the curated options are shown, NOT the acceptance criteria preview yet
     assert "Automatic checks" not in reply
     assert "/dispatch approve" not in reply
     # state: a clarification is pending; NO approval-pending dispatch yet
     assert coord.pending_clarification_for("s") is not None
     assert coord.pending_for("s") is None
+    # the PARKED question is the filtered one (what the operator saw survives a restore)
+    parked = coord.pending_clarification_for("s")
+    assert [o["surface"] for o in parked.question["options"]] == ["desktop-gui", "web"]
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_plan_on_existing_repo_keeps_the_full_menu(tmp_path):
+    # The F3 scope bar: an EXISTING project's menu is byte-identical — all three options,
+    # phone included (today's behavior; #1161 changes nothing off the empty-repo path).
+    repo_dir = _cfg(tmp_path).projects_dir / "app"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.10)",
+                                             encoding="utf-8")
+    coord = _coord(tmp_path, plan_fn=_ambiguous_plan())
+    reply = await coord.handle_command("s", DispatchCommand(kind="run", repo="app", goal="an app with buttons"))
+    assert "1. On this computer" in reply and "2. In a web browser" in reply
+    assert "3. On a phone" in reply
 
 
 @pytest.mark.asyncio
@@ -667,7 +691,10 @@ async def test_non_numeric_answer_also_falls_back(tmp_path):
 async def test_choose_with_nothing_pending_reports_clearly(tmp_path):
     coord = _coord(tmp_path, plan_fn=_fake_plan())
     reply = await coord.handle_command("s", DispatchCommand(kind="choose", choice="2"))
-    assert "no question waiting" in reply.lower()
+    # #1116 reworded: the old line ("there's no question waiting") read as though the
+    # operator had invented the question, which is the opposite of the truth when the
+    # transcript above is still displaying it. Assert the MEANING, not the prose.
+    assert "don't have that question open" in reply.lower()
 
 
 @pytest.mark.asyncio
@@ -747,6 +774,29 @@ async def test_create_and_plan_creates_repo_then_plans(tmp_path):
     # The plan preview signals Approve/Reject buttons (one-shot, then cleared).
     assert coord.pop_action_kind("s") == "dispatch_plan"
     assert coord.pop_action_kind("s") == ""
+    # #1165 M5 dormant default: the coordinator's assets-pipeline gate is OFF unless
+    # the caller threads the AO-resolved conjunction, so the created project carries
+    # the pre-M5 scaffold — no assets folder.
+    assert not (repo / "assets").exists()
+
+
+@pytest.mark.asyncio
+async def test_create_and_plan_seeds_the_assets_contract_when_gated_on(tmp_path):
+    """#1165 M5: with the gateway-side conjunction ON, /dispatch new seeds the
+    operator-assets folder contract into the created project — driven through the
+    REAL coordinator -> fleet.create_project -> disk seam."""
+    calls = []
+    coord = DispatchCoordinator(
+        config=_cfg(tmp_path), enabled=True, plan_fn=_fake_plan(calls=calls),
+        mint_run_id=lambda: "RID-DET",
+        advanced_intake_assets_pipeline_enabled=True,
+    )
+    await coord.handle_command(
+        "s", DispatchCommand(kind="create", repo="Asset App", goal="a page")
+    )
+    repo = _cfg(tmp_path).projects_dir / "asset-app"
+    assert (repo / "assets" / "README.txt").is_file()
+    assert (repo / "assets" / "reference" / "README.txt").is_file()
 
 
 def _web_spec():
@@ -819,7 +869,16 @@ from shared.fleet import clarify as _clarify  # noqa: E402
 
 def _questioning_plan(*, calls=None):
     """A plan_fn that returns CLARIFY questions on the FIRST pass (plain goal) and a real
-    plan on the RE-PLAN (the goal now carries the requirements sentinel)."""
+    plan on the RE-PLAN (the goal now carries the requirements sentinel).
+
+    #1224 N4 — the THIRD instance of the impossible-fixture class, and the one that walks
+    the whole menu flow. This previously returned a bare ``{"prompt": "p"}`` and a spec with
+    NO build_plan at all, so it could observe NEITHER #1220 carrier: reverting both left
+    this file at 121 passed. It now carries a build_plan from the REAL parser and a prompt
+    composed the way ``generate_plan`` composes it, so a test driving the three-turn flow
+    through this fixture tests the program that ships."""
+    import json
+
     async def plan_fn(repo, goal):
         if calls is not None:
             calls.append((repo, goal))
@@ -828,10 +887,15 @@ def _questioning_plan(*, calls=None):
                 {"axis": "surface", "question": "Where will you use this?"},
                 {"axis": "persistence", "question": "Should it save your data?"},
             ])
+        _, req_block = _clarify.split_planning_goal(goal)
+        prompt = "Build the thing."
+        if req_block:
+            prompt += f"{acc.REQUIREMENTS_PROMPT_MARKER}\n{req_block}"
         return PlanResult(
             ok=True,
-            tasks=[{"repo": repo, "task": "t", "prompt": "p"}],
-            spec=_spec(),
+            tasks=[{"repo": repo, "task": "t", "prompt": prompt}],
+            spec=replace(_spec(), build_plan=acc._parse_build_plan(json.dumps(
+                {"surface": "command-line", "complexity": "simple"}))),
             message="planned",
         )
     return plan_fn
@@ -869,17 +933,140 @@ async def test_free_text_answer_replans_and_shapes_the_card(tmp_path):
     assert "what you told me" in reply.lower() and "on my laptop" in reply
 
 
+def _questioning_plan_flaky(*, fail_times=1, calls=None):
+    """Like :func:`_questioning_plan`, but the RE-PLAN (sentinel present) FAILS
+    (Fail-Closed, ``ok=False`` — the shape a transport timeout/#766/#1152 stall takes)
+    for the first *fail_times* calls before succeeding. Exercises the #1152
+    answer-preservation path: a re-plan failure must not discard the operator's
+    already-given answer."""
+    attempts = {"n": 0}
+
+    async def plan_fn(repo, goal):
+        if calls is not None:
+            calls.append((repo, goal))
+        if _clarify.REQUIREMENTS_SENTINEL not in goal:
+            return PlanResult(ok=True, questions=[
+                {"axis": "surface", "question": "Where will you use this?"},
+            ])
+        attempts["n"] += 1
+        if attempts["n"] <= fail_times:
+            return PlanResult(ok=False, message="No response from the Assistant Orchestrator.")
+        return PlanResult(
+            ok=True,
+            tasks=[{"repo": repo, "task": "t", "prompt": "p"}],
+            spec=_spec(),
+            message="planned",
+        )
+
+    return plan_fn
+
+
+@pytest.mark.asyncio
+async def test_replan_transport_failure_preserves_the_answer(tmp_path):
+    """#1152: a Fail-Closed re-plan failure (the AO outran the PLAN budget) must NOT
+    discard the operator's free-text answer. The requirements question stays parked
+    and a bare retry re-plans with the SAME answer rather than forcing a retype."""
+    coord = _coord(tmp_path, plan_fn=_questioning_plan_flaky(fail_times=1))
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply1 = await _send(coord, "s", "/dispatch on my laptop, and yes save my todos")
+    assert "wasn't lost" in reply1.lower()
+    assert "/dispatch approve" not in reply1
+    # The SAME question is still held — the answer was not thrown away.
+    assert coord.pending_requirements_for("s") is not None
+    # A bare retry of the same free-text answer now succeeds against the same fake AO.
+    reply2 = await _send(coord, "s", "/dispatch on my laptop, and yes save my todos")
+    assert "/dispatch approve" in reply2
+    assert coord.pending_requirements_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_decide_for_me_transport_failure_preserves_the_question(tmp_path):
+    """Same #1152 guard on the 'just decide for me' escape hatch: a re-plan failure
+    must not silently drop the pending question either."""
+    coord = _coord(tmp_path, plan_fn=_questioning_plan_flaky(fail_times=1))
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply1 = await _send(coord, "s", "/dispatch just decide for me")
+    assert "wasn't lost" in reply1.lower()
+    assert coord.pending_requirements_for("s") is not None
+    reply2 = await _send(coord, "s", "/dispatch just decide for me")
+    # The retry re-planned successfully: the requirements sub-state is released. #1197 —
+    # this fixture asks the SURFACE on an empty repo, so what follows is now the platform
+    # question rather than the approval card; either way the answer was preserved, which
+    # is the #1152 property under test here.
+    assert coord.pending_requirements_for("s") is None
+    assert "Where will you mainly use this?" in reply2
+
+
 @pytest.mark.asyncio
 async def test_just_decide_records_assumptions(tmp_path):
+    # Repo "todo" does not exist yet -> an EMPTY/NEW project, so the #1161 surface
+    # default is the gradeable-stack text, recorded as the assumed answer (the stock
+    # "app on this computer" default is the desktop-from-nothing steer this retires).
+    #
+    # #1197: on an empty repo the SURFACE is no longer ridden — the operator is asked
+    # first (see test_the_quick_path_asks_before_riding_an_assumed_surface). Answer it,
+    # then assert the recording, which is what this test is about.
     coord = _coord(tmp_path, plan_fn=_questioning_plan())
     await _send(coord, "s", "/dispatch todo | a todo app")
-    reply = await _send(coord, "s", "/dispatch just decide for me")
+    await _send(coord, "s", "/dispatch just decide for me")
+    reply = await _send(coord, "s", "/dispatch 1")  # "On this computer"
     assert "/dispatch approve" in reply and "asked me to decide" in reply.lower()
     spec = coord.pending_for("s").spec
-    assert spec.clarifications and all(c["assumed"] for c in spec.clarifications)
-    # the per-axis defaults were recorded (surface + persistence were asked).
-    answers = {c["answer"] for c in spec.clarifications}
+    by_axis = {c["axes"][0]: c for c in spec.clarifications if c.get("axes")}
+    # #1197: every recorded default carries the axis it answered, on the QUICK path — the
+    # tag `platform_was_assumed` needs. Before #1197 every `axes` here was None.
+    assert set(by_axis) == {_clarify.AXIS_SURFACE, _clarify.AXIS_PERSISTENCE}
+    # The axis the operator was ASKED about now holds THEIR answer, no longer an assumption.
+    assert by_axis[_clarify.AXIS_SURFACE]["answer"] == "On this computer"
+    assert by_axis[_clarify.AXIS_SURFACE]["assumed"] is False
+    assert _clarify.EMPTY_PROJECT_SURFACE_ANSWER not in {
+        c["answer"] for c in spec.clarifications
+    }
+    # Every OTHER axis still self-answered with its per-axis default, still marked assumed.
+    assert by_axis[_clarify.AXIS_PERSISTENCE]["assumed"] is True
+    assert by_axis[_clarify.AXIS_PERSISTENCE]["answer"] == (
+        _clarify.DEFAULT_AXIS_ANSWERS[_clarify.AXIS_PERSISTENCE]
+    )
+
+
+@pytest.mark.asyncio
+async def test_just_decide_existing_project_keeps_stock_surface_default(tmp_path):
+    # #1161 toggle-off bar: an EXISTING project keeps the stock decide defaults
+    # byte-for-byte — the empty-project text is scoped to empty/new shells only.
+    repo_dir = _cfg(tmp_path).projects_dir / "todo"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "pyproject.toml").write_text("[project]\nname='todo'\n", encoding="utf-8")
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    await _send(coord, "s", "/dispatch just decide for me")
+    answers = {c["answer"] for c in coord.pending_for("s").spec.clarifications}
     assert _clarify.DEFAULT_AXIS_ANSWERS["surface"] in answers
+    assert _clarify.EMPTY_PROJECT_SURFACE_ANSWER not in answers
+
+
+@pytest.mark.asyncio
+async def test_the_platform_answer_reaches_both_carriers_through_this_fixture(tmp_path):
+    """#1224 N4 — this file's fixture was repaired to emit a real build_plan and a real
+    composed prompt, but NOTHING here observed either, so reverting the repair left the
+    file green (348/0 in a mutation run). A fixture repair that no test depends on is
+    decoration. This is the assertion that makes it load-bearing.
+
+    SCOPE, so nobody mistakes it for more than it is: both assertions come from carriers that
+    predate the surface-choice re-plan, and this test survives that re-plan's deletion
+    untouched. It locks the FIXTURE, not `_replan_after_surface_choice` — the locks for the
+    re-plan and for the seed it composes live in shared/tests/test_platform_default.py."""
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    await _send(coord, "s", "/dispatch just decide for me")
+    assert coord._clarifying.get("s") is not None, "the platform menu did not open"
+    await _send(coord, "s", "/dispatch 2")  # In a web browser
+
+    card = coord.pending_for("s")
+    assert card.spec.build_plan["surface"] == "web", "carrier A: the build signal"
+    prompt = card.tasks[0]["prompt"]
+    assert "In a web browser" in prompt, "carrier B: the coder's prompt"
+    assert _clarify.EMPTY_PROJECT_SURFACE_ANSWER not in prompt
+    assert card.tasks[0]["surface"] == "web"
 
 
 @pytest.mark.asyncio
@@ -924,7 +1111,10 @@ async def test_decide_or_answer_with_nothing_pending(tmp_path):
     coord = _coord(tmp_path, plan_fn=_fake_plan())
     r1 = await _send(coord, "s", "/dispatch just decide for me")
     r2 = await _send(coord, "s", "/dispatch answer whatever")
-    assert "no question waiting" in r1.lower() and "no question waiting" in r2.lower()
+    assert "don't have that question open" in r1.lower()
+    assert "don't have that question open" in r2.lower()
+    # #1116: an explicit answer carries words, and words are never discarded.
+    assert "whatever" in r2
 
 
 @pytest.mark.asyncio
@@ -1235,7 +1425,9 @@ async def test_revise_disabled_surfaces_message_plan_intact(tmp_path):
 async def test_revise_nothing_pending(tmp_path):
     coord = _coord(tmp_path, plan_fn=_revising_plan())
     reply = await _send(coord, "s", "/dispatch revise change it")
-    assert "nothing to revise" in reply.lower()
+    assert "no plan waiting to change" in reply.lower()
+    # #1116: the change request is prose the operator may have worked on — kept.
+    assert "change it" in reply
 
 
 @pytest.mark.asyncio
@@ -1325,3 +1517,272 @@ async def test_battery_flow_never_revises_auto_accept_unchanged(tmp_path):
     assert len(plan_calls) == 1 and _revise.REVISE_SENTINEL not in plan_calls[0][1]
     fired = [t["task"] for t in exec_calls[0]["tasks"]]
     assert fired == ["build-login", "build-tracker"]  # the ORIGINAL plan fired, unrevised
+
+
+# ── #1161 plan-time: the mobile refusal + the carried build-risk bit ─────────
+
+
+def _empty_repo_dir(tmp_path, name):
+    repo_dir = _cfg(tmp_path).projects_dir / name
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "README.md").write_text(f"# {name}", encoding="utf-8")
+    return repo_dir
+
+
+@pytest.mark.asyncio
+async def test_mobile_goal_on_empty_project_is_refused_before_any_model_time(tmp_path):
+    # The honest refusal: a phone ask on an empty/new project never reaches the 14B and
+    # never becomes a silent desktop-from-nothing build. The typed goal is kept (#1116).
+    _empty_repo_dir(tmp_path, "recipes")
+    calls: list = []
+    coord = _coord(tmp_path, plan_fn=_fake_plan(calls=calls))
+    reply = await _send(coord, "s", "/dispatch recipes | an iphone app for my recipes")
+    assert "PHONE" in reply
+    assert "Nothing was planned" in reply
+    assert "an iphone app for my recipes" in reply  # #1116: words kept
+    assert calls == []                              # no model time spent
+    assert coord.pending_for("s") is None
+    assert coord.pending_requirements_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_mobile_goal_on_existing_project_keeps_todays_path(tmp_path):
+    # Scope bar: an EXISTING project is untouched by #1161 — the plan call proceeds.
+    repo_dir = _cfg(tmp_path).projects_dir / "recipes"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "pyproject.toml").write_text("[project]\nname='r'\n", encoding="utf-8")
+    calls: list = []
+    coord = _coord(tmp_path, plan_fn=_fake_plan(calls=calls))
+    reply = await _send(coord, "s", "/dispatch recipes | an iphone app for my recipes")
+    assert len(calls) == 1
+    assert "/dispatch approve" in reply
+
+
+@pytest.mark.asyncio
+async def test_mobile_answer_keeps_question_parked_and_web_answer_recovers(tmp_path):
+    # The re-plan refusal: a phone ANSWER on an empty project keeps the question parked
+    # (#1152 shape — the words are kept, nothing thrown away), and answering again with
+    # a web-shaped platform proceeds (the scan's web-over-mobile precedence).
+    _empty_repo_dir(tmp_path, "todo")
+    calls: list = []
+    coord = _coord(tmp_path, plan_fn=_questioning_plan(calls=calls))
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    n_after_questions = len(calls)
+    reply = await _send(coord, "s", "/dispatch I want it on my phone please")
+    assert "PHONE" in reply
+    assert "on my phone please" in reply                 # #1116: answer kept
+    assert len(calls) == n_after_questions               # no re-plan was spent
+    assert coord.pending_requirements_for("s") is not None  # still parked
+    reply2 = await _send(coord, "s", "/dispatch fine, in a web browser then")
+    assert "/dispatch approve" in reply2
+    assert coord.pending_requirements_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_desktop_pick_from_nothing_gets_build_risk_line(tmp_path):
+    # #1161 d2 through the coordinator: an EMPTY repo + a clear desktop classification
+    # renders the build-risk disclosure on the approval card — the operator can still
+    # approve, but never again unknowingly.
+    _empty_repo_dir(tmp_path, "calc")
+    clear_spec = AcceptanceSpec(
+        "a desktop calc",
+        (AcceptanceCriterion("c1", "the project builds", "build", ""),
+         AcceptanceCriterion("c2", "2 + 3 shows 5", "behavior", "")),
+        build_plan={"surface": "desktop-gui", "language_hint": None,
+                    "complexity": "moderate", "components": []},
+    )
+    coord = _coord(tmp_path, plan_fn=_fake_plan(clear_spec))
+    reply = await _send(coord, "s", "/dispatch calc | a desktop calc")
+    assert "built from an EMPTY project" in reply
+    assert "command-line tool" in reply
+    # …and the bit survives on the pending slot for revise re-renders.
+    assert coord.pending_for("s").will_scaffold is True
+
+
+@pytest.mark.asyncio
+async def test_existing_repo_card_has_no_build_risk_line(tmp_path):
+    repo_dir = _cfg(tmp_path).projects_dir / "cppapp"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.10)",
+                                             encoding="utf-8")
+    clear_spec = AcceptanceSpec(
+        "a desktop calc",
+        (AcceptanceCriterion("c1", "the project builds", "build", ""),),
+        build_plan={"surface": "desktop-gui", "language_hint": None,
+                    "complexity": "moderate", "components": []},
+    )
+    coord = _coord(tmp_path, plan_fn=_fake_plan(clear_spec))
+    reply = await _send(coord, "s", "/dispatch cppapp | a desktop calc")
+    assert "built from an EMPTY project" not in reply
+    assert coord.pending_for("s").will_scaffold is False
+
+
+def test_will_scaffold_park_restore_roundtrip_and_pre1161_rows():
+    # The parked-slot codecs carry the bit; a pre-#1161 row (no key) restores False.
+    from services.ui_gateway.src.dispatch_coordinator import (
+        PendingClarification,
+        PendingDispatch,
+        _clarifying_from_payload,
+        _clarifying_to_payload,
+        _pending_from_payload,
+        _pending_to_payload,
+    )
+
+    p = PendingDispatch(run_id="r", repo="x", goal="g", will_scaffold=True)
+    assert _pending_from_payload(_pending_to_payload(p)).will_scaffold is True
+    legacy = _pending_to_payload(p)
+    legacy.pop("will_scaffold")
+    assert _pending_from_payload(legacy).will_scaffold is False
+
+    c = PendingClarification(run_id="r", repo="x", goal="g", will_scaffold=True)
+    assert _clarifying_from_payload(_clarifying_to_payload(c)).will_scaffold is True
+    legacy_c = _clarifying_to_payload(c)
+    legacy_c.pop("will_scaffold")
+    assert _clarifying_from_payload(legacy_c).will_scaffold is False
+
+
+# ── #1160 d2: reserved-verb replies at the question stage get ONE honest line ─
+
+
+@pytest.mark.asyncio
+async def test_revise_at_question_stage_consumed_with_notice(tmp_path):
+    # The morning-run collision, locked end to end: the words are STILL consumed as
+    # answers (#1116 — never discarded), the re-plan gets them, and the reply now LEADS
+    # with the honest notice instead of silently briefing them as requirements.
+    calls: list = []
+    coord = _coord(tmp_path, plan_fn=_questioning_plan(calls=calls))
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(
+        coord, "s",
+        "/dispatch revise change the acceptance criteria: friendly, not preachy",
+    )
+    assert reply.startswith("Heads-up: there was no plan yet to revise")
+    assert any(
+        _clarify.REQUIREMENTS_SENTINEL in g and "friendly, not preachy" in g
+        for _, g in calls
+    )
+    assert "/dispatch approve" in reply  # the card still follows the notice
+    assert coord.pending_requirements_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_forget_at_question_stage_consumed_with_notice(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch forget about the phone, just the browser")
+    assert reply.startswith("Heads-up:")
+    assert "nothing was forgotten" in reply.lower()
+    assert "/dispatch approve" in reply
+    # the words reached the plan as answers (the #1126 keep, unchanged)
+    assert "about the phone, just the browser" in reply
+
+
+@pytest.mark.asyncio
+async def test_new_at_question_stage_consumed_with_notice(tmp_path):
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch new features should include reminders")
+    assert reply.startswith("Heads-up:")
+    assert "no new project was created" in reply.lower()
+    assert "/dispatch approve" in reply
+
+
+@pytest.mark.asyncio
+async def test_approve_adjacent_prose_at_question_stage_gets_notice(tmp_path):
+    # "approved …" parses as a plain run goal — the approve-adjacent form.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch approved, keep it simple and save my data")
+    assert reply.startswith("Heads-up: there was no plan to approve yet")
+    assert "/dispatch approve" in reply
+
+
+@pytest.mark.asyncio
+async def test_bare_approve_at_question_stage_says_no_plan_yet(tmp_path):
+    # `/dispatch approve` carries no text (the parser drops trailing words), so nothing
+    # is consumed — the reply leads with the honest state and re-asks; the question
+    # stays parked. Routing is unchanged: this never reaches _approve.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch approve")
+    assert "no plan to approve yet" in reply.lower()
+    assert "didn't catch an answer" in reply.lower()
+    assert coord.pending_requirements_for("s") is not None
+
+
+@pytest.mark.asyncio
+async def test_plain_answer_never_gets_a_verb_notice(tmp_path):
+    # The byte-identity bar for the designed answer shapes: a plain reply and an
+    # explicit `answer <text>` carry NO heads-up line.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch on my laptop, save my stuff")
+    assert not reply.startswith("Heads-up")
+    coord2 = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord2, "s2", "/dispatch todo | a todo app")
+    reply2 = await _send(coord2, "s2", "/dispatch answer on my laptop please")
+    assert not reply2.startswith("Heads-up")
+
+
+@pytest.mark.asyncio
+async def test_bare_digit_answer_deliberately_gets_no_notice(tmp_path):
+    # A lone digit is a plausible REAL answer ("how many habits?" — "5"); a wrong
+    # heads-up would be its own small lie, so `choose` is excluded from the verb set.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch 5")
+    assert not reply.startswith("Heads-up")
+    assert "/dispatch approve" in reply
+
+
+@pytest.mark.asyncio
+async def test_reject_and_status_still_route_as_verbs_at_question_stage(tmp_path):
+    # The protected routing (#1160: do NOT change reject/approve routing; status/stop
+    # keep their read-only meaning): reject cancels — it is never consumed as an answer.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch reject")
+    assert "Cancelled" in reply and not reply.startswith("Heads-up")
+    assert coord.pending_requirements_for("s") is None
+
+
+@pytest.mark.asyncio
+async def test_verb_notice_survives_replan_failure_with_answer_kept(tmp_path):
+    # The notice must ride WHATEVER comes back — including the #1152 answer-kept
+    # failure message — so the consumption is never silent on any branch.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan_flaky(fail_times=1))
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch revise make the tone friendly")
+    assert reply.startswith("Heads-up: there was no plan yet to revise")
+    assert "wasn't lost" in reply.lower()
+    assert coord.pending_requirements_for("s") is not None
+
+
+@pytest.mark.asyncio
+async def test_bare_reserved_verbs_at_question_stage_get_honest_leads(tmp_path):
+    # Review F5: a BARE reserved verb (no text) at the question stage previously got only
+    # the generic nag — the operator's misbelief that a plan exists went uncorrected (the
+    # exact #1160 class). Each bare form now leads with the honest state; the question
+    # stays parked; nothing is consumed.
+    cases = (
+        (DispatchCommand(kind="revise", feedback=""), "no plan to revise yet"),
+        (DispatchCommand(kind="forget", repo=""), "nothing was forgotten"),
+        (DispatchCommand(kind="create", repo="", goal=""), "no new project was created"),
+    )
+    for cmd, expected in cases:
+        coord = _coord(tmp_path, plan_fn=_questioning_plan())
+        await _send(coord, "s", "/dispatch todo | a todo app")
+        reply = await coord.handle_command("s", cmd)
+        assert expected in reply.lower(), cmd.kind
+        assert "didn't catch an answer" in reply.lower(), cmd.kind
+        assert coord.pending_requirements_for("s") is not None, cmd.kind
+
+
+@pytest.mark.asyncio
+async def test_plain_empty_answer_keeps_the_bare_nag(tmp_path):
+    # The F5 byte-identity bar: an empty answer with NO verb (a blank `answer`) keeps
+    # the generic nag alone — no state-correction lead it has no basis for.
+    coord = _coord(tmp_path, plan_fn=_questioning_plan())
+    await _send(coord, "s", "/dispatch todo | a todo app")
+    reply = await _send(coord, "s", "/dispatch answer   ")
+    assert reply.lower().startswith("i didn't catch an answer")

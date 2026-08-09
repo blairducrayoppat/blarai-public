@@ -3056,3 +3056,196 @@ variance beyond the runs stated.
 three raw arm artifacts inline). Prior in this chain: `gemma4-instrument-probe-2026-07-22.json`
 (the model runs at all — GPU correct, CPU corrupt), `gemma4-vs-qwen3vl-headtohead-2026-07-22.md`
 (vision, closed).
+
+## 2026-07-29 — The coverage gate's worst case, timed cold at its own ceremony: 195.5 s of a 720 s budget (#1069)
+
+**What ran.** The batched S3 go-live ceremony's timed demo — the S3-F review-F8 re-measurement.
+One real `/dispatch` PLAN through the production corridor (gateway → mTLS → live AO), the FIRST
+plan after a fresh boot (14B newly resident, prefix caches cold), against a goal staged to leave
+an orphan part: a python markdown converter plus a hand-made ASCII banner file no exam can
+import-test. That forces the full worst-case sequence: single-pass criteria+assumptions (S3-E),
+decomposition, job-oracle authoring + QA, coverage measurement finding the gap, ONE bounded exam
+re-authoring repair (S3-F), re-measurement with the gap honestly surviving, blocked-card render.
+
+**Measured.** Cold worst-case PLAN: **195.5 s** — 27% of the 720 s `PLAN_RESPONSE_TIMEOUT_S`
+budget. The gap-dropping revise that re-opened approve: 1.7 s (deterministic re-measurement, no
+authoring). The refused approve-while-blocked: instant. Hardware/model/method in
+`docs/performance/coverage_gate_cold_plan_timing_2026-07-29.json`.
+
+**Reading.** The 720 s budget was a 2026-07-28 raise (#1152, `ee09901a`) made under a WRONG
+timeout diagnosis and kept as harmless-but-unjustified; the register row asked that it never be
+cited as validated headroom. It now has one measured shape under it: the coverage gate's repair
+round, cold, fits in under a third of the budget — and would have fit the pre-raise 480 s budget
+with 2.4× headroom. The raise remains unjustified by any measured need; it is no longer
+unmeasured.
+
+**NOT measured (named).** Warm-cache timing for the SAME repair-round shape (the demo re-run's
+77.3 s warm plan was a different, gap-free goal — not comparable); run-to-run variance (n=1 by
+design — the cold slot exists once per boot); the #1152-era 8-task plan shapes; PLAN timing under
+GPU contention from a concurrent standing-gate run.
+
+## 2026-07-31 — The exam's discrimination, timed on a real deliverable: 350.5 s per GREEN against a 300 s budget (#1195 item 3)
+
+**What ran.** The oracle-mutation audit over the operator's own banked B2 text-stats GREEN
+(`20260730-140411-bd`, four modules, 38 mutation sites, 20 planned mutants), driven through the
+real battery-close entry point with the real grade-parity runner
+(`uv run --no-project --with pytest==9.1.1 --with hypothesis==6.155.7 python -m pytest -q`). The
+runner was deliberately NOT substituted: a sibling test on this module injects
+`sys.executable -m pytest`, which costs 0.9 s where the pinned command costs ~5.67 s, and the
+attribution this change adds is parsed out of what the PINNED runner prints.
+
+**Measured.** At the shipped 300 s per-job budget the audit reported **17/19, status `run`** — a
+complete-looking audit that had silently dropped one planned mutant. Re-run with a 1800 s budget
+it reported **17/20 in 350.5 s**, reproducing the operator's original 2026-07-30 figure exactly
+(which also confirms attribution changes no mutation outcome). Hardware, toolchain versions and
+method in `docs/performance/oracle_mutation_attribution_cost_2026-07-31.json`.
+
+**Reading.** The module's own docstring estimated ~2 minutes per GREEN from a two-function
+fixture and named "cost against a real battery deliverable" as not measured. It is now measured:
+**350.5 s, 3.1× the estimate, and above the 300 s per-job budget.** A four-GREEN night needs
+~1402 s against a 900 s stage cap, so on a real night the later GREENs are stamped
+`skipped-battery-budget` and reach no L4 rung at all. The budget squeeze is worse than slow: the
+loop's checks pass on a positive-but-tiny remaining, the squeezed mutant times out into an
+uncounted machinery miss, and the stamp still reads `run` rather than `partial-budget`. The
+denominator shrinks and the score does not — 17/19 instead of 17/20 — so the squeeze flatters.
+Both are #1195 item 2's constants and are ticketed rather than retuned here; picking a budget is
+a trade against night wall-clock, not a defect with one right answer.
+
+**What attribution bought.** The same run went from `L4 not measured` to `L4 killed:3 survived:0
+unmeasured:3`, and the whole-file 17/20 turned out to be hiding two things. One survivor
+(`early_return app/word_frequencies.py:27`) sits in `word_frequencies_from_text`, a function no
+test imports — not a weakness in the frequency exam at all. The other two sit in
+`neighbor_pairs`, which *simultaneously* earned the rung through its own test. Earning L4 and
+having a blind spot are not exclusive, which is why surviving loci are now reported per criterion
+whatever level it reached.
+
+**NOT measured (named).** Run-to-run variance (n=1 per configuration, both sharing the CPU with
+other agents; the squeeze is inferred from the generous-budget re-run recovering the 20th mutant,
+not from instrumenting the per-mutant timeout). Cost on trees larger than four modules or wider
+than the 10-target cap. Whether the 5.67 s per-invocation figure holds under that concurrent
+load — only the end-to-end 350.5 s was timed. Node exams (no host `.js` mutation runner, #830).
+Attribution against a real deliverable whose repo pytest config suppresses the failure summary:
+the suppression itself was measured directly (`addopts = -rN --tb=no` removes both the short
+summary and the traceback, so the parser names nobody) and is locked, but no banked deliverable
+carried such a config.
+
+## 2026-08-06 — Three hours of coder fleet, two deliveries, and a budget that never had room for the third task (#1286, #1299)
+
+**What ran.** The B5 habit-tracking card through the coder fleet, launched 17:09:57 local from a
+side campaign config (`pass_banking_frozen: true`) so it could bank nothing against the default
+campaign — the run existed to verify #1289's declared behaviour-contract mechanism, not to earn a
+pass. Qwen3-Coder-30B via OpenVINO Model Server, the resident 14B evicted for the duration and
+restored afterwards. Fresh sandbox, plan-graph mode, pinned driver tree per #1181 (BlarAI
+`85677aeb`, clean, on main; driver `8a919835`).
+
+**Measured.** Wall clock **11,062.4 s against a 10,800 s budget — 102.4%**, outcome TIMEOUT,
+verdict STALLED, attribution HARNESS, failure class HARNESS-BUDGET. Per task:
+
+| task | wall clock | outcome |
+|---|---|---|
+| `create-habit-model` | 5,179 s | delivered |
+| `create-habit-tracking` | 4,224 s | delivered |
+| `calculate-streaks-and-success-rate` | 1,419 s | TIMEOUT, parked |
+
+Both wave integration gates PASSED. Four downstream tasks were skipped on the parked dependency.
+GPU headroom at load: 23.3 GiB free against 15 GiB required. Restore was clean — OVMS confirmed
+stopped, backend-ready probe verified-ready after 22.0 s.
+
+**Reading — the budget was already spent before the third task started.** The two delivered tasks
+consumed 9,403 s, leaving **1,397 s** for a task whose two predecessors had averaged 4,702 s. The
+third task was not slow; it was dispatched into a window roughly a third the size of what the same
+card's tasks had just demonstrated they need. The timeout is real and the HARNESS-BUDGET label is
+correct here, but calling it a *budget* failure invites the reading that the work overran. It did
+not overrun — it was started without room, and the run's own first two measurements were sufficient
+to predict that at 19:50:56.
+
+This is the second B5 attempt today to end without completing, and it is #1286's grain problem
+measured on a second card rather than argued. A third run chasing the same card through the same
+budget would be a third measurement of the same wall.
+
+**The taxonomy point, which is the more useful finding.** Today produced two runs bearing the
+identical `HARNESS-BUDGET` label — one at **49%** of its budget and this one at **102%**. Same
+word, opposite facts, hours apart. A reader of the taxonomy cannot tell "ran out of time" from
+"stopped early and got filed under time," and #1286 reasons from that taxonomy. Banked on #1299,
+which now has two data points instead of one.
+
+**What the run was actually for, and it worked.** #1289's clause 1 and clause 2 are both now
+OBSERVED rather than argued. The plan wrote `blarai-smoke.json`; the exam sat byte-unchanged for
+three hours while the candidate held write access to its directory; and the capture returned a
+GRADED verdict quoting the declared selector — `SMOKE_HONOURED`, `behaviorHard` true, the finding
+built from `spec.expectDelta` and `spec.actionLabel` verbatim. The heuristic path emits different
+words under a different label, so the strings are not interchangeable and the observation is
+unambiguous. Derivation on #1289 c.2836.
+
+It graded a genuine failure: the declared result region did not change when the declared primary
+control was used. Three automatic fix passes then failed — every one to a *coder timeout*, not to
+an inability to fix — and the pipeline kept the prior merged version and reported
+`RESULT: MERGED into your project`. Filed as #1303; the trade-off there is a quality-posture call
+for the Lead Architect, not an implementation choice.
+
+**NOT measured (named).** Model residency at the runner — the scorecard records models as
+`unmeasured-at-runner` and defers to this entry, and this run instrumented no 30B load time, RSS
+delta, or throughput; tokens per second on any task; run-to-run variance (n=1 by construction for a
+battery night); speculative decoding, which the coder path does not use; the third task's true
+duration, so 1,419 s is a floor and not a measurement of that task; whether the three FIX passes
+would have succeeded given a working coder; sustained thermals, power, and NPU utilisation across
+the three hours; and #1289 clause 3, which needs a no-contract plan and no battery night at all.
+
+**Machine-readable:** `docs/performance/b5_coder_fleet_budget_2026-08-06_17-09-57.json`.
+
+---
+
+## 2026-08-08 — Per-task cost of node/web coder tasks, and a 23% figure with its confound attached
+
+*Plain summary: a real four-page website build took about 52 minutes per page once a
+documentation bug was fixed, and 67 minutes before it — but the honest part of that
+comparison is the defect count, not the minutes.*
+
+The first measured per-task figures for node/web work since B3's campaign run gave the wide
+"40–85 minutes EACH" that B9's eight-hour budget was extrapolated from. This is a real
+operator dispatch (`20260808-104536-bd`), not a battery card: the LA typed
+`/dispatch advanced new pottery-studio | …` into the desktop app and approved the plan —
+the first time capability 2's observable has been attempted end to end.
+
+| Task | Wall clock | File-tool denials | Outcome |
+|---|---|---|---|
+| `home-page` | **67.3 min** | **11** | delivered, merged |
+| `pieces-list-page` | **50.2 min** | **0** | delivered, merged |
+| `individual-piece-page` | **53.4 min** | **0** | delivered, merged |
+| `contact-page` | — | 0 | **PARKED** at ~8 min |
+
+Hardware: Intel Core Ultra 7 258V, Arc 140V, 31.323 GB. Coder: `local/coder-30b`
+(Qwen3-Coder-30B-A3B INT4) served by OVMS on `:8000`, with the resident 14B swapped out for
+each task and swapped back after. Wall clock is the fleet journal's `TASK-START`/`TASK-END`
+pairs, which bracket the entire per-task cycle including the post-merge visual-critique loop.
+
+**The variable between task 1 and task 2 was a single sentence in `AGENTS.md`.** The coder
+was emitting `filePath: "/public/index.html"` — a leading slash, which resolves at the
+filesystem root, lands outside the project, trips a containment rule that has nobody to ask
+in a headless run, and is refused every time. Not one `read`, `write` or `edit` succeeded in
+that attempt; the coder spent 40 steps routing around the denials with `cat`, `cp` and
+`echo`, which its own instructions forbid. Its instructions had never named that path shape.
+Fixed live, mid-run, between the two tasks (#1337).
+
+**What is and is not evidence here.** The denial count — 11 → 0, holding for every later
+task — is exact and directly attributable. **The 15.5 minutes are not.** Task 1 also ran
+three visual-fix cycles, n is 1 per arm, and I changed the file mid-run rather than running a
+controlled pair. A 23% improvement will get quoted, so the confound is written beside it
+rather than left for a later reader to supply. The right claim is "the fix removes a defect
+that cost task 1 seventeen minutes of measurable thrash", not "web tasks got 23% faster".
+
+**For the cadence design (#1322):** nine units at the post-fix rate is ~7.8 h against B9's
+declared 28,800 s. The extrapolated budget is roughly right and has **almost no margin** —
+one task needing a second dispatch attempt exhausts it. That is a real input, and it argues
+B9's budget note should stay marked unconfirmed even after its first complete run.
+
+**What was NOT measured**, and this is the ask that matters most: **MODEL time versus
+HARNESS overhead**, #1322's DECISION 4. These are end-to-end figures only; the split needs
+instrumentation that does not exist. Also unmeasured: GPU utilisation and thermals; why
+`contact-page` parked (the coder was mid-request when OVMS stopped — swap-back race,
+resource event or coder failure is not established); and the cost of a *complete* nine-unit
+product, since five tasks never dispatched. And this is not the B9 card — same shape, same
+stack, different instrument. A strong prior for B9's per-unit cost, not B9's measurement.
+B9 has still never completed a run.
+
+**Machine-readable:** `docs/performance/coder_web_task_cost_2026-08-08.json`.

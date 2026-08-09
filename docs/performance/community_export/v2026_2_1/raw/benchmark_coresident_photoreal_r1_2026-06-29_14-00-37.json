@@ -1,0 +1,89 @@
+{
+  "benchmark": "coresident_14b_pairings",
+  "timestamp": "2026-06-29T14:00:37",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2, iGPU, shared LPDDR5X)",
+    "mem_ceiling_gib": 31.323,
+    "gpu_driver": "32.0.101.8826"
+  },
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "method": "14B loaded once (spec-on, prod config); rate probes capped at 128 new tokens over prompts P2+P3; pp probe pp-v1. Per partner: full 14B suite (gen tok/s, pp tok/s, TTFT) at baseline/partner-idle/contention; peak co-resident system-RAM during a base-1024^2 generate (avail = iGPU mem proxy); partner op time. hires NOT tested (evicts the 14B by design). Intel UT telemetry (vccgt-pwr/ddr-bw/igfx-pstate/pkg-pwr/npu-pwr) merged post-run from the ut.exe wrapper.",
+  "14b_baseline": {
+    "resident_gib": 9.13,
+    "load_s": 21.2,
+    "spec_active": true,
+    "gen_tps": 18.47,
+    "ttft_ms": 510.5,
+    "total_ms": 6290.5,
+    "pp_tps": 648.9,
+    "pp_measured": true,
+    "pp_input_tokens": 970.0,
+    "gen_rates": [
+      18.11,
+      18.36,
+      19.95,
+      18.58
+    ]
+  },
+  "baseline_phase": [
+    1782766873.693,
+    1782766901.395
+  ],
+  "partners": [
+    {
+      "partner": "photoreal",
+      "phases": {
+        "partner_load": [
+          1782766901.395,
+          1782766919.322
+        ],
+        "idle": [
+          1782766919.322,
+          1782766932.089
+        ],
+        "partner_op": [
+          1782766932.089,
+          1782766980.69
+        ],
+        "contention": [
+          1782766983.693,
+          1782767017.881
+        ]
+      },
+      "loaded": true,
+      "load_s": 17.9,
+      "partner_resident_gib": 5.58,
+      "used_with_partner_idle_gib": 24.52,
+      "idle_14b": {
+        "gen_tps": 18.44,
+        "ttft_ms": 524.6,
+        "total_ms": 6276.1,
+        "pp_tps": 9286.0,
+        "pp_measured": true,
+        "pp_input_tokens": 970.0,
+        "gen_rates": [
+          18.85,
+          18.03
+        ]
+      },
+      "partner_op_s": 48.6,
+      "contention_14b": {
+        "gen_tps": 0.12,
+        "tokens": 4,
+        "elapsed_s": 34.2,
+        "n_14b_gens": 1,
+        "ttft_ms": 23489.7,
+        "pp_tps": 0.0,
+        "pp_measured": false,
+        "method": "sustained 15s: 14B back-to-back during continuous partner generation"
+      },
+      "partner_gens_during": 1,
+      "peak_used_gib": 27.05,
+      "headroom_gib": 4.27,
+      "fits": true,
+      "contention_errors": [],
+      "avail_after_unload_gib": 9.08
+    }
+  ]
+}

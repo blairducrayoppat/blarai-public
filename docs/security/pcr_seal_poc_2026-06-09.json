@@ -1,0 +1,24 @@
+{
+  "pcr_index": 23,
+  "verdict": "DEMONSTRATED",
+  "secret_sha256": "5beec94539a8abe41fea58f011f8e7db2aeb4583ecbfa9c5f29e710bf7ec50d3",
+  "pcr23_live": "0000000000000000000000000000000000000000000000000000000000000000",
+  "auth_policy_live": "3c87a4b3fb85ebeea58c5fb36ac22d3f280cec27a9f6dd0fa23be9ce560deec8",
+  "auth_policy_other": "00cee3d64f0edfaed78bc18c487b7716e3903038017cd15a81e27975dd6af21a",
+  "policies_differ": true,
+  "primary_handle": "0x80FFFFFF",
+  "positive_unseal": {
+    "rc": "TPM_RC_SUCCESS",
+    "secret_roundtrip": true,
+    "ok": true
+  },
+  "negative_unseal": {
+    "rc": "TPM_RC_POLICY_FAIL (0x09D)",
+    "refused": true,
+    "ok": true
+  },
+  "pcr_extend_usermode": {
+    "rc": "TPM_E_COMMAND_BLOCKED (0x80280400)",
+    "blocked": true
+  }
+}

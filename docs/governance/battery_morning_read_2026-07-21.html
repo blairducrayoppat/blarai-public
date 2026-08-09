@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morning Read — 2026-07-21 — The First Night You Can Believe</title>
+<style>
+  :root { --ink:#1a1c1e; --sub:#5f6368; --line:#e0e2e6; --good:#0b6e4f; --warn:#a15c07; --bad:#b3261e; --card:#f7f8fa; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: var(--ink); max-width: 46rem; margin: 2.5rem auto; padding: 0 1.25rem; line-height: 1.62; }
+  h1 { font-size: 1.7rem; line-height: 1.25; margin-bottom: .3rem; }
+  h2 { font-size: 1.15rem; margin-top: 2.2rem; border-bottom: 1px solid var(--line); padding-bottom: .3rem; }
+  .sub { color: var(--sub); font-size: .95rem; }
+  .verdict { display: flex; gap: 1rem; margin: 1.4rem 0; flex-wrap: wrap; }
+  .vcard { flex: 1 1 14rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; }
+  .vcard .big { font-size: 1.35rem; font-weight: 700; }
+  .good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .incident { border-left: 4px solid var(--bad); background: #fdf3f2; padding: .9rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  .note { border-left: 4px solid var(--warn); background: #fdf8ef; padding: .9rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; margin: 1rem 0; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: Verdana, sans-serif; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--sub); }
+  code { font-family: Consolas, monospace; font-size: .88em; background: var(--card); padding: .08em .35em; border-radius: 4px; }
+  .foot { color: var(--sub); font-size: .85rem; margin-top: 2.5rem; border-top: 1px solid var(--line); padding-top: .8rem; }
+</style>
+</head>
+<body>
+
+<h1>The first night you can believe</h1>
+<p class="sub">Battery night of 2026-07-20 → 21 · written ~02:15 by the overnight session, from the run's own records · everything below is done and verified unless it says otherwise</p>
+
+<div class="verdict">
+  <div class="vcard"><div class="big good">B2 — GREEN</div>
+  Text-statistics card. Built, integrated, and passed its real acceptance exam in 49 minutes. The independent clean-room check agreed. Zero interventions.</div>
+  <div class="vcard"><div class="big warn">B4 — PARKED, honestly</div>
+  Flashcards card. For the <b>first time on record it built all six of its stages cleanly</b> — and then failed only its exam, which has been broken for seven straight nights. The blame line now correctly points at the exam, not the builder.</div>
+</div>
+
+<h2>What the night proved</h2>
+<p>Both repairs you approved worked on their first live night. The memory admission gate — dead code since the 6th of July — actually ran: it measured the machine short, closed Firefox to free three gigabytes, re-measured, and admitted the night with a written record of how it decided. And the tool-call salvage that had been silently voiding B4's attempts held: B4 went from "produces nothing, nine severed attempts" to completing every build stage. The pass rate did not drop the way we braced for — but the number you are looking at tonight is the first one produced by an instrument that was actually working.</p>
+
+<h2>The exam is now fixed, from tonight onward</h2>
+<p>B4's acceptance exam calls a module it never imports — a one-line authoring error the local model has reproduced byte-for-byte for seven nights, and which its two automatic repair rounds could not fix (they re-emitted the same broken exam unchanged, which settled the design question). I replaced the model-written exam with a hand-authored one, the same approach already proven on two other cards: every build task now owns exactly one module, and the exam imports exactly those modules. A structural test now makes this whole failure class impossible for every authored exam. The trade-off, stated plainly: B4 no longer measures the model's ability to plan its own decomposition — it becomes a pure measure of the coder's ability to build, which is what the six-night confounded record needed most. Expect B4's results to be <i>meaningful</i> from tomorrow's night, not necessarily good.</p>
+
+<div class="incident">
+<b>My error tonight, and what contained it.</b> At what I believed was half past one I killed a healthy build candidate, convinced it had been silent for seventy minutes. The actual time was half past midnight — I had read the clock once at eleven and narrated every timestamp after that from feel, exactly the wrong-clock failure you warned me about at the gate. The harness saved the night: its fallback driver resumed the candidate in place — that machinery's first live proof — and the task finished and merged. Cost: about ten minutes of one candidate's progress. The wrongly-filed fault ticket is corrected and closed, the rule ("never assert a duration you did not measure") is in session memory, and the full narrative is in the journal. This stays in the record because sanitized journals don't compound.</div>
+
+<div class="note">
+<b>One genuine new fault, found and fixed the same hour.</b> After the runner finished perfectly, the night's wrapper script crashed before writing the morning report or banking the pass — a strictness setting leaked in by the admission-gate library turned a previously-harmless empty-list check into a fatal error, and it could only fire on a <i>complete</i> night, so tonight was the first night it could possibly appear. Fixed, verified by both banking test-suites, merged. The morning report was reconstructed by hand from the scorecards, and the night's diagnostic pass was banked (lean counter: 2). Ship record: ticket #1019.</div>
+
+<h2>What shipped while the battery ran</h2>
+<table>
+<tr><th>Ticket</th><th>What it means for you</th><th>Where</th></tr>
+<tr><td>#1013 + #856</td><td><b>The task board no longer lies.</b> Every tool that reads it — including the coordinator's feed — now sees all 974 tasks instead of the oldest 50 per project, and "open tasks" filters actually filter. Sessions started from now on see true numbers.</td><td>devplatform <code>f0e60e6</code>, <code>ca0746f</code></td></tr>
+<tr><td>#1009</td><td>The eval harness no longer fails a run for a case it cannot physically run — <b>your answer-quality ceremony (#1006) is now unblocked</b>.</td><td><code>aea75b55</code></td></tr>
+<tr><td>#1001</td><td>The night-over-night trend is alive again — eleven nights had each been reporting themselves as "night 1". Tomorrow's report should show real deltas for the first time.</td><td><code>f5fabc78</code></td></tr>
+<tr><td>#1008</td><td>B4's hand-authored exam (above).</td><td><code>4b847d20</code></td></tr>
+<tr><td>#1010</td><td>The eval comparison now rejects malformed baseline files loudly instead of crashing or absorbing failures.</td><td><code>284f7b15</code></td></tr>
+<tr><td>#1004</td><td>106 prompt-injection attack templates extracted as local, static red-team material for the Policy Agent — nothing installed, nothing that phones home, licences carried.</td><td><code>18565730</code></td></tr>
+<tr><td>#795</td><td>The retrieval fix you approved: at the depth the assistant actually reads (top-4), hybrid search now ties pure-vector and <b>the two queries that had fallen out of reach returned</b>. Full measurement recorded; the honest caveat — hybrid still trails at rank-1 — is in the log, not hidden.</td><td><code>da9f7b87</code></td></tr>
+</table>
+<p>Every merge was independently reviewed (never by its author), the full test gate ran green on the merged result — <b>8,690 passed, 0 failed, 0 skipped</b> — and every ticket is closed citing its shipping commit. Journal fold + doctrine sync land this hour on the same branch.</p>
+
+<h2>Waiting on you — nothing new is urgent</h2>
+<table>
+<tr><th>Item</th><th>Shape</th></tr>
+<tr><td>#1006 answer-quality ceremony</td><td>Now unblocked by #1009. Ready whenever you want the first live answer-quality measurement since the 7th — the first with working teeth.</td></tr>
+<tr><td>#989 build-hold</td><td>Unchanged from last night: the hold rests on a premise the evidence refuted. Your call, evidence on the ticket.</td></tr>
+<tr><td>#877 Bill Splitter</td><td>Today, daytime — needs you for the first ~15–20 minutes only; must start by ~19:00 to clear tonight's battery.</td></tr>
+<tr><td>B5 rejoin (#969)</td><td>Scheduled to join tonight's battery as the web card per your 07-19 decision — one battery-path change per night; tonight was #1008's.</td></tr>
+</table>
+
+<p class="foot">Sources: <code>agentic-setup/state/battery/night-20260720-230001/</code> (scorecards, admission.json, launcher transcript) · <code>MORNING-REPORT.md</code> (reconstructed, marked as such) · PERFORMANCE_LOG.md 2026-07-21 entry · tickets #1008/#1009/#1013/#1015/#1016/#1019/#1020 · gate: 8690/0/0/125 on <code>da9f7b87</code>+cluster. Terms: "guest oracle" = the independent clean-room re-check inside the isolated virtual machine; "PARKED-HONEST" = the run stopped and said so truthfully rather than claiming success.</p>
+
+</body>
+</html>

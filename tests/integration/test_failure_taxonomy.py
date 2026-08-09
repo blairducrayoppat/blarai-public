@@ -286,10 +286,187 @@ def test_blind_fix_outranks_decompose_downgrade():
     assert ftax.classify_scorecard(sc, runs_dir=None)[0] == ftax.CLASS_BLIND_FIX_LOOP
 
 
-def test_harness_attribution_routes_to_harness_budget():
+def test_harness_attribution_alone_is_environment_not_budget():
+    """#1324 — THIS TEST PREVIOUSLY ASSERTED THE DEFECT.
+
+    It read ``... == CLASS_HARNESS_BUDGET`` and passed, because the rule returned BUDGET on
+    the HARNESS attribution alone while reading neither elapsed nor budget. The test did not
+    fail to catch the bug; it recorded the bug as the contract, which is why three green
+    sweeps never questioned it. A baseline is evidence, and this one was wrong.
+
+    A HARNESS fault with NO budget evidence is an environment fault. Saying otherwise
+    invents a cause, and the class counter is what a later session reads as proof that web
+    cards are budget-starved."""
     sc = Scorecard(job_id="B2", verdict="STALLED", attribution="HARNESS",
                    evidence={"oracle_status": "unknown"})
-    assert ftax.classify_scorecard(sc, runs_dir=None)[0] == ftax.CLASS_HARNESS_BUDGET
+    klass, fingerprint = ftax.classify_scorecard(sc, runs_dir=None)
+    assert klass == ftax.CLASS_HARNESS_ENVIRONMENT
+    assert "budget exhaustion NOT established" in fingerprint
+
+
+def test_the_2026_08_07_scorecard_is_not_called_budget_exhaustion():
+    """The real artifact, verbatim: 255.969 s elapsed against a 28,800 s card budget —
+    nine-tenths of one percent — filed as HARNESS-BUDGET. The true cause was the Assistant
+    Orchestrator being shut down mid-run (#1334). The regression lock is the numbers.
+
+    The budget is a STRING here because that is what production writes. The first cut of
+    this fix stamped a float and these tests still passed, because they hand a Scorecard
+    straight to the classifier and never touch the writer that refuses one — see
+    ``test_the_stamped_budget_survives_the_fail_closed_writer`` below, which is the lock
+    that would have caught it."""
+    sc = Scorecard(job_id="B9", verdict="STALLED", attribution="HARNESS",
+                   wall_clock_s=255.969,
+                   evidence={"oracle_status": "unknown", "run_budget_s": "28800.0"})
+    klass, fingerprint = ftax.classify_scorecard(sc, runs_dir=None)
+    assert klass == ftax.CLASS_HARNESS_ENVIRONMENT
+    assert "1%" in fingerprint and "NOT budget exhaustion" in fingerprint
+
+
+def test_the_stamped_budget_survives_the_fail_closed_writer(tmp_path):
+    """#1324 REGRESSION LOCK — this is the test whose absence let a verdict-destroying bug
+    reach review.
+
+    Scorecard evidence is contractually ``{str: str | [str]}``. The first cut of the
+    battery stamp wrote ``run_budget_s`` as a float; ``validate()`` rejected it,
+    ``write_scorecard`` raised, and battery.py's containment handler degraded the card to
+    ``STALLED [HARNESS]`` — so a GREEN B9 would have BANKED AS STALLED, taking the exit
+    code and the pass banking with it. Every card declaring a budget was affected
+    (B2/B3/B4/B9/B10).
+
+    Every other test in this file hands a hand-built Scorecard directly to the classifier
+    and never crosses the writer seam, which is exactly why 45 of them passed on a broken
+    commit. This one crosses it."""
+    from tools.dispatch_harness.scorecard import validate, write_scorecard
+
+    sc = Scorecard(job_id="B9", verdict="GREEN", attribution="", wall_clock_s=1234.5,
+                   evidence={"oracle_status": "passed", "run_budget_s": "28800.0"})
+    assert validate(sc) == [], "the stamped budget must satisfy the evidence contract"
+    out = tmp_path / "B9.scorecard.json"
+    write_scorecard(sc, out)               # fail-closed: raises rather than writing junk
+    assert json.loads(out.read_text(encoding="utf-8"))["evidence"]["run_budget_s"] == "28800.0"
+
+    # THE TOGGLE — a float is REFUSED, so the assertion above proves reachability rather
+    # than an unreachable happy path. Without this, the test could pass on a writer that
+    # accepted anything.
+    bad = Scorecard(job_id="B9", verdict="GREEN", attribution="", wall_clock_s=1234.5,
+                    evidence={"oracle_status": "passed", "run_budget_s": 28800.0})
+    assert validate(bad), "a float budget must be refused, or this lock proves nothing"
+    with pytest.raises(ValueError, match="must be a string, got float"):
+        write_scorecard(bad, tmp_path / "bad.scorecard.json")
+
+
+def test_a_non_finite_budget_is_unmeasured_not_a_ceiling():
+    """NaN fails every comparison, so a bare ``budget <= 0`` admits it and the fingerprint
+    renders 'of nans (nan%)' — a number-shaped non-number in the one place this ticket
+    cannot afford one."""
+    sc = Scorecard(job_id="B2", verdict="STALLED", attribution="HARNESS", wall_clock_s=42.0,
+                   evidence={"oracle_status": "unknown", "run_budget_s": "nan"})
+    klass, fingerprint = ftax.classify_scorecard(sc, runs_dir=None)
+    assert klass == ftax.CLASS_HARNESS_ENVIRONMENT
+    assert "nan%" not in fingerprint and "unmeasured" in fingerprint
+
+
+def test_a_genuinely_exhausted_budget_is_still_called_budget():
+    """The toggle: the class must still FIRE when the claim is true, or the fix would have
+    achieved honesty by never making the claim at all."""
+    sc = Scorecard(job_id="B3", verdict="STALLED", attribution="HARNESS",
+                   wall_clock_s=11000.0,
+                   evidence={"oracle_status": "unknown", "run_budget_s": "10800"})
+    klass, fingerprint = ftax.classify_scorecard(sc, runs_dir=None)
+    assert klass == ftax.CLASS_HARNESS_BUDGET
+    assert "budget exhausted" in fingerprint and "102%" in fingerprint
+
+
+def test_a_kill_marker_is_budget_evidence_without_numbers(tmp_path):
+    """A TIMEOUT/tree-kill describes an actual kill, so it carries the claim even on a
+    scorecard written before run_budget_s existed — and the fingerprint says the budget was
+    unmeasured rather than implying it was checked."""
+    runs_dir = _make_run_dir(tmp_path, "k", {"run-fleet-x.log": "job hit TIMEOUT and was killed\n"})
+    sc = _sc("B3", "STALLED", "HARNESS", {"oracle_status": "unknown"}, "k")
+    klass, fingerprint = ftax.classify_scorecard(sc, runs_dir=runs_dir)
+    assert klass == ftax.CLASS_HARNESS_BUDGET
+    assert "budget unmeasured" in fingerprint
+
+
+def test_routine_budget_bookkeeping_in_the_log_is_not_a_kill(tmp_path):
+    """#1324 — the launcher prints a budget-coherence block on EVERY run. The old pattern
+    ``run[_ ]budget|swap_run_budget`` matched that ordinary furniture and reported
+    "run-budget kill", so a healthy log alone could manufacture the label. A pattern that
+    matches the log's own boilerplate is not evidence."""
+    runs_dir = _make_run_dir(tmp_path, "b", {"run-fleet-x.log":
+        "budget-coherence: default swap_run_budget_s = 10,800s\n"
+        "budget-coherence: [PASS] the live battery budget hierarchy is COHERENT\n"})
+    sc = _sc("B2", "STALLED", "HARNESS", {"oracle_status": "unknown"}, "b")
+    assert ftax.classify_scorecard(sc, runs_dir=runs_dir)[0] == ftax.CLASS_HARNESS_ENVIRONMENT
+
+
+def test_dashboard_class_order_matches_the_taxonomy():
+    """The dashboard reader keeps a LITERAL copy of FAILURE_CLASSES because it is loaded as
+    a script from scripts/, where tools/ is not reliably importable. A copy nobody checks is
+    a copy that drifts: #1324 added HARNESS-ENVIRONMENT and the dashboard would silently
+    have dropped that column, showing a complete-looking taxonomy that omitted a class.
+    This is the structural control for that, so the duplication is a stated trade-off rather
+    than an accident."""
+    import ast
+
+    reader = Path(__file__).resolve().parents[2] / "scripts" / "live_proof" / "battery_reader.py"
+    # PARSED, not imported: importing a script module for one constant drags in its whole
+    # import graph and its dataclasses, and a test that fails for an unrelated import is a
+    # test nobody trusts. The literal is the thing under test, so read the literal.
+    found = None
+    for node in ast.walk(ast.parse(reader.read_text(encoding="utf-8"))):
+        target = getattr(node, "target", None)
+        if isinstance(node, ast.AnnAssign) and getattr(target, "id", "") == "FAILURE_CLASS_ORDER":
+            found = ast.literal_eval(node.value)
+            break
+    assert found is not None, f"FAILURE_CLASS_ORDER not found in {reader}"
+    assert tuple(found) == tuple(ftax.FAILURE_CLASSES), (
+        "scripts/live_proof/battery_reader.py:FAILURE_CLASS_ORDER has drifted from "
+        "failure_taxonomy.FAILURE_CLASSES - update BOTH when adding a class"
+    )
+
+
+def test_a_harness_attributed_card_never_leaks_to_unclassified():
+    """For ``attribution == HARNESS`` the two classes must cover exactly what the single old
+    class did. UNCLASSIFIED is the taxonomy's own health metric — a rising share is the
+    signal that a NEW leak class exists — so inflating it corrupts the instrument.
+
+    Named for what it actually proves. Its predecessor was called
+    ``test_the_split_moves_nothing_to_unclassified``, which claimed more than it checked:
+    every case was HARNESS-attributed, and on that branch ``_rule_harness_environment``
+    returns a non-empty fingerprint unconditionally, so the assertion could not fail. The
+    case it did NOT cover is pinned separately below."""
+    for evidence in ({"oracle_status": "unknown"},
+                     {"oracle_status": "unknown", "run_budget_s": "28800.0"},
+                     {"oracle_status": "unknown", "run_budget_s": "0"},
+                     {"oracle_status": "unknown", "run_budget_s": "-5"},
+                     {"oracle_status": "unknown", "run_budget_s": "abc"},
+                     {}):
+        sc = Scorecard(job_id="B2", verdict="STALLED", attribution="HARNESS",
+                       wall_clock_s=42.0, evidence=dict(evidence))
+        assert ftax.classify_scorecard(sc, runs_dir=None)[0] in (
+            ftax.CLASS_HARNESS_BUDGET, ftax.CLASS_HARNESS_ENVIRONMENT)
+
+
+def test_a_non_harness_card_mentioning_a_budget_is_now_unclassified(tmp_path):
+    """#1324 — the coverage change the split DOES make, pinned so it is a decision rather
+    than a surprise.
+
+    The old rule could reach HARNESS-BUDGET for a NON-HARNESS card whose log matched
+    ``run[_ ]budget|swap_run_budget``. That pattern matched the launcher's routine
+    budget-coherence block — the log's own furniture — so a build failure whose log merely
+    mentioned a budget was labelled a budget kill. The pattern is deleted, so such a card
+    now falls THROUGH the harness rules; with no other fingerprint it lands in UNCLASSIFIED (a flat-mode card would reach DECOMPOSE-DOWNGRADE first).
+
+    That is the right answer: "no known fingerprint matched" is true, and a confidently
+    wrong class is worse than an honest residue. Reach today is nil (no file under
+    state/fleet-runs contains ``run_budget``); this test is what makes it visible if that
+    changes."""
+    runs_dir = _make_run_dir(tmp_path, "n", {"run-fleet-x.log":
+        "budget-coherence: default swap_run_budget_s = 10,800s\n"
+        "budget-coherence: [PASS] the live battery budget hierarchy is COHERENT\n"})
+    sc = _sc("B2", "PARKED-HONEST", "BUILD", {"oracle_status": "failed"}, "n")
+    assert ftax.classify_scorecard(sc, runs_dir=runs_dir)[0] == ftax.CLASS_UNCLASSIFIED
 
 
 def test_coder_idle_is_not_harness_it_is_residue(tmp_path):

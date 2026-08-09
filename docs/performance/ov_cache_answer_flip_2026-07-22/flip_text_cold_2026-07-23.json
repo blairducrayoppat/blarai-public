@@ -1,0 +1,72 @@
+{
+  "label": "cold",
+  "model": "openvino-int4-gpu",
+  "cache_dir": "C:\\Users\\mrbla\\AppData\\Local\\Temp\\claude\\C--Users-mrbla-builds-genai-pr4139\\d78b5843-8694-4ce1-86dc-9520cca74719\\scratchpad\\flip_cache",
+  "cache_gb_before": 0.0,
+  "n_reps": 3,
+  "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "baseline_inuse_gb": 6.081,
+  "load_seconds": 52.06,
+  "peak_inuse_gb": 24.36,
+  "generations": [
+    {
+      "prompt_id": "bat_ball",
+      "rep": 0,
+      "sha256": "d28425dd8d5baba6",
+      "text": "<think>\nOkay, let's see. There's this problem about a bat and a ball costing $1.10 together. The bat is $1.00 more than the ball. Hmm, I need to figure out how much the ball costs. Alright, let me break it down.\n\nFirst, let me try to assign variables. Let's say the cost of the ball is some amount, maybe 'x' dollars. Then the bat is $1.00 more than the ball, so the bat would be 'x + 1.00' dollars. Together, they add up to $1.10. So, the equation should be:\n\nBall cost + Bat cost = Total cost\nx + (x + 1.00) = 1.10\n\nLet me write that out:\n\nx + x + 1.00 = 1.10\n\nCombine like terms:\n\n2x + 1.00 = 1"
+    },
+    {
+      "prompt_id": "bat_ball",
+      "rep": 1,
+      "sha256": "d28425dd8d5baba6",
+      "text": "<think>\nOkay, let's see. There's this problem about a bat and a ball costing $1.10 together. The bat is $1.00 more than the ball. Hmm, I need to figure out how much the ball costs. Alright, let me break it down.\n\nFirst, let me try to assign variables. Let's say the cost of the ball is some amount, maybe 'x' dollars. Then the bat is $1.00 more than the ball, so the bat would be 'x + 1.00' dollars. Together, they add up to $1.10. So, the equation should be:\n\nBall cost + Bat cost = Total cost\nx + (x + 1.00) = 1.10\n\nLet me write that out:\n\nx + x + 1.00 = 1.10\n\nCombine like terms:\n\n2x + 1.00 = 1"
+    },
+    {
+      "prompt_id": "bat_ball",
+      "rep": 2,
+      "sha256": "d28425dd8d5baba6",
+      "text": "<think>\nOkay, let's see. There's this problem about a bat and a ball costing $1.10 together. The bat is $1.00 more than the ball. Hmm, I need to figure out how much the ball costs. Alright, let me break it down.\n\nFirst, let me try to assign variables. Let's say the cost of the ball is some amount, maybe 'x' dollars. Then the bat is $1.00 more than the ball, so the bat would be 'x + 1.00' dollars. Together, they add up to $1.10. So, the equation should be:\n\nBall cost + Bat cost = Total cost\nx + (x + 1.00) = 1.10\n\nLet me write that out:\n\nx + x + 1.00 = 1.10\n\nCombine like terms:\n\n2x + 1.00 = 1"
+    },
+    {
+      "prompt_id": "kilobyte",
+      "rep": 0,
+      "sha256": "6dad0f91e596ef1e",
+      "text": "<think>\nOkay, so the user is asking how many bytes are in one kilobyte. Hmm, I remember that in computing, the terms kilobyte, megabyte, etc., can sometimes be a bit confusing because there are different standards. Let me think.\n\nFirst, the standard SI prefix for kilo is 10^3, which is 1000. So, a kilobyte should be 1000 bytes. But wait, I also recall that in computing, especially with binary systems, sometimes they use 1024 because that's 2^10. So, there's a difference between the decimal-based SI units and the binary-based units.\n\nThe user might be confused between these two. For example, in some contexts, like hard drive manufacturers, they use 1000 bytes per kilobyte, but in computer memory or data transfer rates, they might use 1024. However, the question is"
+    },
+    {
+      "prompt_id": "kilobyte",
+      "rep": 1,
+      "sha256": "6dad0f91e596ef1e",
+      "text": "<think>\nOkay, so the user is asking how many bytes are in one kilobyte. Hmm, I remember that in computing, the terms kilobyte, megabyte, etc., can sometimes be a bit confusing because there are different standards. Let me think.\n\nFirst, the standard SI prefix for kilo is 10^3, which is 1000. So, a kilobyte should be 1000 bytes. But wait, I also recall that in computing, especially with binary systems, sometimes they use 1024 because that's 2^10. So, there's a difference between the decimal-based SI units and the binary-based units.\n\nThe user might be confused between these two. For example, in some contexts, like hard drive manufacturers, they use 1000 bytes per kilobyte, but in computer memory or data transfer rates, they might use 1024. However, the question is"
+    },
+    {
+      "prompt_id": "kilobyte",
+      "rep": 2,
+      "sha256": "6dad0f91e596ef1e",
+      "text": "<think>\nOkay, so the user is asking how many bytes are in one kilobyte. Hmm, I remember that in computing, the terms kilobyte, megabyte, etc., can sometimes be a bit confusing because there are different standards. Let me think.\n\nFirst, the standard SI prefix for kilo is 10^3, which is 1000. So, a kilobyte should be 1000 bytes. But wait, I also recall that in computing, especially with binary systems, sometimes they use 1024 because that's 2^10. So, there's a difference between the decimal-based SI units and the binary-based units.\n\nThe user might be confused between these two. For example, in some contexts, like hard drive manufacturers, they use 1000 bytes per kilobyte, but in computer memory or data transfer rates, they might use 1024. However, the question is"
+    },
+    {
+      "prompt_id": "is_prime",
+      "rep": 0,
+      "sha256": "32cd9ba2b23dee48",
+      "text": "<think>\nOkay, I need to write a Python function called is_prime(n) that returns True if n is a prime number. Let me think about how to approach this.\n\nFirst, what's a prime number? A prime is a number greater than 1 that has no divisors other than 1 and itself. So numbers like 2, 3, 5, 7, etc. But 1 is not considered prime. So the function should return False for n <= 1.\n\nSo the first check: if n is less than 2, return False.\n\nThen, for numbers 2 and up. For a number n, I need to check if any number from 2 up to sqrt(n) divides it. If any of them do, then it's not prime. Otherwise, it is.\n\nWait, why sqrt(n)? Because if n has a factor larger than its square root, the corresponding divisor would be smaller than the square root. So checking up to sqrt"
+    },
+    {
+      "prompt_id": "is_prime",
+      "rep": 1,
+      "sha256": "e52aa694332a7f51",
+      "text": "<think>\nOkay, I need to write a Python function called is_prime(n) that returns True if n is a prime number. Let me think about how to approach this.\n\nFirst, what's a prime number? A prime is a number greater than 1 that has no divisors other than 1 and itself. So numbers like 2, 3, 5, 7, etc. But 1 is not considered prime. So the function should return False for n <= 1.\n\nSo the first check: if n is less than 2, return False.\n\nThen, for numbers 2 and up. For a number n, I need to check if any number from 2 up to sqrt(n) divides it. If any of them do, then it's not prime. Otherwise, it is.\n\nWait, right. Because if n has a factor larger than its square root, the corresponding divisor would be smaller than the square root. So checking up to sqrt(n)"
+    },
+    {
+      "prompt_id": "is_prime",
+      "rep": 2,
+      "sha256": "e52aa694332a7f51",
+      "text": "<think>\nOkay, I need to write a Python function called is_prime(n) that returns True if n is a prime number. Let me think about how to approach this.\n\nFirst, what's a prime number? A prime is a number greater than 1 that has no divisors other than 1 and itself. So numbers like 2, 3, 5, 7, etc. But 1 is not considered prime. So the function should return False for n <= 1.\n\nSo the first check: if n is less than 2, return False.\n\nThen, for numbers 2 and up. For a number n, I need to check if any number from 2 up to sqrt(n) divides it. If any of them do, then it's not prime. Otherwise, it is.\n\nWait, right. Because if n has a factor larger than its square root, the corresponding divisor would be smaller than the square root. So checking up to sqrt(n)"
+    }
+  ],
+  "within_arm_deterministic": {
+    "bat_ball": true,
+    "kilobyte": true,
+    "is_prime": false
+  }
+}

@@ -25,6 +25,10 @@ results are deliberately NOT candidates:
     measurements can't be trusted, so any re-run wants a human look first.
   * ``UNKNOWN`` — unparseable evidence; proposing over evidence we cannot read
     is guesswork, not coordination.
+  * ``REFUSED`` — the dispatch declined to start (#1181a: the scripts pin and the
+    dispatching process disagreed about which code was under test). No task ran,
+    so there is no shortfall to redispatch; re-running it would only re-hit the
+    same refusal until the disagreement itself is resolved.
 
 :data:`RECOGNIZED_RESULTS` pins this contract. Keying on a cross-module string
 literal is correct today and silently wrong after a rename — and a DORMANT limb's
@@ -114,7 +118,7 @@ REDISPATCH_ELIGIBLE_RESULTS: Final[frozenset[str]] = frozenset({"PARKED"})
 #: ``TaskOutcome.result`` values this limb RECOGNIZES and deliberately refuses to
 #: stage for (each reason in the module docstring).
 REDISPATCH_EXCLUDED_RESULTS: Final[frozenset[str]] = frozenset(
-    {"MERGED", "BLOCKED", "NOTHING", "TIMEOUT", "UNKNOWN"}
+    {"MERGED", "BLOCKED", "NOTHING", "TIMEOUT", "UNKNOWN", "REFUSED"}
 )
 
 #: The complete result vocabulary this limb has classified — MUST equal the set

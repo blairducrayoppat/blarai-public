@@ -175,6 +175,32 @@ def test_gpu_gate_waits_for_release_then_proceeds(tmp_path):
     assert res.outcome == "complete" and "load" in calls
 
 
+# ---- (2c) RAM wait-verify gate (#1128 — the gate-abort-instantly defect) --
+
+
+def test_ram_gate_waits_for_headroom_then_proceeds(tmp_path):
+    # #1128: a marginal-RAM night (e.g. right after the wrapper's own real-load probe unloads
+    # the 30B and reboots the 14B) can read short of gate_gb for a bit before the OS finishes
+    # reclaiming pages. The wait-verify gives that room to settle instead of gate-aborting on
+    # the very first snapshot — this is the exact fix for last night's B2/B4 STALL.
+    calls = []
+    seq = iter([18.0, 18.0, 21.0])  # short, short, then clears the 21.0 test gate
+    ops = _ops(calls, available_gb=lambda: next(seq))
+    res = _driver(tmp_path, ops, ram_gate_timeout_s=60.0, ram_gate_poll_s=1.0).run()
+    assert res.outcome == "complete" and "load" in calls
+
+
+def test_ram_gate_aborts_when_never_clears_within_window(tmp_path):
+    # Still fail-closed: RAM that never recovers within the bounded window gate-aborts exactly
+    # as before — the fix adds patience, not a weaker floor.
+    calls = []
+    ops = _ops(calls, available_gb=lambda: 18.0)  # never clears the 21.0 test gate
+    res = _driver(tmp_path, ops, ram_gate_timeout_s=5.0, ram_gate_poll_s=1.0).run()
+    assert res.outcome == "gate-abort" and not res.loaded_30b
+    assert "load" not in calls
+    assert calls == ["disarm", "stop", "restart"]             # never-zero restore
+
+
 # ---- progress trail (restart-surviving, #670) -----------------------------
 
 
@@ -626,7 +652,7 @@ def test_design_phase_iterates_and_feeds_feedback_back(tmp_path):
          "layout_hard": False, "capture_tier": "web"},
     ])
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         captured["design"].append((app_dir, goal, vcj))
         calls.append("critique")
         return next(seq)
@@ -662,7 +688,7 @@ def test_design_phase_stops_when_no_iterate(tmp_path):
     # First critique says it's fine -> NO fix lap, NO reload; one pass only.
     calls = []
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         calls.append("critique")
         return {"should_iterate": False, "needs_work": False, "feedback": "ok",
                 "layout_hard": False, "capture_tier": "web"}
@@ -678,7 +704,7 @@ def test_design_phase_stops_at_iteration_cap(tmp_path):
     # A never-satisfied critic: should_iterate stays True -> bounded by max_design_iterations.
     calls = []
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         calls.append("critique")
         return {"should_iterate": True, "needs_work": True, "feedback": "still off",
                 "layout_hard": False, "capture_tier": "web"}
@@ -695,7 +721,7 @@ def test_design_phase_fail_soft_on_fix_run_task_raise(tmp_path):
     # completes and the 14B is restored (NEVER-ZERO). The exception does NOT propagate.
     calls = []
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         calls.append("critique")
         return {"should_iterate": True, "needs_work": True, "feedback": "fix it",
                 "layout_hard": False, "capture_tier": "web"}
@@ -723,7 +749,7 @@ def test_design_phase_breaks_when_reload_fails(tmp_path):
         calls.append("load")
         return loads["n"] == 1          # the CODE-loop load succeeds; the fix reload fails
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         calls.append("critique")
         return {"should_iterate": True, "needs_work": True, "feedback": "fix it",
                 "layout_hard": False, "capture_tier": "web"}
@@ -739,7 +765,7 @@ def test_design_phase_skipped_for_command_line(tmp_path):
     calls = []
     design_calls = []
     cli_task = {**_WEB_TASK, "surface": "command-line"}
-    res = _driver(tmp_path, _ops(calls, run_design_loop=lambda a, g, v: design_calls.append(1)),
+    res = _driver(tmp_path, _ops(calls, run_design_loop=lambda a, g, v, s="": design_calls.append(1)),
                   tasks=[cli_task]).run()
     assert design_calls == []                # non-visual surface -> never critiqued
     assert res.design_signal is None
@@ -750,7 +776,7 @@ def test_design_phase_skipped_for_empty_visual_criteria(tmp_path):
     calls = []
     design_calls = []
     no_criteria = {**_WEB_TASK, "visual_criteria_json": "[]"}
-    res = _driver(tmp_path, _ops(calls, run_design_loop=lambda a, g, v: design_calls.append(1)),
+    res = _driver(tmp_path, _ops(calls, run_design_loop=lambda a, g, v, s="": design_calls.append(1)),
                   tasks=[no_criteria]).run()
     assert design_calls == []                # "[]" -> nothing to judge -> skipped
     assert res.design_signal is None
@@ -766,7 +792,7 @@ def test_design_phase_skipped_when_nothing_merged(tmp_path):
                            detail="not merged")
 
     res = _driver(tmp_path, _ops(calls, run_task=parked,
-                                 run_design_loop=lambda a, g, v: design_calls.append(1)),
+                                 run_design_loop=lambda a, g, v, s="": design_calls.append(1)),
                   tasks=[_WEB_TASK]).run()
     assert design_calls == []                # no MERGED code -> nothing built to review
     assert res.design_signal is None
@@ -784,7 +810,7 @@ def test_design_phase_skipped_when_cancel_requested(tmp_path):
         return state["n"] > 1            # False for the per-task check; True at the design check
 
     res = _driver(tmp_path, _ops(calls, cancel_requested=cancel,
-                                 run_design_loop=lambda a, g, v: design_calls.append(1)),
+                                 run_design_loop=lambda a, g, v, s="": design_calls.append(1)),
                   tasks=[_WEB_TASK]).run()
     assert res.outcome == "complete"         # the CODE loop did not cancel
     assert design_calls == []                # the design phase was skipped by the cancel guard
@@ -796,7 +822,7 @@ def test_design_progress_is_suggestion_not_verdict(tmp_path):
     # verdict — the operator's eyeball decides. It leads with the hard layout finding.
     progress = []
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         return {"should_iterate": False, "needs_work": True, "feedback": "tighten the spacing",
                 "layout_hard": True, "capture_tier": "web"}
 
@@ -1098,7 +1124,7 @@ def test_critic_phase_fires_before_design_phase(tmp_path):
         calls.append("critic")
         return {"should_iterate": False, "verdict": "MERGE", "findings": ""}
 
-    def design(app_dir, goal, vcj):
+    def design(app_dir, goal, vcj, surface=""):
         calls.append("design")
         return {"should_iterate": False, "needs_work": False,
                 "feedback": "", "layout_hard": False, "capture_tier": ""}

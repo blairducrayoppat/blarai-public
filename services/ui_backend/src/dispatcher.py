@@ -60,7 +60,38 @@ _PROMPT_STREAM_FAILSAFE_S: float = 90.0
 # chat turn (~100 s), so the imagine interception gets its OWN, longer fail-safe —
 # kept just under the 180 s per-socket receive cap (PROMPT_RESPONSE_TIMEOUT_S) so
 # the result still arrives before the socket closes.
+# SCOPE (#1122): this bounds THE IMAGINE INTERCEPTION ONLY. It used to bound the
+# /dispatch interception too, which capped a 480 s plan budget at 175 s — see
+# _DISPATCH_STREAM_FAILSAFE_S below. Do not reuse it for a third surface without
+# checking that surface's own inner budget.
 _IMAGINE_STREAM_FAILSAFE_S: float = 175.0
+
+# /dispatch PLAN is ~6-7 chained 14B generations (decompose -> criteria -> ruler ->
+# oracle -> …), and for a new project it also does a git init + first commit before
+# any of that. Its inner budget is the gateway's PLAN_RESPONSE_TIMEOUT_S = 720 s
+# (raised 180 -> 480 by #766, then 480 -> 720 by #1152 — both times because a cold
+# PLAN legitimately exceeds the prior budget).
+#
+# THE INVARIANT (#1122): an outer fail-safe must DOMINATE the inner budget it wraps.
+# A wrapper shorter than what it wraps does not protect the inner budget, it DELETES
+# it — the inner deadline becomes unreachable and the outer one silently becomes the
+# real limit. That is the 2026-07-27 incident: /dispatch was wrapped in the 175 s
+# IMAGINE fail-safe, so the operator's plan was abandoned at 175 s and COMPLETED
+# 28 s later (measured: dispatch interception timed out 18:20:18, generate_plan
+# finished 18:20:46). The work succeeded and was thrown away, and every automated
+# suite missed it because latency scales with goal size — terse battery cards plan
+# well inside 175 s and only a real, detailed operator goal trips it.
+#
+# 780 s = the 720 s inner budget plus the same 60 s headroom #1122 gave the handler's
+# own work (project creation, IPC framing) — moved in lockstep with #1152's PLAN
+# raise so the invariant above keeps holding. Nothing downstream forces a shorter
+# value: the WinUI pipe client sets a CONNECT timeout only and imposes no response
+# deadline (services/ui_winui/Ipc/PipeClient.cs). This is a BACKSTOP, not the
+# operating bound — the inner 720 s fires first and reports honestly; this only
+# catches a handler that never returns at all.
+# Locked by tests/security/test_timeout_ordering.py, which asserts the RELATIONSHIP
+# rather than the values, because a registry of values could not catch this class.
+_DISPATCH_STREAM_FAILSAFE_S: float = 780.0
 
 # Best-effort voice diagnostics log (ADR-017 bring-up). Appended to so a failed
 # transcribe/synthesize leaves a trace even when stderr is not visible.
@@ -101,6 +132,7 @@ class RpcDispatcher:
         voice: Any | None = None,
         prompt_stream_failsafe_s: float | None = None,
         imagine_failsafe_s: float | None = None,
+        dispatch_failsafe_s: float | None = None,
     ) -> None:
         """Initialize the dispatcher.
 
@@ -117,6 +149,10 @@ class RpcDispatcher:
             imagine_failsafe_s: Override the ``_IMAGINE_STREAM_FAILSAFE_S``
                 deadline for the /imagine interception (heavier than a chat turn —
                 hires + 14B eviction). ``None`` uses the module constant.
+            dispatch_failsafe_s: Override the ``_DISPATCH_STREAM_FAILSAFE_S``
+                deadline for the /dispatch interception (#1122 — must dominate the
+                gateway's PLAN_RESPONSE_TIMEOUT_S, or the plan budget becomes
+                unreachable). ``None`` uses the module constant.
         """
         self._gateway = gateway
         self._store = session_store
@@ -130,6 +166,11 @@ class RpcDispatcher:
             imagine_failsafe_s
             if imagine_failsafe_s is not None
             else _IMAGINE_STREAM_FAILSAFE_S
+        )
+        self._dispatch_failsafe_s: float = (
+            dispatch_failsafe_s
+            if dispatch_failsafe_s is not None
+            else _DISPATCH_STREAM_FAILSAFE_S
         )
 
     async def handle(self, request: dict[str, Any], send: SendFn) -> None:
@@ -219,7 +260,22 @@ class RpcDispatcher:
         if self._store is None:
             await send(error_response(rid, "no_store", "Session store unavailable"))
             return
-        deleted = self._store.delete_session(params["session_id"])
+        session_id = params["session_id"]
+        deleted = self._store.delete_session(session_id)
+        # #1136: the transcript is not the only copy. A parked /dispatch holds the goal
+        # text, the operator's typed answers and the whole plan in dispatch_state.db, and
+        # restore_at_boot would faithfully reload it at the next boot for a chat that no
+        # longer exists. getattr-guarded so a gateway without the surface (tests, older
+        # wiring) is unaffected — the same dormant-safe shape handle_dispatch_command uses.
+        forget = getattr(self._gateway, "forget_dispatch_state", None)
+        if deleted and forget is not None:
+            try:
+                forget(session_id)
+            except Exception:  # noqa: BLE001 — cleanup must never fail the deletion
+                logger.exception(
+                    "_m_delete_session: parked-dispatch cleanup failed for session=%s; "
+                    "the transcript IS deleted.", session_id,
+                )
         await send(ok_response(rid, {"deleted": deleted}))
 
     async def _m_rename_session(self, rid: Any, params: dict, send: SendFn) -> None:
@@ -458,13 +514,15 @@ class RpcDispatcher:
             try:
                 disp_text = await asyncio.wait_for(
                     dispatch_handler(session_id, prompt),
-                    timeout=self._imagine_failsafe_s,
+                    # #1122: the DISPATCH fail-safe, not the imagine one. Wraps the
+                    # gateway's PLAN_RESPONSE_TIMEOUT_S — read the value there, not here.
+                    timeout=self._dispatch_failsafe_s,
                 )
             except asyncio.TimeoutError:
                 logger.error(
                     "_m_prompt: dispatch interception timed out after %.0fs "
                     "(session=%s) — emitting failsafe terminal frame",
-                    self._imagine_failsafe_s, session_id,
+                    self._dispatch_failsafe_s, session_id,
                 )
                 await send(stream_frame(rid, "token", {
                     "token": (

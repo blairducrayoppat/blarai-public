@@ -6,10 +6,19 @@ area: governance
 
 # Active sprint — live pointer
 
-**Last refresh (2026-07-19)** · Maintained by: the merging session that changes sprint
+**Last refresh (2026-07-30)** · Maintained by: the merging session that changes sprint
 state — refresh the date line whenever this file's claims change; the doctrine-freshness
 gate (`tests/security/test_doctrine_freshness.py`) fails if this file falls more than two
 weeks behind the repository's latest commit.
+
+> **A date bump is a claim.** This refresh RE-READ every assertion below rather than
+> advancing the stamp — no sprint is running (no `/sprint-kickoff` has opened one),
+> `DEC-11` is present in `docs/DECISION_REGISTER.md`, Vikunja is the live queue, and
+> `docs/sprints/sprint_18/` still holds the five close-out files this file says it does.
+> Stamping "fresh" on something only re-verified-by-assumption is the exact defect the
+> 2026-07-30 instrument arc exists to remove (#1218, where a corpus manifest recorded a
+> download date for artifacts that were merely re-checked). If you cannot re-read the
+> claims, do not move the date.
 
 **Current state: no sprint cadence is running.** The old sprint-paperwork world (design
 visions, completion reports, gap reports, the retired fleet role that maintained this

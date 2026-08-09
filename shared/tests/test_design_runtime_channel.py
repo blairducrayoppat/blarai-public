@@ -148,7 +148,7 @@ def test_design_note_layout_only_unchanged():
 
 
 def _loop_returning(result: dict):
-    def _fn(_app_dir: str, _goal: str, _vcj: str) -> dict:
+    def _fn(_app_dir: str, _goal: str, _vcj: str, _surface: str = "") -> dict:
         return dict(result)
     return _fn
 
@@ -220,7 +220,7 @@ def test_runtime_error_forces_a_fix_lap_then_reclean(tmp_path):
         calls.append(("task", t["task"]))
         return _outcome(t["task"], "MERGED")
 
-    def _loop(_a, _g, _v):
+    def _loop(_a, _g, _v, _s=""):
         i = min(lap_idx["i"], len(laps) - 1)   # clamp: never StopIteration on an over-call
         lap_idx["i"] += 1
         return dict(laps[i])

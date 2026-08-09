@@ -1,0 +1,6 @@
+model,params_b,precision,runtime,config,gen_median_tps,gen_mean_tps,gen_p95_tps,ttft_median_ms,prefill_pp_median_tps,prefill_pp_note,prefill_input_tokens,num_runs,num_warmup,draft_model,notes
+Qwen3-14B,14,INT4,OpenVINO GenAI 2026.1.0,spec-decode off,11.13,10.08,11.89,466.3,1959.5,true prefill rate (config-independent),970,20,2,,
+Qwen3-14B,14,INT4,OpenVINO GenAI 2026.1.0,spec-decode on,17.07,16.05,21.47,470.5,1308.4,backend artifact under speculative ContinuousBatching — cite the spec-off pp as the prefill rate,970,20,2,Qwen3-0.6B-pruned-6L INT8 (GPU),
+Qwen3-8B,8,INT4,OpenVINO GenAI 2026.1.0,spec-decode off,19.79,16.24,21.12,264.3,1967.8,true prefill rate (config-independent),970,20,2,,
+Qwen3-8B,8,INT4,OpenVINO GenAI 2026.1.0,spec-decode on,27.37,21.89,29.73,313.1,1748.1,backend artifact under speculative ContinuousBatching — cite the spec-off pp as the prefill rate,970,20,2,Qwen3-0.6B-pruned-6L INT8 (GPU),
+"Qwen3-Coder-30B-A3B (MoE, ~3B active)",30,INT4,OVMS 2026.2 (continuous batching),single-stream,38.06,34.92,38.79,213.8,480.1,MoE prefill routes every token across all experts (full ~30B compute),421,20,2,,"MoE: fastest decode + TTFT, slowest prefill of the set"

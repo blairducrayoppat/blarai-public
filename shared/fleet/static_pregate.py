@@ -50,6 +50,8 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from shared import procspawn
+
 #: The ONLY ruff rule codes this gate selects — ERROR level: E9 (syntax / parse
 #: errors, surfaced by ruff as ``invalid-syntax``), F821 (undefined name — the
 #: ``convertUnits`` shape), F823 (local variable referenced before assignment).
@@ -362,10 +364,14 @@ def format_fix_prompt(errors: list[dict]) -> str:
 
 def _default_run(cmd: list[str], timeout_s: float, cwd: "str | None" = None) -> tuple:
     """Bounded, no-shell subprocess for the standalone CLI (the driver seam injects the
-    fleet's console-safe ``_safe_run`` instead). Fail-closed: any error → ``(False, …)``."""
+    fleet's console-safe ``_safe_run`` instead). Fail-closed: any error → ``(False, …)``.
+
+    Routed through ``shared.procspawn.hidden_console`` (#774 sub-task 2). Note this is the
+    STANDALONE-CLI default only — production goes through the injected ``_safe_run`` — so it
+    now also gains ``CREATE_NO_WINDOW`` (the CLI previously flashed a console per child) plus
+    the lesson-219 UTF-8/DEVNULL-stdin pins, aligning it with the injected path."""
     try:
-        cp = subprocess.run(  # noqa: S603 — vector argv, no shell
-            cmd, capture_output=True, text=True, timeout=timeout_s, cwd=cwd or None)
+        cp = procspawn.hidden_console(cmd, cwd=cwd or None, timeout_s=timeout_s)
         return (cp.returncode == 0, cp.stdout or "", cp.stderr or "")
     except subprocess.TimeoutExpired:
         return (False, "", f"timed out after {timeout_s:.0f}s")

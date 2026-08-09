@@ -628,13 +628,43 @@ async def test_dry_run_clarifying_question_answered_then_executes(tmp_path):
 
 
 async def test_dry_run_default_clarify_answer_used_when_job_omits(tmp_path):
+    # The repo EXISTS (a marker file): on an empty/new repo the #1161 F3 filter drops
+    # the "On a phone" option, so a 3-option menu needs a non-fresh repo (locked in
+    # shared/tests/test_platform_default.py + the coordinator suite). This test's
+    # subject is the default-answer MAPPING mechanics, so the repo names itself
+    # existing — same re-aim class as the test_acceptance threading tests.
     cfg = _fake_config(tmp_path)
+    repo_dir = cfg.projects_dir / "app"
+    repo_dir.mkdir(parents=True)
+    (repo_dir / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.10)", encoding="utf-8"
+    )
     calls: list = []
     h = _harness(cfg, _plan_fn(_ambiguous_spec), _execute_fn(cfg, calls=calls),
                  default_clarify_answer="3")
     report = await h.run_job(JobSpec(repo="app", goal="an app"))  # no clarify_answer
     assert report.asked_clarifying is True and report.answered == "3"
     assert calls[0]["surface"] == "mobile"       # option 3 == mobile
+
+
+async def test_dry_run_fresh_repo_menu_never_mints_mobile(tmp_path):
+    # #1161 review F3 at the DRY-RUN seam: on a fresh/empty repo the platform menu
+    # carries no phone option, so the same default answer "3" is now OUT OF RANGE —
+    # the coordinator falls back to the un-refined plan (surface coerced "unknown",
+    # today's no-seed path) and the dispatch still completes. The contrapositive is
+    # the lock: were "On a phone" still offered, "3" would mint a mobile build the
+    # corridor's own refusal says cannot exist.
+    cfg = _fake_config(tmp_path)
+    calls: list = []
+    h = _harness(cfg, _plan_fn(_ambiguous_spec), _execute_fn(cfg, calls=calls),
+                 default_clarify_answer="3")
+    report = await h.run_job(JobSpec(repo="app", goal="an app"))  # repo does not exist
+    assert report.asked_clarifying is True and report.answered == "3"
+    # the out-of-range answer fell back un-refined — visibly, on the reply itself
+    assert "didn't catch which option" in report.plan_preview
+    assert report.approved is True and report.verdict == "COMPLETE"
+    assert calls[0]["surface"] == "unknown"      # never "mobile" — the option is gone
+    assert calls[0]["surface"] != "mobile"
 
 
 def _questioning_plan_fn(spec_factory):
@@ -1155,3 +1185,127 @@ def test_snapshot_no_plan_renders_exactly_as_before(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "PLAN" not in out          # plan_graph=false leaves the view byte-identical
     assert "=== RUN R1" in out
+
+
+# ===========================================================================
+# #1158 — launcher-parity of the gateway's fleet_dispatch_* threading
+# ===========================================================================
+
+
+def _transport_gateway_fleet_kwargs(source: str) -> list[set[str]]:
+    """Each ``TransportGateway(...)`` call's ``fleet_dispatch_*`` keyword names, per call site."""
+    import ast
+
+    calls: list[set[str]] = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+        if name == "TransportGateway":
+            calls.append({
+                kw.arg for kw in node.keywords
+                if kw.arg and kw.arg.startswith("fleet_dispatch_")
+            })
+    return calls
+
+
+def test_harness_threads_every_launcher_fleet_dispatch_gateway_flag():
+    """Regression lock for #1158 (the launcher gained the S2 intake gateway kwargs; the
+    harness's constructions silently did not, so a LIVE ceremony drive would have exercised
+    the quick path). The harness docstring promises launcher-equivalent threading — this
+    parses BOTH sources' ``TransportGateway`` calls so the promise cannot rot again: every
+    ``fleet_dispatch_*`` kwarg the launcher threads must appear in BOTH harness
+    constructions (dev-mode and LIVE)."""
+    repo = Path(__file__).resolve().parents[2]
+    launcher_calls = _transport_gateway_fleet_kwargs(
+        (repo / "launcher" / "__main__.py").read_text(encoding="utf-8"))
+    harness_calls = _transport_gateway_fleet_kwargs(
+        (repo / "tools" / "dispatch_harness" / "harness.py").read_text(encoding="utf-8"))
+    assert len(launcher_calls) == 1, "expected exactly ONE gateway construction in the launcher"
+    assert len(harness_calls) == 2, "expected the dev-mode + LIVE gateway constructions"
+    for i, flags in enumerate(harness_calls):
+        missing = sorted(launcher_calls[0] - flags)
+        assert not missing, (
+            f"harness gateway construction #{i} is missing launcher-threaded "
+            f"fleet_dispatch kwargs: {missing} — thread them (default False, #1158) or a "
+            "harness drive silently exercises a narrower gateway than production")
+
+
+def test_playback_gateway_conjunction_needs_all_three_keys():
+    """#1165 M4: the coordinator's playback gate is the resolved THREE-key conjunction
+    (front AND interview AND playback) — any parent off keeps it off, so the sub-flag
+    can never engage inside a front or interview the shipped config keeps dormant."""
+    from services.ui_gateway.src.transport import TransportGateway
+
+    for front, interview, playback, expect in (
+        (True, True, True, True),
+        (False, True, True, False),
+        (True, False, True, False),
+        (True, True, False, False),
+    ):
+        gw = TransportGateway(
+            session_store=None, dev_mode=True, host="127.0.0.1", port=0,
+            fleet_dispatch_enabled=True,
+            fleet_dispatch_advanced_intake_enabled=front,
+            fleet_dispatch_advanced_intake_interview_enabled=interview,
+            fleet_dispatch_advanced_intake_interview_playback_enabled=playback,
+        )
+        assert gw._dispatch_coordinator._playback_enabled is expect, \
+            (front, interview, playback)
+
+
+def test_load_harness_config_ceremony_flags_validated_not_coerced(tmp_path):
+    """The five ceremony-gated flags resolve strict (#1042: only an explicit TOML
+    boolean ``true``) because they feed for_live's gateway construction — a coerced
+    truthy string must NOT widen a driver's gateway."""
+    p = tmp_path / "c.toml"
+    p.write_text(
+        "[fleet_dispatch]\n"
+        "advanced_intake = true\n"
+        'advanced_intake_interview = "true"\n'  # string, not boolean -> False
+        'advanced_intake_assets_pipeline = "true"\n'  # same rule (#1165 M5)
+        'advanced_intake_interview_playback = "true"\n'  # same rule (#1165 M4)
+        "advanced_intake_interview_voice = 1\n",  # truthy int, not boolean -> False
+        encoding="utf-8",
+    )
+    cfg = load_harness_config(p)
+    assert cfg.advanced_intake_enabled is True
+    assert cfg.advanced_intake_interview_enabled is False   # coercion refused
+    assert cfg.advanced_intake_assets_pipeline_enabled is False  # coercion refused
+    assert cfg.advanced_intake_interview_playback_enabled is False  # coercion refused
+    assert cfg.advanced_intake_interview_voice_enabled is False  # coercion refused
+    assert cfg.project_memory_enabled is False              # absent -> False
+
+    p.write_text(
+        "[fleet_dispatch]\nadvanced_intake_interview_voice = true\n",
+        encoding="utf-8",
+    )
+    assert load_harness_config(p).advanced_intake_interview_voice_enabled is True
+
+
+def test_console_kwargs_mirror_resolved_config():
+    """The console derives its gateway posture FROM config (never hardcodes one):
+    each resolved ceremony flag maps to the exact for_live kwarg name the parity
+    lock above pins, so the console rides the locked corridor end to end."""
+    from tools.dispatch_console import console_gateway_kwargs
+    from tools.dispatch_harness.config import HarnessConfig
+
+    cfg = HarnessConfig(
+        port=5001, fleet_dispatch_enabled=True, agentic_setup_dir="A",
+        projects_dir="P", swap_run_budget_s=1.0, config_path=Path("x.toml"),
+        advanced_intake_enabled=True,
+        advanced_intake_interview_enabled=True,
+        advanced_intake_assets_pipeline_enabled=True,
+        advanced_intake_interview_playback_enabled=True,
+        advanced_intake_interview_voice_enabled=True,
+        project_memory_enabled=False,
+    )
+    kw = console_gateway_kwargs(cfg)
+    assert kw["fleet_dispatch_advanced_intake_enabled"] is True
+    assert kw["fleet_dispatch_advanced_intake_interview_enabled"] is True
+    assert kw["fleet_dispatch_advanced_intake_assets_pipeline_enabled"] is True
+    assert kw["fleet_dispatch_advanced_intake_interview_playback_enabled"] is True
+    assert kw["fleet_dispatch_advanced_intake_interview_voice_enabled"] is True
+    assert kw["fleet_dispatch_project_memory_enabled"] is False
+    assert kw["port"] == 5001 and kw["agentic_setup_dir"] == "A"

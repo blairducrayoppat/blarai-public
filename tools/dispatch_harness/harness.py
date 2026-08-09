@@ -103,6 +103,12 @@ class DispatchHarness:
         agentic_setup_dir: str,
         projects_dir: str,
         fleet_dispatch_enabled: bool = True,
+        fleet_dispatch_advanced_intake_enabled: bool = False,
+        fleet_dispatch_advanced_intake_interview_enabled: bool = False,
+        fleet_dispatch_advanced_intake_assets_pipeline_enabled: bool = False,
+        fleet_dispatch_advanced_intake_interview_playback_enabled: bool = False,
+        fleet_dispatch_advanced_intake_interview_voice_enabled: bool = False,
+        fleet_dispatch_project_memory_enabled: bool = False,
         dev_mode: bool = False,
         certs_dir: str | None = None,
         session_id: str = "harness",
@@ -125,7 +131,9 @@ class DispatchHarness:
         ``dev_mode=True`` preserves the original DRY-RUN/test wiring: loopback, NO mTLS (plaintext
         dev path) — used only when driving a dev-mode AO.
 
-        The fleet-dispatch settings are threaded exactly as the launcher threads them. No session
+        The fleet-dispatch settings are threaded exactly as the launcher threads them — a parity
+        lock in ``tests/integration/test_dispatch_harness.py`` parses both call sites, so a flag
+        the launcher gains and the harness misses fails the gate (#1158). No session
         store (the harness does not persist conversation; the informational-turn persist in
         ``handle_dispatch_command`` no-ops without a store).
 
@@ -133,6 +141,16 @@ class DispatchHarness:
             port: The AO's loopback port (read from the AO ``default.toml`` ``[ipc].vsock_port``).
             agentic_setup_dir / projects_dir: Fleet-dispatch roots (launcher-equivalent threading).
             fleet_dispatch_enabled: Whether dispatch is enabled (the running AO is the SSOT).
+            fleet_dispatch_advanced_intake_enabled / fleet_dispatch_advanced_intake_interview_enabled
+                / fleet_dispatch_advanced_intake_interview_playback_enabled
+                / fleet_dispatch_advanced_intake_interview_voice_enabled
+                / fleet_dispatch_project_memory_enabled: The ceremony-gated gateway seams
+                (#1031 S2, #1165 M4, #1165 M1, #1124), named exactly as the gateway kwargs
+                they thread. Default ``False`` = the quick path, byte-identical to a harness
+                that predates them. ``True`` only lets THIS gateway parse the corresponding
+                token — the running AO's own engagement gate still adjudicates from its
+                resolved config, so the harness can never switch on what the shipped config
+                keeps off.
             dev_mode: ``False`` (default) = production loopback + mTLS; ``True`` = plaintext dev
                       loopback (the prior behavior — no cert paths).
             certs_dir: Override for the per-boot certs directory. ``None`` (default) resolves to
@@ -148,6 +166,20 @@ class DispatchHarness:
                 host="127.0.0.1",
                 port=port,
                 fleet_dispatch_enabled=fleet_dispatch_enabled,
+                fleet_dispatch_advanced_intake_enabled=fleet_dispatch_advanced_intake_enabled,
+                fleet_dispatch_advanced_intake_interview_enabled=(
+                    fleet_dispatch_advanced_intake_interview_enabled
+                ),
+                fleet_dispatch_advanced_intake_assets_pipeline_enabled=(
+                    fleet_dispatch_advanced_intake_assets_pipeline_enabled
+                ),
+                fleet_dispatch_advanced_intake_interview_playback_enabled=(
+                    fleet_dispatch_advanced_intake_interview_playback_enabled
+                ),
+                fleet_dispatch_advanced_intake_interview_voice_enabled=(
+                    fleet_dispatch_advanced_intake_interview_voice_enabled
+                ),
+                fleet_dispatch_project_memory_enabled=fleet_dispatch_project_memory_enabled,
                 fleet_dispatch_agentic_setup_dir=agentic_setup_dir,
                 fleet_dispatch_projects_dir=projects_dir,
             )
@@ -164,7 +196,15 @@ class DispatchHarness:
             if certs_dir is not None:
                 certs_root = Path(certs_dir)
             else:
-                repo_root = Path(__file__).resolve().parents[2]
+                # The certs are minted by the LAUNCHER, so they live under the checkout
+                # the AO boots from — not under whichever tree this harness module was
+                # loaded from. Those are the same tree unless the battery is pinned to a
+                # measurement worktree, and there the worktree has no certs/ at all: this
+                # lookup, not the AO boot, is where a naive pin fails first, turning every
+                # selected card into STALLED [HARNESS] before a model is ever loaded.
+                from tools.dispatch_harness.runtime_root import resolve_runtime_root
+
+                repo_root = resolve_runtime_root(Path(__file__).resolve().parents[2])
                 certs_root = repo_root / DEFAULT_CERTS_DIR
 
             client_cert = certs_root / GATEWAY_CLIENT_CERT_NAME
@@ -195,6 +235,20 @@ class DispatchHarness:
                 mtls_key_path=str(client_key),
                 ca_cert_path=str(ca_cert),
                 fleet_dispatch_enabled=fleet_dispatch_enabled,
+                fleet_dispatch_advanced_intake_enabled=fleet_dispatch_advanced_intake_enabled,
+                fleet_dispatch_advanced_intake_interview_enabled=(
+                    fleet_dispatch_advanced_intake_interview_enabled
+                ),
+                fleet_dispatch_advanced_intake_assets_pipeline_enabled=(
+                    fleet_dispatch_advanced_intake_assets_pipeline_enabled
+                ),
+                fleet_dispatch_advanced_intake_interview_playback_enabled=(
+                    fleet_dispatch_advanced_intake_interview_playback_enabled
+                ),
+                fleet_dispatch_advanced_intake_interview_voice_enabled=(
+                    fleet_dispatch_advanced_intake_interview_voice_enabled
+                ),
+                fleet_dispatch_project_memory_enabled=fleet_dispatch_project_memory_enabled,
                 fleet_dispatch_agentic_setup_dir=agentic_setup_dir,
                 fleet_dispatch_projects_dir=projects_dir,
             )

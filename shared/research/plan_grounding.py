@@ -31,7 +31,11 @@ explicit, reviewable step.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import time
+from pathlib import Path
 
 from shared.research.docset_index import DocsetIndex, ResearchIndexError
 from shared.research.lookup import DocHit, exact_lookup, search_docs
@@ -42,12 +46,77 @@ logger = logging.getLogger(__name__)
 #: an interface card, not documentation).
 GROUNDING_MAX_CHARS = 1200
 
+def _default_usage_log() -> Path | None:
+    """This machine's usage ledger, under the standard BlarAI state tree, or
+    ``None`` when there is no state tree to write into.
+
+    Resolved PER CALL from ``%LOCALAPPDATA%``, the same root
+    ``shared/secrets/dpapi_store.py`` and the coordinator store use. Two
+    defects this replaces, both found 2026-07-30:
+
+    * it was a hard-coded absolute path into a DIFFERENT repo
+      (``agentic-setup/state/``), so this module wrote outside its own tree;
+    * because the path was fixed at import and ignored the environment, every
+      test and review run that reached ``ground_goal`` without remembering to
+      set ``BLARAI_RESEARCH_USAGE_LOG`` appended to the OPERATOR's ledger —
+      1,963 records, most of them review traffic, on a capability that is
+      stood down. Anyone reading that file to decide whether to re-arm was
+      reading us testing it.
+
+    Resolving from ``%LOCALAPPDATA%`` makes the standing
+    LOCALAPPDATA-redirect discipline do the isolation structurally, instead of
+    depending on each test remembering an env var. Returning ``None`` rather
+    than guessing a path keeps the fail-soft posture: no state tree, no record,
+    never a write somewhere unintended.
+    """
+    root = os.environ.get("LOCALAPPDATA", "").strip()
+    if not root:
+        return None
+    return Path(root) / "BlarAI" / "research" / "research-usage.jsonl"
+
+
+#: ALWAYS-ON usage evidence (#746 maturation): every ground_goal() call appends one
+#: JSONL record, so hit rate / block size / outcome are observable without a debug
+#: env flag. ``BLARAI_RESEARCH_USAGE_LOG`` overrides the destination; unset uses
+#: :func:`_default_usage_log`. Best-effort + fail-soft, same posture as the rest of
+#: this module -- a logging failure must never affect grounding.
+def _log_usage(
+    *,
+    goal_len: int,
+    outcome: str,
+    hits: int,
+    block_chars: int,
+    rungs: str = "",
+) -> None:
+    try:
+        override = os.environ.get("BLARAI_RESEARCH_USAGE_LOG", "").strip()
+        resolved = Path(override) if override else _default_usage_log()
+        if resolved is None:
+            return
+        log_path = resolved
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "ts": time.time(),
+            "caller": "plan_grounding",
+            "goal_len": goal_len,
+            "outcome": outcome,  # "no_goal" | "unavailable" | "no_match" | "grounded"
+            "hits": hits,
+            "block_chars": block_chars,
+            # WHICH rungs produced hits, so "the corpus answered" can be told
+            # apart from "the corpus answered the way we think it does":
+            # "exact" | "search", joined by "+".
+            "rungs": rungs,
+        }
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 -- a usage-log failure must never affect grounding
+        pass
+
 GROUNDING_HEADER = "--- Research grounding (local docs) ---"
 GROUNDING_FOOTER = "--- End research grounding ---"
 
 #: Descending per-hit excerpt budgets tried until the block fits the cap.
 _EXCERPT_BUDGETS = (280, 200, 140, 90)
-
 
 def _merge_hits(
     exact: list[DocHit], searched: list[DocHit], k: int
@@ -79,6 +148,28 @@ def _merge_hits(
     return merged
 
 
+def _attribute_rungs(
+    kept: list[DocHit], exact: list[DocHit], searched: list[DocHit]
+) -> str:
+    """Which rungs the RENDERED hits came from — ``"exact"``/``"search"``
+    joined by ``+``, in ladder order.
+
+    Attributed from *kept* rather than from what each rung produced, because
+    the two differ: the block refit drops trailing hits, so a rung can produce
+    a hit that never reaches the prompt. It did not answer, and capability 7
+    asks a number to say what it measured.
+
+    A page both rungs found is credited to the FIRST, matching the merge's
+    precedence — crediting both would make the field unable to draw the one
+    distinction it exists for."""
+    origin: dict[tuple[str, str], str] = {}
+    for name, rung in (("exact", exact), ("search", searched)):
+        for hit in rung:
+            origin.setdefault((hit.source, hit.path), name)
+    answered = {origin.get((hit.source, hit.path)) for hit in kept}
+    return "+".join(name for name in ("exact", "search") if name in answered)
+
+
 def _render(hits: list[DocHit], excerpt_budget: int) -> str:
     lines: list[str] = [GROUNDING_HEADER]
     for hit in hits:
@@ -102,6 +193,15 @@ def ground_goal(
     RELEVANCE_FLOOR` — the pull-not-push contract: the caller includes the
     block only when it exists, and a weak match is the same as no match.
 
+    KNOWN LIMIT, measured and deliberate: a goal written in plain English
+    grounds on NOTHING, because BM25 normalizes by the mass of the whole query
+    so a multi-topic sentence scores every page beneath the floor by
+    construction. A per-topic rung was built to close that and REMOVED after
+    four independent gates each failed the same way on held-out goals — see
+    ``docs/reviews/1204-plan-grounding-salience-disproof-2026-07-31.md``. The
+    silence is correct until a semantic instrument replaces the lexical one;
+    a wrong page at the head of the planner prompt is worse than no page.
+
     The rendered block is deterministically fitted to
     :data:`GROUNDING_MAX_CHARS`: per-hit excerpt budgets shrink first, then
     trailing hits drop, and the footer line always survives.
@@ -114,10 +214,12 @@ def ground_goal(
         searched = search_docs(text, k=k, index=index)
     except ResearchIndexError as exc:
         logger.warning("plan grounding unavailable (%s); continuing ungrounded", exc)
+        _log_usage(goal_len=len(text), outcome="unavailable", hits=0, block_chars=0)
         return ""
 
     merged = _merge_hits(exact, searched, k)
     if not merged:
+        _log_usage(goal_len=len(text), outcome="no_match", hits=0, block_chars=0)
         return ""
 
     kept = list(merged)
@@ -125,10 +227,18 @@ def ground_goal(
         for budget in _EXCERPT_BUDGETS:
             block = _render(kept, budget)
             if len(block) <= GROUNDING_MAX_CHARS:
+                _log_usage(
+                    goal_len=len(text),
+                    outcome="grounded",
+                    hits=len(kept),
+                    block_chars=len(block),
+                    rungs=_attribute_rungs(kept, exact, searched),
+                )
                 return block
         kept.pop()  # drop the weakest (last) hit and refit
     # Unreachable in practice (header+footer alone always fit), but stay
     # fail-closed rather than emit an over-cap block.
+    _log_usage(goal_len=len(text), outcome="unreachable_overcap", hits=0, block_chars=0)
     return ""
 
 

@@ -1,0 +1,32 @@
+{
+  "job_id": "B6",
+  "verdict": "STALLED",
+  "attribution": "HARNESS",
+  "wall_clock_s": 5631.375,
+  "samples_consumed": -1,
+  "packs_consumed": 5,
+  "interventions": 0,
+  "run_id": "20260707-032253-bd",
+  "plan_id": "20260707-032253-bd",
+  "repo": "battery-b6-inventory-cli",
+  "card_path": "evals/battery/B6.json",
+  "evidence": {
+    "plan": "<home>\\agentic-setup\\state\\fleet-swap\\plan.json",
+    "oracle_status": "unknown",
+    "summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260707-032253-bd\\SUMMARY.txt",
+    "job_summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260707-032253-bd\\JOB_SUMMARY.txt",
+    "progress": "<home>\\agentic-setup\\state\\fleet-runs\\20260707-032253-bd\\swap-progress.log",
+    "packs": "<home>\\agentic-setup\\state\\fleet-runs\\20260707-032253-bd\\context-packs.log"
+  },
+  "versions": {
+    "battery_runner": "v1",
+    "blarai": "6d93ba1",
+    "python": "3.11.9",
+    "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+  },
+  "started_utc": "2026-07-07T10:20:00Z",
+  "finished_utc": "2026-07-07T11:53:54Z",
+  "dry_run": false,
+  "notes": "",
+  "schema": "battery-scorecard/v1"
+}

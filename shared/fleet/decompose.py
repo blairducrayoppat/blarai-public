@@ -73,9 +73,13 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from shared.fleet.dispatch import slugify_task, validate_repo
+
+if TYPE_CHECKING:  # import only for type-checkers — the research package is NEVER
+    # touched at import time (dormant-by-default: see _grounded_prompt).
+    from shared.research.docset_index import DocsetIndex
 
 logger = logging.getLogger(__name__)
 
@@ -1095,6 +1099,24 @@ def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[
             entry["contract"] = cand["contract"]
         accepted.append(entry)
         if len(accepted) >= max_tasks:
+            # SAY THAT THE PLAN WAS TRUNCATED (#1279). This `break` used to be silent, and
+            # silence here is the dangerous direction: the operator asked for a product
+            # needing N steps, got a plan for max_tasks of them, and the shortfall reads as
+            # the CODER under-delivering rather than the PLANNER never having been allowed
+            # to ask for the rest. plan_graph.py's sibling cap already warns; this one did
+            # not, so a truncation was observable only by noticing that coherent_tasks
+            # exceeded final_tasks in the diagnostics -- derivable, never stated.
+            #
+            # This is the ceiling on "relatively complex" as a product goal: a genuinely
+            # larger site cannot be expressed in one plan at all, and until that is visible
+            # nobody can tell an over-large ask from a weak build.
+            # NOT FIXED HERE, and deliberately not half-fixed: _ruler is pure and has no
+            # logger, so saying it properly means returning the dropped count and threading
+            # it through both call sites into the decompose diagnostics and onto the
+            # operator's plan card. That is #1279, specified. What is NOT acceptable is a
+            # log line nobody reads standing in for it -- the truncation has to become DATA,
+            # the way `regression_unmeasured` did, or it will keep being derivable and
+            # unstated.
             break
     survivors = {e["task"] for e in accepted}
     for e in accepted:
@@ -1184,6 +1206,48 @@ def _dump_decompose_debug(raw: str, diagnostics: dict) -> None:
         pass
 
 
+# ---------------------------------------------------------------------------
+# #746 research substrate — plan-time grounding (DORMANT by default)
+# ---------------------------------------------------------------------------
+# The decompose/PLAN path can retrieve the top relevant LOCAL doc excerpts for the
+# goal and prepend them to the 14B's decompose prompt, so the plan is written against
+# what the platform actually provides (real API names/semantics) rather than recalled
+# approximations. This is the "research arm switch": OFF by default (the decompose
+# prompt is BYTE-IDENTICAL to today; regression-locked), ON only after an explicit
+# night-boundary flip of [fleet_dispatch].research_grounding.
+
+
+def _grounded_prompt(
+    idea: str, base_prompt: str, index: "DocsetIndex | None"
+) -> str:
+    """Prepend a bounded LOCAL-docs grounding block to *base_prompt*, or return it
+    unchanged.
+
+    #746 plan-time grounding (design point 1 — bounded, once, while the 14B is
+    resident): ``shared.research.ground_goal`` retrieves the top-k relevant excerpts
+    for *idea* from the LOCAL docset index and renders a hard-capped interface card.
+    PULL not PUSH + degrade-gracefully: an empty block — nothing clears the relevance
+    floor, or the corpus is not staged — leaves *base_prompt* BYTE-IDENTICAL to the
+    ungrounded call. ZERO egress: ``ground_goal`` reads only the local index file.
+
+    The research package is imported LAZILY here, so a dormant decompose
+    (``research_grounding=False``) never even touches ``shared.research``. Any failure
+    in retrieval degrades to the ungrounded prompt — plan grounding is enrichment and
+    its absence (or a bug in it) must NEVER break a dispatch plan (the plan-grounding
+    module's own degrade-gracefully contract, enforced again at this seam)."""
+    try:
+        from shared.research import ground_goal  # lazy — untouched while dormant
+
+        block = ground_goal(idea, index=index)
+    except Exception:  # noqa: BLE001 — enrichment only; never break decompose
+        logger.warning("plan grounding failed; continuing ungrounded", exc_info=True)
+        return base_prompt
+    if not block:
+        return base_prompt
+    logger.info("plan grounding applied (%d chars) to decompose prompt", len(block))
+    return f"{block}\n\n{base_prompt}"
+
+
 def decompose_request(
     idea: str,
     repo: str,
@@ -1193,6 +1257,8 @@ def decompose_request(
     max_tasks: int = DEFAULT_MAX_TASKS,
     max_depth: int = DEFAULT_MAX_DEPTH,
     structured_generate_fn: "Callable[[str, str], str] | None" = None,
+    research_grounding: bool = False,
+    research_index: "DocsetIndex | None" = None,
 ) -> DecomposeResult:
     """Decompose *idea* into right-sized fleet tasks for *repo*. Fail-closed + fallback.
 
@@ -1212,6 +1278,18 @@ def decompose_request(
     ``max_depth`` is the recursion bound (the SDD foundation): single-pass decomposition
     runs at depth 1; a future recursive decompose keeps a still-too-big node as one
     flagged task at the bound rather than exploding it.
+
+    ``research_grounding`` (#746, DORMANT by default) gates plan-time grounding: when
+    True, the MAIN decompose prompt is prefixed with a bounded LOCAL-docs grounding
+    block (``shared.research.ground_goal`` over the staged docset index) so the 14B
+    plans against real API names/semantics. When False (the default) the decompose
+    prompt is BYTE-IDENTICAL to today (regression-locked) and ``shared.research`` is
+    never even imported. Grounding is enrichment: an empty block (nothing above the
+    relevance floor, or an absent corpus) also leaves the prompt byte-identical, and a
+    retrieval failure degrades to the ungrounded prompt — it never breaks a plan. Zero
+    egress (local index only). ``research_index`` injects a
+    :class:`~shared.research.docset_index.DocsetIndex` for tests; ``None`` uses the
+    process-wide default (the staged blarai docset).
     """
     repo_path = projects_dir / repo
     err = validate_repo(repo_path, projects_dir)
@@ -1224,8 +1302,17 @@ def decompose_request(
         return DecomposeResult(ok=False, message="Nothing to dispatch — the idea is empty.")
 
     parse_diag: dict = {}
+    decompose_prompt = _DECOMPOSE_TEMPLATE.format(max_tasks=max_tasks, idea=idea)
+    # #746: plan-time grounding is DORMANT by default. OFF ⇒ decompose_prompt is
+    # BYTE-IDENTICAL to today (regression-locked). ON ⇒ prepend a bounded LOCAL-docs
+    # grounding block (itself empty — hence still byte-identical — when nothing clears
+    # the relevance floor or the corpus is absent). Only the MAIN decompose call is
+    # grounded (design point 1: bounded, once, while the 14B is resident); the retry-
+    # with-guidance and recursive envelope-split paths keep the ungrounded shape.
+    if research_grounding:
+        decompose_prompt = _grounded_prompt(idea, decompose_prompt, research_index)
     raw, used_grammar, gen_error = _generate_plan_json(
-        _DECOMPOSE_TEMPLATE.format(max_tasks=max_tasks, idea=idea),
+        decompose_prompt,
         generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
         max_tasks=max_tasks,
     )

@@ -31,8 +31,11 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+
+from shared import procspawn
+import psutil  # process-identity check for the scripts pin (see _launcher_is_live)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +54,13 @@ class FleetDispatchConfig:
     """Resolved paths for the fleet's documented entry points + output."""
 
     scripts_dir: Path
-    """agentic-setup\\scripts (holds add-fleet-task.ps1 / run-fleet.ps1)."""
+    """The dispatch scripts' directory (holds add-fleet-task.ps1 / run-fleet.ps1).
+
+    ``<agentic-setup>\\scripts`` unless a pin names a measured worktree (#1181a) —
+    CODE, so it may be pinned independently of the queue/runs paths, which are
+    STATE and always follow the agentic-setup root. The pin is resolved by
+    :func:`resolve_fleet_scripts_dir`; read that for the precedence, and never
+    assume the environment variable is the channel carrying it."""
     queue_path: Path
     """The fleet queue JSON (state\\fleet-queue.json)."""
     runs_dir: Path
@@ -124,7 +133,7 @@ class TaskOutcome:
 
     task: str
     outcome: str  # the raw run-fleet outcome word (processed/errored/skipped…)
-    result: str  # classified: MERGED | PARKED | BLOCKED | NOTHING | TIMEOUT | UNKNOWN
+    result: str  # classified: MERGED | PARKED | BLOCKED | NOTHING | TIMEOUT | REFUSED | UNKNOWN
     detail: str  # the raw RESULT: line text
 
 
@@ -167,14 +176,15 @@ def _safe_run(
     inherits ``os.environ``) is an OVERLAY merged over the current environment
     (``{**os.environ, **env}``), so the clean-env grader can pin ``PYTHONPATH`` +
     ``PYTHONSAFEPATH`` without a global mutation and without disturbing every other
-    caller. ``creationflags=_NO_WINDOW`` (#761): console-subsystem children of the
-    console-less pythonw-spawned driver must not each be allocated a visible console."""
+    caller. Routed through ``shared.procspawn.hidden_console`` (#774 sub-task 2) — the
+    blessed twin of this exact shape (``subprocess.run`` + ``CREATE_NO_WINDOW`` == the old
+    ``_NO_WINDOW`` flag, for a non-interactive console child of the console-less pythonw
+    driver), which additionally pins the child to UTF-8 and feeds DEVNULL stdin (lesson 219
+    R3/R4). The ``env`` overlay is still merged over ``os.environ`` HERE and passed whole,
+    so hidden_console's replace-semantics preserve the clean-env grader's pins."""
     try:
         run_env = {**os.environ, **env} if env is not None else None
-        cp = subprocess.run(  # noqa: S603 — vector argv, no shell
-            cmd, capture_output=True, text=True, timeout=timeout_s, cwd=cwd or None,
-            creationflags=_NO_WINDOW, env=run_env,
-        )
+        cp = procspawn.hidden_console(cmd, cwd=cwd or None, timeout_s=timeout_s, env=run_env)
         return (cp.returncode == 0, cp.stdout or "", cp.stderr or "")
     except subprocess.TimeoutExpired:
         return (False, "", f"timed out after {timeout_s:.0f}s")
@@ -236,6 +246,12 @@ def new_run_id() -> str:
 
 def _classify_result(result_line: str) -> str:
     low = result_line.lower()
+    # #1181a: a dispatch REFUSED before any task ran. Checked first because the refusal text
+    # explains a pin disagreement and may contain words ("merged", "not merged") that the
+    # delivery classifiers below key on. Without its own class it fell through to UNKNOWN,
+    # which renders as "see report" — pointing at a report that was never written.
+    if "not started" in low:
+        return "REFUSED"
     if "merged" in low and "not merged" not in low:
         return "MERGED"
     if "blocked" in low:
@@ -309,6 +325,13 @@ def _format_report(run_id: str, outcomes: list[TaskOutcome]) -> str:
             "TIMEOUT": "timed out (tree-killed — see report)"}
     lines = [f"Fleet run {run_id} — {len(outcomes)} task(s):"]
     for o in outcomes:
+        if o.result == "REFUSED":
+            # Carry the DETAIL through verbatim. Every other class is a one-word outcome the
+            # operator reads alongside a report he can open; a refusal has no report — the
+            # explanation and the remedy exist only in this line, so mapping it to an icon
+            # discards the only thing that would tell him what to do.
+            lines.append(f"  • {o.task}: {o.detail.split('RESULT:', 1)[-1].strip()}")
+            continue
         lines.append(f"  • {o.task}: {icon.get(o.result, o.result)}")
     return "\n".join(lines)
 
@@ -417,32 +440,30 @@ def run_fleet(*, config: FleetDispatchConfig, run_id: str | None = None) -> Disp
         _pwsh(), "-NoProfile", "-NonInteractive", "-File", str(script),
         "-Queue", str(config.queue_path), "-RunId", rid,
     ]
-    base_flags = 0
-    if sys.platform == "win32":
-        base_flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-    for flags in (base_flags | _CREATE_BREAKAWAY_FROM_JOB, base_flags):
-        try:
-            subprocess.Popen(  # noqa: S603 — vector argv, no shell
-                cmd, creationflags=flags if sys.platform == "win32" else 0,
-                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL, close_fds=True,
-            )
-            return DispatchResult(
-                ok=True, run_id=rid,
-                message=f"Triggered fleet run {rid} (it proceeds once the coder model is loaded).",
-            )
-        except OSError:
-            continue  # breakaway may be disallowed; retry detached-only
-        except Exception as exc:  # noqa: BLE001
-            return DispatchResult(
-                ok=False, run_id=rid,
-                message=f"Could not trigger the fleet run: {exc}.", error=str(exc),
-            )
-    return DispatchResult(
-        ok=False, run_id=rid,
-        message="Could not trigger the fleet run (process launch failed).",
-        error="popen_failed",
-    )
+    # #774 sub-task 2: the DETACHED, DEVNULL-in/out fleet-trigger spawn routes through
+    # shared.procspawn.detached_no_console — it owns exactly this shape (DETACHED_PROCESS |
+    # CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB, with the proven breakaway ->
+    # detached-only OSError fallback for a job that forbids breakaway). argv[0] is pwsh (not
+    # a python shim), so the helper's R1 pythonw resolution is a safe no-op. No log_path ->
+    # stdout/stderr DEVNULL, byte-identical to the pre-migration wiring.
+    try:
+        procspawn.detached_no_console(cmd, breakaway=True)
+        return DispatchResult(
+            ok=True, run_id=rid,
+            message=f"Triggered fleet run {rid} (it proceeds once the coder model is loaded).",
+        )
+    except OSError:
+        # Both the breakaway and the detached-only retry failed to launch.
+        return DispatchResult(
+            ok=False, run_id=rid,
+            message="Could not trigger the fleet run (process launch failed).",
+            error="popen_failed",
+        )
+    except Exception as exc:  # noqa: BLE001
+        return DispatchResult(
+            ok=False, run_id=rid,
+            message=f"Could not trigger the fleet run: {exc}.", error=str(exc),
+        )
 
 
 def read_summary(*, config: FleetDispatchConfig, run_id: str) -> DispatchResult:
@@ -577,8 +598,30 @@ def _readme_text(name: str, goal: str) -> str:
     return "\n".join(lines)
 
 
+# #1165 M5 — the operator-assets folder contract, create side. MIRRORED BY VALUE from
+# ``shared.fleet.acceptance`` (OPERATOR_ASSETS_DIRNAME / _REFERENCE_DIRNAME /
+# _README_NAME): this module deliberately never imports the acceptance package (see the
+# PendingDispatch note above), so a gate test pins the three pairs equal instead — the
+# ``_CARD_SANDBOX_REPO_PREFIX`` precedent.
+_ASSETS_DIRNAME = "assets"
+_ASSETS_REFERENCE_DIRNAME = "reference"
+_ASSETS_README_NAME = "README.txt"
+#: One line each, plain language — the folder IS the interface, and these are the only
+#: instructions the operator ever needs. Excluded from the plan-time manifest by name
+#: (the enumeration side owns that rule).
+_ASSETS_README_TEXT = (
+    "Put photos, documents, and other material for the build in here; "
+    "screenshots to emulate go in the reference folder.\n"
+)
+_ASSETS_REFERENCE_README_TEXT = (
+    "Put screenshots or pictures to emulate in here - say in the interview "
+    "whether you mean how it LOOKS or how it WORKS.\n"
+)
+
+
 def create_project(
-    name: str, *, config: FleetDispatchConfig, goal: str = ""
+    name: str, *, config: FleetDispatchConfig, goal: str = "",
+    seed_assets: bool = False,
 ) -> CreateProjectResult:
     """Create a NEW empty git repository under the configured projects dir so a
     non-git operator can start a project from BlarAI (#712).
@@ -591,6 +634,13 @@ def create_project(
       * an initial commit is REQUIRED (the fleet's worktree/branch machinery
         cannot operate on an unborn HEAD) and the branch is forced to ``main``
         so the fleet's auto-merge target is predictable across git versions.
+
+    ``seed_assets`` (#1165 M5, default ``False`` == the pre-M5 scaffold byte for
+    byte): additionally seed the operator-assets folder contract —
+    ``assets/`` + ``assets/reference/``, each holding a one-line plain-language
+    README — committed with the scaffold so the folders survive a fresh clone.
+    The caller passes the AO-resolved assets-pipeline conjunction; this function
+    stays flag-ignorant.
 
     On success the repo is a valid dispatch target (``.git`` + one commit);
     the returned ``name`` is the slug created, for a follow-on PLAN.
@@ -663,6 +713,15 @@ def create_project(
         resolved.mkdir(parents=False, exist_ok=False)
         (resolved / "README.md").write_text(_readme_text(name, goal), encoding="utf-8")
         (resolved / ".gitignore").write_text(_GITIGNORE_TEXT, encoding="utf-8")
+        if seed_assets:
+            assets_dir = resolved / _ASSETS_DIRNAME
+            (assets_dir / _ASSETS_REFERENCE_DIRNAME).mkdir(parents=True)
+            (assets_dir / _ASSETS_README_NAME).write_text(
+                _ASSETS_README_TEXT, encoding="utf-8"
+            )
+            (assets_dir / _ASSETS_REFERENCE_DIRNAME / _ASSETS_README_NAME).write_text(
+                _ASSETS_REFERENCE_README_TEXT, encoding="utf-8"
+            )
     except OSError as exc:
         return CreateProjectResult(
             ok=False, message=f"Could not write the project files: {exc}.",
@@ -719,6 +778,286 @@ _PROJECTS = Path(r"C:\Users\mrbla\projects")
 FLEET_AGENTIC_SETUP_DIR_ENV: str = "BLARAI_FLEET_AGENTIC_SETUP_DIR"
 FLEET_PROJECTS_DIR_ENV: str = "BLARAI_FLEET_PROJECTS_DIR"
 
+# #1181a: the agentic-setup root above answers TWO different questions that were the same
+# directory until the battery started running a pinned driver, and collapsing them is the
+# defect this env var exists to remove.
+#
+#   CODE  -- which VERSION of the per-task dispatch scripts runs (new-agent-task.ps1,
+#            run-fleet.ps1, critique-loop.ps1, critic-run.ps1, start-llm.ps1). This is the
+#            measuring instrument. It should be PINNED to a commit that exists on main, for
+#            exactly the reason the driver is.
+#   STATE -- where the queue, the run directories, the reports and the worktree base live.
+#            This is accumulated history and must stay in the PRIMARY checkout.
+#
+# Measured, not reasoned (2026-07-30, 13:36): a battery run executed a pinned driver from a
+# tree carrying newly-merged coder_test_qa wiring, and the wiring never fired -- the per-task
+# dispatch ran new-agent-task.ps1 out of the primary checkout, which was parked on
+# fix/1171-declared-surface and did not contain it. `grep -c CoderTestHard` returned 0 on the
+# primary's copy and 1 on the pinned copy. The run produced no CODER TEST QA block and no
+# sidecar: a whole night spent validating nothing, with no error anywhere. #1181's promise --
+# "the battery executes a commit that exists on main" -- was true of the driver and false of
+# the dispatch layer, which is where most of the coder's behaviour actually lives.
+#
+# EMPTY IS THE DEFAULT AND MEANS "not pinned": scripts_dir stays <setup>/scripts, so a
+# hand-run, a dev invocation and every existing caller are byte-identical to before.
+FLEET_SCRIPTS_DIR_ENV: str = "BLARAI_FLEET_SCRIPTS_DIR"
+
+
+class FleetScriptsDirUnavailable(RuntimeError):
+    """The pinned fleet scripts directory was NAMED but cannot be used.
+
+    Deliberately fatal rather than a fallback. Falling back to ``<setup>/scripts``
+    is precisely the silent defeat #1181a exists to remove: the run would proceed,
+    dispatch the primary checkout's scripts, and report a normal night. A caller
+    that cannot honor an explicit pin must fail LOUD (security_by_design 1/11)."""
+
+
+#: Where pinned runs DECLARE their scripts directory, relative to the STATE root. A
+#: DIRECTORY, one file per run — see read_live_declaration for why it is not one file.
+#: On disk rather than in the environment ON PURPOSE — see resolve_fleet_scripts_dir.
+SCRIPTS_PIN_DIR: tuple[str, ...] = ("state", "fleet-swap", "pins")
+
+#: How far apart the launcher's own record of its start time and psutil's may be before the
+#: two are considered different processes. Both sides read the SAME Win32 ``GetProcessTimes``
+#: FILETIME — PowerShell via ``Process.StartTime``, psutil via ``create_time()`` — so the
+#: measured delta is 0.0s exactly; this slack exists only to absorb the ISO-8601 round trip
+#: (7 fractional digits written, 6 parsed). It is deliberately far too tight for a recycled
+#: PID to slip through: that would need the same PID AND a start time within a second of a
+#: process that had to exit first.
+_START_TIME_TOLERANCE_S: float = 1.0
+
+
+def scripts_pin_dir(setup_root: Path) -> Path:
+    """The declarations directory under *setup_root* (the STATE root). One definition,
+    used by the resolver here and by ``swap_ops``' validation, so the writer and every
+    reader cannot drift apart."""
+    return setup_root.joinpath(*SCRIPTS_PIN_DIR)
+
+
+def _launcher_is_live(pid: int, started_at: str, source: Path) -> bool:
+    """Is the run that wrote *source* STILL RUNNING?
+
+    Identity is the pair (pid, process start time), never the pid alone — a bare pid is
+    recycled by the OS and would let a dead night's declaration be resurrected by an
+    unrelated process. The same create-time identity re-check guards this repo's process
+    kills (``shared/fleet/proc_tree.py``), for the same reason.
+
+    Liveness is what scopes a declaration, and it replaced a wall-clock expiry. An expiry
+    answers "could that run still be going?"; the operator needs "IS it?". MEASURED with the
+    expiry design: a declaration written at 23:00 with a 16h window still resolved the frozen
+    tree at 09:00 for a clean child, so his morning dispatches silently ran 23:00-vintage
+    scripts with no error and no signal. Liveness has no window to tune and nothing to get
+    wrong: it is false the instant the launcher exits, crashes or the box reboots.
+    """
+    try:
+        declared = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise FleetScriptsDirUnavailable(
+            f"the fleet scripts pin at {source} has launcher_started_at={started_at!r}, which "
+            "is not an ISO-8601 timestamp, so there is no way to tell whether the run that "
+            f"wrote it is still going. Delete {source} to run unpinned."
+        ) from exc
+    if declared.tzinfo is None:
+        declared = declared.replace(tzinfo=timezone.utc)
+    try:
+        actual = datetime.fromtimestamp(psutil.Process(pid).create_time(), tz=timezone.utc)
+    except psutil.NoSuchProcess:
+        # DEAD, and therefore INERT — the fail-safe direction, and the whole point of keying
+        # on liveness. Nothing has to have been cleaned up for this to be true, so a night
+        # that was killed, crashed or interrupted by a reboot stops governing at that instant.
+        return False
+    except (psutil.AccessDenied, OSError) as exc:
+        # PRESENT BUT UNVERIFIABLE. Guessing either way is wrong: "dead" silently unpins a
+        # live measured night (the original #1203 defect), "live" silently pins the operator's
+        # morning. Refuse instead. Measured not to occur in this system's real configuration —
+        # a NON-elevated reader queries the elevated launcher's create_time successfully
+        # (Windows integrity levels restrict writes, not this read) — so it is a genuine
+        # anomaly rather than a routine state, which is exactly what should stop a run.
+        raise FleetScriptsDirUnavailable(
+            f"the fleet scripts pin at {source} names launcher process {pid}, but whether that "
+            f"process is still running could not be determined ({type(exc).__name__}: {exc}). "
+            "Refusing to guess whether this dispatch belongs to a measured run. Delete "
+            f"{source} to run unpinned."
+        ) from exc
+    return abs((actual - declared).total_seconds()) <= _START_TIME_TOLERANCE_S
+
+
+def _read_one_declaration(source: Path) -> "str | None":
+    """The scripts dir declared by *source* if its run is LIVE, else ``None``.
+
+    Every failure raises rather than returning ``None``: a file that is present but cannot be
+    understood is not the same as no pin, and conflating them is what restored the original
+    defect inside the control built to prevent it. ``None`` means exactly one thing here —
+    a well-formed declaration whose run has ended.
+    """
+    try:
+        # utf-8-sig, not utf-8: Windows PowerShell 5.1 writes a BOM that plain utf-8 decoding
+        # turns into a parse failure, i.e. a correctly-pinned night refused over three bytes.
+        # Tolerated on the READ side so it holds regardless of which shell wrote the file.
+        raw = source.read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        # Raced with a prune between the listing and the read. Nothing is declared by a file
+        # that no longer exists, and a pruner only ever removes declarations already dead.
+        return None
+    except OSError as exc:
+        raise FleetScriptsDirUnavailable(
+            f"the fleet scripts pin at {source} exists but could not be read "
+            f"({type(exc).__name__}: {exc}). Refusing to guess whether this run is pinned. "
+            f"Delete {source} to run unpinned."
+        ) from exc
+    try:
+        payload = json.loads(raw)
+        scripts_dir = str(payload["scripts_dir"]).strip()
+        pid = int(payload["launcher_pid"])
+        started_at = str(payload["launcher_started_at"]).strip()
+    except (ValueError, TypeError, KeyError) as exc:
+        raise FleetScriptsDirUnavailable(
+            f"the fleet scripts pin at {source} is not a usable declaration ({exc}); it must "
+            "carry a scripts_dir plus the launcher_pid and launcher_started_at that say which "
+            f"run it belongs to. Delete {source} to run unpinned."
+        ) from exc
+    if not scripts_dir:
+        raise FleetScriptsDirUnavailable(
+            f"the fleet scripts pin at {source} names no scripts_dir. Delete {source} to run "
+            "unpinned."
+        )
+    if not _launcher_is_live(pid, started_at, source):
+        return None
+    return scripts_dir
+
+
+def read_live_declaration(setup_root: Path) -> str:
+    """The scripts dir declared by a RUNNING pinned run, else ``""`` (unpinned).
+
+    WHY A DIRECTORY OF PER-RUN FILES rather than one file each run replaces. Replacing meant
+    ``Move-Item -Force``, which DELETES the destination before renaming — it un-publishes the
+    declaration. MEASURED over 400 replaces with a stat-only reader: 4,027 of 101,840 reads
+    (3.95%) observed no declaration at all, and absence resolves to the primary checkout,
+    which is #1203 itself restored inside its own fix. Worse, with a reader holding the file
+    open — precisely what a dispatch's ``read_text`` does — 300 of 300 replaces FAILED, and
+    that error reaches the launcher as a terminating error before its stand-down report runs.
+
+    Nothing is ever replaced here, so neither failure has anywhere to live: each run publishes
+    its own new name and no reader is ever competing with a delete. Re-measured against this
+    design: 0 of 34,474 reads saw no declaration, and 0 of 300 publishes failed under a held
+    reader.
+
+    Leftovers are SAFE BY CONSTRUCTION, not by cleanup: a declaration whose launcher is gone
+    is dead on inspection, so an abandoned one is inert without anything having run. Pruning
+    is therefore pure hygiene and correctness never waits on it.
+    """
+    pins = scripts_pin_dir(setup_root)
+    try:
+        sources = sorted(p for p in pins.iterdir() if p.suffix == ".json")
+    except FileNotFoundError:
+        # No directory means no run ever declared anything here — the ordinary unpinned box.
+        return ""
+    except NotADirectoryError as exc:
+        raise FleetScriptsDirUnavailable(
+            f"{pins} is where pinned runs declare their scripts directory, but it is a file, "
+            "not a directory, so no declaration can be read. Refusing to guess whether this "
+            f"run is pinned. Remove {pins} to run unpinned."
+        ) from exc
+    except OSError as exc:
+        raise FleetScriptsDirUnavailable(
+            f"the fleet scripts pin directory {pins} could not be listed "
+            f"({type(exc).__name__}: {exc}). Refusing to guess whether this run is pinned."
+        ) from exc
+
+    # Keyed by the NORMALISED path so two live runs pinning the same tree agree rather than
+    # collide; the value keeps the declaration verbatim, since that is what gets resolved.
+    live: dict[str, tuple[Path, str]] = {}
+    for source in sources:
+        declared = _read_one_declaration(source)
+        if declared is not None:
+            live.setdefault(os.path.normcase(os.path.abspath(declared)), (source, declared))
+    if not live:
+        return ""
+    if len(live) > 1:
+        # Two runs are going at once and they disagree about which code is being measured.
+        # There is no correct choice, so make none: picking either silently mismeasures one
+        # of them, and that is the shape #1203 was — a run confidently reporting on code it
+        # never executed.
+        listed = ", ".join(f"{src} -> {declared}" for _, (src, declared) in sorted(live.items()))
+        raise FleetScriptsDirUnavailable(
+            "two coder runs are in flight at once and they pin different copies of the fleet "
+            f"scripts ({listed}). Refusing to dispatch, because either choice would report on "
+            "code the other run was not running. Let the runs finish, or delete the pin file "
+            "belonging to the one that is over."
+        )
+    return next(iter(live.values()))[1]
+
+
+def resolve_fleet_scripts_dir(setup_root: Path) -> Path:
+    """Resolve the directory the per-task dispatch scripts are executed FROM.
+
+    Order (highest precedence first):
+
+      1. :data:`FLEET_SCRIPTS_DIR_ENV` — an explicit per-process override.
+      2. the on-disk DECLARATION of a RUNNING pinned run, under the state root
+         (:func:`read_live_declaration`).
+      3. ``setup_root / "scripts"`` — the unpinned default, byte-identical to the
+         behaviour of every run before #1181a.
+
+    A value from either 1 or 2 is VALIDATED: it must exist and be a directory, else
+    :class:`FleetScriptsDirUnavailable`. There is no fallback from a named pin — a
+    run that silently used the primary's scripts is the exact failure this prevents.
+
+    WHY THE DECLARATION EXISTS, and why it outranks nothing but is read by everyone:
+    the environment variable travels only by process INHERITANCE, and the process
+    that resolves this for a real dispatch is the running Assistant Orchestrator
+    (``entrypoint.py`` — the only caller of ``execute_swap_dispatch``). The operator's
+    assistant is normally already running, started by the app or restored after a
+    reboot, never by the battery launcher; it therefore never receives the variable.
+    An inheritance-only pin is silently inert in precisely the most common real state
+    of this machine, and it would have to be re-established after every reboot, app
+    restart, model swap and crash-recovery relaunch. The declaration is read at the
+    POINT OF USE by whichever process actually dispatches, so it survives all of
+    those without anyone setting anything by hand.
+
+    ``setup_root`` remains the STATE root: the queue, the run directories and the
+    projects root derive from it and are untouched by the pin."""
+    env_pin = os.environ.get(FLEET_SCRIPTS_DIR_ENV, "").strip()
+    if env_pin:
+        return _validated_pin(Path(env_pin), f"{FLEET_SCRIPTS_DIR_ENV}={env_pin!r}")
+
+    declared = read_live_declaration(setup_root)
+    if declared:
+        # Name the declarations directory AND what was declared: "the pin declared in <dir>
+        # does not name a readable directory" leaves the reader knowing the complaint but not
+        # the culprit, and the culprit is the only part they can act on.
+        return _validated_pin(
+            Path(declared), f"the pin declared in {scripts_pin_dir(setup_root)} ({declared!r})"
+        )
+
+    return setup_root / "scripts"
+
+
+def scripts_dir_provenance(setup_root: Path) -> str:
+    """WHERE the resolved scripts dir came from: ``"env"``, ``"declaration"`` or
+    ``"default"``. Recorded into the run's durable record (the swap spec) so a later
+    session can tell which scripts a past run actually used without re-deriving it
+    from an environment that no longer exists. A run that cannot prove what it
+    measured is the defect class #1181a exists for."""
+    if os.environ.get(FLEET_SCRIPTS_DIR_ENV, "").strip():
+        return "env"
+    if read_live_declaration(setup_root):
+        return "declaration"
+    return "default"
+
+
+def _validated_pin(candidate: Path, origin: str) -> Path:
+    """A named pin must be usable. Fail-closed: never fall back to the primary."""
+    if not candidate.is_dir():
+        raise FleetScriptsDirUnavailable(
+            f"{origin} does not name a readable directory. This pins the fleet's "
+            "dispatch scripts to the measured tree; refusing to fall back to the "
+            "primary checkout, because a run that silently used the primary's "
+            "scripts is the exact failure this pin exists to prevent (#1181a). "
+            "Remove the pin to run unpinned."
+        )
+    return candidate
+
 
 def resolve_fleet_root(env_name: str, toml_value: "object" = "") -> str:
     """Resolve one fleet-dispatch root path string. Order (highest precedence first):
@@ -753,8 +1092,11 @@ def build_default_config(
     """The fleet paths for this host. The two ROOTS are config-driven
     ([fleet_dispatch].agentic_setup_dir / projects_dir, threaded from the AO config);
     an empty/None value falls back to the compiled-in default for this box. The
-    scripts/queue/runs paths derive from the agentic-setup root (the fleet's fixed
-    state\\ layout), so only the root is configurable, never the internal structure.
+    queue/runs paths derive from the agentic-setup root (the fleet's fixed state\\
+    layout), so only the root is configurable, never the internal structure. The
+    scripts path is the ONE exception (#1181a): it is CODE rather than state, so
+    :data:`FLEET_SCRIPTS_DIR_ENV` may pin it to a measured worktree while the state
+    paths stay in the primary checkout. Unset (the default) = ``<root>\\scripts``.
     ``plan_graph`` threads the M2 W1 knob ([fleet_dispatch].plan_graph, #740),
     ``vikunja_bridge`` / ``vikunja_bridge_project_id`` thread the #749 durable-ticket
     knobs, ``guest_oracle_enabled`` threads the #744 guest-certified-oracle knob, and
@@ -763,7 +1105,9 @@ def build_default_config(
     setup = Path(agentic_setup_dir) if agentic_setup_dir else _AGENTIC_SETUP
     projects = Path(projects_dir) if projects_dir else _PROJECTS
     return FleetDispatchConfig(
-        scripts_dir=setup / "scripts",
+        # #1181a: the ONLY path that follows the CODE pin. queue/runs below stay on
+        # ``setup`` (the STATE root) — see resolve_fleet_scripts_dir.
+        scripts_dir=resolve_fleet_scripts_dir(setup),
         queue_path=setup / "state" / "fleet-queue.json",
         runs_dir=setup / "state" / "fleet-runs",
         projects_dir=projects,

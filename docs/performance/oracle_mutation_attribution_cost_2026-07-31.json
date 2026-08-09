@@ -1,0 +1,96 @@
+{
+  "measurement": "oracle-mutation audit wall-clock on a REAL battery deliverable, and the per-criterion attribution it now yields (#1195 item 3, L4-KILLS)",
+  "date": "2026-07-31",
+  "ticket": "#1195 item 3",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "ram_gb_effective": 31.323,
+    "gpu": "Intel Arc 140V (Xe2) - NOT used; this stage is CPU-only subprocess work",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "toolchain": {
+    "host_python": "3.11.9",
+    "uv": "0.10.0 (0ba432459 2026-02-05)",
+    "oracle_runner": "uv run --no-project --with pytest==9.1.1 --with hypothesis==6.155.7 python -m pytest -q <oracle>",
+    "runner_is_grade_parity": true,
+    "note": "The runner was NOT substituted. A sibling test on this module injects `sys.executable -m pytest` (0.9 s/invocation); the pinned command costs ~5.67 s because uv builds a fresh ephemeral environment per run and the audit's per-run isolated home defeats caching."
+  },
+  "subject": {
+    "run_id": "20260730-140411-bd",
+    "card": "B2 text-stats (four-arm diamond)",
+    "deliverable": "app/tokenize.py, app/word_frequencies.py, app/neighbor_pairs.py, app/report.py",
+    "exam": "job-oracle-test_job_acceptance.py, 4 tests",
+    "total_mutation_sites": 38,
+    "mutants_planned": 20,
+    "seed": "54b79d6f7443fad5"
+  },
+  "methodology": "The banked run dir was COPIED to scratch and the operator's evidence left untouched; the delivered tree is copied internally by the stage. Each configuration ran once (n=1) through the real entry point tools.dispatch_harness.green_quality.mutation.audit_green_oracles. Other agents were active on the CPU during both runs.",
+  "results": [
+    {
+      "config": "per_job_budget_s = 300.0 (the SHIPPED default, ORACLE_MUTATION_BUDGET_S)",
+      "mutation_audit": "run",
+      "planned": 20,
+      "ran": 19,
+      "killed": 17,
+      "survived": 2,
+      "score": "17/19",
+      "band": "adequate",
+      "finding": "One planned mutant was silently dropped. The status still reads `run` (a complete audit), not `partial-budget`, because the loop's budget checks pass on a positive-but-tiny remaining and the squeezed mutant becomes an uncounted machinery miss. The denominator shrinks; the score does not."
+    },
+    {
+      "config": "per_job_budget_s = 1800.0 (generous, to isolate the budget effect)",
+      "elapsed_s": 350.5,
+      "mutation_audit": "run",
+      "planned": 20,
+      "ran": 20,
+      "killed": 17,
+      "survived": 3,
+      "score": "17/20",
+      "band": "adequate",
+      "finding": "Reproduces the operator's original 2026-07-30 banked figure (17/20) exactly, which also confirms the attribution change does not alter mutation outcomes."
+    }
+  ],
+  "cost_reading": {
+    "measured_per_green_s": 350.5,
+    "prior_docstring_estimate_s": 113,
+    "estimate_basis": "20 x 5.67 s, from a two-function fixture",
+    "understatement_factor": 3.1,
+    "shipped_per_job_budget_s": 300.0,
+    "shipped_battery_budget_s": 900.0,
+    "consequence": "The measured cost of ONE real GREEN exceeds the per-job budget (350.5 > 300) and a four-GREEN night would need ~1402 s against a 900 s stage cap, so later GREENs would be stamped skipped-battery-budget and reach no L4 rung."
+  },
+  "attribution_yield": {
+    "criteria_in_denominator": 6,
+    "before": {
+      "l3_plus_verified": 3,
+      "l4_killed": 0,
+      "fingerprint": "oracle_coverage=3/6 L3+ (weak:0 gap:0 undecidable:3; L4 not measured)"
+    },
+    "after": {
+      "l3_plus_verified": 3,
+      "l4_killed": 3,
+      "l4_survived": 0,
+      "l4_unmeasured": 3,
+      "l4_blind_spots": 2,
+      "fingerprint": "oracle_coverage=3/6 L3+ (weak:0 gap:0 undecidable:3; L4 killed:3 survived:0 unmeasured:3)"
+    },
+    "note": "The headline L3+ figure is unchanged by design: L3 and L4 are both covered, so attribution refines strength without moving the covered count. The 3 unmeasured are the 3 UNDECIDABLE criteria, which never reached L3 and so can support no rung."
+  },
+  "attribution_findings": [
+    "The whole-file 17/20 hid that one of the three survivors (early_return, app/word_frequencies.py:27) sits in `word_frequencies_from_text` - a function no test imports. It is not a weakness in the `word_frequencies` exam at all.",
+    "The other two survivors (boundary + constant, app/neighbor_pairs.py:33) sit in `neighbor_pairs`, which SIMULTANEOUSLY earned L4 via its own test. A criterion can hold the rung and a blind spot at once, so surviving loci are now reported per criterion regardless of level."
+  ],
+  "seam_test": {
+    "test": "tests/integration/test_oracle_mutation_stage.py::test_real_runner_attribution_reaches_the_l4_rung",
+    "marker": "slow",
+    "elapsed_s": 136.51,
+    "what_it_proves": "REAL pinned uv runner -> REAL audit -> banked sidecar -> REAL traceability.assess_run -> L4-KILLS, with nothing substituted."
+  },
+  "not_measured": [
+    "Run-to-run variance: n=1 per configuration, and both runs shared the CPU with other agents. The 19-vs-20 delta is attributed to the budget squeeze because the generous-budget re-run recovered the 20th mutant, but the squeeze was not isolated by instrumenting the per-mutant timeout directly.",
+    "Cost on deliverables larger than this four-module tree, or with more than the _MAX_TARGET_FILES=10 import targets.",
+    "Whether the 5.67 s per-invocation figure still holds under the concurrent load these runs saw; only the end-to-end 350.5 s was timed.",
+    "Node/web exams: no host .js mutation runner exists (#830), so attribution is python-only.",
+    "Attribution behaviour on an exam whose repo pytest config suppresses the failure summary. The suppression itself WAS measured directly (addopts = -rN --tb=no removes both the short summary and the traceback), and the parser is locked against it, but no real battery deliverable carrying such a config was audited."
+  ]
+}

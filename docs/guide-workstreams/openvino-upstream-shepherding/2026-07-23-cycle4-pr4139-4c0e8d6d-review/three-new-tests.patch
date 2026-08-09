@@ -1,0 +1,40 @@
+diff --git a/tests/cpp/logit_filtering.cpp b/tests/cpp/logit_filtering.cpp
+index fbd4314..cb053ed 100644
+--- a/tests/cpp/logit_filtering.cpp
++++ b/tests/cpp/logit_filtering.cpp
+@@ -622,6 +622,35 @@ TEST(ThinkingBudgetTransformTest, TrailingPromptTokensCountTowardBudget) {
+         << "trailing prompt tokens must count toward the budget";
+ }
+ 
++TEST(ThinkingBudgetTransformTest, TrailingCountReachingBudgetForcesAtConstruction) {
++    // A continue_final_message-style prompt whose open <think> block already
++    // carries the whole budget: the first generated token must be the forced
++    // </think>, otherwise the block overshoots the budget by one token.
++    TokenIds prompt{7, THINKING_START_ID, 1, 2};
++    auto transform = ThinkingBudgetTransform(2, THINKING_START_ID, THINKING_END_ID, prompt);
++    EXPECT_TRUE(thinking_transform_is_forcing(transform))
++        << "trailing count == budget must force before the first generated token";
++
++    transform.accept_token(THINKING_END_ID); // the forced </think> is sampled
++    EXPECT_FALSE(thinking_transform_is_forcing(transform))
++        << "the forced close must return the transform to passthrough";
++}
++
++TEST(ThinkingBudgetTransformTest, TrailingCountOverBudgetForcesAtConstruction) {
++    // More trailing tokens than the budget allows: still forces immediately.
++    TokenIds prompt{THINKING_START_ID, 1, 2, 4, 6};
++    auto transform = ThinkingBudgetTransform(2, THINKING_START_ID, THINKING_END_ID, prompt);
++    EXPECT_TRUE(thinking_transform_is_forcing(transform))
++        << "trailing count > budget must force, not wrap around";
++}
++
++TEST(ThinkingBudgetTransformTest, UnlimitedBudgetIgnoresTrailingCount) {
++    // The disabled budget must stay disabled no matter how long the open block is.
++    TokenIds prompt{THINKING_START_ID, 1, 2, 4};
++    auto transform = ThinkingBudgetTransform(-1, THINKING_START_ID, THINKING_END_ID, prompt);
++    EXPECT_FALSE(thinking_transform_is_forcing(transform));
++}
++
+ TEST(ThinkingBudgetTransformTest, NaturalCloseBeforeBudgetBecomesPassthrough) {
+     TokenIds prompt{THINKING_START_ID};
+     auto transform = ThinkingBudgetTransform(10, THINKING_START_ID, THINKING_END_ID, prompt);

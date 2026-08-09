@@ -51,9 +51,11 @@ milestone-1 number:
    cold-loads the 14B → reports; otherwise a total no-op that never touches the fleet's OVMS/sentinel.
    Converges to "14B up, 30B down" after any crash or reboot.
 
-**Key rulings folded:** the pre-load gate is **`[fleet_dispatch].swap_min_free_gb = 21`** (LA-set,
-matching start-llm's own gate; the milestone-1-margin recommendation was 24, recorded as a trade-off —
-the gate is graceful so a 21–23 GB load thrashes-then-loads, never a hard fail); **conv-state is never
+**Key rulings folded:** the pre-load gate is **`[fleet_dispatch].swap_min_free_gb`**, LA-set and held
+in lockstep with start-llm's own gate. It was **21** at this ADR's acceptance (the milestone-1-margin
+recommendation was 24, recorded as a trade-off — the gate is graceful so a 21–23 GB load
+thrashes-then-loads, never a hard fail). **It has moved twice since; see Amendment 3 for the current
+value and its provenance — do not read the 21 above as live.** **conv-state is never
 persisted to disk** (only `{run_id, session_id, tasks, phase}`; the conversation reloads from the
 encrypted `sessions.db` by `session_id` — privacy-absolute); cancel granularity is **per-task**.
 
@@ -88,8 +90,10 @@ wiring it unvalidated into the live boot/dispatch path would add risk no test co
 - **Full-relaunch UX:** the WinUI window closes during the swap and re-opens after (a consequence of
   the in-process-14B architecture + the no-reconnect WinUI; the nicer window-stays-up UX is the #670
   reconnect follow-up).
-- **21 GiB gate** trades the milestone-1 margin for fewer false-aborts + start-llm consistency; safe
-  because the gate is graceful.
+- **The headroom gate** trades the milestone-1 margin for fewer false-aborts + start-llm consistency;
+  safe because the gate is graceful. Set at 21 GiB here; **moved to 20 (measured) and then 19
+  (operator directive) — see Amendment 3**, which also records why the graceful abort is what makes an
+  unmeasured floor recoverable.
 
 ## Rejected alternatives
 
@@ -208,3 +212,67 @@ cleared.
 
 **Rejected:** dropping `capture_output` globally (breaks the run-fleet stdout parsing); a discrete-GPU
 budget probe before the re-run (the iGPU doesn't expose it reliably; RAM-free is the right proxy here).
+
+## Amendment 3 — the pre-load headroom floor moves twice: 21 → 20 (measured) → 19 (directive) (2026-08-07, #1313)
+
+The floor this ADR set at **21 GiB** has moved twice. The two moves have **different epistemic
+standing**, and conflating them is exactly the rot this amendment exists to prevent.
+
+**21 → 20 GiB (#777, 2026-07-09) — MEASURED.** The original 21 inherited the 2026-06-21 era
+(OpenVINO GenAI 2026.1.0, lowest observed success 23.1 GiB), a dataset that had never *tested* below
+23.1 — so 21 was an inference wearing a measurement's clothes. #777 converted it into a real
+measurement: on OV GenAI 2026.2.1 with a warm compile cache, a supervised 30B load from a **19.85 GiB
+ambient** reached READY in ~13 s with no page storm (Available floor 4.6 GiB), no gate-step slowdown
+under the post-load squeeze, and a normal generation afterwards. The floor moved to 20 on that
+evidence. *(This move was never indexed here when it landed — a register gap this amendment closes.)*
+
+**20 → 19 GiB (#1313, 2026-08-07) — AN OPERATOR DIRECTIVE, NOT A MEASUREMENT.** The 20 GiB floor was
+refusing coder dispatches and blocking work. The Lead Architect directed the floor to 19 and accepted
+the risk. **No supervised load has been run at 19 GiB.** 19 sits **0.85 GiB below the lowest ambient at which
+a supervised, post-step-aside load — the shape this gate measures — has been recorded** (#777's 19.85
+GiB), so this setting is, strictly, extrapolation past that evidence. Recording it as anything else
+would launder a judgement call into data.
+
+**Scope that claim carefully; an earlier draft of this amendment did not.** It is NOT true that no 30B
+load has ever succeeded below 19.85 GiB. #784's live probe
+(`docs/performance/probe_livecheck_2026-07-10.json`, condition `co_resident_artifact`) reached READY
+from a **9.83 GiB** ambient with the 14B still resident, in 34.8 s against the clean path's 15.5 s.
+That run is explicitly non-representative — a wrong certs root meant the AO was never stopped — and is
+no licence to lower this gate further. But it is the most relevant measurement anyone has of the
+failure MODE, and it argues **for** this directive rather than against it: under headroom pressure
+this substrate **degrades** (slower weight staging) rather than hard-failing. The reviewer who caught
+the overstatement is the reason this paragraph exists.
+
+**Why the risk is acceptable, stated as a trade-off rather than a reassurance.** The gate is graceful
+by construction: on refusal the driver aborts to safe and restores the 14B (NEVER-ZERO teardown), and
+the load itself is bounded by the 480 s deadline. So a floor set too thin costs a **failed dispatch**,
+not a wedged box or lost work. Set against that, a floor set too *thick* costs every dispatch the
+operator cannot run — which is the live, recurring, observed cost that prompted the change. The
+asymmetry favours the lower floor. The COLD-load caveat #777 carried still applies and is now larger:
+a post-OVMS-upgrade (#747 class) load stages more than the warm run measured.
+
+**The lockstep set.** The floor is not one number. All five move together — and a first pass at this amendment named only four, having updated the driver's *signature* default while missing the spec fallback that actually decides a swap. Pre-merge review caught it; the distinction is now load-bearing in both the table and the regression lock, and `default.toml`'s
+comment on the key is the authority for the current value:
+
+| Surface | Repo |
+|---|---|
+| `[fleet_dispatch].swap_min_free_gb` — `services/assistant_orchestrator/config/default.toml` | BlarAI |
+| `spec.get("gate_gb", ...)` — `shared/fleet/swap_ops.py` — **the REACHABLE fallback** (the detached driver rehydrates from a persisted spec; a spec lacking the key gates on this) | BlarAI |
+| `SwapDriver.__init__(gate_gb=...)` signature default — `shared/fleet/swap_driver.py` — unreachable today (every production construction passes `gate_gb`), held in lockstep anyway | BlarAI |
+| `$needGB` for coder-30b — `scripts/start-llm.ps1` | agentic-setup |
+| `$LEAN_GATE_GIB` battery lean-preflight (= gate + 0.5) — `scripts/run-battery-night.ps1` | agentic-setup |
+
+**Regression lock — behavioural, deliberately not constant-equality.**
+`tests/security/test_swap_floor_enforced.py` drives a real `SwapDriver` through its real step-8 gate
+and proves it **refuses at floor − 0.1 GiB and admits at floor + 0.1 GiB**, with the threshold resolved
+from the shipped config rather than restated in the test. Per principle 12 it also tests the control
+OFF: the same headroom reading must flip to refused when the gate is raised, which is what
+distinguishes "the floor is enforced" from "the driver admits everything". The lock was
+mutation-verified at authoring time — disabling the gate comparison fails two of its tests. A lock
+asserting only `swap_min_free_gb == 19.0` would have passed against that same broken gate.
+
+**Rejected:** lowering the `21.0` fallbacks in `entrypoint.py` to match (a fallback *higher* than the
+configured floor is merely conservative, a *lower* one silently admits refused swaps — only the second
+direction is a defect, and the new lock closes it; the cosmetic drift is #1315); running a supervised
+measurement at 19 first (the operator accepted the risk explicitly rather than waiting for a
+measurement window, and the graceful-abort backstop makes the unmeasured margin recoverable).

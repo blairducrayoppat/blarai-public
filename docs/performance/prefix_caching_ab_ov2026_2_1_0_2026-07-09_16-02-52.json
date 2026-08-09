@@ -1,0 +1,201 @@
+{
+  "harness": "prefix_caching_ab",
+  "schema_version": 1,
+  "plan": "docs/performance/prefix_caching_ab_validation_plan.md",
+  "vikunja": "#711",
+  "generated_utc": "2026-07-09T23:02:52Z",
+  "environment": {
+    "cpu": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+    "os": "Windows 10.0.26200",
+    "python": "3.11.9",
+    "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+    "total_ram_gib": 31.32,
+    "mem_ceiling_gib": 31.323,
+    "gpu": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+    "gpu_driver": "unavailable"
+  },
+  "methodology": {
+    "ab_protocol": "flag flipped PER ARM (never pinned): fresh pipeline per (angle x enable_prefix_caching) combo, del+gc+settle between",
+    "pipeline": "primary arms use the PRODUCTION seam build_shared_pipeline(..., enable_prefix_caching=<arm>) \u2014 INT4 14B + pruned-6L draft, spec-decode ON, per-request num_assistant_tokens=3 (DEC-01/ISS-1); non-production controls (cache_size != 3, spec-OFF sub-arms) use a direct mirrored build and are labelled pipeline_kind=direct_control",
+    "runs": 2,
+    "warmup_discarded": 1,
+    "aggregates": "median + std + p95 (+ mean, n) on every metric",
+    "ttft": "streamer-callback hardware-timed first token",
+    "do_sample": false,
+    "cache_size_gb": 3,
+    "thermal": "cooldown-separated combos (120.0 s)",
+    "memory_instruments": {
+      "gpu_mem_*": "GPU_MEMORY_STATISTICS (cl_mem ~ reserved KV pool, usm_host ~ weights/working)",
+      "sys_peak_used_gib": "psutil avail-RAM delta vs the 31.323 GiB ceiling (shared-LPDDR5X iGPU proxy)",
+      "caveat": "blind to prefix-cache hit savings (pool reserved at cache_size); watched for pressure only"
+    },
+    "prompts": "fixed version-controlled builders in this script (unit-tested byte-stability)"
+  },
+  "config": {
+    "angles": [
+      "S1",
+      "S3"
+    ],
+    "runs": 2,
+    "warmup": 1,
+    "cache_size": 3,
+    "gen_tokens": 128,
+    "s2_turns": 10,
+    "s5_gen_tokens": 256,
+    "prefix_tokens": 3072,
+    "cooldown_s": 120.0,
+    "steady_state": false,
+    "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft_model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu"
+  },
+  "steady_state_warmup": null,
+  "results": [
+    {
+      "angle": "S1",
+      "description": "shared-prefix repeated turns (fixed ~3K system+tools prefix, distinct short queries)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "prefix_tokens_actual": 3839,
+        "ttft_cold_first_ms": 5993.5,
+        "tpot_cold_first_ms": 163.29,
+        "ttft_warm_ms": {
+          "median": 5855.95,
+          "mean": 5855.95,
+          "std": 18.96,
+          "p95": 5873.02,
+          "n": 2
+        },
+        "tpot_warm_ms": {
+          "median": 165.89,
+          "mean": 165.89,
+          "std": 0.43,
+          "p95": 166.28,
+          "n": 2
+        },
+        "total_latency_warm_ms": {
+          "median": 14565.35,
+          "mean": 14565.35,
+          "std": 124.55,
+          "p95": 14677.45,
+          "n": 2
+        },
+        "decode_tok_s_warm": 6.03,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 1100318,
+          "usm_host": 8982626528,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.366,
+        "sys_peak_used_gib": 11.96
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "prefix_tokens_actual": 3839,
+        "ttft_cold_first_ms": 5965.2,
+        "tpot_cold_first_ms": 162.73,
+        "ttft_warm_ms": {
+          "median": 353.22,
+          "mean": 353.22,
+          "std": 3.69,
+          "p95": 356.54,
+          "n": 2
+        },
+        "tpot_warm_ms": {
+          "median": 166.56,
+          "mean": 166.56,
+          "std": 0.79,
+          "p95": 167.27,
+          "n": 2
+        },
+        "total_latency_warm_ms": {
+          "median": 9097.87,
+          "mean": 9097.87,
+          "std": 120.99,
+          "p95": 9206.75,
+          "n": 2
+        },
+        "decode_tok_s_warm": 6.0,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 986836,
+          "usm_host": 8982626528,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.366,
+        "sys_peak_used_gib": 11.81
+      },
+      "warm_ttft_on_over_off": 0.06
+    },
+    {
+      "angle": "S3",
+      "description": "no-reuse worst case (every prompt fully unique via nonce prefix)",
+      "off": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "ttft_ms": {
+          "median": 3494.84,
+          "mean": 3494.84,
+          "std": 18.15,
+          "p95": 3511.18,
+          "n": 2
+        },
+        "tpot_ms": {
+          "median": 149.37,
+          "mean": 149.37,
+          "std": 0.21,
+          "p95": 149.56,
+          "n": 2
+        },
+        "decode_tok_s": 6.69,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 656464,
+          "usm_host": 8982625042,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.366,
+        "sys_peak_used_gib": 11.8
+      },
+      "on": {
+        "pipeline_kind": "shared_pipeline_production_seam",
+        "ttft_ms": {
+          "median": 3586.72,
+          "mean": 3586.72,
+          "std": 5.21,
+          "p95": 3591.41,
+          "n": 2
+        },
+        "tpot_ms": {
+          "median": 150.1,
+          "mean": 150.1,
+          "std": 0.46,
+          "p95": 150.51,
+          "n": 2
+        },
+        "decode_tok_s": 6.66,
+        "gpu_mem_peak_bytes": {
+          "cl_mem": 3219942400,
+          "unknown": 0,
+          "usm_device": 4448804,
+          "usm_host": 8984466116,
+          "usm_shared": 0
+        },
+        "gpu_mem_kv_pool_gib": 2.999,
+        "gpu_mem_host_gib": 8.367,
+        "sys_peak_used_gib": 11.71
+      }
+    }
+  ],
+  "not_measured": [
+    "prefix-cache HIT memory savings -- the reserved KV pool is fixed at cache_size regardless of hits, so GPU/host memory readouts are blind to hit savings; the caching win is read from TTFT/throughput only (plan honest-caveat, carried from #709)",
+    "angles not selected this run: S2, S4, S5, S6, S7, S8",
+    "thermal steady-state plateau (cooldown-separated run; re-run with --steady-state for the sustained-throttled comparison)"
+  ]
+}

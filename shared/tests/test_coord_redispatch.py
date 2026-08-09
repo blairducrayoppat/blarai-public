@@ -99,8 +99,12 @@ class TestVerdictContract:
         assert cr.REDISPATCH_ELIGIBLE_RESULTS == frozenset({"PARKED"})
 
     def test_excluded_pins_every_non_candidate(self) -> None:
+        # REFUSED (#1181a): the dispatch declined to start because the scripts pin and the
+        # dispatching process disagreed about which code was under test. No task ran, so
+        # there is no honest shortfall to re-ask about — and a redispatch would re-hit the
+        # same refusal until the disagreement itself is resolved.
         assert cr.REDISPATCH_EXCLUDED_RESULTS == frozenset(
-            {"MERGED", "BLOCKED", "NOTHING", "TIMEOUT", "UNKNOWN"}
+            {"MERGED", "BLOCKED", "NOTHING", "TIMEOUT", "UNKNOWN", "REFUSED"}
         )
 
     def test_eligible_and_excluded_are_disjoint(self) -> None:

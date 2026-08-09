@@ -104,6 +104,131 @@ def clean_grade_environ(repo_root: "str | Path", base: "dict[str, str] | None" =
     return merged
 
 
+#: uv's own directories, and the environment variable that overrides each:
+#: ``(override_var, app_data_root_var, subpath)``. Both live UNDER an app-data root, so a
+#: caller that redirects those roots for isolation hides uv's managed interpreter and its
+#: wheel cache from it — see :func:`uv_dir_overlay`.
+UV_DIR_OVERRIDES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("UV_PYTHON_INSTALL_DIR", "APPDATA", ("uv", "python")),
+    ("UV_CACHE_DIR", "LOCALAPPDATA", ("uv", "cache")),
+)
+
+
+def uv_dir_overlay(base: "dict[str, str] | None" = None) -> dict[str, str]:
+    """The env OVERLAY that keeps uv's managed interpreter + wheel cache reachable for a
+    caller that redirects ``APPDATA`` / ``LOCALAPPDATA`` into an isolated dir.
+
+    uv keeps its managed CPython under ``%APPDATA%\\uv\\python`` and its wheel cache under
+    ``%LOCALAPPDATA%\\uv\\cache``. Redirecting those roots does not make uv FAIL — it makes
+    uv silently fall back to whatever interpreter it can still find, whose site-packages
+    inject their own ``pytest11`` entry points. Pytest can then die during plugin load,
+    before it prints anything at all, and a grader reading that empty output cannot tell a
+    broken runner from a defective oracle. That defeats the whole point of pinning the
+    runner: a verdict reached here only predicts the verdict at grade time if both ran on
+    the same interpreter.
+
+    An OVERLAY the caller merges over its base environment BEFORE the redirect
+    (``env.update(uv_dir_overlay(env))``). A variable *base* already sets is left alone (an
+    explicit override always wins), and a directory that is not on disk is omitted rather
+    than invented, so uv falls back to its own defaults rather than to a path we made up.
+    Locations are resolved from the LIVE environment, never hardcoded — a fixed absolute
+    path would survive a reboot perfectly and follow the operator nowhere.
+
+    Avoidance alone is not a control: on a host where the root variables are unset this
+    overlay is empty and uv falls back exactly as before. Callers must therefore still be
+    able to DETECT a runner that did not run (see ``oracle_qa.confirm_collectable``'s
+    ``not-run`` stamp), never infer a result from silence.
+
+    The interpreter directory is pinned only when it actually HOLDS one — see
+    :func:`_has_managed_interpreter`. Exporting a variable at an empty directory would be a
+    path uv ignores on its way to the fallback, i.e. not a pin, and it would manufacture
+    exactly the state :func:`uv_parity_is_vouched` exists to catch. The cache directory is
+    pinned on presence alone: a cold cache costs a wheel fetch, never a different
+    interpreter."""
+    src = os.environ if base is None else base
+    overlay: dict[str, str] = {}
+    for var, root, parts in UV_DIR_OVERRIDES:
+        if src.get(var):
+            continue
+        base_dir = os.environ.get(root)
+        if not base_dir:
+            continue
+        real = Path(base_dir).joinpath(*parts)
+        usable = (_has_managed_interpreter(real) if var == "UV_PYTHON_INSTALL_DIR"
+                  else real.is_dir())
+        if usable:
+            overlay[var] = str(real)
+    return overlay
+
+
+def _has_managed_interpreter(directory: "str | Path | None") -> bool:
+    """Whether *directory* actually CONTAINS a uv-managed interpreter.
+
+    The question every caller here needs, and NOT the one ``Path.is_dir()`` answers. uv lays
+    its managed pythons out as ``<root>/cpython-<version>-<platform>/python.exe``, and an
+    empty-but-present ``<root>`` is a directory uv looks in, finds nothing in, and abandons
+    for the system interpreter. Measured 2026-07-31: pinning ``UV_PYTHON_INSTALL_DIR`` at an
+    existing empty directory resolves ``sys._base_executable`` to ``C:\\Python314\\python.exe``
+    — the exact contaminated interpreter #1200 exists because of — while a presence check
+    reports the pin healthy. (``sys.executable`` shows uv's ephemeral build venv, which is
+    what makes this easy to miss.)"""
+    if not directory:
+        return False
+    root = Path(directory)
+    try:
+        if not root.is_dir():
+            return False
+        for child in root.iterdir():
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            if (child / "python.exe").is_file() or (child / "bin" / "python3").is_file():
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def _native_managed_root() -> "str | None":
+    """Where uv looks for managed interpreters with NO redirect applied — an explicit operator
+    override if there is one, else uv's own default under the real app-data root."""
+    explicit = os.environ.get("UV_PYTHON_INSTALL_DIR")
+    if explicit:
+        return explicit
+    base = os.environ.get("APPDATA")
+    return str(Path(base).joinpath("uv", "python")) if base else None
+
+
+def uv_parity_is_vouched(env: "dict[str, str]") -> bool:
+    """Whether the interpreter uv resolves under *env* is the one it would resolve natively.
+
+    The companion to :func:`uv_dir_overlay`, and the reason avoidance alone is not a control.
+    The overlay can silently produce nothing — a root variable unset, a permissions error, a
+    uv release that relocates the directory — and where the fallback happens to WORK, a result
+    is true about what it measured and silently false about grade parity: the same defect the
+    redirect caused, wearing the remedy's uniform.
+
+    Asks about PARITY, not about pinning, because those come apart in BOTH directions and an
+    earlier presence-check version of this got both wrong (measured 2026-07-31):
+
+    * a host with no managed interpreter at all loses nothing to the redirect — uv resolves
+      the same system python at probe time and at grade time — so parity holds, and firing
+      there would convict an honest run on every invocation, forever;
+    * a pin at an existing but EMPTY directory loses everything, because uv abandons it for
+      the system interpreter, while looking perfectly healthy to a presence check.
+
+    So: if uv would not have used a managed interpreter anyway there is no parity to lose and
+    this is vouched. Otherwise the env must actually reach one."""
+    if not _has_managed_interpreter(_native_managed_root()):
+        return True
+    return _has_managed_interpreter(env.get("UV_PYTHON_INSTALL_DIR"))
+
+
+def runner_is_uv(cmd: "list[str]") -> bool:
+    """Whether *cmd* grades through uv (vs. the current-interpreter fallback). Parity is a
+    uv property; a command that never invokes uv has no uv pin to lose."""
+    return bool(cmd) and Path(cmd[0]).stem.lower() == "uv"
+
+
 def write_clean_grade_ini(dir_path: "str | Path") -> Path:
     """Write :data:`CLEAN_GRADE_INI_CONTENT` to ``<dir_path>/grade-clean.ini`` (a
     HARNESS-OWNED directory — the run dir on the host, the extract root in the guest)

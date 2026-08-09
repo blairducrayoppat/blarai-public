@@ -1,0 +1,92 @@
+{
+  "harness": "kv_cache_sweep",
+  "schema_version": 2,
+  "measurement_state": "cooldown_separated",
+  "steady_state_warmup": null,
+  "supersedes": "docs/performance/_invalid/kv_cache_sweep_2026-06-29_13-11-56.json (Vikunja #709)",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "model_dir": "C:\\Users\\mrbla\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+  "geometry": {
+    "num_hidden_layers": 40,
+    "num_key_value_heads": 8,
+    "head_dim": 128
+  },
+  "methodology": {
+    "cache_size": "right-sized per (precision,context) from analytical KV x margin (NOT the production cache_size=3)",
+    "cache_margin": 1.5,
+    "cache_floor_gb": 4,
+    "pipeline": "fresh per (precision,context), del+gc+settle between combos",
+    "warmup": "one untimed generate at the FULL context length before timing",
+    "cooldown_s": 120.0,
+    "thermal": "fanless Arc 140V throttles under sustained long-context prefill; combos are cooldown-separated so each starts from a comparable baseline, and per-rep TTFT (ttft_ms_first = cool start vs the median = sustained) is retained",
+    "prefix_caching": false,
+    "draft": null,
+    "do_sample": false,
+    "memory_instruments": {
+      "analytical_kv_gib": "ground truth from geometry x precision bytes (the true precision lever)",
+      "gpu_mem_kv_pool_gib": "GPU_MEMORY_STATISTICS cl_mem \u2014 the reserved KV pool (tracks cache_size)",
+      "gpu_mem_host_gib": "GPU_MEMORY_STATISTICS usm_host \u2014 model weights + working buffers",
+      "sys_peak_used_gib": "system-RAM proxy (shared-LPDDR5X iGPU); coarse whole-footprint check",
+      "note": "usm_device stays ~0 on this iGPU; the KV pool is pre-reserved to cache_size, so the precision lever is read from analytical_kv_gib, not the reserved-pool size"
+    }
+  },
+  "config": {
+    "contexts": [
+      32768
+    ],
+    "precisions": [
+      "u8"
+    ],
+    "repeats": 2,
+    "gen_tokens": 128,
+    "cooldown_s": 120.0
+  },
+  "results": [
+    {
+      "precision": "u8",
+      "context": 32768,
+      "input_tokens": 32768,
+      "cache_size_gb": 4,
+      "analytical_kv_gib": 2.5,
+      "kv_precision_supported": true,
+      "kv_precision_applied": true,
+      "load_compile_s": 9.1,
+      "actual_tokens_mean": 32768,
+      "ttft_ms": {
+        "median": 216516.04,
+        "mean": 216516.04,
+        "std": 2128.66,
+        "n": 2
+      },
+      "tpot_ms": {
+        "median": 311.43,
+        "mean": 311.43,
+        "std": 9.7,
+        "n": 2
+      },
+      "ttft_ms_per_rep": [
+        214387.4,
+        218644.7
+      ],
+      "ttft_ms_first": 214387.4,
+      "gpu_mem_peak_bytes": {
+        "cl_mem": 4293754880,
+        "unknown": 0,
+        "usm_device": 4288308,
+        "usm_host": 8476660977,
+        "usm_shared": 0
+      },
+      "gpu_mem_delta_gib": {
+        "cl_mem": 3.999,
+        "unknown": 0.0,
+        "usm_device": 0.004,
+        "usm_host": 7.895,
+        "usm_shared": 0.0
+      },
+      "gpu_mem_kv_pool_gib": 3.999,
+      "gpu_mem_host_gib": 7.895,
+      "sys_peak_used_gib": 12.32
+    }
+  ]
+}

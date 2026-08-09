@@ -1,0 +1,159 @@
+{
+  "schema": "blarai-grounding-goal-set/v1",
+  "topic": "#1204 plan-time grounding — plain-English goals against the local docs corpus",
+  "companion_document": "docs/reviews/1204-plan-grounding-salience-disproof-2026-07-31.md",
+  "corpus": "2026-07 docset, 13803 pages (docs/research/docset-manifest-2026-07.json)",
+
+  "provenance": {
+    "status": "SALVAGE — partial recovery, not the original evidence",
+    "what_was_lost": "The disproof validated four gates over 164 goals in four sets (design 21, held-out 50, held-out 55, held-out 38). Those goals were never written to disk — no goal file was added or deleted in the whole #1204 branch history, and none is present in the gitignored evidence directory. They existed only in the authoring session's context and its scratch probe scripts.",
+    "why_it_matters": "The conclusions in the companion document cannot be reproduced, extended, or challenged without them. Worse, the loss is not repairable by effort: a held-out set cannot be re-blinded once the reader knows what broke the gates. Reconstruction yields 164 DIFFERENT goals, not these.",
+    "what_this_file_is": "Every goal the companion document and ticket #1204 quote verbatim, banked before the prose is archived and they rot too. Roughly 20 of 164. It is a seed, not a replacement.",
+    "recovered_by": "independent review session, 2026-07-31, before any further attempt on this defect"
+  },
+
+  "recording_rules": {
+    "verbatim_only": "Per the companion document's own rule — a measurement whose input is abbreviated is unreproducible by construction. Every string below is quoted exactly. Any goal that survives only in truncated form is marked verbatim=false and MUST NOT be cited beside a number.",
+    "state_the_population": "A rank without its ranked population is as ambiguous as a query with an ellipsis. Where the source gave a rank, the population is recorded with it."
+  },
+
+  "goals": [
+    {
+      "text": "build a CLI using argparse that reads a csv file",
+      "label": "must_ground",
+      "verbatim": true,
+      "source": "disproof §defect table",
+      "measured": {"bm25_normalised": 0.2986, "floor": 0.35, "best_page": "library/csv", "note": "the RIGHT page, discarded by five hundredths — the defect in one row"}
+    },
+    {
+      "text": "build a CLI using argparse that reads a csv file with the csv module",
+      "label": "must_ground",
+      "verbatim": true,
+      "source": "ticket #1204 measurement block",
+      "measured": {"result": "EMPTY (below floor)"},
+      "note": "Longer variant of the row above. The two differ; do not treat them as one goal."
+    },
+    {
+      "text": "a web page that renders user comments safely without innerHTML",
+      "label": "must_ground",
+      "verbatim": true,
+      "source": "ticket #1204 measurement block",
+      "measured": {"result": "EMPTY (below floor)"}
+    },
+    {
+      "text": "use collections.Counter and itertools.pairwise to count word bigrams",
+      "label": "must_ground",
+      "verbatim": true,
+      "source": "ticket #1204 measurement block",
+      "measured": {"result": "786 chars grounded"},
+      "note": "The control that already works — it names exact symbols. Keep it: a change that breaks this has broken the working half."
+    },
+
+    {
+      "text": "purple elephant birthday cake recipe",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §defect table",
+      "measured": {"bm25_normalised": 0.2643, "floor": 0.35},
+      "note": "The calibrated junk control. Scores 0.0343 BELOW a real goal — which is why lowering the floor is not available."
+    },
+    {
+      "text": "my grandmother baked a big cake for the village fete",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 3",
+      "measured": {"page": "[html] reference/elements/big", "score": 0.0783, "length_ratio": 0.55, "rank": 10, "rank_population": "all 13803 scoring pages", "rank_discrepancy": "independent review reported rank 1 at an IDENTICAL score over a different (probably filtered) population; both are far inside any usable bound"},
+      "note": "Killed gate 3. A SHORT page carrying a rare word ranks high by construction."
+    },
+    {
+      "text": "make a copy of my important documents every friday",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 4",
+      "measured": {"page": "library/copy", "rank": 25, "score": 0.1679},
+      "note": "library/copy is object copying — it steers the planner away from shutil, the module actually wanted."
+    },
+    {
+      "text": "manage the queue at my barber shop on a saturday",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 4",
+      "measured": {"page": "library/queue", "rank": 15, "score": 0.1273}
+    },
+    {
+      "text": "build a site for my running club",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 4",
+      "measured": {"page": "library/site", "rank": 36, "score": 0.1982}
+    },
+    {
+      "text": "an app for the operator of the village bus",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 4",
+      "measured": {"page": "library/operator", "rank": 9, "score": 0.1734}
+    },
+    {
+      "text": "tell me the stat for how many miles I cycled",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 4",
+      "measured": {"page": "library/stat", "rank": 17, "score": 0.1503}
+    },
+    {
+      "text": "keep a mailbox of notes from my grandchildren",
+      "label": "must_stay_silent",
+      "verbatim": true,
+      "source": "disproof §gate 4",
+      "measured": {"page": "library/mailbox", "rank": 2, "score": 0.2788}
+    },
+
+    {
+      "text": "somewhere to keep my secrets safe with a password",
+      "label": "CONTESTED",
+      "verbatim": true,
+      "source": "disproof §candidate 5",
+      "measured": {"page": "library/secrets", "score": 0.4284, "context": "higher than 17 of 23 genuine library groundings"},
+      "note": "The companion document labels this junk and then says of it: 'There the page genuinely earns the score.' Python's secrets module IS documented for password and token generation. Any future measurement must state which way it scored this goal — it is the single case that decides whether a separation claim holds."
+    }
+  ],
+
+  "unrecovered": [
+    {
+      "what": "B2's real battery card goal — the ticket's own observable predicate",
+      "why": "Ticket #1204 quotes it twice and truncates it both times ('a toolkit that reads text and reports how often each word appears...' / 'reads a piece of text and tells me things about it… how often each word appears, and which pairs of neighbouring words show up together most'). Neither is complete.",
+      "consequence": "The ticket's acceptance predicate is not verbatim-reproducible from the ticket. Recover it from the B2 battery card before measuring against it; a reconstruction is NOT this goal.",
+      "irony": "This is the exact defect the companion document names as its expensive lesson, committed in the ticket that document serves."
+    },
+    {
+      "what": "held-out sets 1 (50 goals), 2 (55 goals), 3 (38 goals) and the 21-goal design set",
+      "why": "never written to disk",
+      "consequence": "unrecoverable — see provenance.why_it_matters"
+    }
+  ],
+
+  "word_level_evidence": {
+    "note": "Gate 1 asked whether corpus document frequency can separate topic words from sentence scaffolding. These ten rows are the disproof: the classes interleave on the number line.",
+    "must_reject": {"track": 0.0492, "print": 0.0477, "screen": 0.0468, "date": 0.0429, "header": 0.0411},
+    "must_admit": {"title": 0.0241, "keyboard": 0.0167, "lock": 0.0147, "cursor": 0.0140, "marker": 0.0139},
+    "module_name_traps": {
+      "note": "163 plain-lowercase words resolve to a library/<name> page and pass gates 1+2+4. These 16 were confirmed present in the passing set, and are exactly the vocabulary a non-technical operator writes.",
+      "words": ["calendar", "socket", "queue", "site", "copy", "email", "random", "signal", "platform", "secrets", "wave", "turtle", "glob", "enum", "locale", "webbrowser"],
+      "population_discrepancy": "independent review reported 153; re-measurement gave 163 under the stated method (^[a-z]+$, len>=3, df ratio <=0.05, resolving to library/<name> with no fragment)"
+    }
+  },
+
+  "known_dead_ends": {
+    "note": "Six approaches are measured-and-rejected in the companion document. Read it before proposing any of these. The root cause is word-sense disambiguation, which no lexical statistic derived from the corpus can settle.",
+    "rejected": [
+      "lower the RELEVANCE_FLOOR",
+      "gate 1 — salience by corpus document frequency",
+      "gate 2 — require the word to resolve as a symbol",
+      "gate 3 — corroboration by BM25 rank",
+      "gate 4 — restrict to library/<name> module pages",
+      "candidate 5 — threshold on the corroborating page's score",
+      "candidate 6 — naming context ('use X', 'the X module')"
+    ]
+  }
+}

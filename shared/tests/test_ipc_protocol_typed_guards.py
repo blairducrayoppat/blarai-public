@@ -247,6 +247,18 @@ class TestPlanResultGuards:
         with pytest.raises(ValueError, match="'fell_back' must be bool"):
             framer.decode_plan_result(raw)
 
+    def test_container_coverage_blocked_raises(self, framer: MessageFramer) -> None:
+        raw = _frame(framer, MessageType.PLAN_RESULT, {"coverage_blocked": ["x"]})
+        with pytest.raises(ValueError, match="'coverage_blocked' must be str"):
+            framer.decode_plan_result(raw)
+
+    def test_str_criteria_revision_raises_not_char_exploded(
+        self, framer: MessageFramer
+    ) -> None:
+        raw = _frame(framer, MessageType.PLAN_RESULT, {"criteria_revision": "ops"})
+        with pytest.raises(ValueError, match="'criteria_revision' must be list"):
+            framer.decode_plan_result(raw)
+
     def test_well_formed_and_defaults(self, framer: MessageFramer) -> None:
         tasks = [{"repo": "blarai", "task": "t", "prompt": "p"}]
         criteria = {"goal": "g", "criteria": ["c1"]}
@@ -259,11 +271,14 @@ class TestPlanResultGuards:
             "tasks": tasks, "criteria": criteria,
             "questions": [],  # #819 additive
             "revision": [],  # #820 additive
+            "coverage_blocked": "",  # #1069 S3-F additive
+            "criteria_revision": [],  # #1069 S3-G additive
         }
         empty = _frame(framer, MessageType.PLAN_RESULT, {})
         assert framer.decode_plan_result(empty) == {
             "ok": False, "message": "", "fell_back": False,
             "tasks": [], "criteria": {}, "questions": [], "revision": [],
+            "coverage_blocked": "", "criteria_revision": [],
         }
 
 

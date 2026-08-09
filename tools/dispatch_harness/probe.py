@@ -47,9 +47,17 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-#: ``tools/dispatch_harness/probe.py`` -> the blarai checkout root (parents[2]),
-#: the cwd for a re-booted ``python -m launcher`` (mirrors battery._BLARAI_REPO_ROOT).
-_BLARAI_REPO_ROOT = Path(__file__).resolve().parents[2]
+from tools.dispatch_harness.runtime_root import resolve_runtime_root
+
+#: The blarai checkout the probe STOPS and RESTORES the AO in — its ``certs/launcher.lock``
+#: names the process to stop, and it is the cwd of the ``python -m launcher`` that replaces
+#: it. That is an INSTALLATION question, so it resolves through the same override
+#: ``battery._BLARAI_REPO_ROOT`` uses and defaults to this module's own tree when the
+#: override is unset. The probe loads a real 30B and hands the AO back afterwards, so a
+#: weightless tree here would refuse every night in the marginal admission band — the
+#: admission decision must be made by pinned code about the installed system, never by
+#: whichever tree happened to supply the module about whichever tree happened to supply it.
+_BLARAI_REPO_ROOT = resolve_runtime_root(Path(__file__).resolve().parents[2])
 
 #: The coder-30B serves here (OVMS local socket); the production AO serves here.
 _OVMS_PORT = 8000

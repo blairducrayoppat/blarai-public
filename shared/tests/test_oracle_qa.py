@@ -4,19 +4,32 @@ Every taxonomy defect class is a fixture (the ill-posed strategy B1n2, the inven
 contract + interactive-IO B4, the ``sys.listdir`` no-raise smoke B6), plus the
 FAIL-TO-PASS vacuous case, the traceability unmapped-criterion case, the no-raise
 adequacy-floor case, the regeneration accounting, and the evidence-stamp shape. The
-model calls + subprocesses are faked throughout (offline; the live 14B/subprocess proof
-rides the next live dispatch), so the whole gate runs model-free and subprocess-free.
+model calls are faked throughout, so the taxonomy locks run model-free.
+
+SUBPROCESSES ARE NOT ALL FAKED, and the ``#1200`` section at the foot of this file is why.
+Faking the runner everywhere left ``_qa_env`` and ``_pytest_cmd`` — the seam the live path
+crosses — completely unexercised, and BOTH were broken on this host for at least two banked
+nights while every test here stayed green: uv could not see its managed interpreter through
+the app-data redirect, and the execution command's ``-q``/``-v`` cancelled to dot output
+that the per-test parser reads as "nothing passed". The fast locks there assert the seam's
+shape; the ``@pytest.mark.slow`` ones drive the REAL ``uv run``, because a probe that
+finishes in under a second is not running the runner production uses.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
+import time
 from pathlib import Path
 
 import pytest
 
 from shared.fleet import acceptance as acc
 from shared.fleet import clarify as clr
+from shared.fleet import grade_env
+from shared.fleet import oracle_mutation as mutation
 from shared.fleet import oracle_qa as oq
 from shared.fleet import swap_ops as so
 from shared.fleet.acceptance import (
@@ -166,6 +179,87 @@ def test_scan_invented_contracts_conservative():
     assert oq.scan_invented_contracts(_INVENTED_CONTRACT, set()) == []
     # A local helper / stdlib name is never flagged (only `from <first-party> import`).
     assert oq.scan_invented_contracts(_CLEAN, {"add_expense", "total"}) == []
+
+
+# ---------------------------------------------------------------------------
+# #967 D1 — a DECLARED SUBMODULE import is not an invented contract
+# ---------------------------------------------------------------------------
+
+#: The live shape from dispatch run 20260719-002208-bd: the seeded oracle imports the
+#: plan's declared SUBMODULES (flashcard_app/card_manager.py &c), not functions. Judged
+#: against the function-export set alone, every one of them read as an invented contract
+#: — and because invented_contract outranks a coverage gap, both regeneration rounds went
+#: to phantoms while oracle_coverage sat at 0/6. The run's own import probe resolved all
+#: four names against the built package ("unresolved": []), proving them legitimate.
+_SUBMODULE_IMPORT = (
+    "from flashcard_app import card_manager, quiz_engine, score_tracker, main\n\n"
+    "def test_add_card():\n"
+    "    card_manager.add_card('cat', 'feline')\n"
+    "    assert card_manager is not None\n"
+)
+
+#: That run's plan: five created modules, none of which is an exported NAME.
+_SUBMODULE_CREATES = (
+    "flashcard_app/card_manager.py", "flashcard_app/quiz_engine.py",
+    "flashcard_app/score_tracker.py", "flashcard_app/main.py",
+    "flashcard_app/data_storage.py",
+)
+_SUBMODULE_EXPORTS = ("add_card(front, back)", "quiz_user(f)", "track_score(n)", "run_app()")
+
+
+def _submodule_symbols() -> tuple[set[str], set[str]]:
+    return oq._declared_symbols(
+        _tasks(exports=_SUBMODULE_EXPORTS, creates=_SUBMODULE_CREATES)
+    )
+
+
+def test_scan_invented_contracts_accepts_declared_submodules_967():
+    exports, modules = _submodule_symbols()
+    assert "card_manager" not in exports and "card_manager" in modules
+    # The measured defect: judged against exports alone, every submodule import convicts.
+    without = oq.scan_invented_contracts(_SUBMODULE_IMPORT, exports)
+    assert {f.subject for f in without} == {
+        "card_manager", "quiz_engine", "score_tracker", "main"}
+    # Threading the plan's declared submodules through resolves all four as legitimate.
+    assert oq.scan_invented_contracts(_SUBMODULE_IMPORT, exports, modules) == []
+
+
+def test_scan_invented_contracts_still_flags_invention_when_submodules_declared():
+    # The toggle-off half (CLAUDE.md principle 12): with the WIDENED input the check must
+    # still BLOCK a genuine invention, else "the fix works" is indistinguishable from
+    # "the check now accepts everything".
+    exports, modules = _submodule_symbols()
+    code = (
+        "from flashcard_app import card_manager, check_answer\n\n"
+        "def test_quiz():\n"
+        "    assert check_answer('cat', 'cat') == 'correct'\n"
+    )
+    findings = oq.scan_invented_contracts(code, exports, modules)
+    # The declared submodule passes in the SAME import statement the invention rides in.
+    assert [f.subject for f in findings] == ["check_answer"]
+    assert findings[0].cls == oq.CLASS_INVENTED_CONTRACT
+    # B4's original invention is untouched by the widening.
+    assert [f.subject for f in oq.scan_invented_contracts(
+        _INVENTED_CONTRACT, {"add_card", "quiz"}, modules)] == ["check_answer"]
+    # Only the two DECLARED sets license a name — an unknown one is still an invention
+    # even when a module set is supplied.
+    assert oq.scan_invented_contracts(
+        _INVENTED_CONTRACT, {"add_card"}, {"flashcards"}) != []
+    # The fail-soft floor is unmoved: no declared exports → no judgement, modules or not.
+    assert oq.scan_invented_contracts(_INVENTED_CONTRACT, set(), modules) == []
+
+
+def test_static_findings_submodule_fix_touches_only_the_invented_contract_class():
+    # The accounting pin: threading `modules` through changes the invented-contract class
+    # and NOTHING else — the other static classes are class-for-class identical.
+    exports, modules = _submodule_symbols()
+    before = oq._static_findings(_SUBMODULE_IMPORT, exports, set())
+    after = oq._static_findings(_SUBMODULE_IMPORT, exports, modules)
+    assert sorted(f.cls for f in before if f.cls != oq.CLASS_INVENTED_CONTRACT) == \
+        sorted(f.cls for f in after if f.cls != oq.CLASS_INVENTED_CONTRACT)
+    assert [f.cls for f in after] == []  # the live shape is now statically clean
+    # The module surface itself was always declared — this was never an import-contract miss.
+    assert oq.check_import_contract(_SUBMODULE_IMPORT, modules) == []
 
 
 # ---------------------------------------------------------------------------
@@ -552,8 +646,15 @@ def test_confirm_collectable_confirmed():
     assert stamp == "confirmed" and finding is None
 
 
+# Both fixtures below carry the summary line REAL pytest emits on a collection failure
+# ("no tests collected, 1 error in 1.34s", measured 2026-07-30). Without it these asserted
+# against output pytest cannot produce, and #1200's not-run detection — which asks whether
+# the runner completed at all — correctly declines to read a bare `E ...` line as a verdict.
+
+
 def test_confirm_collectable_structural_defect_flags():
-    run = _fake_run(out="E   hypothesis.errors.InvalidArgument: min_value > max_value")
+    run = _fake_run(out="E   hypothesis.errors.InvalidArgument: min_value > max_value\n"
+                        "no tests collected, 1 error in 1.34s")
     stamp, finding = oq.confirm_collectable(_ILLPOSED_STRATEGY, run=run)
     assert stamp == "unconfirmed" and finding is not None
     assert finding.cls == oq.CLASS_COLLECTABILITY
@@ -561,7 +662,8 @@ def test_confirm_collectable_structural_defect_flags():
 
 def test_confirm_collectable_import_miss_is_no_finding():
     # A stub-synthesis miss must NEVER false-park a valid oracle.
-    run = _fake_run(out="E   ModuleNotFoundError: No module named 'expense'")
+    run = _fake_run(out="E   ModuleNotFoundError: No module named 'expense'\n"
+                        "no tests collected, 1 error in 0.42s")
     stamp, finding = oq.confirm_collectable(_CLEAN, run=run)
     assert stamp == "unconfirmed" and finding is None
 
@@ -918,6 +1020,44 @@ def test_validate_tightens_coverage_to_declared_callables():
     assert result.verdict == "seed-partial"
 
 
+def test_validate_spends_regeneration_on_the_real_gap_not_a_submodule_phantom_967():
+    # The end-to-end shape of the 20260719-002208-bd failure. invented_contract ranks 4,
+    # traceability_gap ranks 7, so a phantom invention WINS the round and the regeneration
+    # budget is spent re-authoring around a legitimate submodule import while the genuine
+    # coverage gap is never addressed. With the submodules declared, the rounds go to the
+    # finding that is actually there.
+    crits = [_crit("c2", "adds a card"), _crit("c7", "no crash on empty deck", "smoke")]
+    tasks = _tasks(exports=_SUBMODULE_EXPORTS, creates=_SUBMODULE_CREATES)
+    oracle = (
+        "from flashcard_app import card_manager, quiz_engine\n"
+        "from flashcard_app.card_manager import add_card\n\n"
+        "def test_add_card():\n"
+        "    add_card('cat', 'feline')\n"
+        "    assert card_manager is not None and quiz_engine is not None\n"
+    )
+    asked: list[str] = []
+
+    def gen(prompt):
+        asked.append(prompt)
+        if "ONE pytest test function" in prompt:
+            return "def test_noop():\n    pass\n"  # the append never covers c7
+        return ""
+
+    result = oq.validate_authored_oracle(
+        oracle, "python", _spec(*crits), tasks,
+        generate_fn=gen,
+        structured_generate_fn=_full_cover_structured({"c2": ["test_add_card"]}),
+    )
+    # No phantom was ever counted, so no round was spent re-authoring the whole file.
+    assert result.counts[oq.CLASS_INVENTED_CONTRACT] == 0
+    assert not any("ONE problem to fix" in p for p in asked)
+    # The regeneration budget went to the REAL residual — the uncovered smoke criterion.
+    assert any("ONE pytest test function" in p for p in asked)
+    assert result.uncovered == ["c7"] and result.covered == ["c2"]
+    assert result.coverage_fraction() == "1/2"
+    assert result.verdict == "seed-partial"
+
+
 def test_validate_node_oracle_skips_deep_qa():
     result = oq.validate_authored_oracle(
         "import test from 'node:test';\ntest('x', () => {});", "node",
@@ -1111,6 +1251,10 @@ def test_seed_gate_no_runner_persists_plan_evidence_and_seeds(tmp_path, monkeypa
     assert res["ok"] is True
     ev = json.loads((config.runs_dir / "R1" / "oracle-qa.json").read_text(encoding="utf-8"))
     assert ev["f2p_baseline"] == "not-run"          # execution gate skipped
+    # BOTH execution stamps, or the persisted evidence carries a verdict for a probe that
+    # never ran. This branch defaulted only the f2p stamp, leaving `collectability` absent
+    # entirely — indistinguishable to a reader from a key the writer forgot.
+    assert ev["collectability"] == "not-run"
     assert ev["findings"]["traceability_gap"] == 1  # plan-time evidence persisted
 
 
@@ -1133,3 +1277,552 @@ def test_seed_gate_containment_unaffected(tmp_path):
     res = so.real_seed_job_oracle(
         config, "R1", str(repo), "../../evil.py", _CLEAN, qa_run=_fake_run())
     assert res["ok"] is False and "refused" in res["evidence"]
+
+
+# ---------------------------------------------------------------------------
+# #1200 — the runner the probes actually get
+#
+# Everything above this line fakes the subprocess. That is what hid this defect for two
+# live nights: `_qa_env` and `_pytest_cmd` are the seam the live path crosses, and an
+# injected `run` never touches either. These lock the seam itself — the env the probes
+# get, the command they build, and (in the @slow tier) the REAL `uv run` executing.
+# ---------------------------------------------------------------------------
+
+
+def _managed_root(app_data_base: Path) -> Path:
+    """Build a REALISTIC uv managed-interpreter tree under *app_data_base* and return its
+    ``uv/python`` root.
+
+    A bare empty ``uv/python`` is not an installation — uv looks inside, finds nothing, and
+    falls back — so a fixture that only mkdir'd the root was testing a state uv treats as
+    absent while the old presence-check called it healthy."""
+    install = app_data_base / "uv" / "python" / "cpython-3.13-windows-x86_64-none"
+    install.mkdir(parents=True, exist_ok=True)
+    (install / "python.exe").write_text("", encoding="utf-8")
+    return app_data_base / "uv" / "python"
+
+
+def _fake_app_data(monkeypatch, tmp_path, *, make_dirs: bool = True):
+    """Point the app-data roots at a tmp tree, optionally with uv really installed there.
+
+    Host-independent on purpose: the pinning must be asserted against a tree this test
+    created, never against whatever this machine happens to have installed."""
+    roaming = tmp_path / "Roaming"
+    local = tmp_path / "Local"
+    if make_dirs:
+        _managed_root(roaming)
+        (local / "uv" / "cache").mkdir(parents=True)
+    else:
+        roaming.mkdir(parents=True)
+        local.mkdir(parents=True)
+    monkeypatch.setenv("APPDATA", str(roaming))
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    monkeypatch.delenv("UV_PYTHON_INSTALL_DIR", raising=False)
+    monkeypatch.delenv("UV_CACHE_DIR", raising=False)
+    return roaming, local
+
+
+def test_qa_env_pins_uv_dirs_outside_the_isolated_home(tmp_path, monkeypatch):
+    """The whole defect in one assertion: uv's dirs must survive the app-data redirect.
+
+    Without this, uv cannot see its managed CPython, silently falls back to a system
+    interpreter, and the probes below report on a runner nobody chose."""
+    roaming, local = _fake_app_data(monkeypatch, tmp_path)
+    home = tmp_path / "isolated"
+    home.mkdir()
+
+    env = oq._qa_env(home)
+
+    assert env["UV_PYTHON_INSTALL_DIR"] == str(roaming / "uv" / "python")
+    assert env["UV_CACHE_DIR"] == str(local / "uv" / "cache")
+
+
+def test_qa_env_still_isolates_the_operators_app_data(tmp_path, monkeypatch):
+    """The pinning must not buy grade parity by giving the isolation away: the app-data
+    roots themselves still point into the throwaway home, and the two uv paths are the ONLY
+    things reaching outside it."""
+    _fake_app_data(monkeypatch, tmp_path)
+    home = tmp_path / "isolated"
+    home.mkdir()
+
+    env = oq._qa_env(home)
+
+    assert env["LOCALAPPDATA"] == str(home)
+    assert env["APPDATA"] == str(home)
+    escaping = {k for k, v in env.items()
+                if k.startswith("UV_") and not str(v).startswith(str(home))}
+    assert escaping == {"UV_PYTHON_INSTALL_DIR", "UV_CACHE_DIR"}
+
+
+def test_uv_overlay_never_invents_a_directory(tmp_path, monkeypatch):
+    """A path we made up is worse than uv's own default: it would look pinned and resolve
+    to nothing."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=False)
+    assert grade_env.uv_dir_overlay() == {}
+
+
+def test_uv_overlay_leaves_an_explicit_override_alone(tmp_path, monkeypatch):
+    """An operator/CI override always wins — the overlay pins what was NOT chosen."""
+    _fake_app_data(monkeypatch, tmp_path)
+    chosen = {"UV_PYTHON_INSTALL_DIR": "D:/pythons"}
+    overlay = grade_env.uv_dir_overlay(chosen)
+    assert "UV_PYTHON_INSTALL_DIR" not in overlay
+    assert overlay["UV_CACHE_DIR"].endswith("cache")
+
+
+def test_the_two_modules_share_ONE_uv_rule():
+    """oracle_qa and oracle_mutation redirect the same roots for the same isolation and hit
+    this defect independently. A second copy of the remedy is how a third module gets it
+    wrong silently — the rule has one home."""
+    env: dict = {}
+    mutation._preserve_uv_dirs(env)
+    assert env == grade_env.uv_dir_overlay({})
+
+
+# --- the fail-loud half: a runner that never ran is not a verdict -----------
+
+
+#: The real stderr shape of the fallback interpreter dying during pytest plugin load
+#: (captured 2026-07-30): a traceback, and NO pytest summary line anywhere.
+_BROKEN_RUNNER_STDERR = (
+    "Traceback (most recent call last):\n"
+    r'  File "C:\Python314\Lib\importlib\metadata\__init__.py", line 179, in load' "\n"
+    "    module = import_module(match.group('module'))\n"
+    r'  File "C:\Python314\Lib\site-packages\pytest_textual_snapshot.py", line 23' "\n"
+    "    from rich.console import Console\n"
+    "ModuleNotFoundError: No module named 'rich'\n"
+)
+
+
+def test_collect_probe_stamps_not_run_when_the_runner_died():
+    """The control that makes avoidance safe. Pinning uv can stop working (an unset APPDATA,
+    a moved install) — so the probe must be able to SAY it never ran, rather than reporting
+    `unconfirmed`, which reads as a verdict on the oracle and is what banked for two nights."""
+    run = _fake_run(out="", err=_BROKEN_RUNNER_STDERR)
+    stamp, finding = oq.confirm_collectable(_CLEAN, run=run)
+    assert stamp == "not-run", (
+        "a runner that died before pytest printed anything produced NO evidence about the "
+        "oracle; stamping 'unconfirmed' dresses a machinery miss as a measurement"
+    )
+    assert finding is None
+
+
+def test_collect_probe_not_run_is_distinct_from_a_real_collection_failure():
+    """The toggle on the distinction itself: the same non-zero exit, but WITH a pytest
+    summary, is a genuine result and must still be read as one."""
+    run = _fake_run(out="1 error in 0.10s", err="E   SyntaxError: invalid syntax")
+    stamp, finding = oq.confirm_collectable(_ILLPOSED_STRATEGY, run=run)
+    assert stamp == "unconfirmed" and finding is not None
+
+
+def test_a_result_that_never_probed_does_not_claim_unconfirmed():
+    """The plan-time path never reaches the subprocess probe. Its default said `unconfirmed`
+    — a verdict on an exam nothing had looked at."""
+    assert oq.OracleQAResult(oracle_code=_CLEAN).collectability == "not-run"
+
+
+# --- the command: verbosity is load-bearing, and -q -v cancel ---------------
+
+
+def test_execution_runs_are_verbose_enough_to_parse_per_test(tmp_path):
+    """`_passed_tests` reads `<file>::<name> PASSED` lines. `-q` and `-v` are one counter in
+    pytest, so the two together produce dot output and EVERY passing test parses as absent —
+    a vacuous oracle then grades all-fail clean."""
+    cmd = oq._pytest_cmd("t.py", tmp_path / "clean.ini", collect_only=False)
+    assert cmd is not None
+    assert "-v" in cmd and "-q" not in cmd
+
+
+def test_collect_only_runs_stay_quiet(tmp_path):
+    """Collect-only is read by exit code + a collection signal, not per test."""
+    cmd = oq._pytest_cmd("t.py", tmp_path / "clean.ini", collect_only=True)
+    assert cmd is not None
+    assert "-q" in cmd and "-v" not in cmd
+
+
+# --- the REAL runner: @slow, because they cost what production costs ---------
+#
+# Documented environmental delta: skipped where `uv` is absent. `_pytest_cmd` falls back to
+# the current interpreter there, which is a different runner and cannot prove grade parity.
+
+_NEEDS_UV = pytest.mark.skipif(shutil.which("uv") is None,
+                               reason="grade parity is a uv property; no uv on this host")
+
+#: A genuinely VACUOUS oracle: it passes against an empty tree, so the F2P baseline must
+#: convict it. Reused by the real-runner pair below.
+_REALLY_VACUOUS = "def test_always_green():\n    assert True\n"
+
+
+@pytest.mark.slow
+@_NEEDS_UV
+def test_REAL_uv_runner_confirms_a_collectable_oracle():
+    """The test this module never had. No injected `run` — the actual `uv run --no-project`
+    command, the actual redirected env, the actual pytest.
+
+    On this host it returned `unconfirmed` on every invocation before #1200, because uv fell
+    back to a system interpreter whose site-packages broke pytest's plugin load."""
+    started = time.perf_counter()
+    stamp, finding = oq.confirm_collectable(_CLEAN)
+    elapsed = time.perf_counter() - started
+
+    assert stamp == "confirmed", f"the real runner could not collect a clean oracle: {finding}"
+    assert elapsed > 1.0, (
+        f"the probe finished in {elapsed:.2f}s — a real `uv run` does not, so this test has "
+        "stopped exercising the seam it exists for"
+    )
+
+
+@pytest.mark.slow
+@_NEEDS_UV
+def test_REAL_uv_runner_convicts_a_vacuous_oracle(tmp_path):
+    """The end-to-end property the whole gate exists for, driven for real: a test that passes
+    with NO implementation present is vacuous and must be a HARD finding.
+
+    Catches both #1200 defects at once — a broken runner stamps `not-run`, and a runner whose
+    output cannot be parsed per test stamps `all-fail`, which is a FALSE clean."""
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+
+    stamp, findings = oq.fail_to_pass_baseline(_REALLY_VACUOUS, str(skeleton))
+
+    assert stamp == "vacuous:test_always_green", (
+        f"stamp was {stamp!r}; 'not-run' means the runner never ran, 'all-fail' means it ran "
+        "and its output could not be parsed per test — both let a vacuous oracle seed"
+    )
+    assert len(findings) == 1 and findings[0].hard
+
+
+@pytest.mark.slow
+@_NEEDS_UV
+def test_TOGGLE_without_the_uv_pinning_the_probe_stops_confirming(monkeypatch):
+    """Principle 12 — the control proved OFF. Removing the pinning must visibly change which
+    interpreter runs, or the two tests above are passing for reasons unrelated to the fix.
+
+    Asserted on the RESOLVED INTERPRETER rather than on the stamp: what the fallback
+    interpreter happens to be is a property of the host, but that the redirect hides uv's
+    managed one is a property of the redirect, and that is the defect."""
+    import subprocess
+
+    real_python_dir = grade_env.uv_dir_overlay({}).get("UV_PYTHON_INSTALL_DIR")
+    if not real_python_dir:
+        pytest.skip("uv has no managed interpreter installed here; nothing to hide")
+
+    def resolve(env: dict) -> str:
+        out = subprocess.run(  # noqa: S603 — argv list, no shell
+            [shutil.which("uv"), "run", "--no-project", "python", "-c",
+             "import sys; print(sys.executable)"],
+            capture_output=True, text=True, env=env, timeout=300,
+        )
+        return out.stdout.strip()
+
+    with tempfile.TemporaryDirectory(prefix="oracle_qa_toggle_") as home:
+        pinned = oq._qa_env(Path(home))
+        unpinned = dict(pinned)
+        for var in ("UV_PYTHON_INSTALL_DIR", "UV_CACHE_DIR"):
+            unpinned.pop(var, None)
+
+        assert resolve(pinned).lower().startswith(real_python_dir.lower()), (
+            "the pinned env did not reach uv's managed interpreter — the fix is not doing "
+            "what the tests above credit it for"
+        )
+        assert not resolve(unpinned).lower().startswith(real_python_dir.lower()), (
+            "removing the pinning changed nothing, so this host cannot demonstrate the "
+            "defect and the tests above prove nothing about it"
+        )
+
+
+# --- the gap `not-run` cannot close: a pin that quietly did not take --------
+
+
+def test_a_run_whose_uv_pin_did_not_take_is_not_called_confirmed(tmp_path, monkeypatch):
+    """RESIDUAL 4. The pin can fail silently — a root variable unset, a permissions error, a
+    uv release that relocates the directory — and where the fallback interpreter happens to
+    WORK, the collect succeeds and nothing fails. `not-run` cannot fire. `confirmed` would be
+    true about collectability and silently false about the parity the pin exists for."""
+    # uv IS installed natively (so there is parity to lose) but the overlay failed to pin it —
+    # a permissions error, a relocated directory. THAT is the degraded state. A host with no
+    # managed interpreter at all is not degraded and must not be convicted; see below.
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)
+    monkeypatch.setattr(grade_env, "uv_dir_overlay", lambda base=None: {})
+    monkeypatch.setattr(shutil, "which", lambda name: "C:/tools/uv.exe" if name == "uv" else None)
+    run = _fake_run(out="collected 2 items", ok=True)        # the fallback WORKED
+
+    stamp, finding = oq.confirm_collectable(_CLEAN, run=run)
+
+    assert stamp == "parity-unverified", (
+        f"stamp was {stamp!r} — a collect that succeeded on an interpreter we could not pin "
+        "must not borrow the clean word; that is the original defect wearing the fix's uniform"
+    )
+    assert finding is None, "an unvouched runner is not evidence of a defective oracle"
+
+
+def test_TOGGLE_restoring_the_pin_restores_confirmed(tmp_path, monkeypatch):
+    """The other half of the same control (principle 12): identical run, identical output,
+    the ONLY difference is that uv's directory is now reachable. If this did not flip back to
+    `confirmed`, the check above would be convicting every run rather than degraded ones."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)    # the overlay can pin now
+    monkeypatch.setattr(shutil, "which", lambda name: "C:/tools/uv.exe" if name == "uv" else None)
+    run = _fake_run(out="collected 2 items", ok=True)
+
+    stamp, finding = oq.confirm_collectable(_CLEAN, run=run)
+
+    assert (stamp, finding) == ("confirmed", None)
+
+
+def test_the_non_uv_fallback_runner_is_not_convicted_of_a_parity_loss(tmp_path, monkeypatch):
+    """Precision, so fail-loud does not become cry-wolf: where no uv exists the command runs
+    the current interpreter and there is no uv pin to have lost. Convicting it would make the
+    stamp meaningless on every host without uv."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=False)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    run = _fake_run(out="collected 2 items", ok=True)
+
+    stamp, _ = oq.confirm_collectable(_CLEAN, run=run)
+
+    assert stamp == "confirmed"
+
+
+def test_an_override_pointing_at_nothing_is_not_a_pin(tmp_path, monkeypatch):
+    """`uv_dir_overlay` honours an explicit override, so the parity check must not take the
+    variable's mere presence as proof — uv ignores a path that holds no interpreter."""
+    monkeypatch.setenv("APPDATA", str(_managed_root(tmp_path / "native").parent.parent))
+    monkeypatch.delenv("UV_PYTHON_INSTALL_DIR", raising=False)
+    assert not grade_env.uv_parity_is_vouched({"UV_PYTHON_INSTALL_DIR": str(tmp_path / "gone")})
+    assert not grade_env.uv_parity_is_vouched({})
+    assert grade_env.uv_parity_is_vouched(
+        {"UV_PYTHON_INSTALL_DIR": str(_managed_root(tmp_path / "other"))})
+
+
+# --- the same discipline on the sibling: `all-fail` reads as CLEAN ----------
+
+
+def test_f2p_clean_verdict_from_an_unvouched_runner_is_not_called_all_fail(tmp_path, monkeypatch):
+    """The symmetric case. `fail_to_pass_baseline` shares `_qa_env`, so it can complete on the
+    same unvouched interpreter — and its clean word is `all-fail`, which is exactly the false
+    green this gate exists to prevent. The asymmetry was worse than the original defect: the
+    probe that refuses to borrow the clean word makes the one that does look deliberate."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)    # parity exists to be lost
+    monkeypatch.setattr(grade_env, "uv_dir_overlay", lambda base=None: {})
+    monkeypatch.setattr(shutil, "which", lambda name: "C:/tools/uv.exe" if name == "uv" else None)
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+    run = _fake_run(out="_qa_f2p_probe.py::test_x FAILED\n1 failed in 0.10s")
+
+    stamp, findings = oq.fail_to_pass_baseline(_CLEAN, str(skeleton), run=run)
+
+    assert stamp == "parity-unverified", f"a clean F2P verdict was stamped {stamp!r}"
+    assert findings == []
+
+
+def test_TOGGLE_f2p_reachable_interpreter_restores_all_fail(tmp_path, monkeypatch):
+    """Identical run, identical output; the only difference is a reachable directory."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)
+    monkeypatch.setattr(shutil, "which", lambda name: "C:/tools/uv.exe" if name == "uv" else None)
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+    run = _fake_run(out="_qa_f2p_probe.py::test_x FAILED\n1 failed in 0.10s")
+
+    stamp, findings = oq.fail_to_pass_baseline(_CLEAN, str(skeleton), run=run)
+
+    assert (stamp, findings) == ("all-fail", [])
+
+
+def test_f2p_non_uv_runner_is_not_convicted_of_a_parity_loss(tmp_path, monkeypatch):
+    """No uv, no uv pin to lose — convicting here would make the stamp noise."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=False)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+    run = _fake_run(out="_qa_f2p_probe.py::test_x FAILED\n1 failed in 0.10s")
+
+    stamp, _ = oq.fail_to_pass_baseline(_CLEAN, str(skeleton), run=run)
+
+    assert stamp == "all-fail"
+
+
+def test_an_unvouched_runner_does_NOT_soften_a_vacuous_conviction(tmp_path, monkeypatch):
+    """The deliberate asymmetry, locked. ONLY the clean outcome is downgraded.
+
+    A test that PASSES with no implementation present is evidence whichever interpreter
+    observed it, and softening a HARD finding would weaken the gate — a capability change, not
+    a defect fix. `failure_taxonomy` also keys off the `vacuous` prefix, so the shape is load
+    bearing beyond this module."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)
+    monkeypatch.setattr(grade_env, "uv_dir_overlay", lambda base=None: {})
+    monkeypatch.setattr(shutil, "which", lambda name: "C:/tools/uv.exe" if name == "uv" else None)
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+    run = _fake_run(out="_qa_f2p_probe.py::test_always PASSED\n1 passed in 0.01s")
+
+    stamp, findings = oq.fail_to_pass_baseline(_NO_FIRST_PARTY, str(skeleton), run=run)
+
+    assert stamp == "vacuous:test_always"
+    assert len(findings) == 1 and findings[0].hard
+
+
+# --- a machinery miss must not be able to SPELL itself like a result -------
+
+
+#: Real uv failure text. Contains " failed" twice and would have satisfied the old
+#: substring-based `_run_completed`, turning a network failure into a clean F2P verdict.
+_UV_FETCH_ERROR = (
+    "error: Failed to fetch: https://pypi.org/simple/pytest/\n"
+    "  Caused by: Request failed after 3 retries\n"
+)
+
+
+@pytest.mark.parametrize("blob", [
+    _UV_FETCH_ERROR,
+    "error: No interpreter found for Python 3.13 in managed installations\n",
+    "error: Distribution not found: hypothesis==6.155.7\n",
+    "The system cannot find the path specified.\n",
+])
+def test_machinery_failures_are_never_read_as_a_completed_run(blob):
+    """`_run_completed` gates F2P's clean verdict. It once accepted the bare substrings
+    ' passed' / ' failed' / ' error' / '=== ', which ordinary English contains — so a uv
+    network error read as a run that completed with nothing passing, i.e. `all-fail`, i.e.
+    CLEAN, from a run that never executed a test."""
+    assert not oq._run_completed(blob), f"a machinery miss was read as a completed run: {blob!r}"
+
+
+@pytest.mark.parametrize("blob", [
+    "1 failed in 0.02s",
+    "no tests collected, 1 error in 1.34s",
+    "collected 2 items",
+    "= 1 passed in 0.39s =",
+    "no tests ran in 0.01s",
+    "errors during collection",
+])
+def test_real_pytest_completions_are_still_recognised(blob):
+    """The other direction: tightening must not turn genuine runs into false `not-run`s,
+    which would make the gate permanently unmeasurable in the safe-looking direction."""
+    assert oq._run_completed(blob)
+
+
+def test_the_FAILURES_banner_still_counts_as_a_completed_run():
+    """REGRESSION LOCK — `_run_completed` is NOT private to this module.
+
+    `oracle_mutation._mutant_verdict` calls it, and there "the run completed and failed"
+    means the mutant was KILLED while "the run did not complete" means NOT COUNTED. A repo
+    whose ``addopts`` suppresses the short summary (``-rN --tb=no`` — exactly the config
+    #1195 wrote its killer-parsing fallback for) produces a RED run carrying the FAILURES
+    banner and NO count line.
+
+    An earlier draft of this branch's anchoring pass dropped the banner along with the
+    unanchored ``"=== "`` it was right to remove. Measured then: `_mutant_verdict(False,
+    banner)` returned None where main returned False — a genuine kill silently leaving both
+    `oracle_mutation_killed` and `oracle_mutation_ran`, which are REGISTERED counts
+    (`shared/instrument_registry.py`). Main's own `test_oracle_mutation.py` stayed green
+    throughout, because `failing_tests` and `_run_completed` read the same blob by different
+    routes — so no existing gate could catch it.
+
+    Toggle: delete `_PYTEST_FAILURES_RE` from `_run_completed` and this goes red.
+    """
+    banner = "=========== FAILURES ===========\n_________ test_beta _________\n"
+    assert oq._run_completed(banner), (
+        "a RED run whose repo suppresses the short summary was read as a machinery miss — "
+        "downstream, oracle_mutation stops COUNTING a mutant it genuinely killed")
+
+
+def test_the_banner_must_be_a_LINE_not_a_phrase():
+    """CONTROL for the lock above, and the reason the pattern is line-anchored.
+
+    Re-admitting the banner must not re-open the hole the anchoring pass closed: prose that
+    merely mentions the banner is not evidence pytest ran."""
+    assert not oq._run_completed("the doc says === FAILURES === appears in output")
+    assert not oq._run_completed(
+        "error: Failed to fetch https://x  Request failed after 3 retries")
+
+
+def test_f2p_does_not_return_clean_from_a_uv_network_failure(tmp_path):
+    """The blocker end to end, at the seam that matters: the vacuity gate must not certify a
+    clean exam because uv could not reach the index.
+
+    This branch was DEAD before the runner was fixed — F2P stamped `not-run` on every
+    invocation on this host — so repairing the interpreter is what brought it live on the
+    dispatch path, and with it this fail-open."""
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+
+    stamp, findings = oq.fail_to_pass_baseline(
+        _CLEAN, str(skeleton), run=_fake_run(out="", err=_UV_FETCH_ERROR))
+
+    assert stamp == "not-run", (
+        f"a uv network failure was stamped {stamp!r}; 'all-fail' would certify the oracle "
+        "discriminates on the strength of a run that never executed a test"
+    )
+    assert findings == []
+
+
+# --- the two edges that broke the presence-check predicate ------------------
+#
+# Both MEASURED on the real uv (2026-07-31) via sys._base_executable — sys.executable only
+# reports uv's ephemeral build venv, which is what made the empty-directory case easy to miss.
+
+
+def test_a_pin_at_an_EMPTY_directory_is_not_parity(tmp_path, monkeypatch):
+    r"""TOO NARROW, the edge the presence-check let straight through.
+
+    `UV_PYTHON_INSTALL_DIR` at a directory that exists but holds no interpreter: uv looks in,
+    finds nothing, and falls back. Measured — `sys._base_executable` resolves to
+    `C:\Python314\python.exe`, the exact contaminated interpreter #1200 exists because of —
+    while `Path.is_dir()` reports the pin healthy. Reachable in production from a uv upgrade
+    relocating the version dir, an interpreter removed, or a partial install."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)     # uv IS installed natively
+    hollow = tmp_path / "hollow_pin"
+    hollow.mkdir()
+
+    assert not grade_env.uv_parity_is_vouched({"UV_PYTHON_INSTALL_DIR": str(hollow)}), (
+        "an existing but empty interpreter directory was vouched as parity — uv abandons it "
+        "for the system interpreter, so this is the original defect with a healthy-looking pin"
+    )
+
+
+def test_the_overlay_never_pins_an_EMPTY_interpreter_directory(tmp_path, monkeypatch):
+    """The same question in the function that SETS the variable. Pinning a hollow directory
+    would manufacture precisely the state the guard above convicts — a control firing on a
+    state its own sibling created."""
+    roaming, local = tmp_path / "Roaming", tmp_path / "Local"
+    (roaming / "uv" / "python").mkdir(parents=True)           # present, no interpreter
+    (local / "uv" / "cache").mkdir(parents=True)
+    monkeypatch.setenv("APPDATA", str(roaming))
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    monkeypatch.delenv("UV_PYTHON_INSTALL_DIR", raising=False)
+    monkeypatch.delenv("UV_CACHE_DIR", raising=False)
+
+    overlay = grade_env.uv_dir_overlay({})
+
+    assert "UV_PYTHON_INSTALL_DIR" not in overlay, (
+        "the overlay exported a pin at a directory uv ignores — not a pin, and it would make "
+        "the parity guard convict a configuration the overlay itself created"
+    )
+    assert overlay["UV_CACHE_DIR"].endswith("cache"), "a cold cache costs a fetch, not parity"
+
+
+def test_a_host_with_NO_managed_interpreter_is_not_convicted(tmp_path, monkeypatch):
+    r"""TOO WIDE, and it is my own rule turned on my own fix: a fail-loud control that convicts
+    healthy configurations gets muted.
+
+    Where uv has no managed interpreter at all, the redirect changes NOTHING — measured, the
+    probe-time and grade-time `sys._base_executable` are the same `C:\Python314\python.exe`,
+    so parity genuinely holds. The presence-check version fired `unpinned` on every such run,
+    forever, because the overlay had nothing to pin."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=False)    # uv NOT installed natively
+
+    assert grade_env.uv_parity_is_vouched({}), (
+        "a host that never had a managed interpreter has no parity to lose; convicting it "
+        "makes parity-unverified permanent noise and the stamp gets ignored"
+    )
+
+
+def test_the_two_edges_disagree_so_the_predicate_is_doing_real_work(tmp_path, monkeypatch):
+    """The pair pinned together, because each alone is satisfiable by a constant: a predicate
+    hardwired True passes the no-interpreter case, hardwired False passes the hollow-pin case.
+    Only both at once require it to actually ask the question."""
+    _fake_app_data(monkeypatch, tmp_path, make_dirs=True)
+    hollow = tmp_path / "hollow"
+    hollow.mkdir()
+    real = _managed_root(tmp_path / "elsewhere")
+
+    assert not grade_env.uv_parity_is_vouched({"UV_PYTHON_INSTALL_DIR": str(hollow)})
+    assert grade_env.uv_parity_is_vouched({"UV_PYTHON_INSTALL_DIR": str(real)})

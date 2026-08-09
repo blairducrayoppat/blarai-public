@@ -28,9 +28,12 @@ _SPEC_DIR = Path(__file__).resolve().parents[2] / "evals" / "battery"
 # ===========================================================================
 
 
-def test_all_eight_cards_load_and_validate():
+def test_all_shipped_cards_load_and_validate():
+    # Was "all_eight" until 2026-08-06, when B9 (the first MULTI-PAGE web card) joined the
+    # set. The count is deliberately still pinned rather than globbed: a card appearing or
+    # vanishing unnoticed is a silent change to what the fleet is measured on.
     cards = bat.load_cards(_SPEC_DIR)
-    assert set(cards) == {f"B{i}" for i in range(1, 9)}
+    assert set(cards) == {f"B{i}" for i in range(1, 11)}
     for cid, card in cards.items():
         assert card["units"] >= 1
         assert bat._SANDBOX_REPO_RE.match(card["repo"]), f"{cid} repo not sandbox-pinned"
@@ -93,7 +96,7 @@ def test_existing_battery_cards_are_all_frozen():
     # The seed FROZEN eval set: every shipped card loads, validates, and resolves to
     # card_class 'frozen' — byte-behavior-identical to before the split (#838 D4).
     cards = bat.load_cards(_SPEC_DIR)
-    assert set(cards) == {f"B{i}" for i in range(1, 9)}
+    assert set(cards) == {f"B{i}" for i in range(1, 11)}
     for cid, card in cards.items():
         assert card["card_class"] == bat.CARD_CLASS_FROZEN, f"{cid} not frozen"
         assert bat.resolve_card_class(card) == "frozen"
@@ -101,7 +104,7 @@ def test_existing_battery_cards_are_all_frozen():
 
 def test_frozen_battery_cards_carry_the_explicit_frozen_stamp():
     # The born-frozen attestation is ON DISK, not merely defaulted (#838 D4).
-    for i in range(1, 9):
+    for i in range(1, 11):
         raw = json.loads((_SPEC_DIR / f"B{i}.json").read_text(encoding="utf-8"))
         assert raw.get("card_class") == "frozen", f"B{i}.json is missing the frozen stamp"
 
@@ -1726,7 +1729,8 @@ async def test_dirty_sandbox_is_refused_before_any_spend(tmp_path):
     written = sc.read_scorecard(tmp_path / "out" / "B1.scorecard.json")
     assert written.evidence["sandbox_freshness"] == bat.SANDBOX_DIRTY
     assert written.evidence["sandbox_agent_commits"] == "1"
-    assert written.evidence["sandbox_commit_count"] == "2"
+    # #1341 renamed this: the gate's reading is the SEED, and only the seed.
+    assert written.evidence["sandbox_seed_commit_count"] == "2"
     assert "agent: build the widget" in written.evidence["sandbox_offending_subjects"]
     assert "sandbox_opt_out" not in written.evidence  # no opt-out was engaged
 
@@ -1741,7 +1745,7 @@ async def test_fresh_sandbox_proceeds_and_the_condition_rides_the_record(tmp_pat
     assert harness.dispatched == ["battery-cleanpass"]
     written = sc.read_scorecard(tmp_path / "out" / "B1.scorecard.json")
     assert written.evidence["sandbox_freshness"] == bat.SANDBOX_FRESH
-    assert written.evidence["sandbox_commit_count"] == "1"
+    assert written.evidence["sandbox_seed_commit_count"] == "1"
     assert "sandbox_opt_out" not in written.evidence
 
 

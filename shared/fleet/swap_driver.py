@@ -75,7 +75,8 @@ def _false() -> bool:
     return False
 
 
-def _noop_design_loop(_app_dir: str, _goal: str, _visual_criteria_json: str) -> dict:
+def _noop_design_loop(_app_dir: str, _goal: str, _visual_criteria_json: str,
+                      _declared_surface: str = "") -> dict:
     """Default ``SwapOps.run_design_loop`` — design critique unavailable, so the design phase
     no-ops (a single pass that reports nothing actionable). Legacy tests construct ``SwapOps``
     without it; the live ``build_swap_ops`` wires the real capture+critique pass. ``ok`` is
@@ -451,7 +452,7 @@ class SwapOps:
     # #688 Phase 3: ONE end-of-run VLM capture+critique pass over the built app, returning
     # ``{should_iterate, needs_work, feedback, layout_hard, capture_tier}``. The driver calls it
     # with the 30B already unloaded (GPU free). Fail-soft in the live impl; default no-ops.
-    run_design_loop: Callable[[str, str, str], dict] = _noop_design_loop
+    run_design_loop: Callable[..., dict] = _noop_design_loop
     # #687 task 2: cross-model 14B code critic — one post-merge pass over the 30B's diff,
     # returning ``{should_iterate, verdict, findings}``. Called as (app_dir, base_branch,
     # base_sha) — base_sha (#693) is main's pre-dispatch HEAD ("" -> the script falls back
@@ -811,6 +812,56 @@ def _oracle_unfit_from_run_dir(run_dir: "str | Path | None") -> bool:
     if not isinstance(data, dict):
         return False
     return _coverage_is_zero(data.get("oracle_coverage"))
+
+
+#: The two execution-stage stamps ``shared.fleet.oracle_qa`` writes. Each names a probe that
+#: either produced a real result or did not run; only a real result is evidence.
+#:
+#: Imported from the module that WRITES the stamps rather than re-declared here: two copies
+#: of a vocabulary drift, and the drift would be silent in exactly the direction that hurts
+#: — a stamp this file did not recognise as "not measured" would be treated as evidence and
+#: let an unvalidated oracle delete work again (#1342).
+from shared.fleet.oracle_qa import STAMPS_NOT_MEASURED as _QA_STAMPS_NOT_MEASURED
+
+
+def _oracle_execution_validated(run_dir: "str | Path | None") -> bool:
+    """Was the job oracle ever proven capable of FAILING?
+
+    True only when the run's ``oracle-qa.json`` carries a real result for BOTH execution-stage
+    probes — the fail-to-pass baseline (does the oracle fail on a tree where the product does not
+    yet exist?) and collectability. ``not-run``, ``skipped``, ``unknown``, absent, unreadable,
+    malformed: all False.
+
+    **This deliberately fails in the OPPOSITE direction to its sibling**
+    :func:`_oracle_unfit_from_run_dir`, and the asymmetry is the point. That function moves a
+    VERDICT, so it fails soft toward "we cannot say" — a false positive would wrongly downgrade a
+    finished run. This one gates whether work may be DELETED from the plan, so it fails closed
+    toward "not validated": being wrong here in the permissive direction removes a task the
+    operator asked for, while being wrong in the strict direction costs one coder candidate and
+    builds something that may already exist. Those are not comparable prices.
+
+    #1342 measured the permissive direction's cost. A node job oracle skips both probes
+    unconditionally (``oracle_qa.f2p_seed_gate`` returns early for any non-``.py`` path), so a
+    website — the operator's stated priority — always reached the already-satisfied pre-check with
+    an oracle nothing had ever validated. B9's was five tests of which two had empty bodies; it
+    passed on any tree, the pre-check believed it, and ``create-piece-detail-page`` and
+    ``acceptance-tests`` were dropped from a plan that then graded GREEN. Never raises."""
+    if not run_dir:
+        return False
+    try:
+        path = Path(run_dir) / "oracle-qa.json"
+        if not path.is_file():
+            return False
+        data = json.loads(path.read_text(encoding="utf-8")[:_ORACLE_QA_MAX_CHARS])
+    except (OSError, ValueError, TypeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    for key in ("f2p_baseline", "collectability"):
+        value = data.get(key)
+        if not isinstance(value, str) or value.strip().lower() in _QA_STAMPS_NOT_MEASURED:
+            return False
+    return True
 
 
 def compute_job_verdict(
@@ -1367,6 +1418,25 @@ SETTLE_TIMEOUT_S = 60.0
 #: release before the 30B loads (#670 run-2 — a single snapshot raced the release; the
 #: wait-verify replaced it). On expiry the driver proceeds on the graceful 14B unload.
 GPU_SETTLE_TIMEOUT_S = 15.0
+#: Step-8 RAM wait-verify: how long to wait for system RAM to clear ``gate_gb`` before
+#: gate-aborting (#1128 — a single snapshot wasted the whole ~4h+ job envelope on a
+#: ~100s false abort the night the wrapper's own real-load probe had just admitted at a
+#: lower floor, #784's PROBE_FLOOR_GIB, and the OS hadn't finished reclaiming pages from
+#: the probe's own 30B-unload + 14B reboot yet). Matches the wrapper's own ~30-minute
+#: night-admission re-check cadence, spent here at per-job scope instead.
+RAM_GATE_TIMEOUT_S = 1800.0
+#: How long the RAM gate waits WITHOUT PROGRESS before calling the shortfall structural
+#: rather than transient (#1274). The full window above exists for pressure that is
+#: CLEARING — the probe's own 30B-unload and 14B reboot still returning pages (#1128). When
+#: availability is not climbing at all, nothing is clearing: the memory is held by resident
+#: processes that will not release it, and every further poll is dead time charged to the
+#: job's envelope. MEASURED 2026-08-06: a manual run sat the full 1800 s at 19.7 GiB against
+#: a 20 GiB gate and aborted anyway — 30 minutes spent re-reading a number that never moved.
+RAM_GATE_STALL_S = 300.0
+#: The improvement over the FIRST reading that counts as "clearing". Below this the trend is
+#: noise, not reclamation. Deliberately small: the question is whether pages are coming back
+#: at all, not whether they are coming back fast.
+RAM_GATE_PROGRESS_GIB = 0.25
 #: Teardown verify-the-stop, first window: let a ~15 GB OVMS unload finish before crying
 #: wolf (#670 B2 — a too-short window manufactures a phantom "still alive" and a needless
 #: forced Stop-Process while a large unload is legitimately finishing).
@@ -1388,9 +1458,15 @@ class SwapDriver:
         tasks: list[dict],
         swap_state_path: Path,
         ops: SwapOps,
-        gate_gb: float = 20.0,   # GiB (F1); matches start-llm's coder-30b gate ($needGB=20, #777 measured 2026-07-09)
+        gate_gb: float = 19.0,   # GiB (F1) — FALLBACK ONLY; the live floor is [fleet_dispatch].swap_min_free_gb,
+                                 # which the AO always passes explicitly. Held in lockstep with start-llm's $needGB
+                                 # so this fallback can never be laxer than the configured gate (#1313).
         settle_timeout_s: float = SETTLE_TIMEOUT_S,
         settle_poll_s: float = 2.0,
+        ram_gate_timeout_s: float = RAM_GATE_TIMEOUT_S,  # #1128 RAM wait-verify window
+        ram_gate_poll_s: float = 30.0,
+        ram_gate_stall_s: float = RAM_GATE_STALL_S,       # #1274 no-progress cutoff
+        ram_gate_progress_gib: float = RAM_GATE_PROGRESS_GIB,
         gpu_gate_gb: float = 15.0,            # 30B GPU need (GiB) — the wait-verify target (#670 run-2)
         gpu_settle_timeout_s: float = GPU_SETTLE_TIMEOUT_S,
         gpu_settle_poll_s: float = 2.0,
@@ -1469,6 +1545,10 @@ class SwapDriver:
         self._gate_gb = gate_gb
         self._settle_timeout_s = settle_timeout_s
         self._settle_poll_s = max(0.01, settle_poll_s)
+        self._ram_gate_timeout_s = ram_gate_timeout_s
+        self._ram_gate_poll_s = max(0.01, ram_gate_poll_s)
+        self._ram_gate_stall_s = ram_gate_stall_s
+        self._ram_gate_progress_gib = ram_gate_progress_gib
         self._gpu_gate_gb = gpu_gate_gb
         self._gpu_settle_timeout_s = gpu_settle_timeout_s
         self._gpu_settle_poll_s = max(0.01, gpu_settle_poll_s)
@@ -1612,6 +1692,49 @@ class SwapDriver:
                 return False
             self._sleep(self._settle_poll_s)
             waited += self._settle_poll_s
+
+    def _await_ram_clear(self) -> float:
+        """Poll available RAM until it clears ``gate_gb`` or the RAM gate window expires (step 8).
+
+        Mirrors :meth:`_await_gpu_clear`'s wait-verify shape: the wrapper's own night-admission
+        probe can admit a night off a real-load success at a LOWER floor than this gate enforces
+        (#784's ``PROBE_FLOOR_GIB`` vs this driver's ``gate_gb``), and the OS may not have finished
+        reclaiming pages from the probe's own 30B-unload + 14B reboot by the time the first job's
+        swap starts. A single snapshot there wastes the job's whole multi-hour envelope on a
+        ~100-second false abort (#1128) instead of giving transient pressure the same kind of
+        settling room the GPU check already gets.
+
+        STRUCTURAL PRESSURE EXITS EARLY (#1274). The window above is for headroom that is
+        CLEARING. If availability has not climbed by :data:`RAM_GATE_PROGRESS_GIB` over the
+        first reading after :data:`RAM_GATE_STALL_S`, nothing is being reclaimed — the memory
+        is held by resident processes — and the remaining poll time is dead, charged to the
+        job's envelope for a number that will not move. Measured 2026-08-06: a run sat the
+        full 1800 s at 19.7 GiB against a 20 GiB gate. The transient case is untouched,
+        because a clearing system trips the progress test almost immediately."""
+        waited = 0.0
+        first: "float | None" = None
+        best = 0.0
+        while True:
+            avail = self._ops.available_gb()
+            if first is None:
+                first = avail
+            best = max(best, avail)
+            if avail >= self._gate_gb or waited >= self._ram_gate_timeout_s:
+                return avail
+            if (
+                waited >= self._ram_gate_stall_s
+                and best - first < self._ram_gate_progress_gib
+            ):
+                # Not a timeout — a diagnosis. The caller's abort message is the same, but it
+                # arrives in minutes rather than half an hour, and the log says why.
+                self._progress(
+                    f"Headroom is not clearing: {best:.1f} GiB free after "
+                    f"{waited:.0f}s (need {self._gate_gb:.0f} GiB) and it has not moved. "
+                    "Something resident is holding it — waiting longer will not help."
+                )
+                return avail
+            self._sleep(self._ram_gate_poll_s)
+            waited += self._ram_gate_poll_s
 
     def _await_gpu_clear(self) -> "float | None":
         """Poll GPU-free until it clears the 30B's need or the GPU settle window expires.
@@ -1885,13 +2008,15 @@ class SwapDriver:
 
         # 8 GATE — graceful + recoverable
         self._phase(ss.PHASE_GATE)
-        avail = self._ops.available_gb()
+        avail = self._await_ram_clear()
         if avail < self._gate_gb:
             self._progress(f"Aborted safely: only {avail:.1f} GiB free (need "
-                           f"{self._gate_gb:.0f} GiB) — restoring the 14B. Lean the box and retry.")
+                           f"{self._gate_gb:.0f} GiB) after waiting up to "
+                           f"{self._ram_gate_timeout_s:.0f}s for headroom to settle — "
+                           "restoring the 14B. Lean the box and retry.")
             return ("gate-abort", False, False, avail,
-                    f"not enough headroom now ({avail:.1f} GiB < {self._gate_gb:.0f} GiB) "
-                    "— free something or retry")
+                    f"not enough headroom after the wait-verify window ({avail:.1f} GiB < "
+                    f"{self._gate_gb:.0f} GiB) — free something or retry")
         stop = self._budget_stop(avail)
         if stop is not None:
             return stop
@@ -2296,6 +2421,19 @@ class SwapDriver:
                 f"current tree ({status}) — dispatching wave {next_wave_no} normally."
             )
             return False
+        # #1342: a PASS is only evidence if the oracle could have failed. An oracle whose
+        # execution-stage validation never ran passes on any tree, including one where the
+        # product does not exist — so its "satisfied" carries no information, and acting on it
+        # DELETES the remaining tasks. Skipping is an assertion of completeness and has to be
+        # earned by a measurement; the grading run still adjudicates the tree independently.
+        if not _oracle_execution_validated(self._run_dir):
+            self._progress(
+                f"Already-satisfied pre-check: the job oracle PASSES, but it was never proven "
+                f"able to FAIL (no fail-to-pass baseline on record) — a pass from an unvalidated "
+                f"oracle is not evidence of completeness. Dispatching wave {next_wave_no} "
+                f"normally (fail-closed, #1342)."
+            )
+            return False
         evidence = _EVIDENCE_CTRL_RE.sub(
             " ", str(res.get("evidence", "") or "pre-check ran"))[:200]
         pending = sorted(
@@ -2651,12 +2789,15 @@ class SwapDriver:
             f"{base.get('prompt', '')}\n\nLAYOUT FIX (single focus — this is the ONLY "
             "thing to change): the integrated project does NOT expose the module "
             "interface the protected job-acceptance oracle imports, so the whole job "
-            "will score zero on an import error, not on your logic. Provide these EXACT "
-            "importable names at the TOP-LEVEL module path the oracle imports (do NOT "
-            "nest them inside an app/ or src/ package, do NOT rename or relocate them):\n"
+            "will score zero on an import error, not on your logic. Make each of these "
+            "imports resolve EXACTLY as written, from the repo root:\n"
             f"{lines}\n"
-            "A module you built under a package must be importable as a TOP-LEVEL module "
-            "from the repo root (or re-exported at the exact path shown)."
+            "Provide the EXACT module path and public name shown — do not rename, "
+            "relocate, or re-spell them. A dotted path names a package: "
+            "`pkg.thing` must live at pkg/thing.py with pkg/__init__.py present. An "
+            "undotted path names a top-level module: `thing` must live at thing.py in "
+            "the repo root. Where the code already exists somewhere else, re-export it "
+            "at the exact path shown rather than moving work that already passes."
         )
         self._progress(
             f"Layout fix cycle: re-running task {target.id} with the exact unresolved "
@@ -2820,8 +2961,38 @@ class SwapDriver:
             self._task_refs[ptask.id] = (base_ref, new_merge)
         return new_merge
 
+    def _pin_smoke_contract(self, app_dir: str) -> None:
+        """Re-materialise the plan's behaviour-smoke contract into *app_dir* immediately
+        before a capture reads it.
+
+        The contract file is seeded into the baseline pre-swap so the coder can be TOLD
+        what the capture will exercise — which means it sits in the tree the coder writes
+        to, and a candidate could edit the exam it is about to sit. The plan is the
+        authority, so the plan's bytes are written back at the last possible moment: a
+        coder's edit cannot survive into the capture that grades it. Structural, not
+        vigilance — nothing has to notice the tampering for the control to hold.
+
+        On an untampered tree the bytes are identical (:func:`smoke_spec_file_bytes` is the
+        one authority for them), so this is a no-op that leaves no diff. When the plan
+        declared NO contract nothing is written at all, and the capture behaves exactly as
+        it does today. Fail-soft: never raises into the phase that calls it."""
+        try:
+            from shared.fleet.acceptance import decode_smoke_spec, write_smoke_spec_file
+
+            if not app_dir:
+                return
+            spec = decode_smoke_spec(self._tasks)
+            if not spec:
+                return
+            write_smoke_spec_file(app_dir, spec)
+        except Exception:  # noqa: BLE001 — a contract write must never derail a capture
+            return
+
     def _exec_smoke(self, oracle_rel: str) -> dict:
         """Run the executability floor (fail-soft to a non-blocking ``ok=None``)."""
+        # The web arm of this floor drives the same headless capture the design loop uses,
+        # so the plan's contract is pinned here too — every reader gets the plan's bytes.
+        self._pin_smoke_contract(self._repo())
         try:
             smoke = self._ops.run_exec_smoke(self._repo(), oracle_rel)
         except Exception as exc:  # noqa: BLE001 — a smoke raise is could-not-run
@@ -2854,9 +3025,11 @@ class SwapDriver:
             "entrypoint failed with this exact error:\n"
             f"  {boot_err}\n"
             "Make the entrypoint import and start cleanly. A missing or mis-placed module "
-            "at boot is the usual cause — provide it at the TOP-LEVEL path the entrypoint "
-            "imports (do NOT nest it under an app/ or src/ package). Do NOT change program "
-            "behavior beyond making it boot."
+            "at boot is the usual cause — provide it at the EXACT path the entrypoint "
+            "imports, resolving from the repo root (a dotted path names a package: "
+            "`pkg.thing` must live at pkg/thing.py with pkg/__init__.py present; an "
+            "undotted path names a top-level module at the repo root). Do NOT change "
+            "program behavior beyond making it boot."
         )
         self._progress(
             f"Executability fix cycle: re-running task {target.id} with the boot error named."
@@ -3149,7 +3322,17 @@ class SwapDriver:
                 if self._ops.cancel_requested() or self._ops.stop_requested():
                     break
                 self._phase(ss.PHASE_CRITIC)
-                self._progress("Running the 14B cross-model code critic on the merged diff...")
+                # #1139: only claim to be RUNNING when the critic is actually wired. This
+                # line was unconditional, so a dormant run printed "this critic pass is a
+                # no-op" and then "Running the 14B cross-model code critic..." on the very
+                # next line, with run_critic bound to _noop_critic. Two adjacent lines
+                # contradicted each other, and the trail is what a later session greps to
+                # answer "was this diff reviewed?" — B2's GREEN on 20260727-230115-bd reads
+                # as reviewed and was not. The dormancy line above is the honest one.
+                if self._ops.critic_enabled:
+                    self._progress(
+                        "Running the 14B cross-model code critic on the merged diff..."
+                    )
                 result = self._ops.run_critic(
                     app_dir, base_branch, self._repo_bases.get(app_dir, ""))
                 if not isinstance(result, dict):
@@ -3210,15 +3393,69 @@ class SwapDriver:
         if feedback:
             parts.append(feedback)
         body = "; ".join(parts)
+        smoke = self._smoke_contract_note(result)
         if needs_work or layout_hard or runtime_hard:
             if body:
-                return (f"The design reviewer suggests changes: {body} "
+                return (f"The design reviewer suggests changes: {body}{smoke} "
                         "(open the app and judge for yourself).")
-            return "The design reviewer suggests changes (open the app and judge for yourself)."
+            return ("The design reviewer suggests changes"
+                    f"{smoke} (open the app and judge for yourself).")
         if body:
-            return f"The design reviewer noted: {body} (open the app and judge for yourself)."
-        return ("The design reviewer found nothing obvious to change "
+            return (f"The design reviewer noted: {body}{smoke} "
+                    "(open the app and judge for yourself).")
+        return (f"The design reviewer found nothing obvious to change{smoke} "
                 "(open the app and judge for yourself).")
+
+    @staticmethod
+    def _smoke_contract_note(result: dict) -> str:
+        """The behaviour-contract clause of :meth:`_design_note`, or ``""`` to stay silent.
+
+        This is the PYTHON-side read of the #1289 honesty channel. Without it the channel is
+        rendered only in PowerShell, and a BlarAI reader of "found nothing obvious to change"
+        cannot tell a GRADED declared check from a heuristic guess that happened to click the
+        right thing — which is the collapse the contract was built to retire, reproduced one
+        repo further along.
+
+        SPEAKS in exactly two cases, because noise is the failure mode of this whole class of
+        fix (``instrument_registry`` module docstring: make every instrument loud and the
+        operator learns to skim the caveat block, at which point the honest ones are silent too):
+
+        * EXERCISED — a one-clause positive, and only worth saying at all because the sentence
+          it joins otherwise reads identically whether or not anything was graded.
+        * DECLARED-NOT-EXERCISED — a disclosure. A contract existed and did not run; that is a
+          defect in either the writer or the delivery and the operator should not have to infer
+          it from silence.
+
+        STAYS SILENT on the other two, deliberately, and NOT by the rule the security scan uses:
+
+        * ``no-contract-declared`` is the common case (every non-web dispatch) and saying so
+          every time is pure noise.
+        * ``could-not-determine`` covers every legitimately contract-blind path — WinUI, the
+          msedge fallback, a fail-soft critique, a legacy producer. #823 settled the precedent
+          for its sibling channel: a console-blind run keeps today's behaviour rather than
+          announcing its blindness. An unmeasured SECURITY scan hides a live credential and
+          must shout; an unmeasured behaviour contract on a surface that has no contracts costs
+          a reader nothing. The status is still carried verbatim in ``self._design_signal``, so
+          the fact is recorded even where this line declines to say it.
+
+        The import is function-local because ``swap_ops`` imports ``SwapOps`` from THIS module
+        (``swap_ops.py:48``) — a module-level import here would close that cycle. Same reason
+        :meth:`_pin_smoke_contract` imports ``acceptance`` locally."""
+        from shared.fleet import swap_ops
+
+        # The positive claim is gated on the predicate DIRECTLY, not on the disposition that
+        # wraps it. `smoke_contract_disposition` does consult it, so routing through the
+        # disposition alone would be honest — but `test_no_registered_renderer_collapses_a_
+        # count_into_truthiness` requires a renderer to ASK by name, and it is right to: a
+        # transitive consult is one refactor away from not being one, and nothing would fail.
+        if swap_ops.smoke_contract_is_measured(result):
+            return "; the behaviour check the plan declared was exercised"
+        disposition = swap_ops.smoke_contract_disposition(result)
+        if disposition == swap_ops.SMOKE_DISPOSITION_NOT_EXERCISED:
+            status = str(result.get("smoke_status", "") or "")
+            return (f"; the behaviour check the plan declared did NOT run ({status}) -- "
+                    "this review did not grade it")
+        return ""
 
     @staticmethod
     def _design_fix_prompt(feedback: str) -> str:
@@ -3293,7 +3530,14 @@ class SwapDriver:
                 self._progress("Reviewing the finished design -- swapping the coder out "
                                "for the vision model...")
                 self._ops.stop_ovms()  # unload the 30B: GPU free for capture + the in-process VLM
-                result = self._ops.run_design_loop(app_dir, goal, vcj)
+                # Pin the plan's smoke contract EVERY lap: the fix cycle between laps runs
+                # the coder over this same tree, so a contract restored only once could be
+                # edited out before the re-capture that grades the fix.
+                self._pin_smoke_contract(app_dir)
+                # #1171: the intake-declared surface rides along so the structural
+                # check states a fact instead of asking the operator a question its
+                # own spec already answered.
+                result = self._ops.run_design_loop(app_dir, goal, vcj, surface)
                 if not isinstance(result, dict):
                     result = {}
                 self._design_signal = result

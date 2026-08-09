@@ -947,3 +947,183 @@ Evidence: `state/battery/night-20260723-190142/scorecards/B4.scorecard.json`,
 *(Placement note: as with the preceding two 2026-07-23 entries, appended at the END despite the
 file's "newest first" header, following the immediately preceding entry's precedent and keeping the
 day's three runs adjacent. The convention drift is recorded rather than silently reorganised.)*
+
+## Run `night-20260723-230001` — B2+B4 — BOTH GREEN — the real unattended 23:00 nightly, first carrying #1074 + #1076's BlarAI-half
+
+The actual 23:00 scheduled nightly (`BlarAI-M2-Battery-Nightly`), default campaign
+`state/battery-campaign.json` (jobs `[B2, B4]`, no side config — the first run this cycle that
+is NOT a supervised daytime validation). Runner exit `0`. **B2 GREEN** (run `20260723-230115-bd`,
+1,625.6 s / ~27 m). **B4 GREEN** (run `20260723-232920-bd`, 3,982.0 s / ~66 m — well under its
+historical ~2.3 h ceiling). Both jobs: oracle `passed`, guest-oracle `passed`/`agree`, sandbox
+`fresh` (`sandbox_commit_count: 1`), `already_satisfied: acceptance-tests` (the job-acceptance
+oracle passed on the integrated tree before the final wave dispatched, so that task was honestly
+skipped with no coder candidate spent — #1049), `samples_consumed: -1` on both (the no-resample
+sentinel — **no fix cycle fired on either job**). Campaign counter: **LEAN pass 5 banked** (the
+lean diagnostic counter; the frozen full-campaign counter stays 3/5 per #904 — tonight's job set
+is not the six-card baseline set).
+
+**Significance — the first unattended proof for two overnight-fixed instruments.** #1074
+(fail-loud git capture) and #1076's BlarAI-half (evidence preservation) had each only been proven
+in supervised daytime `-Now` windows before tonight; this is their first exposure to a fully
+unattended cycle with nobody watching. Zero fault markers anywhere in the run directory
+(`capture fault`/`ERRORED`/`STALLED`, checked). **What this proves:** no false-alarm regression
+under real unattended conditions, on top of the happy path both instruments were already validated
+against. **What it still cannot prove:** neither instrument's actual repair-path behavior — a
+clean run with no fix cycle never reaches the append/honesty logic either was built to fix; that
+rests on the executed toggle-offs from their own supervised validation runs, not on this one.
+
+**green_quality_band B on both jobs (informational, not a failure):** B2 — "there is no
+ready-made way to run it without writing a little code"; B4 — "its README still describes the
+empty starter project, not what was actually built." Both are `green_class: GREEN-UNVERIFIED`
+(`det-only` mode, `oracle_coverage=unknown` — no traceability map yet — a pre-existing
+classification gap, not something new tonight). Real, if minor, plan/documentation-quality
+observations worth feeding back to the PLAN-layer loop eventually; neither blocks or qualifies
+the GREEN verdict.
+
+**One benign artifact, not chased further:** `MORNING-REPORT.md` notes `unreadable scorecard:
+battery-summary.json` — no file by that name exists anywhere under `agentic-setup/state`
+(searched). Both per-job scorecards (`B2.scorecard.json`, `B4.scorecard.json`) are present,
+complete, and schema-valid; this does not affect either verdict.
+
+**Cadence hygiene verified.** `agentic-setup` primary checkout was on
+`fix/1074-fail-loud-git-capture`@`84724f8` throughout (the deliberate carried-forward condition
+from the prior evening's driver) — untouched by this run. The nightly's own AO released itself
+cleanly at run end with no stranding (confirmed post-run: no live `pythonw`/`python`/`pwsh`
+process matching `launcher`/`swap_ops`/`run-fleet`, port 5001 clear) — the `-Now`-specific AO
+stranding residual (#1053) does not apply to the scheduled path.
+
+Evidence: `state/battery/night-20260723-230001/{MORNING-REPORT.md,
+scorecards/B2.scorecard.json, scorecards/B4.scorecard.json}`,
+`state/fleet-runs/20260723-230115-bd/` (B2), `state/fleet-runs/20260723-232920-bd/` (B4).
+
+*(Placement note: appended at the END, continuing the established 2026-07-23 precedent above —
+the file's "newest first" header still reads backwards from actual practice.)*
+
+## Run `night-20260724-012542` — B4 — PARKED-HONEST (attribution BUILD) — #1075's own targeted window, unrelated finding surfaced
+
+Supervised daytime targeted run, side config `state/battery-1075-dedup-b4-20260724.json`,
+launched 01:25:52 PDT via `run-battery-night.ps1 -Now` (pwsh) — validation leg for #1075
+(run-fleet's dedup guard). Runner exit `0`. **Verdict PARKED-HONEST, attribution BUILD**,
+8,409.5 s (~2.3 h). Job acceptance oracle **failed**:
+`test_scores_kept_over_time_in_order` — `assert [s["correct"] for s in loaded] == [1, 3]`,
+got `[3, 3]`. `failure_class: UNCLASSIFIED` ("candidate new leak class").
+
+**Does NOT indicate a problem with #1075.** Grepped the entire run directory for
+"Nothing to merge"/"NOT merged"/repair/retry/dedup activity: none found. All 6 tasks
+(store-cards, import-deck, add-card, quiz, track-scores, acceptance-tests) show
+`RESULT: MERGED` on their first dispatch; all 5 wave-integration gates passed. The dedup
+guard's repair mechanism was never exercised — consistent with #1075's own side config
+predicting this was the likely outcome given B4's recent GREEN streak. `samples_consumed: 2`
+reflects normal best-of-N candidate sampling (this job's complexity classed as "moderate ->
+up to 3 candidates"), not a fix-cycle; confirmed by grepping every `run-fleet-*.log` for
+candidate counts (only `acceptance-tests` shows more than 1, matching ordinary best-of-N,
+not a retry).
+
+**What it DID surface — a real, separate finding, root-caused by reading the actual sandbox
+code and git history (`C:/Users/mrbla/projects/battery-b4-flashcards-cli`).** A genuine
+scope-sprawl + inherited-interface bug: task `quiz` (wave 3) improvised the ENTIRE
+`app/score_tracker.py` file (contracted to `track-scores`, wave 4) with signature
+`record_score(asked, correct, ...)`. The protected, pre-seeded job acceptance oracle calls
+`record_score(1, 3, ...)` expecting `(correct, asked)` order — backwards relative to what
+quiz built. `track-scores` (wave 4, commit `7c1cf7a`) found the file already existing and
+built `cli.py` + its own tests on top of it without re-validating the interface against the
+job-level contract — so the wrong parameter order rode straight through five passing
+wave-level gates (each checking only local, self-consistent correctness) to the final,
+deferred job-level oracle, which is precisely where the harness is designed to catch exactly
+this class of thing, and did. **Filed as #1109** (structural finding: scope-sprawl is already
+a named, tracked harness signal, but nothing currently re-scrutinizes the interface a
+sprawling task invents, or warns a later task that its assigned file was pre-empted).
+
+**Cadence hygiene verified.** Default campaign `state/battery-campaign.json` unaffected (side
+config only). `BlarAI-M2-Battery-Nightly` confirmed `LastTaskResult 0`, `NextRunTime
+2026-07-24 23:00:00`. `-Now`'s AO stranding (#1053) confirmed and stopped via the audited
+`stop-assistant.ps1` seam: freed ~11.6 GB (21.97→~21.3 GB available reported, PID 20060).
+
+Evidence: `state/battery/night-20260724-012542/scorecards/B4.scorecard.json`,
+`state/fleet-runs/20260724-012842-bd/{JOB_SUMMARY.txt,swap-progress.log}`,
+sandbox commits `1ab258e` (quiz) and `7c1cf7a` (track-scores) in
+`C:/Users/mrbla/projects/battery-b4-flashcards-cli`.
+
+## Run `night-20260724-035623` — B4 — PARKED-HONEST (attribution BUILD) — #1076's still-owed agentic-setup-half window, SAME defect reproduced
+
+Supervised daytime targeted run, side config `state/battery-1076-agentic-half-b4-20260724.json`,
+launched 03:56:26 PDT via `run-battery-night.ps1 -Now` (pwsh) — the still-owed validation leg
+for #1076's agentic-setup half (already confirmed merged into agentic-setup main via
+`git merge-base --is-ancestor`; this window validates it under real conditions for the first
+time). Runner exit `0`. **Verdict PARKED-HONEST, attribution BUILD**, 7,044.6 s (~2.0 h). Job
+acceptance oracle **failed**: `test_scores_kept_over_time_in_order` — identical assertion
+failure to the run three hours earlier (`[3, 3]` vs expected `[1, 3]`).
+
+**This is the EXACT SAME defect as `night-20260724-012542` (three hours prior), reproduced on
+an independently fresh sandbox re-init.** Same scope-sprawl (`quiz: app/score_tracker.py
+(track-scores)`), same failing test, same failure signature. Two occurrences of an identical
+defect on two independent fresh builds in one night elevates this from "one candidate finding"
+to a likely-systemic gap — updated on ticket #1109 (priority raised 2→3) with the sharper
+diagnosis: the harness's own import contract names `record_score`'s import path but never its
+parameter order/signature, and the protected hidden oracle hardcodes one specific positional
+order the coder has no way to infer. Not evidence against #1075 or #1076 — no fix-cycle/retry
+activity in this run either (grepped, none found); `samples_consumed: 2` again ordinary
+best-of-N, not a repair.
+
+**#1076's agentic-setup half is validated on the happy path it could reach** (git's real-message
+surfacing on a worktree-add failure path never had occasion to fire — a healthy run doesn't hit
+that path — consistent with what was predicted before launch).
+
+**Cadence hygiene verified.** Default campaign untouched (side config only).
+`BlarAI-M2-Battery-Nightly` confirmed `LastTaskResult 0`, `NextRunTime 2026-07-24 23:00:00`
+after this run too. `-Now` AO stranding (#1053) confirmed and stopped via `stop-assistant.ps1`:
+freed ~9.8 GB (PID 17640).
+
+Evidence: `state/battery/night-20260724-035623/scorecards/B4.scorecard.json`,
+`state/fleet-runs/20260724-035801-bd/JOB_SUMMARY.txt`. Ticket: #1109 (recurrence comment,
+2026-07-24).
+
+## Run `night-20260724-080244` — B7 — GREEN — #746 validation program, Phase 1 (sandbox safety check, grounding ON)
+
+Supervised daytime targeted run, side config `state/battery-746-grounding-sandbox-b7-20260724.json`,
+launched 08:02:53 PDT via `run-battery-night.ps1 -Now` — Phase 1 of the LA-directed #746
+validation program (properly tested/evaluated/verified/validated, not a single spot-check).
+`research_grounding=true` **temporarily, uncommitted**, for this one run only, reverted to
+`false` immediately after evidence capture. Runner exit `0`. **Verdict GREEN**, 4,084.9 s
+(~68 min). All 3 tasks (slugify-phrase-helper, unit-converter-helper, password-generator-helper)
+merged on first dispatch; `acceptance-tests` honestly skipped as already-satisfied (#1049, 5/5
+job-oracle tests passed pre-dispatch, no coder candidate spent). `samples_consumed: 2` (ordinary
+best-of-N candidate generation, not a fix-cycle — no repair activity in the logs).
+
+**Grounding fired exactly once, as expected for a single-decompose job, with an honest
+`no_match` result.** Traced `_grounded_prompt`'s only call site (`shared/fleet/decompose.py`,
+one call per `decompose_request`) and confirmed via the usage log's real timestamp (08:03:47
+PDT, immediately after launch) that B7's own goal (Node CLI: slugify/unit-convert/password-gen)
+found nothing above the relevance floor — a sensible result given the docset's Python/web focus
+and this goal's vanilla-JS-utility content. **Safety confirmed**: zero errors, zero crashes,
+zero degradation from grounding being on; the build completed identically to what a stdlib/
+vanilla-JS-only goal would produce regardless of the flag.
+
+**A real, self-inflicted defect found and FIXED during this same window, not just flagged.**
+The usage log initially showed what looked like a live anomaly (~10 `plan_grounding` calls for
+one 3-task job, 2 `unavailable` outcomes) — investigated properly rather than left as an open
+question. Root cause, confirmed by timestamp correlation and exact-value matching: THREE test
+files (`shared/tests/test_decompose_research_wiring.py`, `shared/tests/test_research_substrate.py`,
+`agentic-setup/tools/tests/test_search_docs.py`) all exercise the real logging code path with
+fixed/synthetic goal strings and none isolated `BLARAI_RESEARCH_USAGE_LOG` — every pytest run of
+these files (including the standing gate itself) was silently appending synthetic records to the
+SAME file real dispatches use. Fixed in all three files (autouse fixture redirecting to
+`tmp_path`), verified: targeted suites (49 + 19 = 68 tests) and the full standing gate (9,206
+passed) all confirmed leaving the real log at 0 bytes afterward. This was a real, if narrow,
+observability defect — undiscovered until this validation program specifically went looking for
+usage evidence that hadn't existed before tonight.
+
+**Cadence hygiene verified.** Default campaign untouched (side config only). `-Now` AO stranding
+(#1053) confirmed and stopped via `stop-assistant.ps1`: freed ~10.8 GB (PID 16848).
+`research_grounding` confirmed reverted to `false` (committed) immediately after evidence capture
+— not left live.
+
+**Phase 1 of 5 in the #746 validation program is complete.** Remaining: Phase 2 (B6 paired
+on/off comparison), Phase 3 (purpose-built stdlib-depth scenario), Phase 4 (reactive-tool
+live-fire), Phase 5 (consolidated report). Full plan: `docs/research/746-validation-program-2026-07-24.md`.
+Handed off via `docs/handoffs/746-validation-handoff-20260724.md` for a dedicated follow-on
+session per LA direction.
+
+Evidence: `state/battery/night-20260724-080244/scorecards/B7.scorecard.json`,
+`state/fleet-runs/20260724-080505-bd/JOB_SUMMARY.txt`, `state/research-usage.jsonl` (the single
+real entry, captured before the log-isolation fixes landed).

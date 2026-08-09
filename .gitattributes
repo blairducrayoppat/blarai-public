@@ -22,3 +22,22 @@ docs/TEST_GOVERNANCE.md text eol=lf
 docs/sprints/ACTIVE_SPRINT.md text eol=lf
 .github/copilot-instructions.md text eol=lf
 LESSONS.md text eol=lf
+
+# Measurement subjects are evidence: the bytes a recorded probe consumed. On Windows
+# with core.autocrlf=true these check out CRLF, so the worktree copy is NOT what the
+# recorded run read — measured 2026-08-07, cook_ok.html was 23,713 bytes committed and
+# 24,296 on disk. That file is the GROUND TRUTH of the 2026-07-22 gemma4 vision probe
+# (cook_ok.png / cook_broken.png were rendered from it), so a re-render from the
+# worktree would consume different bytes than the record cites. Marking every subjects/
+# directory under docs/performance/ as -text removes the conversion rather than hoping
+# it is benign; READMEs beside them are prose and stay normalised.
+# (#1318, found by review; see docs/performance/subjects/README.md.)
+docs/performance/**/subjects/** -text
+docs/performance/**/subjects/*.md text eol=lf
+
+# Shell scripts MUST check out with LF. On Windows with core.autocrlf=true a .sh file
+# checks out CRLF, and the CR rides into the shebang — bash reports "bad interpreter:
+# no such file or directory" and the script is simply unusable, with an error naming
+# the interpreter rather than the line endings. Same class as the measurement-subject
+# rule above: a platform default silently rewriting content that is read byte-wise.
+*.sh text eol=lf

@@ -203,8 +203,11 @@ def test_full_plan_sequence_runs_grammar_constrained(tmp_path):
         structured_generate_fn=_structured_gen(s_calls),
     )
     assert res.ok
-    # decompose + criteria + assumptions + build-signal + assets == 5 grammar calls.
-    assert len(s_calls) == 5 and f_calls == []
+    # decompose + criteria + assumptions + build-signal + assets + smoke-contract == 6 grammar
+    # calls. The smoke contract is the sixth and fires only for a WEB surface — which this goal
+    # is. A non-web plan still makes five, and the surface gate is pinned in
+    # tests/integration/test_smoke_contract.py.
+    assert len(s_calls) == 6 and f_calls == []
     # The grammar decompose payload (2 feature tasks), not the free "[]"; compile_prompts
     # appends the dedicated acceptance-tests task for a multi-task plan with test criteria.
     assert [t["task"] for t in res.tasks] == [

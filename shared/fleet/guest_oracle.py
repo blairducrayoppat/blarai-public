@@ -484,7 +484,13 @@ def _default_pytest_run(cmd: list[str], timeout_s: float, cwd: str, *,
                         env: "dict | None" = None) -> tuple[bool, str, str]:
     """Bounded, no-shell pytest subprocess (argv-only — §10 S1). ``env`` (#822 H1,
     additive; ``None`` inherits) is an OVERLAY merged over ``os.environ`` so the guest
-    grade pins PYTHONPATH/PYTHONSAFEPATH exactly like the host."""
+    grade pins PYTHONPATH/PYTHONSAFEPATH exactly like the host.
+
+    #774 sub-task 2: DELIBERATELY stays raw (allowlisted). This module SHIPS to the
+    NIC-less Alpine guest and runs the coder snapshot's pytest INSIDE the isolated VM;
+    it is stdlib-only at module scope by design (see the ``_CLEAN_GRADE_INI`` note), so
+    taking a ``shared.procspawn`` dependency here would expand the guest's trusted surface
+    across the vsock isolation boundary. Kept self-contained by design."""
     try:
         run_env = {**os.environ, **env} if env is not None else None
         cp = subprocess.run(  # noqa: S603 — vector argv, no shell

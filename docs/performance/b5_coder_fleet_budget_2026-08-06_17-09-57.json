@@ -1,0 +1,128 @@
+{
+  "benchmark": "b5_coder_fleet_wall_clock_vs_budget",
+  "timestamp": "2026-08-06T17:09:57-07:00",
+  "run_id": "20260806-171303-bd",
+  "night_id": "night-20260806-170917",
+  "purpose": "Verification run for #1289's declared behaviour-contract mechanism. Launched from a side campaign config with pass_banking_frozen=true, so it banks nothing against the default campaign; the default campaign was verified untouched before and after.",
+  "model": "Qwen3-Coder-30B (deep coding), served via OpenVINO Model Server",
+  "surface": "coder fleet swap driver -> OVMS -> 30B; BlarAI 14B evicted for the duration and restored after",
+  "environment": {
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "python": "3.11.9",
+    "drivers": {
+      "gpu_arc140v": "32.0.101.8826",
+      "npu_ai_boost": "32.0.100.4778",
+      "source": "Win32_PnPSignedDriver, measured 2026-08-06 20:31 local"
+    },
+    "hardware": "Intel Core Ultra 7 258V (Lunar Lake), Arc 140V iGPU (16GB), Intel AI Boost NPU, 32 GB LPDDR5X",
+    "ovms_model_cache": "enabled (C:/Users/mrbla/agentic-setup/state/ovms-model-cache)",
+    "measured_tree": {
+      "blarai": "85677aeb",
+      "blarai_on_main": "yes",
+      "blarai_tree": "clean",
+      "agentic_setup_driver": "8a919835",
+      "pin": "#1181 pinned driver tree C:/Users/mrbla/agentic-battery-measured"
+    }
+  },
+  "methodology": {
+    "card": "evals/battery/B5.json (habit-tracking web app, plan-graph mode)",
+    "sandbox": "fresh (previous battery-b5-habit-web archived at 17:09:56)",
+    "runs": 1,
+    "note": "n=1. A battery night is a single diagnostic run, not a repeated benchmark; run-to-run variance is unmeasured by construction.",
+    "gpu_headroom_at_load": "23.3 GiB free, 15 GiB required for the 30B"
+  },
+  "budget": {
+    "overall_budget_s": 10800,
+    "wall_clock_s": 11062.391,
+    "over_budget_s": 262.391,
+    "pct_of_budget": 102.4,
+    "outcome": "TIMEOUT",
+    "polls": 1652
+  },
+  "results": {
+    "verdict": "STALLED",
+    "attribution": "HARNESS",
+    "failure_class": "HARNESS-BUDGET",
+    "waves": [
+      {
+        "wave": 1,
+        "tasks": ["create-habit-model"],
+        "integration_gate": "PASSED"
+      },
+      {
+        "wave": 2,
+        "tasks": ["create-habit-tracking", "calculate-streaks-and-success-rate"],
+        "integration_gate": "PASSED",
+        "scope_sprawl_finding": "create-habit-tracking authored src/utils/analysis.js (contracted to calculate-streaks-and-success-rate) and src/utils/chart-data.js (contracted to generate-chart-data)"
+      }
+    ],
+    "per_task_wall_clock_s": [
+      {
+        "task": "create-habit-model",
+        "started": "17:14:06",
+        "ended": "18:40:25",
+        "wall_clock_s": 5179,
+        "outcome": "processed",
+        "delivered": true
+      },
+      {
+        "task": "create-habit-tracking",
+        "started": "18:40:29",
+        "ended": "19:50:53",
+        "wall_clock_s": 4224,
+        "outcome": "processed",
+        "delivered": true
+      },
+      {
+        "task": "calculate-streaks-and-success-rate",
+        "started": "19:50:56",
+        "ended": "20:14:35",
+        "wall_clock_s": 1419,
+        "outcome": "TIMEOUT (parked)",
+        "delivered": false,
+        "note": "Budget elapsed mid-task. Two tasks consumed 9,403 s of a 10,800 s budget before this one started, leaving 1,397 s for a task whose two predecessors averaged 4,702 s."
+      }
+    ],
+    "skipped_on_dependency": [
+      "acceptance-tests",
+      "combine-tracker-and-chart",
+      "create-chart-view",
+      "generate-chart-data"
+    ],
+    "reliability": {
+      "green": 0,
+      "plan_graph_eligible": 1,
+      "flat_queue": 0,
+      "note": "#789 honest denominator; structurally non-GREEN, under-decomposed"
+    },
+    "hard_gates": {
+      "false_done": 0,
+      "interventions": 0,
+      "stalled": 1
+    },
+    "behaviour_contract_observed": {
+      "clause_1_contract_written_from_plan": true,
+      "clause_2_graded_delta_reported": true,
+      "clause_2_evidence": "SMOKE_HONOURED; behaviorHard true; finding quoted spec.expectDelta ([data-blarai-result=\"primary\"]) and spec.actionLabel verbatim on task create-habit-tracking",
+      "clause_2_result": "FAIL — the declared result region did not change after the declared primary control was used",
+      "fix_passes_attempted": 3,
+      "fix_passes_succeeded": 0,
+      "fix_pass_failure_mode": "coder timed out on every FIX pass; pipeline kept the prior merged version"
+    },
+    "guest_oracle": "not-run (run-cancelled-or-stopped) — isolation certificate unavailable, advisory only, verdict unchanged",
+    "restore": {
+      "ovms_30b_stopped": true,
+      "backend_ready_probe": "verified-ready, stable_polls=3, waited_s=22.0"
+    }
+  },
+  "not_measured": [
+    "model residency figures at the runner — the scorecard records models as 'unmeasured-at-runner' and defers to this entry, and this run did not instrument 30B load time, RSS delta, or tokens/sec",
+    "tokens per second, prompt or generation throughput for the 30B on any task",
+    "run-to-run variance (n=1 by construction for a battery night)",
+    "speculative decoding contribution — the coder path does not run the 14B+0.6B draft configuration",
+    "the third task's true duration; it was truncated by the budget, so 1,419 s is a floor and not a measurement of the task",
+    "clause 3 of #1289 (a plan with NO declared contract yielding a byte-identical coder prompt) — requires a no-contract plan and does not need a battery night",
+    "sustained thermals, power draw, and NPU utilisation throughout the 3-hour run",
+    "whether the 3 failed FIX passes would have succeeded with a working coder — they failed to timeout, not to inability"
+  ]
+}

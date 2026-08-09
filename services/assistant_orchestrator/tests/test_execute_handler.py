@@ -58,12 +58,20 @@ class _ExecHarness:
             step_aside_grace_s=grace,
         )
         self._asset_calls: list = []
+        self._smoke_calls: list = []
 
     def _maybe_generate_dispatch_assets(self, tasks, config, session_id):
         # SEAM A stand-in: record the pre-swap asset call (and how many swaps had fired,
         # proving it runs BEFORE _fire_swap). Real generation is exercised in
         # test_dispatch_asset_generation.py; here we assert only the WIRING/ORDERING.
         self._asset_calls.append({"session_id": session_id, "fires_before": len(self._fire_calls)})
+
+    def _maybe_seed_smoke_contract(self, tasks, config):
+        # Behaviour-contract stand-in, same discipline as the asset seam above: record that it
+        # ran and how many swaps had fired, so the ORDERING claim (the contract reaches the
+        # baseline BEFORE the coder candidates branch from it) is asserted rather than assumed.
+        # Real seeding is exercised in tests/integration/test_smoke_contract.py.
+        self._smoke_calls.append({"tasks": tasks, "fires_before": len(self._fire_calls)})
 
     def _fire_swap(self, run_id, session_id, tasks, config):
         self._fire_calls.append(
@@ -141,6 +149,22 @@ def test_execute_generates_assets_before_firing_the_swap(tmp_path):
     assert len(h._asset_calls) == 1
     assert h._asset_calls[0]["session_id"] == "s"
     assert h._asset_calls[0]["fires_before"] == 0     # assets generated BEFORE the swap fired
+    assert len(h._fire_calls) == 1                    # ...and the swap still fired
+
+
+def test_execute_seeds_the_smoke_contract_before_firing_the_swap(tmp_path):
+    """The behaviour contract must reach the repo baseline BEFORE the swap, because the coder
+    candidate worktrees branch from that baseline and the coder can only be TOLD about a marker
+    that is already in its tree. A seam that ran after the swap would be a control nothing
+    reaches — the exact shape this whole change exists to retire."""
+    events: list = []
+    h = _ExecHarness(tmp_path, fire_result=_ok(), step_aside=lambda: events.append("step_aside"))
+    t = _FakeTransport(events)
+    tasks = [{"repo": "R", "task": "a", "prompt": "p"}]
+    h._handle_execute_request(t, "rid", {"session_id": "s", "run_id": "RID-DET", "tasks": tasks})
+    assert len(h._smoke_calls) == 1
+    assert h._smoke_calls[0]["fires_before"] == 0     # seeded BEFORE the swap fired
+    assert h._smoke_calls[0]["tasks"] == tasks        # the approved tasks carry the contract
     assert len(h._fire_calls) == 1                    # ...and the swap still fired
 
 

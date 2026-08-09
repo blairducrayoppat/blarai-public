@@ -78,6 +78,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from shared import procspawn
 from shared.constants import ORCHESTRATOR_VM_ID
 from shared.fleet.guest_oracle import REASON_GUEST_ERROR
 from shared.ipc.oracle_channel import (
@@ -207,13 +208,18 @@ def _candidate_commands(bridge_python: str = "") -> list[list[str]]:
 
 
 def _interp_has_af_hyperv(command: list[str]) -> bool:
-    """True iff *command* launches an interpreter reporting ``socket.AF_HYPERV``."""
+    """True iff *command* launches an interpreter reporting ``socket.AF_HYPERV``.
+
+    Routed through ``shared.procspawn.hidden_console`` (#774 sub-task 2): a short,
+    returncode-only, non-interactive console probe of a candidate interpreter — exactly
+    the blessed hidden-console shape (it also hides the probe's console + feeds DEVNULL
+    stdin). Only the exit code is read, so the helper's UTF-8 output decode is immaterial.
+    (Its sibling :meth:`GuestOracleBridge._run` stays raw — it speaks a BINARY frame
+    protocol procspawn's text helpers would corrupt.)"""
     try:
-        result = subprocess.run(
+        result = procspawn.hidden_console(
             [*command, "-c", _AF_HYPERV_PROBE],
-            capture_output=True,
-            timeout=_PROBE_TIMEOUT_S,
-            check=False,
+            timeout_s=_PROBE_TIMEOUT_S,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.debug("oracle bridge interpreter probe failed for %r: %s", command, exc)
@@ -373,6 +379,12 @@ class GuestOracleBridge:
 
         # Spawn margin over the op's own budget: connect + interpreter start.
         timeout_s = float(endpoint.timeout_s) + 15.0
+        # #774 sub-task 2: DELIBERATELY stays raw (allowlisted). This is a BINARY frame
+        # protocol — ``input`` is bytes (a json line + length-prefixed request frames) and
+        # ``proc.stdout`` is bytes parsed by ``_split_status_and_frames``. Every
+        # shared.procspawn helper decodes stdout to UTF-8 text (errors='replace'), which
+        # would corrupt the frames, and none accepts bytes stdin — so routing this through
+        # the blessed surface is not behavior-preserving. Kept raw by design.
         try:
             proc = subprocess.run(  # noqa: S603 — vector argv, no shell
                 [*self._command, "-m", self._bridge_module],

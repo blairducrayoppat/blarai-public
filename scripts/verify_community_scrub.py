@@ -47,12 +47,14 @@ SUBSTITUTIONS: list[tuple[str, str]] = [
     (r"[A-Za-z]:[\\/]Users[\\/]mrbla[\\/]tools[\\/]intel-ut[^\"'\s]*", "<ut-home>"),
     (r"[A-Za-z]:[\\/]Users[\\/]mrbla[\\/](?:blarai|BlarAI)", "<repo>"),
     (r"[A-Za-z]:[\\/]Users[\\/]mrbla", "<home>"),
+    (r"(?i)\bNORTHSTAR100\b", "<host>"),
     (r"\bmrbla\b", "<user>"),
 ]
 
 # --- Residual scan: these MUST NOT survive in a scrubbed artifact (hard fail). ---
 SENSITIVE_FAIL: list[tuple[str, str]] = [
     (r"mrbla", "username"),
+    (r"(?i)NORTHSTAR100", "hostname"),
     (r"[A-Za-z]:[\\/]Users", "windows user path"),
     (r"[A-Za-z]:\\", "windows absolute path (backslash)"),
     (r"AppData[\\/]Local", "appdata path"),
@@ -122,7 +124,7 @@ def residual_scan(text: str) -> tuple[list[str], list[str]]:
             snippet = text[max(0, m.start() - 20):m.start() + 40].replace("\n", " ")
             fails.append(f"{label}: …{snippet}…")
     for term in WARN_INTERNAL:
-        if re.search(re.escape(term), text):
+        if re.search(re.escape(term), text, re.IGNORECASE):
             warns.append(term)
     return fails, warns
 
@@ -176,13 +178,43 @@ def check_pair(original: Path, scrubbed: Path) -> bool:
     return ok
 
 
+def scan_only(path: Path) -> bool:
+    """Residual-scan a FRESH-authored artifact (no original to diff against).
+    Used for the derived files (flat tables, dataset card) that aren't copy-scrubs."""
+    print(f"\n=== scan-only: {path.name} ===")
+    text = path.read_text(encoding="utf-8", errors="replace")
+    fails, warns = residual_scan(text)
+    ok = not fails
+    if fails:
+        print(f"  [FAIL] {len(fails)} sensitive token(s) present:")
+        for f in fails[:20]:
+            print(f"         {f}")
+    else:
+        print("  [ok] no residual sensitive tokens (paths/username/hostname/uuid/secrets)")
+    if warns:
+        print(f"  [WARN] internal term(s) present — confirm intended: {sorted(set(warns))}")
+    print(f"  => {'PASS' if ok else 'FAIL'}")
+    return ok
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Adversarial integrity gate for community-scrubbed artifacts.")
     ap.add_argument("--original")
     ap.add_argument("--scrubbed")
     ap.add_argument("--original-dir")
     ap.add_argument("--scrubbed-dir")
+    ap.add_argument("--scan-only", help="residual-scan fresh-authored file(s)/dir (no original to diff)")
     args = ap.parse_args()
+
+    if args.scan_only:
+        p = Path(args.scan_only)
+        files = sorted(x for x in p.rglob("*") if x.is_file()) if p.is_dir() else [p]
+        if not files:
+            print("FATAL: nothing to scan")
+            return 2
+        res = [scan_only(f) for f in files]
+        print(f"\n=== SCAN SUMMARY: {sum(res)}/{len(res)} clean ===")
+        return 0 if all(res) else 1
 
     pairs: list[tuple[Path, Path]] = []
     if args.original and args.scrubbed:

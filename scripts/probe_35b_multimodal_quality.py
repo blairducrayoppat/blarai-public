@@ -10,6 +10,10 @@ the capture rule. Runtime substrate (OpenVINO GenAI 2026.2.1 — the consolidati
 target), thinking ON (no working disable exists on this substrate — the outputs
 honestly show what a swap would feel like today).
 
+Subjects live in docs/performance/subjects/ and are tracked, so this probe is
+re-runnable from a clean clone. They sat untracked at the repo root when the
+2026-07-16 record was produced (#1318); see that directory's README.
+
 Usage (box lean, BlarAI down):
   .venv\\Scripts\\python.exe scripts\\probe_35b_multimodal_quality.py
 """
@@ -28,12 +32,13 @@ import openvino_genai as ov_genai
 from PIL import Image
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+_SUBJECTS = _REPO_ROOT / "docs" / "performance" / "subjects"
 MODEL_DIR = Path("C:/Users/mrbla/models/qwen36-35b-a3b-int4-ov-OFFICIAL")
 
 CASES = [
     {
         "label": "rendered_scene",
-        "path": _REPO_ROOT / "blarai_lighthouse3.png",
+        "path": _SUBJECTS / "blarai_lighthouse3.png",
         "prompt": "Describe this image in detail: setting, style, lighting, and mood.",
     },
     {
@@ -44,7 +49,7 @@ CASES = [
     },
     {
         "label": "detail_render",
-        "path": _REPO_ROOT / "hand2.png",
+        "path": _SUBJECTS / "hand2.png",
         "prompt": "Describe exactly what this image shows, including any anatomical or "
                   "structural details, and note anything that looks wrong or artificial.",
     },

@@ -46,15 +46,18 @@ and this gate resolves every entry against the real codebase:
    comment and its flag (or a moved block) fails instead of silently
    re-binding — the flag→comment binding, not just comment content.
 4. TRUTH — every declared capability must resolve: the path exists, lives
-   under the runtime roots (``shared/``, ``services/``, ``launcher/`` — a
-   capability "existing" only in a test file is not a shipped capability),
-   and the named symbol is defined in that file's AST (def / async def /
-   class at any depth; module-level Assign / AnnAssign targets).  A renamed
-   or deleted capability fails the standing gate naming the flag, the claim,
-   and the missing symbol.
+   under the roots ITS OWN SECTION may declare (``shared/``, ``services/``,
+   ``launcher/``, plus ``tools/`` for a dispatch-side section only — see
+   :func:`_roots_for`; a capability "existing" only in a test file is not a
+   shipped capability in any root), and the named symbol is defined in that
+   file's AST (def / async def / class at any depth; module-level Assign /
+   AnnAssign targets).  A renamed or deleted capability fails the standing
+   gate naming the flag, the claim, and the missing symbol.
 5. CONSUMPTION — the flag's key literal (or, for the generic key ``enabled``,
-   its section literal) appears in runtime source: a beautifully-declared
-   flag that no runtime code reads is a lie of a different shape.
+   its section literal) appears in the source its own section is read from:
+   a beautifully-declared flag that no code reads is a lie of a different
+   shape.  Same per-section root set as (4), from the same function, so the
+   two checks cannot drift apart about where a section's code lives.
 
 Same precedent shape as the WinUI passthrough allowlist gate
 (``tests/integration/test_winui_passthrough_allowlist.py``): parse a
@@ -72,6 +75,13 @@ HONEST LIMITS — what this control provably MISSES (measured, not asserted):
   flag's boolean actually gates that symbol's execution path — per-flag
   behavior tests own that seam (e.g. ``test_advanced_intake_flag_reaches_
   generate_plan``).
+* Scope of "shipped" includes ``tools/`` FOR DISPATCH-SIDE SECTIONS ONLY
+  (:data:`_DISPATCH_SECTIONS`), because otherwise a dispatch-side ceremony
+  flag could carry no checkable declaration at all.  Bound to the section
+  that needs it rather than granted globally, so an AO-runtime flag naming a
+  ``tools/`` symbol — in a declaration or as its only reader — still fails
+  exactly as it did before.  Nothing else moved: the file must exist, the
+  symbol must be defined in it, and a test file is refused in every root.
 * Direction is claims ⊆ code only.  A flag enabling MORE than its comment
   declares is not caught; the code-side registry that could catch it was
   rejected as a hand-maintained map (lesson 293) — the map is the artifact
@@ -118,6 +128,40 @@ _CONFIGS: dict[str, Path] = {
 # The runtime source roots (the same surface test_dependency_truth.py scans).
 _RUNTIME_ROOTS = ("shared", "services", "launcher")
 
+# The DISPATCH-SIDE root.  ``[fleet_dispatch]`` already carries flags whose only
+# reader is the battery harness under ``tools/`` — dispatch-side dev tooling that
+# the sealed AO runtime does not contain (the ``vikunja_bridge`` block says so in
+# as many words: "the socket lives under tools/, not the runtime").  Such a flag
+# is still a ceremony surface: the LA reads this file to decide whether an
+# instrument may change what he is told about a delivery.  Excluding ``tools/``
+# from declaration resolution meant those flags could carry NO machine-checked
+# declaration at all, so the only way to ship one was to write a comment block
+# that dodges every membership trigger — the documented escape, chosen on
+# purpose, which is worse than the lie this gate exists to catch.
+_TOOL_ROOTS = ("tools",)
+
+# The sections whose flags are read dispatch-side.  THIS SET IS THE WHOLE POINT
+# of the pairing below: the need is "a [fleet_dispatch] flag may declare a
+# tools/ symbol", and granting it globally would have conceded something nobody
+# asked for — that an AO-RUNTIME flag may name a tools/ symbol and pass.  A
+# section-specific need answered with a global constant buys a relaxation
+# broader than its own requirement, and a relaxation is hardest to narrow once
+# other flags have been written against it.  So the permission is bound to the
+# section that needs it, and every other section refuses ``tools/`` exactly as
+# it did before.  A future dispatch-side section is added HERE, deliberately,
+# in the change that creates it.
+_DISPATCH_SECTIONS = frozenset({"fleet_dispatch"})
+
+
+def _roots_for(section: str) -> tuple[str, ...]:
+    """Where a declaration bound to *section* may point, and which sources its
+    consumption is scanned in.  The single authority for that mapping — both
+    the TRUTH check and the CONSUMPTION check ask this, so the two can never
+    drift into disagreeing about where a section's code lives."""
+    if section in _DISPATCH_SECTIONS:
+        return _RUNTIME_ROOTS + _TOOL_ROOTS
+    return _RUNTIME_ROOTS
+
 # Past-tense ceremony-flip narration.  CASE-SENSITIVE on purpose: the file's
 # prose uses lowercase "go-live" ~6 times in non-flip contexts ("go-live
 # attestation", "Pre-go-live", "until an LA go-live ceremony adds it here")
@@ -161,6 +205,7 @@ _KNOWN_CEREMONY_FLAGS: dict[str, frozenset[str]] = {
             "knowledge.images_enabled",
             "fleet_dispatch.enabled",
             "fleet_dispatch.advanced_intake",
+            "fleet_dispatch.advanced_intake_coherence_gate",
             "fleet_dispatch.vikunja_bridge",
             "fleet_dispatch.guest_oracle_enabled",
             "coordinator.enabled",
@@ -364,11 +409,19 @@ def _defined_names(path: Path) -> set[str]:
 
 
 @functools.cache
-def _runtime_source_blob(repo: Path) -> str:
-    """Concatenated non-test runtime source, for the consumption check.
-    Same path convention as test_dependency_truth.py."""
+def _runtime_source_blob(repo: Path, roots: tuple[str, ...] = _RUNTIME_ROOTS) -> str:
+    """Concatenated non-test source under *roots*, for the consumption check.
+    Same path convention as test_dependency_truth.py.
+
+    *roots* comes from :func:`_roots_for`, so a runtime-section flag is still
+    scanned against the runtime alone — one blob per distinct root set, cached
+    independently.  A ``[fleet_dispatch]`` flag whose only reader is the battery
+    harness IS consumed, and calling it a dead switch because the AO does not
+    read it would fail a truthful flag for being honest about where its code
+    lives; an ``[image_generation]`` flag read only from ``tools/`` is still the
+    dead switch this check was built to catch."""
     chunks: list[str] = []
-    for root in _RUNTIME_ROOTS:
+    for root in roots:
         for f in (repo / root).rglob("*.py"):
             parts = set(f.parts)
             if parts & {"tests", "test", "__pycache__"}:
@@ -379,9 +432,13 @@ def _runtime_source_blob(repo: Path) -> str:
     return "\n".join(chunks)
 
 
-def _is_runtime_path(rel_path: str) -> bool:
+def _is_runtime_path(rel_path: str, section: str = "") -> bool:
+    """Is *rel_path* shipped code a flag in *section* may legitimately declare?
+
+    ``section`` selects the permitted roots via :func:`_roots_for`; the default
+    is the strict runtime set, so an unnamed section can never widen anything."""
     parts = rel_path.split("/")
-    if parts[0] not in _RUNTIME_ROOTS:
+    if parts[0] not in _roots_for(section):
         return False
     if {"tests", "test"} & set(parts):
         return False
@@ -397,10 +454,15 @@ def check_config_comment_truth(
     Pure over ``config_text`` so planted-violation tests can drive it over a
     MUTATED copy of the real file; capability resolution always runs against
     the real repository on disk.
+
+    Both the TRUTH and the CONSUMPTION check are resolved PER FLAG against
+    :func:`_roots_for`, so where a section's code may live is decided in one
+    place and asked twice, rather than decided twice and hoped to agree.
+    ``runtime_blob`` overrides the scanned source for every flag (the injection
+    seam), and is the strict-runtime blob by name and by default.
     """
     flags = _parse_flags(config_text)
     _cross_validate_against_tomllib(config_text, flags)
-    blob = runtime_blob if runtime_blob is not None else _runtime_source_blob(repo)
 
     violations: list[Violation] = []
     members: set[str] = set()
@@ -440,15 +502,17 @@ def check_config_comment_truth(
             continue
 
         for cap_name, rel_path, symbol in entries:
-            if not _is_runtime_path(rel_path):
+            if not _is_runtime_path(rel_path, flag.section):
                 violations.append(
                     Violation(
                         flag.qualified,
                         "not-runtime",
                         f"capability '{cap_name}' points at {rel_path}, which "
-                        f"is not runtime code ({'/'.join(_RUNTIME_ROOTS)}, "
-                        "non-test) — a capability living in a test or tool "
-                        "file is not a shipped capability.",
+                        f"is not shipped code a [{flag.section}] flag may "
+                        f"declare ({'/'.join(_roots_for(flag.section))}, "
+                        "non-test) — a capability living in a test file is not "
+                        "a shipped capability, and only a dispatch-side section "
+                        "may name tools/.",
                     )
                 )
                 continue
@@ -478,15 +542,19 @@ def check_config_comment_truth(
                     )
                 )
 
+        roots = _roots_for(flag.section)
+        blob = (runtime_blob if runtime_blob is not None
+                else _runtime_source_blob(repo, roots))
         needle = flag.key if flag.key not in _GENERIC_KEYS else flag.section
         if needle not in blob:
             violations.append(
                 Violation(
                     flag.qualified,
                     "unconsumed-flag",
-                    f"neither runtime root contains the literal '{needle}' — "
-                    "a ceremony flag no runtime code reads is a dead switch "
-                    "wearing a live label.",
+                    f"no source root a [{flag.section}] flag may be read from "
+                    f"({'/'.join(roots)}) contains the literal '{needle}' — a "
+                    "ceremony flag no code reads is a dead switch wearing a "
+                    "live label.",
                 )
             )
     return violations, members
@@ -537,13 +605,17 @@ def test_membership_and_extraction_are_not_vacuous() -> None:
     assert "guest_parser.enabled" in launcher_members
 
 
-_PLANT_TEMPLATE = """
-[synthetic_probe]
-# Planted by test_config_comment_truth.py — never ships.
-{extra_comment}# capabilities(synthetic_probe.{key}):
+_PLANT_BODY = """# Planted by test_config_comment_truth.py — never ships.
+{extra_comment}# capabilities({section}.{key}):
 #   {cap_line}
 {key} = true{inline}
 """
+
+#: The dispatch-side section a plant aims at.  It is a REAL section of the real
+#: file, deliberately: the property under test is that ``fleet_dispatch``
+#: specifically may declare ``tools/``, and a synthetic stand-in would not be in
+#: :data:`_DISPATCH_SECTIONS` and so would prove the opposite of what it claims.
+_DISPATCH_PLANT_SECTION = "fleet_dispatch"
 
 
 def _plant(
@@ -552,10 +624,22 @@ def _plant(
     cap_line: str,
     inline: str = "   # GO-LIVE 2026-01-01 (#0): planted",
     extra_comment: str = "",
+    section: str = "synthetic_probe",
 ) -> str:
-    return _real_config_text() + _PLANT_TEMPLATE.format(
-        key=key, cap_line=cap_line, inline=inline, extra_comment=extra_comment
-    )
+    """The real config text plus one planted flag, in *section*.
+
+    A plant aimed at a section the real file ALREADY opens is INSERTED inside
+    it rather than appended after it: TOML refuses to declare a table twice, so
+    appending a second ``[fleet_dispatch]`` header would fail the tomllib
+    cross-validation before the check under test ever ran."""
+    body = _PLANT_BODY.format(key=key, cap_line=cap_line, inline=inline,
+                              extra_comment=extra_comment, section=section)
+    text = _real_config_text()
+    marker = f"\n[{section}]\n"
+    if marker in text:
+        at = text.index(marker) + len(marker)
+        return text[:at] + body + "\n" + text[at:]
+    return f"{text}\n[{section}]\n{body}"
 
 
 def _violations_for(text: str, flag: str) -> list[Violation]:
@@ -603,6 +687,91 @@ def test_planted_true_claim_passes_as_an_equal_partner() -> None:
     kinds = {v.kind for v in hits}
     assert "missing-symbol" not in kinds and "missing-file" not in kinds, hits
     assert kinds == {"unconsumed-flag"}, hits
+
+
+_PROSE_GATE_CAP = (
+    "prose-band-gate = tools/dispatch_harness/green_quality/"
+    "placeholder_prose.py::prose_band_enabled"
+)
+
+
+def test_planted_dispatch_side_claim_resolves_and_a_phantom_one_still_fails() -> None:
+    """BOTH DIRECTIONS inside a DISPATCH-SIDE section.  A ceremony flag whose
+    capability genuinely lives in the battery harness must pass — that is the
+    whole reason ``tools/`` is declarable, and without this half the permission
+    is only a hole.  The SAME plant naming a symbol that file does not contain
+    must still fail by name, or ``tools/`` would be an unchecked region rather
+    than a checked one."""
+    real = _plant(key="zz_probe_dispatch_zz", cap_line=_PROSE_GATE_CAP,
+                  section=_DISPATCH_PLANT_SECTION)
+    kinds = {v.kind for v in _violations_for(real, "fleet_dispatch.zz_probe_dispatch_zz")}
+    assert "not-runtime" not in kinds and "missing-symbol" not in kinds, kinds
+
+    phantom = _plant(
+        key="zz_probe_dispatch_zz",
+        cap_line=(
+            "phantom = tools/dispatch_harness/green_quality/"
+            "placeholder_prose.py::_capability_that_does_not_exist"
+        ),
+        section=_DISPATCH_PLANT_SECTION,
+    )
+    hits = _violations_for(phantom, "fleet_dispatch.zz_probe_dispatch_zz")
+    assert any(v.kind == "missing-symbol" for v in hits), (
+        f"a phantom claim under tools/ went unchecked: {hits}"
+    )
+
+
+def test_planted_runtime_section_still_cannot_declare_a_tools_symbol() -> None:
+    """THE NARROWING, and the reason ``tools/`` is bound to a section rather
+    than granted globally.
+
+    The requirement was "a [fleet_dispatch] flag may declare a tools/ symbol".
+    Answering it with a global constant would have conceded something nobody
+    asked for — that an AO-RUNTIME flag may name one too — and a relaxation is
+    hardest to narrow once other flags have been written against it.  So the
+    IDENTICAL, entirely truthful declaration that passes in the dispatch-side
+    section above must still fail here, in a section the AO runtime owns."""
+    text = _plant(cap_line=_PROSE_GATE_CAP)  # [synthetic_probe] — not dispatch-side
+    hits = _violations_for(text, "synthetic_probe.enabled")
+    assert any(v.kind == "not-runtime" for v in hits), (
+        f"a runtime-section flag declared a tools/ symbol and passed: {hits}"
+    )
+
+
+def test_planted_runtime_section_consumed_only_from_tools_is_still_a_dead_switch() -> None:
+    """THE SECOND HALF OF THE NARROWING, which is easy to leave behind because
+    it lives in a different check.
+
+    Declaration and consumption are two independent relaxations, and widening
+    only one of them would have left an AO-runtime flag able to pass CONSUMPTION
+    on a literal that appears solely in dispatch tooling.  The needle here is
+    read by ``tools/dispatch_harness/config.py`` and by nothing under the
+    runtime roots, so a runtime-owned section must still call it unconsumed."""
+    text = _plant(
+        key="green_quality_prose_band",
+        cap_line="realism-guard = shared/fleet/acceptance.py::_apply_realism_guard",
+    )
+    hits = _violations_for(text, "synthetic_probe.green_quality_prose_band")
+    assert any(v.kind == "unconsumed-flag" for v in hits), (
+        f"a runtime-section flag read only from tools/ passed consumption: {hits}"
+    )
+
+
+def test_planted_tool_test_file_claim_still_fails() -> None:
+    """The property no section relaxes: a test file is not a capability in ANY
+    root, dispatch-side included."""
+    for section, flag in ((_DISPATCH_PLANT_SECTION, "fleet_dispatch.zz_probe_dispatch_zz"),
+                          ("synthetic_probe", "synthetic_probe.zz_probe_dispatch_zz")):
+        text = _plant(
+            key="zz_probe_dispatch_zz",
+            cap_line=(
+                "phantom = tests/integration/test_green_quality_prose.py::"
+                "test_the_written_site_is_measured_clean"
+            ),
+            section=section,
+        )
+        hits = _violations_for(text, flag)
+        assert any(v.kind == "not-runtime" for v in hits), (section, hits)
 
 
 def test_planted_ceremony_flag_without_declaration_fails() -> None:

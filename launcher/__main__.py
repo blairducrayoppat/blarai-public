@@ -503,6 +503,7 @@ from shared.inference.shared_pipeline import (
     SharedInferencePipeline,
     build_shared_pipeline,
 )
+from shared.ipc.protocol import DEFAULT_MAX_MESSAGE_BYTES
 from services.assistant_orchestrator.src import entrypoint as _ao_entrypoint
 from services.assistant_orchestrator.src.entrypoint import (
     AssistantOrchestratorService,
@@ -1339,6 +1340,36 @@ def _resolve_kv_cache_precision(runtime_mode: DeploymentMode) -> str | None:
         return None
 
 
+def _gateway_frame_cap(orchestrator_service: "AssistantOrchestratorService") -> int:
+    """The AO's LIVE frame cap, for the gateway end of the same channel (#1152).
+
+    ONE read, ONE value, both ends. Deliberately NOT a second parse of
+    ``default.toml``: two independent reads of one setting is the same
+    disagreement-between-ends defect this exists to prevent, and it would land on
+    the SILENT side — the operator would see the generic "No response from the
+    Assistant Orchestrator" with only a warning in ``launcher.log``, the surface
+    that already went unread for a full diagnostic arc on 2026-07-28.
+
+    FAILS CLOSED. The AO is constructed and ``start()``-ed (and the launcher has
+    already returned non-zero if that failed) before the gateway is built, so a
+    missing resolved config here is not a config problem — it is an ordering
+    regression, and guessing a cap would re-open the very failure. Raising is the
+    honest response to a state that should be unreachable.
+    """
+    cap = orchestrator_service.resolved_max_message_bytes
+    if cap is None:
+        raise RuntimeError(
+            "Assistant Orchestrator has no resolved [ipc].max_message_bytes at "
+            "gateway construction (Fail-Closed, #1152). The gateway must enforce "
+            "the SAME frame cap as the AO; defaulting here would let the AO send "
+            "frames the gateway refuses, which surfaces to the operator as 'No "
+            "response from the Assistant Orchestrator'. This means the AO was not "
+            "started before the gateway was built — fix the ordering, do not "
+            "reintroduce a fallback."
+        )
+    return cap
+
+
 def _resolve_require_signed_draft_manifest(runtime_mode: DeploymentMode) -> bool:
     """Read ``[security].require_signed_draft_manifest`` from the AO config TOML.
 
@@ -2015,6 +2046,13 @@ def main() -> int:
         host_mode=gateway_host_mode,
         host="127.0.0.1",
         port=gateway_port,
+        # #1152: the AO's LIVE resolved [ipc].max_message_bytes — the same value its
+        # listener and framer were built from — so both ends of the channel enforce
+        # ONE cap read ONCE. A gateway cap smaller than the AO's turns a delivered
+        # PLAN into "No response from the Assistant Orchestrator" while the AO is
+        # healthy, so this must never silently fall back: `_gateway_frame_cap`
+        # fails closed rather than guess.
+        max_message_bytes=_gateway_frame_cap(_orchestrator_service),
         mtls_cert_path=(
             str(_per_boot_certs.gateway_client_cert_path)
             if _per_boot_certs is not None
@@ -2041,6 +2079,37 @@ def main() -> int:
         # source of truth, read off the started orchestrator service — never a
         # second TOML parse). Default-dormant: false until the operator flips it.
         fleet_dispatch_enabled=_orchestrator_service.fleet_dispatch_enabled,
+        # #1124: project memory is a PRIVACY-POSTURE flag, dormant by default and
+        # flipped only at an LA-present ceremony. Threaded from the SAME AO-resolved
+        # config as its neighbours — never a second TOML parse.
+        fleet_dispatch_project_memory_enabled=(
+            _orchestrator_service.fleet_dispatch_project_memory_enabled
+        ),
+        # #1031 S2: the intake interview is gated at BOTH seams — the gateway's token
+        # gate needs the same two AO-resolved flags the AO's engagement gate reads
+        # (single source of truth, never a second TOML parse). Both default-dormant.
+        fleet_dispatch_advanced_intake_enabled=(
+            _orchestrator_service.fleet_dispatch_advanced_intake_enabled
+        ),
+        fleet_dispatch_advanced_intake_interview_enabled=(
+            _orchestrator_service.fleet_dispatch_advanced_intake_interview_enabled
+        ),
+        # #1165 M5: the assets pipeline rides the same two-seam pattern — the gateway
+        # needs the AO-resolved sub-flag for create_project seeding (single source of
+        # truth, never a second TOML parse). Default-dormant.
+        fleet_dispatch_advanced_intake_assets_pipeline_enabled=(
+            _orchestrator_service.fleet_dispatch_advanced_intake_assets_pipeline_enabled
+        ),
+        # #1165 M4: the interview's playback turn — same AO-resolved single source;
+        # the gateway conjoins it with the front + interview keys threaded above.
+        fleet_dispatch_advanced_intake_interview_playback_enabled=(
+            _orchestrator_service.fleet_dispatch_advanced_intake_interview_playback_enabled
+        ),
+        # #1165 M1: the interview-voice sub-flag rides the same single-source threading
+        # (AO-resolved, never a second TOML parse). Default-dormant.
+        fleet_dispatch_advanced_intake_interview_voice_enabled=(
+            _orchestrator_service.fleet_dispatch_advanced_intake_interview_voice_enabled
+        ),
         # #670: the dispatch target is config-driven (not compiled in) — thread the
         # AO-resolved roots into the gateway's fleet config (empty -> compiled-in fallback).
         fleet_dispatch_agentic_setup_dir=_orchestrator_service.fleet_dispatch_agentic_setup_dir,

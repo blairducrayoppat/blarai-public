@@ -1,0 +1,41 @@
+{
+  "schema": "battery-card/v1",
+  "card_class": "frozen",
+  "id": "B10",
+  "title": "plant shelf (node-web, 3 units, MULTI-PAGE LITE: shared layout + parameterised route + one data source)",
+  "provenance": "B10 is the LITE sibling of B9 (the id must match B<n>; a B9L form is refused by the spec validator). LA direction 2026-08-07, verbatim: 'if we still have an opportunity to make a lite card that can go even faster and still give us the needed information then I would say we should absolutely still create the lite card for instances that it may be preferred.' Sized from B9's FIRST MEASURED RUN the same evening (39m43s first task, then 8m08s / 10m58s / 11m00s -> ~10 min marginal per node-web task).",
+  "stack": "node-web",
+  "units": 3,
+  "shape": "multi-page-shared-layout",
+  "repo": "battery-b9l-plant-shelf",
+  "sandbox_only": true,
+  "clarify_answer": "web",
+  "goal": "I sell a few house plants and I want a small website for them. There should be a page listing the plants I have, and a separate page for each individual plant with its own details and photo. Both pages have to come from the same saved information, so when I change a plant's price it changes everywhere it appears. Every page needs the same heading and menu across the top so it feels like one website and I can get from the list to a plant and back again.",
+  "rigs": [],
+  "expected_outcome": {
+    "must_verify_tiers": [
+      "build",
+      "behavior"
+    ],
+    "human_tiers_expected": [
+      "visual"
+    ],
+    "oracle": {
+      "expected": true,
+      "ecosystem": "node",
+      "path": "tests/acceptance.job.test.mjs"
+    },
+    "allowed_terminal_verdicts": [
+      "GREEN",
+      "PARKED-HONEST",
+      "RECOVERED"
+    ],
+    "target_verdict": "GREEN",
+    "min_dependency_edges": 3,
+    "expects_context_packs": true,
+    "expects_waves_gte": 1,
+    "notes": "THE FAST STRUCTURAL PROBE. It keeps exactly the three properties where a coder classically writes TWO SOURCES OF TRUTH that each pass their own unit tests: (1) a SHARED LAYOUT rendered on more than one route, so a header must be extracted rather than copy-pasted; (2) a PARAMETERISED route (per-plant detail) - the first route the fleet must build without enumerating it at author time; (3) ONE data source feeding TWO views, so a price change must propagate from the list to the detail page. B9's first run proved these are the load-bearing shapes: it produced data/pieces.json feeding src/pieces/data.js, and header.html+header.js extracted rather than pasted.\n\nWHAT THIS CARD DELIBERATELY DOES NOT COVER, and why a pass here is NOT a pass for the multi-page goal: (a) DECOMPOSITION UNDER THE CAP - B9 declares 8 units against decompose.py DEFAULT_MAX_TASKS = 8, so it tests planning at the ceiling; 3 units never will, and #1279 is the ticket that would move that ceiling. (b) The FORM that must preserve typed text on rejection (lesson-321 class). (c) FILTERING. Any claim of the form 'B9L passed, so the multi-page path is fine' is FALSE BY CONSTRUCTION - this card is a different instrument, not a cheaper B9, and full B9 must keep running on its own cadence regardless of B9L results (#1331, #1322).\n\nWHEN TO PREFER IT: doctrine is one change per battery RUN, so run COUNT is the throughput constraint, not run length. B9L exists to let more separate changes be attributed in a day, not to make one measurement cheaper."
+  },
+  "run_budget_s": 7200,
+  "run_budget_note": "2 h. DERIVED FROM MEASUREMENT, not extrapolated: B9's first run measured ~10.0 min marginal per node-web task (n=3: 8m08s, 10m58s, 11m00s) plus a ~30 min first-task premium. 3 units projects to ~60 min; 7200 s is 2x that as headroom rather than a target. THE PREMIUM IS PROBABLY NOT PER-RUN: the model was READY before task 1 began (start-llm.log mtime 19:58:41 vs TASK-START 19:58:42), no npm install ran, and every task built exactly one candidate - which points at first-inference kernel compilation writing the .cl_cache (see start-llm.log's own '~15s warm, up to ~5 min COLD ... compiles + writes the .cl_cache' note, #747). If that is right, the SECOND B9L run should land near 35 min and this budget can drop. Re-measure and replace this note; do not inherit it."
+}

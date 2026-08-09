@@ -18,9 +18,10 @@ the curation rule that a recurring failure must ship one.
 WHAT IS LOCKED HERE
 -------------------
 1. Every disposition record in the repo stays well-formed forever (rot guard).
-2. Every FIXED row's commit-ish evidence actually RESOLVES in this repo - the
-   verifier alone can only check shape, and a plausible-but-wrong SHA is the
-   precise shape of the errors this whole control answers.
+2. Every FIXED row's commit-ish evidence actually RESOLVES in the repository
+   it NAMES - a plausible-but-wrong SHA is the precise shape of the errors
+   this whole control answers, and a fix that landed in a sibling repository
+   has to be checkable there rather than merely tolerated (#1090).
 3. The verifier genuinely REFUSES each failure mode. Every check below has a
    planted-violation twin, because a validator nobody has watched reject
    something is not known to work (security_by_design principle 12).
@@ -44,9 +45,16 @@ VERIFIER = REPO_ROOT / "scripts" / "verify_disposition.py"
 REVIEW_DIR = REPO_ROOT / "docs" / "reviews"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-from verify_disposition import check_row, extract_block, verify  # noqa: E402
-
-SHA_RE = re.compile(r"\b[0-9a-f]{7,40}\b")
+from verify_disposition import (  # noqa: E402
+    CONSTELLATION_ROOT_ENV,
+    KNOWN_REPOS,
+    check_row,
+    citations,
+    extract_block,
+    repo_root_for,
+    resolve_citation,
+    verify,
+)
 
 GOOD = """```disposition
 ADR-012 inverted draft claim | FIXED | f4211acc, merged e1cf0d68
@@ -219,25 +227,154 @@ def test_every_recorded_disposition_stays_well_formed() -> None:
 
 
 def test_fixed_rows_cite_shas_that_actually_resolve() -> None:
-    """The check the verifier cannot make alone.
+    """Every FIXED citation resolves in the repository it NAMES.
 
     A structurally valid but non-existent SHA is exactly the shape of the
     2026-07-20 errors: a claim that looks like evidence and was never checked
-    against the thing itself.
+    against the thing itself. A bare SHA is BlarAI's; ``<repo>@<sha>`` is the
+    named sibling's, and is resolved there rather than waved through.
     """
     for path in _disposition_files():
         for row in _rows(path.read_text(encoding="utf-8")):
             if row.status != "FIXED":
                 continue
-            for sha in SHA_RE.findall(row.evidence):
-                out = subprocess.run(
-                    ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
-                    cwd=REPO_ROOT, capture_output=True,
-                )
-                assert out.returncode == 0, (
-                    f"{path.name}: row {row.finding!r} cites SHA {sha} which does not resolve "
-                    f"in this repo - evidence that cannot be checked is not evidence"
-                )
+            found, shape_errors = citations(row.evidence)
+            assert not shape_errors, f"{path.name}: row {row.finding!r}: {shape_errors}"
+            for repo, sha in found:
+                reason = resolve_citation(repo, sha)
+                assert reason is None, f"{path.name}: row {row.finding!r}: {reason}"
+
+
+# --------------------------------------------------------------------------
+# 5. Evidence in a sibling repository (#1090)
+#
+# Half of a cross-repo arc could not be recorded honestly before this: a
+# sibling SHA was rejected by a check that only knew BlarAI, so the only green
+# form left was to cite a BRANCH NAME - the unverifiable label this control was
+# built to refuse, arriving through the control's own door. The tests below are
+# written to fail if the resolution is ever loosened into tolerance, which is
+# the failure that would look like success.
+# --------------------------------------------------------------------------
+
+SIBLING = "agentic-setup"
+
+
+def _head_of(repo: str) -> str:
+    """A SHA that genuinely exists in ``repo``.
+
+    Read from the repository rather than pinned, so this stays true as either
+    history moves. An absent sibling FAILS here: a cross-repo control that
+    quietly skips when the other repo is missing is untested, and a silent
+    skip is this project's most recurrent defect class.
+    """
+    root = repo_root_for(repo)
+    assert (root / ".git").exists(), (
+        f"{repo} is not present at {root} - the constellation this control checks against "
+        f"is incomplete, so the cross-repo door is unproven (set {CONSTELLATION_ROOT_ENV})"
+    )
+    out = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+    )
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip()
+
+
+def test_sibling_evidence_resolves_in_the_named_repository(tmp_path: Path) -> None:
+    """The capability: a FIXED row may cite a commit that landed next door."""
+    md = f"```disposition\nx | FIXED | {SIBLING}@{_head_of(SIBLING)} - the fix landed there\n```"
+    code, report = _run(md, tmp_path)
+    assert code == 0, report
+
+
+def test_the_sibling_sha_would_not_resolve_in_blarai() -> None:
+    """Proves the previous test is load-bearing and not accidentally passing.
+
+    If the sibling HEAD also existed in BlarAI, the positive case above would
+    say nothing about WHERE the lookup happened.
+    """
+    assert resolve_citation("blarai", _head_of(SIBLING)) is not None
+
+
+def test_a_blarai_sha_labelled_as_the_sibling_is_refused(tmp_path: Path) -> None:
+    """The teeth: the check follows the NAME it was given.
+
+    A verifier that resolved a citation against whichever repository happened
+    to contain the SHA would pass this row, and would have no way to tell a
+    cross-repo claim from a mislabelled one.
+    """
+    blarai_sha = _head_of("blarai")
+    md = f"```disposition\nx | FIXED | {SIBLING}@{blarai_sha} - landed next door\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0, f"a BlarAI SHA passed as {SIBLING} evidence:\n{report}"
+    assert "does not resolve to a commit in agentic-setup" in report, report
+
+
+def test_a_bare_sibling_sha_is_still_refused(tmp_path: Path) -> None:
+    """Bare SHAs keep meaning BlarAI - the door has to be opened deliberately."""
+    md = f"```disposition\nx | FIXED | {_head_of(SIBLING)} - the fix landed somewhere\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0 and "does not resolve to a commit in blarai" in report, report
+
+
+def test_an_unknown_repository_name_is_refused(tmp_path: Path) -> None:
+    """Allowlist, not blocklist: an unlocatable repository is an unchecked claim."""
+    md = "```disposition\nx | FIXED | some-other-repo@59fc51d - landed elsewhere\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0 and "not one of" in report, report
+
+
+def test_a_sibling_sha_that_does_not_resolve_is_refused(tmp_path: Path) -> None:
+    md = f"```disposition\nx | FIXED | {SIBLING}@{'0' * 40} - landed next door\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0 and "does not resolve" in report, report
+
+
+def test_a_branch_name_is_not_admitted_across_the_boundary(tmp_path: Path) -> None:
+    """The exact substitution #1090 exists to remove.
+
+    ``fix/1090-x`` alone still satisfies the BlarAI form - records predating
+    this rely on it - but qualified with a sibling it becomes a label in a
+    repository nobody resolves, which is the thing being refused.
+    """
+    md = f"```disposition\nx | FIXED | {SIBLING}@fix/1090-cross-repo - landed next door\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0 and "only a SHA is evidence" in report, report
+
+
+def test_an_unreachable_repository_fails_rather_than_skips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Absence is the one thing a verifier must never read as consent."""
+    monkeypatch.setenv(CONSTELLATION_ROOT_ENV, str(tmp_path))
+    md = f"```disposition\nx | FIXED | {SIBLING}@{'a' * 40} - landed next door\n```"
+    code, report = _run(md, tmp_path)
+    assert code != 0 and "not reachable" in report, report
+
+
+def test_a_qualified_citation_is_not_also_read_as_a_blarai_sha() -> None:
+    """Unit-level pin on the ordering the whole scheme rests on."""
+    found, errors = citations(f"{SIBLING}@59fc51d and bare deadbeef1")
+    assert not errors, errors
+    assert found == [(SIBLING, "59fc51d"), ("blarai", "deadbeef1")], found
+
+
+def test_a_hex_looking_domain_does_not_name_a_repository() -> None:
+    """An address is not a citation - ``x@deadbeef.com`` names no repository.
+
+    The bare hex left behind is still read as a BlarAI SHA, unchanged from
+    before this door existed: a SHA in prose is routinely followed by a full
+    stop, so tightening that scan would stop CHECKING real evidence to silence
+    a shape nobody writes in an evidence column.
+    """
+    found, errors = citations("noted by claude@deadbeef.com in passing")
+    assert not errors, errors
+    assert all(repo == "blarai" for repo, _ in found), found
+
+
+def test_the_home_repo_is_in_the_allowlist() -> None:
+    """``blarai@<sha>`` is the explicit spelling of the default, not a second door."""
+    assert "blarai" in KNOWN_REPOS
+    assert resolve_citation("blarai", _head_of("blarai")) is None
 
 
 def test_the_verifier_is_wired_and_executable() -> None:

@@ -81,12 +81,42 @@ def _plan_fixture(tmp_path):
     return store.write(result.plan), store, tasks
 
 
-def _plan_driver(tmp_path, calls, *, precheck_result=None, ops_overrides=None, **kw):
+#: A job oracle whose execution-stage probes BOTH produced a real result — the only shape that
+#: earns the right to delete work from the plan (#1342).
+QA_VALIDATED = {"f2p_baseline": "fails-on-skeleton", "collectability": "collected"}
+
+#: The shape every NODE oracle has had in production: both probes skipped unconditionally by
+#: ``oracle_qa.f2p_seed_gate``'s non-``.py`` early return. Copied from the real
+#: ``state/fleet-runs/20260808-160538-bd/oracle-qa.json``, which reported ``findings_total: 0``
+#: and ``validated: true`` beside these two "we did not look" stamps.
+QA_NEVER_VALIDATED = {
+    "validated": True, "findings_total": 0, "language": "node", "verdict": "seed",
+    "f2p_baseline": "not-run", "collectability": "skipped", "oracle_coverage": "unknown",
+}
+
+
+def _qa_run_dir(tmp_path, stamps):
+    """Write an ``oracle-qa.json`` sidecar and return the run dir holding it.
+
+    ``stamps=None`` writes NO sidecar — the absent-evidence case, which must read as "never
+    validated" rather than as permission."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    if stamps is not None:
+        (run_dir / "oracle-qa.json").write_text(json.dumps(stamps), encoding="utf-8")
+    return run_dir
+
+
+def _plan_driver(tmp_path, calls, *, precheck_result=None, ops_overrides=None,
+                 qa_stamps=QA_VALIDATED, **kw):
     plan, store, tasks = _plan_fixture(tmp_path)
     overrides = dict(ops_overrides or {})
     if precheck_result is not None:
         overrides["precheck_job_oracle"] = _recording_precheck(calls, precheck_result)
     ops = _ops(calls, **overrides)
+    # Default to a VALIDATED oracle so the pre-existing cases keep testing what they were
+    # written to test; #1342's own cases override it explicitly.
+    kw.setdefault("run_dir", str(_qa_run_dir(tmp_path, qa_stamps)))
     return sd.SwapDriver(
         run_id="R1", session_id="s1", tasks=tasks,
         swap_state_path=tmp_path / "swap.json", ops=ops,
@@ -219,6 +249,101 @@ def test_fail_closed_noop_seam_default_dispatches_the_wave(tmp_path):
     res = _plan_driver(tmp_path, calls, already_satisfied_precheck=True).run()
     assert [c[1] for c in _task_calls(calls)] == ["storage", "report"]
     assert not any(getattr(o, "result", "") == "SKIPPED" for o in res.outcomes)
+
+
+# ---- #1342: a PASS from an oracle that was never proven able to FAIL is not evidence ----
+#
+# The permissive direction's cost, measured on B9 (2026-08-07/08): a node job oracle skips both
+# execution-stage probes unconditionally, so a website — the operator's stated priority — always
+# reached this pre-check with an oracle nothing had ever validated. B9's had five tests, two with
+# empty bodies. It passed on any tree; the pre-check believed it; `create-piece-detail-page` (a
+# page the operator asked for in his own words) and `acceptance-tests` were deleted from the plan;
+# the job graded GREEN. The exam did not merely fail to catch a defect — it AMPUTATED the build.
+
+
+@pytest.mark.parametrize(
+    "qa_stamps, why",
+    [
+        (QA_NEVER_VALIDATED, "the real production node shape: both probes skipped"),
+        ({"f2p_baseline": "not-run", "collectability": "collected"}, "no fail-to-pass baseline"),
+        ({"f2p_baseline": "fails-on-skeleton", "collectability": "skipped"}, "not collectable"),
+        ({"f2p_baseline": "", "collectability": ""}, "empty stamps"),
+        ({"f2p_baseline": None, "collectability": None}, "null stamps"),
+        ({}, "sidecar present but says nothing"),
+        (None, "no sidecar at all — absence is not permission"),
+    ],
+)
+def test_unvalidated_oracle_may_not_delete_work_even_when_it_passes(tmp_path, qa_stamps, why):
+    """The lock. The oracle PASSES and the knob is ON — the only thing withheld is proof that
+    the oracle could have failed, and that alone must keep every task dispatching."""
+    calls = []
+    res = _plan_driver(
+        tmp_path, calls,
+        precheck_result={"status": "passed", "evidence": "exit 0; 5 passed"},
+        already_satisfied_precheck=True,
+        qa_stamps=qa_stamps,
+    ).run()
+    assert [c[1] for c in _task_calls(calls)] == ["storage", "report"], why
+    assert not any(getattr(o, "result", "") == "SKIPPED" for o in res.outcomes), why
+    sc = _scorecard(calls)
+    assert sc is not None and "already_satisfied" not in sc["evidence"], why
+
+
+def test_validated_oracle_still_skips___the_toggle_proof(tmp_path):
+    """The other half of principle 12: with the SAME passing oracle and the SAME knob, a
+    validated QA record still permits the skip. Without this, the test above would pass just as
+    happily if the pre-check had been broken outright rather than gated."""
+    calls = []
+    res = _plan_driver(
+        tmp_path, calls,
+        precheck_result={"status": "passed", "evidence": "exit 0; 5 passed"},
+        already_satisfied_precheck=True,
+        qa_stamps=QA_VALIDATED,
+    ).run()
+    assert [c[1] for c in _task_calls(calls)] == ["storage"]
+    assert [o.task for o in res.outcomes if getattr(o, "result", "") == "SKIPPED"] == ["report"]
+
+
+def test_the_refusal_says_why_rather_than_going_quiet(tmp_path):
+    """A control that degrades silently is worse than none. The operator reading the progress
+    log must be able to tell 'the oracle disagreed' from 'the oracle was never checked'."""
+    lines = []
+    calls = []
+    _plan_driver(
+        tmp_path, calls,
+        precheck_result={"status": "passed", "evidence": "exit 0"},
+        already_satisfied_precheck=True,
+        qa_stamps=QA_NEVER_VALIDATED,
+        ops_overrides={"write_progress": lines.append},
+    ).run()
+    said = "\n".join(lines)
+    assert "never proven able to FAIL" in said
+    assert "#1342" in said
+
+
+def test_the_real_b9_qa_sidecar_is_refused(tmp_path):
+    """Seed proof. Built from the artifact that actually escaped, not from a defect I invented:
+    the sidecar reports ``validated: true`` and ``findings_total: 0`` — which is exactly why a
+    reader believed it — while its own adjacent fields say neither probe ran."""
+    run_dir = _qa_run_dir(tmp_path, QA_NEVER_VALIDATED)
+    assert json.loads((run_dir / "oracle-qa.json").read_text())["validated"] is True
+    assert sd._oracle_execution_validated(str(run_dir)) is False
+
+
+@pytest.mark.parametrize("bad", ["not json at all", "[]", '"a string"', "null"])
+def test_malformed_qa_sidecar_reads_as_unvalidated(tmp_path, bad):
+    """Fail CLOSED, opposite to ``_oracle_unfit_from_run_dir``'s soft direction: an unreadable
+    record is not permission to delete work."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "oracle-qa.json").write_text(bad, encoding="utf-8")
+    assert sd._oracle_execution_validated(str(run_dir)) is False
+
+
+def test_validation_probe_never_raises(tmp_path):
+    """It runs inside a dispatch decision; a raise here would take the run with it."""
+    for arg in (None, "", str(tmp_path / "nope"), str(tmp_path)):
+        assert sd._oracle_execution_validated(arg) is False
 
 
 # ---- verdict semantics (pure) ----------------------------------------------------

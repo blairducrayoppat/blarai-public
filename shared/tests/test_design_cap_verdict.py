@@ -37,6 +37,7 @@ Every external effect rides the injected ``SwapOps`` seams — model-free, GPU-f
 
 from __future__ import annotations
 
+import types
 from pathlib import Path
 
 import pytest
@@ -89,7 +90,7 @@ _B5_TASK = {
 }
 
 
-def _iterating_design_loop(_app_dir: str, _goal: str, _vcj: str) -> dict:
+def _iterating_design_loop(_app_dir: str, _goal: str, _vcj: str, _surface: str = "") -> dict:
     """A design reviewer that ALWAYS requests another lap — with the default cap of 2
     this is exactly B5's night-20260711 ending: critique -> fix -> re-critique -> CAP."""
     return {"should_iterate": True, "needs_work": True,
@@ -97,7 +98,7 @@ def _iterating_design_loop(_app_dir: str, _goal: str, _vcj: str) -> dict:
             "capture_tier": "web-headless", "ok": True}
 
 
-def _satisfied_design_loop(_app_dir: str, _goal: str, _vcj: str) -> dict:
+def _satisfied_design_loop(_app_dir: str, _goal: str, _vcj: str, _surface: str = "") -> dict:
     """The c.1717 clean ending: a REAL critique ran (``ok=True`` — the flag every
     unavailable/fail-soft producer reports False) and the reviewer was satisfied."""
     return {"should_iterate": False, "needs_work": False,
@@ -493,7 +494,7 @@ def test_not_satisfied_non_iterate_ending_reclasses_nothing(tmp_path):
     ``needs_work=True`` — e.g. the ps-side loop declined another lap) is neither
     clean nor cap: out of the decided scope, so the terminal stays STALLED
     [VERIFY] and no stamp rides."""
-    def declined(_a: str, _g: str, _v: str) -> dict:
+    def declined(_a: str, _g: str, _v: str, _s: str = "") -> dict:
         return {"should_iterate": False, "needs_work": True,
                 "feedback": "spacing still off", "layout_hard": False,
                 "capture_tier": "web-headless", "ok": True}
@@ -611,3 +612,64 @@ def test_banking_rule_design_ending_passes_bank_true_stalled_does_not(tmp_path):
     blocked = battery.BatterySummary(scorecards=[capped, clean, crashed])
     assert blocked.stalled == 1
     assert blocked.exit_code() == 1     # a true STALLED still blocks the bank
+
+
+# ---------------------------------------------------------------------------
+# #1171 — the declared surface reaches the structural check
+# ---------------------------------------------------------------------------
+
+
+def test_declared_surface_rides_the_design_loop_command_to_the_structural_check(monkeypatch, tmp_path):
+    """The seam, not the sides. The intake platform menu already records what the
+    operator chose; before #1171 that answer stopped at the spec and the structural
+    check had to write "only a finding if this project was supposed to have a WinUI
+    front end" — a question aimed at the one reader who cannot answer it.
+
+    Threading it means five hops (driver → ops → critique-loop.ps1 → capture-app.ps1 →
+    check-design-structural.ps1), and a break at ANY hop degrades silently back to that
+    hedge with nothing in the report to say the wiring broke. So assert on the real
+    command string the subprocess would receive."""
+    from shared.fleet import swap_ops as so
+
+    seen: dict = {}
+
+    def _fake_run_to_logfile_at(cmd, *, log_path, timeout_s):
+        seen["cmd"] = cmd
+        return False, 0  # fail-soft path; we are asserting the command, not the result
+
+    monkeypatch.setattr(so, "_run_to_logfile_at", _fake_run_to_logfile_at)
+
+    config = types.SimpleNamespace(
+        scripts_dir=tmp_path / "scripts",
+        runs_dir=tmp_path / "runs",
+    )
+    (tmp_path / "scripts").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "runs").mkdir(parents=True, exist_ok=True)
+
+    so.real_run_design_loop(config, "run-1", str(tmp_path), "a kitchen helper", "[]",
+                            "command-line")
+
+    command = " ".join(seen["cmd"])
+    assert "-DeclaredSurface 'command-line'" in command, (
+        "the operator's declared surface must reach critique-loop.ps1; without it the "
+        "structural check falls back to hypothesising about a WinUI front end"
+    )
+
+
+def test_design_loop_without_a_surface_still_runs(monkeypatch, tmp_path):
+    """An unclarified `ambiguous`/`unknown` spec is a legitimate state. It must pass an
+    EMPTY surface rather than omitting the parameter — the downstream default reproduces
+    the pre-#1171 wording, and a missing parameter would be a binding error instead."""
+    from shared.fleet import swap_ops as so
+
+    seen: dict = {}
+    monkeypatch.setattr(so, "_run_to_logfile_at",
+                        lambda cmd, *, log_path, timeout_s: (seen.update(cmd=cmd), (False, 0))[1])
+
+    config = types.SimpleNamespace(scripts_dir=tmp_path / "s", runs_dir=tmp_path / "r")
+    (tmp_path / "s").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "r").mkdir(parents=True, exist_ok=True)
+
+    so.real_run_design_loop(config, "run-1", str(tmp_path), "goal", "[]")
+
+    assert "-DeclaredSurface ''" in " ".join(seen["cmd"])

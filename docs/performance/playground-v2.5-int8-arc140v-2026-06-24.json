@@ -1,0 +1,52 @@
+{
+  "title": "Playground v2.5 (SDXL-arch) OpenVINO INT8 on Arc 140V — resident RAM footprint + 1024px generation speed",
+  "date": "2026-06-24",
+  "question": "How much system RAM does Playground v2.5 (OV-INT8) occupy resident on the Arc 140V iGPU, and how fast does it generate at 1024px? Captured for UC-010's second (illustration) image model and the swap-budget math.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake, Series 2)",
+    "igpu": "Intel Arc 140V (Xe2, 16 GB shared)",
+    "ram_total_gb": 31.32,
+    "ram_type": "LPDDR5X unified"
+  },
+  "software": {
+    "os": "Windows 11 Pro 26200",
+    "openvino": "2026.2.1-21919 (releases/2026/2)",
+    "gpu_driver": "32.0.101.8826",
+    "optimum_intel": "2.2.0 (export)",
+    "runtime": "optimum-intel OVStableDiffusionXLPipeline, isolated Python 3.11 venv",
+    "memory_sampler": "psutil virtual_memory().used (system in-use), deltas vs baseline"
+  },
+  "model": {
+    "name": "Playground v2.5 (playgroundai/playground-v2.5-1024px-aesthetic)",
+    "architecture": "Stable Diffusion XL (SDXL-arch)",
+    "precision": "OpenVINO INT8 weight-only (optimum-cli export openvino --weight-format int8)",
+    "on_disk_int8_gb": 3.3
+  },
+  "method": "RAM: system in-use RAM sampled at baseline (with the Qwen3-Coder-30B ALSO loaded in OVMS), after Playground loads on GPU, and the peak during one 1024x1024 generation; the deltas isolate Playground (the 30B is constant in the baseline). Generation: device=GPU (Arc 140V), 1024x1024, 30 steps, guidance_scale 3.0, model-default scheduler, single image. CPU smoke (separate run): device=CPU, 512x512, 20 steps. Single run each, NOT averaged.",
+  "result_ram": {
+    "baseline_used_gb": 24.12,
+    "baseline_note": "Qwen3-Coder-30B (OVMS) + OS + processes loaded",
+    "after_playground_load_used_gb": 32.28,
+    "playground_resident_delta_gb": 8.16,
+    "peak_during_gen_used_gb": 32.54,
+    "playground_peak_delta_gb": 8.42
+  },
+  "result_speed": {
+    "gpu_1024px_30step_total_s": 36,
+    "gpu_s_per_step": 1.2,
+    "cpu_512px_20step_total_s": 157,
+    "cpu_s_per_step": 7.85
+  },
+  "co_residence_finding": {
+    "ceiling_gb": 31.32,
+    "peak_used_with_30b_gb": 32.54,
+    "over_ceiling_gb": 1.2,
+    "conclusion": "Playground (~8.4 GB) co-resident with the 30B coder (~18 GB) EXCEEDS the 31.32 GB ceiling and pages ~1.2 GB to disk during generation. They cannot truly co-reside; the UC-010 design must swap one model resident per phase. Playground ALONE (~8.4 GB) fits comfortably inside 31.32 GB."
+  },
+  "not_measured": [
+    "Clean ALONE footprint (30B unloaded): the generation ran under ~1.2 GB paging pressure, so the 8.42 GB PEAK is measured under memory pressure; the 8.16 GB LOAD delta is clean (load completed before the gen paging). An alone re-measure (30B stopped) would give a publication-clean peak.",
+    "Image quality not benchmarked. Subjective: decent flat-style subjects, cluttered/painterly backgrounds; flat-vector brochure target needs background-removal or a flat-vector LoRA.",
+    "INT8 vs FP16 quality/speed not compared.",
+    "GPU power / thermal not captured this run."
+  ]
+}

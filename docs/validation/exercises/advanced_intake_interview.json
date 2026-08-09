@@ -1,0 +1,52 @@
+{
+  "capability": "2. Advanced intake and interview",
+  "flag": "advanced_intake_interview",
+  "title": "The interview: does it ask in plain language, and does the plan come back in your words?",
+  "observable": "An operator-driven dispatch COMPLETES without a technical question being asked of you. Quoted from CODER_DEFINITION_OF_DONE.md capability 2.",
+  "why": "This has never once been finished. The interview has been opened twice and approved zero times, so everything after the plan card — whether your photos get used, whether the exams grade your actual request, whether the report tells the truth — has never run on a real job. The flags being switched on is not the same as the thing working, and only you can close that gap.",
+  "minutes": 12,
+  "steps": [
+    {
+      "action": "open",
+      "target": "the BlarAI app",
+      "expect": "the chat screen, with your name at the top and a box at the bottom that says \"Message BlarAI…\"",
+      "note": "If the box is missing or the app is blank, the assistant is not running — stop here and say so. That is a real finding, not something to work around."
+    },
+    {
+      "action": "type",
+      "target": "the \"Message BlarAI…\" box, then press Enter",
+      "text": "/dispatch advanced pottery-studio | I run a small pottery studio and I want a proper little website for it, not just one page. A home page, a page listing the pieces I have for sale, a separate page for each piece, and a contact page where someone can send me an enquiry.",
+      "expect": "it starts ASKING YOU QUESTIONS, one at a time, in ordinary English — about what the site is for, who it is for, what it should feel like. It should NOT ask you anything technical, and it should NOT jump straight to a plan.",
+      "note": "The word \"advanced\" is what triggers the interview. Without it you get the short path and this exercise proves nothing."
+    },
+    {
+      "action": "look",
+      "target": "the questions it asks",
+      "expect": "plain language a non-technical person can answer. If ANY question uses jargon you would not use yourself — framework, endpoint, schema, deploy — that is a failure worth reporting word for word."
+    },
+    {
+      "action": "type",
+      "target": "the message box, as your answer to any one question",
+      "text": "I don't know",
+      "expect": "it accepts that and moves on, and later tells you it decided that one for you. It must NOT get stuck, repeat the question, or scold you.",
+      "note": "Being allowed to say \"I don't know\" is a designed behaviour, not a loophole. If it refuses the answer, that is the finding."
+    },
+    {
+      "action": "look",
+      "target": "the plan card it shows you at the end",
+      "expect": "YOUR OWN WORDS played back — the phrases you actually typed, not a rewritten version. It should also list anything it assumed on your behalf."
+    },
+    {
+      "action": "click",
+      "target": "the \"Approve & build\" button on the plan card",
+      "expect": "it accepts the approval and begins building. This is the step that has never been taken — everything past this point is unproven, so whatever happens next is worth reporting exactly as you see it.",
+      "note": "The build itself takes hours. You do not wait for it. Stop here; the result appears in tomorrow's report."
+    }
+  ],
+  "cannot_check": [
+    "Whether the finished website is any good — the build runs for hours after you approve, and its result is graded separately.",
+    "Whether your own photos get used. That half of the system has never run either, and the interview does NOT yet ask you for files; you would have to know to put them in the project's assets folder yourself.",
+    "How it looks. Appearance is judged by eye and is never auto-passed — it is reported as unverified rather than claimed as working."
+  ],
+  "rollback": "Open the AI Control Panel and press [8] Undo AI changes in a project — that reverses anything the build wrote. If the assistant itself is misbehaving, [S] stops it and [K] stops everything. Turning the interview OFF is a config change rather than a button, so say the word and it is a one-line change on my side."
+}

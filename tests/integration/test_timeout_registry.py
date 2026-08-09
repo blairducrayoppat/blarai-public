@@ -38,6 +38,7 @@ _SCAN_FILES: tuple[str, ...] = (
     "shared/fleet/oracle_mutation.py",
     "shared/fleet/vikunja_bridge.py",
     "tools/dispatch_harness/config.py",
+    "tools/dispatch_harness/green_quality/mutation.py",
     "services/assistant_orchestrator/src/websearch/live_adapter.py",
 )
 
@@ -55,6 +56,8 @@ _MODULE_FOR_FILE = {
     "shared/fleet/oracle_mutation.py": "shared.fleet.oracle_mutation",
     "shared/fleet/vikunja_bridge.py": "shared.fleet.vikunja_bridge",
     "tools/dispatch_harness/config.py": "tools.dispatch_harness.config",
+    "tools/dispatch_harness/green_quality/mutation.py":
+        "tools.dispatch_harness.green_quality.mutation",
     "services/assistant_orchestrator/src/websearch/live_adapter.py":
         "services.assistant_orchestrator.src.websearch.live_adapter",
 }

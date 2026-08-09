@@ -233,7 +233,11 @@ def contract_import_findings(
     Delegates to :func:`shared.fleet.oracle_qa.scan_invented_contracts` — the
     SAME AST walk the live dispatch fleet's authorship-time QA gate (#821)
     runs before a job oracle seeds — so this eval measures production
-    behavior verbatim rather than a second, possibly-drifting heuristic.
+    behavior rather than a second, possibly-drifting heuristic. Scope note
+    (#967 D1): production ALSO passes the plan's declared submodule set, so a
+    ``from <pkg> import <declared submodule>`` is legitimate there. This eval's
+    case schema models ``declared_exports`` only, so it exercises the
+    exports-only leg — a strictly narrower input, never a divergent check.
     Fail-closed: unparseable source yields no importable symbols (the upstream
     ``_first_party_imports`` catches ``SyntaxError``/``ValueError`` and
     returns ``[]``), so a syntax-broken oracle reads as contract-clean here —

@@ -27,148 +27,108 @@ through. Always redirect `LOCALAPPDATA` (§2.6); run from a TERM-bearing shell w
 `PYTHONIOENCODING` override (the PowerShell tool shell false-fails 3 tests — bash is the
 proven runner).
 
-> **LIVE_GATE_BASELINE: 10011 passed / 0 failed / 0 skipped / 129 deselected**
-> *(as of 2026-07-30, MEASURED on merged main `4a978f09`, NOT derived — the full measurement
-> annotation lives in the primary repository's TEST_GOVERNANCE.md §1; this public mirror
-> carries the headline figure. Prior baseline: 2026-07-23, #1067 v7 carve-out + honest
-> grading instrument — prior 8919, +128:
-> MEASURED on merged main `c2316106` (primary LF checkout, models present, app down,
-> LOCALAPPDATA redirected, bash runner; 9047 passed / 0 failed / 0 skipped in 266 s),
-> NOT derived. The delta is the #1067 v7 guard suite grown for the carve-out plus the
-> grading instrument's new locks (exact-bipartition screen, fail-loud token cap,
-> grade_window figure lock, characterisation test) and the merge-session disposition
-> discipline. prose_guard.py's runtime behaviour is unchanged; nothing went live
-> (coordinator stays shadow). The branch worktree read 9024/1-CRLF-artifact/21-model-skip;
-> those resolve to 0/0 on the primary checkout, which is why the merged-main figure is
-> the authority — RE-MEASURE here, never derive from a worktree run.)*
+> *Older per-merge stamps are rotated to*
+> [`docs/archive/test-governance-baseline-history.md`](archive/test-governance-baseline-history.md)
+> *(2026-08-08, when this file breached its 40,000-byte budget). Nothing was deleted; the
+> retractions and corrections are there in full.*
 >
-> *(prior entry, 2026-07-23, #1079 grading instrument — prior 8883 (post-#1043 clean-env), +26: the coordinator
-> graduation grading tool's suite in
-> `shared/tests/test_coordinator_graduation_grading.py` — positive control
-> (asserted against a fixture whose known answer is a FAILING window), determinism,
-> oracle/guard independence, corpus fail-loud, superseded-decision abstention, and
-> the N-bar-counts-VERIFIED-decisions lock. MEASURED 8873 in the isolated build
-> worktree, where 21 model-dependent tests env-skip on the gitignored weights;
-> merged main restores those, hence 8909. The +26 was taken from
-> `pytest --collect-only`, not derived: an earlier +23/8891 pair was off by the
-> tests the later fix commits added, and BOTH surfaces carried the wrong figure
-> consistently — which is exactly the #970 hole, so
-> **RE-MEASURE on merged main before trusting this line** rather than relying on
-> the freshness gate, which only compares this figure to the CLAUDE.md snapshot.)*
+> **LIVE_GATE_BASELINE: 10843 passed / 0 failed / 0 skipped / 133 deselected**
+> *(**CONFIRMED on merged `main`** @ `88a634eb`, 2026-08-08, **started 22:04:53, finished
+> 22:12:28** local, **450.47 s** — primary checkout, assistant STOPPED, no dispatch, no
+> battery. **+33 over 10810**: `c9fc9633` (#1349, +5 — the grader stopped calling the
+> operator's own photographs pipeline waste) and `88a634eb` (#1348, +28 — requirement
+> coverage can finally see a website; the assessor globbed `*.py` and then reported "no
+> seeded job oracle" while a `.mjs` one sat in the same directory).*
 >
-> *(prior entry, 2026-07-23, S3 slice A — prior 8852, +16: the #1055 honest-revise
-> message's parametrized false-positive corpus (8 task-edit inputs the pre-merge
-> review's F1/F2 flagged) + true-positive/scope corpus (6 inputs) in
-> `tests/integration/test_dispatch_coordinator.py`. RE-MEASURED on merged main
-> `70d5ddee` (4:17, app down, LOCALAPPDATA redirected, bash runner).)*
+> *A merge lesson banked with the figure: the first #1348 merge at 21:55 took only the
+> branch's FIRST commit, because I merged while its agent was still working. The second
+> commit — the reachability tests proving the node path is reached at BATTERY CLOSE, not
+> just from `assess_run` — landed in a second merge. Merging a branch whose author has not
+> reported is merging a moving target.*
 >
-> *(prior entry, 2026-07-23, the scaffold window — prior 8851, +1: the neutral-seed
-> prompt-companion lock (35e8df49). The merged-main re-run caught one
-> pre-existing lock the merge semantically outdated — the oracle-contract test
-> pinned the retired app.core literal; re-pinned to the app-package intent in
-> 8dce0935 and re-measured green at 8852.)*
+> *Previous: **10810** @ `e8038c95` — (**CONFIRMED on merged `main`**, 2026-08-08, **started
+> 21:00:01, finished 21:07:40** local, **455.06 s** — the CONFIRMING run, stamped rather
+> than the 20:50:48 run that carried the same count but FAILED on the grammar gate; a
+> baseline must cite the run that actually passed. Primary checkout, models
+> present, assistant STOPPED, no dispatch and no battery live (the guard's own pattern —
+> image AND invocation form — returned 0 driving processes). **+86 over 10724**, from the
+> evening's second arc: every instrument that publishes a verdict now has to say what it did
+> not measure.*
+> - *`83633ce0` (#1342 item 2, +19, `test_oracle_qa_measurement_honesty.py`) — the QA record
+>   reported `findings_total: 0` beside `f2p_baseline: "not-run"`. `findings_conclusive` is
+>   now false whenever any producing stage did not run.*
+> - *`74257ce7` (#1345, +38, `test_image_placement.py`) — grades where a site's pictures
+>   LAND. Catches the operator's own two remaining complaints on the real delivery.*
+> - *`ca742a99` (#1346, +24, `test_morning_website_section.py`) — the morning report names
+>   the site built last night, or says why it cannot.*
+> - *`95e007be` (lesson 33's owed control, +5,
+>   `test_graders_disclose_what_they_did_not_measure.py`) — deny-by-default: a module that
+>   publishes a findings total must carry some way to say a check did not run. Found zero
+>   real offenders; it is a ratchet against the next one, proved able to fire by planting one.*
 >
-> *(prior entry, 2026-07-23, the #1049 window — prior 8828, +23: the already-satisfied
-> pre-check suite + execute-handler contract locks, gated green on merged main
-> c67e99ab in the change's own attribution window.)*
+> *This run FAILED once before passing, and the failure was worth having:
+> `test_coder_dod_grammar.py` rejected a `Status: STARTED` line written into capability 12
+> earlier the same evening. STARTED is not in the legend, and PARTIAL was the honest word
+> anyway — one reviewed delivery is a data point, not the published rate the row asks for.
+> The grammar gate caught a status claim that had drifted past its own legend.*
 >
-> *(prior entry, 2026-07-23, the overnight merge train — prior 8780, +48 across five
-> serialized merges, each gated green on merged main: #1021 journal chronology
-> gate +5 (8785), #946 guard lexicon locks +5 (8790), #1059 lesson-tally sync
-> gate +10 (8800), #1060 ceremony-flag capability-truth gate +16 (8816), #1058
-> sandbox-freshness precondition +12 (8828, incl. its timeout-registry row).
-> Every figure MEASURED on merged main, never derived.)*
+> *Previous: **10724** @ `75e8e24f`, 2026-08-08 19:48:05→19:55:09, 419.62 s, **+69 over
+> 10655**, from two merges that give the delivered PRODUCT its first automated examination:*
+> - *`32a9ed1f` (#1345, +26, `shared/tests/test_link_lint.py`) — every href/src in a
+>   delivered site resolved against the root a server actually mounts. The operator found a
+>   broken "View Details" button by hand in under a minute that four gates had passed;
+>   nothing was asking whether a link's target existed. Advisory, not a gate: a regression
+>   lock proves a broken site and a clean site produce identical verdicts.*
+> - *`75e8e24f` (#1343, +43, `tests/integration/test_battery_website_presentation.py`) — a
+>   website battery run now ends by leaving him a record and a double-click launcher, after
+>   every measurement has landed. Fail-open by design in this one place, proved
+>   byte-identical across seven forced failure paths.*
 >
-> *(prior entry, 2026-07-22, the journal fold's lesson-156 third-instance control — prior
-> 8776, +4 in `test_acceptance_clarify.py`: an `ast` enumeration of every consumer
-> of `planning_seed` after its mint in `generate_plan`, deny-by-default against an
-> explicit allowlist (`rule_spec` alone, which owns the clean `spec.goal` by
-> contract), a paired reached-by-the-seed assertion so "no offender" cannot be
-> satisfied by "no consumer," and a planted-violation toggle-off. Both locks
-> mutation-proven RED against the reverted #1032 fix (both the direct and the
-> LAUNDERED shapes) with byte-exact restore verified by digest, plus a
-> planted-violation toggle-off and a negative control. The figure was WRONG
-> TWICE before it was right: first 8780 from a miscount of helper functions as
-> tests, then 8779 after measuring — and back to 8780 once independent review
-> added the negative control. The count is now MEASURED, never derived.
-> Prior 8776: #1031 S1 advanced-intake DORMANT merge — prior 8744, +32
-> across `test_advanced_intake.py` (realism guard + delivery floor + the #1041
-> identity-idempotency and floor-then-guard ordering lock driven through the real
-> generate_plan), `test_plan_handler.py` (the three #1042 dormancy locks over the
-> REAL config loader + the fail-open close), and `test_acceptance_clarify.py`;
-> measured on merged main `72c0990c`, app down, models present. Flag ships false.
-> Prior 8744: #1050 ledger-candidate gate — prior 8735, +9 from
-> `test_ledger_candidate_discipline.py` (every ledger "tuning candidate" names a
-> `#NNN` or an explicit `no-ticket:` reason with a word floor; BLOCK-scoped, not
-> line-windowed; whitespace-normalised so a hard-wrapped phrase is still seen;
-> planted-violation toggle-off; both honest forms as negative controls; a
-> different-block ticket must NOT satisfy a candidate). The gate FAILED on its
-> first run against the live ledger, catching three unreferenced candidate
-> blocks — two un-ticketed since the seed run (now #1049). An independent review
-> then found the first implementation 25% blind to wrapped phrases and ~83%
-> ineffective on its line window; rebuilt, and the reviewer's own plant-everywhere
-> experiment went 16.8% -> 65.9% caught with all four realistic placements caught.
-> Round 2 then fixed a FALSE POSITIVE (a nested sub-bullet reference was refused;
-> only a top-level bullet starts a block now) and corrected a wrong characterisation
-> of the residual in the round-1 commit message - measured 0 of 221 misses matched
-> the stated mechanism, the true one being its mirror image.
-> Measured 8742 with a battery run CONCURRENT (467s vs the usual ~230s); 0 failed
-> / 0 skipped, and re-measured uncontended on merged main.
-> Prior 8735: #1032 job-oracle requirements channel — prior 8733, +2 from
-> `test_acceptance_clarify.py` (the clarified-requirements block reaches the
-> MULTI-task job-oracle authoring prompt verbatim, captured from the real
-> prompt rather than asserted on the argument, vacuity-guarded; plus the
-> no-requirements byte-identity proof by prompt EQUALITY across the two
-> no-requirements paths). Mutant proven: reverting the one argument turns the
-> first lock RED and correctly leaves the second GREEN.
-> Prior 8733: #989 wave-1 scope ceiling — prior 8711, +22: **21** from the
-> new `test_wave1_scope_ceiling.py` (scope-ceiling composition reaching ROOT tasks,
-> <2-task exemption, shared/ambiguous-ownership permitting, plan-time
-> contract-coverage warn-loud on both oracle origins, added-only scope-sprawl
-> finding, evidence control-stripping) + **1** from `test_integration_gate.py` (the
-> exact-sequence dep-delta ref pin that replaced a provably weaker re-pinned lock —
-> review round 1, F1); measured clean on merged main `49988be8`, app down.
-> Prior 8711: #1006 tool-call status — prior 8695, +16 from
-> `test_eval_harness.py` (TestToolCallStatus: closed-pair detection incl.
-> unclosed-mention-stays-a-fail, full baseline transition matrix, offline-path
-> equivalence, resolved-binding drift lock); measured clean on merged main
-> `e28c255a`, app down.
-> Prior 8695: #877 revise repo-path fix — prior 8694, +1 from
-> `test_dispatch_coordinator.py` (revise-minted tasks carry the plan-time
-> resolved repo path; production-shaped fixture, toggle-off proven red);
-> measured clean on merged main `9c972dcc`, app down.
-> Prior 8694: #1022 gate-spec restoration — prior 8692, +2 from
-> `test_doctrine_freshness.py` (comprehension-gate section-list pin on every
-> gate-stating surface + toggle-off proof); measured clean on merged main
-> `c6d1926a`, app down.
-> Prior 8692: #1003 order-probe — prior 8690, +2 from `test_oracle_qa.py`
-> (coverage-map order-independence, both injection hooks, vacuity-guarded).
-> Prior 8690: the six-merge overnight cluster — prior 8653, +37 measured
-> on merged main (never summed per-branch): #1001 trend locks, #1008 the
-> battery-plans suite, #1010 baseline-validation locks, #1004 corpus integrity,
-> #795 stopword locks.
-> Prior 8653: #1009 unwired-generator-is-a-skip (+2 from
-> `test_eval_oracle_quality.py` — unwired generator does not fail the run; a
-> generator that RAISES is still an ERROR, never a skip).
-> Prior 8651: #1000 hardware-tier baseline teeth (+14, `test_eval_harness.py` —
-> unbaselined-failure regression ×2 statuses, first-pass not-a-regression,
-> recorded-known-failure unchanged, non-canonical baseline status ×6,
-> non-string baseline status is a harness error ×4).
-> Prior 8637: the #965 oracle-unfit attribution fix (+9, `test_integration_gate.py`).
-> Prior 8628: the #994 doc-rot gate (+34 from `test_doc_pointers_and_banners.py`).
-> Prior 8594: deferral-discipline (+28, `9ecad198`); 8566: #978 pair; 8555: #927.
-> Clean env = models present, app down, TERM-bearing shell.
-> An ISOLATED WORKTREE cannot confirm the 0-skipped half of this figure: without
-> the gitignored models it reports 21 env-skips (20 `services/semantic_router/
-> tests/test_router.py` needing bge-small-en-v1.5 ONNX, 1 `test_benchmark_kv_
-> cache_sweep.py` needing the 14B `config.json`). Benign and bounded — but it
-> means a worktree-measured figure is PROVISIONAL: the passed count is real,
-> the 0-skipped claim is not yet evidence. Confirm it with a full run on merged
-> main and correct this line if it differs (#1000, 2026-07-20).
-> The merging session updates this line + `CLAUDE.md <status_snapshot>` in the same
-> commit that changes counts — the freshness gate enforces agreement.
-> NOTE: that gate compares these two surfaces only to EACH OTHER (#970), so a
-> wrong-but-consistent pair passes silently — re-measure, never copy the other file.)*
+> *Previous: **10655** @ `462c55cb`, 2026-08-08 18:37:54→18:43:50, 353.32 s, **+81 over
+> 10574**, from the evening's three merges, all of them locks on instruments that were reporting
+> passes they had not measured:*
+> - *`4a51fb5e` (#1342, +38, `shared/tests/test_oracle_qa_node.py`) — node oracles skipped BOTH
+>   execution-stage probes unconditionally, so a website was exactly the case where nobody
+>   checked whether the exam could fail. Fail-to-pass baseline + static vacuity for node.*
+> - *`7821bab4` (#1342, +19, `test_already_satisfied_precheck.py` 16→35) — an oracle never shown
+>   capable of failing may no longer delete work from the plan.*
+> - *`462c55cb` (#1341, +27, `tests/integration/test_battery_evidence_capture.py` and its
+>   `live_dispatch` witness) — the scorecard cited a mutable file as evidence and stamped a
+>   pre-build commit count as a run property.*
+>
+> *Measured AFTER all three merges, so it is the merge tree's own figure, not inherited from any
+> branch. Each of the three ships its refusal case (principle 12): the #1342 precheck lock was
+> toggle-proven by forcing its probe to `return True` — 14 locks fail, while the
+> still-skips test keeps passing, so the suite tells "correctly gated" from "broken outright".*
+>
+> *(prior — CONFIRMED on merged `main` @ `0ea1f32b`, 2026-08-08, 14:31:48→14:37:38, 346.57 s,
+> **10574**; +9 over 10565, all `test_failure_taxonomy.py`, #1324's honesty split.)*
+>
+> *(prior — CONFIRMED on merged `main` @ `be0ad99b`, 2026-08-07, 23:28:25→23:33:57, 325.96 s,
+> **10565**.)*
+>
+> *(**RE-MEASURED on the resolved merge tree** of `docs/dod-ratification-20260807` × `main@49e4cb18`,
+> 2026-08-07, **started 23:21:58, finished 23:27:32** local, **327.66 s** — worktree
+> `blarai-wt-dod-rat` at model parity, venv interpreter, AO stopped, no battery live. **The
+> re-merge was CLEAN — no conflicts in this file or in the `CLAUDE.md` snapshot**, contrary to
+> the landing brief's expectation, because the branch already carried main's measurement history
+> and the four commits main gained since (`cce07cc6`, `43e30e59`, `a6bfd39a`, `49e4cb18`) touched
+> neither. The figure the files already carried was therefore MEASURED rather than inherited —
+> a clean merge of two independent baseline edits is precisely the case the doctrine-freshness
+> gate cannot catch, since it compares the two documents to each other and never to reality.*
+>
+> *(**MEASURED on the merge tree** of `docs/dod-ratification-20260807` × `main@bcaf2cd7`,
+> 2026-08-07, **started 19:56:24, finished 20:04:43** local, **490.93 s** — dedicated worktree
+> `blarai-wt-dod-rat` at model parity (junction-completed; an earlier same-tree run skipped ONE
+> test, `test_benchmark_kv_cache_sweep.py`, on a missing linked model file — completed, re-run
+> 27/27, then clean full runs only), venv interpreter, AO stopped (launcher pid 9752 stopped
+> 19:21 for the gate window, restarted after the post-merge confirmation), no dispatch, no
+> concurrent gate. **+13 over 10552**, all of it `tests/security/test_coder_dod_grammar.py` —
+> the DoD status-grammar gate ratified with capability 11 (#1325): status presence on all 21
+> rows, legend vocabulary, LIVE-requires-dated-citation, acceptance-test Executed lines, four
+> checker fail-proofs and one conforming-pass proof, plus 2 beyond-range hardening tests from
+> the pre-merge review. Reconciles across tonight's three parallel arcs:
+> 10526 + 21 (#1327) + 5 (#1324) + 13 = 10565. Deselected unchanged at 133.*
 
 **Documented environmental deltas (benign only because named and bounded):**
 non-elevated shell → 2 symlink skips · isolated worktree without the gitignored models →
@@ -319,7 +279,7 @@ prompt-flow preflight as a default boot gate), #621 (the WinUI GUI automation ha
 objective named by the Lead Architect: *production stability and speedy development with as little
 human involvement as is reasonable.*
 
-**Structural spawn-surface ratchet (#774 sub-task 4, 2026-07-17).** `tests/integration/test_no_new_raw_spawn_sites.py` is a deny-by-default gate in the standing selection: it AST-scans production `shared/` / `services/` / `launcher/` code and FAILS LOUD if any raw `subprocess.*` / `os.spawn*` / `os.system` call site is not in its documented allowlist, forcing new spawns through the blessed `shared/procspawn.py` helper (the lesson-219 Windows-stdio scar family). The allowlist is a ratchet — it only shrinks as #774 sub-task 2 migrates the known `shared/fleet/*` sites onto the helper. Test trees and `procspawn.py` itself are scoped out (documented in the test's SCOPE note).
+**Structural spawn-surface ratchet (#774 sub-task 4, 2026-07-17).** `tests/integration/test_no_new_raw_spawn_sites.py` is a deny-by-default gate in the standing selection: it AST-scans production `shared/` / `services/` / `launcher/` code and FAILS LOUD if any raw `subprocess.*` / `os.spawn*` / `os.system` call site is not in its documented allowlist, forcing new spawns through the blessed `shared/procspawn.py` helper (the lesson-219 Windows-stdio scar family). The allowlist is a ratchet — it only shrinks as #774 sub-task 2 migrates the known `shared/fleet/*` sites onto the helper. Test trees and `procspawn.py` itself are scoped out (documented in the test's SCOPE note). **API scope (N2):** the gate covers the `subprocess.*` call family and the `os` spawn/exec/system family only; deliberately OUT of current scope — spawn paths it does not see — are `ctypes` Win32 `CreateProcess`/`ShellExecute`, `os.startfile`, and `asyncio.create_subprocess_exec`/`_shell` (none used on the current surface; a future need for one is a deliberate extension of the gate's API sets, never a silent gap).
 
 **Doctrine-freshness ratchet (#945 D8, 2026-07-19).** `tests/security/test_doctrine_freshness.py`
 is a deny-by-default gate over the always-loaded doctrine surfaces: it FAILS if this document's

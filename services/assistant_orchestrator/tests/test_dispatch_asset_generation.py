@@ -308,3 +308,40 @@ def test_commit_dispatch_assets_bad_repo_is_failsoft(tmp_path):
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+# ---------------------------------------------------------------------------
+# The night this cost (2026-08-08) — a stop() mid-generation must not kill the AO
+# ---------------------------------------------------------------------------
+
+
+def test_generate_one_survives_the_config_being_cleared_mid_flight(_patched_image_gen):
+    """`stop()` clears `_resolved_config` while assets are in flight. That must SKIP.
+
+    The outer loop already guards `_resolved_config is None`, so this is a race and not a
+    missing check: the guard passes, `stop()` runs, and the per-asset call dereferences a
+    config that was valid a moment earlier. On 2026-08-08 that raised
+    `AttributeError: 'NoneType' object has no attribute 'image_gen_model_dir'` out of the
+    Assistant Orchestrator, the 23:00 battery's approve got no response, and the whole
+    night banked STALLED [HARNESS].
+
+    A dispatch asset is a nicety; the dispatch is the product.
+    """
+    ao = AssistantOrchestratorService.__new__(AssistantOrchestratorService)
+    ao._resolved_config = None  # exactly what stop() leaves behind
+
+    png = ao._generate_one_dispatch_asset({"prompt": "an elephant", "style": "cartoon"}, "s")
+
+    assert png is None, "an unresolved config must degrade to no-asset, never raise"
+
+
+def test_generate_one_does_not_raise_when_config_is_cleared(_patched_image_gen):
+    """The regression in its bluntest form: this call must not propagate an exception."""
+    ao = AssistantOrchestratorService.__new__(AssistantOrchestratorService)
+    ao._resolved_config = None
+    try:
+        ao._generate_one_dispatch_asset({"prompt": "x", "style": "cartoon"}, "s")
+    except AttributeError as exc:  # pragma: no cover - the defect itself
+        raise AssertionError(
+            f"the 2026-08-08 night-losing crash is back: {exc}"
+        ) from exc

@@ -1,0 +1,45 @@
+{
+  "harness": "sdxl_latency",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "config": {
+    "steps": 20,
+    "dims": "1024x1024",
+    "prompt": "a serene mountain lake at sunrise, detailed, high quality"
+  },
+  "results": [
+    {
+      "style": "photoreal",
+      "available": true,
+      "variant": "photoreal-sdxl",
+      "lora": false,
+      "load_plus_first_s": 38.13,
+      "gen_latency_s_median": 29.95,
+      "peak_used_gb_median": 15.42,
+      "png_bytes_median": 1801088,
+      "n": 2
+    },
+    {
+      "style": "illustration",
+      "available": true,
+      "variant": "illustration",
+      "lora": false,
+      "load_plus_first_s": 43.19,
+      "gen_latency_s_median": 31.31,
+      "peak_used_gb_median": 15.21,
+      "png_bytes_median": 1632127,
+      "n": 2
+    },
+    {
+      "style": "cartoon",
+      "available": true,
+      "variant": "illustration-cartoon",
+      "lora": true,
+      "load_plus_first_s": 60.48,
+      "gen_latency_s_median": 37.43,
+      "peak_used_gb_median": 16.78,
+      "png_bytes_median": 1390220,
+      "n": 2
+    }
+  ]
+}

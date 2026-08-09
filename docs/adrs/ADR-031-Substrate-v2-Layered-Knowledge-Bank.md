@@ -176,7 +176,7 @@ datamarked grounded context (L4).
 
 ### 6. The encrypted staging-file handoff — content never rides the IPC frame
 
-The gateway→AO envelope is hard-capped at 64 KB (`DEFAULT_MAX_MESSAGE_BYTES = 65_536`,
+The gateway→AO envelope is hard-capped at 64 KB **for this content path** (`DEFAULT_MAX_MESSAGE_BYTES = 65_536`,
 `shared/ipc/protocol.py:38`, enforced at encode, send, and receive). Article-sized content does not
 ride it. Instead, cleaned content crosses processes via an **encrypted staging file**:
 `%LOCALAPPDATA%\BlarAI\ingest_staging\<doc_uuid>.bin` — a `FieldCipher` blob under the SAME DEK,
@@ -193,7 +193,7 @@ three message types in the existing `MessageType` + `encode_*`/`decode_*` patter
 - `INGEST_DECISION` (gateway→AO): `doc_uuid`, `approve|reject`;
 - `INGEST_RESULT` (AO→gateway): `ok`, `doc_uuid`, `state`, `chunk_count`, error code/message.
 
-The 64 KB envelope is **untouched**. Rejected: raising `max_message_bytes` (config-raisable to 1 MB,
+The 64 KB envelope is **untouched** *(for CONTENT — scoped by Amendment 1 below, #1152, which raises the AO channel's own cap to 256 KB for locally-generated PLAN metadata; this content posture is unchanged)*. Rejected: raising `max_message_bytes` (config-raisable to 1 MB,
 `default.toml:108`) — a transport-wide posture loosened for one feature, paid by every message on
 the channel; the staging file keeps bulk content out-of-band (the lazily-staged-image precedent),
 encrypted, and integrity-checkable (`content_sha256` verified AO-side before the row persists,
@@ -243,6 +243,71 @@ not silent:
 - **HNSW/ANN + at-scale lexical** — brute-force cosine + in-RAM FTS5 hold at personal scale; the
   `_search_kind`-style private-seam discipline is kept in the new store so an ANN index slots in
   unchanged (\~100K-vector rule of thumb, ADR-016 §2.5).
+
+## Amendment 1 (2026-07-28, #1152) — §6's rejection is scoped to CONTENT, not to the cap itself
+
+§6 above rejected "raising `max_message_bytes`" and chose the encrypted staging file instead. **That
+rejection stands, unchanged, for what it actually governs: article-sized ingested CONTENT.** Bulk
+untrusted text fetched from the internet still never rides the IPC frame.
+
+What §6 did not anticipate is a *different* payload class hitting the same cap. On 2026-07-28 a real
+operator `/dispatch` produced a `PLAN_RESULT` of 65891 bytes, then 66938 bytes, against the 64 KB cap.
+The plan **succeeded** both times and could not be delivered: `encode` raised, the AO's serve loop
+dropped the connection, and the operator was told "No response from the Assistant Orchestrator" —
+a message asserting silence about work that had in fact completed. Two properties distinguish this
+payload from §6's:
+
+- it is **BlarAI's own locally-generated planning metadata**, not fetched external content, crossing
+  the loopback + mTLS **host** channel — not the guest-VM trust boundary ADR-030 hardens;
+- it is **structurally narrow**: metadata (task titles, prompts, plain-English criteria), not a
+  document body, and its cardinality is capped (`DEFAULT_MAX_TASKS=8`, `DEFAULT_MAX_CRITERIA=8`,
+  `DEFAULT_MAX_ASSUMPTIONS=4`).
+
+**Honest limit — this payload is NOT byte-bounded, and that is the load-bearing caveat.** Those are
+*cardinality* caps, not length caps: there is no length limit on the goal or on the operator's
+free-text requirements anywhere in `shared/fleet/acceptance.py`, `shared/fleet/clarify.py`, or the
+gateway. Size grows O(n_tasks × (goal + requirements)) — the requirements are threaded into every
+compiled task prompt by design — which is exactly why one extra task straddled the cap. So the raise
+does **not** buy a proof that the payload fits; it buys headroom over an observed worst case. A larger
+cap also admits a larger inbound goal, so the theoretical worst case grows with it. **The control is
+therefore the fail-loud refusal below, not the number** — anyone tempted to justify a future raise by
+"it is bounded anyway" should read this paragraph first. Bounding goal/requirements length at the
+intake boundary remains the stronger fix and is not done here.
+
+**Decision:** `[ipc].max_message_bytes` is raised **65536 → 262144** for the AO channel only
+(~4× headroom over the observed worst case, inside the config validator's existing 1 KB–1 MB band).
+`DEFAULT_MAX_MESSAGE_BYTES` and `VsockConfig.max_message_bytes` **keep their 64 KB defaults**, so this
+is a **per-channel** raise, not the transport-wide loosening §6 rejected — the guest parse boundary and
+every other transport user are untouched, and `tests/security/test_ipc_frame_cap_agreement.py` pins
+that scope.
+
+**Two latent defects surfaced by the same investigation, both fixed here** — either alone would have
+made a config-only raise inert, which is why §6's "config-raisable" description was true but not
+sufficient:
+
+1. The AO built its `MessageFramer()` in `__init__`, before any config is read, so the **framer** —
+   the binding cap on encode, and the one that actually raised — kept the compiled-in 64 KB default
+   forever while the transport honored the configured value. It is now bound to the resolved config.
+2. The **gateway never set a cap at all** on any of its `VsockConfig` sites, silently keeping 64 KB. A
+   one-sided raise would therefore have had the AO send a frame the gateway then refused on receive,
+   reproducing the identical failure. The launcher now threads the AO's own value into the gateway so
+   both ends of the channel are configured from one source.
+
+**Rejected alternative, named — CHUNKED FRAMING (the in-repo precedent).** `shared/ipc/parse_channel.py`
+(256 KB pages) and `shared/ipc/resolve_channel.py` (2 MiB images, `RESOLVE_CHUNK_DATA_BYTES = 45_000`)
+already implement chunked framing over this transport, both citing the 64 KB cap as their reason to
+exist. Chunking `PLAN_RESULT` would have needed **no cap raise and no both-ends agreement at all**, and
+would hold for any future size. It was rejected here as disproportionate for a ~67 KB metadata payload:
+it adds a third wire contract both ends must speak, and a wire-contract change is a larger blast radius
+than a per-channel number for a payload one order of magnitude from the cap, not three. That trade
+inverts if this recurs — **if the fail-loud refusal below ever fires in production, chunking is the fix,
+not a second raise.**
+
+**Fail-loud (principle 11), the control that outlives the number:** headroom can always be consumed
+again, so the durable fix is not 256 KB — it is that exceeding the cap now reports honestly. The AO's
+PLAN handler returns a small, plain-language refusal naming what happened and what to shorten, instead
+of unwinding into a dropped connection. A control that degrades into a misleading message is worse than
+no control: this one cost a full diagnostic arc and one merged fix aimed at the wrong cause.
 
 ## Consequences
 

@@ -231,6 +231,13 @@ class GreenAuditResult:
 
     @property
     def gamed(self) -> bool:
+        """Any LIVE finding — the downgrade trigger.
+
+        Deliberately NOT gated on :attr:`audited`. This is an accusation, and an unaudited
+        tree must not produce one: a scan that never ran is not evidence of gaming. The
+        honesty problem an unaudited result creates lives on the other side of the same
+        question — see :meth:`to_sidecar_dict`, where "not gamed" stopped being rendered as
+        "clean"."""
         return bool(self.findings)
 
     def class_counts(self) -> dict[str, int]:
@@ -252,12 +259,21 @@ class GreenAuditResult:
     def to_sidecar_dict(self) -> dict:
         """The ``green-audit.json`` shape. ``gamed`` / ``green_audit`` / ``gaming_reason``
         are exactly the keys #827's ``_gaming_signal`` reads; ``class_counts`` is the joint
-        coverage-disclosure field."""
+        coverage-disclosure field.
+
+        ``green_audit`` is THREE-WAY, not two. ``gamed`` correctly stays False on an unaudited
+        tree (see that property), but rendering the same tree as ``"clean"`` told every later
+        reader that a scan had run and found nothing when none had run at all (#1223). The
+        consumers compare against ``"gamed"`` and nothing else
+        (``failure_taxonomy._gaming_signal``, ``battery``'s two reads), so the third value
+        changes no downgrade decision and removes a false clean."""
         return {
             "schema": GREEN_AUDIT_SCHEMA,
             "audited": self.audited,
             "gamed": self.gamed,
-            "green_audit": "gamed" if self.gamed else "clean",
+            "green_audit": ("gamed" if self.gamed
+                            else "clean" if self.audited
+                            else "not-audited"),
             "gaming_reason": self.summary_line(),
             "class_counts": self.class_counts(),
             "fingerprints": [f.to_dict() for f in self.findings],

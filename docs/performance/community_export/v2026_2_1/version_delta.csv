@@ -1,0 +1,14 @@
+model,params_b,precision,metric,length_or_config,unit,ov_2026_1_0,ov_2026_2_1,pct_change_toward_better,change_human,driver,notes
+Qwen3-14B,14,INT4,generation median throughput,spec-decode off,tok/s,11.13,10.95,-1.6,-1.6% tok/s,32.0.101.8826,flat within run-to-run noise — the in-process bump is generation-neutral
+Qwen3-14B,14,INT4,generation median throughput,spec-decode on,tok/s,17.07,17.2,0.8,+0.8% tok/s,32.0.101.8826,flat within run-to-run noise — the in-process bump is generation-neutral
+Qwen3-8B,8,INT4,generation median throughput,spec-decode off,tok/s,19.79,19.62,-0.9,-0.9% tok/s,32.0.101.8826,flat within run-to-run noise — the in-process bump is generation-neutral
+Qwen3-8B,8,INT4,generation median throughput,spec-decode on,tok/s,27.37,27.09,-1.0,-1.0% tok/s,32.0.101.8826,flat within run-to-run noise — the in-process bump is generation-neutral
+Qwen3-14B,14,INT4,"prefill throughput (cold, no-draft)",512-token prompt,tok/s,595.0,760.8,27.9,+27.9% tok/s,32.0.101.8826,std 57->9; tight — solid claim
+Qwen3-14B,14,INT4,"prefill throughput (cold, no-draft)",2048-token prompt,tok/s,425.9,746.9,75.4,+75.4% tok/s,32.0.101.8826,std 55->62; noisier — directional
+Qwen3-14B,14,INT4,"prefill throughput (cold, no-draft)",8192-token prompt,tok/s,276.9,387.9,40.1,+40.1% tok/s,32.0.101.8826,std 17->24; noisier — directional
+Qwen3-8B,8,INT4,"prefill throughput (cold, no-draft)",512-token prompt,tok/s,1085.9,1476.5,36.0,+36.0% tok/s,32.0.101.8826,std 157->9; tight — solid claim
+Qwen3-8B,8,INT4,"prefill throughput (cold, no-draft)",2048-token prompt,tok/s,716.3,1106.3,54.4,+54.4% tok/s,32.0.101.8826,std 109->224; noisier — directional
+Qwen3-8B,8,INT4,"prefill throughput (cold, no-draft)",8192-token prompt,tok/s,592.0,626.9,5.9,+5.9% tok/s,32.0.101.8826,std 32->23; noisier — directional
+Qwen3-VL-8B-Instruct,8,INT4,VLM time-to-first-token (TTFT),fixed image+prompt,ms,201.3,161.8,19.6,+19.6% faster,32.0.101.8826,solid claim (the 2026.1.0 run was noisier on TPOT than on TTFT)
+Qwen3-VL-8B-Instruct,8,INT4,VLM time-per-output-token (TPOT),fixed image+prompt,ms,63.0,47.3,24.9,+24.9% faster,32.0.101.8826,directional — the 2026.1.0 TPOT sample was noisier
+Qwen3-VL-8B-Instruct,8,INT4,VLM decode throughput,fixed image+prompt,tok/s,15.9,21.1,32.7,+32.7% tok/s,32.0.101.8826,directional (pairs with the TPOT note)

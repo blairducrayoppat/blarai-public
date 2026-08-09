@@ -1,0 +1,12 @@
+2026-07-23 14:59:39 | RUN-START | queue=C:\Users\mrbla\AppData\Local\Temp\pytest-of-mrbla\pytest-3819\test_an_empty_task_is_not_reco0\fleet\state\fleet-swap\task-queue.json tasks=1 runid=R1075 resume_done=0
+2026-07-23 14:59:39 | TASK-START | add-card repo=C:\Users\mrbla\AppData\Local\Temp\pytest-of-mrbla\pytest-3819\test_an_empty_task_is_not_reco0\projects\proj model=stub-coder-30b
+2026-07-23 14:59:40 | TASK-END | add-card outcome=processed | 
+2026-07-23 14:59:40 | RUN-END | processed=1
+2026-07-23 14:59:41 | RUN-START | queue=C:\Users\mrbla\AppData\Local\Temp\pytest-of-mrbla\pytest-3819\test_a_delivered_task_is_still0\fleet\state\fleet-swap\task-queue.json tasks=1 runid=R1075 resume_done=1
+2026-07-23 14:59:41 | RUN-END | processed=0
+2026-07-23 14:59:42 | RUN-START | queue=C:\Users\mrbla\AppData\Local\Temp\pytest-of-mrbla\pytest-3819\test_retries_are_bounded_so_a_0\fleet\state\fleet-swap\task-queue.json tasks=1 runid=R1075 resume_done=1
+2026-07-23 14:59:42 | RUN-END | processed=0
+2026-07-23 14:59:43 | RUN-START | queue=C:\Users\mrbla\AppData\Local\Temp\pytest-of-mrbla\pytest-3819\test_retries_are_bounded_so_a_0\fleet\state\fleet-swap\task-queue.json tasks=1 runid=R1075 resume_done=1
+2026-07-23 14:59:43 | RUN-END | processed=0
+2026-07-23 14:59:43 | RUN-START | queue=C:\Users\mrbla\AppData\Local\Temp\pytest-of-mrbla\pytest-3819\test_retries_are_bounded_so_a_0\fleet\state\fleet-swap\task-queue.json tasks=1 runid=R1075 resume_done=1
+2026-07-23 14:59:44 | RUN-END | processed=0

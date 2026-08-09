@@ -1,0 +1,38 @@
+embedder loaded: backend='ort-cpu'
+corpus: 13803 pages, avgdl=665.8
+RELEVANCE_FLOOR (lexical, current gate) = 0.35
+
+[GOOD] cos=0.7197  bm25_top=0.2986  python-3.11.13-docs-text/library/argparse.txt
+        goal: build a CLI using argparse that reads a csv file
+[GOOD] cos=0.5898  bm25_top=0.1982  library/difflib
+        goal: a toolkit that reads text and reports how often each word appears, and which pairs of neighbouring words show up together most
+[GOOD] cos=0.6653  bm25_top=0.3187  guides/comments
+        goal: a web page that renders user comments safely without innerHTML
+[GOOD] cos=0.6307  bm25_top=0.2218  library/itertools
+        goal: use collections.Counter and itertools.pairwise to count word bigrams
+[JUNK] cos=0.4839  bm25_top=0.2264  global_objects/temporal/plaindate/dayofweek
+        goal: make a copy of my important documents every friday
+[JUNK] cos=0.4993  bm25_top=0.1635  library/queue
+        goal: manage the queue at my barber shop on a saturday
+[JUNK] cos=0.5432  bm25_top=0.3411  reference/elements/hr
+        goal: build a site for my running club
+[JUNK] cos=0.5390  bm25_top=0.2807  webotp_api
+        goal: an app for the operator of the village bus
+[JUNK] cos=0.5544  bm25_top=0.1846  python-3.11.13-docs-text/library/stat.txt
+        goal: tell me the stat for how many miles I cycled
+[JUNK] cos=0.5614  bm25_top=0.2788  python-3.11.13-docs-text/library/mailbox.txt
+        goal: keep a mailbox of notes from my grandchildren
+[JUNK] cos=0.4432  bm25_top=0.1338  animation/play
+        goal: my grandmother baked a big cake for the village fete
+[JUNK] cos=0.5143  bm25_top=0.2643  layout_cookbook/media_objects
+        goal: purple elephant birthday cake recipe
+[JUNK] cos=0.6662  bm25_top=0.4295  python-3.11.13-docs-text/library/secrets.txt
+        goal: somewhere to keep my secrets safe with a password
+
+====================================================================
+GOOD cosine  min=0.5898  max=0.7197  n=4
+JUNK cosine  min=0.4432  max=0.6662  n=9
+
+SEPARATES ON COSINE? NO
+  overlap: worst GOOD 0.5898 <= best JUNK 0.6662
+  -> same failure shape as the four lexical gates

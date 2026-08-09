@@ -1481,3 +1481,50 @@ class TestPerBootCertIsolation:
             f"production main() must not create or modify {repo_certs} — the "
             f"per-boot mint must be redirected to tmp (#751)"
         )
+
+
+def test_every_docstring_threading_claim_names_a_property_the_launcher_reads():
+    """The AO entrypoint's resolved-property docstrings claim "the launcher
+    threads this"; sweep every such claim and assert the launcher actually reads
+    that property somewhere. This is the claim-rot side of the #1158 class — a
+    promise whose referent moves would otherwise fail only in production wiring,
+    never in a test. Name-level by design: the per-kwarg sentinel tests above pin
+    the VALUE threading; this pins the CLAIM inventory (and tolerates wrapper
+    indirection like ``_gateway_frame_cap``, which reads the property off its own
+    parameter)."""
+    import ast
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[2]
+    entry_src = (
+        repo / "services" / "assistant_orchestrator" / "src" / "entrypoint.py"
+    ).read_text(encoding="utf-8")
+    launcher_src = (repo / "launcher" / "__main__.py").read_text(encoding="utf-8")
+
+    claimed: set[str] = set()
+    for node in ast.walk(ast.parse(entry_src)):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        is_property = any(
+            isinstance(dec, ast.Name) and dec.id == "property"
+            for dec in node.decorator_list
+        )
+        if not is_property:
+            continue
+        if "launcher threads" in (ast.get_docstring(node) or "").lower():
+            claimed.add(node.name)
+    assert claimed, (
+        "the sweep matched no docstring claims — the 'launcher threads' wording "
+        "moved; update this lock alongside it"
+    )
+
+    accessed = {
+        node.attr
+        for node in ast.walk(ast.parse(launcher_src))
+        if isinstance(node, ast.Attribute)
+    }
+    missing = sorted(claimed - accessed)
+    assert not missing, (
+        "entrypoint properties whose docstrings claim the launcher threads them, "
+        f"but the launcher never reads: {missing} — thread them or fix the claim"
+    )

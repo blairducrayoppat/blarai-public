@@ -242,7 +242,8 @@ def _make_test_image(path: Path) -> None:
         print(f"  [WARN] test image build failed: {exc}")
 
 
-def measure_partner(name: str, engine, baseline: dict, test_image: Path) -> dict:
+def measure_partner(name: str, engine, baseline: dict, test_image: Path,
+                    warmup_gens: int = 0, warmup_timeout_s: float = 90.0) -> dict:
     print(f"\n{'=' * 68}\n  PARTNER: {name}\n{'=' * 68}")
     rec: dict = {"partner": name, "phases": {}}
     base_gen = baseline["gen_tps"]
@@ -304,7 +305,20 @@ def measure_partner(name: str, engine, baseline: dict, test_image: Path) -> dict
     print("  [CONTENTION] partner generating continuously; 14B back-to-back for 15s ...")
     sampler_th = _spawn_mem_sampler(sample_stop, mem_min)
     th.start()
-    time.sleep(3.0)  # let the partner get mid-generation before we measure
+    if warmup_gens > 0:
+        # STEADY STATE: wait for the partner to finish `warmup_gens` full generation(s) in the
+        # contention loop (warms past first-generation spin-up, e.g. a runtime LoRA fuse) before we
+        # measure, so the window captures steady-state contention rather than the partner's ramp.
+        _t_warm = time.time()
+        while n_gens[0] < warmup_gens and (time.time() - _t_warm) < warmup_timeout_s:
+            time.sleep(0.5)
+        rec["partner_warmup_gens"] = warmup_gens
+        rec["partner_warmup_waited_s"] = round(time.time() - _t_warm, 1)
+        rec["partner_warmup_reached"] = bool(n_gens[0] >= warmup_gens)
+        print(f"  [warmup] partner completed {n_gens[0]} gen(s) in {rec['partner_warmup_waited_s']}s "
+              f"before measuring (reached={rec['partner_warmup_reached']})")
+    else:
+        time.sleep(3.0)  # default: let the partner get mid-generation before we measure
     rec["phases"]["contention"] = [round(time.time(), 3), None]
     rec["contention_14b"] = _measure_sustained_14b(engine, duration_s=15.0)
     rec["phases"]["contention"][1] = round(time.time(), 3)
@@ -340,6 +354,14 @@ def main() -> int:
     parser.add_argument("--partners", nargs="*", default=_ALL_PARTNERS,
                         choices=_ALL_PARTNERS)
     parser.add_argument("--out-tag", default="", help="extra tag in the output filename")
+    parser.add_argument("--partner-warmup-gens", type=int, default=0,
+                        help="STEADY-STATE mode: before the contention window opens, wait until the "
+                             "partner has completed this many full generations in the contention loop "
+                             "(warms past first-generation spin-up such as a runtime LoRA fuse). "
+                             "0 = the original fixed 3s pre-roll (default; reproduces the committed "
+                             "methodology).")
+    parser.add_argument("--warmup-timeout", type=float, default=90.0,
+                        help="max seconds to wait for the partner warm-up generations")
     args = parser.parse_args()
 
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -384,7 +406,8 @@ def main() -> int:
     results = []
     for name in args.partners:
         try:
-            results.append(measure_partner(name, engine, baseline, test_image))
+            results.append(measure_partner(name, engine, baseline, test_image,
+                                            args.partner_warmup_gens, args.warmup_timeout))
         except Exception as exc:  # noqa: BLE001
             import traceback
             traceback.print_exc()

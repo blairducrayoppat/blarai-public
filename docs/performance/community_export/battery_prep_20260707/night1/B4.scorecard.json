@@ -1,0 +1,27 @@
+{
+  "job_id": "B4",
+  "verdict": "STALLED",
+  "attribution": "HARNESS",
+  "wall_clock_s": 2.125,
+  "samples_consumed": -1,
+  "packs_consumed": -1,
+  "interventions": 0,
+  "run_id": "",
+  "plan_id": "",
+  "repo": "battery-b4-flashcards-cli",
+  "card_path": "evals/battery/B4.json",
+  "evidence": {
+    "oracle_status": "unknown"
+  },
+  "versions": {
+    "battery_runner": "v1",
+    "blarai": "755ec39",
+    "python": "3.11.9",
+    "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+  },
+  "started_utc": "2026-07-06T08:53:53Z",
+  "finished_utc": "2026-07-06T08:53:55Z",
+  "dry_run": false,
+  "notes": "job could not run: could not connect to the Assistant Orchestrator (is it running on :5001?)",
+  "schema": "battery-scorecard/v1"
+}

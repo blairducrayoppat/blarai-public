@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context &amp; Handoff Audit — 2026-07-28</title>
+<style>
+  :root { --ink:#1a1d21; --paper:#fdfdfb; --muted:#5b6470; --line:#d9dde3; --accent:#0f5b8c;
+          --keep:#1d7a3e; --keep-bg:#e8f5ec; --change:#a05a00; --change-bg:#fdf3e3;
+          --decide:#0f5b8c; --decide-bg:#e8f1f8; --card:#f4f6f8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e6e8eb; --paper:#16181c; --muted:#9aa4b0; --line:#3a4048; --accent:#6db3dd;
+            --keep:#5fc98a; --keep-bg:#173322; --change:#e0a04a; --change-bg:#33270f;
+            --decide:#6db3dd; --decide-bg:#132836; --card:#1e2126; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2rem 1rem 4rem; background:var(--paper); color:var(--ink);
+         font:16px/1.6 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size:1.7rem; line-height:1.25; margin:0 0 .3rem; }
+  h2 { font-size:1.25rem; margin:2.4rem 0 .6rem; padding-top:1rem; border-top:2px solid var(--line); }
+  h3 { font-size:1.02rem; margin:1.4rem 0 .4rem; }
+  p, li { max-width: 72ch; }
+  .sub { color:var(--muted); margin:0 0 1.6rem; }
+  .verdict { background:var(--decide-bg); border-left:5px solid var(--decide); padding:1rem 1.2rem; border-radius:6px; margin:1.4rem 0; }
+  .verdict p { margin:.5rem 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  table { border-collapse:collapse; width:100%; font-size:.9rem; margin:1rem 0; }
+  .scroll { overflow-x:auto; }
+  th, td { border:1px solid var(--line); padding:.5rem .6rem; text-align:left; vertical-align:top; }
+  th { background:var(--card); }
+  .badge { display:inline-block; font-size:.72rem; font-weight:600; padding:.1rem .5rem; border-radius:99px; white-space:nowrap; }
+  .b-keep { color:var(--keep); background:var(--keep-bg); }
+  .b-change { color:var(--change); background:var(--change-bg); }
+  .b-decide { color:var(--decide); background:var(--decide-bg); }
+  .rcard { background:var(--card); border-left:5px solid var(--accent); border-radius:6px; padding: .9rem 1.1rem; margin: 1rem 0; }
+  .rcard h3 { margin:.1rem 0 .5rem; }
+  .rcard .owner { font-size:.78rem; font-weight:700; letter-spacing:.02em; }
+  .facts { background:var(--card); border-radius:6px; padding:.9rem 1.1rem; margin:1rem 0; }
+  .facts ul { margin:.4rem 0; }
+  code { background:var(--card); border:1px solid var(--line); border-radius:4px; padding:0 .3em; font-size:.88em; }
+  a { color:var(--accent); }
+  .src { font-size:.85rem; }
+  .flag { color:var(--change); font-weight:600; }
+  .small { font-size:.85rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>How sessions should end: an audit of the handoff practice</h1>
+<p class="sub">Research read for the Lead Architect · 2026-07-28 · Sources: the official Claude Code documentation (fetched live today) plus twelve full-read practitioner sources from 2025–2026, gathered by two research agents · Local evidence measured in this repository. Nothing in current practice has been changed — every proposed change below waits for your decision. Revised same day at your direction: the redesign section now carries the execution-ready build plan (A1–A8) for capturing facts in their durable homes at event time.</p>
+
+<div class="verdict">
+<p><strong>Verdict on your question.</strong> Handing off to a fresh session is <strong>not</strong> poor practice — it is the approach Anthropic itself endorses and the one experienced users converge on. What the evidence does condemn is <em>how</em> we do it: our handoff documents are roughly ten times larger than the field's standard, they are written at the moment of maximum fatigue rather than at healthy boundaries, and they buffer information that should have been filed in its permanent home hours earlier.</p>
+<p><strong>The deep change you suspected is real, but it points at the handoff layer, not the foundation.</strong> The foundation — durable state on disk (the ticket board, the journal, the lessons file, memory) plus fresh sessions that re-ground from disk — is precisely the strongest published pattern. The redesign below (R1–R7) shrinks briefs by ~80%, replaces the triggers, retires one stop-rule the tool has outgrown, and puts two governance questions squarely in front of you.</p>
+</div>
+
+<h2>1 · What was asked</h2>
+<p>Two questions: (a) what is the best method for a Claude Code developer whose session has reached full context and wants to continue in a fresh session, and (b) is handing off itself a poor practice — should something else entirely be used? Per your instruction, current practice was treated as suspect, not as a baseline to defend.</p>
+
+<h2>2 · What the tool actually does today (verified against live docs, 2026-07-28)</h2>
+<p>First, the vocabulary. The <strong>context window</strong> is a session's working memory — roughly 200,000 tokens, on the order of 150,000 words. Everything the session reads, writes, and runs accumulates there. When it nears full, Claude Code performs <strong>compaction</strong>: it replaces the conversation with a summary and continues. That summary is lossy — some detail is genuinely gone.</p>
+<div class="facts">
+<strong>Facts that matter for our practice</strong> (each verified in the official documentation today):
+<ul>
+<li><strong>Compaction is no longer a cliff.</strong> When it fires, the project's CLAUDE.md and the first 200 lines of the memory index are automatically re-injected from disk, a preservation order favors the task and key code over old tool output, and the running harness explicitly instructs sessions to keep working through the boundary rather than wrap up early. Runaway loops are detected and stopped after ~3 cycles.</li>
+<li><strong>What compaction loses:</strong> nested per-directory instruction files, the skills index, and any conversational nuance the summary didn't keep. A standing instruction in CLAUDE.md can tell the summarizer what to always preserve — we don't use this yet.</li>
+<li><strong>Manual controls:</strong> <code>/context</code> shows how full the window is; <code>/compact</code> accepts steering instructions ("keep the open defects and modified files"); <code>/clear</code> starts fresh (the old conversation is now saved and resumable); <code>/memory</code> shows what is permanently remembered.</li>
+<li><strong>Session continuity exists natively:</strong> <code>claude --resume</code> reopens a previous session with its memory intact (for interruptions, not exhaustion); <code>/branch</code> forks one. There is <em>no</em> built-in handoff feature — handoff documents are a user-space pattern, which is why quality varies so widely in the field.</li>
+<li><strong>Subagents are the context shield:</strong> each runs in its own separate window and returns only a short summary (~200–400 tokens) to the main session. Their file reading never lands in the main window. This is the official mechanism for long-running work.</li>
+<li><strong>Always-loaded files have a recommended budget:</strong> the docs advise keeping each memory file to ~200 lines for adherence, with conditional content moved to path-scoped rule files (<code>.claude/rules/</code>) that load only when relevant files are touched, and <code>@import</code> for on-demand documents.</li>
+</ul>
+</div>
+
+<h2>3 · What the field converged on</h2>
+<p>Across the official best-practices guidance, Anthropic's context-engineering essay, and the practitioner literature, the same four-layer model appears again and again. It is a ladder — the higher layers make the lower ones cheap.</p>
+<div class="scroll"><table>
+<tr><th style="width:11rem">Layer</th><th>Practice</th></tr>
+<tr><td><strong>1 · Prevent</strong></td><td>One task per session; start a new session for a new task ("the kitchen-sink session" is the officially named #1 failure pattern). Delegate bulk reading and research to subagents. Keep always-loaded instruction files lean. After <strong>two failed corrections</strong> of the same defect, stop pushing — a fresh session with a better-informed prompt "almost always outperforms a long session with accumulated corrections" (official guidance).</td></tr>
+<tr><td><strong>2 · Externalize continuously</strong></td><td>Durable state lives on disk <em>as it is created</em> — plans, decisions, progress, and failures go to files, trackers, and commit history at event time, not at session end. Anthropic's essay names this "structured note-taking"; the strongest autonomous pattern in the wild (the "Ralph loop") runs fresh contexts in a circle over a perpetually-current plan file and treats <em>any</em> per-session handoff narrative as a symptom of state that failed to reach its home.</td></tr>
+<tr><td><strong>3 · Compact deliberately</strong></td><td>Mid-task, compact <em>at a natural boundary with explicit instructions</em>, never by letting the automatic version fire mid-thought. A large practitioner camp disables auto-compaction entirely for state-heavy work; a 2026 bug that silently stripped resumed sessions of their reasoning hardened that distrust. The 1-million-token windows now available change none of this — attention degrades as windows fill ("context rot"), so the ceiling rose but the discipline stands.</td></tr>
+<tr><td><strong>4 · Hand off cleanly</strong></td><td>At a genuine boundary, write a <strong>short</strong> continuation document — goal, status, decisions <em>with reasoning</em>, <strong>what failed and why</strong>, exact next step, test baseline — then start fresh and have the successor read it and verify against the repository. Write it at ~60% context use while still sharp; "a degraded author writes a degraded handoff" is the field's most-cited failure. The counter-finding: <em>oversized</em> handoffs actively harm the successor ("context-dump fallacy" — noise degrades reasoning). Field-standard size: tens of lines.</td></tr>
+</table></div>
+<p class="small">The ~60% number is converged folklore (several independent practitioners, no controlled measurement) — treat it as a planning heuristic, not physics.</p>
+
+<h2>4 · The audit: our practice against that standard</h2>
+<p>Measured locally today: <span class="num"><strong>137 handoff briefs, ~2.1 MB</strong></span> over the project's life — roughly half a million tokens of continuity prose. The last 8 days alone: 17 files, ~456 KB; median brief ~22 KB (~5,500 tokens); the largest 87 KB. Each transition costs the successor its reading (~5–6k tokens) plus re-grounding plus a full nine-point comprehension gate, before any work begins — and costs you a gate confirmation 2–4 times per day. Meanwhile every session (and most subagents) starts by loading 317 lines / ~48 KB of CLAUDE.md plus the 18.6 KB memory index: ~8% of the window spent before the first action.</p>
+<div class="scroll"><table>
+<tr><th>Aspect</th><th>Ours today</th><th>Field / official standard</th><th>Verdict</th></tr>
+<tr><td>Fresh session + re-ground from disk</td><td>Core of the protocol</td><td>Exactly the endorsed pattern</td><td><span class="badge b-keep">KEEP</span></td></tr>
+<tr><td>Durable substrate (ticket board as single source of truth, journal, lessons, memory)</td><td>Rich, disciplined</td><td>This <em>is</em> "structured note-taking" + trackers-as-state</td><td><span class="badge b-keep">KEEP</span></td></tr>
+<tr><td>Machine-verified brief anchors (<code>verify_handoff_brief.py</code>)</td><td>Every brief, enforced</td><td>Nothing comparable exists in the field — manual advice only</td><td><span class="badge b-keep">KEEP</span></td></tr>
+<tr><td>Retractions section (corrected claims travel with the brief)</td><td>Required</td><td>Matches the field's top failure mode; rare in the wild</td><td><span class="badge b-keep">KEEP</span></td></tr>
+<tr><td>Brief size</td><td>Median ~22 KB, max 87 KB</td><td>Tens of lines; oversized handoffs harm the successor</td><td><span class="badge b-change">CHANGE — R1</span></td></tr>
+<tr><td>Standing operations block pasted verbatim into briefs</td><td>~1.7 KB pasted into ~30 of 137 briefs <em>(corrected at independent review — an earlier form of this report said 137×)</em></td><td>Permanent conventions belong in the always-loaded layer, once</td><td><span class="badge b-change">CHANGE — R1</span></td></tr>
+<tr><td>Queue table rebuilt inside each brief</td><td>Template rule</td><td>The board <em>is</em> the state; briefs carry deltas and pointers</td><td><span class="badge b-change">CHANGE — R1</span></td></tr>
+<tr><td>Handoff triggers</td><td>3 of 5 fire only after degradation has begun</td><td>Plan the landing at ~60% context, at a work boundary, while sharp</td><td><span class="badge b-change">CHANGE — R2</span></td></tr>
+<tr><td>Compaction treated as a stop-signal</td><td>"Post-compaction" is a handoff trigger</td><td>The tool now re-injects doctrine + memory and continues; verify, then proceed</td><td><span class="badge b-change">CHANGE — R3</span></td></tr>
+<tr><td>Always-loaded doctrine size</td><td>317 lines / ~48 KB + 18.6 KB memory index</td><td>~200-line guidance per file; conditional content in path-scoped rules</td><td><span class="badge b-change">CHANGE — R4 (staged)</span></td></tr>
+<tr><td>Full comprehension gate on every successor</td><td>Nine points + wait, 2–4×/day</td><td>Field uses a read-back check; gating depth is a governance choice</td><td><span class="badge b-decide">YOUR CALL — R5</span></td></tr>
+<tr><td>Session shape</td><td>"Driver" sessions run the queue until context exhausts</td><td>One-arc sessions; completion-condition tooling for long runs</td><td><span class="badge b-decide">YOUR CALL — R6</span></td></tr>
+<tr><td>"What failed" travels forward</td><td>Retractions ≠ dead ends; failed approaches not first-class</td><td>The single most load-bearing handoff section</td><td><span class="badge b-change">CHANGE — R7</span></td></tr>
+<tr><td>Subagent fan-out to protect the main window</td><td>Doctrine mandates it</td><td>Official isolation model confirms it</td><td><span class="badge b-keep">KEEP</span></td></tr>
+</table></div>
+<p>Read the verdict column honestly: the <em>architecture</em> a novice supposedly built is the one the field's strongest practitioners arrived at, and three of its controls (anchors verification, retractions, the board-as-truth rule) are ahead of anything published. The defects are defects of <em>dosage and timing</em> — the handoff layer grew heavy because every failure was answered by adding more brief, when the durable substrate underneath was the right place to put the weight.</p>
+
+<h2>5 · The redesign — proposed, nothing applied</h2>
+<p>Each item stands alone; ratify or decline per item. "MINE" = a technical change I implement on your go-ahead. "YOURS" = a governance trade-off only you should weigh.</p>
+
+<div class="rcard"><h3>R1 · Bank state when it happens; shrink the brief to a landing card <span class="owner">[MINE — technical]</span></h3>
+<p>Rule: any fact that matters tomorrow reaches its durable home <em>the moment it exists</em> — the ticket gets its comment when the thing happens, the journal fragment is written at ship time, the unblocked ticket is annotated in the same motion as the merge that unblocked it. The brief then carries only what has no durable home yet: machine state (processes, branch, tree), in-flight thread position, retractions and dead ends not yet banked, the single next step, and the anchors block. Target ≤150 lines; the existing verifier gains a size check so this is enforced, not aspirational. The standing operations block moves to one tracked document that every brief cites by path. Trade-off: slightly more bookkeeping during the session; in exchange, transitions stop costing three documents' worth of reading, and the 2026-07-22 class of omission (the brief forgot what the board knew) becomes structurally impossible because the board was updated at event time.</p>
+<p><strong>Execution-ready:</strong> the full build plan is specified below — “R1 in full” (A1–A8).</p></div>
+
+<div class="rcard"><h3>R2 · Hand off at boundaries, planned by the gauge <span class="owner">[YOURS — changes when you get interrupted]</span></h3>
+<p>Retire the degradation-shaped triggers (post-compaction, quality slipping, hour counts). New rule: sessions check <code>/context</code> at natural seams; from ~60% usage they plan the landing (finish the current limb, close its ticket, write the thin brief), landing by ~75–80% while still sharp. A handoff authored after degradation is the field's canonical failure and currently our default timing. Trade-off: sessions end slightly earlier than their theoretical maximum; you get briefs written by a sharp author instead of an exhausted one.</p></div>
+
+<div class="rcard"><h3>R3 · Compaction becomes a speed bump, not a stop sign <span class="owner">[YOURS — retires a stop-rule]</span></h3>
+<p>Current doctrine treats a compaction as a signal to consider stopping. The tool has outgrown this: doctrine and memory re-inject automatically, and the harness is built to continue through the boundary. New rule: mid-arc compaction → re-read the live surfaces (ticket, branch, plan), confirm position, continue; the full handoff ceremony is reserved for genuine session ends. We also add standing compaction instructions to CLAUDE.md ("always preserve: current ticket, branch, gate status, modified files, open defects") — a documented feature we don't use. Trade-off: a summarized session is trusted to keep working mid-arc; the mitigation is R1 (state is already banked, so the summary carries navigation, not cargo). For judgment-heavy moments a session may still choose the boundary — the change is the default, not a prohibition.</p></div>
+
+<div class="rcard"><h3>R4 · Slim the always-loaded doctrine — staged, carefully <span class="owner">[YOURS — CLAUDE.md is governance]</span></h3>
+<p>CLAUDE.md is 317 lines / ~48 KB against a ~200-line official adherence guidance; every session and most subagents pay it before working, and the docs warn that bloated instruction files get partially ignored. Proposal: keep a lean always-on core (critical rules, decision boundary, identity split, pointers), move conditional content to path-scoped rules that load only when relevant surfaces are touched, and on-demand documents via imports. The freshness gates that police doctrine move with their content. This is the riskiest item — the file demonstrably works, adherence loss here is unmeasured locally, and a bad split could orphan rules. Staged migration with the doctrine-freshness tests extended first, or decline and accept the load as the price of a single authoritative file. My recommendation: do it, slowly, one section at a time.</p></div>
+
+<div class="rcard"><h3>R5 · Tier the gate <span class="owner">[YOURS — entirely]</span></h3>
+<p>Today every successor session authors the full nine-point comprehension gate and waits for you — 2–4 times a day at the current handoff rate. Option A (recommended): full gate for <em>new engagements</em>; for a continuation of already-gated work, a delta-gate of ≤10 lines — what changed, what I'll do next, what I need from you — still confirmed by you, but readable in twenty seconds. Option B: keep the full gate everywhere and accept the cost knowingly; it is your strongest comprehension check, and R1/R6 will reduce how often it fires anyway. The trade-off is your attention against depth-of-verification on continuations; only you can price your attention.</p></div>
+
+<div class="rcard"><h3>R6 · Prefer arcs to marathons <span class="owner">[YOURS — touches the autonomy doctrine]</span></h3>
+<p>The "driver" sessions that run the whole queue until context exhausts are our version of the officially named kitchen-sink anti-pattern, and they are why briefs must hand over a world. Proposal: a session takes one arc to <em>done</em> (merged, ticket closed, journal written — which is when there is almost nothing to hand off), then either picks the next arc <em>if the gauge is healthy</em> or lands. Queue-driving continuity comes from the board, not from any one session's longevity. Trade-off: more session starts (each paying the always-loaded cost — which R4 shrinks); in exchange, each session works mostly in its sharp zone and handoffs become boring.</p></div>
+
+<div class="rcard"><h3>R7 · Carry the dead ends; adopt the two-corrections rule <span class="owner">[MINE — technical]</span></h3>
+<p>The brief template gains a required "What failed" section — approaches tried and abandoned, with why — distinct from retractions (claims corrected). Field consensus calls this the most load-bearing content a successor receives; without it they cheerfully retry the dead end. And doctrine adopts the official two-corrections rule: when two attempted fixes for the same defect have failed, stop grinding — bank what was learned and put fresh context on it (subagent or fresh session). This matches your existing stop-doomed-runs instinct; it just names the threshold.</p></div>
+
+<h3 id="r1plan">R1 in full — the build plan for banking at event time (A1–A8, execution-ready)</h3>
+<p>Your instruction: be structurally set up to capture facts in their durable homes <em>automatically and systematically, at event time</em>, so a handoff hands over <em>objectives, deltas, and pointers — not a rebuilt world</em>. The principle becomes structure in three moves: doctrine names every fact's home and its write moment (A1, A6, A7); the brief becomes physically too small to be a world (A2, A3); tooling automates the volatile half and machine-checks the rest (A4, A5, A8). Vigilance is not one of the mechanisms — every rule below has an enforcement surface, because a rule without a control is a hope.</p>
+<p>The governing habit is the <strong>crash test</strong>, run at every seam of the work: <em>if this session vanished right now, with no brief written, what would be lost?</em> Anything you can name is a banking failure — and the fix is to bank it at that moment, not to remember it for the handoff.</p>
+<div class="scroll"><table>
+<tr><th style="width:4.5rem">Action</th><th>What changes</th><th>Enforcement</th></tr>
+<tr><td><strong>A1</strong></td><td>CLAUDE.md gains a compact <em>banking table</em> — every fact class mapped to its durable home and write moment (draft below). It <em>replaces</em> the scattered distribution lines; it does not add to them.</td><td>Doctrine-freshness suite already scans CLAUDE.md; A5 locks the new section's presence.</td></tr>
+<tr><td><strong>A2</strong></td><td>The handoff template is rewritten from world-report to <em>landing card</em> (skeleton below): objective, deltas, machine state, next step, pointers — ≤150 lines total.</td><td>A4's size + structure gates; a brief in the old shape fails the verifier.</td></tr>
+<tr><td><strong>A3</strong></td><td>The standing operations block (start/stop/battery/PID lore, ~1.7 KB pasted verbatim into ~30 of the era's 137 briefs — <em>measured; an earlier form of this report said 137×</em>) moves to <strong>one tracked document</strong>, <code>docs/governance/session-ops-surface.md</code>, cited by path from briefs and doctrine.</td><td>A4 fails any brief that pastes ops content instead of the citation; the doc itself is version-controlled, so it has history the copies never had.</td></tr>
+<tr><td><strong>A4</strong></td><td><code>scripts/verify_handoff_brief.py</code> — which already machine-checks anchors — gains: a <strong>size gate</strong> (fail &gt;150 lines or &gt;8 KB), a <strong>structure gate</strong> (landing-card sections required; a rebuilt world — “Work queue” tables, pasted ops blocks — fails), and a <strong>staleness warning</strong> when the machine-state stamp is over an hour old at verification.</td><td>The verifier is already a mandatory grounding step for every successor; the gates ride the existing control.</td></tr>
+<tr><td><strong>A5</strong></td><td>Doctrine locks: gate tests pin the template's section set and line budget and the ops-surface doc's existence, so silent drift back toward mega-briefs fails the standing test gate.</td><td>The standing pytest gate itself.</td></tr>
+<tr><td><strong>A6</strong></td><td>The atomic ship motion (merge + ticket close + journal + regression lock) gains a fifth verb: <strong>comment every ticket this merge unblocks</strong>, swept from the board's blocked-by predicates <em>at merge time</em> — the moment of maximum knowledge, instead of handoff time, the moment of maximum fatigue. This retires the 2026-07-22 omission class at its root.</td><td>Ship-checklist edit in CLAUDE.md; the landing card's Deltas section cites the comments, so a missing sweep is visible at verification.</td></tr>
+<tr><td><strong>A7</strong></td><td>Compaction insurance: a standing instruction in CLAUDE.md telling the summarizer what must always survive — current ticket, branch, gate status, modified files, open defects, next step. A documented feature we don't use; compatible with either outcome of R3.</td><td>Same doctrine locks as A1.</td></tr>
+<tr><td><strong>A8</strong></td><td>A landing-card <strong>assembler</strong>, <code>scripts/author_landing_card.py</code>: autogenerates the entire machine-state section (branch/HEAD, dirty files and whose, live processes, scheduled jobs, dormant-vs-live callouts) plus a pre-filled anchors block. The author writes only objective, deltas, and next step — minutes, not an hour.</td><td>The assembler stamps its output; A4's staleness warning catches hand-rolled or stale machine state.</td></tr>
+</table></div>
+
+<h3>A1 draft — the CLAUDE.md banking section (for your ratification, terse register as the file requires)</h3>
+<pre style="white-space:pre-wrap; background:var(--card); border:1px solid var(--line); border-radius:6px; padding: .8rem 1rem; font-size:.82rem; overflow-x:auto;">&lt;event_time_banking priority="structural — the brief buffers nothing durable"&gt;
+Every fact lands in its durable home AT THE EVENT, never at handoff:
+- Work state changes (limb done, blocker hit, scope shift) → dated CURRENT STATE comment on the ticket, at the change.
+- Decision made → the causing ticket at decision time; governance decisions → ADR + DECISION_REGISTER row in the same change.
+- Approach abandoned → "DEAD END: tried X, failed because Y" ticket comment at abandonment; transferable judgment → LESSONS, mechanics → FIELD_NOTES.
+- Claim corrected → fix the artifact carrying the stale claim NOW (superseded banner, ticket comment); briefs may only point at the correction.
+- Merge lands → the SAME atomic motion comments every ticket the merge UNBLOCKS (sweep blocked-by predicates at merge time — the moment of maximum knowledge).
+- Ship narrative → journal fragment at ship time. Measurement → PERFORMANCE_LOG + docs/performance at run time. (Standing rules, restated here as the banking table's rows.)
+CRASH TEST at every seam: if this session vanished right now with no brief, what is lost? Anything nameable = a banking failure — bank it now.
+Handoff briefs are LANDING CARDS (template + verifier-enforced ≤150 lines): objective, deltas since last durable state, machine state, next step, pointers. Writing one takes minutes and teaches you nothing — if it takes longer, or you learn something while writing it, banking failed upstream; fix that, not the brief.
+&lt;/event_time_banking&gt;</pre>
+
+<h3>A2 draft — the landing-card skeleton (replaces the world-report template)</h3>
+<pre style="white-space:pre-wrap; background:var(--card); border:1px solid var(--line); border-radius:6px; padding: .8rem 1rem; font-size:.82rem; overflow-x:auto;"># Landing card — &lt;topic&gt;                      ≤150 lines TOTAL, machine-enforced
+frontmatter + anchors block                     kept as-is — machine-checked by the verifier
+## Objective          ≤3 lines                  the arc and why it matters
+## Deltas             ≤15 lines                 what changed since last durable state — merges (SHAs),
+                                                board moves, flips; one pointer-line each
+## Machine state      ≤25 lines                 the ONLY unbankable content: branch/HEAD, dirty files
+                                                and whose, live processes/runs, scheduled jobs,
+                                                dormant-vs-live callouts   [autogenerated — A8]
+## Next step          ≤3 lines                  singular and concrete
+## Pointers           ≤10 lines                 ≤6 reads · "the board is the source of truth — read it
+                                                fresh" · ops surface cited by path (A3), never pasted
+## Retractions &amp; dead ends                      pointer form ONLY — "banked at #N (comment, date)";
+                                                content living here is a banking failure by definition
+(successor grounding + gate steps: kept per current doctrine; becomes the
+ 20-second delta-gate if you ratify R5 Option A)</pre>
+
+<p><strong>Net size and sequencing.</strong> The CLAUDE.md edits are replacements, not additions — the banking table absorbs the existing distribution prose and the rewritten handoff section shrinks; the target for the whole doctrine commit is net-zero or negative lines, consistent with R4's direction rather than fighting it. R7 collapses into this plan (dead ends bank at abandonment via A1; the two-corrections rule rides the same doctrine commit). Ship order: A3 → A1+A6+A7 (one doctrine commit) → A2 → A8+A4+A5 (tooling and locks). One day-scale arc, three to four commits, each gate-green — and it is worth doing even if you decline every other R, because thin briefs and event-time banking make R2, R3, R5, and R6 cheaper whenever you do decide them.</p>
+
+<h2>6 · Direct answers</h2>
+<p><strong>(a) Best method when a session reaches full context:</strong> ideally, don't reach it — land at a boundary around 60–75% with the arc closed and a thin, machine-verified landing card (R1/R2). If mid-arc, let compaction carry you through, re-verify against the live surfaces, and land at the next seam (R3). Reserve <code>--resume</code> for interruptions of healthy sessions; never paste a summary into a new prompt — point the fresh session at disk and let it verify.</p>
+<p><strong>(b) Is handing off poor practice?</strong> No — it is the endorsed, converged practice, and your instinct to externalize state and re-ground fresh sessions from disk is the right architecture. What the evidence says to abandon is the current <em>dosage</em>: mega-briefs, degradation-timed authorship, per-brief rebuilt world-state, and treating every compaction as an emergency. The "something else entirely" you asked about does exist, and you already own it: the durable substrate (board, journal, lessons, memory). The deep change is moving weight off the briefs and onto that substrate, at event time.</p>
+
+<h2>7 · Your side of the keyboard — a short cheat sheet</h2>
+<div class="facts"><ul>
+<li><strong>New job → new session.</strong> Don't extend an old chat into unrelated work; it drags noise forward.</li>
+<li><strong>A session failed the same fix twice?</strong> Say: "bank what you learned and hand off to fresh context." Fresh + informed beats long + frustrated.</li>
+<li><strong>Interrupted (reboot, closed lid)?</strong> <code>claude --resume</code> reopens the session intact — no handoff needed.</li>
+<li><strong>Curious how full a session is?</strong> Type <code>/context</code>. Green is roomy; plan landings from ~60%.</li>
+<li><strong>See a compaction notice mid-task?</strong> Under the new rules that's normal — expect the session to re-check its ticket and continue, not stop.</li>
+<li><strong>Memory:</strong> <code>/memory</code> shows what persists across all sessions. Our index is at 123 of the 200 auto-loaded lines — headroom, but worth watching.</li>
+</ul></div>
+
+<h2>8 · Sources</h2>
+<p class="src"><strong>Official (fetched live 2026-07-28):</strong> code.claude.com/docs — context-window, sessions, memory, sub-agents, best-practices pages · claude.com/blog "Session management and 1M context" (2026-04-15) · anthropic.com/engineering "Effective context engineering for AI agents" (2025-09-29).<br>
+<strong>Practitioner (full reads):</strong> ianlpaterson.com on auto-compact mid-task loss + the 45k-token reserve (2026-03, upd. 2026-07) · nathanonn.com "Never auto-compact" / HANDOFF.md + <code>/clear</code> (2026-05) · dev.to (Adolan) compaction hooks + SQLite capture (2026-04) · hidekazu-konishi.com long-session methodology (2026-06) · fazm.ai three-layer HANDOFF.md pattern (2026-03) · jdhodges.com handoff templates and failure modes (2026-03) · ykdojo handoff skill · codecentric.de on the Ralph loop (2026-04, orig. G. Huntley 2025) · Hacker News threads on resume-vs-fresh and the 2026 thinking-token clearing bug.<br>
+<span class="flag">Flagged as folklore:</span> the 60% threshold (multiple independent practitioners, no controlled measurement) and one unverified claim that compaction costs 3–5× a cold reload.</p>
+
+<h2>9 · What happens next</h2>
+<p>Nothing has been changed — no doctrine, template, or verifier edits. The ratification queue is ticket <strong>#1144 (BlarAI Infrastructure)</strong> with one line per item; approve or decline per item, in any order. R1 is now execution-ready — build plan A1–A8 above, with R7 folded in: on “go R1” it ships as one day-scale arc of three to four commits (ops-surface extraction; the doctrine banking section + unblock sweep + compaction insurance; the landing-card template; then the verifier gates, doctrine locks, and machine-state assembler), each gate-green, with the doctrine change carrying its decision-register row and journal entry. Governance items (R2–R6) each get the same treatment when decided; R4 I would stage last and slowest.</p>
+
+</main>
+</body>
+</html>

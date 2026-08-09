@@ -10,6 +10,10 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from shared.fleet import dispatch as dispatch_mod
+
 from shared.fleet.dispatch import (
     FleetDispatchConfig,
     _classify_result,
@@ -409,6 +413,27 @@ def test_read_acceptance_record_missing_is_none(tmp_path):
 # ---- build_default_config: config-driven roots (#670) ---------------------
 
 
+@pytest.fixture(autouse=True)
+def _no_live_scripts_pin(monkeypatch):
+    """Isolate these tests from a RUNNING pinned battery on the operator's real box.
+
+    ``build_default_config()`` resolves ``scripts_dir`` via ``resolve_fleet_scripts_dir``,
+    whose second input is the on-disk DECLARATION of a live pinned run under the REAL state
+    root — it psutil-probes every file in ``state/fleet-swap/pins/``. Correct in production;
+    a hidden dependency for a test whose subject is the COMPILED-IN FALLBACK.
+
+    Without this, ``test_build_default_config_falls_back_when_empty_or_absent`` asserts
+    ``scripts_dir.parent.name == "agentic-setup"`` and goes RED for the whole duration of any
+    pinned run — on a test that has nothing to do with pinning. ``protect_the_gate`` is
+    explicit that the gate must not be killed by the live system, and this is that shape.
+
+    Neutralising the DECLARATION rather than the resolver is deliberate: the resolver's real
+    behaviour stays under test in ``test_fleet_dir_resolution.py``, which drives it with its
+    own declarations. Here we only remove an input these tests never meant to consume.
+    """
+    monkeypatch.setattr(dispatch_mod, "read_live_declaration", lambda _root: "")
+
+
 def test_build_default_config_uses_provided_roots():
     cfg = build_default_config(agentic_setup_dir="D:/fleet", projects_dir="D:/projects")
     assert cfg.scripts_dir == Path("D:/fleet/scripts")
@@ -460,6 +485,35 @@ def test_create_project_makes_a_valid_dispatch_target(tmp_path):
     assert "a tiny calculator" in (repo / "README.md").read_text(encoding="utf-8")
     assert (repo / ".gitignore").is_file()
     assert _git_branch(repo) == "main"
+
+
+def test_create_project_seed_assets_off_is_the_pre_m5_scaffold(tmp_path):
+    """#1165 M5 toggle-off: the default scaffold carries NO assets folder —
+    byte-identical to the pre-M5 create."""
+    cfg = _cfg(tmp_path)
+    res = create_project("plain", config=cfg, goal="a page")
+    assert res.ok
+    assert not (Path(res.path) / "assets").exists()
+
+
+def test_create_project_seed_assets_seeds_the_folder_contract(tmp_path):
+    """#1165 M5: ``seed_assets=True`` seeds ``assets/`` + ``assets/reference/`` with
+    their one-line READMEs, COMMITTED with the scaffold (a clean tree proves it —
+    the folders survive a fresh clone)."""
+    cfg = _cfg(tmp_path)
+    res = create_project("with-assets", config=cfg, goal="a page", seed_assets=True)
+    assert res.ok
+    repo = Path(res.path)
+    assets = repo / "assets"
+    assert (assets / "README.txt").is_file()
+    assert (assets / "reference" / "README.txt").is_file()
+    text = (assets / "README.txt").read_text(encoding="utf-8")
+    assert "reference" in text and text.endswith("\n")
+    ref_text = (assets / "reference" / "README.txt").read_text(encoding="utf-8")
+    assert "LOOKS" in ref_text and "WORKS" in ref_text
+    cp = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
+                        capture_output=True, text=True)
+    assert cp.stdout.strip() == "", "the seeded assets folders must be committed"
 
 
 def test_create_project_refuses_empty_name(tmp_path):

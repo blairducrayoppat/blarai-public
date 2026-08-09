@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import json
 import re
+from math import isfinite
 from pathlib import Path
 from typing import Optional
 
@@ -76,21 +77,40 @@ CLASS_BLIND_FIX_LOOP = "BLIND-FIX-LOOP"
 #: The plan under-decomposed to <2 tasks and dropped to flat mode, which skips the job
 #: oracle entirely — structurally caps the job at "can never be GREEN" (B1, B5 flat).
 CLASS_DECOMPOSE_DOWNGRADE = "DECOMPOSE-DOWNGRADE"
-#: The environment / runner / budget was the terminal cause — a timeout kill, a
-#: tree-kill, a harness crash, an unadoptable/could-not-run card (HARNESS attribution).
+#: The run genuinely EXHAUSTED its time budget — measured, not inferred: elapsed reached
+#: the card's ``run_budget_s``, or a kill marker (TIMEOUT / tree-kill) is in the log.
+#:
+#: #1324: this class used to fire on the HARNESS attribution ALONE, reading neither
+#: elapsed nor budget, so every environment fault was filed as budget exhaustion. Measured
+#: instances of the SAME label: 49% of budget, 102% of budget (PERFORMANCE_LOG.md:3167),
+#: and 255.97 s of a 28,800 s budget — **nine-tenths of one percent** — on 2026-08-07,
+#: where the real cause was the Assistant Orchestrator being shut down mid-run.
+#:
+#: The harm is the COUNTER, not the wording. ``failure-taxonomy: HARNESS-BUDGET n`` is
+#: exactly the evidence a later session counts to argue that web cards are budget-starved,
+#: so a mislabel does not sit still — it becomes someone else's premise.
 CLASS_HARNESS_BUDGET = "HARNESS-BUDGET"
+#: A terminal environment / runner fault that is NOT budget exhaustion — the service went
+#: away, the GPU never initialised, the harness crashed. Same HARNESS attribution, entirely
+#: different cure: WAIT and re-run helps a budget fault and does nothing for this one.
+#: Deny-by-default applied to labelling: a HARNESS fault lands here unless there is
+#: POSITIVE evidence of budget exhaustion.
+CLASS_HARNESS_ENVIRONMENT = "HARNESS-ENVIRONMENT"
 #: The honest residue — no known fingerprint matched. A RISING unclassified rate is the
 #: instrument telling us the taxonomy needs a human pass (a NEW leak class). Never silent.
 CLASS_UNCLASSIFIED = "UNCLASSIFIED"
 
 #: Every failure class, in a stable order (so the count map always carries the full
 #: taxonomy — even the classes that did not fire tonight — for a stable summary shape).
+#: HARNESS-ENVIRONMENT is APPENDED after HARNESS-BUDGET rather than inserted, so the
+#: historical column order of every prior report is unchanged.
 FAILURE_CLASSES: tuple[str, ...] = (
     CLASS_ORACLE_DEFECT,
     CLASS_INTEGRATION_SEAM,
     CLASS_BLIND_FIX_LOOP,
     CLASS_DECOMPOSE_DOWNGRADE,
     CLASS_HARNESS_BUDGET,
+    CLASS_HARNESS_ENVIRONMENT,
     CLASS_UNCLASSIFIED,
 )
 
@@ -161,15 +181,27 @@ _SEAM_LOG: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"Cannot find module ['\"]?([^'\"\n]+)"), "cannot find module (node)"),
 )
 
-#: HARNESS-BUDGET: a terminal environment/budget fault. Deliberately does NOT include the
-#: coder idle circuit-breaker — an idle coder is a BUILD/capability event, not a harness
-#: fault (the hand-analysis is explicit that B4/B6's idle tasks were not the terminal
-#: cause), so it must fall through to the honest residue rather than mislabel as HARNESS.
+#: POSITIVE evidence that a run was KILLED for time. Only these two markers qualify: both
+#: describe an actual kill, not a mention of budgets.
+#:
+#: #1324: ``run[_ ]budget|swap_run_budget`` used to live here as "run-budget kill" and was
+#: REMOVED, because the nightly launcher prints a routine budget-coherence block
+#: (``default swap_run_budget_s = 10,800s``) on EVERY run. Any log carrying that ordinary
+#: bookkeeping matched, so a healthy run that failed for an unrelated reason read as a
+#: budget kill. A pattern that matches the log's own furniture is not evidence.
+_HARNESS_KILL_LOG: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bTIMEOUT\b"), "TIMEOUT (budget kill)"),
+    (re.compile(r"tree[- ]kill"), "tree-kill"),
+)
+
+#: A terminal harness fault with no claim about its cause. Deliberately does NOT include
+#: the coder idle circuit-breaker — an idle coder is a BUILD/capability event, not a
+#: harness fault (the hand-analysis is explicit that B4/B6's idle tasks were not the
+#: terminal cause), so it must fall through to the honest residue rather than mislabel.
 _HARNESS_LOG: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bTIMEOUT\b"), "TIMEOUT (budget kill)"),
     (re.compile(r"tree[- ]kill"), "tree-kill"),
     (re.compile(r"harness exception"), "harness exception"),
-    (re.compile(r"run[_ ]budget|swap_run_budget"), "run-budget kill"),
 )
 
 #: The oracle-QA finding classes (#821) that constitute an ORACLE-DEFECT. ``import_contract``
@@ -233,7 +265,8 @@ class _Context:
     """The evidence bundle for one scorecard — the structured sidecars + bounded log text.
     Constructed once per card at battery close; every field is optional/fail-soft."""
 
-    __slots__ = ("oracle_qa", "decompose", "import_probe", "logs", "green_audit")
+    __slots__ = ("oracle_qa", "decompose", "import_probe", "logs", "green_audit",
+                 "traceability")
 
     def __init__(
         self,
@@ -242,12 +275,14 @@ class _Context:
         decompose: Optional[dict] = None,
         import_probe: Optional[dict] = None,
         green_audit: Optional[dict] = None,
+        traceability: Optional[dict] = None,
         logs: str = "",
     ) -> None:
         self.oracle_qa = oracle_qa
         self.decompose = decompose
         self.import_probe = import_probe
         self.green_audit = green_audit
+        self.traceability = traceability
         self.logs = logs or ""
 
 
@@ -266,6 +301,10 @@ def load_context(runs_dir: "str | Path | None", run_id: str) -> _Context:
         import_probe=_read_json(run_dir / "import-probe-verdict.json"),
         # #832 / #837 seam: an OPTIONAL green-audit sidecar. Inert until those land.
         green_audit=_read_json(run_dir / "green-audit.json"),
+        # The DETERMINISTIC requirement->assertion traceability block. Same optional-sidecar
+        # pattern; absent means classify_green falls back to the #821 declaration exactly as
+        # before.
+        traceability=_read_json(run_dir / "traceability.json"),
         logs=_read_logs(run_dir),
     )
 
@@ -339,12 +378,92 @@ def _rule_blind_fix_loop(ev: dict, ctx: _Context) -> Optional[str]:
     return None
 
 
-def _rule_harness_budget(ev: dict, attribution: str, ctx: _Context) -> Optional[str]:
-    """A terminal environment/runner/budget fault — the HARNESS attribution, or a
-    timeout/tree-kill/crash log marker. NOT a coder idle circuit-breaker (a BUILD event)."""
-    if attribution == ATTRIBUTION_HARNESS:
-        return "attribution=HARNESS (environment/runner/budget fault)"
-    return _first_log_match(ctx.logs, _HARNESS_LOG)
+#: Elapsed/budget ratio at or above which a run is called EXHAUSTED. Not 1.0: a run killed
+#: at its ceiling rarely records the last fraction of a second, and the two measured real
+#: instances sit at 49% and 102% — nowhere near this boundary, which is the point. The
+#: threshold exists to be unambiguous, not to adjudicate close calls.
+_BUDGET_EXHAUSTED_FRACTION = 0.95
+
+
+def _budget_reading(sc: Scorecard, ev: dict) -> tuple[Optional[float], float, Optional[float]]:
+    """``(budget_s, elapsed_s, fraction)``. ``budget_s``/``fraction`` are ``None`` when the
+    card's budget was not recorded on this scorecard — the honest state for every scorecard
+    written before #1324, and the reason this returns a tri-state instead of defaulting."""
+    elapsed = float(getattr(sc, "wall_clock_s", 0.0) or 0.0)
+    raw = ev.get("run_budget_s")
+    try:
+        budget = float(raw) if raw is not None else 0.0
+    except (TypeError, ValueError):
+        budget = 0.0
+    # `isfinite` and not just `> 0`: NaN fails EVERY comparison, so a bare `budget <= 0.0`
+    # lets it through as a valid budget and it then renders as "of nans (nan%)" — a
+    # number-shaped non-number in the fingerprint, which is the one place this ticket
+    # cannot afford one. Non-finite is unmeasured, which is the truth about it.
+    if not isfinite(budget) or budget <= 0.0:
+        return (None, elapsed, None)
+    return (budget, elapsed, elapsed / budget)
+
+
+def _rule_harness_budget(sc: Scorecard, ev: dict, attribution: str, ctx: _Context) -> Optional[str]:
+    """The run EXHAUSTED its time budget — claimed only on POSITIVE evidence.
+
+    #1324. This used to return BUDGET on ``attribution == HARNESS`` alone, reading neither
+    elapsed nor budget, so every environment fault was filed as budget exhaustion. It is
+    now a measurement: the elapsed/budget ratio, or a kill marker that describes an actual
+    kill. Absent both, the fault is real but its cause is NOT budget, and it belongs to
+    HARNESS-ENVIRONMENT below.
+
+    Deny-by-default, applied to labelling: an UNKNOWN budget is not a satisfied one. A
+    scorecard with no ``run_budget_s`` cannot support this claim and does not get it.
+    """
+    kill = _first_log_match(ctx.logs, _HARNESS_KILL_LOG)
+    if attribution != ATTRIBUTION_HARNESS and not kill:
+        return None
+    budget, elapsed, frac = _budget_reading(sc, ev)
+    if frac is not None and frac >= _BUDGET_EXHAUSTED_FRACTION:
+        return f"budget exhausted: elapsed {elapsed:.0f}s of {budget:.0f}s ({frac:.0%})"
+    if kill:
+        measured = (f"elapsed {elapsed:.0f}s of {budget:.0f}s ({frac:.0%})"
+                    if frac is not None else f"elapsed {elapsed:.0f}s, budget unmeasured")
+        return f"{kill}; {measured}"
+    return None
+
+
+def _rule_harness_environment(sc: Scorecard, ev: dict, attribution: str, ctx: _Context) -> Optional[str]:
+    """A terminal environment/runner fault that is NOT budget exhaustion — the service went
+    away, the GPU never initialised, the harness crashed. Ranked immediately below
+    HARNESS-BUDGET so it takes everything the HARNESS ATTRIBUTION used to hand to it.
+
+    COVERAGE, stated exactly rather than generously. For an ``attribution == HARNESS``
+    card the two harness classes cover precisely what the single old class covered, and
+    nothing moves to UNCLASSIFIED. For a NON-HARNESS card the old rule could still reach
+    HARNESS-BUDGET through ``_HARNESS_LOG``, which then contained
+    ``run[_ ]budget|swap_run_budget``; that pattern is deleted (it matched the launcher's
+    routine budget-coherence block, i.e. the log's own furniture), so a non-HARNESS card
+    whose log merely MENTIONS a budget now **falls through the harness rules** instead of
+    being labelled a budget kill. Where it lands then depends on the rules below: ``flat``
+    mode reaches DECOMPOSE-DOWNGRADE, otherwise UNCLASSIFIED. **That is a deliberate
+    behaviour change, not an oversight**, and it is pinned by a test — a wrong class is
+    worse than an honest "no fingerprint matched", and UNCLASSIFIED is designed to be the
+    residue.
+
+    Reachability is CONDITIONAL, deliberately not dated: this path opens only if that
+    string enters a log the classifier actually scans, and a real kill prints ``TIMEOUT``,
+    which ``_HARNESS_KILL_LOG`` catches. How many scanned logs contain it *today* is a
+    measurement, and it lives on #1324 — a docstring that dates its own evidence rots into
+    a false assertion the first time the world moves, and this one would have pointed at a
+    path in another repository that a reader here cannot check.
+
+    The fingerprint always carries the NUMBERS, so the label can be checked rather than
+    believed — the whole point of #1324."""
+    if attribution != ATTRIBUTION_HARNESS:
+        return _first_log_match(ctx.logs, _HARNESS_LOG)
+    budget, elapsed, frac = _budget_reading(sc, ev)
+    if frac is not None:
+        return (f"attribution=HARNESS; elapsed {elapsed:.0f}s of {budget:.0f}s ({frac:.0%}) "
+                f"- NOT budget exhaustion")
+    return (f"attribution=HARNESS; elapsed {elapsed:.0f}s, budget unmeasured "
+            f"(no run_budget_s on this scorecard) - budget exhaustion NOT established")
 
 
 def _rule_decompose_downgrade(ev: dict, ctx: _Context) -> Optional[str]:
@@ -371,7 +490,14 @@ def classify_failure(sc: Scorecard, ctx: _Context) -> tuple[str, str]:
         (CLASS_ORACLE_DEFECT, lambda: _rule_oracle_defect(ev, ctx)),
         (CLASS_INTEGRATION_SEAM, lambda: _rule_integration_seam(ev, ctx)),
         (CLASS_BLIND_FIX_LOOP, lambda: _rule_blind_fix_loop(ev, ctx)),
-        (CLASS_HARNESS_BUDGET, lambda: _rule_harness_budget(ev, attribution, ctx)),
+        # #1324: BUDGET before ENVIRONMENT — the specific claim is tried first and must
+        # earn itself on measured evidence; ENVIRONMENT then takes the rest of what the
+        # HARNESS ATTRIBUTION used to hand to BUDGET unexamined. For an attribution=HARNESS
+        # card the two together cover exactly the old class's ground. For a NON-HARNESS card
+        # they do NOT — see _rule_harness_environment's docstring for the one shape that now
+        # falls to UNCLASSIFIED, and why that is the right answer rather than a leak.
+        (CLASS_HARNESS_BUDGET, lambda: _rule_harness_budget(sc, ev, attribution, ctx)),
+        (CLASS_HARNESS_ENVIRONMENT, lambda: _rule_harness_environment(sc, ev, attribution, ctx)),
         (CLASS_DECOMPOSE_DOWNGRADE, lambda: _rule_decompose_downgrade(ev, ctx)),
     ):
         fingerprint = rule()
@@ -410,6 +536,23 @@ def classify_green(sc: Scorecard, ctx: _Context) -> tuple[str, str]:
     gamed = _gaming_signal(ev, ctx)
     if gamed:
         return (CLASS_GREEN_GAMED, gamed)
+    # The DETERMINISTIC traceability block WINS over the #821 declaration when present: the
+    # latter is a 14B assertion that a test covers a criterion, the former is AST evidence
+    # about the oracle itself. Its own rule decides VERIFIED (notably: anything undecidable
+    # blocks it), so a coverage figure that cannot be determined can never read as a pass.
+    trace = ctx.traceability
+    if isinstance(trace, dict) and "verified_class" in trace:
+        fingerprint = str(trace.get("fingerprint") or "oracle_coverage=unavailable")
+        if not trace.get("available"):
+            return (CLASS_GREEN_UNVERIFIED, fingerprint)
+        if trace.get("verified_class"):
+            return (CLASS_GREEN_VERIFIED, fingerprint)
+        # PARTIAL means "some of it was proven". A block that verified NOTHING proved nothing,
+        # whatever the reason — that is UNVERIFIED, the same rule the #821 branch applies to
+        # a k of zero.
+        if int(trace.get("verified", 0) or 0) <= 0:
+            return (CLASS_GREEN_UNVERIFIED, fingerprint)
+        return (CLASS_GREEN_PARTIAL, fingerprint)
     qa = ctx.oracle_qa
     if qa and "oracle_coverage" in qa:
         cov = str(qa.get("oracle_coverage") or "unknown")

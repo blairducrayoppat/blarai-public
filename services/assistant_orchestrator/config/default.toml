@@ -399,6 +399,48 @@ clarify = true
 # Set false to refuse `/dispatch revise` (accept/reject unchanged). Set false to disable.
 revise = true
 
+# #1120/#1124 — PROJECT MEMORY. Remember what you have already told BlarAI about a project.
+#
+# THIS COMMENT IS THE CEREMONY'S PRIMARY ARTIFACT — what the operator reads before flipping
+# the key. It describes ONLY what the flag does today.
+#
+# WHAT IT DOES WHEN TRUE. When BlarAI asks you clarifying questions and you answer them,
+# those answers are stored — encrypted, keyed by project — and reused on the NEXT dispatch
+# for that same project, so rejecting a plan no longer throws away everything you said. The
+# plan card shows what is being carried, under its own heading, and
+# `/dispatch forget <project>` clears it.
+#
+# WHAT YOU ARE ACTUALLY DECIDING (the reason this is a ceremony and not a default).
+# Turning this ON means BlarAI RETAINS your typed project descriptions and answers
+# INDEFINITELY — there is no expiry and no size cap — and REPLAYS them into the planning
+# prompt on every later dispatch for that project. The content is born-encrypted at rest the
+# whole time and never leaves the machine; the decision is about RETENTION, not exposure.
+#
+# KNOWN LIMITATIONS AT THIS FLAG'S FIRST GO-LIVE (2026-07-27 independent review, #1123-#1125
+# track the fixes). Read these before flipping:
+#   * Once a project has ANY remembered answer, BlarAI STOPS ASKING clarifying questions for
+#     that project, and the old goal's answers are applied to every NEW goal on it. Safe for
+#     re-running the SAME goal; wrong for a different one on the same project.
+#   * Deleting a conversation does NOT delete what was remembered.
+#   * There is no listing surface — you cannot see everything BlarAI has banked, only what a
+#     given plan card shows.
+# Until those land, the honest guidance is: turn it on for a focused validation run, turn it
+# off again afterwards.
+#
+# FALSE (the shipped default) is FULL DORMANCY, not a degraded mode: nothing is recalled,
+# nothing is written, no row is created, and the corridor behaves EXACTLY as it did before
+# #1120 — including the pre-#1120 amnesia this feature exists to fix. Flipping back to false
+# is a complete, immediate off-switch; it does not delete rows already written (use
+# `/dispatch forget <project>` for that, or delete dispatch_state.db).
+#
+# Runbook: docs/runbooks/dispatch_project_memory_go_live.md
+# capabilities(fleet_dispatch.project_memory):
+#   project-memory-write = services/ui_gateway/src/dispatch_state_store.py::remember_answers
+#   project-memory-read = services/ui_gateway/src/dispatch_state_store.py::recall_answers
+#   project-memory-erase = services/ui_gateway/src/dispatch_state_store.py::forget_answers
+#   project-memory-replay = services/ui_gateway/src/dispatch_coordinator.py::_recall
+project_memory = false
+
 # #1031 — the ADVANCED INTAKE front (staged specification), SLICE S1 ONLY.
 #
 # THIS COMMENT IS THE CEREMONY'S PRIMARY ARTIFACT — what the operator reads before flipping
@@ -416,11 +458,15 @@ revise = true
 #   2. DELIVERY FLOOR — a web / web-static spec gains a machine-gated SMOKE criterion
 #      asserting the served page loads.
 #
-# WHAT IT DOES NOT DO — all still unbuilt (S2–S4), none of it enabled by this key:
+# WHAT IT DOES NOT DO — none of it enabled by this key:
 #   * NO wider elicitation interview — the clarify stage is untouched.
-#   * NO co-authored acceptance criteria — the criteria prompt is untouched.
+#   * NO co-authored acceptance criteria FROM THIS KEY — the criteria prompt this key runs is
+#     untouched. Co-authoring is `advanced_intake_coherence_gate` below, which needs its own
+#     flip AND this one; this key alone never engages it.
 #   * NO 1:1 oracle import contract — oracle authoring is untouched.
 #   * The plan-time coverage check stays WARN-LOUD in both modes; it never blocks approval.
+#   * NO bad-input exam floor — that is `advanced_intake_bad_input_floor` below, which needs
+#     BOTH keys, so turning this one on can never change what a build is graded on.
 #
 # WENT LIVE at the LA-present go-live ceremony 2026-07-22 (#1031), flipped from its shipped
 # default. Reverting is a full undo: set this back to false and restart, and the next plan is
@@ -437,20 +483,428 @@ revise = true
 #   web-delivery-floor = shared/fleet/acceptance.py::_ensure_delivery_floor
 advanced_intake = true   # GO-LIVE 2026-07-22 (#1031): the two intake rulers act on every non-card dispatch
 
+# The BAD-INPUT EXAM FLOOR (#1044) — a sub-gate of the advanced-intake front above. BOTH keys
+# must be true before it acts; `advanced_intake` alone does nothing here.
+#
+# WHY IT EXISTS — a measured hole, not a hypothesis. A flashcards build passed its per-task
+# oracles, its job-level exam, the sandbox's own eight test files, AND our quality juror (which
+# scored it "bad input handling: graceful") — and the shipped code crashed on two ordinary
+# inputs: a card with a missing field, and an answer that was not text. Both were confirmed by
+# running the shipped file. GREEN meant "the happy path works", and every capability number
+# resting on a GREEN rate carries that caveat until this closes.
+#
+# WHAT true DOES — for a PYTHON acceptance exam only, and only on an operator dispatch: every
+# entry point the exam already drives gains a machine-written test that feeds it malformed
+# input (empty, missing, wrong-type, missing-field) and requires it not to fall over. The test
+# is INJECTED by machinery, never asked of the model. REJECTING bad input passes — refusing an
+# argument with a clear error is correct handling; only an unhandled crash fails.
+#
+# WHAT IT DOES NOT DO:
+#   * It does NOT judge whether the handling is GOOD, only that the thing does not crash. A
+#     build can satisfy it shallowly. Scoring the quality of the handling is a new grading
+#     layer and a separate decision.
+#   * It does NOT touch a battery/headless card dispatch — a card IS its own exam, frozen so
+#     nights stay comparable.
+#   * It does NOT apply to a node/JavaScript exam — the same probe would assert a much weaker
+#     property there, and a weak assertion made loudly is worse than none.
+#   * It does NOT change the plan, the criteria, or the coverage warning. Only the exam bytes.
+#
+# WHY ITS OWN KEY AND ITS OWN CEREMONY: it changes what a build is GRADED on. A build that
+# only ever worked on the happy path now fails an exam it used to pass, so GREEN rates measured
+# before and after are not the same measurement. That is a capability decision, not a rider on
+# an already-live flag. Reverting is a full undo: set false and restart; the next plan's exam
+# bytes are byte-identical to the prior behaviour.
+#
+# VALIDATED, NOT COERCED (#1042): only an explicit boolean `true` enables this; a quoted
+# "false" and every other non-boolean value resolve false.
+# capabilities(fleet_dispatch.advanced_intake_bad_input_floor):
+#   bad-input-exam-floor = shared/fleet/bad_input_floor.py::inject_bad_input_floor
+#   exam-floor-gate = shared/fleet/acceptance.py::_ensure_bad_input_floor
+advanced_intake_bad_input_floor = true   # GO-LIVE 2026-07-29 (#1069 batched S3 ceremony, LA-present): every python exam gains the machine-injected bad-input assertions
+
+# #1054 (S3 slice E) — COHERENCE BY SINGLE AUTHORSHIP. A SEPARATE flip inside the advanced
+# intake front. It needs `advanced_intake` above to be true AS WELL; on its own it does
+# nothing, and the front being live is not consent for what lands inside it later.
+#
+# THE DEFECT IT RETIRES, measured on a real dispatch (2026-07-22, water-tracker): the plan's
+# assumptions said "Assumed a reset button is not needed" while its acceptance criteria said
+# "The web page includes a reset button…". One document told the coder both that a capability
+# was out of scope and that it was a graded requirement, because the assumptions and the
+# criteria came from two model calls that never saw each other's output.
+#
+# WHAT true DOES — two things, and the second is the one with teeth:
+#   1. SINGLE-PASS AUTHORING — the criteria and the assumptions are written in ONE model call
+#      whose prompt carries both jobs, so the scope decision is made once, in one context.
+#      The same prompt carries a SCOPE ANCHOR (assert only behaviours the request names),
+#      which is the other half of the same live defect: that plan also invented goal-setting
+#      and history features the goal never mentioned.
+#   2. A DETERMINISTIC CONTRADICTION GATE — after authoring, the (assumption, criteria) pair
+#      is parsed and the plan is REFUSED when a criterion requires a capability an assumption
+#      ruled out, or the reverse. The prompt is vigilance; this is the control, and it holds
+#      even if a future model regresses.
+#
+# THIS IS A CAPABILITY CHANGE, which is why it is a ceremony and not a proven-defaults flip:
+# a dispatch that could previously only be PLANNED can now be REFUSED at plan time. The
+# refusal is plain-language, names the two statements that disagree, enqueues nothing, and
+# leaves reject/re-dispatch open — it never edits the plan to reconcile it, because choosing
+# which half was wrong is the operator's judgement, not a rule.
+#
+# WHAT IT DOES NOT DO: no elicitation interview; no oracle import contract; the plan-time
+# coverage check stays WARN-LOUD in both modes and still never blocks approval. It never runs
+# for a battery/headless card dispatch — the card IS the spec and is frozen for cross-night
+# comparability, the same self-suppression the two S1 rulers carry.
+#
+# ---------------------------------------------------------------------------------------
+# WHAT CAN GO WRONG, in both directions. Read this before flipping it — the first version of
+# this comment described only the MISSES, and a control that can also REFUSE YOUR GOOD PLAN
+# must say so where the decision is made.
+#
+#   * IT CAN REFUSE A PLAN THAT WAS FINE — and there is a KNOWN, UNFIXED way it does. The
+#     gate reads ordinary English with patterns, and a pattern can be wrong. When that
+#     happens you lose the plan: you are told which two sentences it believes disagree,
+#     nothing is built, and you dispatch again.
+#
+#     THREE such faults have been found. Two are fixed and locked:
+#       - an ordinary two-clause sentence — "a reset button would be useful, but it is not
+#         needed for now" — was refused because of the COMMA;
+#       - "the app launches without an error message" was read as banning error messages.
+#
+#     THE THIRD IS STILL PRESENT (#1096). When a sentence says a feature is not wanted in one
+#     PLACE or one FORM, the gate hears it as not wanted at all:
+#       - "The user data is not stored on a server", alongside an assumption that the user
+#         data stays in the browser;
+#       - "The reset button is not shown on the print view".
+#     Both plans are perfectly consistent, and both are refused. It is not new — it has been
+#     there since the first version of this feature — and it is disclosed rather than fixed
+#     because fixing it means changing the matching logic, which is the kind of change that
+#     has been introducing fresh faults on this tree.
+#
+#     The test sets measure ZERO wrong refusals across 30 plans, and that number is real —
+#     but it was measured on plans that happen not to contain the third shape, which is
+#     exactly how the shape survived two independent reviews. Read "zero" as "none left that
+#     we knew how to look for", never as "impossible".
+#
+#   * IT MISSES MORE THAN IT CATCHES. It only sees a disagreement about a capability named in
+#     TWO OR MORE words ("reset button", "dark mode"). Every one of the ten commonest
+#     one-word features — history, search, undo, login, pagination, notifications, autosave,
+#     printing, charts, sorting — escapes entirely. It also misses "the reset button is not
+#     shown until an entry exists" (#1095), which does require a reset button. Measured
+#     across BOTH test sets it caught 22 of 36 planted contradictions — about 61%. A single
+#     test set read 14 of 16 and made it look like 88%; the two-set figure is the honest one.
+#
+#   * IT DECIDES CONTRADICTION, NOT CORRECTNESS. Two statements that agree with each other and
+#     are both wrong about what you asked for pass cleanly. This is a floor against a plan
+#     arguing with itself, not a check that the plan is any good.
+# ---------------------------------------------------------------------------------------
+#
+# Reverting is a full undo: set back to false and restart, and authoring returns to the
+# two-call path with no gate. Procedure of record — its OWN ceremony, separate from the
+# front's: docs/runbooks/advanced_intake_coherence_gate_go_live.md.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# capabilities(fleet_dispatch.advanced_intake_coherence_gate):
+#   coauthored-criteria-and-assumptions = shared/fleet/acceptance.py::_COAUTHORED_TEMPLATE
+#   single-pass-authoring = shared/fleet/acceptance.py::_coauthor_spec
+#   deterministic-coherence-gate = shared/fleet/coherence.py::check_coherence
+advanced_intake_coherence_gate = true   # GO-LIVE 2026-07-29 (#1069 batched S3 ceremony, LA-present): single-pass authoring + the deterministic contradiction gate
+
+# #1069 (S3 slice F) — the COVERAGE GATE. A SEPARATE flip inside the advanced-intake front;
+# it needs `advanced_intake` above to be true AS WELL — on its own it does nothing, and the
+# front being live is not consent for what lands inside it later.
+#
+# THE DEFECT IT RETIRES, measured across a campaign (#989/#1008): a build task owning no
+# module the job exam imports tends to build far beyond its slice (the B4 sprawl shape), and
+# an exam import no task owns is a module nobody is told to build — either way the exam
+# cannot verify the plan, the run still reports GREEN, and that GREEN enters the capability
+# record meaning nothing. Warn-loud is what the system does today, and #989/#1008 happened
+# anyway: a warning that can be clicked through is a note, not a control.
+#
+# WHAT IT DOES — only with BOTH keys true, only on the multi-task job-exam shape, and never
+# for a battery card (`battery-*` sandboxes self-suppress; the card IS the instrument):
+#   * the exam author's prompt carries a deterministic 1:1 import pin derived from the task
+#     contracts (coverage BY CONSTRUCTION — the model is told the import set, not hoped at);
+#   * a residual coverage gap triggers ONE bounded re-authoring with the gap named; a repair
+#     that comes back empty is discarded (a gappy exam never degrades into NO exam);
+#   * a gap that survives BLOCKS approval: the card renders with the gap named, revise and
+#     reject stay open, and a revision that measurably closes the gap unblocks approve (the
+#     gateway re-runs the same deterministic check after every revision).
+# WHAT IT DOES NOT DO:
+#   * the quick path stays WARN-LOUD — the capability boundary its own docstring states
+#     (shared/fleet/acceptance.py::_plan_contract_coverage_warning) is unchanged;
+#   * a single-task plan is never gated (it owns everything by construction);
+#   * a plan that honestly authors NO exam (build-only ecosystems, .NET etc.) is a
+#     DISCLOSED absence, not a gap — never blocked;
+#   * nothing here touches egress, the coordinator write path, or any store.
+#
+# LA framing of record (#1069 c.2512): "It's less 'the system tells you no' and more 'the
+# system won't let you sign something it couldn't check.'" Ratified #1069 c.2461. Goes live
+# ONLY at the batched S3 D/E/F/G ceremony — one flag-flip session across the four slices.
+#
+# Reverting is a full undo: set back to false and restart, and planning returns to the
+# warn-loud path byte-identically.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# The approve refusal itself lives in DispatchCoordinator._approve (a method, so it is
+# named here in prose; the declaration below names the module-level symbols).
+# capabilities(fleet_dispatch.advanced_intake_coverage_gate):
+#   coverage-by-construction-pin = shared/fleet/acceptance.py::_coverage_contract_block
+#   measured-clean-release-rule = shared/fleet/acceptance.py::_coverage_measured_clean
+#   blocking-marker-builder = shared/fleet/acceptance.py::_coverage_blocked_message
+#   post-revision-re-evaluation = services/ui_gateway/src/dispatch_coordinator.py::_riding_job_oracle
+advanced_intake_coverage_gate = true   # GO-LIVE 2026-07-29 (#1069 batched S3 ceremony, LA-present): the exam's import pin + ONE bounded repair + approval BLOCKS on a surviving gap
+
+# #1069 (S3 slice G) — CRITERIA REVISION (#1055 part 2). A SEPARATE flip inside the
+# advanced-intake front; it needs `advanced_intake` above to be true AS WELL — on its own it
+# does nothing.
+#
+# THE DEFECT IT RETIRES, hit live by the operator (#1055, 2026-07-22): revise edits the
+# plan's TASKS, never the criteria, and its old failure message invited rephrasing — a loop
+# that could never succeed. Slice A shipped the honest message (live since 70d5ddee); this
+# key is the real capability behind it: criteria/scope feedback on a pending plan runs a
+# criteria-revise model call, and the operator's judged checklist actually changes.
+#
+# WHAT IT DOES — only with BOTH keys true, and only when a task-revision yielded no change
+# and the feedback reads as criteria/scope:
+#   * the operator-judged criteria (visual / human) may be reworded, removed, or added —
+#     an added criterion is FORCED to the human tier;
+#   * the deterministic floors are re-injected and the realism guard re-applied after every
+#     criteria revision (a revision cannot strip a floor — two independent locks: the
+#     machine wall below, and the idempotent re-injection);
+#   * the delta card leads with reworded/added/removed/protected, in plain language.
+# WHAT IT DOES NOT DO — the MACHINE WALL, and it is load-bearing:
+#   * machine-gated criteria (build / behavior / smoke) are KEEP-ONLY: a rescope aimed at
+#     one is discarded and reported "protected", and an omitted one is auto-kept. The
+#     compiled task prompts and the riding exam consume ONLY machine tiers and are frozen
+#     at plan time (#877/#820 safety asymmetry), so if this path could edit a machine
+#     criterion the card would show one assertion while the exam tested another. Changing
+#     an automatic check remains reject + re-dispatch, and the card says so.
+#   * the compiled task prompts and the exam bytes are byte-identical through any criteria
+#     revision, by construction; the shared 3-revision budget is consumed as usual.
+# Goes live ONLY at the batched S3 D/E/F/G ceremony.
+#
+# Reverting is a full undo: set back to false and restart — a criteria-revise request is
+# then refused Fail-Closed AO-side and the gateway renders the honest #1055 message,
+# byte-identically to pre-G behaviour.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# capabilities(fleet_dispatch.advanced_intake_criteria_revise):
+#   criteria-edit-ruler = shared/fleet/revise.py::apply_criteria_revision_ops
+#   criteria-revise-sentinel = shared/fleet/revise.py::CRITERIA_REVISE_SENTINEL
+#   criteria-delta-card = shared/fleet/revise.py::render_criteria_revision_delta
+advanced_intake_criteria_revise = true   # GO-LIVE 2026-07-29 (#1069 batched S3 ceremony, LA-present): the judged checklist becomes editable; machine tiers stay keep-only (the wall)
+
+# #1031 (S2) — the ADVANCED-INTAKE INTERVIEW. A SEPARATE flip inside the advanced-intake
+# front; it needs `advanced_intake` above to be true AS WELL — that key's own comment
+# promises "NO wider elicitation interview", and this key is where the promise is kept.
+# It ALSO rides the clarify stage: real engagement is `clarify` AND `advanced_intake` AND
+# this key (with `clarify = false` an `advanced` dispatch asks nothing and says so).
+#
+# THE GAP IT CLOSES, measured three ways: content was never elicited (a build invented
+# placeholder projects and presented them as real — the quality ledger's operator-
+# experience row); the operator's own awkward cases never reached a spec (#1044's class,
+# which the machine floor catches but cannot phrase in the operator's words); non-goals
+# were always inferred, never authored (and the revise wall is deliberately one-way, so
+# the intake is the only place a scope fence is born with the operator's authority).
+#
+# WHAT IT DOES — only with the keys above true, and ONLY when the operator asks:
+#   * `/dispatch advanced <project> | <goal>` (and `advanced new <name> | <goal>`) runs
+#     the FULLER interview — the five quick-path decision areas plus content, edge cases,
+#     and non-goals — still one screenful (a structural one-per-axis cap of 8), still one
+#     free-text reply, still "just decide for me" with recorded defaults;
+#   * a long quick-path ask may end with ONE hint line naming the `advanced` form;
+#   * each recorded answer is tagged with the decision area(s) it covered on the run's
+#     acceptance record (labels on entries that already persist — no new store).
+# WHAT IT DOES NOT DO:
+#   * a normal `/dispatch` is byte-identical to today, in BOTH states of this key;
+#   * nobody is interviewed without asking — no size or ambiguity heuristic ever enters
+#     the mode (rejected as a least-surprise violation; the hint line is the whole nudge);
+#   * battery/headless cards never interview (the clarify gate's own card suppression);
+#   * an interview failure never blocks a dispatch — it degrades to the quick behaviour.
+# Go-live/reversal is an LA ceremony (procedure of record:
+# docs/runbooks/advanced_intake_interview_go_live.md). The remembered-answers decision
+# is settled: `advanced` DEFERS to memory, with `/dispatch forget <project>` as the
+# fresh-interview escape (docs/DECISION_REGISTER.md, 2026-07-29).
+#
+# Reverting is a full undo: set back to false and restart — the token stops parsing, the
+# marker is inert text, and the next dispatch is byte-identical to the pre-go-live front.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# capabilities(fleet_dispatch.advanced_intake_interview):
+#   intake-axes-vocabulary = shared/fleet/clarify.py::INTAKE_AXES
+#   intake-interview-template = shared/fleet/clarify.py::_INTAKE_TEMPLATE
+#   intake-mode-marker = shared/fleet/clarify.py::INTAKE_SENTINEL
+advanced_intake_interview = true   # GO-LIVE 2026-07-29 (#1031 S2 ceremony, LA-present): the fuller `advanced` interview — content/edge-cases/non-goals among the axes; defers to remembered answers
+
+# #1165 (M5) — the OPERATOR-ASSETS PIPELINE. A SEPARATE flip inside the advanced-intake
+# front; it needs `advanced_intake` above to be true AS WELL. Deliberately INDEPENDENT of
+# `advanced_intake_interview`: files the operator placed in a project's `assets` folder
+# are explicit intent on ANY advanced-front dispatch, and the plan card's acknowledgment
+# keeps the result visible and vetoable — no interview needs to have run.
+#
+# THE GAP IT CLOSES (#1165, the LA's capability A): there was no place to PUT your own
+# photos, logo, documents, or data — builds invented placeholder stand-ins even when the
+# real material existed. Now every project has an `assets` folder (new projects are
+# created with it, plus an `assets/reference` subfolder for screenshots to emulate);
+# drop files in with File Explorer and the next plan works from them.
+#
+# WHAT IT DOES — only with both keys true, and never for a battery/headless card:
+#   * at PLAN time the folder is enumerated ONCE, AO-side — rooted walk, ALL reparse
+#     points (symlinks/junctions/mount points) excluded fail-closed with containment
+#     re-checked after resolution, a conservative filename allowlist (non-conforming
+#     files are skipped and the card says so), a closed extension allowlist classified
+#     image/document/data/code/other, per-file and total size caps, relative paths only;
+#   * the manifest rides the spec as `operator_assets` — the single carrier the card
+#     acknowledgment ("Working from your assets folder: …"), the injected use checks,
+#     and the conditional `operator_assets_json` task field all read;
+#   * web builds gain a MACHINE-gated wiring floor (at least one provided filename
+#     referenced in the built pages — presence asserts wiring, not rendering) that the
+#     criteria-revision wall keeps keep-only and re-injection restores (two independent
+#     locks); every build with assets gains an OPERATOR-tier visual criterion ("your
+#     files visibly appear"), deliberately revisable/droppable like any judged item.
+# WHAT IT DOES NOT DO:
+#   * paths TYPED in interview answers are recorded words — NEVER dereferenced; the
+#     system acts only on its own enumeration of the folder;
+#   * file CONTENTS never ride the manifest, the card, or the record — names, classes
+#     and sizes only; nothing manifest-shaped ever rides the goal string;
+#   * an absent or empty `assets` folder changes nothing anywhere (byte-identical
+#     plans — battery projects carry no folder, and card dispatches self-suppress
+#     regardless); an unreadable folder plans WITHOUT assets and says so on the card.
+# Goes live ONLY at an LA-present ceremony (the #1165 maturation program's runbook).
+#
+# Reverting is a full undo: set back to false and restart — no enumeration runs, no
+# card line renders, and new projects keep the pre-M5 scaffold, byte-identically.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# capabilities(fleet_dispatch.advanced_intake_assets_pipeline):
+#   assets-manifest-enumeration = shared/fleet/acceptance.py::enumerate_operator_assets
+#   assets-use-floor = shared/fleet/acceptance.py::_ensure_operator_assets_floor
+#   assets-card-acknowledgment = shared/fleet/acceptance.py::operator_assets_card_lines
+#   assets-folder-seeding = shared/fleet/dispatch.py::create_project
+advanced_intake_assets_pipeline = true   # GO-LIVE 2026-07-29 (#1165 M5, LA-present ceremony): the operator-assets folder pipeline
+# #1165 (M1) — the INTERVIEW VOICE. A SEPARATE flip inside the interview; it needs
+# `advanced_intake` AND `advanced_intake_interview` above to be true AS WELL (and the
+# interview itself rides `clarify`) — a sub-flag may not engage a capability inside a
+# front that is itself off.
+#
+# WHAT IT DOES — only with the keys above true, and ONLY on the fuller interview:
+#   * the question-authoring prompt speaks the approved novice-interview template
+#     (docs/research/novice-interview-template-research-2026-07-29.md Part 1): decision
+#     areas worded about the person's life, never software; the look-and-feel area as
+#     paired opposites (calm/colorful, dense/spacious); the question-writing mistake
+#     rules (one decision per question; never leading, hypothetical, or jargon-bearing;
+#     concrete beats abstract) baked into the prompt itself;
+#   * the intake question render opens with the Phase-0 promise — no wrong answers,
+#     everyday words, the "you decide" hatch, the read-back contract;
+#   * a WHOLE-reply "I don't know" ("no idea" / "not sure") is recognized as "you
+#     decide": safe defaults chosen and RECORDED as assumptions the plan card shows. A
+#     reply that merely contains those words stays a real answer.
+# WHAT IT DOES NOT DO:
+#   * a normal `/dispatch` and a voice-off `advanced` interview are byte-identical to
+#     today (the template builder's all-off output is locked against the S2 constant);
+#   * no new question areas, no new turns — wording and recognition only;
+#   * template wording never restates a "you decide" default inline — defaults render
+#     from shared/fleet/clarify.py::DEFAULT_AXIS_ANSWERS alone (the #1161 guard, locked).
+# Goes live ONLY at the batched interview-maturation ceremony (#1165 M1-M6).
+#
+# Reverting is a full undo: set back to false and restart — the S2 template constant
+# drives the interview again, byte-identically.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# capabilities(fleet_dispatch.advanced_intake_interview_voice):
+#   intake-template-builder = shared/fleet/clarify.py::intake_template_for
+#   intake-axes-order = shared/fleet/clarify.py::INTAKE_AXES_ORDER
+#   phase0-preamble = shared/fleet/clarify.py::INTAKE_PREAMBLE
+#   dont-know-hatch = shared/fleet/clarify.py::is_decide_for_me
+advanced_intake_interview_voice = true   # GO-LIVE 2026-07-29 (#1165 M1, LA-present ceremony): the approved novice-interview voice — Part 1 wordings + mistake rules + Phase-0 preamble + the I-don't-know hatch
+
+# #1165 (M4) — the interview's PLAYBACK turn. A SEPARATE flip inside the advanced-intake
+# front; it needs `advanced_intake` AND `advanced_intake_interview` above to be true AS
+# WELL — on its own it does nothing, and a live interview is not consent for what lands
+# inside it later.
+#
+# THE GAP IT CLOSES (design:
+# docs/design/advanced_intake_novice_interview_maturation_DESIGN.md §2 M4): the interview
+# asks its questions BEFORE planning, but the plan card — the first moment the operator
+# can SEE what was actually understood — closes with verbs only (approve/revise/reject).
+# A novice who spots a misunderstanding there has no invited way to say so in plain
+# words; free text typed at that turn gets the usage line back.
+#
+# WHAT true DOES — on an INTAKE-mode plan card only (a quick-path card is byte-identical):
+#   * the card CLOSES with the interview template's two playback questions — "Did I get
+#     anything wrong? Is there anything I should have asked you about that I didn't?" —
+#     and invites a plain-words reply to fix the plan;
+#   * a pipe-less free-text reply while that card waits routes into the EXISTING bounded
+#     revise path as feedback (the shared 3-revision budget, the CHANGED-vs-KEPT delta,
+#     the fail-soft re-render — a playback correction IS a revision);
+#   * the re-rendered card still carries the invitation; at the revision cap the card
+#     says the budget is used instead of promising a fix revise would refuse.
+# WHAT IT DOES NOT DO:
+#   * reserved verbs are untouched — approve / reject / revise / status parse first,
+#     exactly as today, on every path;
+#   * the PIPED `<repo> | <goal>` shape still gets the "a dispatch is already waiting"
+#     answer — an attempt to start a SECOND dispatch is never read as a playback reply;
+#   * the quick path and the flag-off world keep the #1116 usage/keep-text reply
+#     byte-identically — that reply, not a nag, is this key's toggle bar;
+#   * no AO plan knob rides this key — both seams are gateway-side (the card render and
+#     the approval-turn routing).
+# Goes live ONLY at the batched interview-maturation ceremony (procedure of record:
+# docs/runbooks/advanced_intake_maturation_batched_ceremony.md).
+#
+# Reverting is a full undo: set back to false and restart — the next card renders
+# today's footer and a pipe-less reply gets the usage/keep-text answer, byte-identically.
+#
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` enables this. Every
+# other value — a quoted "false", "true", 1, [] — resolves false.
+# The free-text re-route lives in DispatchCoordinator._plan and the card seam in
+# DispatchCoordinator._finalize_pending (methods, so named here in prose; the declaration
+# below names the module-level symbols).
+# capabilities(fleet_dispatch.advanced_intake_interview_playback):
+#   playback-invitation = services/ui_gateway/src/dispatch_coordinator.py::_playback_invitation
+#   intake-approval-carrier = services/ui_gateway/src/dispatch_coordinator.py::PendingDispatch
+advanced_intake_interview_playback = true   # GO-LIVE 2026-07-29 (#1165 M4, LA-present ceremony): the plan card's playback invitation
+
 # Increment-2 swap: pre-load headroom gate — GiB of free RAM required after BlarAI
-# fully steps aside, before the 30B is loaded. 20 GiB (LA-set 2026-07-09, #777) —
-# MEASURED on the current substrate (OpenVINO GenAI 2026.2.1, warm compile cache):
-# a supervised load from a 19.85 GiB ambient completed READY in ~13s with NO page
-# storm (Available floor 4.6 GiB, disk saturated ~10s of weight staging only),
-# zero gate-step slowdown under the post-load squeeze, and a normal generation.
-# The prior 21 matched start-llm's gate and the 2026-06-21 era (OV 2026.1.0,
-# lowest observed success 23.1 GiB) — that dataset never TESTED below 23.1; #777
-# converted the inference into a measurement. Caveat honestly carried: the #777
-# run was WARM-cache; a rare COLD load (post-OVMS-upgrade, #747 class) stages
-# more and is backstopped by the 480s load deadline + this gate's GRACEFUL abort
-# (restores the 14B). Keep in lockstep with start-llm's $needGB and the battery
-# lean-preflight ($LEAN_GATE_GIB = this + 0.5). Tunable without a code change.
-swap_min_free_gb = 20.0
+# fully steps aside, before the 30B is loaded.
+#
+# 19 GiB — LA DIRECTIVE 2026-08-07 (#1313), NOT a measurement. The 20 GiB floor was
+# refusing coder dispatches; the LA accepted the risk of a lower one. No supervised
+# load has been run AT 19.
+#
+# Scope that claim precisely — an earlier draft of this comment overstated it. 19 is
+# below the lowest ambient at which a SUPERVISED, POST-STEP-ASIDE load (the shape this
+# gate actually measures) has been recorded: #777, 2026-07-09, OpenVINO GenAI 2026.2.1,
+# warm compile cache — READY in ~13s from a 19.85 GiB ambient with NO page storm
+# (Available floor 4.6 GiB, ~10s of weight staging only), zero gate-step slowdown under
+# the post-load squeeze, normal generation after. That is the 20.0 setting's evidence,
+# and this setting is 0.85 GiB under it. Before that, 21 matched start-llm's gate and
+# the 2026-06-21 era (OV 2026.1.0, lowest observed success 23.1 GiB) — a dataset that
+# never TESTED below 23.1.
+#
+# It is NOT true that no 30B load has ever succeeded below 19.85. #784's live probe
+# (docs/performance/probe_livecheck_2026-07-10.json, condition `co_resident_artifact`)
+# reached READY from a 9.83 GiB ambient with the 14B STILL RESIDENT — in 34.8s rather
+# than 15.5s. That run is not representative (wrong certs root, so the AO was never
+# stopped) and must not be read as licence to lower this gate further. But it is the
+# most relevant thing anyone has measured about the failure MODE, and it argues FOR the
+# directive rather than against it: under headroom pressure this substrate degrades —
+# it stages slower — rather than hard-failing.
+#
+# What backstops the unmeasured margin: the 480s load deadline and THIS gate's
+# GRACEFUL abort (restores the 14B). A too-thin floor costs a failed dispatch, not a
+# wedged box. The COLD-load caveat #777 carried still applies and is now larger — a
+# post-OVMS-upgrade (#747 class) load stages more than the warm run measured.
+#
+# Keep in lockstep with start-llm's $needGB and the battery lean-preflight
+# ($LEAN_GATE_GIB = this + 0.5). Tunable without a code change; tests/security/
+# test_swap_floor_enforced.py proves the driver actually REFUSES below this value
+# rather than merely storing it.
+swap_min_free_gb = 19.0
 
 # Problem-2 (#670): out-of-band OVERALL-run budget (seconds). A watchdog in the detached
 # swap driver force-kills a wedged run-fleet child and tears down to restore the 14B if the
@@ -499,6 +953,25 @@ step_aside_grace_s = 2.0
 # a real 6-task dependency graph executed in waves on the Arc 140V; #740/#748; the
 # LA's proven-features-default-LIVE rule).
 plan_graph = true
+
+# #746 research substrate -- PLAN-TIME GROUNDING. When true, the 14B's decompose prompt
+# is prefixed with a bounded block of the most relevant LOCAL doc excerpts for the goal
+# (shared/research/ -- the hash-pinned, staged docset index; deterministic-first exact +
+# floor-gated BM25), so the plan is written against real API names/semantics instead of
+# recalled approximations. PULL not PUSH + degrade-gracefully: nothing above the relevance
+# floor (or an unstaged corpus) yields an EMPTY block and the decompose prompt is
+# byte-identical to today. ZERO egress -- the docset is local disk, read-only; no fetch.
+# The deliberate "research arm switch" for the reliability campaign. With false the
+# decompose prompt is BYTE-IDENTICAL to today's and shared.research is never even
+# imported (regression-locked). Go-live history + the docset's staging/measurement
+# status live in DECISION_REGISTER.md and the journal, never restated here.
+# capabilities(fleet_dispatch.research_grounding):
+#   plan-time-grounding = shared/research/plan_grounding.py::ground_goal
+#   docset-index-loader = shared/research/docset_index.py::ensure_index
+#   exact-symbol-lookup = shared/research/lookup.py::exact_lookup
+#   semantic-page-search = shared/research/lookup.py::search_docs
+#   decompose-consumer = shared/fleet/decompose.py::decompose_request
+research_grounding = false   # STOOD DOWN 2026-07-30 pm (LA-directed, #1204). It went live earlier the same day; independent review then MEASURED the retrieval leading with a WRONG page on 5 of 9 library goals. Re-arming waits on the #1204 relevance fix and a fresh measurement — not on time passing. With false the decompose prompt is byte-identical and shared.research is never imported.
 
 # #749 dispatch→Vikunja bridge: one durable ticket per dispatched job in a
 # dedicated Vikunja project (created at dispatch, outcome at REPORT, closed only
@@ -551,6 +1024,33 @@ guest_oracle_enabled = true
 # Battery-path instrument change — merged in its OWN attribution window per the
 # #740 cadence (docs/runbooks/battery_cadence_and_targeted_runs.md).
 already_satisfied_precheck = true
+
+# #1281 — may the PLACEHOLDER-PROSE scan's findings change what the operator is TOLD about a
+# GREEN? The scan reads a delivered website's visible words and reports the ones that announce
+# themselves as unfinished (lorem ipsum, "Your text here", a scaffold's default page title).
+# Its MEASUREMENT is NOT gated by this flag and never will be: the green-quality.json sidecar,
+# the green_quality_prose evidence stamp, the night's rollup counts and the KPI line all accrue
+# from the first night, because those counts against real deliverables are the evidence any
+# later decision about this instrument has to rest on.
+# What this flag gates is the CONSEQUENCE — an unambiguous finding becoming a band-B caveat and
+# taking the operator card's single "one thing to watch" slot. The card carries exactly one
+# caveat, ordered security -> prose -> craft, so a wrong prose sentence does not merely add
+# noise: it EVICTS the true Layer-1 sentence that would otherwise have been there. Dormant
+# until the counts have run against real deliverables and the LA judges the false-positive rate
+# at an LA-present ceremony; withholding the band costs nothing the measurement does not
+# already deliver. Battery-path instrument — its first armed night is its own attribution
+# window per the #740 cadence (docs/runbooks/battery_cadence_and_targeted_runs.md).
+# VALIDATED, NOT COERCED (#1042 rule): only an explicit boolean `true` grants it; a quoted
+# "false" and every other non-boolean value resolve false. FAIL-CLOSED: a missing, unreadable
+# or malformed config denies, and the scan keeps measuring.
+# Reverting is a full undo: set back to false and the next battery close computes a band and a
+# card byte-identical to the pre-#1281 ones, with the sidecar and the counts still written.
+# capabilities(fleet_dispatch.green_quality_prose_band):
+#   consequence-gate = tools/dispatch_harness/green_quality/placeholder_prose.py::prose_band_enabled
+#   composition-seam = tools/dispatch_harness/green_quality/__init__.py::audit_green
+#   band-contribution = tools/dispatch_harness/green_quality/band.py::_prose_reasons
+#   card-caveat = tools/dispatch_harness/green_quality/card.py::_caveat_from_prose
+green_quality_prose_band = false
 
 # ─────────────────────────────────────────────────────────────────────────────
 # [coordinator] — the self-governance boundary + Coordinator program (ADR-039).
@@ -727,4 +1227,15 @@ mtls_key_path = "certs/orch_client_key.pem"
 ca_cert_path = "certs/ca.pem"
 policy_agent_port = 5000
 timeout_ms = 5000
-max_message_bytes = 65536
+# 65536 -> 262144 (#1152, 2026-07-29, ADR-031 amendment 1). A PLAN_RESULT for a real
+# operator goal exceeded the 64 KB cap in production (65891 and 66938 bytes on two live
+# runs): the plan SUCCEEDED and could not be delivered. ADR-031 rejected raising this for
+# ARTICLE content — unbounded, untrusted, fetched from the internet — and that rejection
+# STANDS for that case (bulk content still crosses out-of-band via the encrypted staging
+# file). This raise covers a different payload class: BlarAI's OWN locally-generated
+# planning metadata on the loopback+mTLS host channel. NOTE the plan's max_tasks/
+# max_criteria caps bound CARDINALITY, not bytes — the goal and the operator's
+# requirements have no length limit, so this is headroom over an observed worst case,
+# NOT a proof the payload fits. The honest over-cap refusal in the AO PLAN handler is
+# the control; if it ever fires, chunk the result (ADR-031 Am.1), do not raise again.
+max_message_bytes = 262144

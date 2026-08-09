@@ -1,0 +1,41 @@
+{
+  "schema": "battery-card/v1",
+  "card_class": "frozen",
+  "id": "B9",
+  "title": "pottery studio site (node-web, 9 units, MULTI-PAGE: shared layout + routing + per-item pages + a form)",
+  "provenance": "LA direction 2026-08-06, verbatim: 'my current priority is for it to be able to engineer relatively complex website with multiple pages... We don't need to one-shot websites any more.' Authored because NO multi-page card existed: B3 and B5 are the only web cards and both ask for 'a page' - singular. A capability nothing measures cannot be iterated toward.",
+  "stack": "node-web",
+  "units": 8,
+  "shape": "multi-page-shared-layout",
+  "repo": "battery-b9-pottery-site",
+  "sandbox_only": true,
+  "clarify_answer": "web",
+  "goal": "I run a small pottery studio and I want a proper little website for it, not just one page. There should be a home page that introduces the studio, a page listing the pieces I have for sale, a separate page for each individual piece with its own details and photo, and a contact page where someone can send me an enquiry. Every page needs the same heading and menu across the top so it feels like one website and I can get anywhere from anywhere. The list of pieces and each piece's own page have to come from the same saved information, so when I change a piece's price it changes everywhere it appears. The contact page should keep the enquiries somewhere I can look at later, and it should tell someone politely if they have left something out instead of just losing what they typed. I would also like the piece list to let me narrow down to just the mugs or just the bowls.",
+  "rigs": [],
+  "expected_outcome": {
+    "must_verify_tiers": [
+      "build",
+      "behavior"
+    ],
+    "human_tiers_expected": [
+      "visual"
+    ],
+    "oracle": {
+      "expected": true,
+      "ecosystem": "node",
+      "path": "tests/acceptance.job.test.mjs"
+    },
+    "allowed_terminal_verdicts": [
+      "GREEN",
+      "PARKED-HONEST",
+      "RECOVERED"
+    ],
+    "target_verdict": "GREEN",
+    "min_dependency_edges": 9,
+    "expects_context_packs": true,
+    "expects_waves_gte": 4,
+    "notes": "THE MULTI-PAGE CARD. What this exercises that B3 and B5 cannot, because both of those build ONE page: (1) a SHARED LAYOUT - one header/nav rendered on four routes, so a change in one place must hold everywhere and cannot be copy-pasted per page; (2) ROUTING across four distinct routes including a PARAMETERISED one (per-piece detail), which is the first time the fleet must build a route it cannot enumerate at author time; (3) ONE data source feeding two different views (the list and the detail page), so a price change must propagate - the classic place a coder writes two sources of truth and both pass their own unit tests; (4) a FORM with validation that must PRESERVE the operator's typed text on rejection (the lesson-321 class, live at #1117 and #1168 on the operator's own surfaces - here it is graded rather than hoped for); (5) FILTERING that is behaviourally checkable without eyeballs. Visual criteria stay eyeball-tier and are rendered honestly UNVERIFIED, never auto-passed - unchanged from B3/B5, and the reason the visual-automation gap is worth closing separately rather than pretended away here. UNITS ARE CAPPED AT 8, NOT CHOSEN: decompose.py DEFAULT_MAX_TASKS = 8 and nothing on the dispatch path overrides it, so a 9th unit would be silently dropped with a 'plan capped at 8 tasks' warning. The four pages, the shared layout, the shared data source, the filtering and the acceptance tests fit in 8 exactly -- but the cap, not the product, is what set the number, and a genuinely larger site cannot be expressed as a single card until that cap moves. Budget: this card is intended for DEDICATED runs of one or two jobs, not the six-card set - per verify-battery-budget-coherence.ps1 C3, a global budget bump breaks the PT16H ceiling while a single long job fits comfortably."
+  },
+  "run_budget_s": 28800,
+  "run_budget_note": "8 h = CARD_RUN_BUDGET_MAX_S, the clamp ceiling. EXTRAPOLATED, NOT MEASURED: B3's own run_budget_note records node/web tasks measuring 40-85 minutes EACH on its first campaign run (5 tasks + gates + acceptance = 4.5-6.5 h), and B3 now carries 21600. B9 is a wider 8-unit multi-page card, so 6 h would likely repeat B3's stall. Without a declared budget a card falls to _DEFAULT_RUN_BUDGET_S = 10800 (3 h) -- the exact default B3 STALLED on -- which is why this is declared rather than left to inherit. Re-measure after the first real run and replace this note with the figure."
+}

@@ -1,0 +1,32 @@
+{
+  "job_id": "B2",
+  "verdict": "PARKED-HONEST",
+  "attribution": "BUILD",
+  "wall_clock_s": 2281.484999999986,
+  "samples_consumed": -1,
+  "packs_consumed": 0,
+  "interventions": 0,
+  "run_id": "20260706-011856-bd",
+  "plan_id": "20260706-011856-bd",
+  "repo": "battery-b2-text-stats",
+  "card_path": "evals/battery/B2.json",
+  "evidence": {
+    "plan": "<home>\\agentic-setup\\state\\fleet-swap\\plan.json",
+    "oracle_status": "not-run",
+    "summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\SUMMARY.txt",
+    "job_summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\JOB_SUMMARY.txt",
+    "progress": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\swap-progress.log",
+    "packs": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\context-packs.log"
+  },
+  "versions": {
+    "battery_runner": "v1",
+    "blarai": "755ec39",
+    "python": "3.11.9",
+    "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+  },
+  "started_utc": "2026-07-06T08:15:51Z",
+  "finished_utc": "2026-07-06T08:53:53Z",
+  "dry_run": false,
+  "notes": "",
+  "schema": "battery-scorecard/v1"
+}

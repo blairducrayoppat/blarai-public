@@ -39,17 +39,23 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import os
 import re
+import stat as _stat
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import TYPE_CHECKING, Callable, NamedTuple, Sequence
 
 from shared.fleet import clarify as _clarify
+from shared.fleet import coherence as _coherence
 from shared.fleet import revise as _revise
 from shared.fleet.context_pack import contract_coverage
 from shared.fleet.decompose import DEFAULT_MAX_TASKS, DecomposeResult, decompose_request
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:  # type-checkers only — research package untouched while dormant
+    from shared.research.docset_index import DocsetIndex
 
 # ---------------------------------------------------------------------------
 # Tiers
@@ -309,22 +315,130 @@ def resolve_clarifying_question(build_plan: dict | None) -> dict | None:
     }
 
 
-def apply_clarification(build_plan: dict | None, chosen_surface: str) -> dict | None:
+def suppress_phone_option_for_fresh_repo(question: dict | None) -> dict | None:
+    """#1161 review F3: drop the "On a phone" option from an increment-4 platform menu
+    when the target repo is an EMPTY/NEW shell (the CALLER holds that fact and applies
+    this only then). Building phone apps is not a fleet capability; on an empty repo a
+    phone choice would mint an approvable plan for a build the corridor's own refusal
+    says cannot exist — and a menu offering a choice the system will not honour is the
+    same lie the coverage-blocked footer refuses to tell. Structural absence beats
+    offer-then-refuse.
+
+    Returns a FRESH question dict with the mobile option removed. A 2-way
+    desktop/mobile fork degrades to a ONE-option menu — still an explicit operator
+    confirm turn, never a silent default (the operator can also reject). ``None`` when
+    no option survives or the input is not a question dict — the caller then proceeds
+    exactly as an unmapped fork does today (no question, un-refined plan). Existing
+    repos never pass through here, so their menus are byte-identical. Pure + total."""
+    if not isinstance(question, dict):
+        return None
+    options = [
+        dict(o) for o in question.get("options", [])
+        if isinstance(o, dict) and o.get("surface") != "mobile"
+    ]
+    if not options:
+        return None
+    return {"question": question.get("question", ""), "options": options}
+
+
+#: Delimiter opening the clarified-requirements section appended to EVERY compiled task
+#: prompt. A named constant because two functions must agree on it byte-for-byte:
+#: :func:`generate_plan` writes it, and :func:`recompose_task_requirements` finds it again
+#: to replace what follows. Editing it in one place only would silently turn the recompose
+#: into a no-op — the same drift hazard the requirements block's own headers carry.
+REQUIREMENTS_PROMPT_MARKER = "\n\n--- Requirements for this build ---"
+
+
+def recompose_task_requirements(
+    tasks: "list[dict]", clarifications: "list | tuple"
+) -> list:
+    """Rewrite the requirements section of every task prompt from *clarifications*, IN PLACE
+    (returns the same list). The single repair for #1220 carrier B.
+
+    The requirements block is composed into ``task["prompt"]`` at re-plan time
+    (:func:`generate_plan`) and was frozen from then on — ``_thread_build_fields`` stamps the
+    task DICT's build-signal fields and never touches prompt text, and the coordinator's
+    revise path documents the same constraint. So when the operator answered the platform
+    menu AFTER the plan was compiled, the card re-rendered from ``spec`` and showed his
+    choice while the prompt the coder actually reads still carried the system's assumed
+    "a simple command-line tool …". The two disagreed and only the card was visible to him.
+
+    DESIGN NOTE — why recompose rather than make the prompt read the surface at build time.
+    The alternative would put a placeholder in the prompt for the fleet to resolve, which
+    changes the cross-repo ``{repo, task, prompt}`` contract every fleet script consumes,
+    for one field. This keeps the prompt a finished string and re-derives the ONE section
+    whose source of truth already lives on the spec. Scope is deliberately exact: only the
+    text after :data:`REQUIREMENTS_PROMPT_MARKER` is replaced, because that section is the
+    only part of the prompt this module composed and can therefore honestly recompose.
+
+    SCOPE, and it is a contract about this function, not about its callers: everything ABOVE
+    the marker is left exactly as the author of the prompt wrote it. This function does not
+    make the task body agree with the clarifications — a body describing a different surface
+    survives it untouched. Whether that matters depends on the caller: one that regenerates
+    the whole plan from the corrected clarifications has no stale body to worry about; one
+    that rewrites this section alone leaves a body it must reconcile some other way or accept.
+
+    The marker is matched from the RIGHT (``rpartition``). The writer appends its section at
+    the END of the prompt, so the LAST occurrence is the one it wrote — and a task body that
+    happens to quote the marker's own text back (a model asked for requirements can echo the
+    heading it was given) would otherwise split the prompt at the ECHO, silently discarding
+    every real word between it and the section. Low likelihood, unbounded blast radius, and
+    matching from the right costs nothing.
+
+    A task with no marker is left untouched (nothing was composed into it). Empty
+    clarifications drop the section entirely rather than leaving a stale one. Never raises."""
+    block = _clarify.compose_requirements_block(clarifications)
+    for t in tasks:
+        if not isinstance(t, dict):
+            continue
+        prompt = str(t.get("prompt", "") or "")
+        head, sep, _ = prompt.rpartition(REQUIREMENTS_PROMPT_MARKER)
+        if not sep:
+            continue  # no requirements section was ever composed into this task
+        t["prompt"] = f"{head}{REQUIREMENTS_PROMPT_MARKER}\n{block}" if block else head
+    return tasks
+
+
+def apply_clarification(
+    build_plan: dict | None, chosen_surface: str, *, offered: "list | tuple | None" = None
+) -> dict | None:
     """Return a NEW build_plan with ``surface = chosen_surface`` + ``candidates`` cleared.
 
-    PURE — no model, no I/O. The operator's answer is VALIDATED against the build_plan's OWN
-    ``candidates`` (the surfaces the 14B actually flagged): an off-list / unknown / garbage
-    answer is IGNORED and the plan is returned UNCHANGED (a fresh copy), so the caller can
-    re-ask or fall back to the un-refined plan — never a silent acceptance of a surface the
-    14B did not offer. On a valid choice, ``surface`` becomes the chosen real surface and
-    ``candidates`` is reset to ``[]`` (the fork is resolved — the signal is no longer
-    ambiguous, so it now flows exactly like an ordinary clear-surface build_plan).
+    PURE — no model, no I/O. The operator's answer is VALIDATED against an allowlist: an
+    off-list / unknown / garbage answer is IGNORED and the plan is returned UNCHANGED (a
+    fresh copy), so the caller can re-ask or fall back to the un-refined plan — never a
+    silent acceptance of a surface nobody offered. On a valid choice, ``surface`` becomes
+    the chosen real surface and ``candidates`` is reset to ``[]`` (the fork is resolved —
+    the signal is no longer ambiguous, so it flows exactly like a clear-surface plan).
+
+    The allowlist is the build_plan's own ``candidates`` (the surfaces the 14B flagged) —
+    EXCEPT when *offered* names the surfaces the operator was actually shown, which then
+    governs instead (#1220).
+
+    Why *offered* exists, and why it is not a loosening. :func:`_parse_build_plan` attaches
+    ``candidates`` ONLY to an ``ambiguous`` surface, and the #1174/#1197 forced question
+    fires only when the surface is NON-ambiguous — so on that path ``candidates`` is absent
+    BY CONSTRUCTION and this function could do nothing but return the plan unchanged. The
+    operator picked a platform from a menu and the build ignored him, every time. The fix
+    is not to skip validation but to validate against the RIGHT list: the menu the caller
+    actually rendered. That is the same rule stated more precisely — the answer must be one
+    he was really offered — and it is still intersected with :data:`_REAL_SURFACES`, so a
+    malformed or forged menu entry cannot smuggle a surface through. Deny-by-default
+    survives unchanged: an empty or absent allowlist accepts NOTHING. ``offered=None``
+    (increment 4's own call) is byte-identical to pre-#1220.
 
     A ``None``/non-dict build_plan returns ``None`` unchanged (nothing to refine)."""
     if not isinstance(build_plan, dict):
         return None
-    raw = build_plan.get("candidates")
-    valid = {c for c in raw if isinstance(c, str) and c in _REAL_SURFACES} if isinstance(raw, list) else set()
+    # `is not None`, never a truthiness coalesce (#1224 N3): an EMPTY offered list must deny
+    # everything, not fall through to the build_plan's own candidates. On an ambiguous plan
+    # the two differ — `offered=[]` denies today and would ACCEPT `web` under `or`, which is
+    # precisely the sentence the docstring above leans on.
+    raw = offered if offered is not None else build_plan.get("candidates")
+    valid = (
+        {c for c in raw if isinstance(c, str) and c in _REAL_SURFACES}
+        if isinstance(raw, (list, tuple)) else set()
+    )
     refined = dict(build_plan)
     if chosen_surface not in valid:
         # Off-list answer: leave the plan as-is (still ambiguous) so the caller falls back /
@@ -412,6 +526,28 @@ class AcceptanceSpec:
     #: Attached by the gateway coordinator AFTER planning. Rides ``to_dict``/``from_dict`` like
     #: ``asset_specs``; default ``()`` == today (every existing spec/wire payload unchanged).
     clarifications: tuple[dict, ...] = ()
+    #: #1165 M5 — the OPERATOR-ASSETS manifest: what :func:`enumerate_operator_assets`
+    #: found in the project's ``assets/`` folder at PLAN time. The SINGLE carrier — the
+    #: card acknowledgment, the injected use floors, and the ``operator_assets_json``
+    #: task stamp all read THIS field, so no two surfaces can disagree about what was
+    #: found. Shape: ``{"files": [{"name", "class", "size"}, ...],
+    #: "skipped_names": int, "skipped_other": int[, "read_error": true]}`` — names are
+    #: hygiene-validated RELATIVE paths, never contents (least data). ``None`` (the
+    #: default: flag off, absent folder, or a folder with nothing to report) is emitted
+    #: as NO key by ``to_dict`` so every existing spec/wire payload stays byte-identical;
+    #: ``from_dict`` re-validates through :func:`_coerce_operator_assets` fail-closed.
+    #: Never banked or replayed — re-enumerated fresh at every plan (a stale manifest
+    #: would be a false card claim).
+    operator_assets: dict | None = None
+    #: The behaviour-smoke CONTRACT for a web product: what the headless capture must
+    #: click and what must change when it does. Shape:
+    #: ``{"click", "expectDelta", "actionLabel", "resultLabel"}`` — the two selectors are
+    #: ruler-owned constants, the two labels the 14B's plain words. ``None`` (the default:
+    #: every non-web product, every static page, every failed emission) is emitted as NO
+    #: key by ``to_dict``, so every existing spec and wire payload stays byte-identical
+    #: and the capture keeps its heuristic. Threaded onto every task as ``smoke_spec_json``;
+    #: re-validated fail-closed by :func:`_coerce_smoke_spec` on the way back in.
+    smoke_spec: dict | None = None
 
     @property
     def objective(self) -> tuple[AcceptanceCriterion, ...]:
@@ -424,7 +560,7 @@ class AcceptanceSpec:
         return tuple(c for c in self.criteria if c.tier in HUMAN_TIERS)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "goal": self.goal,
             "criteria": [c.to_dict() for c in self.criteria],
             "assumptions": list(self.assumptions),
@@ -432,6 +568,17 @@ class AcceptanceSpec:
             "asset_specs": [dict(a) for a in self.asset_specs],
             "clarifications": [dict(c) for c in self.clarifications],
         }
+        # #1165 M5: conditional emit — an absent manifest (every flag-off plan, and every
+        # plan with nothing to report) keeps the payload byte-identical to pre-M5, across
+        # the gateway IPC and the durable dispatch-state store alike.
+        if self.operator_assets is not None:
+            d["operator_assets"] = dict(self.operator_assets)
+        # Same conditional-emit discipline: a contract-less plan (every non-web product,
+        # every static page) keeps the payload byte-identical to pre-contract, across the
+        # gateway IPC and the durable dispatch-state store alike.
+        if self.smoke_spec is not None:
+            d["smoke_spec"] = dict(self.smoke_spec)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "AcceptanceSpec":
@@ -458,6 +605,14 @@ class AcceptanceSpec:
             build_plan=build_plan,
             asset_specs=_coerce_asset_specs(d.get("asset_specs")),
             clarifications=_coerce_clarifications(d.get("clarifications")),
+            # #1165 M5: tolerate a missing key (every pre-M5 payload -> None == today);
+            # a present key is re-validated fail-closed (the whitelist discipline).
+            operator_assets=_coerce_operator_assets(d.get("operator_assets")),
+            # The smoke contract: tolerate a missing key (every pre-contract payload ->
+            # None == today); a present key is re-validated fail-closed, selectors
+            # included — this is the wire boundary, and the value it carries ends up in
+            # a browser's document.querySelector.
+            smoke_spec=_coerce_smoke_spec(d.get("smoke_spec")),
         )
 
 
@@ -498,6 +653,23 @@ class PlanResult:
     #: the existing plan — a keep is byte-identical, an add/revise is new). Empty ``()`` == not a
     #: revise request (or a fail-soft empty revision -> the coordinator re-renders the original).
     revision: list[dict] = field(default_factory=list)
+    #: The intake coverage-gate BLOCKING marker (#1069 S3-F) — plain-language text naming
+    #: the exam's coverage gap. NON-EMPTY only when the advanced-intake coverage gate was
+    #: active for this dispatch and the gap survived the one bounded re-authoring: the plan
+    #: still renders (tasks/spec are REAL), but approval must be refused while this is set —
+    #: the exam cannot verify the plan as written, so a GREEN from it would not mean what it
+    #: says. The gateway coordinator owns the refusal and RE-EVALUATES the marker after every
+    #: revision (a revision is the operator's unblock path). Empty ``""`` — the gate off, a
+    #: clean plan, a single-task/no-exam shape, or a card dispatch — changes nothing anywhere.
+    coverage_blocked: str = ""
+    #: Criteria-revision edit ops (#1069 S3-G) — a list of ``{op, ref, text, check}`` dicts.
+    #: NON-EMPTY only on the CRITERIA-REVISE early-return: the operator's criteria feedback
+    #: rode the goal behind :data:`shared.fleet.revise.CRITERIA_REVISE_SENTINEL`, both intake
+    #: knobs were on, and the model proposed ops the ruler validated. The gateway coordinator
+    #: APPLIES them to the pending spec (machine tiers keep-only — the wall lives in
+    #: :func:`shared.fleet.revise.apply_criteria_revision_ops`). Empty ``()`` == not a
+    #: criteria-revise request, the stage off, or a fail-soft empty proposal.
+    criteria_revision: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -622,6 +794,136 @@ def _parse_assumptions(text: str, *, max_assumptions: int) -> tuple[str, ...]:
         if len(out) >= max_assumptions:
             break
     return tuple(out)
+
+
+# ---------------------------------------------------------------------------
+# Co-authored criteria + assumptions (#1054, S3 slice E) — ONE pass, one context
+# ---------------------------------------------------------------------------
+#
+# The two calls above are DELIBERATELY separate, and for the reasons their own comments give
+# — but separation is also what let a live plan say "Assumed a reset button is not needed"
+# in one block and "The web page includes a reset button" in the other. Neither pass could
+# see the other's decision, so there was no place for the disagreement to be noticed.
+#
+# This template asks for BOTH in one emission, so the model makes the scope decision ONCE and
+# writes criteria consistent with it. It carries the SCOPE ANCHOR in the same breath (assert
+# only behaviours the request names), which is the other half of the same defect: the same
+# plan invented goal-setting and history features the goal never mentioned.
+#
+# The criteria half is worded from :data:`_CRITERIA_TEMPLATE` and the assumptions half from
+# :data:`_ASSUMPTIONS_TEMPLATE` so the emitted shapes stay the ones the existing rulers
+# already validate — :func:`_parse_coauthored` hands each half to the SAME parser rather than
+# writing a second one. Which authoring path runs is read from the flags in
+# ``services/assistant_orchestrator/config/default.toml``; nothing here asserts it.
+#
+# The prompt is the QUALITY half. It is vigilance, not a guarantee: a model that regresses
+# can still contradict itself. :mod:`shared.fleet.coherence` is the guarantee half.
+
+_COAUTHORED_TEMPLATE = (
+    "You are writing the SPEC for a software change request — ONE document containing BOTH "
+    "the PRODUCT ASSUMPTIONS you had to make and the ACCEPTANCE CRITERIA that mean it is "
+    "DONE and correct.\n\n"
+    "THE TWO MUST AGREE. If you assume a capability is not needed, you may NOT then require "
+    "it in a criterion; if a criterion requires it, do not assume it away. Decide once, in "
+    "the assumptions, then write criteria consistent with that decision.\n\n"
+    "STAY INSIDE THE REQUEST. Assert only behaviours the request below names. A feature the "
+    "request does not ask for is out of scope however sensible it seems — do not write a "
+    "criterion for it.\n\n"
+    "ASSUMPTIONS — where the request did not spell something out, the most important PRODUCT "
+    "reads of what it PROBABLY wants: WHAT it should do, show, or how it should behave. The "
+    "kind of thing a non-technical requester could read and say \"yes\" or \"no, I meant "
+    "something else\" to (for example: \"Assumed decimals are supported\", \"Assumed no "
+    "calculation history is kept\", \"Assumed a normal resizable window\"). ONLY "
+    "product/behaviour/appearance a non-developer can judge; NEVER a programming language, "
+    "framework, library, SDK, version, file layout or any other technical/implementation "
+    "choice — those are decided for you and the requester cannot answer them. Each must be "
+    "something the request genuinely left open. At most {max_assumptions}, most important "
+    "first; an empty list if the request was fully specified.\n\n"
+    "CRITERIA — at most {max_criteria} plain-English conditions, each tagged by HOW it is "
+    "checked. Tiers: build = it compiles/installs; behavior = a deterministic rule a unit "
+    "test can assert (e.g. 2 + 3 shows 5; divide-by-zero shows an error); smoke = it launches "
+    "without crashing; visual = how it looks; human = judgment/fit. Prefer concrete, testable "
+    "criteria; include at least one build or behavior criterion.\n\n"
+    "Return ONLY a JSON object (no prose):\n"
+    '{{"assumptions": ["<short assumption>"], "criteria": [{{"text": "<plain-English '
+    'condition the requester can understand>", "tier": "<build|behavior|smoke|visual|human>", '
+    '"check": "<the concrete check: a test/assertion, or what to look at by eye>"}}]}}'
+    "\n\nRequest:\n{idea}\n"
+)
+
+
+def _parse_coauthored(
+    text: str, *, max_criteria: int, max_assumptions: int
+) -> "tuple[list[dict], tuple[str, ...]] | None":
+    """Split one co-authored emission into ``(criteria dicts, assumptions)``.
+
+    Each half is handed to the parser that already owns it (:func:`_parse_criteria`,
+    :func:`_parse_assumptions`), re-serialised rather than re-implemented, so the co-authored
+    path inherits every rule those rulers enforce and cannot drift from them.
+
+    Returns ``None`` when the emission is unusable — no balanced object, not an object, or no
+    criterion survives the ruler. ``None`` is the FALL-BACK signal, not a plan failure: the
+    caller then runs the two-call path unchanged, exactly as :func:`_grammar_first` falls back
+    to free text. An emission with criteria but no assumptions is USABLE and yields ``()`` —
+    the fully-specified goal, decided in the one context that also wrote the criteria."""
+    if not text:
+        return None
+    blob = _first_json_object(text)
+    if blob is None:
+        return None
+    try:
+        data = json.loads(blob)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    criteria = _parse_criteria(
+        json.dumps(data.get("criteria", [])), max_criteria=max_criteria
+    )
+    if not criteria:
+        return None
+    assumptions = _parse_assumptions(
+        json.dumps(data.get("assumptions", [])), max_assumptions=max_assumptions
+    )
+    return criteria, assumptions
+
+
+def _coauthor_spec(
+    planning_seed: str,
+    *,
+    generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None",
+    max_criteria: int,
+    max_assumptions: int,
+) -> "tuple[list[dict], tuple[str, ...]] | None":
+    """ONE model call authoring the criteria and the assumptions together (#1054).
+
+    Grammar-first over the combined schema, then today's free-text path, then ``None`` —
+    the same three-step discipline every other structured call in this module uses. ``None``
+    means the caller must run the two-call path; a co-authoring failure degrades to today's
+    behaviour, never to a thinner spec."""
+    prompt = _COAUTHORED_TEMPLATE.format(
+        max_criteria=max_criteria, max_assumptions=max_assumptions, idea=planning_seed
+    )
+    raw = _grammar_first(
+        prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=coauthored_emission_json_schema(
+            max_criteria=max_criteria, max_assumptions=max_assumptions
+        ),
+        usable=lambda t: _parse_coauthored(
+            t, max_criteria=max_criteria, max_assumptions=max_assumptions
+        )
+        is not None,
+    )
+    if raw is None:
+        try:
+            raw = generate_fn(prompt)
+        except Exception:  # noqa: BLE001 — an authoring failure must not crash the plan
+            raw = ""
+    return _parse_coauthored(
+        raw, max_criteria=max_criteria, max_assumptions=max_assumptions
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -752,9 +1054,28 @@ ASSET_STYLE_VALUES: frozenset[str] = frozenset({"illustration", "cartoon", "phot
 ASSET_STYLE_DEFAULT = "cartoon"
 
 #: Hard cap on image assets generated for one goal — a deterministic GPU-cost + wire +
-#: dispatch-timeout ceiling. 3 covers the common "a few product images" ask (#714) while
-#: keeping total generation time under the dispatch interception timeout even on a tight box.
-DEFAULT_MAX_ASSETS = 3
+#: dispatch-timeout ceiling.
+#:
+#: RAISED 3 -> 8 on 2026-07-27 (#1125), LA-approved, because the constraint that fixed it
+#: at 3 has expired. The old rationale was "keeping total generation time under the
+#: dispatch interception timeout even on a tight box" — and #1122 raised that timeout from
+#: 175 s to 540 s the same day. The number stayed while its reason moved.
+#:
+#: 8 is MEASURED, not chosen: generation ran ~43 s per image on the Arc 140V that evening
+#: (3 images, 21:10:52 -> 21:13:02, including pipeline load). 8 x 43 s = ~344 s against the
+#: 540 s budget, leaving ~200 s of margin for the plan and project creation that share it.
+#:
+#: DELIBERATELY STILL BOUNDED, against the LA's "remove the cap": an unbounded cap lets a
+#: goal like "an image for every chapter" commit the GPU for as long as the model felt like
+#: enumerating, inside a turn with a hard deadline — and the failure would be a timeout
+#: mid-generation, not a clean refusal. Raise it further on measurement, not on feel.
+#:
+#: KNOWN GAP (#1125, not closed by this raise): nothing reconciles this cap with the
+#: acceptance criteria, which are written from the GOAL. A goal asking for more assets than
+#: the cap still yields a plan card promising N and a run producing 8 — the operator
+#: approves a contract the system cannot honour. The raise makes that rarer; it does not
+#: fix it.
+DEFAULT_MAX_ASSETS = 8
 
 #: The surfaces that can DISPLAY a raster image (others never get assets).
 _ASSET_VISUAL_SURFACES: frozenset[str] = frozenset({"web", "desktop-gui", "mobile"})
@@ -831,6 +1152,64 @@ _ASSET_SPECS_TEMPLATE = (
 )
 
 
+#: Clauses that ask the IMAGE MODEL to render literal text (#1130). Diffusion models
+#: draw text as plausible letter-SHAPES with no concept of spelling, so these produce
+#: confident nonsense — measured 2026-07-27 on the operator's book covers:
+#:   asked "The Day the Gods Died"  -> rendered "THE GODS THE CLED"
+#:   asked "Blair DuCray-Oppat"     -> rendered "THE BLIARI DUARCARY"
+#: Five garbled text regions across two covers. No prompt wording fixes this — "in clear
+#: print" cannot help — and re-generating only yields different nonsense.
+#:
+#: Text belongs in the PAGE, not the pixels: rendered in HTML it is correctly spelt,
+#: crisp at any size, selectable and screen-readable, and changeable without
+#: regenerating. That is also how real publisher sites layer cover art and typography.
+#:
+#: DELIBERATELY NARROW — each alternative requires an explicit text-rendering verb AND a
+#: quoted string or a name/title noun. A bare "a poster" is untouched. The strip is
+#: always DISCLOSED (never silent), so a wrong strip is visible on the plan card rather
+#: than discovered in the image.
+#: Each alternative consumes to a SENTENCE boundary, not the next comma: a real
+#: directive routinely spans commas ("The author's name, Blair DuCray-Oppat, appears in
+#: clear print below"), and stopping at the first comma left the name stranded in the
+#: prompt — the exact debris the strip exists to remove.
+_TEXT_IN_IMAGE_RE = re.compile(
+    r"(?i)(?:,\s*)?\bwith\s+the\s+(?:book\s+)?(?:title|name|text|caption|words?|lettering)\b[^.]*"
+    r"|(?:,\s*)?\bthe\s+(?:book\s+)?title\s*,?\s*[\"'“][^\"'”]{1,80}[\"'”][^.]*"
+    r"|(?:,\s*)?\b(?:the\s+)?author(?:'s|s')?\s+name\b[^.]*"
+    r"|(?:,\s*)?\bin\s+clear\s+print\b[^.]*"
+    r"|(?:,\s*)?\b(?:text|words?|lettering)\s+(?:that\s+)?(?:reads?|saying|spelling)\b[^.]*"
+)
+
+#: Debris a strip can leave behind: a dangling connective or orphaned punctuation.
+_STRIP_DEBRIS_RE = re.compile(r"(?i)(?:\s*[.,;]\s*)+(?=[.,;])|\s+(?:and|with)\s*$|^\s*(?:and|with)\s+")
+
+
+def strip_text_directives(subject: str) -> "tuple[str, str]":
+    """Remove literal-text-rendering directives from an image subject (#1130).
+
+    Returns ``(cleaned_subject, removed_text)``. ``removed_text`` is empty when nothing
+    was stripped, and is what the plan card discloses — the operator must be able to see
+    that BlarAI declined part of their instruction and why.
+
+    Fail-soft and conservative: if stripping would leave too little to generate from,
+    the ORIGINAL subject is returned untouched. A garbled title is a poor image; an empty
+    prompt is no image at all, which is worse.
+    """
+    original = (subject or "").strip()
+    if not original:
+        return "", ""
+    removed = " ".join(m.group().strip(" ,") for m in _TEXT_IN_IMAGE_RE.finditer(original))
+    if not removed:
+        return original, ""
+    cleaned = _TEXT_IN_IMAGE_RE.sub("", original)
+    cleaned = _STRIP_DEBRIS_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([.,;])", r"\1", cleaned).strip(" ,;.")
+    if len(cleaned) < _MIN_ASSET_SUBJECT_LEN:
+        return original, ""     # never trade a flawed prompt for an unusable one
+    return cleaned, removed
+
+
 def _validate_asset_specs(text, *, surface: str, max_assets: int) -> tuple[dict, ...]:
     """Parse the model output into validated asset-spec dicts, fail-closed. The model
     supplies name/subject/style; the ruler owns the slug, dims, in-repo path, dedup (by
@@ -860,6 +1239,11 @@ def _validate_asset_specs(text, *, surface: str, max_assets: int) -> tuple[dict,
         subject = str(item.get("prompt", item.get("subject", ""))).strip()
         if not slug or len(subject) < _MIN_ASSET_SUBJECT_LEN:
             continue
+        # #1130: the image model cannot spell. Strip literal-text directives from the
+        # prompt and carry what was removed so the plan card can SAY SO — a silent strip
+        # would trade one dishonesty (garbled text) for another (a quietly narrowed
+        # instruction). Conservative: unstrippable prompts pass through untouched.
+        subject, text_removed = strip_text_directives(subject)
         style = str(item.get("style", "")).strip().lower()
         if style not in ASSET_STYLE_VALUES:
             style = ASSET_STYLE_DEFAULT
@@ -867,14 +1251,19 @@ def _validate_asset_specs(text, *, surface: str, max_assets: int) -> tuple[dict,
         if rel in seen:
             continue
         seen.add(rel)
-        out.append({
+        spec = {
             "name": slug,
             "prompt": subject,
             "style": style,
             "width": _ASSET_DEFAULT_EDGE,
             "height": _ASSET_DEFAULT_EDGE,
             "target_rel_path": rel,
-        })
+        }
+        # Only present when something was actually removed, so every pre-#1130 spec and
+        # every prompt without a text directive is byte-identical to before.
+        if text_removed:
+            spec["text_removed"] = text_removed
+        out.append(spec)
         if len(out) >= max_assets:
             break
     return tuple(out)
@@ -904,14 +1293,23 @@ def _coerce_asset_specs(raw) -> tuple[dict, ...]:
             height = int(item.get("height", _ASSET_DEFAULT_EDGE))
         except (TypeError, ValueError):
             continue
-        out.append({
+        coerced = {
             "name": name,
             "prompt": prompt,
             "style": style,
             "width": max(_ASSET_MIN_EDGE, min(_ASSET_MAX_EDGE, width)),
             "height": max(_ASSET_MIN_EDGE, min(_ASSET_MAX_EDGE, height)),
             "target_rel_path": rel,
-        })
+        }
+        # #1130: the strip DISCLOSURE must survive to_dict/from_dict, the gateway IPC and
+        # the acceptance record — the plan card is rendered from a coerced spec, so
+        # dropping this here would silently restore the pre-#1130 silence while leaving
+        # the prompt stripped. That is the worst of both: a narrowed instruction with no
+        # notice. Exactly the round-trip lesson the `remembered` flag taught in #1120.
+        removed = str(item.get("text_removed", "")).strip()
+        if removed:
+            coerced["text_removed"] = removed
+        out.append(coerced)
     return tuple(out)
 
 
@@ -933,14 +1331,79 @@ def _coerce_clarifications(raw) -> tuple[dict, ...]:
         answer = str(item.get("answer", "")).strip()
         if len(answer) < _MIN_CLARIFICATION_LEN:
             continue
-        out.append(
-            {
-                "question": str(item.get("question", "")).strip(),
-                "answer": answer,
-                "assumed": bool(item.get("assumed", False)),
-            }
-        )
+        coerced = {
+            "question": str(item.get("question", "")).strip(),
+            "answer": answer,
+            "assumed": bool(item.get("assumed", False)),
+            # #1120: carried-forward marker. MUST survive this coercion — the spec makes
+            # a to_dict/from_dict round-trip across the IPC and into the acceptance
+            # record, and dropping the flag here would silently re-label every remembered
+            # answer as something the operator said in the current turn.
+            "remembered": bool(item.get("remembered", False)),
+        }
+        # #1031 S2: the intake interview's axis tags — which decision area(s) the entry
+        # covered. Conditional carry, the #1120 precedent applied the strict way: the
+        # key survives ONLY when it arrived as a list whose members are REAL axis labels
+        # (membership-validated against the intake vocabulary — deny-by-default, a
+        # record label outside the closed set is dropped, never propagated), and it is
+        # NEVER minted for a dict that came without it — an unconditional `"axes": []`
+        # would change every flag-off record's bytes.
+        raw_axes = item.get("axes")
+        if isinstance(raw_axes, list):
+            axes = [
+                str(a).strip() for a in raw_axes
+                if str(a).strip() in _clarify.INTAKE_AXES
+            ]
+            if axes:
+                coerced["axes"] = axes
+        out.append(coerced)
     return tuple(out)
+
+
+def _coerce_operator_assets(raw) -> "dict | None":
+    """Reconstruct ``operator_assets`` (#1165 M5) from a ``to_dict``/wire payload
+    fail-closed: only a dict survives at all; each file entry is re-validated through
+    the SAME rules the walk applies — every relative-path component must clear the
+    filename allowlist, the class must EQUAL the one the walk derives from the name's
+    extension (review F2: a membership check alone let a forged payload relabel
+    ``evil.py`` as ``image``; validate-don't-coerce, so a mismatch DROPS the entry),
+    the size a non-negative int — and a malformed entry is dropped, never repaired:
+    nothing survives the wire that could not have survived the walk. Skip counters
+    coerce to non-negative ints; ``read_error`` survives only as a real ``True``.
+    ``None`` for a non-dict (every pre-M5 payload). Never raises."""
+    if not isinstance(raw, dict):
+        return None
+    files: list[dict] = []
+    for item in raw.get("files") or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", ""))
+        cls = str(item.get("class", ""))
+        if not _operator_asset_rel_name_ok(name) or cls != _operator_asset_class(name):
+            continue
+        try:
+            size = int(item.get("size", 0))
+        except (TypeError, ValueError):
+            continue
+        if size < 0:
+            continue
+        files.append({"name": name, "class": cls, "size": size})
+
+    def _count(key: str) -> int:
+        try:
+            n = int(raw.get(key, 0))
+        except (TypeError, ValueError):
+            return 0
+        return max(0, n)
+
+    out: dict = {
+        "files": files,
+        "skipped_names": _count("skipped_names"),
+        "skipped_other": _count("skipped_other"),
+    }
+    if raw.get("read_error") is True:
+        out["read_error"] = True
+    return out
 
 
 def _asset_specs_from_plan(
@@ -999,6 +1462,371 @@ def decode_asset_specs(tasks: list[dict]) -> list[dict]:
             out.append(spec)
         return out
     return []
+
+
+# ---------------------------------------------------------------------------
+# Behaviour-smoke contract — the plan DECLARES what the capture must exercise
+# ---------------------------------------------------------------------------
+#
+# ``capture-web-cdp.mjs`` runs a POSITIVE behaviour smoke on every web capture: click the
+# product's primary action, assert a DOM delta, and treat a DECLARED failure as a HARD
+# finding that forces a fix cycle. It has always been able to read that declaration from
+# ``<app-dir>/blarai-smoke.json`` — and nothing in either repo ever wrote that file. So the
+# declared arm was unreachable on every web build ever done: the capture fell back to its
+# heuristic ("first visible enabled control"), whose failures are only a SOFT note. The
+# built-but-wired-into-nothing shape the testing doctrine names as recurring.
+#
+# The contract is RULER-OWNED, never model-guessed. A CSS selector the 14B invents at plan
+# time describes code that does not exist yet — it would name a control the coder had no
+# reason to build, and every run would mint a false defect and burn a fix cycle on it. So
+# the ruler pins two deterministic hooks the coder is TOLD to place
+# (``fleet-lib.ps1``'s smoke-contract hint, gated on this file's presence in the worktree,
+# mirroring the asset hint). The model supplies ONLY the plain-language labels that make
+# the instruction and the finding readable ("the Calculate button", "the results panel").
+#
+# Told, then graded — the two halves of capability 3 in
+# docs/design/CODER_DEFINITION_OF_DONE.md. Absence stays legal end to end: no contract
+# means no file, which means the capture behaves exactly as it does today.
+
+#: Surfaces the headless-browser capture actually drives, and so the only surfaces a
+#: behaviour-smoke contract can be exercised on. ``desktop-gui``/``mobile`` are visual
+#: (they take image-asset specs) but never reach ``capture-web-cdp.mjs``.
+_SMOKE_SPEC_SURFACES: frozenset[str] = frozenset({"web"})
+
+#: The DOM attribute marking the product's primary action control.
+SMOKE_ACTION_ATTR = "data-blarai-action"
+#: The DOM attribute marking the region that must change when that control is used.
+SMOKE_RESULT_ATTR = "data-blarai-result"
+#: The single contract value. ONE primary action per product — the smoke asks "does the
+#: main thing work?", not "does every control work"; the exams own the rest.
+SMOKE_CONTRACT_VALUE = "primary"
+
+#: The selectors the capture is handed. Derived from the attribute constants so the hook
+#: the coder is told to place and the hook the capture looks for can never drift apart.
+SMOKE_CLICK_SELECTOR = f'[{SMOKE_ACTION_ATTR}="{SMOKE_CONTRACT_VALUE}"]'
+SMOKE_DELTA_SELECTOR = f'[{SMOKE_RESULT_ATTR}="{SMOKE_CONTRACT_VALUE}"]'
+
+#: The filename ``capture-web-cdp.mjs``'s ``readSmokeSpec`` opens under its ``--app-dir``.
+#: Named here because several surfaces write or read it — the AO pre-swap seam, the swap
+#: driver's pre-capture re-materialisation, the coder hint — and a second spelling would
+#: silently disable the check on whichever surface got it wrong.
+SMOKE_SPEC_FILENAME = "blarai-smoke.json"
+
+#: Length cap on a plain-language label: long enough for "the Add to basket button",
+#: short enough that a runaway emission cannot bloat a coder prompt or a finding line.
+_SMOKE_LABEL_MAX = 80
+#: A label shorter than this (after hygiene) is vacuous and the contract is dropped.
+_MIN_SMOKE_LABEL_LEN = 3
+#: Length cap on a selector crossing the wire boundary.
+_SMOKE_SELECTOR_MAX = 120
+
+#: One simple CSS selector from a DELIBERATELY NARROW allowlist (principle 2: allowlists,
+#: never blocklists) — ``[attr="value"]``, ``#id``, ``.class`` or a bare tag. No commas (a
+#: selector LIST would let one garbled half hide behind a working one), no pseudo-classes,
+#: no functional notation, no quote characters beyond the attribute value's own delimiters.
+#:
+#: ASCII classes are SPELLED OUT rather than written ``\w``: Python's ``\w`` is Unicode-aware
+#: and JavaScript's is ASCII-only, so the shorthand silently made this side admit a strict
+#: superset of what ``capture-web-cdp.mjs`` accepts. The two sides must admit the SAME
+#: language — a selector one repo mints and the other refuses disables the check on whichever
+#: side lost, and the divergence is invisible until a non-ASCII identifier appears.
+_CSS_SIMPLE_SELECTOR = (
+    r'(?:\[[A-Za-z][A-Za-z0-9_-]*="[A-Za-z0-9_ -]{1,40}"\]'
+    r"|#[A-Za-z][A-Za-z0-9_-]*"
+    r"|\.[A-Za-z][A-Za-z0-9_-]*"
+    r"|[A-Za-z][A-Za-z0-9]*)"
+)
+#: ONE simple selector, matched at a position. Deliberately NOT wrapped in an outer ``+``
+#: and NOT chained with a combinator group: ``(?:…|tag)+(?:…(?:…|tag)+)*`` is a nested
+#: quantifier over an alternation whose last branch matches a bare run of letters, and the
+#: backtracking that produces is catastrophic — measured on this box at 3.4 s for 27
+#: characters and roughly 4x per two more, so the 120-character cap sat about ninety
+#: characters past the point of no return. A hang is worse than a rejection here: the
+#: ``try/except`` wrappers around every caller cannot catch one, because no error path is
+#: ever taken. :func:`_scan_css_selector` walks the string ONCE instead.
+_CSS_SIMPLE_RE = re.compile(_CSS_SIMPLE_SELECTOR)
+
+#: The whitespace a combinator may be built from. Spelled out for the same cross-repo reason
+#: as the identifier classes: ``\s`` is Unicode in both JavaScript and (unflagged) Python but
+#: an explicit set is the same on both sides no matter what either engine's shorthand means.
+_CSS_SPACE = frozenset(" \t\n\r\f\v")
+
+
+def _scan_css_selector(text: str) -> bool:
+    """Linear-time recogniser for the selector allowlist: a sequence of compounds separated
+    by a descendant (whitespace) or child (``>``) combinator, each compound being one or
+    more simple selectors written back to back.
+
+    Equivalent to the regular language the old pattern described, and reached the same way a
+    parser would: consume simple selectors greedily at the current position, then a
+    combinator, then repeat. Greedy is safe to do without backtracking because the four
+    branches have DISJOINT first characters (``[``, ``#``, ``.``, a letter) and a shorter
+    match of any branch can only be followed by another match of the same branch — splitting
+    ``divspan`` into ``div``+``span`` admits nothing that ``divspan`` does not. Every
+    iteration advances ``pos`` by at least one character, so the scan is O(len(text))."""
+    pos = 0
+    end = len(text)
+    while True:
+        simples = 0
+        while pos < end:
+            match = _CSS_SIMPLE_RE.match(text, pos)
+            if match is None:
+                break
+            pos = match.end()
+            simples += 1
+        if not simples:
+            return False  # a character the allowlist does not admit, or an empty compound
+        if pos >= end:
+            return True
+        combinator_start = pos
+        while pos < end and text[pos] in _CSS_SPACE:
+            pos += 1
+        if pos < end and text[pos] == ">":
+            pos += 1
+            while pos < end and text[pos] in _CSS_SPACE:
+                pos += 1
+        if pos == combinator_start:
+            return False  # not a combinator: the compound ended on an inadmissible character
+        if pos >= end:
+            return False  # a trailing combinator names no second compound
+
+
+def is_valid_smoke_selector(selector) -> bool:
+    """True iff *selector* is a CSS selector the smoke contract may carry.
+
+    Deny-by-default: anything outside :func:`_scan_css_selector`'s narrow allowlist — a
+    selector list, a pseudo-class, functional notation, an over-long string, a non-string
+    — is refused. The ruler mints both selectors itself, so in the happy path this always
+    passes; it earns its place at the WIRE boundary, where a ``from_dict`` payload is
+    untrusted input that reaches ``document.querySelector`` (principle 7, and the same
+    re-validation ``_coerce_asset_specs`` applies to a target path).
+
+    The length cap is a size bound, NOT the time bound: the scan is linear, so a rejection
+    costs the same as an acceptance and no input can wedge the thread that calls this."""
+    if not isinstance(selector, str):
+        return False
+    text = selector.strip()
+    if not text or len(text) > _SMOKE_SELECTOR_MAX:
+        return False
+    return _scan_css_selector(text)
+
+
+def _smoke_label(raw) -> str:
+    """Hygiene a plain-language label: control characters and quote/backslash/backtick
+    stripped, whitespace collapsed, length-capped. ``''`` when nothing usable survives
+    (the contract is then dropped fail-closed). The label crosses into a coder PROMPT and
+    into a finding line, so the characters that could reshape either are removed rather
+    than escaped."""
+    text = re.sub(r"[\x00-\x1f\x7f]", " ", str(raw or ""))
+    text = re.sub(r"[\"'`\\]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) < _MIN_SMOKE_LABEL_LEN:
+        return ""
+    return text[:_SMOKE_LABEL_MAX]
+
+
+_SMOKE_SPEC_TEMPLATE = (
+    "This product is a web page. A headless browser will open the finished page, use its "
+    "ONE main interactive control, and check that the page actually responds — the check "
+    "that catches a product which looks right and does nothing.\n"
+    "Name that one main control, and the part of the page that must visibly change when "
+    "it is used, in the requester's own plain words.\n"
+    "Return ONLY a JSON array (no prose) with AT MOST ONE item, exactly:\n"
+    '[{{"action": "<the one main control, in plain words>", '
+    '"result": "<the part of the page that must change, in plain words>"}}]\n'
+    "action = what a person clicks or presses to make the product do its main job "
+    '(e.g. "the Calculate button", "the Search button", "the Add to basket button").\n'
+    "result = what visibly changes as a result "
+    '(e.g. "the total shown below the form", "the list of search results").\n'
+    "Rules: name the SINGLE most important action only, never a list. If the page is "
+    "purely static content with nothing to press — a brochure, an article, an about page "
+    "— return an empty array [].\n"
+    "Examples:\n"
+    '"a tip calculator page" -> '
+    '[{{"action":"the Calculate button","result":"the tip amount shown below the form"}}]\n'
+    '"a page about my pottery studio" -> []\n'
+    "\nRequest:\n{idea}\n"
+)
+
+
+def smoke_spec_emission_json_schema() -> dict:
+    """The JSON schema for a grammar-constrained SMOKE-CONTRACT emission — the
+    ``{action, result}`` shape :func:`_validate_smoke_spec` expects, capped at one item.
+    ``[]`` is a VALID constrained answer (a static page with nothing to press)."""
+    return {
+        "type": "array",
+        "maxItems": 1,
+        "items": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "minLength": _MIN_SMOKE_LABEL_LEN},
+                "result": {"type": "string", "minLength": _MIN_SMOKE_LABEL_LEN},
+            },
+            "required": ["action", "result"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def _validate_smoke_spec(text, *, surface: str) -> "dict | None":
+    """Parse the model emission into a validated smoke contract, fail-closed.
+
+    The model supplies ONLY the two plain-language labels; the ruler owns both selectors,
+    the surface gate and the shape. Returns ``None`` — no contract, today's heuristic
+    stands — for a non-web surface, an unparseable or garbage emission, an empty array
+    (the model's "this page has nothing to press" answer), or a vacuous label. Never
+    raises. The ruler's own selectors are put through
+    :func:`is_valid_smoke_selector` here too: a constant that someone later edits into an
+    invalid selector must fail LOUDLY at the plan, not degrade silently at the capture."""
+    if surface not in _SMOKE_SPEC_SURFACES:
+        return None
+    if not isinstance(text, str) or not text:
+        return None
+    match = _JSON_ARRAY_RE.search(text)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(0))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, list) or not data:
+        return None
+    item = data[0]
+    if not isinstance(item, dict):
+        return None
+    action_label = _smoke_label(item.get("action"))
+    result_label = _smoke_label(item.get("result"))
+    if not action_label or not result_label:
+        return None
+    if not is_valid_smoke_selector(SMOKE_CLICK_SELECTOR):
+        return None
+    if not is_valid_smoke_selector(SMOKE_DELTA_SELECTOR):
+        return None
+    return {
+        "click": SMOKE_CLICK_SELECTOR,
+        "expectDelta": SMOKE_DELTA_SELECTOR,
+        "actionLabel": action_label,
+        "resultLabel": result_label,
+    }
+
+
+def _coerce_smoke_spec(raw) -> "dict | None":
+    """Reconstruct ``smoke_spec`` from a ``to_dict``/wire payload fail-closed: both
+    selectors must clear :func:`is_valid_smoke_selector` and both labels must survive
+    hygiene, or the whole contract is dropped (validate-don't-coerce — a half-built
+    contract would send the capture hunting for a selector the coder was never told to
+    provide). ``None`` for a non-dict, which is every pre-contract payload."""
+    if not isinstance(raw, dict):
+        return None
+    click = str(raw.get("click", "")).strip()
+    delta = str(raw.get("expectDelta", "")).strip()
+    if not is_valid_smoke_selector(click) or not is_valid_smoke_selector(delta):
+        return None
+    action_label = _smoke_label(raw.get("actionLabel"))
+    result_label = _smoke_label(raw.get("resultLabel"))
+    if not action_label or not result_label:
+        return None
+    return {
+        "click": click,
+        "expectDelta": delta,
+        "actionLabel": action_label,
+        "resultLabel": result_label,
+    }
+
+
+def _smoke_spec_from_plan(
+    goal: str, build_plan: "dict | None", *,
+    generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
+) -> "dict | None":
+    """The 14B names the product's ONE main action in plain words; the ruler disposes.
+
+    Fail-closed to ``None`` on ANY failure OR a non-web surface (no build_plan, a
+    CLI/desktop/library/unknown surface -> no contract, ever). Non-blocking: a contract
+    failure never crashes the plan (the capture just falls back to its heuristic, which
+    is today's behaviour on every run). Mirrors :func:`_asset_specs_from_plan`: the W2
+    grammar hook is tried FIRST when provided, fail-soft to the free-text path (grammar
+    off or erroring ⇒ byte-identical behaviour)."""
+    surface = ""
+    if isinstance(build_plan, dict):
+        surface = str(build_plan.get("surface", "")).strip().lower()
+    if surface not in _SMOKE_SPEC_SURFACES:
+        return None
+    prompt = _SMOKE_SPEC_TEMPLATE.format(idea=goal)
+    raw = _grammar_first(
+        prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=smoke_spec_emission_json_schema(),
+        usable=_is_json_array_emission,
+    )
+    if raw is None:
+        try:
+            raw = generate_fn(prompt)
+        except Exception:  # noqa: BLE001 — a contract failure must not crash the plan
+            return None
+    return _validate_smoke_spec(raw, surface=surface)
+
+
+def decode_smoke_spec(tasks: list[dict]) -> "dict | None":
+    """Read the run-scoped behaviour-smoke contract threaded onto the dispatch tasks.
+
+    The contract is byte-identical across every task (stamped once by
+    :func:`_thread_build_fields`), so read the first present ``smoke_spec_json`` and
+    coerce it fail-closed. ``None`` when no contract was declared (the common case, and
+    every non-web dispatch) — the capture then runs its heuristic exactly as today. This
+    is the single entry point for the contract on the dispatch side; every writer goes
+    through it, so no two of them can disagree about what the plan declared."""
+    for t in tasks:
+        raw = t.get("smoke_spec_json")
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return None
+        return _coerce_smoke_spec(data)
+    return None
+
+
+def smoke_spec_file_bytes(spec: "dict | None") -> "bytes | None":
+    """The EXACT bytes of ``blarai-smoke.json`` for *spec*, or ``None`` when there is no
+    contract to write.
+
+    One authority for the file's content, because it is written from two places — the AO
+    seam that seeds the baseline every coder candidate inherits, and the swap driver's
+    re-materialisation immediately before each capture. Byte-identical output is what
+    makes that second write a NO-OP on an untampered tree (no spurious diff) and a
+    RESTORE on a tampered one. Sorted keys + a trailing newline keep it stable."""
+    if not spec:
+        return None
+    coerced = _coerce_smoke_spec(spec)
+    if coerced is None:
+        return None
+    return (json.dumps(coerced, sort_keys=True, indent=2) + "\n").encode("utf-8")
+
+
+def write_smoke_spec_file(repo_path, spec: "dict | None") -> bool:
+    """Materialise the contract as ``<repo>/blarai-smoke.json``. True iff bytes were
+    written.
+
+    Writes NOTHING when there is no contract: absence stays legal, and an undeclared run
+    leaves the delivery byte-identical to today. It deliberately does NOT delete a file it
+    did not write — removing a path from someone else's git worktree is a destructive act
+    on work this function cannot inspect, and the driver's pre-capture write already
+    ensures that whatever a declared run's capture reads came from the plan.
+
+    Fail-soft: any OS error returns False (the capture then falls back to the heuristic).
+    Never raises — every caller sits on a path that must not be derailed by this."""
+    payload = smoke_spec_file_bytes(spec)
+    if payload is None:
+        return False
+    try:
+        dest = Path(repo_path) / SMOKE_SPEC_FILENAME
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(payload)
+        return True
+    except OSError:
+        return False
 
 
 def _validate_candidates(raw, *, max_candidates: int = DEFAULT_MAX_CANDIDATES) -> list[str]:
@@ -1138,6 +1966,275 @@ _STATIC_WEB_RE = re.compile(
 )
 
 
+#: Explicit MULTI-PAGE signals in a GOAL (#1118) — the veto on the static narrow above.
+#:
+#: ``static`` and ``single-page`` are ORTHOGONAL axes and this refiner used to conflate them:
+#: "static" means NO BACKEND, it does not mean ONE PAGE, and a four-page site with no backend
+#: is completely ordinary. The live failure (2026-07-27): an author-website goal saying "the
+#: website will contain four webpages" three times over was narrowed to ``web-static`` because
+#: the operator's answer to BlarAI's OWN clarifying question said "the website is static for
+#: now". That is not a cosmetic mislabel — ``Add-WebStaticHint`` tells the coder "EXTEND THAT
+#: ONE FILE -- do NOT add ... a second project", so the build would have fought its own goal.
+#:
+#: Keyed on plural pages and explicit counts, NOT on a bare "page" (every web goal has one).
+#: Hyphen/space tolerant, case-insensitive.
+_MULTI_PAGE_RE = re.compile(
+    r"(?i)(?:"
+    # "webpages" / "web pages" — the plural itself means more than one page.
+    r"\bweb[\s-]?pages\b"
+    # a counted set: "four pages", "3 web pages", "two separate pages", "five sub-pages".
+    # Counts are 2+ ONLY: "1 pages"/"0 pages" are typos or absences, never a multi-page ask.
+    # The filler bound is ONE adjective ("four SEPARATE pages"), not two — at two it
+    # started matching "3 seconds between pages" and "2 columns of pages" (#1123 D3).
+    r"|\b(?:two|three|four|five|six|seven|eight|nine|ten|dozen|[2-9]|[1-9]\d+)\s+"
+    r"(?:[a-z-]+\s+)?(?:web[\s-]?|sub[\s-]?)?pages\b"
+    # explicit multiplicity words
+    r"|\bmulti[\s-]?page\b"
+    r"|\b(?:multiple|several|separate|additional|other|different|various|few|couple"
+    r"|many|lots|both|more)\s+(?:of\s+)?(?:[a-z-]+\s+)?(?:web[\s-]?|sub[\s-]?)?pages\b"
+    r"|\bsub[\s-]?pages\b"
+    # "a second/third/another page" — presupposes a first
+    r"|\b(?:a|one)\s+(?:second|third|fourth|fifth|further|extra|additional)\s+"
+    r"(?:web[\s-]?)?page\b"
+    r"|\banother\s+(?:web[\s-]?)?page\b"
+    # "each page" / "every page" / "all the pages" / "per page" — presupposes more than one
+    r"|\b(?:each|every)\s+(?:web[\s-]?)?page\b"
+    r"|\b(?:each|every)\s+(?:\w+\s+){0,2}?(?:with\s+)?(?:its|their)\s+own\s+"
+    r"(?:web[\s-]?)?page\b"
+    r"|\b(?:a|another)\s+new\s+(?:web[\s-]?)?page\b"
+    r"|\ball\s+(?:of\s+)?the\s+(?:web[\s-]?)?pages\b"
+    r"|\b(?:one|a)\s+page\s+per\b|\bpages?\s+for\s+each\b|\bpage\s+for\s+each\b"
+    # "index.html, about.html" / "four separate html files" / "the other three htmls"
+    r"|\b(?:two|three|four|five|six|seven|eight|nine|ten|[2-9]|[1-9]\d+)\s+"
+    r"(?:[a-z-]+\s+){0,2}?html\s+files?\b"
+    r"|\bhtmls\b"
+    r")"
+)
+
+#: #1126 - the STRONG signals: everything in _MULTI_PAGE_RE except the bare count arm.
+#: Scanned separately so a file mention can discount a COUNT without also discounting a
+#: plural that happens to follow it (alternation is leftmost-first, so "four webpages"
+#: was being consumed by the count arm and silently downgraded to a weak signal).
+_STRONG_MULTI_PAGE_RE = re.compile(
+    r"(?i)(?:"
+    # "webpages" / "web pages" — the plural itself means more than one page.
+    r"\bweb[\s-]?pages\b"
+    # a counted set: "four pages", "3 web pages", "two separate pages", "five sub-pages".
+    # Counts are 2+ ONLY: "1 pages"/"0 pages" are typos or absences, never a multi-page ask.
+    # The filler bound is ONE adjective ("four SEPARATE pages"), not two — at two it
+    # started matching "3 seconds between pages" and "2 columns of pages" (#1123 D3).
+    # explicit multiplicity words
+    r"|\bmulti[\s-]?page\b"
+    r"|\b(?:multiple|several|separate|additional|other|different|various|few|couple"
+    r"|many|lots|both|more)\s+(?:of\s+)?(?:[a-z-]+\s+)?(?:web[\s-]?|sub[\s-]?)?pages\b"
+    r"|\bsub[\s-]?pages\b"
+    # "a second/third/another page" — presupposes a first
+    r"|\b(?:a|one)\s+(?:second|third|fourth|fifth|further|extra|additional)\s+"
+    r"(?:web[\s-]?)?page\b"
+    r"|\banother\s+(?:web[\s-]?)?page\b"
+    # "each page" / "every page" / "all the pages" / "per page" — presupposes more than one
+    r"|\b(?:each|every)\s+(?:web[\s-]?)?page\b"
+    r"|\b(?:each|every)\s+(?:\w+\s+){0,2}?(?:with\s+)?(?:its|their)\s+own\s+"
+    r"(?:web[\s-]?)?page\b"
+    r"|\b(?:a|another)\s+new\s+(?:web[\s-]?)?page\b"
+    r"|\ball\s+(?:of\s+)?the\s+(?:web[\s-]?)?pages\b"
+    r"|\b(?:one|a)\s+page\s+per\b|\bpages?\s+for\s+each\b|\bpage\s+for\s+each\b"
+    # "index.html, about.html" / "four separate html files" / "the other three htmls"
+    r"|\b(?:two|three|four|five|six|seven|eight|nine|ten|[2-9]|[1-9]\d+)\s+"
+    r"(?:[a-z-]+\s+){0,2}?html\s+files?\b"
+    r"|\bhtmls\b"
+    r")"
+)
+
+#: A NEGATION appearing shortly BEFORE a multi-page phrase inverts it (#1123 D2). The
+#: v1 detector had no polarity check, so "I do NOT want multiple pages, just one" and
+#: "avoid separate pages, use tabs instead" FIRED the veto — handing a genuinely
+#: single-page static ask to the node-server seed whose `fetch('/api/health')` hangs
+#: forever on a `file://` page. That is the verbatim #886 failure, re-introduced by the
+#: fix built beside it.
+_NEGATION_RE = re.compile(
+    r"(?i)\b(?:not|no|never|avoid|avoiding|without|dont|doesnt|isnt|skip|skipping"
+    r"|instead\s+of|rather\s+than|as\s+opposed\s+to)\b|n't\b"
+)
+
+#: How far back to look for a negation.
+_NEGATION_WINDOW = 40
+
+#: A negation only counts if it is in the SAME CLAUSE as the phrase it would invert.
+#: This is load-bearing and subtle: the goals that reach this predicate are saturated
+#: with negations that have nothing to do with pages — "no server", "no backend", "no
+#: build step" are the very phrases that fire the STATIC signal in the first place. A
+#: naive window check therefore suppressed 8 of the reviewer's 20 real multi-page asks
+#: ("no backend, a couple of pages" read as a refusal of pages). A clause boundary
+#: between the refusal and the phrase means the refusal is about something else.
+#: Dashes count (#1126): "not just one file - I want four separate pages" put the
+#: refusal and the ask in different clauses with only a dash between them, so a
+#: boundary class of [;,.:] read the ask as refused.
+_CLAUSE_BOUNDARY_RE = re.compile(r"[;,.:–—]|\s-\s")
+
+#: An explicit ONE-FILE declaration, used to discount a WEAK page count — "static, one
+#: html file, with 12 book pages rendered as cards" counts pages OF A BOOK, and books
+#: are the domain this ticket came from.
+#:
+#: #1126 — THIS RULE PREVIOUSLY RE-RAN THE #1118 INCIDENT. As first written it returned
+#: False unconditionally, before every polarity check, outranking every other signal.
+#: Independent verification drove the operator's REAL four-page goal through the REAL
+#: planning_seed and found four of five plausible clarify answers capped it at one page:
+#:   "one html file per page is fine"        -> a statement that there are MANY files
+#:   "keep all the styling in one file"      -> about CSS, not page count
+#:   "I do not want a single file"           -> a REFUSAL
+#: It also regressed five cases the #1118 lexicon got right. Three separate errors in
+#: one rule: no polarity, no distributive sense, and unscoped precedence.
+#:
+#: Now: it is polarity-checked and distributive-checked at the use site, and it discounts
+#: ONLY a bare count match — never enumeration, never an .html file count, never an
+#: explicit multiplicity word. A weak signal may be outvoted; a strong one may not.
+_SINGLE_FILE_DECLARATION_RE = re.compile(
+    r"(?i)\b(?:one|a\s+single|1)\s+(?:self-contained\s+)?(?:html\s+)?file\b"
+    r"|\bsingle[\s-]file\b"
+    r"|\b(?:one|a\s+single)\s+index\.html\b"
+    r"|\binside\s+(?:one|a\s+single)\s+file\b"
+)
+
+#: "one file PER page" / "a single file FOR EACH chapter" — a distributive inverts a
+#: single-file declaration into a MANY-files statement. The same asymmetry was already
+#: handled for pages ("one page per album" is multi-page, and tested); it was missing
+#: for files, which is half of why the rule above misfired.
+_DISTRIBUTIVE_RE = re.compile(r"(?i)^\s*(?:per\b|for\s+each\b|for\s+every\b|each\b|apiece\b)")
+
+#: The COUNT arm alone — the one weak signal a single-file declaration may discount.
+#: Split out of the main pattern so precedence is expressible: everything else in
+#: :data:`_MULTI_PAGE_RE` is a strong signal that no file mention can outvote.
+_COUNT_PAGES_RE = re.compile(
+    r"(?i)\b(?:two|three|four|five|six|seven|eight|nine|ten|dozen|[2-9]|[1-9]\d+)\s+"
+    r"(?:[a-z-]+\s+)?(?:web[\s-]?|sub[\s-]?)?pages\b"
+)
+
+#: An ALIASING construction names ONE page twice ("a landing page, also called a splash
+#: page"). Without this, two synonyms for the same page read as an enumeration of two.
+_ALIAS_RE = re.compile(
+    r"(?i)\b(?:also\s+(?:called|known\s+as)|a\.?k\.?a\.?|i\.e\.|that\s+is|or\s+rather)\b"
+)
+
+#: A named page must be INTRODUCED by a determiner and TERMINATED by a delimiter. This
+#: is the structural half of the enumeration fix (#1126): "on page load" and "a full
+#: page background image" are not pages being requested, and no word list can tell you
+#: that — the grammar can. "page" followed by another noun is a compound, not a page.
+_NAMED_PAGE_RE = re.compile(
+    r"(?i)\b(?:a|an|the|another|its|their|my|our|your)\s+"
+    r"(?:[a-z-]+\s+){0,2}?([a-z][a-z-]{1,20})\s+page\b"
+    r"(?=\s*(?:[,.;:!?)]|$|\b(?:and|or|plus|that|which|with|for|to|linking|linked"
+    r"|listing|lists|shows|contains|is|are|should|will|plus)\b))"
+)
+
+#: Qualifiers that do NOT make "<x> page" a distinct named page — counts, singulars and
+#: deictics. Without this exclusion "a single page" and "one page" would each read as a
+#: named page and two of them would look like an enumeration.
+_NON_NAMING_QUALIFIERS: frozenset[str] = frozenset({
+    "a", "an", "the", "one", "single", "same", "this", "that", "each", "every", "per",
+    "any", "some", "no", "another", "second", "third", "fourth", "fifth", "next",
+    "previous", "last", "first", "whole", "entire", "web", "html", "static", "new",
+    "other", "separate", "additional", "extra", "further", "multiple", "several",
+    # #1126: leaks the verifier measured — words that precede "page" without naming a
+    # distinct page. These are a BACKSTOP now, not the mechanism: the determiner +
+    # delimiter structure in _NAMED_PAGE_RE does the real work, because an exclusion
+    # list fails OPEN (an unknown word becomes a page name) and that is the more
+    # dangerous polarity.
+    "only", "sole", "lone", "full", "top", "bottom", "half", "cross", "off", "on",
+    "in", "current", "final", "long", "short",
+})
+
+# (the enumeration pattern lives above, next to its structural rationale)
+
+
+def _goal_wants_multiple_pages(goal: str) -> bool:
+    """True when the goal asks for more than one page (#1118, rewritten #1123).
+
+    Three independent signals, any of which is sufficient:
+      1. an explicit multi-page phrase (plural, count, multiplicity word, ordinal, html
+         file count) that is NOT negated;
+      2. ENUMERATION — two or more distinctly-named pages ("a landing page, an about
+         page"), which needs no plural or count word at all;
+      3. two or more distinct ``.html`` filenames ("index.html, about.html").
+
+    NEGATION-AWARE, which the v1 detector was not: a multi-page phrase preceded by a
+    refusal inside :data:`_NEGATION_WINDOW` characters does not count. An un-negated
+    match elsewhere in the goal still wins, so "no server; four separate pages" is
+    correctly multi-page — the guard suppresses the NEGATED phrase, not the whole goal.
+
+    HONEST LIMIT: this reads whatever text it is handed, which at the call site is the
+    ``planning_seed`` — goal + clarified requirements, including model-authored
+    ``(assumed)`` defaults. So it can fire on a sentence the operator never wrote. That
+    is the mirror of #1118's own root cause and is not fixed here; it is inherited from
+    #886's input widening and needs the call site changed, not this predicate.
+
+    Pure, total, never raises.
+    """
+    text = goal or ""
+    if not text:
+        return False
+
+    # A single-file declaration is only meaningful if it is neither REFUSED nor
+    # DISTRIBUTIVE. "not just one file" and "one file per page" both assert MANY files;
+    # reading either as "one page" is what re-ran the #1118 incident (#1126).
+    single_file = False
+    for match in _SINGLE_FILE_DECLARATION_RE.finditer(text):
+        if _DISTRIBUTIVE_RE.match(text[match.end():]):
+            continue  # "one file PER page" — a many-files statement
+        if _negated_before(text, match.start()):
+            continue  # "not just one file" — a refusal
+        single_file = True
+        break
+
+    # 1a. STRONG phrases — plurals, multiplicity words, ordinals, html-file counts. No
+    #     file mention outvotes these. Scanned SEPARATELY from the count arm rather than
+    #     filtered out of one combined scan, because alternation is leftmost-first: in
+    #     "four webpages" the COUNT arm matches at "four" and consumes the strong
+    #     "webpages" that follows it, so a combined scan let a file mention discount a
+    #     plural (#1126 — this is what capped the operator's real goal under the answer
+    #     "keep all the styling in one file").
+    for match in _STRONG_MULTI_PAGE_RE.finditer(text):
+        if not _negated_before(text, match.start()):
+            return True
+
+    # 1b. a bare COUNT is the one weak signal an un-negated, non-distributive
+    #     single-file declaration may discount ("one html file, with 12 book pages
+    #     rendered as cards" — those are pages OF A BOOK).
+    if not single_file:
+        for match in _COUNT_PAGES_RE.finditer(text):
+            if not _negated_before(text, match.start()):
+                return True
+
+    # 2. enumeration — two or more distinctly NAMED pages, each introduced by a
+    #    determiner and terminated by a delimiter (the structure carries this, not the
+    #    word list). An ALIASING construction names one page twice, so it needs a third.
+    named = {
+        qualifier.lower()
+        for qualifier in _NAMED_PAGE_RE.findall(text)
+        if qualifier.lower() not in _NON_NAMING_QUALIFIERS
+    }
+    if len(named) >= (3 if _ALIAS_RE.search(text) else 2):
+        return True
+
+    # 3. two or more distinct .html filenames.
+    return len({f.lower() for f in re.findall(r"(?i)\b([a-z0-9_-]+\.html)\b", text)}) >= 2
+
+
+def _negated_before(text: str, index: int) -> bool:
+    """True when a refusal sits in the SAME CLAUSE just before *index* (#1123 D2).
+
+    Clause-scoped on purpose: the goals reaching this predicate are saturated with
+    negations about other things — "no server", "no backend", "no build step" are the
+    very phrases that fire the STATIC signal. A clause boundary between the refusal and
+    the phrase means the refusal was about something else.
+    """
+    window = text[max(0, index - _NEGATION_WINDOW):index]
+    for neg in _NEGATION_RE.finditer(window):
+        if not _CLAUSE_BOUNDARY_RE.search(window[neg.end():]):
+            return True
+    return False
+
+
 def _refine_web_static(build_plan: dict | None, goal: str) -> dict | None:
     """Deterministically narrow a ``web`` build-signal to ``web-static`` when the GOAL carries
     explicit static / no-backend / single-file signals (#886). The model PROPOSES the ``web``
@@ -1151,17 +2248,353 @@ def _refine_web_static(build_plan: dict | None, goal: str) -> dict | None:
     UNCHANGED, as is a ``web`` goal with no static signal (today's full-stack path) and a
     ``None``/non-dict build_plan. Pure, fail-closed, never raises.
 
-    Directionality note: a false NARROW (a server ask mis-read as static) only DROPS the seed's
-    server files — recoverable, the coder still adds them — whereas the bug this fixes seeds a
-    server the static page can never reach. But the signals above are specific enough that an
-    ordinary server web goal does not trip them; the refiner errs toward leaving ``web`` alone."""
+    MULTI-PAGE VETO (#1118): an explicit ask for more than one page BLOCKS the narrow, however
+    loud the static signal. ``web-static`` seeds ONE ``index.html`` and its coder prompt forbids
+    adding a second — so narrowing a multi-page goal does not merely mislabel it, it caps the
+    build below its own requirement. The two axes are orthogonal: "static" means NO BACKEND, not
+    ONE PAGE.
+
+    Directionality note: the original #886 reasoning held that a false NARROW only DROPS the
+    seed's server files — recoverable, the coder still adds them. The 2026-07-27 incident
+    disproves that for multi-page goals specifically: the static coder prompt does not merely
+    omit a server, it INSTRUCTS against a second page, which the coder obeys. Hence the veto
+    rather than a re-tuning of the static signals — for a multi-page ask the refiner must err
+    toward leaving ``web`` alone, which is exactly what it now does."""
     if not isinstance(build_plan, dict) or build_plan.get("surface") != "web":
         return build_plan
     if not _STATIC_WEB_RE.search(goal or ""):
         return build_plan
+    if _goal_wants_multiple_pages(goal):
+        return build_plan
     refined = dict(build_plan)
     refined["surface"] = SURFACE_WEB_STATIC
     return refined
+
+
+# ---------------------------------------------------------------------------
+# #1161 — the empty-project gradeable-stack default (plan-time direction 1)
+# ---------------------------------------------------------------------------
+#
+# Run evidence (2026-07-29, run 20260729-085557-bd): a brand-new EMPTY project whose
+# operator never named a platform was classified ``desktop-gui`` by the build-signal
+# model, scaffolded winui-from-nothing, and burned ~103 minutes of fleet time with zero
+# merge — two candidates failed COMPILE on the seeded core, and .NET is build-only so
+# the exam machinery was blind the whole way. The LA's verdict at the ceremony: "the
+# system is too brittle." The defect is the SILENT default: nobody chose desktop — an
+# unanswered question resolved to the fleet's weakest stack.
+#
+# The fix is a deterministic refiner in the same family as :func:`_refine_web_static`:
+# when the target repo is an empty/new shell AND no OPERATOR-authored text names a
+# platform AND the classified stack would be exam-blind on a fresh scaffold, the default
+# becomes the stack the exam machinery fully sights — a python command-line build (the
+# oracle, the bad-input floor and the behavior checks all run there). Operator words
+# always win: a named platform (or an explicit non-gated language hint) suppresses the
+# default, and a goal naming the web forces ``web`` (also behavior-gated). ``mobile``
+# asks are refused honestly at the corridor (gateway-side), never silently rebuilt as
+# desktop. An existing non-empty project never enters this refiner — its own
+# language/scaffold is the signal, exactly today's behavior.
+
+#: OPERATOR-authored platform words, scanned deterministically (never the model). Each
+#: bucket is DELIBERATELY NARROW — the same directionality argument as
+#: ``_CRITERIA_SCOPE_SIGNALS``: a MISS merely yields the gradeable default plus an honest
+#: card line (safe, reversible at the preview), while a false positive forces the wrong
+#: stack (the dangerous direction), so every term must be an unambiguous platform name.
+#: The desktop bucket includes the explicit Windows-stack words (c#/.net/winui/wpf):
+#: naming the stack IS naming the platform, and the build-signal model's own
+#: ``language_hint`` can miss them.
+_PLATFORM_WORDS_WEB_RE = re.compile(
+    r"(?i)\b(?:web|website|web[\s-]?page|web[\s-]?site|web[\s-]?app|browser|html)\b"
+)
+_PLATFORM_WORDS_MOBILE_RE = re.compile(
+    r"(?i)\b(?:phone|mobile|android|iphone|ipad|ios|tablet|smartphone)\b"
+)
+_PLATFORM_WORDS_DESKTOP_RE = re.compile(
+    r"(?i)(?:\b(?:desktop|winui|wpf|dotnet|csharp|windows\s+app(?:lication)?)\b"
+    r"|(?<!\w)c#|\.net\b)"
+)
+_PLATFORM_WORDS_CLI_RE = re.compile(
+    r"(?i)\b(?:command[\s-]?line|cli|terminal|console\s+(?:app|tool|program))\b"
+)
+
+#: THE WEAK-TIER OPERATOR VOCABULARY — one table, not one regex arm per word.
+#:
+#: A weak-tier term is an everyday noun that INDICATES web without naming it. Weak-tier
+#: terms are consulted only when no explicit platform word matched, because each also has
+#: a non-web sense: "a desktop app for my construction site logs" is a desktop ask ABOUT a
+#: site, and "print it on the title page" is not a web ask at all. A weak indicator must
+#: never override an explicit platform word.
+#:
+#: **Why a table and not another ``if``.** This structure is the structural control for the
+#: THIRD instance of the operator-vocabulary class in one day (2026-07-29: webpage variants,
+#: then bare "ecommerce site", then bare "page" — #1161 F-A), which LESSONS Rule 3 requires
+#: to ship a control rather than a fourth patch. The failure mode is always the same shape:
+#: the operator uses an ordinary word for the thing he wants, the scan does not carry that
+#: word, his words therefore never reach the precedence rule at all, and the refiner sees an
+#: UNANSWERED platform question and forces the gradeable default. Nothing is broken and no
+#: error is raised — the system simply cannot hear him. A table makes the vocabulary the
+#: DATA the parametrized test enumerates (``test_platform_default.py`` drives every term and
+#: every exclusion from this dict), so adding a term cannot silently ship untested, and the
+#: set of words the system can hear is readable in one place instead of inferred from
+#: regex arms.
+#:
+#: Exclusions are evaluated occurrence by occurrence: a text carrying both "construction
+#: site" and "portfolio site" still reads web from the non-excluded occurrence. One-word
+#: forms ("campsite", "homepage") never match the ``\b`` boundaries at all — "homepage" is
+#: already an explicit web word upstream.
+#:
+#: Direction-of-error, stated once for the whole tier: a MISS yields the gradeable default
+#: plus an honest card line (safe, reversible at the preview); a FALSE POSITIVE forces the
+#: wrong stack (dangerous). Exclusion lists are therefore bounded and plainly non-web by
+#: design. A NOVEL non-web compound ("fishing sites") will read web, which the card's
+#: "Building this as" line makes visible and one reject fixes.
+
+
+class _WeakWebTerm(NamedTuple):
+    """One weak-tier web noun plus the compounds that disqualify an occurrence.
+
+    ``modifiers`` are words IMMEDIATELY BEFORE the noun, ``followers`` immediately after.
+    ``numeric_follower_excludes`` disqualifies a digit follower ("page 3", "page 12") —
+    a numbered page is a document page, never a deliverable.
+    """
+
+    noun: str
+    modifiers: frozenset[str]
+    followers: frozenset[str]
+    numeric_follower_excludes: bool = False
+
+
+#: ``site`` — LA vocabulary extension, 2026-07-29 mid-review, verbatim: '"ecommerce site".
+#: site is probably a pretty good indicator of it being a web project'.
+#: ``page`` — #1161 F-A, 2026-07-29 ceremony drive: he asked for "one page that displays my
+#: two recipes" and got a command-line tool, because bare "page" was the one web word the
+#: scan did not carry. It is the single most natural novice word for a web page.
+OPERATOR_WEB_VOCABULARY: "dict[str, _WeakWebTerm]" = {
+    "site": _WeakWebTerm(
+        noun=r"sites?",
+        modifiers=frozenset({
+            "camp", "camping", "job", "construction", "work", "building", "dig",
+            "excavation", "burial", "grave", "crash", "drill", "on",
+        }),
+        # Followers that mark ``site`` as a place being VISITED, not a deliverable.
+        followers=frozenset({"visit", "visits", "inspection", "inspections"}),
+    ),
+    "page": _WeakWebTerm(
+        noun=r"pages?",
+        # Document-anatomy and paper senses. "front page" is listed deliberately even
+        # though a site HAS a front page: in novice prose it far more often means a
+        # newspaper or document, and the miss direction is the safe one.
+        modifiers=frozenset({
+            "front", "title", "cover", "contents", "back", "facing", "blank",
+            "printed", "paper", "per", "first", "last", "next", "previous",
+        }),
+        # ``page`` as a verb ("page me", "page the nurse") and paper-layout compounds.
+        followers=frozenset({
+            "me", "him", "her", "them", "us", "number", "numbers", "count",
+            "counts", "break", "breaks", "margin", "margins", "size",
+        }),
+        numeric_follower_excludes=True,
+    ),
+}
+
+#: Built from the table, never hand-maintained alongside it.
+_WEAK_WEB_RES: "dict[str, re.Pattern[str]]" = {
+    key: re.compile(
+        r"(?i)(?:\b([a-z]+)[\s-]+)?\b(?:" + term.noun + r")\b(?:[\s-]+([a-z0-9]+))?"
+    )
+    for key, term in OPERATOR_WEB_VOCABULARY.items()
+}
+
+#: A capitalized weak-tier noun that is not sentence-initial is treated as a proper noun
+#: ("ask Page about it") and disqualified. Deliberately conservative per the
+#: direction-of-error rule above: the cost is one reject, not a wrong forced build.
+_SENTENCE_START_RE = re.compile(r"(?:^|[.!?]\s+|\n\s*)$")
+
+
+def _weak_web_term_names_web(text: str, key: str) -> bool:
+    """True iff *text* carries at least one occurrence of the weak-tier term *key* that is
+    not disqualified by its exclusion sets. Pure, never raises."""
+    term = OPERATOR_WEB_VOCABULARY[key]
+    haystack = text or ""
+    for m in _WEAK_WEB_RES[key].finditer(haystack):
+        if (m.group(1) or "").lower() in term.modifiers:
+            continue
+        follower = (m.group(2) or "").lower()
+        if follower in term.followers:
+            continue
+        if term.numeric_follower_excludes and follower.isdigit():
+            continue
+        # Proper-noun guard, evaluated on the noun token's ORIGINAL casing: a capitalized
+        # noun that is not sentence-initial reads as a name ("ask Page about it").
+        matched = m.group(0)
+        noun_match = re.search(r"(?i)\b(?:" + term.noun + r")\b", matched)
+        if noun_match is not None:
+            token = matched[noun_match.start():noun_match.end()]
+            abs_start = m.start() + noun_match.start()
+            if token[:1].isupper() and not _SENTENCE_START_RE.search(haystack[:abs_start]):
+                continue
+        return True
+    return False
+
+
+def _bare_site_names_web(text: str) -> bool:
+    """Back-compatible alias for the ``site`` term. See
+    :data:`OPERATOR_WEB_VOCABULARY`."""
+    return _weak_web_term_names_web(text, "site")
+
+
+def _weak_tier_names_web(text: str) -> bool:
+    """True iff ANY weak-tier vocabulary term reads web in *text*. Pure, never raises."""
+    return any(_weak_web_term_names_web(text, key) for key in OPERATOR_WEB_VOCABULARY)
+
+
+def operator_platform_signal(text: str) -> str:
+    """The platform an OPERATOR's own words name: ``"web"`` | ``"mobile"`` |
+    ``"desktop-gui"`` | ``"command-line"`` | ``""`` (nothing named). Pure, deterministic,
+    never raises.
+
+    Precedence is fixed and deliberate: web > mobile > desktop-gui > command-line, then
+    the WEAK bare-``site`` web indicator LAST. A goal naming both web and phone ("a web
+    page I can read on my phone") is BUILDABLE as web — a browser page works on a phone —
+    so explicit web outranks the mobile refusal. Bare ``site`` sits BELOW every explicit
+    platform word: "a desktop app for my portfolio site" is a desktop ask about a site,
+    so the weak indicator never overrides a named platform. The one asymmetry that
+    placement creates is deliberate: "an ecommerce site for my phone" reads MOBILE and is
+    refused honestly — and the refusal itself names the web escape — because the
+    alternative (a weak indicator silently overriding the explicit word "phone" into a
+    forced web build) is the silent-override class this scan exists to end; a refusal
+    with a named recovery costs one turn, a wrong forced build costs a run. Scan
+    OPERATOR-authored text only (the goal + non-assumed answers): system-authored
+    defaults must never count as the operator having named a platform."""
+    s = text or ""
+    if _PLATFORM_WORDS_WEB_RE.search(s):
+        return "web"
+    if _PLATFORM_WORDS_MOBILE_RE.search(s):
+        return "mobile"
+    if _PLATFORM_WORDS_DESKTOP_RE.search(s):
+        return "desktop-gui"
+    if _PLATFORM_WORDS_CLI_RE.search(s):
+        return "command-line"
+    if _weak_tier_names_web(s):
+        return "web"
+    return ""
+
+
+#: The honest card line for the gradeable default — attached to ``spec.assumptions`` so it
+#: renders in the "here's how I read the parts you didn't spell out" block AND persists in
+#: the acceptance record. One line, reversible at the preview.
+_GRADEABLE_DEFAULT_ASSUMPTION = (
+    "You didn't say where this should run, and this is a brand-new project — so I picked "
+    "the kind I can fully test for you from start to finish: a command-line tool. If you "
+    "wanted a web page or a desktop app instead, reject and say so in the goal."
+)
+_WEB_NAMED_ASSUMPTION = (
+    "Your request mentions the web, so I'm building this as a web app."
+)
+
+#: Non-gated language hints that CAN suppress the gradeable default — but only when the
+#: operator's own words corroborate them (review F2). ``language_hint``'s contract says
+#: it is set only when the product explicitly implies a language, but the hint is
+#: AUTHORED BY THE SAME 14B whose surface discipline caused the #1161 incident — trusting
+#: it as an operator word re-opens the exact emission shape it flagged (a silent goal +
+#: a model-invented ``dotnet`` hint yielding desktop-from-nothing). Corroborated, it is
+#: honored: overriding a real "PowerShell script" ask to a python CLI would trample the
+#: operator's words, the reverse failure.
+_EXPLICIT_NON_GATED_HINTS: frozenset[str] = frozenset({"dotnet", "cpp", "powershell"})
+
+#: hint -> the OPERATOR-word pattern that corroborates it. ``dotnet`` maps to the
+#: desktop-word scan (c#/csharp/.net/dotnet/winui/wpf) — when those words are present the
+#: scan already returned early as a named desktop platform, so the entry is defense in
+#: depth against a future precedence change, not a live path.
+_HINT_CORROBORATION_RES: dict[str, "re.Pattern[str]"] = {
+    "powershell": re.compile(r"(?i)\b(?:powershell|pwsh|ps1)\b"),
+    "cpp": re.compile(r"(?i)(?:(?<!\w)c\+\+|\bcpp\b)"),
+    "dotnet": _PLATFORM_WORDS_DESKTOP_RE,
+}
+
+
+def _operator_corroborates_hint(operator_text: str, hint: object) -> bool:
+    """True iff the operator's own words name the language *hint* claims (review F2).
+    Unknown hints are uncorroborated (fail-closed toward the gradeable default)."""
+    pattern = _HINT_CORROBORATION_RES.get(str(hint))
+    return bool(pattern and pattern.search(operator_text or ""))
+
+
+def default_gradeable_platform(
+    build_plan: dict | None, *, operator_text: str, repo_path: Path
+) -> "tuple[dict | None, str]":
+    """#1161: resolve an empty-project blind platform default to the GRADEABLE stack.
+
+    Returns ``(build_plan, assumption_line)``. The plan is refined ONLY when ALL hold:
+
+      * ``repo_path`` is an empty/new shell (:func:`is_empty_new_project`) — an existing
+        project's own language governs and this never fires;
+      * the classified ``surface`` is a REAL buildable surface (``unknown`` keeps today's
+        honest no-seed path; ``ambiguous`` keeps the increment-4 numbered platform
+        question — the one lever that already asks instead of guessing; ``web-static`` is
+        a deliberate deterministic narrow, never a blind guess);
+      * ``language_hint`` is not an OPERATOR-CORROBORATED non-gated language (review F2:
+        the hint is authored by the same model whose surface discipline caused the
+        incident, so it is honored only when the operator's own words back it — a
+        "PowerShell script" ask keeps its PowerShell hint; a model-invented ``dotnet``
+        hint on a silent goal does not suppress the default);
+      * *operator_text* (goal + non-assumed answers — never system defaults) names NO
+        platform — an unanswered question is the ONLY thing this refiner may decide; and
+      * the stack the fleet would scaffold is exam-BLIND (:func:`scaffold_gated_ecosystem`
+        returns ``""``) — a web/python/node classification is already fully sighted and
+        passes through untouched.
+
+    When they all hold, the surface becomes ``command-line`` with ``language_hint``
+    ``python`` — the stack where the acceptance oracle, the bad-input floor and the
+    behavior checks all actually run — and the returned assumption line disposes the
+    choice ON THE CARD (never silently). When *operator_text* names the web AND NO OTHER
+    buildable platform (review F1: "a command-line tool that scrapes a website" is a CLI
+    ask ABOUT the web — the same subordination the bare-``site`` tier applies, one level
+    up), the operator's word wins over a model misread: the surface is forced to ``web``
+    (also behavior-gated). Every other case returns the plan untouched with ``""``.
+    Pure over its inputs (one read-only disk probe); never raises."""
+    if not isinstance(build_plan, dict):
+        return build_plan, ""
+    surface = build_plan.get("surface")
+    if surface not in _REAL_SURFACES and surface != SURFACE_WEB_STATIC:
+        return build_plan, ""
+    if not is_empty_new_project(repo_path):
+        return build_plan, ""
+    signal = operator_platform_signal(operator_text)
+    if signal == "web":
+        # Review F1: the web-force is SUBORDINATE to any other named buildable platform.
+        # The scan's precedence puts web first, so signal=="web" only means "web was
+        # named somewhere" — an ask that ALSO names command-line or desktop is a
+        # named-platform ask ABOUT the web, and forcing web would override the
+        # operator's word (the exact class this refiner exists to end). Mobile is
+        # deliberately NOT in this guard: web>mobile stays — a browser page works on a
+        # phone, and mobile is a refusal, never a build.
+        if _PLATFORM_WORDS_CLI_RE.search(operator_text) or (
+            _PLATFORM_WORDS_DESKTOP_RE.search(operator_text)
+        ):
+            return build_plan, ""
+        if surface in ("web", SURFACE_WEB_STATIC):
+            return build_plan, ""
+        refined = dict(build_plan)
+        refined["surface"] = "web"
+        return refined, _WEB_NAMED_ASSUMPTION
+    if signal:
+        # mobile / desktop-gui / command-line named by the operator: the default never
+        # overrides a named platform. (An empty-project MOBILE ask is refused honestly
+        # at the corridor before planning ever starts — see the dispatch coordinator.)
+        return build_plan, ""
+    if surface == SURFACE_WEB_STATIC:
+        return build_plan, ""
+    hint = build_plan.get("language_hint")
+    if hint in _EXPLICIT_NON_GATED_HINTS and _operator_corroborates_hint(
+        operator_text, hint
+    ):
+        return build_plan, ""
+    if scaffold_gated_ecosystem(build_plan) != "":
+        return build_plan, ""
+    refined = dict(build_plan)
+    refined["surface"] = "command-line"
+    refined["language_hint"] = "python"
+    return refined, _GRADEABLE_DEFAULT_ASSUMPTION
 
 
 def _parse_criteria(text: str, *, max_criteria: int) -> list[dict]:
@@ -1291,6 +2724,29 @@ def assumptions_emission_json_schema(
         "type": "array",
         "maxItems": max_assumptions,
         "items": {"type": "string", "minLength": _MIN_ASSUMPTION_LEN},
+    }
+
+
+def coauthored_emission_json_schema(
+    *,
+    max_criteria: int = DEFAULT_MAX_CRITERIA,
+    max_assumptions: int = DEFAULT_MAX_ASSUMPTIONS,
+) -> dict:
+    """The JSON schema for the grammar-constrained CO-AUTHORED emission (#1054) — the two
+    schemas above composed into one object, so the constrained shape and the free-text shape
+    are the same shape and neither half can drift from the parser that already validates it.
+    Both keys are required: the whole point of the single pass is that one context produces
+    both, so an object carrying only one is not the co-authored artifact."""
+    return {
+        "type": "object",
+        "properties": {
+            "assumptions": assumptions_emission_json_schema(
+                max_assumptions=max_assumptions
+            ),
+            "criteria": criteria_emission_json_schema(max_criteria=max_criteria),
+        },
+        "required": ["assumptions", "criteria"],
+        "additionalProperties": False,
     }
 
 
@@ -1627,6 +3083,468 @@ def _ensure_delivery_floor(spec: AcceptanceSpec) -> AcceptanceSpec:
 
 
 # ---------------------------------------------------------------------------
+# #1165 M5 — the operator-assets folder contract: enumeration, floors, card line
+# ---------------------------------------------------------------------------
+
+#: The operator's material folder inside a project (``<project>/assets/``). The folder IS
+#: the interface: the operator drops files in with File Explorer; nothing is imported or
+#: registered. MIRRORED BY VALUE in ``shared.fleet.dispatch`` (the create_project seeding
+#: side) — that module deliberately never imports this package, so a gate test pins the
+#: two constants equal instead (the ``_CARD_SANDBOX_REPO_PREFIX`` precedent).
+OPERATOR_ASSETS_DIRNAME = "assets"
+#: Reference material to EMULATE lives in ``assets/reference/`` — the extraction family's
+#: input channel, deliberately OUTSIDE the build manifest: a screenshot to take
+#: inspiration from is not material the build must wire in, so the use floors must never
+#: demand it.
+OPERATOR_ASSETS_REFERENCE_DIRNAME = "reference"
+#: The one-line README ``create_project`` seeds into each folder — OUR scaffold file,
+#: excluded from the manifest by name at the walk root (acknowledging our own README as
+#: the operator's material would be a false card claim on every fresh project).
+OPERATOR_ASSETS_README_NAME = "README.txt"
+
+#: Filename hygiene (design review F5) — the conservative ALLOWLISTED character class a
+#: manifest name must clear, applied PER PATH COMPONENT (a hostile directory name would
+#: otherwise ride the relative path onto the card): letters, digits, space, dash,
+#: underscore, dot; no leading/trailing dot or space; length-capped. The classes are
+#: explicit ASCII ranges, so bidirectional-override, zero-width and control characters
+#: cannot appear in a conforming component, ``..`` (dots only) cannot clear the edge
+#: rule, and card-line spoofing dies at the walk.
+_OPERATOR_ASSET_COMPONENT_RE = re.compile(r"^(?![. ])[A-Za-z0-9 ._\-]{1,80}(?<![. ])$")
+#: Whole relative path length cap (components + separators).
+_OPERATOR_ASSET_REL_NAME_MAX = 160
+#: Bounded walk depth below ``assets/`` (a deeper nest is skipped, counted, and named on
+#: the card — never silently lost, never unboundedly walked).
+_OPERATOR_ASSET_MAX_DEPTH = 4
+#: Per-file and total size caps (bytes). Least data: the manifest carries names, classes
+#: and sizes — never contents — but the files themselves ride into the fleet worktree,
+#: so the caps bound what a plan can sweep in.
+OPERATOR_ASSET_MAX_FILE_BYTES = 25 * 1024 * 1024
+OPERATOR_ASSET_MAX_TOTAL_BYTES = 200 * 1024 * 1024
+#: Manifest entry cap — files beyond it (in deterministic name order) are counted and
+#: named on the card as left out, never silently dropped.
+OPERATOR_ASSET_MAX_FILES = 64
+
+#: The CLOSED extension allowlist, classified for the card and the coder (deny-by-
+#: default: an extension in no class is skipped and counted). Values are the class
+#: names the manifest carries.
+OPERATOR_ASSET_CLASSES: dict[str, frozenset[str]] = {
+    "image": frozenset({
+        "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico",
+    }),
+    "document": frozenset({
+        "pdf", "txt", "md", "rtf", "docx", "odt",
+    }),
+    "data": frozenset({
+        "csv", "tsv", "json", "xlsx", "xls", "ods", "yaml", "yml", "toml",
+    }),
+    "code": frozenset({
+        "py", "js", "mjs", "ts", "html", "css", "c", "h", "cpp", "cs", "java",
+        "rb", "go", "rs", "sh", "ps1", "sql",
+    }),
+    "other": frozenset({
+        "ttf", "otf", "woff", "woff2", "mp3", "wav", "ogg", "mp4", "webm",
+    }),
+}
+
+#: Raster photo extensions — the card line groups these as "N photos" (the class the
+#: operator drops in bulk); everything else renders by (quoted) name.
+_OPERATOR_ASSET_PHOTO_EXTS: frozenset[str] = frozenset(
+    {"png", "jpg", "jpeg", "gif", "webp", "bmp"}
+)
+
+#: Reserved criterion ids for the injected use checks (#1041 identity discipline: the
+#: floor is idempotent because THIS id is present, never because wording looked
+#: asset-ish). The MACHINE floor is web-only and wall-protected + re-injected (two
+#: independent locks); the VISUAL criterion is deliberately operator-tier and DROPPABLE
+#: by a criteria revision (the S3-G posture — taste is revisable, floors are not).
+OPERATOR_ASSETS_FLOOR_ID: str = "operator-assets-floor"
+OPERATOR_ASSETS_VISUAL_ID: str = "operator-assets-visual"
+
+
+def _operator_asset_component_ok(component: str) -> bool:
+    """True iff ONE path component clears the conservative allowlist (F5)."""
+    return bool(_OPERATOR_ASSET_COMPONENT_RE.match(component))
+
+
+def _operator_asset_rel_name_ok(rel: str) -> bool:
+    """True iff a RELATIVE manifest name is well-formed end to end: forward-slash
+    separated, length-capped, no absolute/drive/UNC shape, and EVERY component clears
+    the allowlist. The wire-side twin of the walk's per-entry checks
+    (:func:`_coerce_operator_assets` calls this so a forged payload cannot smuggle a
+    name the walk would have refused)."""
+    if not rel or len(rel) > _OPERATOR_ASSET_REL_NAME_MAX:
+        return False
+    if rel.startswith("/") or "\\" in rel or ":" in rel:
+        return False
+    parts = rel.split("/")
+    if len(parts) > _OPERATOR_ASSET_MAX_DEPTH + 1:
+        return False
+    return all(_operator_asset_component_ok(p) for p in parts)
+
+
+def _operator_asset_class(name: str) -> "str | None":
+    """The closed-allowlist class for a filename, or ``None`` (deny-by-default)."""
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    for cls, exts in OPERATOR_ASSET_CLASSES.items():
+        if ext in exts:
+            return cls
+    return None
+
+
+def _is_reparse_point(entry_path: str) -> bool:
+    """True when the path is ANY reparse point — symlink, junction, or mount point.
+
+    Junctions are the live traversal class on Windows (design review F6): they are
+    creatable WITHOUT elevation and ``os.path.islink`` reports them ``False``, so the
+    check reads the FILE_ATTRIBUTE_REPARSE_POINT bit from ``lstat`` on Windows and
+    falls back to ``islink`` elsewhere. Fail-closed: an unstatable entry is treated as
+    a reparse point (excluded)."""
+    try:
+        st = os.lstat(entry_path)
+    except OSError:
+        return True
+    attrs = getattr(st, "st_file_attributes", 0)
+    if attrs & getattr(_stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
+        return True
+    return _stat.S_ISLNK(st.st_mode)
+
+
+def enumerate_operator_assets(assets_dir: Path) -> "dict | None":
+    """ONE deterministic, rooted enumeration of the operator's ``assets/`` folder —
+    the manifest is the ONLY thing the system acts on (paths TYPED in interview
+    answers are recorded words, never dereferenced; §8 of the maturation design).
+
+    Deny-by-default at every step:
+
+      * ALL reparse points are excluded fail-closed — symlinks, junctions AND mount
+        points (:func:`_is_reparse_point`) — and every kept file must additionally
+        RESOLVE inside the resolved assets root (containment after resolution);
+      * every path component must clear the filename allowlist
+        (:data:`_OPERATOR_ASSET_COMPONENT_RE`) — a non-conforming file is SKIPPED and
+        counted (``skipped_names``) for the card's rename advice;
+      * extensions classify against the CLOSED allowlist; unknown extensions, files
+        over the per-file cap, entries beyond the total/count caps, and unstatable
+        entries are SKIPPED and counted (``skipped_other``);
+      * the seeded :data:`OPERATOR_ASSETS_README_NAME` at the walk ROOT and the whole
+        :data:`OPERATOR_ASSETS_REFERENCE_DIRNAME` subfolder are structurally excluded
+        (our scaffold and the emulation channel are not build material). KNOWN SEAM,
+        disclosed: UC-010's generated images target ``assets/<slug>.png`` on NON-web
+        surfaces (:func:`_asset_target_rel_path`), so a previously image-generating
+        non-web project may carry machine-generated files here; they enumerate like
+        any file and stay visible + vetoable on the card. Web targets live under
+        ``public/assets/`` and never collide (locked).
+
+    Returns ``None`` when the folder does not exist (the absent-folder no-op — every
+    battery project, and every project predating the contract), or when it exists but
+    yields nothing at all to report (the empty-folder honest default: no false
+    "working from your assets" claim, no notice). Otherwise the manifest dict
+    (:attr:`AcceptanceSpec.operator_assets` documents the shape), files sorted by
+    name for byte-deterministic output. A folder that cannot be READ at all returns
+    ``{"files": [], ..., "read_error": True}`` — the fail-SOFT convenience arm: a
+    broken folder read must not block a build the quick path would serve, and the
+    card says so. Never raises."""
+    try:
+        if _is_reparse_point(str(assets_dir)) or not assets_dir.is_dir():
+            return None
+        root = assets_dir.resolve(strict=True)
+    except OSError:
+        return None
+
+    files: list[dict] = []
+    skipped_names = 0
+    skipped_other = 0
+    total = 0
+
+    def _walk(dir_path: Path, rel_parts: tuple[str, ...]) -> None:
+        nonlocal skipped_names, skipped_other
+        try:
+            with os.scandir(str(dir_path)) as it:
+                entries = sorted(it, key=lambda e: e.name)
+        except OSError:
+            if not rel_parts:
+                raise  # root unreadable -> the read_error manifest (fail-soft, loud)
+            skipped_other += 1  # one unreadable SUBfolder skips, the rest still count
+            return
+        for entry in entries:
+            name = entry.name
+            at_root = not rel_parts
+            # Windows filesystems are case-insensitive: the scaffold exclusions match
+            # casefolded so "readme.txt" / "Reference" cannot dodge them.
+            if at_root and name.casefold() == OPERATOR_ASSETS_README_NAME.casefold():
+                continue  # our own seeded scaffold, never operator material
+            # The NAME rule runs FIRST — a pure string check, before any stat (review
+            # F3: a Win32-unstatable name like a raw trailing-dot creation would
+            # otherwise die in the reparse probe's fail-closed arm and be miscounted
+            # as an unsupported type instead of earning the rename advice).
+            if not _operator_asset_component_ok(name):
+                skipped_names += 1
+                continue
+            if _is_reparse_point(entry.path):
+                skipped_other += 1
+                continue
+            try:
+                is_dir = entry.is_dir(follow_symlinks=False)
+            except OSError:
+                skipped_other += 1
+                continue
+            if is_dir:
+                if at_root and (
+                    name.casefold()
+                    == OPERATOR_ASSETS_REFERENCE_DIRNAME.casefold()
+                ):
+                    continue  # the emulation channel (M6's input), not build material
+                if len(rel_parts) + 1 > _OPERATOR_ASSET_MAX_DEPTH:
+                    skipped_other += 1
+                    continue
+                _walk(Path(entry.path), rel_parts + (name,))
+                continue
+            rel = "/".join(rel_parts + (name,))
+            if len(rel) > _OPERATOR_ASSET_REL_NAME_MAX:
+                skipped_other += 1
+                continue
+            cls = _operator_asset_class(name)
+            if cls is None:
+                skipped_other += 1
+                continue
+            # Containment after resolution: whatever the entry claims to be, the path
+            # the system would hand the fleet must still live under the assets root.
+            try:
+                resolved = Path(entry.path).resolve(strict=True)
+                resolved.relative_to(root)
+                size = entry.stat(follow_symlinks=False).st_size
+            except (OSError, ValueError):
+                skipped_other += 1
+                continue
+            if size > OPERATOR_ASSET_MAX_FILE_BYTES:
+                skipped_other += 1
+                continue
+            files.append({"name": rel, "class": cls, "size": int(size)})
+
+    try:
+        _walk(root, ())
+    except OSError:
+        return {"files": [], "skipped_names": 0, "skipped_other": 0,
+                "read_error": True}
+
+    # Deterministic order, then the count + total-size caps over that order — which
+    # files survive the caps is a function of the folder alone, never of walk order.
+    files.sort(key=lambda f: f["name"])
+    kept: list[dict] = []
+    for f in files:
+        if len(kept) >= OPERATOR_ASSET_MAX_FILES:
+            skipped_other += 1
+            continue
+        if total + f["size"] > OPERATOR_ASSET_MAX_TOTAL_BYTES:
+            skipped_other += 1
+            continue
+        total += f["size"]
+        kept.append(f)
+
+    if not kept and not skipped_names and not skipped_other:
+        return None
+    return {"files": kept, "skipped_names": skipped_names,
+            "skipped_other": skipped_other}
+
+
+def _operator_asset_quoted_names(manifest: "dict | None", cap: int) -> list[str]:
+    """Up to *cap* manifest names, each DOUBLE-QUOTED — names are DATA everywhere they
+    render (an instruction-shaped filename stays a quoted list entry, never prose)."""
+    if not manifest:
+        return []
+    names = [str(f.get("name", "")) for f in manifest.get("files") or []]
+    return [f'"{n}"' for n in names[:cap] if n]
+
+
+def operator_assets_card_lines(manifest: "dict | None") -> list[str]:
+    """The plan-card acknowledgment for the operator-assets manifest — rendered from
+    the spec's single carrier, so the card can never disagree with what the floors and
+    the task stamp saw. Empty list (absent manifest, or nothing to say) renders
+    NOTHING — the byte-identical card every flag-off and empty-folder plan keeps.
+
+    Shape: one "Working from your assets folder: …" line — raster photos grouped as a
+    count, everything else a quoted name, name-capped with an "and N more" summary —
+    plus honest skip notices (rename advice for name-hygiene skips; type/size for the
+    rest) and the read-error disclosure. Names render ONLY as quoted list entries."""
+    if not manifest:
+        return []
+    lines: list[str] = []
+    files = [f for f in manifest.get("files") or [] if f.get("name")]
+    if files:
+        photos = [f for f in files
+                  if str(f["name"]).rsplit(".", 1)[-1].lower()
+                  in _OPERATOR_ASSET_PHOTO_EXTS]
+        others = [f for f in files if f not in photos]
+        bits: list[str] = []
+        if len(photos) >= 2:
+            bits.append(f"{len(photos)} photos")
+        else:
+            # A lone photo is named like any file — keep manifest (name) order.
+            others = sorted(photos + others, key=lambda f: str(f.get("name", "")))
+        named = [f'"{f["name"]}"' for f in others[:6]]
+        bits.extend(named)
+        beyond = len(others) - len(named)
+        if beyond > 0:
+            bits.append(f"and {beyond} more file(s)")
+        lines.append(
+            "Working from your assets folder: " + ", ".join(bits) + " — the build "
+            "is graded on actually using them."
+        )
+    if manifest.get("skipped_names"):
+        n = manifest["skipped_names"]
+        lines.append(
+            f"({n} file(s) in your assets folder skipped — rename them to plain "
+            "names (letters, digits, spaces, dots, dashes) and they'll be picked "
+            "up next time.)"
+        )
+    if manifest.get("skipped_other"):
+        n = manifest["skipped_other"]
+        # "item(s)", not "file(s)" — one skip may be a whole too-deep FOLDER, and a
+        # card claiming a folder is a file is a small lie the operator can catch us in
+        # (review F3).
+        lines.append(
+            f"({n} item(s) in your assets folder left out — an unsupported type, "
+            "too big, too deeply nested, or not a plain file.)"
+        )
+    if manifest.get("read_error"):
+        lines.append(
+            "(I couldn't read your assets folder this time, so I'm planning "
+            "without it.)"
+        )
+    return lines
+
+
+def _ensure_operator_assets_floor(spec: AcceptanceSpec) -> AcceptanceSpec:
+    """#1165 M5 (machine half): a WEB-target spec planned over a non-empty operator
+    manifest carries a MACHINE-gated criterion asserting the build actually WIRES the
+    provided files in — a filename-presence check over the built pages.
+
+    Honest limit, stated where it binds: presence-in-markup asserts WIRING, not
+    rendering — the rendered half is the deliberately separate operator-tier visual
+    criterion (:func:`_ensure_operator_assets_visual`). Same discipline as the
+    delivery floor: deterministic, idempotent by the reserved id
+    (:data:`OPERATOR_ASSETS_FLOOR_ID`), web surfaces only (non-web output has no page
+    markup to check — those surfaces get the visual criterion alone), and it derives
+    from the CURRENT ``spec.operator_assets`` — remove the files and it does not
+    inject. Machine tier ⇒ the S3-G wall keeps it keep-only, and the coordinator
+    re-injects it after every criteria revision (two independent locks)."""
+    manifest = spec.operator_assets
+    if not manifest or not manifest.get("files"):
+        return spec
+    surface = ""
+    if isinstance(spec.build_plan, dict):
+        surface = str(spec.build_plan.get("surface", "") or "").strip().lower()
+    if surface not in _DELIVERY_FLOOR_SURFACES:
+        return spec
+    if any(c.id == OPERATOR_ASSETS_FLOOR_ID for c in spec.criteria):
+        return spec
+    named = ", ".join(_operator_asset_quoted_names(manifest, 6))
+    floor = AcceptanceCriterion(
+        id=OPERATOR_ASSETS_FLOOR_ID,
+        text="The build uses the operator's provided asset files from the "
+             "project's assets folder.",
+        tier=TIER_SMOKE,
+        check=(
+            "Assert at least one of the provided asset filenames "
+            f"({named}) appears referenced in the built page markup — presence "
+            "asserts the files are wired in, not that they render."
+        ),
+    )
+    # #1042 L5-1: replace() — carries every field by construction.
+    return replace(spec, criteria=spec.criteria + (floor,))
+
+
+def _ensure_operator_assets_visual(spec: AcceptanceSpec) -> AcceptanceSpec:
+    """#1165 M5 (operator half): the rendered-use criterion — VISUAL tier, judged by
+    the operator's eye (and seen by the VLM critique loop like any visual criterion).
+
+    Deliberately OUTSIDE the machine wall and NOT re-injected after criteria
+    revisions: "your photos appear on the page" is taste-adjacent judgment, and
+    judged checklist items stay the operator's to edit (the S3-G posture, design
+    review F8). Dropping it never weakens the machine gate — the markup floor still
+    asserts wiring. Injected for ANY surface with a non-empty manifest (non-web
+    surfaces get exactly this criterion and no machine floor); idempotent by the
+    reserved id; derives from the CURRENT manifest."""
+    manifest = spec.operator_assets
+    if not manifest or not manifest.get("files"):
+        return spec
+    if any(c.id == OPERATOR_ASSETS_VISUAL_ID for c in spec.criteria):
+        return spec
+    criterion = AcceptanceCriterion(
+        id=OPERATOR_ASSETS_VISUAL_ID,
+        text="Your provided files from the assets folder visibly appear in the "
+             "finished product (your photos where pictures are shown, your real "
+             "content instead of invented stand-ins).",
+        tier=TIER_VISUAL,
+        check="Open it and look for your own material — the files you provided, "
+              "not placeholder stand-ins.",
+    )
+    # #1042 L5-1: replace() — carries every field by construction.
+    return replace(spec, criteria=spec.criteria + (criterion,))
+
+
+def _ensure_bad_input_floor(oracle_code: str, spec: "AcceptanceSpec") -> str:
+    """#1044 (S3 slice D): a python acceptance EXAM must carry at least one machine-gated
+    assertion over malformed input for every entry point it drives — injected here, never
+    requested from the model and hoped for.
+
+    The gap this closes was measured, not theorised: an exam certified a build GREEN while
+    asserting nothing about bad input, and the shipped code crashed on a card dict missing a
+    key and on an answer that was not a string. The ``green_quality`` rubric already NAMES
+    ``bad_input_handling`` as a dimension it scores, so the jury was being asked to judge a
+    property the exam never tested; this makes the exam test it.
+
+    The ruler itself is :mod:`shared.fleet.bad_input_floor` — pure, model-free, and imported
+    LAZILY here, so that with the floor off nothing of it EXECUTES: no target is derived, no
+    block is emitted, and the exam comes back as the same object.
+
+    **RETRACTED and narrowed (#1044 review N1).** This previously said "nothing of it is
+    loaded, let alone executed". The seed-time gate has since made the first half false:
+    :func:`shared.fleet.oracle_qa.fail_to_pass_baseline` imports this module for its reserved
+    test-name prefix on every run, whichever way either flag is set. That import is inert — it
+    binds one string constant and runs no floor code — but "never loaded" claimed more than the
+    design earns, and a dormancy claim that overstates itself is precisely the class this
+    project keeps a gate for. What holds, and is locked on the F2P path, is the narrower
+    statement above: with the floor off no floor behaviour runs and no exam byte changes.
+
+    This wrapper owns only the two gating decisions that belong to this module: an empty exam
+    is left alone, and the ecosystem must be python (:func:`_oracle_ecosystem`) — a node exam
+    is outside the ruler's contract and is returned unchanged.
+
+    FAIL-SOFT AND LOUD, matching this seam's other derivations
+    (:func:`_oracle_signature_contract_line`, :func:`_plan_contract_coverage_warning`): a
+    crash in the ruler returns the exam untouched and logs the floor as NOT APPLIED. The
+    alternative — refusing the plan — would make a derivation bug change what a dispatch can
+    do, which is not this layer's call to make. An absent floor is an absent measurement,
+    never a clean bill, so it is never silent.
+
+    Whether this runs at all is read from ``[fleet_dispatch]`` in the assistant
+    orchestrator's config; this function does not decide it and does not restate it.
+
+    One vintage note, so a reader of the record is not misled: the oracle-QA evidence blob
+    (:func:`author_and_qa_job_oracle`) describes the exam as AUTHORED, before this ruler runs.
+    That is deliberate and correct — the QA gate scores criterion-to-test traceability, floor
+    tests trace to no criterion, and counting them would deflate coverage against a denominator
+    they never served. The blob and the seeded bytes are therefore two vintages of one exam,
+    and the blob is not a description of what ships.
+    """
+    if not oracle_code:
+        return oracle_code
+    if _oracle_ecosystem(spec) != "python":
+        return oracle_code
+    try:
+        from shared.fleet.bad_input_floor import inject_bad_input_floor
+
+        return inject_bad_input_floor(oracle_code)
+    except Exception as exc:  # noqa: BLE001 — a ruler crash must never sink a plan request
+        logger.warning(
+            "generate_plan: bad-input floor crashed (%s: %s) — the exam is seeded WITHOUT "
+            "the floor (fail-soft; bad-input coverage is UNMEASURED for this plan, not clean).",
+            type(exc).__name__, exc,
+        )
+        return oracle_code
+
+
+# ---------------------------------------------------------------------------
 # Compile criteria into task prompts (fleet queue schema unchanged)
 # ---------------------------------------------------------------------------
 
@@ -1691,6 +3609,19 @@ def _thread_build_fields(tasks: list[dict], spec: "AcceptanceSpec") -> list[dict
     # absent key as "no assets"). Stamped once here, identical across every task.
     if spec.asset_specs:
         loop_fields["asset_specs_json"] = json.dumps([dict(a) for a in spec.asset_specs])
+    # #1165 M5: the operator-assets manifest, same conditional-stamp discipline — ONLY
+    # when the manifest carries files, so every manifest-less plan's task dicts stay
+    # byte-identical. JSON-encoding keeps every filename a quoted list entry (names are
+    # data, never prose) all the way to the fleet queue write.
+    if spec.operator_assets and spec.operator_assets.get("files"):
+        loop_fields["operator_assets_json"] = json.dumps(
+            [dict(f) for f in spec.operator_assets["files"]]
+        )
+    # The behaviour-smoke contract, same conditional-stamp discipline — ONLY when the
+    # plan declared one, so every contract-less plan's task dicts stay byte-identical and
+    # the dispatch side (decode_smoke_spec) reads an absent key as "no contract".
+    if spec.smoke_spec:
+        loop_fields["smoke_spec_json"] = json.dumps(dict(spec.smoke_spec))
     for t in tasks:
         t.update(_task_build_fields(build_plan))
         t.update(loop_fields)
@@ -1843,8 +3774,43 @@ def _node_oracle_block(oracle_code: str) -> str:
     )
 
 
+def _job_oracle_task_relevance_line(task: dict) -> str:
+    """#763 — per-task relevance framing for the JOB-level oracle block: names THIS task's
+    own declared W2 contract (creates/exports) so a build task in a >=2-feature job sees
+    exactly which of the shared oracle's assertions ITS part feeds — never the whole job's
+    contract list (that full picture is for the model that AUTHORS the oracle at plan time,
+    :func:`_contracts_block`; a build task only needs its own slice).
+
+    A task with no declared contract still gets an honest, non-empty fallback line — never a
+    silent no-op — because it still needs to know the oracle spans the WHOLE job, not just
+    what it individually produces."""
+    contract = task.get("contract") if isinstance(task.get("contract"), dict) else {}
+    creates = contract.get("creates") or []
+    exports = contract.get("exports") or []
+    bits: list[str] = []
+    if creates:
+        bits.append("creates " + ", ".join(str(c) for c in creates[:8]))
+    if exports:
+        bits.append("exports " + "; ".join(str(e) for e in exports[:8]))
+    if not bits:
+        return (
+            "\nThe oracle asserts the GOAL criteria across the WHOLE job, not just this "
+            "task — build the part you own so the assertions that depend on it pass."
+        )
+    return (
+        "\nYour declared part of this job (" + "; ".join(bits) + ") is exactly what the "
+        "shared oracle's assertions rely on for this slice of the goal — build it so "
+        "those assertions pass."
+    )
+
+
 def compile_prompts(
-    tasks: list[dict], spec: AcceptanceSpec, *, oracle_code: str = ""
+    tasks: list[dict],
+    spec: AcceptanceSpec,
+    *,
+    oracle_code: str = "",
+    job_oracle_code: str = "",
+    job_oracle_path: str = "",
 ) -> list[dict]:
     """Route the behavior/smoke criteria to the coder — FOLDED into the lone feature task
     when there is exactly one, else a dedicated FINAL ``acceptance-tests`` task.
@@ -1887,6 +3853,20 @@ def compile_prompts(
     :data:`ACCEPTANCE_ORACLE_PATH_NODE` (#697), so the seed PATH extension matches the oracle's
     language. Empty ``oracle_code`` (every existing caller, and any multi-feature shape) is
     byte-identical to today's behavior.
+
+    #763 — the JOB-level oracle at MULTI-feature grain (the >=2-feature analogue of #690
+    above, M2 W4 / #740): when ``job_oracle_code``/``job_oracle_path`` are supplied (the
+    14B-written job-level spec-blind oracle asserting the SAME criteria against the tasks'
+    declared W2 contracts — python/node only, see :func:`author_and_qa_job_oracle`), EVERY
+    feature task is told that protected file IS the specification for the whole goal — with
+    its OWN declared contract framed as the slice it feeds (see
+    :func:`_job_oracle_task_relevance_line`) — and the dedicated acceptance task is told NOT
+    to author a second, competing test file, REPLACING the blind "write your own tests"
+    instruction below (the +30pp #690 mechanism, previously unexercised in this default
+    multi-feature shape per the #688 c.1412 audit). Empty ``job_oracle_code``/
+    ``job_oracle_path`` (every existing caller, and any non-python/node, criteria-less,
+    contract-less, or QUALITY-3-refused shape — the overwhelming majority today) is
+    byte-identical to today's blind ``test_block`` behavior.
     """
     feature = [dict(t) for t in tasks]
     test_criteria = [c for c in spec.criteria if c.tier in TEST_TIERS]
@@ -1990,6 +3970,59 @@ def compile_prompts(
         only = feature[0]
         only["prompt"] = f"{only['prompt']}\n\n--- Acceptance tests ---\n{test_block}"
         return _thread_build_fields(feature, spec)
+
+    # #763 — the JOB-level oracle (M2 W4, #740) at multi-feature grain: the job-grain mirror
+    # of the #690 oracle_block above. When PLAN time already produced ONE job-level
+    # spec-blind oracle (:func:`author_and_qa_job_oracle`, or a caller override, #752 F2)
+    # asserting these SAME criteria against the tasks' declared W2 contracts, feed it to the
+    # coder as INPUT instead of the blind "write your own tests" instruction below — the
+    # +30pp #690 mechanism, unexercised in this >=2-feature shape (the DEFAULT for most jobs)
+    # per the #688 c.1412 audit. EVERY build task is told the oracle exists + its OWN
+    # declared contract is the slice the oracle exercises (per-task relevance — a build task
+    # cannot see the whole job, only what it is responsible for); the dedicated acceptance
+    # task is told NOT to author competing tests, only to close integration gaps. Empty
+    # job_oracle_code/path (no python/node target, no test criteria, no declared contract, or
+    # a QUALITY-3-refused emission — the overwhelming majority today) is BYTE-IDENTICAL to
+    # today's blind test_block below.
+    if job_oracle_code and job_oracle_path:
+        contract = _oracle_import_contract(job_oracle_code)
+        contract_line = ""
+        if contract:
+            joined = ", ".join(f"`{s}`" for s in contract)
+            contract_line = (
+                "\nThe protected job oracle imports EXACTLY these names once every part of "
+                f"this job is merged: {joined}. A missing or renamed one means pytest cannot "
+                "even collect the tests and the JOB scores zero on plumbing, not on logic."
+            )
+        signature_line = _oracle_signature_contract_line(job_oracle_code)
+        oracle_header = (
+            "--- Job-level acceptance tests (DO NOT EDIT) ---\n"
+            f"A protected job-level acceptance-test file `{job_oracle_path}` IS the "
+            "specification for this WHOLE multi-part goal. It is graded ONCE, on the FINAL "
+            "integrated project after every part has merged — not on your part alone. Do "
+            "NOT edit, weaken, delete, rename, or skip any test in it, and do NOT create a "
+            "second test file that duplicates it: it is restored to the original before "
+            "grading, so changing it cannot help and only wastes the attempt."
+        )
+        for t in feature:
+            t["prompt"] = (
+                f"{t['prompt']}\n\n{oracle_header}"
+                f"{_job_oracle_task_relevance_line(t)}{contract_line}{signature_line}"
+            )
+        acceptance_task = {
+            "repo": feature[-1].get("repo", ""),
+            "task": ACCEPTANCE_TASK_SLUG,
+            "prompt": (
+                f"{oracle_header}\nYour job here is NOT to author another test file — the "
+                "protected job oracle above already asserts every criterion end-to-end "
+                "against the merged project. Use this task to close any remaining gap "
+                "between the merged parts and those assertions (integration glue, a missing "
+                "wire-up, a mismatched signature) WITHOUT touching the protected file."
+                + contract_line
+                + signature_line
+            ),
+        }
+        return _thread_build_fields(feature + [acceptance_task], spec)
 
     acceptance_task = {
         "repo": feature[-1].get("repo", ""),
@@ -2140,6 +4173,101 @@ def repo_will_scaffold(repo: Path) -> bool:
         return False
 
 
+def is_empty_new_project(repo: Path) -> bool:
+    """True iff *repo* is an empty/new shell at PLAN time — the #1161 empty-project signal.
+
+    The SAME pair #888 established for the New-Project card disclosure, named once so the
+    gradeable-stack default, the corridor's mobile refusal and the card's build-risk line
+    can never drift apart: the ecosystem sniff is blind (``unknown`` — no manifest, no
+    ``*.py``) AND a fresh dispatch would seed a scaffold (:func:`repo_will_scaffold` — no
+    project marker at any depth). A repo of loose ``.py`` scripts with no manifest sniffs
+    ``python`` and is correctly NOT empty; a README-only New-Project shell is. Fail-closed:
+    an unreadable repo returns False (today's behavior, no default fires)."""
+    try:
+        rp = Path(repo)
+    except (TypeError, ValueError):
+        return False
+    return detect_ecosystem(rp) == "unknown" and repo_will_scaffold(rp)
+
+
+def platform_was_assumed(clarifications) -> bool:
+    """True when the SURFACE was chosen by the system, not by the operator (#1174).
+
+    A clarification records ``assumed=True`` when it came from the "just decide for me"
+    path — the system wrote the question, wrote the answer, and the plan card shows it as
+    an assumption. That is honest bookkeeping, and for most axes it is fine: a wrong guess
+    about scope or styling is visible in the result and cheap to redo.
+
+    The SURFACE axis is not like the others. It decides whether the operator gets a
+    website, a windowed app, or a command-line tool, and every downstream choice —
+    scaffold, capture tier, design check — follows from it. Getting it wrong does not
+    produce a flawed version of the right thing; it produces the wrong thing.
+
+    Measured 2026-07-29: on a fresh repo the decide-path surface default resolves to a
+    command-line tool "the kind whose behavior can be fully checked automatically", and
+    the run's report then told the operator "The person clarified these requirements"
+    above five answers the person never gave. They expected an app. Reading a plan card is
+    not the same act as making a choice, and an assumption the operator COULD have
+    answered in one tap should not ride to a build unchallenged.
+
+    Reads defensively: any non-mapping entry is ignored, and a clarification with no axis
+    tags cannot claim the surface — an untagged entry is treated as not-a-surface-claim
+    rather than guessed at. #1197: both live paths now TAG (the coordinator passes
+    ``record_axes=True`` unconditionally), so the untagged case is a legacy/replayed record
+    rather than a live one; the no-guess rule stays because it is what keeps this gate's
+    only failure mode a false NEGATIVE. Inferring an axis from an untagged entry would let
+    it fire on the cases the narrowness claims deliberately exclude."""
+    for entry in clarifications or ():
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("assumed"):
+            continue
+        axes = entry.get("axes")
+        if isinstance(axes, (list, tuple)) and "surface" in axes:
+            return True
+    return False
+
+
+def surface_axis_was_put_to_the_operator(clarifications) -> bool:
+    """True when SOME clarification covers the surface axis — i.e. the platform was put to
+    the operator, whether they answered it themselves or asked the system to decide (#1219).
+
+    False means nobody asked at all: the #819 clarify stage judged the goal sufficient, no
+    question was raised, and the surface on the plan card came from the classifier reading
+    their goal. That is a weaker claim than the other two — derived from THEIR words rather
+    than invented — but the card stated it as flat fact, so they could not tell it apart
+    from a choice they had made. This is what the disclosure keys off.
+
+    Same defensive read as :func:`platform_was_assumed`: non-mapping entries are skipped and
+    an untagged entry cannot claim the surface. The two therefore agree by construction
+    about which entry IS the surface, and cannot drift apart."""
+    for entry in clarifications or ():
+        if not isinstance(entry, dict):
+            continue
+        axes = entry.get("axes")
+        if isinstance(axes, (list, tuple)) and "surface" in axes:
+            return True
+    return False
+
+
+def platform_question_for_assumed_surface() -> dict:
+    """The platform menu to ask when the system assumed the surface (#1174).
+
+    Deliberately the SAME curated question and options increment-4 already asks for a
+    model-flagged ambiguous fork -- one platform question exists in this system, with one
+    wording and one option list, so the operator never meets two dialects of the same
+    choice. The caller applies :func:`suppress_phone_option_for_fresh_repo` exactly as it
+    does for the increment-4 path, so a fresh repo is never offered a build the corridor
+    will refuse."""
+    return _platform_entry(frozenset({"desktop-gui", "web", "mobile"}))
+
+
+def _build_plan_surface(spec: "AcceptanceSpec") -> str:
+    """The spec's classified surface, or ``""`` when unclassified (#1118). Pure, never raises."""
+    plan = getattr(spec, "build_plan", None)
+    return str(plan.get("surface", "")) if isinstance(plan, dict) else ""
+
+
 def scaffold_gated_ecosystem(build_plan: dict | None) -> str:
     """The behavior-GATED ecosystem (``python`` | ``node``) the fleet's scaffold will produce for
     this build-signal, or ``""`` when the scaffold is NOT gate-run (#888).
@@ -2273,6 +4401,8 @@ def render_criteria_preview(
     tasks: list | None = None,
     revise_hint: str = "",
     scaffold_ecosystem: str = "",
+    coverage_blocked: str = "",
+    will_scaffold: bool = False,
 ) -> str:
     """The confirm-time preview the operator approves (PLAN -> WAIT).
 
@@ -2310,14 +4440,53 @@ def render_criteria_preview(
     resolves the scaffold's behaviour-GATED ecosystem (``node``/``python``, via
     :func:`scaffold_gated_ecosystem`, and ONLY when :func:`repo_will_scaffold`) and passes it here,
     the ``unknown``-ecosystem branch states the run's truth instead. Empty ``""`` (every existing
-    caller, an unknown/none surface, an existing repo, or a non-gated scaffold like ``web-static``)
-    preserves the honest warning BYTE-FOR-BYTE — this is a coverage-DISCLOSURE fix and NEVER widens
+    caller, an unknown/none surface, or an existing repo) preserves the honest warning
+    BYTE-FOR-BYTE. NOTE (#1123 D5): ``web-static`` was named here as an example of that
+    byte-for-byte case and no longer is — #1118 gave it its own honest wording ("a plain HTML
+    page has no test runner", which is the real limitation; its language was never unknown).
+    This is a coverage-DISCLOSURE fix and NEVER widens
     an actual coverage claim.
+
+    ``coverage_blocked`` (#1069 S3-F) is the intake coverage-gate's blocking marker
+    (:func:`_coverage_blocked_message` text, carried on the pending plan). Non-empty: the
+    card leads with the blocked notice and the footer offers revise/reject ONLY — never
+    approve, because the coordinator would refuse it anyway and a card must not offer a
+    verb the system will not honour. Empty ``""`` (every non-intake plan) renders
+    byte-identically to before.
+
+    ``will_scaffold`` (#1161 direction 2) marks a plan that will scaffold a FRESH repo
+    (the coordinator passes :func:`repo_will_scaffold`'s answer, computed once at plan
+    time and carried on the pending slots so revise re-renders keep it). It lets the
+    ``unknown``-ecosystem branch tell apart the two cases ``scaffold_ecosystem == ""``
+    conflates: an EXISTING repo whose language defeated detection (the old honest
+    warning, unchanged) versus a NAMED stack about to be built FROM NOTHING with no
+    behavior gate — the morning-run case, where the card disclosed the grading blindness
+    but not the build risk, though both had the same root cause. For that second case the
+    card now carries the build-risk line: the stack is unproven from an empty project,
+    and a command-line tool would be fully checkable. False (every pre-#1161 caller and
+    every parked pre-#1161 row) renders byte-identically to before.
     """
     lines = [f"Here's what I'll treat as DONE for: {spec.goal}", ""]
+    if coverage_blocked:
+        lines += [
+            "APPROVAL IS BLOCKED FOR NOW — details at the bottom of this card.",
+            "",
+        ]
     friendly = _friendly_surface(spec)
     if friendly is not None:
-        lines.append(f"Building this as: {friendly}.")
+        # #1219: when the platform was never PUT to the operator — the clarify stage judged
+        # the goal sufficient, so no question was asked and no clarification covers the
+        # surface — this line was a flat statement of fact he could not tell apart from a
+        # choice he had made. Say where it came from. The other two cases already disclose
+        # themselves elsewhere on the card ("what you told me" / "you asked me to decide"),
+        # so they stay byte-identical and no extra turn is added on any path.
+        if surface_axis_was_put_to_the_operator(spec.clarifications):
+            lines.append(f"Building this as: {friendly}.")
+        else:
+            lines.append(
+                f"Building this as: {friendly}. I worked that out from your goal — you "
+                "weren't asked to pick, so reject this if it's wrong."
+            )
         lines.append("")
     if tasks:
         lines.append(f"Here's how I'll build it ({len(tasks)} task(s)):")
@@ -2334,8 +4503,22 @@ def render_criteria_preview(
     # what I decided for them ("just decide for me" -> assumed defaults). Display-only, so a
     # wrong answer/default is caught before the ~30-minute build. Absent (a sufficient goal /
     # clarify off) -> no section, byte-identical to before.
-    answered = [c for c in spec.clarifications if not c.get("assumed")]
+    # #1120: an answer CARRIED FORWARD from an earlier dispatch for this project gets its own
+    # heading. Silently folding it in with "what you told me when I asked" would let something
+    # said three attempts ago pass for something said this turn — and an invisible memory is
+    # worse than none, because the operator cannot correct what they cannot see.
+    remembered = [c for c in spec.clarifications
+                  if c.get("remembered") and not c.get("assumed")]
+    answered = [c for c in spec.clarifications
+                if not c.get("assumed") and not c.get("remembered")]
     assumed = [c for c in spec.clarifications if c.get("assumed")]
+    if remembered:
+        lines.append(
+            "I'm still using what you told me about this project earlier "
+            "(`/dispatch forget <project>` to clear it):"
+        )
+        lines.extend(f"  - {str(c.get('answer', '')).strip()}" for c in remembered)
+        lines.append("")
     if answered:
         lines.append("Here's what you told me when I asked (this shaped the plan):")
         lines.extend(f"  - {str(c.get('answer', '')).strip()}" for c in answered)
@@ -2346,6 +4529,31 @@ def render_criteria_preview(
         )
         lines.extend(f"  - {str(c.get('answer', '')).strip()}" for c in assumed)
         lines.append("")
+    # #1165 M5: the operator-assets acknowledgment — what the plan-time enumeration of
+    # the project's assets folder found, rendered from the spec's single carrier
+    # (operator_assets) so this card, the injected floors and the task stamp can never
+    # disagree. Absent/empty manifest (every flag-off plan, every folderless project)
+    # renders NOTHING — byte-identical card. Filenames appear ONLY as quoted list
+    # entries inside the helper (names are data, never prose).
+    asset_lines = operator_assets_card_lines(spec.operator_assets)
+    if asset_lines:
+        lines.extend(asset_lines)
+        lines.append("")
+    # #1130: if any image prompt asked for literal text, say plainly that the picture
+    # will not contain it. Silence here would be the same failure as the garbled text
+    # itself — the operator reads "book cover with the title above" on the card, sees
+    # text-shaped pixels in the result, and never learns the words are nonsense.
+    text_asks = [a for a in spec.asset_specs if isinstance(a, dict) and a.get("text_removed")]
+    if text_asks:
+        lines += [
+            "About the words you asked for INSIDE the pictures:",
+            "  - Generated images can't spell — the picture would come out with "
+            "convincing-looking gibberish instead of your title and name.",
+            "  - So I'm generating the artwork only, and the titles and names should go "
+            "on the PAGE over the image, where they'll be correct and readable.",
+            "",
+        ]
+
     obj = spec.objective
     hum = spec.human
     if obj:
@@ -2374,6 +4582,49 @@ def render_criteria_preview(
                 "checks WILL run once it's built — a clean report means the behavior was "
                 "tested, not just that it compiled.",
             ]
+        elif _build_plan_surface(spec) == SURFACE_WEB_STATIC:
+            # #1118 honesty: for a lone static page the language is NOT unknown (it is HTML) —
+            # the real reason the checks are off is that a plain HTML page has no test runner.
+            # The generic "couldn't tell the language" line sent the operator hunting for a
+            # detection bug that was not there, and hid the actual limitation.
+            # #1123 D7: attribute this to the PLAN, not to the repo. `scaffold_ecosystem`
+            # is "" both for "no scaffold will run" and "the scaffold isn't behaviour-
+            # gated", so an EXISTING repo whose language detection failed reaches here
+            # too — and asserting "this is a plain HTML page" about a repo that may well
+            # have tests would be a guess dressed as a fact. What we DO know is what the
+            # plan classified.
+            lines += [
+                "",
+                "Heads up: I'm planning this as a plain HTML page, which has no automatic "
+                "test runner — so the behavior above is yours to verify by eye. A clean "
+                "report means it was built, not that it does what you asked.",
+            ]
+        elif will_scaffold and _friendly_surface(spec) is not None:
+            # #1161 direction 2 — the BUILD-RISK disclosure. This arm is the fresh-repo,
+            # named-stack, no-behavior-gate case (a desktop app about to be scaffolded
+            # from nothing is the measured instance). The card already disclosed the
+            # GRADING blindness on the morning run; the build risk — same root cause —
+            # went undisclosed, and the operator approved the fleet's least-proven path
+            # without knowing it was one. Both honesty lines now ride the same beat.
+            # Review F4: when the blind stack IS a command-line tool (a corroborated
+            # PowerShell/C++ CLI), "a command-line tool is the kind I can fully check"
+            # would contradict the warning two clauses earlier — the checkable
+            # alternative is then named precisely (a PYTHON command-line tool).
+            friendly = _friendly_surface(spec)
+            checkable = (
+                "A python command-line tool"
+                if friendly == _SURFACE_FRIENDLY["command-line"]
+                else "A command-line tool"
+            )
+            lines += [
+                "",
+                f"Heads up: this would be {friendly} built from an EMPTY project — the "
+                "fleet's least-proven path. Its behavior can't be auto-checked, and a "
+                f"first build from nothing fails more often than any other kind. {checkable} "
+                "is the kind I can fully check for you — reject and "
+                f"say so in the goal if that would do. Approve only if {friendly} is "
+                "really what you want.",
+            ]
         else:
             lines += [
                 "",
@@ -2386,7 +4637,20 @@ def render_criteria_preview(
     # coordinator supplies the exact phrasing incl. the honest remaining-revisions count). An
     # empty ``revise_hint`` (every pre-#820 caller, and a plan at its revision cap) renders the
     # original approve/reject-only footer byte-identically.
-    if revise_hint:
+    if coverage_blocked:
+        # #1069 S3-F: a blocked card never offers approve — the coordinator refuses it, and
+        # a card offering a verb the system will not honour is a lie of the UI's making.
+        lines += ["", coverage_blocked]
+        if not revise_hint:
+            # Review F3: at the revision cap the marker's baked revise offer is stale —
+            # supersede it explicitly rather than let two surfaces disagree about which
+            # verbs still work.
+            lines += [
+                "",
+                "(Refinements are used up on this plan, so the revise offer above no "
+                "longer applies — `/dispatch reject` to start over.)",
+            ]
+    elif revise_hint:
         lines += [
             "",
             "Reply `/dispatch approve` to start, `/dispatch reject` to cancel, or "
@@ -2870,14 +5134,59 @@ def _contracts_block(tasks: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _coverage_contract_block(tasks: list[dict]) -> str:
+    """The 1:1 import pin fed to the exam author's prompt in intake mode (#1069 S3-F).
+
+    Derived from the SAME ruler-validated contracts as :func:`_contracts_block`, but stated
+    as an OBLIGATION rather than a listing: every part's declared modules must be imported
+    and exercised, and no undeclared first-party module may be. This is the "coverage by
+    construction" half of the intake coverage gate; the deterministic
+    :func:`~shared.fleet.context_pack.contract_coverage` measurement afterwards is the
+    guarantee half — the pin shapes the model, the check refuses its failures. Tasks with no
+    usable contract contribute nothing (the coverage check counts them uncovered either way,
+    which is the honest reading — an exam cannot cover an interface nobody declared). Empty
+    ``""`` when NO task declares a contract. Pure + deterministic."""
+    lines: list[str] = []
+    for t in tasks:
+        contract = t.get("contract") if isinstance(t.get("contract"), dict) else {}
+        creates = [str(c).strip() for c in (contract.get("creates") or []) if str(c).strip()]
+        exports = [str(e).strip() for e in (contract.get("exports") or []) if str(e).strip()]
+        if not creates and not exports:
+            continue
+        slug = str(t.get("task", "") or "").strip() or "task"
+        bits: list[str] = []
+        if creates:
+            bits.append("modules " + ", ".join(creates[:8]))
+        if exports:
+            bits.append("exports " + "; ".join(exports[:8]))
+        lines.append(f"- {slug}: " + "; ".join(bits))
+    if not lines:
+        return ""
+    return (
+        "IMPORT COVERAGE IS A HARD REQUIREMENT (it is checked mechanically after you "
+        "write):\n"
+        "- Import and exercise at least one declared module or export of EVERY part "
+        "listed below.\n"
+        "- Import NO first-party module that is not declared below (standard library "
+        "imports are fine).\n"
+        + "\n".join(lines)
+    )
+
+
 def generate_job_acceptance_oracle(
     goal: str,
     spec: "AcceptanceSpec",
     tasks: list[dict],
     *,
     generate_fn: Callable[[str], str],
+    coverage_contract: str = "",
 ) -> tuple[str, str]:
     """PLAN-time: the 14B writes the JOB-LEVEL spec-blind oracle for a MULTI-task job.
+
+    ``coverage_contract`` (#1069 S3-F) is an optional deterministic obligation block
+    appended to the contracts listing in the prompt — the intake mode's 1:1 import pin,
+    plus any repair note on the bounded re-authoring. ``""`` (every non-intake caller)
+    keeps the prompt byte-identical.
 
     This is the PURE authoring primitive (unchanged): it emits + structurally validates
     ONE oracle. The QUALITY-3 (#821) validation gate — the static well-posedness stages,
@@ -2929,10 +5238,13 @@ def generate_job_acceptance_oracle(
     template = (
         _JOB_ORACLE_TEMPLATE_PY if ecosystem == "python" else _JOB_ORACLE_TEMPLATE_NODE
     )
+    contracts_text = _contracts_block(tasks)
+    if coverage_contract:
+        contracts_text = f"{contracts_text}\n\n{coverage_contract}"
     try:
         raw = generate_fn(template.format(
             goal=(goal or "").strip(),
-            contracts=_contracts_block(tasks),
+            contracts=contracts_text,
             criteria=criteria_block,
         ))
     except Exception:  # noqa: BLE001 — an oracle-gen failure must not crash the plan
@@ -2967,6 +5279,7 @@ def author_and_qa_job_oracle(
     structured_generate_fn: "Callable[[str, str], str] | None" = None,
     reauthor: bool = True,
     operator_answers: "Sequence[str] | None" = (),
+    coverage_contract: str = "",
 ) -> tuple[str, str, dict]:
     """PLAN-time: author the job oracle (:func:`generate_job_acceptance_oracle`) AND run
     it through the QUALITY-3 (#821) validation gate before it seeds.
@@ -2982,6 +5295,10 @@ def author_and_qa_job_oracle(
     rendered block extracts these with
     :func:`shared.fleet.clarify.operator_answers_from_block`.
 
+    ``coverage_contract`` (#1069 S3-F) rides through verbatim to
+    :func:`generate_job_acceptance_oracle` — the intake mode's 1:1 import pin. ``""``
+    (every non-intake caller) authors the byte-identical prompt.
+
     Returns ``(oracle_code, rel_path, qa_evidence)``. On a clean or SOFT-only validation
     the (possibly regenerated) code is returned with a ``seed``/``seed-partial`` evidence
     stamp; on a HARD residual the oracle is REFUSED (code ``""`` — a bad oracle is worse
@@ -2994,7 +5311,9 @@ def author_and_qa_job_oracle(
     the pre-#821 author-only path did — the authored ``(code, path)`` seeds unvalidated
     (never a crash, never a blocked plan). ``reauthor=False`` validates + stamps a
     caller-authorised oracle (the #752 override branch) without rewriting it."""
-    code, path = generate_job_acceptance_oracle(goal, spec, tasks, generate_fn=generate_fn)
+    code, path = generate_job_acceptance_oracle(
+        goal, spec, tasks, generate_fn=generate_fn, coverage_contract=coverage_contract
+    )
     if not code or not path:
         return (code, path, {})
     try:
@@ -3115,6 +5434,94 @@ def _plan_contract_coverage_warning(
     )
 
 
+def _coverage_measured_clean(
+    tasks: list[dict], oracle_rel: str, oracle_code: str
+) -> bool:
+    """#1069 S3-F (review F1): True ONLY when coverage was MEASURED and came back clean —
+    a non-``None`` :func:`contract_coverage` dict with zero uncovered tasks AND zero
+    orphan imports.
+
+    ``None`` (not computable: no exam, or no usable first-party import target) and a
+    derivation crash are both False. The warning helper's own contract calls an absent
+    measurement "never a clean bill", and inside the ENGAGED gate that has teeth: the
+    repair-adoption and post-revision-unblock decisions release the block, so treating
+    "could not measure" as "measured clean" there would open the exact hole the gate
+    closes — through its own repair door (a repair that over-complies and strips every
+    first-party import measures ``None``, not clean). Deny-by-default: unmeasurable keeps
+    the block."""
+    try:
+        coverage = contract_coverage(tasks, oracle_rel, oracle_code)
+    except Exception:  # noqa: BLE001 — cannot measure ⇒ NOT clean, never fail-open
+        return False
+    if not coverage:
+        return False
+    return not coverage["uncovered_tasks"] and not coverage["orphan_imports"]
+
+
+def _coverage_orphan_only(
+    tasks: list[dict], oracle_rel: str, oracle_code: str
+) -> bool:
+    """#1069 S3-F (review F4): True when the measured gap consists ONLY of orphan
+    imports (every task covered; the exam imports something no task declares). This gap
+    class cannot be cleared by any plan revision — revise ops mint contract-less task
+    dicts and never touch the exam — so the blocked message routes to the verb that can
+    actually converge (reject + re-dispatch) instead of inviting a structurally futile
+    revise. False on unmeasurable/crash (the generic message then stands)."""
+    try:
+        coverage = contract_coverage(tasks, oracle_rel, oracle_code)
+    except Exception:  # noqa: BLE001 — unmeasurable ⇒ not a classified gap
+        return False
+    if not coverage:
+        return False
+    return bool(coverage["orphan_imports"]) and not coverage["uncovered_tasks"]
+
+
+def _coverage_blocked_message(coverage_warning: str) -> str:
+    """The operator-facing BLOCKING text for an intake-mode coverage gap (#1069 S3-F).
+
+    ONE builder, used by both the plan-time gate (:func:`generate_plan`) and the gateway
+    coordinator's post-revision re-evaluation, so the card and the approve refusal can never
+    drift apart. The framing is the operator's own (#1069 c.2512): this is not the system
+    refusing the operator's judgement — it is the system declining to record a GREEN it
+    could not earn. The named gap rides verbatim so revise has something concrete to aim at."""
+    return (
+        "I can't let this plan be approved yet: the exam that would grade it does not "
+        f"cover the plan, so a passing result would not mean the build works. "
+        f"({coverage_warning}) I already tried one automatic repair of the exam. "
+        "Reply `/dispatch revise <what to change>` to change the plan, or "
+        "`/dispatch reject` to cancel."
+    )
+
+
+#: #1165 M4: the sentence that DEFINES the orphan-only blocked variant. Embedded in the
+#: builder below AND keyed on by :func:`coverage_blocked_is_orphan_only`, so the text and
+#: the predicate live in one place and cannot drift apart.
+_ORPHAN_ONLY_BLOCKED_SIGNATURE = "changing the plan's steps can't fix this kind of gap"
+
+
+def coverage_blocked_is_orphan_only(marker: str) -> bool:
+    """True when a carried ``coverage_blocked`` marker is the orphan-only variant — the
+    gap class no plan revision can clear (#1069 S3-F review F4). Render-time surfaces
+    (#1165 M4: the playback invitation must not promise a fix revise cannot deliver)
+    classify the CARRIED marker through this instead of holding a second state bit that
+    could contradict it; the shared signature constant keeps builder and predicate
+    honest together. ``False`` for empty/unknown text (the generic reading stands)."""
+    return _ORPHAN_ONLY_BLOCKED_SIGNATURE in (marker or "")
+
+
+def _coverage_blocked_message_orphan_only(coverage_warning: str) -> str:
+    """The orphan-only variant of :func:`_coverage_blocked_message` (review F4): a plan
+    change cannot clear this gap class, and the message must not offer a verb that can
+    never converge."""
+    return (
+        "I can't let this plan be approved: the exam that would grade it checks for "
+        "something no part of the plan builds, so a passing result would not mean the "
+        f"build works. ({coverage_warning}) I already tried one automatic repair of the "
+        f"exam, and {_ORPHAN_ONLY_BLOCKED_SIGNATURE} — reply "
+        "`/dispatch reject` and start a new dispatch with the goal re-described."
+    )
+
+
 def generate_plan(
     idea: str,
     repo: str,
@@ -3132,9 +5539,25 @@ def generate_plan(
     max_questions: int = _clarify.DEFAULT_MAX_QUESTIONS,
     revise: bool = False,
     advanced_intake: bool = False,
+    bad_input_floor: bool = False,
+    coherence_gate: bool = False,
+    coverage_gate: bool = False,
+    criteria_revise: bool = False,
+    interview: bool = False,
+    assets_pipeline: bool = False,
+    interview_voice: bool = False,
+    research_grounding: bool = False,
+    research_index: "DocsetIndex | None" = None,
 ) -> PlanResult:
     """The 14B-resident PLAN step: decompose into tasks + an AcceptanceSpec, validate both,
     compile the criteria into the task prompts.
+
+    ``research_grounding`` (#746, DORMANT by default) threads plan-time LOCAL-docs
+    grounding into the decompose call: False (the default) keeps the decompose prompt
+    byte-identical to today; True prefixes it with a bounded ``ground_goal`` block over
+    the staged docset (zero egress, degrade-gracefully). ``research_index`` injects an
+    index for tests (``None`` uses the process-wide default). Only the decompose limb is
+    grounded — criteria generation is unchanged.
 
     Returns COMPILED tasks (ready to enqueue on approval) + the validated spec (for the
     confirm preview and the later report). The spec also carries the 14B's PRODUCT-LEVEL
@@ -3173,9 +5596,133 @@ def generate_plan(
     never a fresh decompose. Gated by ``revise`` (default False == today); ``revise=False`` on a
     revise goal is a clean Fail-Closed refusal (the knob is off), never a fresh plan of the
     sentinel-laden string.
+
+    #1044 — the BAD-INPUT EXAM FLOOR (S3 slice D). ``bad_input_floor`` requires
+    ``advanced_intake`` as well: BOTH must be True before a python acceptance exam gains the
+    machine-injected malformed-input assertions (:func:`_ensure_bad_input_floor`). It is a
+    separate knob because it changes what a build is GRADED on — a build that only ever worked
+    on the happy path now fails an exam it used to pass — which is a capability change and
+    therefore its own decision, not a rider on an already-live flag. Either knob False leaves
+    the exam bytes, the compiled tasks and the coverage warning byte-identical, and no floor
+    code runs — the ruler is not imported anywhere on the PLAN path (the seed-time F2P gate
+    imports it for a constant regardless of the flags; see :func:`_ensure_bad_input_floor`).
+    Card-driven dispatches self-suppress exactly as the S1 floors do: a battery card IS the
+    exam, frozen for cross-night comparability.
+
+    #1054 — COHERENCE BY SINGLE AUTHORSHIP. ``coherence_gate`` requires ``advanced_intake``
+    as well (both, or the path does not exist) and self-suppresses for a card-driven dispatch,
+    like every other intake stage. When it is on, the criteria and the assumptions are authored
+    in ONE model call whose prompt carries both jobs and the scope anchor, so the model cannot
+    rule a capability out in one block and require it in the other; the authored pair is then
+    checked by a deterministic contradiction gate
+    (:func:`shared.fleet.coherence.check_coherence`), which REFUSES the plan — ``ok=False``, no
+    tasks, the disagreement named in plain language — rather than render a self-contradicting
+    spec. A gate that cannot RUN also refuses. The prompt is the quality half and the gate is
+    the guarantee half, so a model regression can defeat the first and not the second.
+
+    The gate reports only ESTABLISHED contradictions; it does not refuse on what it merely
+    could not check, and its reach is narrow by design. That contract, and what it provably
+    misses, is documented on :mod:`shared.fleet.coherence` and is deliberately not restated
+    here. Off (the default) is byte-identical to the two-call path.
+
+    #1069 S3-F — the COVERAGE GATE ("the system won't let you sign something it couldn't
+    check"). ``coverage_gate`` requires ``advanced_intake`` as well and self-suppresses for a
+    card-driven dispatch, like every other intake stage. Scoped to the multi-task job-exam
+    shape: a single-task plan owns everything by construction, and a plan that honestly
+    authors NO exam (build-only ecosystems) is a DISCLOSED absence, not a gap — blocking
+    there would be a new refusal outside the one the operator ratified (#1069 c.2461). When
+    it is on: the exam author's prompt carries a deterministic 1:1 import pin derived from
+    the task contracts (coverage BY CONSTRUCTION, :func:`_coverage_contract_block`); a
+    residual #989 coverage gap triggers ONE bounded re-authoring with the gap named; a gap
+    that survives sets :attr:`PlanResult.coverage_blocked` — the plan still renders, and the
+    gateway coordinator refuses approval while the marker is set, re-evaluating it after
+    every revision. A re-authoring that comes back EMPTY is discarded and the original exam
+    kept: the gate must never convert "an exam with a gap" into "no exam at all", because an
+    absent exam is approvable. Adoption and unblock both require MEASURED-CLEAN coverage
+    (:func:`_coverage_measured_clean`) — an unmeasurable result keeps the block. Known
+    limit: the #821 QA gate's bounded regeneration repairs code single-focus and does not
+    carry the pin; a regeneration that drops pinned imports is caught by the deterministic
+    measurement (a block — the safe direction, never an unsound approval). Off (the
+    default) is byte-identical: no pin in the prompt, no re-authoring, never a marker.
+
+    #1069 S3-G — CRITERIA REVISION. When the goal carries the criteria-revise sentinel (the
+    operator's criteria/scope feedback on a PENDING plan;
+    :func:`shared.fleet.revise.compose_criteria_revision_goal` embedded the feedback + the
+    current criteria rows), this RETURNS EARLY with validated edit ops in
+    :attr:`PlanResult.criteria_revision` and NO tasks/spec — the gateway coordinator applies
+    them to the pending spec, re-injects the deterministic floors, and re-renders. Gated on
+    ``criteria_revise`` AND ``advanced_intake`` (both, or the path does not exist); off on a
+    criteria-revise goal is a clean Fail-Closed refusal the coordinator renders as the
+    honest #1055 message — the dormant default is byte-identical operator behaviour. The
+    machine-tier wall (build/behavior/smoke rows are keep-only) is enforced in the apply
+    ruler, where the real tiers live.
+
+    #1031 S2 — the ADVANCED-INTAKE INTERVIEW. ``interview`` requires ``advanced_intake``
+    as well: when both are on AND the goal carries the intake marker
+    (:data:`shared.fleet.clarify.INTAKE_SENTINEL` — the gateway appends it for a
+    ``/dispatch advanced`` request), the marker is stripped and the #819 clarify stage
+    below runs the FULLER interview — the eight-axis vocabulary, the intake template, and
+    the one-per-axis structural cap — through the same sufficiency check, the same early
+    return, and the same absolute fail-soft. Either knob off ⇒ the marker is INERT TEXT
+    riding the goal untouched (byte-identical planning, including for an operator who
+    typed the marker by hand); a card dispatch cannot reach the interview because the
+    clarify gate's own ``decomposition_override`` predicate suppresses it.
+
+    #1165 M5 — the OPERATOR-ASSETS PIPELINE. ``assets_pipeline`` requires
+    ``advanced_intake`` as well (front AND own) and is deliberately
+    interview-INDEPENDENT: files in the project's ``assets/`` folder are explicit
+    intent on ANY advanced-front dispatch, and the card acknowledgment keeps the
+    result visible + vetoable. When engaged (and the dispatch is not card-driven —
+    the same :func:`_is_card_driven` self-suppression every deterministic ruler here
+    carries, so a frozen battery exam can never gain an asset criterion), the folder
+    is enumerated ONCE, here, AO-side (:func:`enumerate_operator_assets` over
+    ``projects_dir / repo / assets``) — rooted, reparse-excluded, hygiene-allowlisted,
+    size-capped — and the manifest lands on ``spec.operator_assets``, the single
+    carrier the card line, the use floors and the ``operator_assets_json`` task stamp
+    all read. Nothing manifest-shaped ever rides the goal string, so the
+    operator-words corpus is never near machine prose by construction. Absent folder,
+    empty manifest, or either knob off ⇒ byte-identical planning; an unreadable
+    folder plans WITHOUT assets and says so on the card (fail-soft — a broken folder
+    read must not block a build the quick path would serve).
+    #1165 M1 — the INTERVIEW VOICE. ``interview_voice`` swaps the engaged interview's
+    question-authoring template for the approved novice-interview register
+    (:func:`shared.fleet.clarify.intake_template_for` with ``voice=True`` — Part 1 area
+    wordings + the question-writing mistake rules). It reads ONLY inside an engaged
+    interview: with ``interview_voice=False`` (every pre-M1 caller) the builder's all-off
+    output is the S2 template constant byte for byte (identity-locked), and outside
+    intake mode the flag reads nothing at all.
     """
     goal = (idea or "").strip()
     req = (requirements or "").strip()
+
+    # #1031 S2 — the intake-mode marker, resolved before anything reads the goal. Engaged
+    # (BOTH knobs) ⇒ stripped here, so it can never reach planning_seed, spec.goal, a
+    # prompt, or a compiled task (the hygiene lock's subject). Off ⇒ inert text, untouched.
+    # The split is unconditional under the knobs and total — no membership pre-check,
+    # because the goal was just ``.strip()``-ed and a padded-constant test would miss the
+    # marker's stripped terminal form (the split keys on the core token).
+    interview_active = False
+    if interview and advanced_intake:
+        goal, interview_active = _clarify.split_intake_goal(goal)
+
+    # #1069 S3-G CRITERIA-REVISE: detected FIRST — the two revise sentinels are distinct and
+    # never co-composed, and checking this one first keeps a payload that pathologically
+    # contained both from running the task path on a criteria request.
+    if _revise.CRITERIA_REVISE_SENTINEL in (idea or ""):
+        cr_goal, cr_feedback, cr_rows = _revise.split_criteria_revision_goal(idea)
+        if not (criteria_revise and advanced_intake):
+            return PlanResult(
+                ok=False, message="Criteria revision is turned off (Fail-Closed)."
+            )
+        cr_ops = _revise.generate_criteria_revision_ops(
+            cr_goal, cr_rows, cr_feedback,
+            generate_fn=generate_fn, structured_generate_fn=structured_generate_fn,
+        )
+        return PlanResult(
+            ok=True,
+            criteria_revision=[o.to_dict() for o in cr_ops],
+            message=f"Proposed {len(cr_ops)} criteria-revision step(s).",
+        )
 
     # #820 REVISE: a revise request rides the goal via the revise sentinel (feedback + the
     # current plan's task titles). Detected FIRST — before clarify/decompose — so a revise goal
@@ -3212,11 +5759,28 @@ def generate_plan(
         from shared.fleet.decompose import validate_repo
 
         if validate_repo(projects_dir / repo, projects_dir) is None:
+            # #1031 S2: the interview breadth is selected HERE and nowhere else — the
+            # intake mode widens the closed axis set, swaps the template, and raises the
+            # cap to the structural one-per-axis bound; the quick path's arguments are the
+            # function's own defaults, byte for byte.
             questions = _clarify.generate_clarifying_questions(
                 goal,
                 generate_fn=generate_fn,
                 structured_generate_fn=structured_generate_fn,
-                max_questions=max_questions,
+                max_questions=(
+                    _clarify.INTAKE_MAX_QUESTIONS if interview_active else max_questions
+                ),
+                axes=(
+                    _clarify.INTAKE_AXES if interview_active else _clarify.CLARIFY_AXES
+                ),
+                # #1165 M1: the intake template comes from the builder so the voice flag
+                # can swap wordings — all-off output == the S2 constant byte for byte
+                # (identity-locked), so voice-off remains today's prompt exactly.
+                template=(
+                    _clarify.intake_template_for(voice=interview_voice)
+                    if interview_active
+                    else _clarify._CLARIFY_TEMPLATE
+                ),
             )
             if questions:
                 return PlanResult(
@@ -3255,28 +5819,77 @@ def generate_plan(
             # is threaded here — without it the grammar path could never fire on a real
             # /dispatch plan. Additive + fail-soft (None == today).
             structured_generate_fn=structured_generate_fn,
+            # #746: plan-time grounding is threaded through DORMANT (research_grounding
+            # default False ⇒ byte-identical decompose prompt).
+            research_grounding=research_grounding, research_index=research_index,
         )
     if not decomposed.ok:
         return PlanResult(ok=False, message=decomposed.message)
+
+    # 1b. #1054 S3 slice E — is the SINGLE-AUTHORSHIP path live for this dispatch? Decided
+    # ONCE, here, and read by exactly two places below (the authoring branch and the gate), so
+    # there is one predicate and no way for the two halves to disagree about whether they are
+    # on. BOTH flags are required — the sub-flag alone cannot engage a capability inside a
+    # front that is itself off — and a card-driven dispatch self-suppresses for the same
+    # reason S1's floors do: the card IS the spec, frozen for cross-night comparability, and a
+    # refusal here would break a nightly campaign rather than a plan the operator can re-issue.
+    coauthored_intake = (
+        advanced_intake
+        and coherence_gate
+        and not _is_card_driven(repo, decomposition_override)
+    )
+
+    # 1c. #1069 S3-F — is the COVERAGE GATE live for this dispatch? Same one-predicate
+    # discipline as slice E above: decided once, read by the two places below (the exam
+    # author's 1:1 pin at 2g and the blocking check at 2h), so the pin and the gate cannot
+    # disagree about whether they are on. BOTH flags required; a card-driven dispatch
+    # self-suppresses — the card IS the instrument, and blocking a nightly campaign is not
+    # a plan an operator can revise.
+    coverage_gate_active = (
+        coverage_gate
+        and advanced_intake
+        and not _is_card_driven(repo, decomposition_override)
+    )
 
     # 2. Acceptance criteria — the 14B proposes; the ruler disposes (+ a build floor).
     # #743: grammar-first over the SAME schema _parse_criteria expects; a missing/erroring
     # hook or an unusable constrained emission runs today's free-text path UNCHANGED.
     # #819: the criteria plan FROM planning_seed (goal + any clarified requirements), but
     # rule_spec keeps spec.goal the CLEAN goal so the preview header never shows the block.
-    criteria_prompt = _CRITERIA_TEMPLATE.format(max_criteria=max_criteria, idea=planning_seed)
-    raw = _grammar_first(
-        criteria_prompt,
-        structured_generate_fn=structured_generate_fn,
-        schema=criteria_emission_json_schema(max_criteria=max_criteria),
-        usable=lambda t: bool(_parse_criteria(t, max_criteria=max_criteria)),
-    )
-    if raw is None:
-        try:
-            raw = generate_fn(criteria_prompt)
-        except Exception:  # noqa: BLE001 — a criteria-gen failure must not crash the plan
-            raw = ""
-    spec = rule_spec(goal, _parse_criteria(raw, max_criteria=max_criteria), max_criteria=max_criteria)
+    # #1054: under single authorship the criteria arrive from the co-authored call together
+    # with the assumptions (2c then has nothing left to ask for). An unusable co-authored
+    # emission returns None and falls through to the two-call path below UNCHANGED — the
+    # fail-soft contract every structured call in this module keeps, so a co-authoring failure
+    # can never yield a thinner spec than today's.
+    criteria_parsed: "list[dict] | None" = None
+    coauthored_assumptions: "tuple[str, ...] | None" = None
+    if coauthored_intake:
+        coauthored = _coauthor_spec(
+            planning_seed,
+            generate_fn=generate_fn,
+            structured_generate_fn=structured_generate_fn,
+            max_criteria=max_criteria,
+            max_assumptions=max_assumptions,
+        )
+        if coauthored is not None:
+            criteria_parsed, coauthored_assumptions = coauthored
+    if criteria_parsed is None:
+        criteria_prompt = _CRITERIA_TEMPLATE.format(
+            max_criteria=max_criteria, idea=planning_seed
+        )
+        raw = _grammar_first(
+            criteria_prompt,
+            structured_generate_fn=structured_generate_fn,
+            schema=criteria_emission_json_schema(max_criteria=max_criteria),
+            usable=lambda t: bool(_parse_criteria(t, max_criteria=max_criteria)),
+        )
+        if raw is None:
+            try:
+                raw = generate_fn(criteria_prompt)
+            except Exception:  # noqa: BLE001 — a criteria-gen failure must not crash the plan
+                raw = ""
+        criteria_parsed = _parse_criteria(raw, max_criteria=max_criteria)
+    spec = rule_spec(goal, criteria_parsed, max_criteria=max_criteria)
 
     # 2b. Never end at zero tests. The right-sizing decomposer drops the model's
     # structural test tasks (the test task is added downstream). So if it collapsed test
@@ -3300,26 +5913,33 @@ def generate_plan(
     # assumptions and no preview section — the plan proceeds unchanged.
     # #743: grammar-first (array-of-strings schema). A constrained ``[]`` is a VALID
     # answer (the fully-specified goal) — accepted, no redundant free-text retry.
-    assumptions_prompt = _ASSUMPTIONS_TEMPLATE.format(
-        max_assumptions=max_assumptions, idea=planning_seed
-    )
-    raw_assumptions = _grammar_first(
-        assumptions_prompt,
-        structured_generate_fn=structured_generate_fn,
-        schema=assumptions_emission_json_schema(max_assumptions=max_assumptions),
-        usable=_is_json_array_emission,
-    )
-    if raw_assumptions is None:
-        try:
-            raw_assumptions = generate_fn(assumptions_prompt)
-        except Exception:  # noqa: BLE001 — an assumptions-gen failure must not crash the plan
-            raw_assumptions = ""
-    assumptions = _parse_assumptions(raw_assumptions, max_assumptions=max_assumptions)
-    if assumptions:
-        spec = AcceptanceSpec(
-            goal=spec.goal, criteria=spec.criteria, assumptions=assumptions,
-            build_plan=spec.build_plan,  # carry the (still-None here) signal — ordering-safe
+    # #1054: under single authorship the assumptions were already written, in the SAME
+    # emission and the same context as the criteria — that shared context is the whole fix, so
+    # this second call is not made rather than made and discarded. An empty result from that
+    # emission is a real answer (the fully-specified goal), not a reason to ask again: asking
+    # again would re-create the uncoordinated second pass this slice exists to retire.
+    if coauthored_assumptions is not None:
+        assumptions = coauthored_assumptions
+    else:
+        assumptions_prompt = _ASSUMPTIONS_TEMPLATE.format(
+            max_assumptions=max_assumptions, idea=planning_seed
         )
+        raw_assumptions = _grammar_first(
+            assumptions_prompt,
+            structured_generate_fn=structured_generate_fn,
+            schema=assumptions_emission_json_schema(max_assumptions=max_assumptions),
+            usable=_is_json_array_emission,
+        )
+        if raw_assumptions is None:
+            try:
+                raw_assumptions = generate_fn(assumptions_prompt)
+            except Exception:  # noqa: BLE001 — an assumptions-gen failure must not crash the plan
+                raw_assumptions = ""
+        assumptions = _parse_assumptions(raw_assumptions, max_assumptions=max_assumptions)
+    if assumptions:
+        # #1042 L5-1: replace(), NOT a field-by-field rebuild — a rebuild names the
+        # fields it knows and silently drops every field added after it was written.
+        spec = replace(spec, assumptions=assumptions)
 
     # 2d. Build-signal — a THIRD, separate 14B call (after decompose + criteria + assumptions)
     # classifying PRODUCT intent into a COARSE platform signal (surface / language_hint /
@@ -3351,8 +5971,34 @@ def generate_plan(
         # signals, so the fleet seeds a lone static page instead of the full-stack skeleton whose
         # server fetch hangs a ``file://`` page. A non-web signal / no static signal is unchanged.
         build_plan = _refine_web_static(build_plan, planning_seed)
-        spec = AcceptanceSpec(
-            goal=spec.goal, criteria=spec.criteria, assumptions=spec.assumptions,
+        # #1161: the empty-project GRADEABLE-STACK default. Deterministic and operator-
+        # words-first: it may only decide a platform question the operator left
+        # unanswered, on an empty/new repo, when the classified stack would be exam-blind
+        # — and it decides it toward the stack every check can sight (python
+        # command-line), disclosed on the card via the assumption line it returns.
+        # Placed HERE — before the floors, the oracle and compile — so the WHOLE plan
+        # compiles natively for the resolved stack, never a post-hoc restamp. Scans only
+        # OPERATOR-authored words (the clean goal + non-assumed answer lines): the
+        # planning_seed would let a system-authored default masquerade as the operator
+        # having named a platform. Self-suppresses for card-driven dispatches — a frozen
+        # battery card is the measurement instrument, and changing its surface
+        # mid-campaign is the #989 confound class.
+        platform_note = ""
+        if not _is_card_driven(repo, decomposition_override):
+            build_plan, platform_note = default_gradeable_platform(
+                build_plan,
+                operator_text=(
+                    goal + "\n" + "\n".join(_clarify.operator_authored_answers(req))
+                ),
+                repo_path=projects_dir / repo,
+            )
+        # #1042 L5-1: replace() — same rationale as the assumptions attach above.
+        spec = replace(
+            spec,
+            assumptions=(
+                spec.assumptions + (platform_note,)
+                if platform_note else spec.assumptions
+            ),
             build_plan=build_plan,
         )
 
@@ -3390,6 +6036,73 @@ def generate_plan(
         spec = _ensure_delivery_floor(spec)
         spec = _apply_realism_guard(spec)
 
+    # 2e-i-b. #1165 M5 — the OPERATOR-ASSETS stage: ONE enumeration, the single spec
+    # carrier, and the two use checks. Placed HERE — after the build-signal attach (the
+    # machine floor reads ``spec.build_plan.surface``, the same dependency that pinned
+    # 2e-i) and BEFORE the oracle calls and the coherence gate, so the exam is authored
+    # against the floored spec and an injected criterion is held to the same coherence
+    # standard as an authored one (the delivery-floor precedent, exactly).
+    # BOTH knobs, and card-driven dispatches self-suppress (``_is_card_driven``): a
+    # battery card IS the frozen instrument, and the absent-``assets/``-folder no-op is
+    # deliberately NOT the only lock protecting it — someone seeding files into a
+    # sandbox must not re-shape a card exam either (defense in depth, two independent
+    # locks, both tested). Enumeration is fresh at EVERY plan — the manifest is never
+    # banked, because files change between dispatches and a stale manifest would be a
+    # false card claim.
+    if (
+        assets_pipeline
+        and advanced_intake
+        and not _is_card_driven(repo, decomposition_override)
+    ):
+        manifest = enumerate_operator_assets(
+            projects_dir / repo / OPERATOR_ASSETS_DIRNAME
+        )
+        if manifest is not None:
+            # #1042 L5-1: replace() — carries every field by construction.
+            spec = replace(spec, operator_assets=manifest)
+            spec = _ensure_operator_assets_floor(spec)
+            spec = _ensure_operator_assets_visual(spec)
+
+    # 2e-ii. #1054 S3 slice E — the DETERMINISTIC COHERENCE GATE, the guarantee half of
+    # single authorship. The prompt asks the model not to contradict itself; this REFUSES the
+    # plan when it did anyway, so the retirement survives a model regression.
+    #
+    # Placed HERE, after the S1 floors and BEFORE the two oracle calls, for two reasons: the
+    # pair it checks is then the pair the operator would actually be shown — deterministic
+    # floors included, so an injected criterion is held to the same standard as an authored
+    # one — and a plan that is going to be refused is refused before spending the oracle's GPU
+    # calls on it.
+    #
+    # A finding refuses; a gate that could not RUN also refuses. The `except` is not the usual
+    # fail-soft-to-today arm this module uses for model calls — this is a control, and a
+    # control that cannot execute at all blocks rather than letting an unchecked plan render
+    # as though it had been checked.
+    #
+    # Note what is NOT here, because it was and it was wrong: the gate does not refuse on
+    # statements it merely could not PARSE. That arm (2026-07-23) refused an ordinary
+    # two-clause assumption because a comma stopped the pattern reaching the noun, and it
+    # could never have caught a contradiction in exchange — an unnamed subject matches
+    # nothing. Its removal is argued in full in `coherence`'s contract section; the line that
+    # holds is between the gate FAILING and the gate finding nothing.
+    #
+    # It never mutates the spec: reconciling a contradiction means deciding which half of the
+    # plan was wrong, which is a judgement the operator owns, not a rule this can apply.
+    if coauthored_intake:
+        try:
+            findings = _coherence.check_coherence(
+                spec.assumptions, [c.text for c in spec.criteria]
+            )
+        except Exception as exc:  # noqa: BLE001 — cannot verify ⇒ refuse, never proceed
+            logger.error("coherence gate failed to run: %s", exc, exc_info=True)
+            return PlanResult(
+                ok=False, message=_coherence.refusal_message_for_error(exc)
+            )
+        if findings:
+            logger.info(
+                "coherence gate refused a plan: %d finding(s)", len(findings)
+            )
+            return PlanResult(ok=False, message=_coherence.refusal_message(findings))
+
     # 2e. Acceptance-test ORACLE (#690/#697) — the shared, spec-derived scorecard for best-of-N.
     # The 14B writes ONE spec-blind test file (CROSS-MODEL: the 30B coder never authors the tests
     # that grade it), seeded into every candidate's worktree and restored before the gate so all
@@ -3418,10 +6131,25 @@ def generate_plan(
         structured_generate_fn=structured_generate_fn,
     )
     if asset_specs:
-        spec = AcceptanceSpec(
-            goal=spec.goal, criteria=spec.criteria, assumptions=spec.assumptions,
-            build_plan=spec.build_plan, asset_specs=asset_specs,
-        )
+        # #1042 L5-1: replace() — the field-by-field rebuild this replaced would have
+        # silently dropped ``operator_assets`` (attached at 2e-i-b above), the exact
+        # "seventh field added later" failure the lesson's own comment predicted.
+        spec = replace(spec, asset_specs=asset_specs)
+
+    # 2f-ii. Behaviour-smoke CONTRACT — a separate 14B call, web products only. It names
+    # the ONE main control the headless capture must use and the region that must change,
+    # in the requester's plain words; the deterministic ruler owns both selectors, the
+    # surface gate and the shape. Same separate-call discipline as the asset specs, so
+    # every prior JSON contract stays byte-identical. Fail-closed + non-blocking: any
+    # failure (or a non-web product, or a static page with nothing to press) yields no
+    # contract, and the capture keeps the heuristic it has always used. ``replace()``
+    # rather than a field-by-field rebuild — the #1042 L5-1 lesson.
+    smoke_spec = _smoke_spec_from_plan(
+        planning_seed, spec.build_plan, generate_fn=generate_fn,
+        structured_generate_fn=structured_generate_fn,
+    )
+    if smoke_spec:
+        spec = replace(spec, smoke_spec=smoke_spec)
 
     # 2g. JOB-level acceptance oracle (M2 W4, #740) — the multi-task analogue of 2e. For a
     # job of >=2 tasks the 14B writes ONE job-level spec-blind oracle (python pytest or
@@ -3466,6 +6194,11 @@ def generate_plan(
             # rather than the block itself — the rendered prose is ours, and grounding on it
             # would excuse an oracle asserting our own header words. Empty ``req`` -> ().
             operator_answers=_clarify.operator_answers_from_block(req),
+            # #1069 S3-F: in intake mode the authoring prompt itself pins the 1:1 import set
+            # (coverage BY CONSTRUCTION). ``""`` (the gate off) keeps the prompt byte-identical.
+            coverage_contract=(
+                _coverage_contract_block(decomposed.tasks) if coverage_gate_active else ""
+            ),
         )
 
     # 2h. Plan-time CONTRACT-COVERAGE check (#989): every build task must OWN at least
@@ -3473,25 +6206,106 @@ def generate_plan(
     # computed over BOTH oracle origins (14B-authored and caller-authorised) from data
     # this function already holds. Surfaced LOUDLY at plan time — the AO log AND the
     # PlanResult message the operator preview renders — and deliberately warn-loud,
-    # never a refusal (rationale in _plan_contract_coverage_warning). Scoped to the
-    # multi-task job-oracle shape: a single-task plan owns everything by construction.
+    # never a refusal (rationale in _plan_contract_coverage_warning) ON THE QUICK PATH.
+    # Scoped to the multi-task job-oracle shape: a single-task plan owns everything by
+    # construction. In intake mode (#1069 S3-F, ``coverage_gate_active``) the SAME
+    # measurement feeds the blocking gate below — the capability call the quick-path
+    # rationale reserves is made properly there, behind its own ceremony-gated flag.
     coverage_warning = ""
+    coverage_blocked = ""
     if job_oracle_code and job_oracle_path and len(decomposed.tasks) >= 2:
         coverage_warning = _plan_contract_coverage_warning(
             decomposed.tasks, job_oracle_path, job_oracle_code)
         if coverage_warning:
             logger.warning("generate_plan: %s", coverage_warning)
+        # #1069 S3-F: ONE bounded re-authoring, the gap named in the prompt alongside the
+        # 1:1 pin. Adopt the repair ONLY when it measures CLEAN — a still-gapped repair
+        # keeps the ORIGINAL exam (and its QA evidence chain), and an EMPTY repair is
+        # discarded outright, because trading "an exam with a gap" for "no exam at all"
+        # would make the plan approvable again through the exact hole the gate closes.
+        if coverage_warning and coverage_gate_active:
+            repaired_code, repaired_path, repaired_qa = author_and_qa_job_oracle(
+                planning_seed, spec, decomposed.tasks, generate_fn=generate_fn,
+                structured_generate_fn=structured_generate_fn,
+                operator_answers=_clarify.operator_answers_from_block(req),
+                coverage_contract=(
+                    _coverage_contract_block(decomposed.tasks)
+                    + "\nA previous attempt FAILED the mechanical coverage check:\n"
+                    + coverage_warning
+                    + "\nFix exactly that: import each part's declared module(s), and drop "
+                    "every first-party import no part declares."
+                ),
+            )
+            # Adoption requires MEASURED-CLEAN, not merely warning-free (review F1): the
+            # warning helper returns "" for measured-clean AND for not-computable AND
+            # for a derivation crash, and a repair that stripped every first-party
+            # import would ride the second of those straight past the gate. The helper
+            # reads the measurement itself and refuses the unmeasurable.
+            if repaired_code and repaired_path and _coverage_measured_clean(
+                decomposed.tasks, repaired_path, repaired_code
+            ):
+                job_oracle_code, job_oracle_path, job_oracle_qa = (
+                    repaired_code, repaired_path, repaired_qa)
+                coverage_warning = ""
+            if coverage_warning:
+                coverage_blocked = (
+                    _coverage_blocked_message_orphan_only(coverage_warning)
+                    if _coverage_orphan_only(
+                        decomposed.tasks, job_oracle_path, job_oracle_code)
+                    else _coverage_blocked_message(coverage_warning)
+                )
+                logger.warning(
+                    "generate_plan: intake coverage gate is BLOCKING approval — %s",
+                    coverage_warning,
+                )
+
+    # 2i. #1044 S3-D — the BAD-INPUT EXAM FLOOR. BOTH knobs are required: the floor rides
+    # advanced-intake mode, but it does not go live with it, because it changes what a build is
+    # GRADED on rather than how a plan is written.
+    #
+    # Placed HERE, after 2h and before the compile, and the position is load-bearing in both
+    # directions. AFTER 2h: the #989 coverage warning is computed over the AUTHORED exam, so
+    # turning the floor on cannot move a coverage number and confound the predictor it feeds.
+    # BEFORE step 3: compile_prompts derives the coder's import + signature contract from
+    # ``oracle_code``, and the job exam's bytes are stamped onto the final task below — both
+    # must see the floored exam, or the floor would be seeded into a tree whose coder was never
+    # told the contract it asserts.
+    #
+    # SELF-SUPPRESSES FOR ANY CARD-DRIVEN DISPATCH, for the S1 reason and a sharper one: a
+    # battery card's exam is the measuring instrument, and #1044's own evidence came from a
+    # card's exam, so silently re-flooring it mid-campaign would make the finding un-observable
+    # in the very place it was found. ``_is_card_driven`` also covers the caller-authorised
+    # oracle branch (#752 F2), whose exam the caller owns and this may not rewrite.
+    if bad_input_floor and advanced_intake and not _is_card_driven(repo, decomposition_override):
+        oracle_code = _ensure_bad_input_floor(oracle_code, spec)
+        job_oracle_code = _ensure_bad_input_floor(job_oracle_code, spec)
 
     # 3. Compile behavior/smoke criteria into the task prompts (fleet schema unchanged). The
     # goal-level build-signal fields are threaded onto each task here (compile_prompts). When an
     # oracle was generated, the lone feature task is told to code against it (carrying it for the
-    # fleet to seed); an empty oracle leaves the compile byte-identical to today.
-    tasks = compile_prompts(decomposed.tasks, spec, oracle_code=oracle_code)
+    # fleet to seed); an empty oracle leaves the compile byte-identical to today. #763: the
+    # JOB-level oracle from 2g above is threaded through the SAME call (it was already computed
+    # before this line) so the >=2-feature branch can feed it to every task as INPUT instead of
+    # the blind "write your own tests" instruction — empty job_oracle_code/path is byte-identical.
+    tasks = compile_prompts(
+        decomposed.tasks, spec, oracle_code=oracle_code,
+        job_oracle_code=job_oracle_code, job_oracle_path=job_oracle_path,
+    )
     # #819: the clarified requirements ride EVERY task context so the coder builds to them —
     # a compact, clearly-delimited section appended to each task prompt (in addition to
     # having seeded decompose/criteria/oracle above). No-op byte-identical when absent.
     if req:
-        req_block = f"\n\n--- Clarified requirements (build to these) ---\n{req}"
+        # #1197: the section title says only that these govern the build — it does NOT say
+        # who supplied them. "Clarified requirements" was a claim about the operator, and on
+        # a "just decide for me" run every line under it was a system default. The block's
+        # own two headers (`compose_requirements_block`) now carry the attribution, per
+        # group, so this wrapper must not pre-empt them with a wrong one.
+        # #1224 N2: the WRITER and the rewriter must use the same constant, never a
+        # duplicated literal. A one-space drift here silently turns
+        # `recompose_task_requirements` into a no-op (its partition finds nothing, every
+        # task is skipped) and carrier B reverts to the #1220 defect with nothing red —
+        # a silent degradation in a correctness path, which inverts fail-loud.
+        req_block = f"{REQUIREMENTS_PROMPT_MARKER}\n{req}"
         for t in tasks:
             t["prompt"] = f"{t.get('prompt', '')}{req_block}"
     if job_oracle_code and job_oracle_path and tasks:
@@ -3511,4 +6325,5 @@ def generate_plan(
             f"Planned {len(tasks)} task(s) with {len(spec.criteria)} acceptance criteria."
             + (f" {coverage_warning}" if coverage_warning else "")
         ),
+        coverage_blocked=coverage_blocked,
     )

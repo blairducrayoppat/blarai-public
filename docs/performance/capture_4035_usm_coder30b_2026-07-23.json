@@ -1,0 +1,34 @@
+{
+  "model": "coder-30b",
+  "device": "GPU",
+  "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "ov_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "baseline_inuse_gb": 8.519,
+  "baseline_avail_gb": 22.804,
+  "gpu_stats_before": {
+    "cl_mem": 0,
+    "unknown": 0,
+    "usm_device": 0,
+    "usm_host": 0,
+    "usm_shared": 0
+  },
+  "load_seconds": 57.26,
+  "gpu_stats_after": {
+    "cl_mem": 0,
+    "unknown": 0,
+    "usm_device": 0,
+    "usm_host": 16170885515,
+    "usm_shared": 0
+  },
+  "steady_inuse_gb": 21.649,
+  "steady_delta_gb": 13.13,
+  "transient_peak_inuse_gb": 31.322,
+  "transient_min_avail_gb": 0.001,
+  "usm_host_gib": 15.06,
+  "usm_device_gib": 0.0,
+  "usm_shared_gib": 0.0,
+  "cl_mem_gib": 0.0,
+  "gen_seconds": 1.83,
+  "gen_ok": true,
+  "gen_excerpt": "Here are a few different implementations of a function to return the nth Fibonacci number:\n\n## Method 1: Iterative Approach (Most Efficient)\n```python\ndef fibonacci(n):\n    \"\"\"\n    Returns the nth Fib"
+}

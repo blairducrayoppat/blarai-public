@@ -50,6 +50,12 @@ SCOPE (documented environmental deltas — benign only because bounded).
   class this gate guards is the SHIPPED runtime spawn surface, not gate scaffolding.
 * ``shared/procspawn.py`` is EXCLUDED — it is the blessed wrapper and legitimately
   calls the low-level ``subprocess`` API; that is its whole job.
+* API SCOPE (N2): the gate covers the ``subprocess.*`` call family and the ``os``
+  spawn/exec/system family ONLY.  Deliberately OUT of current scope — spawn paths this
+  gate does NOT see — are ``ctypes`` Win32 ``CreateProcess``/``ShellExecute``,
+  ``os.startfile``, and ``asyncio.create_subprocess_exec``/``_shell``.  None are used on
+  the current surface; a future need for one is a deliberate extension of
+  :data:`_SUBPROCESS_APIS` / :data:`_OS_APIS`, never a silent gap.
 """
 
 from __future__ import annotations
@@ -104,15 +110,21 @@ _OS_APIS = frozenset(
 # is still caught; migrate opportunistically where a blessed shape fits.
 # ===========================================================================
 KNOWN_RAW_SPAWN_SITES: dict[str, int] = {
-    # ---- GROUP A: shared/fleet/* — #774 sub-task 2 migration targets ----
-    "shared/fleet/dispatch.py::subprocess.Popen": 1,   # run_fleet — detached fleet child
-    "shared/fleet/dispatch.py::subprocess.run": 1,     # _safe_run — captured helper
-    "shared/fleet/guest_oracle.py::subprocess.run": 1,  # _default_pytest_run
-    "shared/fleet/guest_oracle_transport.py::subprocess.run": 2,  # _interp_has_af_hyperv; GuestOracleBridge._run
-    "shared/fleet/oracle_qa.py::subprocess.run": 1,    # _default_run
-    "shared/fleet/static_pregate.py::subprocess.run": 1,  # _default_run
-    "shared/fleet/swap_ops.py::subprocess.Popen": 3,   # restart_launcher (x2); _spawn_detached_driver
-    "shared/fleet/swap_ops.py::subprocess.run": 2,     # real_ovms_alive; _default_hermetic_run
+    # ---- GROUP A: shared/fleet/* — #774 sub-task 2 migration debt ----
+    # 2026-07-17 (#774 sub-task 2): 10 of the 12 Group-A sites migrated onto
+    # shared.procspawn (dispatch _safe_run/run_fleet, oracle_qa/static_pregate/
+    # swap_ops _default_(hermetic_)run, swap_ops real_ovms_alive, restart_launcher x2,
+    # _spawn_detached_driver, transport _interp_has_af_hyperv).  The two that REMAIN raw
+    # cannot route through the blessed helper without a behavior change:
+    "shared/fleet/guest_oracle.py::subprocess.run": 1,  # _default_pytest_run — this module
+    #   SHIPS to the NIC-less Alpine guest and runs the coder snapshot's pytest INSIDE the
+    #   isolated VM; it is stdlib-only at module scope by design (see its in-file note), so
+    #   it cannot take a shared.procspawn dependency without expanding the guest's trusted
+    #   surface across the vsock isolation boundary.
+    "shared/fleet/guest_oracle_transport.py::subprocess.run": 1,  # GuestOracleBridge._run —
+    #   a BINARY vsock frame protocol: bytes stdin (json line + length-prefixed frames) and
+    #   bytes stdout parsed as frames.  Every procspawn helper decodes stdout to UTF-8 text
+    #   (errors='replace'), which would corrupt the frames, and none accepts bytes input.
     # ---- GROUP B: other current known sites (launcher / services / shared) ----
     "launcher/guest_parser_invoker.py::subprocess.run": 2,  # _interp_has_af_hyperv; GuestParserBridge._run
     "launcher/process_launch.py::subprocess.Popen": 1,  # launch_winui — WinUI process primitive
@@ -134,29 +146,43 @@ _REMEDIATION = (
 
 
 # ---------------------------------------------------------------------------
-# The scanner — alias-aware AST walk, isolated so the self-tests can drive it with
-# synthetic source (security_by_design principle 12: control tested ON and OFF).
+# The scanner — a TWO-PASS alias-aware AST walk (N1), isolated so the self-tests can
+# drive it with synthetic source (security_by_design principle 12: control tested ON
+# and OFF).  Pass 1 collects import aliases across the WHOLE module; pass 2 detects
+# calls against the complete maps — so a spawn call SYNTACTICALLY ABOVE its import
+# (e.g. a helper defined before a bottom-of-file ``import subprocess``) is still
+# resolved.  A single-pass in-source-order walk resolved a call against the aliases
+# seen SO FAR and silently missed any spawn above its import.
 # ---------------------------------------------------------------------------
-class _SpawnCallFinder(ast.NodeVisitor):
-    """Collect ``(api, qualname, lineno)`` for every raw-spawn CALL in one module."""
+class _AliasCollector(ast.NodeVisitor):
+    """Pass 1 — collect module + symbol aliases across the whole module, order-independent."""
 
     def __init__(self) -> None:
-        self._mod_alias: dict[str, str] = {}   # local name -> "subprocess" | "os"
-        self._sym_alias: dict[str, str] = {}    # local name -> "subprocess.run" etc.
-        self._scope: list[str] = []
-        self.hits: list[tuple[str, str, int]] = []
+        self.mod_alias: dict[str, str] = {}   # local name -> "subprocess" | "os"
+        self.sym_alias: dict[str, str] = {}   # local name -> "subprocess.run" etc.
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             if alias.name in ("subprocess", "os"):
-                self._mod_alias[alias.asname or alias.name] = alias.name
+                self.mod_alias[alias.asname or alias.name] = alias.name
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module in ("subprocess", "os"):
             for alias in node.names:
-                self._sym_alias[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+                self.sym_alias[alias.asname or alias.name] = f"{node.module}.{alias.name}"
         self.generic_visit(node)
+
+
+class _SpawnCallFinder(ast.NodeVisitor):
+    """Pass 2 — with the complete alias maps, collect ``(api, qualname, lineno)`` for
+    every raw-spawn CALL in one module."""
+
+    def __init__(self, mod_alias: dict[str, str], sym_alias: dict[str, str]) -> None:
+        self._mod_alias = mod_alias
+        self._sym_alias = sym_alias
+        self._scope: list[str] = []
+        self.hits: list[tuple[str, str, int]] = []
 
     def _visit_scoped(self, name: str, node: ast.AST) -> None:
         self._scope.append(name)
@@ -193,11 +219,18 @@ class _SpawnCallFinder(ast.NodeVisitor):
 
 
 def _scan_source(source: str) -> list[tuple[str, str, int]]:
-    """Raw-spawn hits in a single module's *source* (used by the self-tests)."""
+    """Raw-spawn hits in a single module's *source* (used by the self-tests).
+
+    Two-pass (N1): aliases are collected across the WHOLE module first, THEN calls are
+    resolved — so the result is independent of whether a spawn call sits above or below
+    its import statement.
+    """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", SyntaxWarning)  # scanned code may carry stray escapes
         tree = ast.parse(source)
-    finder = _SpawnCallFinder()
+    aliases = _AliasCollector()
+    aliases.visit(tree)
+    finder = _SpawnCallFinder(aliases.mod_alias, aliases.sym_alias)
     finder.visit(tree)
     return finder.hits
 
@@ -236,8 +269,12 @@ def _scan_surface() -> tuple[dict[str, list[str]], list[str]]:
         rel = py.relative_to(_REPO_ROOT).as_posix()
         try:
             hits = _scan_source(py.read_text(encoding="utf-8"))
-        except SyntaxError as exc:  # noqa: PERF203 — one report per bad file
-            parse_errors.append(f"{rel}: {exc}")
+        except (SyntaxError, ValueError, UnicodeDecodeError) as exc:  # noqa: PERF203 — one report per bad file
+            # N3 (fail-closed): SyntaxError won't parse; ValueError == null bytes in the
+            # source (ast.parse rejects them); UnicodeDecodeError == the file is not valid
+            # UTF-8.  An unscannable file cannot be vouched for, so it FAILS the gate via
+            # the clean parse_errors message rather than crashing the whole run.
+            parse_errors.append(f"{rel}: {type(exc).__name__}: {exc}")
             continue
         for api, qual, lineno in hits:
             sites.setdefault(f"{rel}::{api}", []).append(f"L{lineno} {qual}")
@@ -377,6 +414,57 @@ def test_scanner_ignores_nonspawn_and_mentions() -> None:
         "    return popen\n"
     )
     assert _scan_source(source) == []
+
+
+def test_scanner_resolves_call_above_its_import() -> None:
+    """N1 (order-independence): a spawn call SYNTACTICALLY ABOVE its import is still
+    detected.  A single-pass in-source-order walk resolved each call against the aliases
+    seen SO FAR and silently missed a spawn whose ``import subprocess`` sat below it — a
+    real blind spot (a helper defined before a bottom-of-file import).  The two-pass
+    scanner collects aliases across the whole module first, so order does not matter."""
+    call_above_import = (
+        "def _spawn():\n"
+        "    subprocess.Popen(['x'])\n"   # the CALL …
+        "import subprocess\n"             # … appears ABOVE this import
+    )
+    hits = _scan_source(call_above_import)
+    assert [api for api, _, _ in hits] == ["subprocess.Popen"], (
+        f"two-pass scanner must catch a spawn above its import (N1) -> {hits}"
+    )
+    # And the from-import symbol form, likewise resolved from below the call.
+    from_import_below = (
+        "def _spawn():\n"
+        "    Popen(['x'])\n"
+        "from subprocess import Popen\n"
+    )
+    assert [api for api, _, _ in _scan_source(from_import_below)] == ["subprocess.Popen"]
+
+
+def test_scan_surface_fails_closed_on_unparseable_bytes(tmp_path, monkeypatch) -> None:
+    """N3 (fail-closed): a file with NULL BYTES (ast.parse -> ValueError) or NON-UTF-8
+    bytes (read_text -> UnicodeDecodeError) is reported as a parse_error and FAILS the
+    gate cleanly — never a silent skip and never an uncaught crash."""
+    import sys as _sys
+
+    module = _sys.modules[__name__]
+    nullbyte = tmp_path / "nullbyte.py"
+    nullbyte.write_bytes(b"import subprocess\nsubprocess.Popen(['x'])\x00\n")  # ValueError
+    badenc = tmp_path / "badenc.py"
+    badenc.write_bytes(b"# not valid utf-8: \xff\xfe\n")                       # UnicodeDecodeError
+
+    monkeypatch.setattr(module, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(module, "_iter_surface_files", lambda: [nullbyte, badenc])
+
+    sites, parse_errors = _scan_surface()
+    assert sites == {}
+    assert len(parse_errors) == 2
+    # The non-UTF-8 file is the case the ORIGINAL bare ``except SyntaxError`` would have let
+    # crash the whole gate (UnicodeDecodeError escapes it); N3's broadening turns it into a
+    # clean, fail-closed parse_error instead.
+    assert any("badenc.py: UnicodeDecodeError" in e for e in parse_errors)
+    # The null-byte file is reported too — ast.parse raises SyntaxError for it on CPython
+    # 3.12 (ValueError on some builds); either way it fails closed rather than crashing.
+    assert any(e.startswith("nullbyte.py: ") for e in parse_errors)
 
 
 # ---------------------------------------------------------------------------

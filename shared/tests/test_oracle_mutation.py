@@ -152,6 +152,127 @@ def test_trivial_functions_get_no_early_return_site():
 
 
 # ---------------------------------------------------------------------------
+# #1195 item 3 — attribution: WHICH symbol, killed by WHICH test
+# ---------------------------------------------------------------------------
+
+
+def test_every_site_names_its_enclosing_top_level_symbol():
+    """Without this the score is whole-file and no criterion can ever claim a kill."""
+    attributed = om.mutation_sites_attributed(_CALC)
+    assert attributed, "the fixture must produce sites"
+    assert {sym for _op, _line, sym in attributed} == {"add", "is_pos"}
+    # The two-tuple contract other callers rely on is unchanged by the third element.
+    assert om.mutation_sites(_CALC) == [(op, line) for op, line, _ in attributed]
+
+
+def test_nested_and_method_sites_attribute_to_the_EXPORTED_name():
+    """A criterion's subject can only ever be a name the oracle imported, so a site inside a
+    nested helper or a method must attribute to the top-level name that contains it."""
+    src = (
+        "def outer(n):\n"
+        "    def inner(x):\n"
+        "        return x + 1\n"
+        "    return inner(n)\n"
+        "\n"
+        "class Deck:\n"
+        "    def add(self, n):\n"
+        "        return n + 2\n"
+    )
+    assert {sym for _op, _line, sym in om.mutation_sites_attributed(src)} == {"outer", "Deck"}
+
+
+def test_module_level_site_names_no_symbol():
+    """Module scope is a real answer, not a missing one: it supports no rung, and must not be
+    silently folded into whichever function happens to be nearby."""
+    src = "LIMIT = 10\n\ndef f(n):\n    return n + 1\n"
+    by_symbol = {sym for _op, _line, sym in om.mutation_sites_attributed(src)}
+    assert "" in by_symbol, "a module-level constant must attribute to no symbol"
+    assert "f" in by_symbol
+
+
+@pytest.mark.parametrize("blob,expect", [
+    # The REAL pinned runner's shapes, captured from `uv run ... python -m pytest -q`.
+    ("=========================== short test summary info ====================\n"
+     "FAILED tests/t.py::test_alpha - assert (1 + 1) == 3\n"
+     "ERROR tests/t.py::test_setup_fails - RuntimeError: boom\n"
+     "1 failed, 1 error in 0.5s", ("test_alpha", "test_setup_fails")),
+    # Parametrisation is stripped: the exam's AST reader sees one `def`, not one per param.
+    ("FAILED tests/t.py::test_param[2] - assert 2 == 1\n"
+     "FAILED tests/t.py::test_param[3] - assert 3 == 1", ("test_param",)),
+    # A class-based test reports as Class::method; the method name is the grain.
+    ("FAILED tests/t.py::TestDeck::test_add - AssertionError", ("test_add",)),
+    # Fallback: the FAILURES banner, when a repo config suppresses the short summary.
+    ("=========== FAILURES ===========\n_________ test_beta _________\n", ("test_beta",)),
+    # A collection error names no test function; it must yield nothing rather than a path.
+    ("ERROR tests/t.py\n1 error in 0.1s", ()),
+])
+def test_failing_tests_parses_the_measured_runner_shapes(blob, expect):
+    assert om.failing_tests(blob) == expect
+
+
+def test_a_blind_run_names_nobody_rather_than_guessing():
+    """`addopts = -rN --tb=no` suppresses BOTH the summary and the traceback — measured on the
+    pinned runner. The RED/GREEN answer survives (it is the exit code); the attribution does
+    not, and an empty answer must mean "cannot attribute", never "nothing failed"."""
+    assert om.failing_tests("E.F   [100%]\n1 failed, 1 passed, 1 error in 0.01s") == ()
+    assert om.failing_tests("") == ()
+
+
+def test_killed_mutants_record_who_killed_them(tmp_path):
+    """The row that makes L4 possible: outcome + symbol + the failing test names."""
+    repo = _repo(tmp_path)
+    blob = "FAILED tests/t.py::test_pos - assert False\n1 failed in 0.1s"
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(repo), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_FakeRunner(mutant=(False, blob, "")), pytest_cmd=_fake_cmd, persist=False)
+    rows = ev[om.EV_MUTANTS]
+    assert len(rows) == ev["ran"] == 8
+    assert all(r["outcome"] == "killed" for r in rows)
+    assert all(r["killed_by"] == ["test_pos"] for r in rows)
+    assert {r["symbol"] for r in rows} == {"add", "is_pos"}
+    assert ev[om.EV_ORACLE_SHA] == om.oracle_digest(_SHARP_ORACLE)
+
+
+def test_surviving_mutants_record_the_symbol_they_slipped_past(tmp_path):
+    repo = _repo(tmp_path)
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(repo), JOB_ORACLE_PATH_PYTHON, _VACUOUS_ORACLE,
+        run=_FakeRunner(mutant=(True, "1 passed", "")), pytest_cmd=_fake_cmd, persist=False)
+    rows = ev[om.EV_MUTANTS]
+    assert rows and all(r["outcome"] == "survived" for r in rows)
+    assert all(r["killed_by"] == [] for r in rows)
+    assert all(r["symbol"] in {"add", "is_pos"} for r in rows)
+    # The survivors list gains the symbol too, so the whole-file summary can name it.
+    assert all("symbol" in s for s in ev["survivors"])
+
+
+def test_a_kill_nobody_claims_is_recorded_as_unclaimed(tmp_path):
+    """A RED run whose failing tests could not be parsed still COUNTS as a kill (the exit code
+    is unambiguous) but names nobody. Reading that as evidence for a criterion would be the
+    fail-open this whole rung exists to refuse."""
+    repo = _repo(tmp_path)
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(repo), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_FakeRunner(mutant=(False, "1 failed in 0.01s", "")), pytest_cmd=_fake_cmd,
+        persist=False)
+    assert ev["killed"] == 8, "the kill still counts toward the whole-file score"
+    assert all(r["killed_by"] == [] for r in ev[om.EV_MUTANTS])
+
+
+def test_a_skipped_audit_banks_the_attribution_shape_empty(tmp_path):
+    """Key ABSENCE must never be how a consumer learns attribution is missing — an audit that
+    predates the feature and one that ran and attributed nothing would look alike."""
+    ev = om.not_measured_evidence(JOB_ORACLE_PATH_PYTHON, "skipped-no-delivered-tree")
+    assert ev[om.EV_MUTANTS] == [] and ev[om.EV_ORACLE_SHA] == ""
+    assert ev[om.EV_ORACLE_PATH] == JOB_ORACLE_PATH_PYTHON
+
+
+def test_oracle_digest_distinguishes_two_exams():
+    assert om.oracle_digest(_SHARP_ORACLE) != om.oracle_digest(_VACUOUS_ORACLE)
+    assert om.oracle_digest(_SHARP_ORACLE) == om.oracle_digest(_SHARP_ORACLE)
+
+
+# ---------------------------------------------------------------------------
 # Deterministic, operator-diverse, bounded selection
 # ---------------------------------------------------------------------------
 
@@ -215,6 +336,10 @@ _FORBIDDEN_VERDICT_KEYS = {
 _ADVISORY_KEYS = {
     "oracle_mutation_score", "oracle_mutation_coverage", "killed", "survived",
     "ran", "by_operator", "survivors", "mutation_audit",
+    # #1195 item 3: the per-mutant attribution rows and the digest of the exam they came
+    # from. Both move with the score by construction (a different exam kills differently) and
+    # neither is a verdict — the traceability ladder GRADES from them; it is not told a result.
+    om.EV_MUTANTS, om.EV_ORACLE_SHA,
 }
 
 
@@ -273,6 +398,222 @@ def test_budget_expiry_mid_run_is_partial_budget(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# #1231 — a tighter budget must never make the audit look BETTER
+# ---------------------------------------------------------------------------
+
+
+class _MixedRunner:
+    """Baseline passes; then mutants alternate KILLED / SURVIVED.
+
+    The pre-existing budget locks use a sharp runner that kills every mutant, which
+    pins the score at a 100% ceiling — a ceiling cannot detect inflation, so those
+    tests passed happily while the band rose as the budget fell. A mixed verdict is
+    what makes the defect observable at all."""
+
+    def __init__(self) -> None:
+        self.calls: list = []
+
+    def __call__(self, cmd, cwd, timeout_s, env):
+        self.calls.append((tuple(cmd), cwd, timeout_s))
+        if len(self.calls) == 1:
+            return (True, "1 passed in 0.01s", "")
+        # even-numbered mutant calls fail (oracle RED -> killed), odd ones pass (survived)
+        return ((False, "1 failed in 0.01s", "") if len(self.calls) % 2 == 0
+                else (True, "1 passed in 0.01s", ""))
+
+
+_BAND_RANK = {"unknown": -1, "weak": 0, "adequate": 1, "strong": 2}
+
+
+def _run_with_clock(repo, clock):
+    return om.run_oracle_mutation_audit(
+        None, "R", str(repo), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_MixedRunner(), pytest_cmd=_fake_cmd,
+        persist=False, budget_s=5, clock=clock)
+
+
+def test_tightening_the_budget_cannot_raise_the_coverage_band(tmp_path):
+    """The defect, stated as an invariant: doing LESS work must not report BETTER
+    coverage. Before #1231 the band was killed/ran, so dropping every mutant the
+    oracle would have survived left a 1/1 'strong' behind."""
+    full = _run_with_clock(_repo(tmp_path), _SeqClock([0] * 400))
+    # base + baseline-remaining + (loop-check, remaining) per mutant, then the check
+    # that trips: one mutant runs, the rest are dropped.
+    tight = _run_with_clock(_repo(tmp_path), _SeqClock([0, 0, 0, 0] + [10] * 400))
+
+    assert full["mutation_audit"] == "run"
+    assert tight["mutation_audit"] == "partial-budget"
+    assert tight["ran"] < full["ran"], "the tight run must actually have dropped mutants"
+    assert tight["not_run"] > 0
+
+    assert _BAND_RANK[tight["oracle_mutation_coverage"]] <= _BAND_RANK[full["oracle_mutation_coverage"]], (
+        f"a tighter budget reported a BETTER band: {tight['oracle_mutation_coverage']} "
+        f"(ran {tight['ran']}, dropped {tight['not_run']}) vs "
+        f"{full['oracle_mutation_coverage']} (ran {full['ran']})"
+    )
+
+
+def test_dropped_mutants_are_counted_not_forgotten(tmp_path):
+    """A reader must be able to see how much of the audit actually happened rather than
+    inferring completeness from a bare score.
+
+    ``planned`` is the authority on the selection size -- an earlier draft of this fix
+    added a second ``selected`` key derived as ran+not_run, which reported 0 for a run
+    that planned 8 mutants and lost all 8 to machinery misses. Two keys for one fact
+    disagree the moment anything takes a third path."""
+    tight = _run_with_clock(_repo(tmp_path), _SeqClock([0, 0, 0, 0] + [10] * 400))
+
+    assert tight["not_run"] > 0
+    assert tight["planned"] == tight["ran"] + tight["not_run"] + tight["unreachable"], (
+        "every selected mutant must land in exactly one bucket"
+    )
+    # The score still describes what RAN -- it is not retconned into a completeness claim.
+    assert tight["oracle_mutation_score"] == f"{tight['killed']}/{tight['ran']}"
+
+
+class _NoVerdictAfterN:
+    """Baseline passes, the first ``n_ok`` mutants are KILLED, the rest return a blob the
+    verdict parser cannot read — the shape a per-mutant timeout produces in production."""
+
+    def __init__(self, n_ok: int = 0) -> None:
+        self.calls = 0
+        self.n_ok = n_ok
+
+    def __call__(self, cmd, cwd, timeout_s, env):
+        self.calls += 1
+        if self.calls == 1:
+            return (True, "1 passed in 0.01s", "")
+        if self.calls - 1 <= self.n_ok:
+            return (False, "1 failed in 0.01s", "")  # oracle RED -> killed
+        return (False, "ERROR: could not start interpreter", "")  # no readable verdict
+
+
+def test_the_three_buckets_reconcile_against_planned(tmp_path):
+    """``planned`` is the authority on the selection size; every mutant lands in exactly
+    one of ran / not_run / unreachable. An earlier cut of this fix added a ``selected`` key
+    derived as ran+not_run, which reported 0 for a run that planned 8 and lost all 8 to
+    machinery misses -- two keys for one fact disagree as soon as a third path exists."""
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(_repo(tmp_path)), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_NoVerdictAfterN(0), pytest_cmd=_fake_cmd, persist=False, budget_s=999)
+
+    assert ev["planned"] > 0
+    assert ev["ran"] == 0 and ev["not_run"] == 0
+    assert ev["unreachable"] == ev["planned"], "every mutant was unreachable here"
+    assert ev["planned"] == ev["ran"] + ev["not_run"] + ev["unreachable"]
+
+
+def test_unreadable_verdicts_cannot_report_a_complete_strong_audit(tmp_path):
+    """The sibling of the budget defect, and a WORSE claim: with no budget pressure the
+    stamp said ``run`` -- asserting completeness outright -- while 7 of 8 mutants had
+    timed out and the band read ``strong`` off a 1/1 score."""
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(_repo(tmp_path)), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_NoVerdictAfterN(1), pytest_cmd=_fake_cmd, persist=False, budget_s=10 ** 9)
+
+    assert ev["ran"] == 1 and ev["killed"] == 1  # everything that got a verdict was killed
+    assert ev["unreachable"] > 0
+    assert ev["mutation_audit"] != "run", (
+        "'run' asserts the audit completed; mutants the machinery never reached mean it did not"
+    )
+    assert ev["mutation_audit"] == "partial-machinery"
+    assert ev["oracle_mutation_coverage"] != "strong", (
+        "a 1/1 score over 8 selected mutants reported 'strong' with no partial stamp at all"
+    )
+
+
+def test_unreachable_mutants_get_no_verdict_rows(tmp_path):
+    """They must be visible downstream, and must never look like a subject that was tested."""
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(_repo(tmp_path)), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_NoVerdictAfterN(1), pytest_cmd=_fake_cmd, persist=False, budget_s=10 ** 9)
+
+    rows = ev[om.EV_MUTANTS]
+    assert [r["outcome"] for r in rows].count("no-verdict") == ev["unreachable"]
+    assert len(rows) == ev["planned"], "every selected mutant needs a row"
+    for row in rows:
+        if row["outcome"] == "no-verdict":
+            assert row["killed_by"] == []
+
+
+def test_the_second_break_site_also_records_its_dropped_mutants(tmp_path):
+    """There are TWO budget exits. The loop-head check and the post-write ``remaining``
+    check. An independent review found only the first was reached by any test: deleting the
+    second site's bookkeeping left the whole suite green, so the fixed defect could have
+    been reintroduced there silently."""
+    # call 4 is the `remaining` read -- 10 >= deadline 5 trips the SECOND site, at idx 0.
+    ev = _run_with_clock(_repo(tmp_path), _SeqClock([0, 0, 0, 10] + [10] * 400))
+
+    assert ev["ran"] == 0
+    assert ev["not_run"] == ev["planned"], (
+        "the mutant in flight when the second budget check tripped must be recorded too"
+    )
+    assert ev["mutation_audit"] == "skipped-budget"
+
+
+def test_the_second_break_site_mid_run_keeps_the_counts_disjoint(tmp_path):
+    """The in-flight item breaks BEFORE ``ran += 1``, so it belongs to not_run and must not
+    also be counted as run -- the double-count this slicing could easily have introduced."""
+    ev = _run_with_clock(_repo(tmp_path), _SeqClock([0, 0, 0, 0, 0, 10] + [10] * 400))
+
+    assert ev["ran"] >= 1 and ev["not_run"] >= 1
+    assert ev["planned"] == ev["ran"] + ev["not_run"] + ev["unreachable"]
+    sites = [(r["file"], r["line"], r["operator"]) for r in ev[om.EV_MUTANTS]]
+    assert len(sites) == len(set(sites)), "a mutant was recorded twice"
+
+
+def test_dropped_mutants_appear_as_not_run_rows(tmp_path):
+    """A partial audit must not LOOK complete to a downstream reader of EV_MUTANTS."""
+    tight = _run_with_clock(_repo(tmp_path), _SeqClock([0, 0, 0, 0] + [10] * 400))
+
+    rows = tight[om.EV_MUTANTS]
+    outcomes = [r["outcome"] for r in rows]
+    assert outcomes.count("not-run") == tight["not_run"]
+    assert len(rows) == tight["ran"] + tight["not_run"], "every accounted mutant needs a row"
+    for row in rows:
+        if row["outcome"] == "not-run":
+            assert row["killed_by"] == [], "a mutant that never ran cannot name a killer"
+
+
+def test_a_band_of_strong_requires_every_selected_mutant_to_have_run(tmp_path):
+    """The sharp-oracle case: 100% of what ran was killed, but not everything ran.
+    'strong' would be a claim about mutants nobody tried."""
+    repo = _repo(tmp_path)
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(repo), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_FakeRunner(mutant=(False, "1 failed", "")), pytest_cmd=_fake_cmd,
+        persist=False, budget_s=5, clock=_SeqClock([0, 0, 0, 0] + [10] * 400))
+
+    assert ev["killed"] == ev["ran"] == 1  # everything that ran was killed
+    assert ev["not_run"] > 0
+    assert ev["oracle_mutation_coverage"] != "strong", (
+        "a 1/1 score with dropped mutants reported 'strong' -- the exact inflation #1231 fixes"
+    )
+
+
+def test_nothing_ran_stays_unknown_rather_than_weak(tmp_path):
+    """Fail-closed must not overshoot into asserting a finding. With zero attempts the
+    audit has no opinion; reporting 'weak' would convict an oracle nobody examined."""
+    ev = om.run_oracle_mutation_audit(
+        None, "R", str(_repo(tmp_path)), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
+        run=_FakeRunner(mutant=(False, "1 failed", "")), pytest_cmd=_fake_cmd,
+        persist=False, budget_s=5, clock=_SeqClock([0, 0] + [10] * 400))
+
+    assert ev["ran"] == 0
+    assert ev["mutation_audit"] == "skipped-budget"
+    assert ev["oracle_mutation_coverage"] == "unknown"
+
+
+def test_band_counts_unrun_mutants_against_the_score():
+    """The unit-level statement of the rule, independent of the audit's plumbing."""
+    assert om._band(4, 4, 0) == "strong"
+    assert om._band(4, 4, 16) == "weak", "16 unattempted mutants must not read as strong"
+    assert om._band(9, 10, 0) == "adequate"
+    assert om._band(9, 10, 40) == "weak"
+    assert om._band(0, 0, 20) == "unknown", "no attempts means no opinion, not a bad one"
+
+
+# ---------------------------------------------------------------------------
 # Honest fail-soft skips (baseline / machinery / language / disabled / targets)
 # ---------------------------------------------------------------------------
 
@@ -298,15 +639,24 @@ def test_baseline_not_run_declines(tmp_path):
 
 
 def test_machinery_miss_mutants_not_counted(tmp_path):
+    """Baseline green, every mutant run a machinery miss (no summary) → not counted.
+
+    This test asserted ``mutation_audit == "run"`` until #1231. That was the defect
+    written down as expected behaviour: ``run`` asserts the audit COMPLETED, and here it
+    reached none of its mutants. The stamp is now ``skipped-machinery`` (``ran == 0``),
+    or ``partial-machinery`` when some mutants did get a verdict. A baseline that encodes
+    the bug is the one place a green suite actively defends it.
+    """
     repo = _repo(tmp_path)
-    # Baseline green, but every mutant run is a machinery miss (no summary) → not counted.
     runner = _FakeRunner(mutant=(False, "", ""))
     ev = om.run_oracle_mutation_audit(
         None, "R", str(repo), JOB_ORACLE_PATH_PYTHON, _SHARP_ORACLE,
         run=runner, pytest_cmd=_fake_cmd, persist=False)
-    assert ev["mutation_audit"] == "run"
+    assert ev["mutation_audit"] == "skipped-machinery"
     assert ev["ran"] == 0 and ev["killed"] == 0
+    assert ev["unreachable"] == ev["planned"]
     assert ev["oracle_mutation_coverage"] == "unknown"  # nothing counted → honest unknown
+    assert not om.is_measured(ev), "an audit that reached no mutant is not a measurement"
 
 
 def test_node_oracle_is_skipped_no_python_runner(tmp_path):

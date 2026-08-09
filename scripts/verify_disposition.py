@@ -40,13 +40,42 @@ THE BLOCK (fenced ```disposition), pipe-delimited. Each row:
     <finding> | <status> | <evidence-or-predicate>
 
   - ``FIXED``    - requires a commit-ish token in evidence: a 7-40 hex SHA, or
-                   a ``branch/name`` ref. Verified structurally here; the gate
-                   test additionally resolves SHAs against the repo.
+                   a ``branch/name`` ref. Every SHA is additionally RESOLVED
+                   against the repository it claims to live in (see below).
   - ``DEFERRED`` - requires BOTH a ``#NNN`` ticket AND a ``blocked-by:`` clause
                    that is neither filler nor unobservable.
   - ``REJECTED`` - a finding judged not to be a defect. Requires a reason of
                    >= MIN_REASON_WORDS words, because "not a defect" asserted
                    without argument is the same silence in a different hat.
+
+EVIDENCE IN A SIBLING REPOSITORY (``<repo>@<sha>``)
+
+A bare SHA is resolved against BlarAI. Work that lands in a sibling repository
+of the constellation is cited by NAMING that repository:
+
+    finding | FIXED | agentic-setup@59fc51d - one line on what the fix does
+
+and the SHA is then resolved *in agentic-setup*. This exists because half of a
+cross-repo arc could previously not be recorded honestly at all: a sibling SHA
+was rejected by a check that only knew BlarAI, so the only way to make a record
+green was to cite a BRANCH NAME instead - and a branch name in a repository
+nobody resolves is a label, not evidence. That substitution is the failure this
+control was built to refuse, arriving through the control's own door. The fix
+is to check the citation, not to tolerate it.
+
+Consequences, all deliberate:
+
+  * only the names in ``KNOWN_REPOS`` are accepted - an allowlist, because a
+    citation into a repository nobody can locate is an unchecked claim;
+  * a repository the machine cannot open is a FAILURE, never a skip. Absence
+    is the one thing a verifier must never read as consent;
+  * the sibling door takes a SHA only. A ``branch/name`` still satisfies the
+    BlarAI form (records predating this rely on it), but it is not admitted
+    across a repository boundary, where it is exactly the evasion above;
+  * the qualified token is consumed FIRST, so the SHA half of a sibling
+    citation is never re-read as a BlarAI SHA - and, symmetrically, a BlarAI
+    SHA mislabelled ``agentic-setup@...`` fails, because the check follows the
+    name it was given rather than looking for somewhere the SHA does resolve.
 
 HONEST LIMIT, stated because a control that overstates its coverage is the
 exact defect class this repository keeps re-learning (see #978 probe 2, whose
@@ -69,8 +98,11 @@ Usage (from repo root, or anywhere with ``--repo``):
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 BLOCK_RE = re.compile(r"```disposition\s*\n(.*?)```", re.S)
@@ -79,6 +111,33 @@ STATUSES = ("FIXED", "DEFERRED", "REJECTED")
 
 #: A commit-ish: a 7-40 hex SHA, or a ``kind/branch-name`` ref.
 COMMITISH_RE = re.compile(r"\b(?:[0-9a-f]{7,40}\b|[a-z]+/[A-Za-z0-9._-]+)")
+
+#: A SHA with no repository named. Resolved against BlarAI.
+BARE_SHA_RE = re.compile(r"\b[0-9a-f]{7,40}\b")
+
+#: ``<repo>@<sha>`` - evidence in a NAMED sibling repository. The trailing
+#: lookahead keeps a hex-looking domain (``x@deadbeef.com``) from reading as a
+#: citation; the hex half is required, per the sibling-door rule in the module
+#: docstring.
+QUALIFIED_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9._-]*)@([0-9a-f]{7,40})(?![0-9A-Za-z._-])")
+
+#: The repository whose history a bare SHA is read against.
+HOME_REPO = "blarai"
+
+#: The repositories a row may cite, lowercased, per CLAUDE.md
+#: <repo_constellation>. An allowlist: a name that is not here is refused
+#: rather than searched for, so a typo cannot become a directory probe.
+KNOWN_REPOS: tuple[str, ...] = (HOME_REPO, "agentic-setup", "devplatform")
+
+#: A named repository followed by something that is not a resolvable SHA -
+#: the branch-name substitution arriving through the sibling door. Scanned
+#: only after the valid citations have been struck out.
+SIBLING_NON_SHA_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9._-]*)@(\S*)")
+
+#: Overrides the directory the sibling repositories are looked up under.
+#: Unset, it is the parent of the BlarAI checkout that owns this script. It
+#: moves WHERE a citation is resolved, never WHETHER it is.
+CONSTELLATION_ROOT_ENV = "BLARAI_CONSTELLATION_ROOT"
 
 TICKET_RE = re.compile(r"#\d{1,6}\b")
 BLOCKED_BY_RE = re.compile(r"blocked-by:\s*(.+)$", re.I)
@@ -119,6 +178,119 @@ class Row:
         self.raw = raw
 
 
+@lru_cache(maxsize=1)
+def home_checkout() -> Path:
+    """The BlarAI working tree owning this script; a worktree resolves to its main tree.
+
+    ``--git-common-dir`` is what makes a linked worktree name the same
+    constellation as the checkout it was cut from. Without it every worktree
+    would look for siblings under ``.worktrees/``, where the fallback below
+    leaves it - which makes sibling citations FAIL rather than pass, the safe
+    direction for a lookup that could not be completed.
+    """
+    here = Path(__file__).resolve().parents[1]
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(here), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True,
+        )
+    except OSError:
+        return here
+    if out.returncode != 0 or not out.stdout.strip():
+        return here
+    return Path(out.stdout.strip()).resolve().parent
+
+
+def constellation_root() -> Path:
+    """The directory the sibling repositories are looked up under."""
+    override = os.environ.get(CONSTELLATION_ROOT_ENV)
+    return Path(override).resolve() if override else home_checkout().parent
+
+
+def repo_root_for(name: str) -> Path:
+    """The working tree a citation naming ``name`` is resolved against."""
+    return home_checkout() if name == HOME_REPO else constellation_root() / name
+
+
+def citations(evidence: str) -> tuple[list[tuple[str, str]], list[str]]:
+    """Split evidence into ``(repo, sha)`` citations, plus any shape errors.
+
+    Qualified ``<repo>@<sha>`` tokens are consumed first and struck from the
+    text, so a sibling SHA is never also read as a BlarAI SHA. Whatever hex
+    survives that pass named no repository and belongs to ``HOME_REPO``.
+    """
+    found: list[tuple[str, str]] = []
+    errors: list[str] = []
+
+    def _take(m: re.Match[str]) -> str:
+        name, sha = m.group(1), m.group(2)
+        if name.lower() in KNOWN_REPOS:
+            found.append((name.lower(), sha))
+        else:
+            errors.append(
+                f"{m.group(0)!r} names repository {name!r}, which is not one of "
+                f"{', '.join(KNOWN_REPOS)} - a citation into a repository nobody can "
+                f"locate is an unchecked claim wearing the shape of evidence"
+            )
+        return " "
+
+    remainder = QUALIFIED_RE.sub(_take, evidence)
+
+    # Every well-formed citation is gone by now, so a surviving ``<known>@...``
+    # is one that was reached for and missed the only form the door takes.
+    for m in SIBLING_NON_SHA_RE.finditer(remainder):
+        if m.group(1).lower() in KNOWN_REPOS:
+            errors.append(
+                f"{m.group(0)!r} cites {m.group(1)} with {m.group(2)!r}, which is not a "
+                f"7-40 hex SHA - across a repository boundary only a SHA is evidence, "
+                f"because a branch name there is a label nobody resolves"
+            )
+
+    found.extend((HOME_REPO, sha) for sha in BARE_SHA_RE.findall(remainder))
+    return found, errors
+
+
+def resolve_citation(repo: str, sha: str) -> str | None:
+    """Return why ``sha`` fails to name a commit in ``repo``, or None when it does.
+
+    Deny-by-default: an unreachable repository, an absent git, and a SHA that
+    does not resolve are all failures. Absence is never read as consent.
+    """
+    root = repo_root_for(repo)
+    if not (root / ".git").exists():
+        return (
+            f"repository {repo!r} is not reachable at {root} - a citation this machine "
+            f"cannot open is unchecked, and an unchecked claim is what this control "
+            f"refuses (set {CONSTELLATION_ROOT_ENV} if the constellation lives elsewhere)"
+        )
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", f"{sha}^{{commit}}"],
+            capture_output=True, text=True,
+        )
+    except OSError as exc:
+        return f"cannot run git to resolve {sha} in {repo}: {exc}"
+    if out.returncode != 0:
+        return (
+            f"{sha} does not resolve to a commit in {repo} ({root}) - evidence that "
+            f"cannot be checked is not evidence"
+        )
+    return None
+
+
+def resolve_row(row: Row) -> list[str]:
+    """Every citation in a FIXED row that does not resolve. Empty list == pass.
+
+    Only FIXED rows make an evidence claim, so only FIXED rows are resolved;
+    a malformed repository NAME is caught for every status by ``check_row``,
+    which needs no git to see it.
+    """
+    if row.status != "FIXED":
+        return []
+    found, _ = citations(row.evidence)
+    return [reason for repo, sha in found if (reason := resolve_citation(repo, sha)) is not None]
+
+
 def extract_block(text: str) -> tuple[list[Row] | None, str | None]:
     """Return (rows, error). Deny-by-default: absent or duplicate block is an error."""
     blocks = BLOCK_RE.findall(text)
@@ -156,6 +328,8 @@ def check_row(row: Row) -> list[str]:
 
     if "<" in row.evidence and ">" in row.evidence:
         fails.append("evidence still carries a <placeholder>")
+
+    fails.extend(citations(row.evidence)[1])
 
     if row.status == "FIXED":
         if not COMMITISH_RE.search(row.evidence):
@@ -219,7 +393,7 @@ def verify(path: Path) -> tuple[int, list[str]]:
     assert rows is not None
     n_fail = 0
     for row in rows:
-        fails = check_row(row)
+        fails = check_row(row) + resolve_row(row)
         if fails:
             n_fail += 1
             out.append(f"  [FAIL] {row.finding} ({row.status})")

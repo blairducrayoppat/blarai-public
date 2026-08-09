@@ -480,3 +480,399 @@ def render_revision_delta(outcome: RevisionOutcome, feedback: str) -> str:
         lines.append("  (No changes — the plan is the same.)")
     lines.append("")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CRITERIA revision (#1055 part 2 / #1069 S3 slice G)
+# ---------------------------------------------------------------------------
+#
+# The #820 machinery above edits the TASK list; the #1055 dead-end was that criteria could
+# not be edited at all — the honest message (slice A) routes the operator to reject +
+# re-dispatch. This block is the real capability behind that message, with a HARD WALL the
+# task machinery does not need:
+#
+#   MACHINE-GATED TIERS (build / behavior / smoke) ARE KEEP-ONLY. The folded test block in
+#   the compiled task prompts and the riding job exam consume ONLY machine-tier criteria,
+#   and both are frozen at plan time by the #820 safety asymmetry (a revision can never
+#   weaken — or change — the machine gate). If a criteria revision could edit a machine
+#   criterion, the card would show one assertion while the exam tested another: a
+#   divergence trap wearing an edit box. Keeping them immutable here means NOTHING the
+#   coder or the exam consumes can change through this path, so the card, the prompts and
+#   the exam cannot disagree, by construction. The operator-judged tiers (visual / human)
+#   are the operator's own checklist — those are fully editable, and an added criterion is
+#   FORCED to the human tier for the same reason (a post-plan addition must never mint a
+#   machine check nobody authored an exam for).
+#
+# Same discipline as everything above: the model proposes, a deterministic ruler disposes,
+# fail-soft is absolute, and the request rides the goal string over the existing plan seam
+# behind its own sentinel — no new IPC verb.
+
+CRITERIA_REVISE_SENTINEL = "\n\n[[BLARAI_CRITERIA_REVISION]]\n"
+
+#: The criteria tiers the machine gates consume — KEEP-ONLY through this path. Replicated
+#: from acceptance's TEST_TIERS + build tier (this module stays acceptance-free; the
+#: equality is pinned by test, the same pattern as the sandbox-prefix mirror).
+MACHINE_TIERS: frozenset[str] = frozenset({"build", "behavior", "smoke"})
+#: The operator-judged tiers — fully editable; the forced tier for an added criterion.
+JUDGED_TIERS: frozenset[str] = frozenset({"visual", "human"})
+
+_CRITERIA_OP_KEEP = "keep"
+_CRITERIA_OP_RESCOPE = "rescope"
+_CRITERIA_OP_ADD = "add"
+_CRITERIA_OPS: frozenset[str] = frozenset(
+    {_CRITERIA_OP_KEEP, _CRITERIA_OP_RESCOPE, _CRITERIA_OP_ADD}
+)
+
+#: Bounds for criteria ops — same rationale as the task caps above.
+_MAX_CRITERIA_REVISION_STEPS = 16
+_MIN_CRITERION_LEN = 5
+_CRITERION_TEXT_MAX = 300
+
+
+def compose_criteria_revision_goal(
+    goal: str, feedback: str, criteria: "list[dict] | tuple[dict, ...]"
+) -> str:
+    """Embed the operator's *feedback* + the current criteria set into the goal for the
+    ``plan_fn(repo, goal)`` hop, behind :data:`CRITERIA_REVISE_SENTINEL`. Each criterion
+    rides as ``{id, text, tier, check}``. Pure + total (never raises)."""
+    rows = [
+        {"id": str(c.get("id", "")), "text": str(c.get("text", "")),
+         "tier": str(c.get("tier", "")), "check": str(c.get("check", ""))}
+        for c in (criteria or ()) if isinstance(c, dict)
+    ]
+    payload = json.dumps({"feedback": (feedback or "").strip(), "criteria": rows})
+    return (goal or "").strip() + CRITERIA_REVISE_SENTINEL + payload
+
+
+def split_criteria_revision_goal(goal: str) -> "tuple[str, str, list[dict]]":
+    """Inverse of :func:`compose_criteria_revision_goal`:
+    ``(clean_goal, feedback, criteria_rows)``. A goal WITHOUT the sentinel returns
+    ``(goal_stripped, "", [])``. Fail-soft on a malformed payload. Never raises."""
+    raw = goal or ""
+    if CRITERIA_REVISE_SENTINEL not in raw:
+        return raw.strip(), "", []
+    head, _, tail = raw.partition(CRITERIA_REVISE_SENTINEL)
+    try:
+        data = json.loads(tail.strip())
+    except (ValueError, TypeError):
+        return head.strip(), "", []
+    if not isinstance(data, dict):
+        return head.strip(), "", []
+    feedback = str(data.get("feedback", "")).strip()
+    raw_rows = data.get("criteria")
+    rows = [dict(r) for r in raw_rows if isinstance(r, dict)] if isinstance(raw_rows, list) else []
+    return head.strip(), feedback, rows
+
+
+@dataclass(frozen=True)
+class CriteriaReviseOp:
+    """One validated edit operation over the criteria set.
+
+    ``keep``    -> preserve criterion number ``ref`` (1-based) unchanged.
+    ``rescope`` -> replace criterion ``ref``'s wording (judged tiers only; the ruler
+                   discards a rescope aimed at a machine tier and reports it protected).
+    ``add``     -> a new operator-judged criterion (tier FORCED to ``human``).
+    """
+
+    op: str
+    ref: int = 0
+    text: str = ""
+    check: str = ""
+
+    def to_dict(self) -> dict:
+        return {"op": self.op, "ref": self.ref, "text": self.text, "check": self.check}
+
+
+_CRITERIA_REVISE_TEMPLATE = (
+    "A non-technical person reviewed what their build will be judged on and asked for "
+    "changes. REVISE the list of acceptance criteria to match their feedback — reword, "
+    "remove, or add ONLY what the feedback asks; KEEP every criterion the feedback does "
+    "not touch exactly as it is. Return ONLY a JSON array (no prose) listing the criteria "
+    "in their final order. Each item is exactly one of:\n"
+    '  {{"op": "keep", "ref": <number of an existing criterion to keep unchanged>}}\n'
+    '  {{"op": "rescope", "ref": <number of an existing criterion to reword>, '
+    '"text": "<the new wording>"}}\n'
+    '  {{"op": "add", "text": "<a new thing the person will check by eye>"}}\n'
+    "To REMOVE a criterion, simply leave it out. Criteria marked [protected] are the "
+    "automatic machine checks — you MUST include a keep for each of them; they cannot be "
+    "reworded or removed here.\n\n"
+    "The overall goal:\n{goal}\n\n"
+    "The current criteria:\n{criteria}\n\n"
+    "The person's feedback:\n{feedback}\n"
+)
+
+
+def criteria_revision_ops_emission_json_schema() -> dict:
+    """Schema for a grammar-constrained CRITERIA-revise emission (the #743 hook shape)."""
+    return {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": _MAX_CRITERIA_REVISION_STEPS,
+        "items": {
+            "type": "object",
+            "properties": {
+                "op": {"enum": sorted(_CRITERIA_OPS)},
+                "ref": {"type": "integer"},
+                "text": {"type": "string", "maxLength": _CRITERION_TEXT_MAX},
+            },
+            "required": ["op"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def generate_criteria_revision_ops(
+    goal: str,
+    criteria: "list[dict] | tuple[dict, ...]",
+    feedback: str,
+    *,
+    generate_fn: Callable[[str], str],
+    structured_generate_fn: "Callable[[str, str], str] | None" = None,
+) -> tuple[CriteriaReviseOp, ...]:
+    """The 14B proposes criteria edit ops; the ruler disposes. AO-side, via the criteria
+    branch of ``generate_plan``. Machine-tier criteria are rendered ``[protected]`` in the
+    prompt AND enforced by the ruler — the prompt is the quality half, the ruler the
+    guarantee half, exactly the slice-E split. Fail-soft is absolute: ANY failure returns
+    ``()`` and the coordinator re-renders the original card untouched."""
+    fb = (feedback or "").strip()
+    rows = [c for c in (criteria or ()) if isinstance(c, dict)]
+    if not fb or not rows:
+        return ()
+    listing = "\n".join(
+        f"{i}. {'[protected] ' if str(c.get('tier', '')) in MACHINE_TIERS else ''}"
+        f"[{c.get('tier', '')}] {c.get('text', '')}"
+        for i, c in enumerate(rows, start=1)
+    )
+    prompt = _CRITERIA_REVISE_TEMPLATE.format(
+        goal=(goal or "").strip(), criteria=listing, feedback=fb
+    )
+    raw = _grammar_first(
+        prompt,
+        structured_generate_fn=structured_generate_fn,
+        schema=criteria_revision_ops_emission_json_schema(),
+    )
+    if raw is None:
+        try:
+            raw = generate_fn(prompt)
+        except Exception:  # noqa: BLE001 — a revise failure must degrade, never crash
+            return ()
+    return _parse_criteria_revision_ops(raw, n_criteria=len(rows))
+
+
+def _parse_criteria_revision_ops(text: str, *, n_criteria: int) -> tuple[CriteriaReviseOp, ...]:
+    """Best-effort parse into validated criteria ops; ``()`` on failure. Ref-range checks
+    and dedupe as in :func:`_parse_revision_ops`; tier enforcement happens in
+    :func:`apply_criteria_revision_ops`, which holds the real tiers. Never raises."""
+    if not text or n_criteria < 0:
+        return ()
+    match = _JSON_ARRAY_RE.search(text)
+    if not match:
+        return ()
+    try:
+        data = json.loads(match.group(0))
+    except (ValueError, TypeError):
+        return ()
+    if not isinstance(data, list):
+        return ()
+    out: list[CriteriaReviseOp] = []
+    used_refs: set[int] = set()
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        op = str(item.get("op", "")).strip().lower()
+        if op not in _CRITERIA_OPS:
+            continue
+        if op == _CRITERIA_OP_ADD:
+            text_val = str(item.get("text", "")).strip()[:_CRITERION_TEXT_MAX]
+            if len(text_val) < _MIN_CRITERION_LEN:
+                continue
+            out.append(CriteriaReviseOp(op=op, text=text_val))
+        else:  # keep | rescope — both reference an existing criterion
+            ref = _coerce_ref(item.get("ref"))
+            if ref is None or not (1 <= ref <= n_criteria) or ref in used_refs:
+                continue
+            if op == _CRITERIA_OP_KEEP:
+                used_refs.add(ref)
+                out.append(CriteriaReviseOp(op=op, ref=ref))
+            else:
+                text_val = str(item.get("text", "")).strip()[:_CRITERION_TEXT_MAX]
+                if len(text_val) < _MIN_CRITERION_LEN:
+                    continue
+                used_refs.add(ref)
+                out.append(CriteriaReviseOp(op=op, ref=ref, text=text_val))
+        if len(out) >= _MAX_CRITERIA_REVISION_STEPS:
+            break
+    return tuple(out)
+
+
+def criteria_ops_from_dicts(raw: object) -> tuple[CriteriaReviseOp, ...]:
+    """Reconstruct :class:`CriteriaReviseOp` from the ``{op, ref, text, check}`` wire dicts
+    (``PlanResult.criteria_revision``). Fail-closed, never raises; RANGE/tier validation is
+    :func:`apply_criteria_revision_ops`'s job (it holds the real set), but the seam applies
+    the same shape rules the AO-side parser applies (review F4 — wire parity): duplicate
+    keep/rescope refs are dropped, an add/rescope below the text floor is dropped, and the
+    step cap holds — so a hand-crafted wire payload cannot mint blank rows or
+    double-report a protected title."""
+    if not isinstance(raw, list):
+        return ()
+    out: list[CriteriaReviseOp] = []
+    used_refs: set[int] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        op = str(item.get("op", "")).strip().lower()
+        if op not in _CRITERIA_OPS:
+            continue
+        text = str(item.get("text", "")).strip()[:_CRITERION_TEXT_MAX]
+        if op == _CRITERIA_OP_ADD:
+            if len(text) < _MIN_CRITERION_LEN:
+                continue
+            out.append(CriteriaReviseOp(op=op, text=text))
+        else:
+            ref = _coerce_ref(item.get("ref")) or 0
+            if ref in used_refs:
+                continue
+            if op == _CRITERIA_OP_RESCOPE and len(text) < _MIN_CRITERION_LEN:
+                continue
+            used_refs.add(ref)
+            out.append(CriteriaReviseOp(
+                op=op, ref=ref,
+                text=text if op == _CRITERIA_OP_RESCOPE else "",
+                check=str(item.get("check", "")).strip(),
+            ))
+        if len(out) >= _MAX_CRITERIA_REVISION_STEPS:
+            break
+    return tuple(out)
+
+
+@dataclass(frozen=True)
+class CriteriaRevisionOutcome:
+    """The result of applying criteria ops.
+
+    ``criteria`` are the revised rows (``{id, text, tier, check}`` dicts): a kept row is a
+    byte-identical copy; a rescoped row keeps its id and tier with new wording and an
+    EMPTIED check (the old check verified the old wording — carrying it forward would claim
+    a verification nobody re-authored; the realism guard then re-tiers if needed); an added
+    row is minted at the ``human`` tier with a fresh non-colliding id. ``protected_titles``
+    are machine-tier criteria an op tried to touch (or omit) — auto-kept, and the card says
+    so. ``changed`` False ⇒ fail-soft (the coordinator re-renders the original)."""
+
+    criteria: list[dict] = field(default_factory=list)
+    kept: int = 0
+    rescoped_titles: list[str] = field(default_factory=list)
+    added_titles: list[str] = field(default_factory=list)
+    removed_titles: list[str] = field(default_factory=list)
+    protected_titles: list[str] = field(default_factory=list)
+    changed: bool = False
+
+
+def apply_criteria_revision_ops(
+    current: "list[dict] | tuple[dict, ...]",
+    ops: "tuple[CriteriaReviseOp, ...] | list[CriteriaReviseOp]",
+) -> "CriteriaRevisionOutcome | None":
+    """Apply validated *ops* to the current criteria rows, enforcing the tier wall.
+
+    THE WALL, restated where it is enforced: a machine-tier row (:data:`MACHINE_TIERS`) is
+    immutable through this path — a ``rescope`` aimed at one is discarded (recorded in
+    ``protected_titles``), and an OMITTED machine row is auto-kept in its original position
+    rather than dropped. Judged-tier rows may be kept, reworded, dropped by omission, or
+    added (added ⇒ ``human`` tier, empty check, fresh id). Returns ``None`` fail-soft for
+    no ops or an all-invalid emission. Pure + total — never raises."""
+    rows = [dict(c) for c in (current or ()) if isinstance(c, dict)]
+    if not ops or not rows:
+        return None
+    n = len(rows)
+    used_refs: set[int] = set()
+    out: list[dict] = []
+    rescoped_titles: list[str] = []
+    added_titles: list[str] = []
+    protected_titles: list[str] = []
+    kept = 0
+    existing_ids = {str(r.get("id", "")) for r in rows}
+
+    def _mint_id() -> str:
+        i = 1
+        while f"op{i}" in existing_ids:
+            i += 1
+        existing_ids.add(f"op{i}")
+        return f"op{i}"
+
+    for op in ops:
+        if op.op == _CRITERIA_OP_ADD:
+            added_titles.append(op.text)
+            out.append({"id": _mint_id(), "text": op.text, "tier": "human", "check": ""})
+            continue
+        idx = op.ref - 1
+        if not (0 <= idx < n) or op.ref in used_refs:
+            continue
+        row = rows[idx]
+        tier = str(row.get("tier", ""))
+        if op.op == _CRITERIA_OP_KEEP:
+            used_refs.add(op.ref)
+            out.append(dict(row))
+            kept += 1
+        else:  # rescope
+            if tier in MACHINE_TIERS:
+                # The wall: recorded, auto-kept below via the omission sweep.
+                protected_titles.append(str(row.get("text", "")))
+                continue
+            used_refs.add(op.ref)
+            out.append({"id": str(row.get("id", "")), "text": op.text, "tier": tier,
+                        "check": ""})
+            rescoped_titles.append(op.text)
+
+    # Omission sweep: an OMITTED machine-tier row is AUTO-KEPT (deny-by-default — dropping
+    # a machine check requires reject + re-dispatch, never an omission here); an omitted
+    # judged row is a deliberate removal. Auto-kept rows append in original relative order;
+    # the card groups criteria by tier when it renders, so intra-tuple position is not an
+    # operator-visible ordering.
+    removed_titles: list[str] = []
+    for i, row in enumerate(rows, start=1):
+        if i in used_refs:
+            continue
+        if str(row.get("tier", "")) in MACHINE_TIERS:
+            out.append(dict(row))
+            if str(row.get("text", "")) not in protected_titles:
+                protected_titles.append(str(row.get("text", "")))
+            kept += 1
+        else:
+            removed_titles.append(str(row.get("text", "")))
+    final = out
+    if not final:
+        return None
+    changed = bool(rescoped_titles or added_titles or removed_titles)
+    return CriteriaRevisionOutcome(
+        criteria=final,
+        kept=kept,
+        rescoped_titles=rescoped_titles,
+        added_titles=added_titles,
+        removed_titles=removed_titles,
+        protected_titles=protected_titles,
+        changed=changed,
+    )
+
+
+def render_criteria_revision_delta(outcome: CriteriaRevisionOutcome, feedback: str) -> str:
+    """The plain-language delta LEADING the re-rendered card after a criteria revision —
+    what changed, what was added/removed, and which automatic checks were protected."""
+    fb = (feedback or "").strip()
+    lines = [f"I updated what the build will be judged on, from your feedback (“{fb}”):", ""]
+    if outcome.rescoped_titles:
+        lines.append("  Reworded:")
+        lines.extend(f"    ~ {t}" for t in outcome.rescoped_titles)
+    if outcome.added_titles:
+        lines.append("  Added (you check these yourself):")
+        lines.extend(f"    + {t}" for t in outcome.added_titles)
+    if outcome.removed_titles:
+        lines.append("  Removed:")
+        lines.extend(f"    - {t}" for t in outcome.removed_titles)
+    if outcome.protected_titles:
+        lines.append(
+            "  Protected (automatic checks are set by the goal and the exam — to change "
+            "these, /dispatch reject and start a new dispatch):"
+        )
+        lines.extend(f"    = {t}" for t in outcome.protected_titles)
+    if not (outcome.rescoped_titles or outcome.added_titles or outcome.removed_titles):
+        lines.append("  (No changes — the criteria are the same.)")
+    lines.append("")
+    return "\n".join(lines)

@@ -107,18 +107,35 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         seconds=180.0,
         surface="ui_gateway → AO (every framed message unless overridden)",
         incident="#561 — a legitimate vision turn (VLM load + describe + two 14B generations) tripped the old 120 s and was fail-closed as a spurious validation error",
-        rationale="Headroom over the slowest LEGITIMATE single turn (the vision chain).",
-        review="Shrink if the VLM-eviction fix keeps real turns well under it across a measured sample; any shrink must re-run the vision-turn worst case.",
+        rationale="Headroom over the slowest LEGITIMATE single turn (the vision chain) — a claim now falsified for one path, see review.",
+        review=(
+            "MEASURED 2026-08-08 (#1341): the APPROVE turn rides this default and is NOT bounded by "
+            "it. Approving a dispatch triggers synchronous dispatch-asset generation on the AO's own "
+            "thread — measured on battery run 20260808-160538-bd: 12.0 s pipeline load + 25.6 s "
+            "inference at 1024x1024/18 steps = ~38 s PER ASSET, and B9 declares 8, so ~420 s of "
+            "continuous GPU work. A live mTLS probe during that window returns `timeout`: the service "
+            "is BLOCKED, not absent. 420 s against a 180 s budget is a deterministic loss, not a race "
+            "— B9 has never once completed and both prior investigations blamed AO lifecycle instead. "
+            "Note the asymmetry this exposes: PLAN_RESPONSE_TIMEOUT_S is 720 s for a turn that "
+            "generates NOTHING, while APPROVE — which generates every asset — inherits 180 s. "
+            "DELIBERATELY NOT RAISED HERE: this constant bounds EVERY framed message, and widening it "
+            "to fit one path's unbudgeted work would blunt failure detection everywhere to hide a "
+            "defect that belongs off the request thread (#1341 direction 1). The measurement is "
+            "recorded so the next actor decides on data rather than on the 2026-07-07 vision-turn "
+            "rationale, which never anticipated this workload. Original review stands: shrink if the "
+            "VLM-eviction fix keeps real turns well under it across a measured sample; any shrink must "
+            "re-run the vision-turn worst case."
+        ),
     ),
     TimeoutEntry(
         name="Dispatch PLAN (the plan-time 14B sequence)",
         module="services.ui_gateway.src.constants",
         attribute="PLAN_RESPONSE_TIMEOUT_S",
-        seconds=480.0,
+        seconds=720.0,
         surface="ui_gateway → AO (PLAN_REQUEST only)",
-        incident="#766 — a PLAN (~6 chained generations) against a cold just-swapped-back AO legitimately exceeded 180 s; the gateway hung up mid-generation and B4/B6 STALLED [HARNESS] (2026-07-07, two instances)",
-        rationale="Dominates the measured cold worst case; the per-job mTLS re-ensure is the fast liveness gate, so this only ever waits on a provably-alive AO.",
-        review="Shrink once cold-boot PLAN latency is measured across campaign transitions; retire if the PLAN ever streams progress (an event beats a deadline).",
+        incident="#766 — a PLAN (~6 chained generations) against a cold just-swapped-back AO legitimately exceeded 180 s; the gateway hung up mid-generation and B4/B6 STALLED [HARNESS] (2026-07-07, two instances). #1152 (2026-07-29) — the SAME shape recurred on the requirements-answer re-plan (the first FULL-chain PLAN call; the initial pass with clarify on only runs one generation) against an AO that had booted minutes earlier — a fresh boot is the same cold-pipeline class, a different trigger than a swap-back. A live warm-state repro of the same goal+answer measured 170 s, well inside the old 480 s, so the failure was cold-boot headroom, not goal size. #1069 batched-S3 ceremony (2026-07-29) — the genuine fresh-boot timing this entry asked for arrived: cold worst-case PLAN INCLUDING an S3-F exam-repair round measured 195.5 s, 27% of budget (docs/performance/coverage_gate_cold_plan_timing_2026-07-29.json).",
+        rationale="Dominates the measured cold worst case with real slack a warm measurement alone cannot rule out; the per-job mTLS re-ensure is the fast liveness gate, so this only ever waits on a provably-alive AO.",
+        review="Cold-boot latency now has ONE direct measurement (195.5 s, worst shape with a repair round — n=1 by construction, one cold slot per boot). A 720→480 shrink (2.4× measured headroom) stays open pending a second cold sample and an 8-task-shape timing (#1152's original class); retire if the PLAN ever streams progress (an event beats a deadline).",
     ),
     TimeoutEntry(
         name="Fleet per-task ceiling (one run-fleet task)",
@@ -372,14 +389,24 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         review="Tighten if the write→dispatch path is ever measured to be near-instant; retire with the file mechanism if per-card budgets move onto the live dispatch protocol.",
     ),
     TimeoutEntry(
+        name="Dispatch interception fail-safe (IPC backstop over the PLAN)",
+        module="services.ui_backend.src.dispatcher",
+        attribute="_DISPATCH_STREAM_FAILSAFE_S",
+        seconds=780.0,
+        surface="ui_backend dispatcher → gateway handle_dispatch_command (the whole /dispatch turn, incl. PLAN)",
+        incident="#1122 (2026-07-27, LA-blocking) — this interception was wrapped in the 175 s IMAGINE fail-safe while the PLAN it wraps is budgeted at 480 s, so the operator's plan was abandoned at 175 s and COMPLETED 28 s later (measured: timeout 18:20:18, generate_plan finished 18:20:46). #766 had raised the inner budget 180→480; nobody raised the wrapper, so that fix was unreachable from the UI. #1152 (2026-07-29) moved this in lockstep when PLAN_RESPONSE_TIMEOUT_S rose 480→720, so the dominance invariant kept holding.",
+        rationale="MUST DOMINATE PLAN_RESPONSE_TIMEOUT_S (720) plus handler overhead — a wrapper shorter than what it wraps does not protect the inner budget, it deletes it. 780 leaves the same 60 s #1122 gave for project creation + IPC framing. A BACKSTOP, not the operating bound: the inner 720 fires first and reports honestly. Nothing downstream forces a shorter value (the WinUI pipe client sets a CONNECT timeout only).",
+        review="Must move whenever PLAN_RESPONSE_TIMEOUT_S moves — the ORDERING is locked by tests/security/test_timeout_ordering.py, which asserts the relationship rather than the values, because a registry of values could not catch this class.",
+    ),
+    TimeoutEntry(
         name="Imagine stream fail-safe (IPC)",
         module="services.ui_backend.src.dispatcher",
         attribute="_IMAGINE_STREAM_FAILSAFE_S",
         seconds=175.0,
-        surface="ui_backend dispatcher → imagine coordinator stream",
-        incident="UC-010 go-live — the original 90 s fail-safe was blown by a legitimate hires generate (14B eviction + upscale + refine); raised to 175 at the ADR-033 Am.2 rework",
-        rationale="Headroom over the slowest legitimate hires generate measured at go-live; the fail-safe exists so a wedged generate can never park the IPC forever.",
-        review="Re-measure if the image model, steps default, or hires ceiling changes (L195 era-rot class).",
+        surface="ui_backend dispatcher → imagine coordinator stream (IMAGINE ONLY since #1122)",
+        incident="UC-010 go-live — the original 90 s fail-safe was blown by a legitimate hires generate (14B eviction + upscale + refine); raised to 175 at the ADR-033 Am.2 rework. SCOPE CORRECTION (#1122, 2026-07-27): this constant ALSO bounded the /dispatch interception, capping a 480 s PLAN budget at 175 s; that consumer now has its own registered entry above.",
+        rationale="Headroom over the slowest legitimate hires generate measured at go-live; the fail-safe exists so a wedged generate can never park the IPC forever. Sized for IMAGINE's inner work only — do not reuse it for a surface with a longer inner budget (that is the #1122 defect).",
+        review="Re-measure if the image model, steps default, or hires ceiling changes (L195 era-rot class). Any NEW consumer of this constant must first prove its own inner budget is shorter than 175 s.",
     ),
     # ---- promoted from the BACKLOG (#767 item 2, 2026-07-09) — the call-site /
     # signature literals named as constants in their consumer modules (values
@@ -433,6 +460,26 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         incident="#670 run-2 — a single-snapshot GPU check raced the 14B's release; the wait-verify replaced it",
         rationale="Gives the 14B's ~8.7 GB time to return to system RAM after the step-aside; on expiry the driver proceeds on the graceful unload rather than aborting.",
         review="Re-measure release latency if the model or GPU driver changes; retire if a real GPU budget probe ever lands on the iGPU.",
+    ),
+    TimeoutEntry(
+        name="RAM gate wait-verify (system headroom clearing gate_gb before the 30B load, step 8)",
+        module="shared.fleet.swap_driver",
+        attribute="RAM_GATE_TIMEOUT_S",
+        seconds=1800.0,
+        surface="swap driver → system-RAM headroom wait-verify (#1128)",
+        incident="#1128 — battery night 2026-07-26: a single-snapshot RAM check gate-aborted BOTH scheduled jobs in ~100s each, on a night the wrapper's own real-load admission probe (#784's lower PROBE_FLOOR_GIB) had just succeeded and admitted; the OS had not finished reclaiming pages from that probe's 30B-unload + 14B reboot by the time the first job's own swap started.",
+        rationale="Mirrors the GPU wait-verify's fix for the same class of race (a graceful release racing a single snapshot). 1800s matches the wrapper's own existing ~30-minute night-admission re-check cadence, spent here at per-job scope; each job's own run envelope is 15,000-16,200s, so even the full wait leaves the large majority of the budget for real coding work. Does NOT change gate_gb (the #777-measured 20 GiB safety floor) — only how patiently the driver waits for headroom to reach it.",
+        review="Shrink if RAM-settling latency after a probe/reboot is ever measured directly; retire if the wrapper's admission probe and this gate are ever unified onto one consistent threshold instead of two independent checks.",
+    ),
+    TimeoutEntry(
+        name="RAM gate no-progress cutoff (structural vs transient pressure, step 8)",
+        module="shared.fleet.swap_driver",
+        attribute="RAM_GATE_STALL_S",
+        seconds=300.0,
+        surface="swap driver → RAM wait-verify early exit when headroom is not clearing (#1274)",
+        incident="#1274 — manual battery run 2026-08-06 07:52: the lean preflight MEASURED 19.4 GiB against a 20.5 GiB fast-path gate, proceeded (the -Now path warns but never blocks, by design), and the swap then sat the FULL 1800 s RAM_GATE_TIMEOUT_S at 19.7 GiB before aborting. 30 minutes and a STALLED[HARNESS] scorecard spent re-reading a number that never moved, because the shortfall was resident processes (the dev tooling itself), not pages still being reclaimed.",
+        rationale="RAM_GATE_TIMEOUT_S exists for pressure that is CLEARING (#1128's probe-unload race). When availability has not climbed by RAM_GATE_PROGRESS_GIB over the first reading after this window, nothing is being reclaimed and the rest of the wait is dead time charged to the job envelope. 300 s is 10 polls at the 30 s cadence — long enough that a genuinely settling system trips the progress test first (it climbs within a poll or two), short enough that a structural shortfall costs minutes rather than half an hour. Does NOT change gate_gb or the full window; only the case where waiting provably cannot help.",
+        review="Raise if a real reclamation pattern is ever measured that climbs later than 300 s; retire if the admission probe and this gate are unified (same trigger as the row above).",
     ),
     TimeoutEntry(
         name="OVMS stop verify (teardown, first window)",
@@ -562,7 +609,7 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         seconds=60.0,
         surface="oracle-QA seed gate → pytest --collect-only over the synthesised stub skeleton (#821)",
         incident="design (#821 — the advisory collectability confirmation; py_compile is in-process, this bounds the isolated collect-only subprocess)",
-        rationale="A collect-only never executes a test — it imports + collects the single oracle file against inert stubs; 60 s covers a cold `uv` wheel-resolve behind the pinned pytest/hypothesis and matches the guest-provisioning wheel-fetch class. On expiry the stamp is 'unconfirmed' (fail-soft, never a false-park) — the sound HARD collectability gate is the in-process py_compile.",
+        rationale="A collect-only never executes a test — it imports + collects the single oracle file against inert stubs; 60 s covers a cold `uv` wheel-resolve behind the pinned pytest/hypothesis and matches the guest-provisioning wheel-fetch class. On expiry the stamp is 'not-run' (a timeout produces no pytest signal, so the probe reports that it never ran rather than passing a machinery miss off as a verdict on the oracle) — fail-soft, never a false-park; the sound HARD collectability gate is the in-process py_compile.",
         review="Shrink toward the measured warm collect-only latency once #821 runs live on the Arc 140V; retire if the collectability confirmation folds into #822's grade-time import probe.",
     ),
     TimeoutEntry(
@@ -575,6 +622,16 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         rationale="Runs the oracle ONCE against a tree whose implementation does not exist yet, so most tests fail fast on import — 120 s covers a cold `uv` resolve plus a slow property test with margin, and stays well under grade-time's 600 s. On expiry the f2p stamp is 'not-run' (fail-soft — a machinery miss never blocks a dispatch, only a CONFIRMED vacuous pass refuses).",
         review="Shrink toward measured F2P latency from the first live #821 seed gates; must stay below the grade-time oracle bound (the seed baseline can never legitimately run longer than the graded run).",
     ),
+    TimeoutEntry(
+        name="Oracle-QA NODE FAIL-TO-PASS baseline (.mjs oracle vs pre-wave skeleton)",
+        module="shared.fleet.oracle_qa",
+        attribute="ORACLE_QA_NODE_F2P_TIMEOUT_S",
+        seconds=60.0,
+        surface="oracle-QA seed gate → `node --test --test-reporter=tap` over the raw .mjs oracle against the pre-implementation tree (#1342)",
+        incident="#1342 — B9's `20260807-195617-bd` banked GREEN missing an operator-required page: every non-python oracle skipped the execution stages outright, so the 33-line job oracle (two EMPTY test bodies) was never proven able to fail, and `already_satisfied` (#1049) read its pass as proof of completeness and deleted the task from the plan",
+        rationale="The node dual of ORACLE_QA_F2P_TIMEOUT_S, deliberately its OWN bound rather than a reuse: node resolves no wheels and has no `uv` step, so the python row's 120 s is entirely resolve-shaped margin that would only delay an abort here. Measured on this host, the five-test escaped oracle runs in ~0.15 s, so 60 s is ~400x the observed cost and still covers a cold start plus a test that hangs on a real socket. On expiry the stamp is 'not-run' (fail-soft — a machinery miss never blocks a dispatch; only a CONFIRMED pre-implementation pass refuses).",
+        review="Shrink toward measured node F2P latency once #1342 has run live across a full battery night; retire if the node and python baselines ever converge on one runner-agnostic bound.",
+    ),
     # ---- #828 (QUALITY-10) oracle mutation-audit budget (2026-07-11) -------------
     TimeoutEntry(
         name="Oracle mutation-audit overall budget (one GREEN job)",
@@ -585,6 +642,16 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         incident="design (#828 — the discrimination dual of #821; bounds the WHOLE bounded (N≤20) audit, not one mutant — the per-mutant subprocess reuses #821's registered ORACLE_QA_F2P_TIMEOUT_S)",
         rationale="An oracle grades in seconds and the audit runs ≤20 mutants, so 5 minutes covers a full worst-case pass (incl. a cold `uv` resolve on the first mutant) with margin; the audit is offline and GREEN-only (~1/night), off the dispatch critical path, so a generous abort bound costs nothing on the common night. On expiry the audit stamps `partial-budget`/`skipped-budget` honestly — it never fakes a full score.",
         review="Shrink toward the measured full-audit wall-clock once #828 runs live on the Arc 140V; retire the fixed bound if the audit ever moves to a per-mutant event/heartbeat model.",
+    ),
+    TimeoutEntry(
+        name="Oracle mutation-audit STAGE budget (all GREENs of one battery)",
+        module="tools.dispatch_harness.green_quality.mutation",
+        attribute="ORACLE_MUTATION_BATTERY_BUDGET_S",
+        seconds=900.0,
+        surface="battery close → the advisory oracle-mutation stage across every GREEN of one night (#1195 item 2)",
+        incident="design (#1195 — #828's audit had no production caller; wiring it at battery close multiplies a PER-JOB bound by the night's GREEN count, so the stage needs a ceiling of its own)",
+        rationale="MEASURED through the stage on this host 2026-07-30: one pinned oracle invocation costs 5.67 s (uv builds a fresh ephemeral env per run, and the audit's per-run isolated home pays that every mutant), so a full N=20 audit is ~2 min per GREEN and a 4-GREEN night ~8 min. 15 minutes covers that with margin while refusing the 20 min that 4 GREENs each entitled to the per-job 300 s would allow — a per-job bound cannot bound a stage. On expiry the unreached GREENs stamp `skipped-battery-budget` — visible as unaudited, never absent and never counted as a pass.",
+        review="Re-measure against a real battery deliverable (the 5.67 s came from a two-function fixture; a wider tree has more mutation sites); revisit if the GREEN count per night rises materially or if per-criterion attribution (L4-KILLS) multiplies the mutant count.",
     ),
     # ---- #829 (QUALITY-11) flake differential — hermetic re-run bound (2026-07-11) --
     TimeoutEntry(
@@ -628,6 +695,17 @@ REGISTRY: tuple[TimeoutEntry, ...] = (
         incident="#812 / AUDIT-13 (Standards Conformance + System Qualities, 12-Factor IX disposability) — the child-wait was a single unconditional WaitForSingleObject(_INFINITE), so launcher liveness was hostage to a wedged WinUI child handle with no supervisory wake",
         rationale="A POLL CADENCE, not an abort budget: the launcher's main-thread child-wait now loops in chunks of this length rather than one un-woken INFINITE syscall, so it re-checks each lap and can never sit forever on a stuck handle. With timeout=None (the launcher's call) the wait still blocks until the child exits — 5 s bounds liveness loss on a wedged handle yet never busy-spins the main thread.",
         review="Retire if the child-wait ever consumes a real stop/exit event instead of polling (an event beats a poll); shrink only if launcher-responsiveness telemetry ever demands a tighter wake.",
+    ),
+    # ---- #1201 coder-test-QA scope resolution (2026-07-30) ----------------------
+    TimeoutEntry(
+        name="Coder-test-QA scope resolution (one bounded git read; three sequential reads per call)",
+        module="shared.fleet.coder_test_qa",
+        attribute="CODER_TEST_SCOPE_GIT_TIMEOUT_S",
+        seconds=30.0,
+        surface="coder_test_qa CLI → git rev-parse/diff/ls-files over the candidate worktree, to learn which test files THIS task wrote",
+        incident="design (#1201 — the scan was whole-tree, so task N was charged for the exams of tasks 1..N-1 and any repo with history withdrew every review-skip forever; scoping the scan introduced these reads). Sized on the registered DEP_DELTA_GIT_TIMEOUT_S sibling, which bounds the same operation against the same kind of tree.",
+        rationale="A rev-parse plus two name-only reads over one small candidate worktree are milliseconds; 30 s is the abort ceiling on a wedged git. The reads spawn through shared.procspawn.run_captured (#1239), so an EXPIRY IS NOT THE WHOLE COST: the helper then tree-kills (psutil.wait_procs, up to 3 s) and drains the dying child's pipes (up to 5 s), so a timed-out read costs up to ~38 s, and three sequential ones a ~114 s worst wall per scan — not the 90 s a bare abort ceiling implies. Still far inside the 14400 s per-task ceiling and never on a control path: an expiry yields an UNRESOLVED scope, which is reported as an absent measurement and forces nothing. Read the teardown bounds from shared/procspawn.py rather than restating them if they change.",
+        review="Shrink toward measured resolution latency once live dispatch runs record it; retire if the harness ever hands the changed-file list to the scanner directly instead of the scanner deriving it.",
     ),
 )
 

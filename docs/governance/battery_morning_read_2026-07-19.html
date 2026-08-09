@@ -1,0 +1,264 @@
+<title>The Night That Wasn't Read — Battery Morning Read, 2026-07-19</title>
+<style>
+  :root {
+    --paper: #f7f6f2;
+    --ink: #22282b;
+    --muted: #5c6a6e;
+    --line: #d8d9d2;
+    --accent: #1f6f66;
+    --accent-soft: #e3edea;
+    --good: #1f6f66;
+    --good-soft: #ddebe7;
+    --warn: #9a6b13;
+    --warn-soft: #f4e9d3;
+    --bad: #9a3b2f;
+    --bad-soft: #f3e0dc;
+    --card: #fffefb;
+    --answer-bg: #eef2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171d1f; --ink: #e3e2da; --muted: #9aa8ab; --line: #313a3d;
+      --accent: #5fb3a5; --accent-soft: #1e2e2b;
+      --good: #5fb3a5; --good-soft: #16302b;
+      --warn: #d3a04a; --warn-soft: #33290f;
+      --bad: #d98a7c; --bad-soft: #33201c;
+      --card: #1d2426; --answer-bg: #212b26;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f7f6f2; --ink: #22282b; --muted: #5c6a6e; --line: #d8d9d2;
+    --accent: #1f6f66; --accent-soft: #e3edea;
+    --good: #1f6f66; --good-soft: #ddebe7;
+    --warn: #9a6b13; --warn-soft: #f4e9d3;
+    --bad: #9a3b2f; --bad-soft: #f3e0dc;
+    --card: #fffefb; --answer-bg: #eef2ee;
+  }
+  :root[data-theme="dark"] {
+    --paper: #171d1f; --ink: #e3e2da; --muted: #9aa8ab; --line: #313a3d;
+    --accent: #5fb3a5; --accent-soft: #1e2e2b;
+    --good: #5fb3a5; --good-soft: #16302b;
+    --warn: #d3a04a; --warn-soft: #33290f;
+    --bad: #d98a7c; --bad-soft: #33201c;
+    --card: #1d2426; --answer-bg: #212b26;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: Charter, Georgia, "Times New Roman", serif;
+    font-size: 1.06rem; line-height: 1.62; margin: 0;
+    padding: 2.5rem 1.25rem 5rem;
+  }
+  .sheet { max-width: 46rem; margin: 0 auto; }
+  .eyebrow, .chip, th, .kicker-inline, .answer-label { font-family: "Segoe UI", system-ui, sans-serif; }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em;
+    font-size: 0.72rem; font-weight: 600; color: var(--accent);
+  }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0.4rem 0 0.6rem; text-wrap: balance; font-weight: 600; }
+  h2 {
+    font-size: 1.3rem; line-height: 1.25; margin: 2.6rem 0 0.4rem;
+    padding-top: 1.8rem; border-top: 2px solid var(--line);
+    text-wrap: balance; font-weight: 600;
+  }
+  h3 {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.11em;
+    color: var(--muted); margin: 1.5rem 0 0.4rem; font-weight: 600;
+  }
+  p { margin: 0.6rem 0; }
+  .lede { color: var(--muted); font-size: 1.02rem; margin-top: 0; }
+  .chip {
+    display: inline-block; font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.09em; text-transform: uppercase;
+    padding: 0.18rem 0.6rem; border-radius: 3px; vertical-align: middle;
+  }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad  { background: var(--bad-soft);  color: var(--bad); }
+  .teach {
+    background: var(--accent-soft); border-radius: 6px;
+    padding: 0.9rem 1.1rem; margin: 1rem 0;
+  }
+  .teach .kicker-inline {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 0.25rem;
+  }
+  .scorebox { border: 1px solid var(--line); background: var(--card); border-radius: 6px; margin: 1.2rem 0; overflow-x: auto; }
+  .scorebox table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  .scorebox th {
+    text-align: left; font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); font-weight: 600;
+    padding: 0.7rem 0.9rem 0.3rem; border-bottom: 1px solid var(--line);
+  }
+  .scorebox td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .scorebox tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; font-family: Consolas, ui-monospace, monospace; font-size: 0.92rem; white-space: nowrap; }
+  ul { margin: 0.5rem 0 0.8rem; padding-left: 1.3rem; }
+  li { margin: 0.35rem 0; }
+  blockquote {
+    margin: 0.8rem 0; padding: 0.6rem 1rem;
+    border-left: 3px solid var(--bad); background: var(--bad-soft);
+    border-radius: 0 6px 6px 0; font-style: italic;
+  }
+  blockquote.ok { border-left-color: var(--good); background: var(--good-soft); }
+  blockquote.code {
+    font-style: normal; font-family: Consolas, ui-monospace, monospace;
+    font-size: 0.88rem; overflow-x: auto; line-height: 1.5;
+  }
+  .answer {
+    background: var(--answer-bg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 0.85rem 1.1rem; margin-top: 1.4rem;
+  }
+  .answer-label {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 0.3rem;
+  }
+  .option { margin: 0.8rem 0; padding-left: 1rem; border-left: 3px solid var(--line); }
+  .option.rec { border-left-color: var(--accent); }
+  .option b { font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.95rem; }
+  .option .rec-tag {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent); margin-left: 0.45rem;
+  }
+  .timeline { border: 1px solid var(--line); background: var(--card); border-radius: 6px; margin: 1.2rem 0; overflow-x: auto; }
+  .timeline table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  .timeline th {
+    text-align: left; font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); font-weight: 600;
+    padding: 0.7rem 0.9rem 0.3rem; border-bottom: 1px solid var(--line);
+  }
+  .timeline td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .timeline tr:last-child td { border-bottom: none; }
+  .timeline .when { font-family: "Segoe UI", system-ui, sans-serif; font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
+  .provenance {
+    margin-top: 3.5rem; padding-top: 1.4rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.88rem;
+  }
+</style>
+
+<div class="sheet">
+  <header>
+    <span class="eyebrow">BlarAI · Governance briefing · Battery morning read · 2026-07-19</span>
+    <h1>The night that wasn't read</h1>
+    <p class="lede">You asked me to read last night's overnight coding run and find what needs fixing. Two things came back. The first is that the night you were told to read <em>hasn't happened yet</em> — it runs tonight. The second is that the night that <em>did</em> run was never read by anyone, and it was hiding a real defect: for at least four days the system has been failing the coder for mistakes made by the examiner.</p>
+  </header>
+
+  <h2>First, the calendar</h2>
+  <p>The handoff notes I was given describe reading "the gate-scoping A/B night." That night fires <b>tonight at 11 PM</b>. The machine agrees on all three counts: the scheduler reports its last run as 07-18 11 PM and its next as 07-19 11 PM; the newest results folder on disk is <span class="num">night-20260718-230002</span>; and the change being tested (#790) was merged <em>today</em>, hours after last night's run had already finished.</p>
+  <p>So the notes were written this afternoon <em>for tomorrow morning's session</em> and reached me a day early. Nothing is wrong — but it means the comparison you wanted can't be made until tomorrow. What I did instead was read the night that <em>did</em> run, which turns out to be the clean "before" picture, and characterise it precisely so tomorrow's comparison is sharp rather than vague.</p>
+
+  <h2>What the battery is, in one paragraph</h2>
+  <div class="teach">
+    <span class="kicker-inline">The thing being measured</span>
+    <p>Every night at 11 PM, BlarAI gives its coding assistant a small software project written the way a normal person would ask for it — "I want a flashcard program I can use from a command window." The assistant plans the work, breaks it into pieces, builds each piece, and checks its own work as it goes. At the end, a separate <b>final exam</b> runs: a set of tests that decides whether the finished program actually does what was asked. Each run gets a <b>verdict</b> (did it succeed?) and, if it didn't, an <b>attribution</b> — <em>whose fault was it?</em> The choices are roughly: the coder built it wrong, the plan was bad, the checking machinery broke, or the surrounding system failed. That attribution is the number that matters, because it's what tells you whether the assistant is getting better.</p>
+  </div>
+
+  <h2>Last night's run</h2>
+  <div class="scorebox">
+    <table>
+      <tr><th>Job</th><th>Verdict</th><th>Blamed on</th><th>Time</th><th>Build stages</th></tr>
+      <tr>
+        <td><b>B2</b> — text-analysis toolkit</td>
+        <td><span class="chip good">Passed</span></td>
+        <td class="num">&mdash;</td>
+        <td class="num">4,523s &nbsp;<span style="color:var(--muted)">(1.3 h)</span></td>
+        <td class="num">4 of 4 passed</td>
+      </tr>
+      <tr>
+        <td><b>B4</b> — flashcard study program</td>
+        <td><span class="chip warn">Parked</span></td>
+        <td class="num"><b>the coder</b></td>
+        <td class="num">8,894s &nbsp;<span style="color:var(--muted)">(2.5 h)</span></td>
+        <td class="num">6 of 6 passed</td>
+      </tr>
+    </table>
+  </div>
+  <p>The whole night ran 11:01 PM to about 2:45 AM. One clean pass, one parked job blamed on the coder. On its face, an ordinary night — which is presumably why nobody looked twice.</p>
+
+  <h2>The defect: the exam was broken, and the student was failed for it</h2>
+  <p>Look at B4's row again. <b>Every one of its six build stages passed.</b> All six pieces of the program were built, checked, and merged successfully. Then the final exam ran, failed four of its six questions, and the run was blamed on the coder.</p>
+  <p>Here is what those four failures actually were. Three of them are this:</p>
+  <blockquote class="code">NameError: name 'data_storage' is not defined</blockquote>
+  <p>The exam refers to a part of the program it never actually opened. That's not the program being wrong — that's the exam paper referring to a page it forgot to turn to. The fourth failure is subtler and, if anything, worse: the exam ran the "does the program exit cleanly when I ask it to?" test, the program <em>exited cleanly</em>, and the exam recorded that as a failure because it wasn't written to expect the thing it had just asked for.</p>
+  <p>And the system already knew. The exam's own quality file, written automatically at the time, reports:</p>
+  <div class="scorebox">
+    <table>
+      <tr><th>Quality measure</th><th>Recorded value</th><th>Meaning</th></tr>
+      <tr><td>Coverage of what was asked</td><td class="num"><b>0 / 6</b></td><td>The exam tested <em>none</em> of the six things the job was actually required to do.</td></tr>
+      <tr><td>Invented requirements</td><td class="num">9</td><td>Things the exam demanded that nobody ever specified.</td></tr>
+      <tr><td>Traceability gaps</td><td class="num">12</td><td>Required behaviours with no corresponding test at all.</td></tr>
+      <tr><td>Baseline sanity check</td><td class="num">not run</td><td>The check that catches a meaningless exam never executed.</td></tr>
+    </table>
+  </div>
+  <p>The system even labelled the run internally as <span class="num">ORACLE-DEFECT</span> — "the examiner is broken." And then blamed the coder anyway.</p>
+
+  <div class="teach">
+    <span class="kicker-inline">Why it did that, and why the design isn't stupid</span>
+    <p>The component that spots a broken exam is deliberately <b>advisory only</b>. It is forbidden from changing a verdict — and that restriction is <em>correct</em>. It exists so that no clever after-the-fact classifier can ever quietly upgrade a failure into a success. That's a genuine safety property and I have not touched it.</p>
+    <p>The defect is narrower: the part of the code that decides <em>whose fault it was</em> never asks whether the exam was fit to judge. It looks at exactly two things — did the final exam fail, and was it flaky? If the exam failed and wasn't flaky, blame the coder. There is no third question, and "was this exam even valid?" is that missing third question.</p>
+  </div>
+
+  <h3>It has happened before</h3>
+  <p>This is not a one-off. The project's own quality ledger records the <em>same card</em>, on <b>2026-07-16</b>, with the identical pairing: parked, blamed on the coder, internally flagged as a broken examiner. That's at least two occurrences in four days, both unnoticed.</p>
+  <p>The cost is that your campaign's permanent record now carries coder-blame for examiner bugs. The battery exists to answer one question — <em>is the coding assistant getting better?</em> — and its evidence base has been quietly accumulating wrong answers.</p>
+
+  <h3>What I did about it</h3>
+  <p>Filed as ticket <b>#965</b> and the fix is built. It adds the missing third question: if the exam covered <em>none</em> of what was asked, a failure against it is attributed to the checking machinery, not the coder. It can never turn a failure into a success — a parked run stays parked; only the blame label changes, so your pass/fail banking is untouched. Because a repeat offence requires a permanent guard rather than a patch, it ships with tests that lock the behaviour both ways: a broken exam must re-route the blame, and a <em>valid</em> exam must still blame the coder — so we can tell "this control works" apart from "this control can't reach anything."</p>
+  <p>Three smaller defects surfaced alongside it, filed as <b>#967</b>. The most interesting one explains how the broken exam got through: the quality checker mistakenly flags legitimate references as "invented," and because it ranks those higher than real problems, <b>both of the system's two repair attempts were spent chasing false alarms while the 0-out-of-6 coverage went untouched.</b> The repair even introduced the <span class="num">data_storage</span> error while trying to fix a non-problem.</p>
+
+  <h2>The web card: I owe you a correction</h2>
+  <p>Earlier today I told you adding the web-based test job might not fit in the nightly window, and cited a number. That number was real but it was the wrong <em>kind</em> of number, and it alarmed you for no reason.</p>
+  <div class="teach">
+    <span class="kicker-inline">Two numbers that are easy to confuse</span>
+    <p>A <b>budget</b> is a safety cap — "stop this job if it somehow runs this long." It's set deliberately generous, because its job is to catch runaway processes, not to predict anything. <b>Runtime</b> is how long the work actually takes. I quoted you budget arithmetic as though it forecast runtime. In practice these jobs finish in roughly a third to a half of their budget: last night's two jobs had 8.7 hours of budget between them and were done in 3.7.</p>
+  </div>
+  <p>A three-job night would likely finish around 6 AM — well inside a window that allows until 3 PM. <b>The web card fits.</b></p>
+  <p>And its history makes the case stronger, not weaker. The web card, B5, was benched for "harness failures." I pulled every run of it. Both failures say the same thing:</p>
+  <blockquote class="code">TIMED OUT — the overall run budget elapsed mid-task</blockquote>
+  <p><b>It ran out of budget.</b> That is precisely the starvation bug that ticket <b>#927</b> — the merge I own for tomorrow — exists to fix. The web card wasn't failing because web work is hard; it was failing because it was given three hours for a job that needs more. The two tasks you gave me are the same fix, and the correct order is the one already scheduled: budgets tomorrow, web card the night after.</p>
+  <p>One honest unknown: because B5 was always killed <em>at</em> the cap, nobody knows how long it truly takes. Its first properly-funded night is partly a measurement.</p>
+
+  <h2>The real problem: nobody owned the read</h2>
+  <p>You said things were falling through the cracks. I checked every change made in both repositories today. Today was genuinely productive — five merges plus an entire publications programme stood up. <b>Not one of them touched last night's battery.</b></p>
+  <p>The cause is structural, not effort. Every reliably-completed item in this project has a ticket and a named owner. The morning read is the one recurring obligation that is <em>assumed</em> rather than <em>assigned</em> — so on a busy day it is the thing with nobody's name on it, and it evaporates. The same cause produced the 07-18 slip that pushed #790 a day late. That's twice in one week from one root cause.</p>
+  <div class="option rec">
+    <b>Make the morning read an owned, recurring item.</b><span class="rec-tag">Recommended</span>
+    <p>Filed as <b>#966</b>. A standing item that opens each morning carrying the read's checklist, and counts as done only when findings are recorded on tickets — a read that leaves no durable record didn't happen. Best version: the battery writes the item itself when a night completes, so the reminder is produced by the thing needing to be read rather than by someone remembering. That converts this from a vigilance problem into a structural one, which is the pattern this project already uses everywhere else.</p>
+  </div>
+
+  <h2>Two things that are working</h2>
+  <p>Both of today's other fixes are already proving themselves, ahead of schedule:</p>
+  <ul>
+    <li><b>The harvest fix (#953) works.</b> The coordinator's sealed record shows it going from seeing <em>nothing</em> to correctly picking up last night's flashcards run within minutes of the fix going live. That's exactly the blind spot it was built to close, confirmed a night early.</li>
+    <li><b>The verdict guard (#946) is live and behaving.</b> Three cycles so far, all three of the model's drafts accepted, none rejected, and the run headline is now being produced by the deterministic code rather than the language model. Too early to say whether it <em>catches</em> anything — that needs tonight's run under load. Recorded on #855; grading it stays your ceremony, not mine.</li>
+  </ul>
+  <p>One side finding: the app was shut down at 2:35 PM and stayed down until I restarted it at 5:08 PM, costing about eleven cycles of the evidence you're accumulating for that decision. Nothing noticed or alarmed. Filed as <b>#968</b> with options, because how to watch for that is a judgement call rather than a defect with one right answer.</p>
+
+  <h2>What happens next</h2>
+  <div class="timeline">
+    <table>
+      <tr><th>When</th><th>What</th><th>Status</th></tr>
+      <tr><td class="when">Tonight, 11 PM</td><td>The #790 night runs — <b>untouched</b>. Nothing is being merged into it, so tomorrow's comparison is clean.</td><td><span class="chip good">Protected</span></td></tr>
+      <tr><td class="when">Tomorrow AM</td><td>The real comparison read, written for you.</td><td><span class="chip warn">Scheduled</span></td></tr>
+      <tr><td class="when">Tomorrow PM</td><td><b>#927</b> budgets merge. Checks already done and recorded; the merge is now mechanical.</td><td><span class="chip good">Prepped</span></td></tr>
+      <tr><td class="when">07-21</td><td>Web card merges — read back to you in full before it goes in.</td><td><span class="chip warn">Building</span></td></tr>
+      <tr><td class="when">Unscheduled</td><td><b>#965</b> attribution fix — built and held, waiting for a night that isn't already measuring something.</td><td><span class="chip good">Built</span></td></tr>
+    </table>
+  </div>
+  <p>On tomorrow's comparison, one caution I've recorded on the ticket: last night's parked job is <em>not</em> an example of the problem #790 fixes. #790 targets runs blocked by a candidate's own scratch tests; last night's park was a broken final exam, which is #965's territory. If tomorrow's read scores those as one number, it will credit or blame #790 for the wrong mechanism. They need to be counted separately.</p>
+
+  <div class="answer">
+    <span class="answer-label">The one thing I need from you</span>
+    <p>The campaign is currently scheduled to end <b>2026-07-21</b> — the same night the web card would first run. Adding a job to a campaign on its closing night means either the campaign is being extended, or the web card is really the opening of a new phase. Both are fine; they're recorded differently and sized differently. Which did you intend?</p>
+    <p style="margin-bottom:0">Everything else on this page is either done, filed, or scheduled, and needs nothing from you.</p>
+  </div>
+
+  <div class="provenance">
+    <p><b>Evidence.</b> Run records <span class="num">20260718-230141-bd</span> and <span class="num">20260719-002208-bd</span> (scorecards, job summaries, oracle quality files, acceptance definitions, generated exam source); morning report <span class="num">night-20260718-230002</span>; historical web-card runs 2026-07-13 and 2026-07-14; the coordinator's sealed shadow journal read through its sanctioned interface (169 entries, 2026-07-15 to now); the live budget-coherence verifier run against current main; scheduler task state; and the full commit history of both repositories for 2026-07-19.</p>
+    <p><b>Tickets opened:</b> #965 (attribution defect, fix built), #966 (morning-read ownership), #967 (three oracle-quality defects), #968 (shadow-window gap detection). <b>Records added:</b> #790 (baseline + A/B caution), #855 (guard and harvest evidence), #927 (merge-prep evidence).</p>
+    <p style="margin-bottom:0">Nothing in this read changed any running system except restarting the app. No merges were made. Tonight's run is untouched.</p>
+  </div>
+</div>

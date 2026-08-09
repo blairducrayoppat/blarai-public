@@ -2,16 +2,6 @@
 
 **A personal, locally-run, security-first AI system engineered for decades of use on consumer hardware.**
 
-**&#9654; Watch it run (2 minutes):**
-
-https://github.com/user-attachments/assets/6df40e93-a4ec-4444-845b-27f71703acad
-
-*([streaming player](https://blairducrayoppat.github.io/blarai-public/demo.html) &middot; [1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-v1))*
-
-**&#9654; The vision film (66 seconds):**
-
-https://github.com/user-attachments/assets/9ffd473b-93e5-4763-a9ec-e12ac6afa10c
-
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
 local disk, and **zero external network dependency by default**. It is a
@@ -24,44 +14,6 @@ The design premise is uncompromising: a system that holds decades of a person's
 private data must assume every component can fail or be subverted, must fail
 *closed* when it does, and must be able to prove — cryptographically and in a
 tamper-evident audit trail — what it did and why.
-
----
-
-## Recent enhancements (as of July 2026)
-
-Highlights of what has landed on the main line since the previous public snapshot.
-Every item below corresponds to code, tests, or measurements in this repository —
-not roadmap intentions.
-
-- **A self-coordination layer that cannot touch its own governed core.** A new
-  coordinator (`shared/coordinator/`) can plan and prioritize the system's own work,
-  but it is *structurally* severed from the trust spine: it has no write path to its
-  own policy, egress, or security configuration, and its output is advisory only. It
-  currently runs in shadow mode — observing and proposing, never acting on the live
-  controls — with its promotion criteria written down in advance and its shadow-mode
-  precision measured rather than assumed.
-- **Independent model-quality evaluation.** A grading harness (`shared/grading/`)
-  scores the assistant's answers against committed baselines, with a *second,
-  independent* grader — a different model — cross-checking the primary one, so a blind
-  spot in one grader is more likely to be caught by the other. Quality regressions fail
-  the evaluation gate with real exit codes.
-- **Prompt-injection defense, made explicit.** Untrusted external content is
-  provenance-tagged and datamarked so it can never gain instruction authority, and a
-  dedicated scanner (`shared/security/injection_scan.py`) screens for injection
-  patterns — exercised by an adversarial test corpus, not merely asserted.
-- **Two new architecture decisions, recorded in the open.** ADR-040 pins the resident
-  model's key/value-cache precision against measured memory headroom; ADR-041 defines
-  the host-mode action-authorization boundary. Both live in `docs/adrs/`, beside a
-  decision register updated in the same change that makes each decision.
-- **Auditable governance.** Every review pass now produces a machine-checkable
-  *disposition record* — each finding marked fixed, deferred-with-evidence, or
-  rejected-with-argument — with dozens landed this month under `docs/reviews/`. New
-  governance documents cover model-weight integrity verification, credential lifecycle,
-  and document lifecycle.
-- **The standing test gate grew to 10011 passing / 0 failed / 0 skipped** on the merged
-  main line (hardware, WinUI, and slow tiers run at their own ceremonies), and the
-  measured-performance dataset gained dozens of new captures — key/value-cache
-  precision sweeps, coordinator shadow-precision, and more — under `docs/performance/`.
 
 ---
 
@@ -97,9 +49,14 @@ an Intel/OpenVINO-native stack tuned for Lunar Lake.
   (conversation) — one weight load, distinct KV-caches — so the security gate and
   the conversational agent never double the RAM cost.
 - **Speculative decoding.** A Qwen3-0.6B draft, pruned to 6 layers and quantized
-  INT8, drives speculative decoding at a measured 1.48–1.68× sustained throughput (July 2026 configuration; an earlier ~2× claim was walked back after re-measurement). The pruned draft
+  INT8, drives speculative decoding for **1.48–1.68× sustained** throughput
+  (short turns 1.68×, long turns 1.48×; interleaved A/B, 2026-07-10, OpenVINO
+  2026.2.1 — `PERFORMANCE_LOG.md`). Two earlier figures are superseded, not wrong:
+  a "~2×" traced to a cool-GPU burst against a thermally disadvantaged baseline,
+  and a methodology-corrected **~1.4×** from 2026-05 measured on a different,
+  unpruned INT4 draft two runtime generations back. The pruned draft
   was chosen over a full 0.6B draft specifically because it *streams* token by
-  token — a deliberate trade of \~20% peak throughput for a responsive, live-typing
+  token — a deliberate trade of some peak throughput for a responsive, live-typing
   feel on every reply.
 - **Embeddings — bge-small-en-v1.5, NPU-offloaded.** The shared 384-dim encoder
   (substrate retrieval, knowledge bank, and leakage detection all ride one
@@ -114,7 +71,7 @@ an Intel/OpenVINO-native stack tuned for Lunar Lake.
   demand.
 - **Local image generation (UC-010).** Text→image and image+text→image on the
   Arc 140V via OpenVINO `Text2ImagePipeline` / `Image2ImagePipeline`, using an
-  uncensored Stable Diffusion XL (SDXL) INT8 finetune (RealVisXL V5.0) for photoreal plus a base SDXL +
+  Stable Diffusion XL (SDXL) INT8 photoreal finetune (RealVisXL V5.0) plus a base SDXL +
   runtime Low-Rank Adaptation (LoRA) for illustration and cartoon styles. Because SDXL and the 14B
   cannot always co-reside under the 31.323 GB ceiling, generation is choreographed
   against memory: the diffusion pipeline is evicted after every generate, and a
@@ -217,8 +174,7 @@ controls rather than a per-item rubber-stamp.
   model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
-- **Standing test gate.** **10011 passed / 0 failed / 0 skipped / 129 deselected**
-  (live baseline, 2026-07-30), plus the
+- **Standing test gate.** **10011 passed / 0 skipped / 129 deselected**, plus the
   model-quality eval gate green, on the merged main line. Hardware, WinUI, and
   slow tiers are deselected from the standing gate and run separately. Test policy
   and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
@@ -304,8 +260,9 @@ Canonical definitions live in `Use Cases_FINAL.md`.
 `BUILD_JOURNAL.md` and `LESSONS.md` are load-bearing parts of this repository, not
 decoration. They are the honest record of how BlarAI was built — and they keep the
 failures in. A benchmark that corrected two wrong assumptions in two minutes; a
-"2× faster" measurement that turned out to be a hot GPU and was walked back to the
-true 1.4×; a prompt-injection defense that failed its own test and was parked on a
+"2× faster" measurement that turned out to be a hot GPU and was walked back that
+week to an honest ~1.4× (the sustained figure on today's pruned draft is
+1.48–1.68×); a prompt-injection defense that failed its own test and was parked on a
 branch rather than shipped; a security fix that three passing test sweeps missed
 and a live screen caught. The judgment behind each call is the point. Sanitized
 journals do not compound; this one is meant to.

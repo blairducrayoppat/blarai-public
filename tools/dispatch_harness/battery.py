@@ -57,13 +57,21 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from hashlib import sha256
+from math import isfinite
 from pathlib import Path
 
 from tools.dispatch_harness import green_audit
 from tools.dispatch_harness.config import load_harness_config
 from tools.dispatch_harness.harness import DispatchHarness
 from tools.dispatch_harness.jobs import JobSpec
+from tools.dispatch_harness.live_dispatch import (
+    LIVE as LIVE_DISPATCH_LIVE,
+    LiveDispatch,
+    UNKNOWN as LIVE_DISPATCH_UNKNOWN,
+    probe_live_dispatch,
+)
 from tools.dispatch_harness.report import JobReport
+from tools.dispatch_harness.runtime_root import resolve_runtime_root
 from tools.dispatch_harness.scorecard import (
     ATTRIBUTION_HARNESS,
     ATTRIBUTION_VERIFY,
@@ -77,6 +85,7 @@ from tools.dispatch_harness.scorecard import (
     validate as validate_scorecard,
     write_scorecard,
 )
+from tools.dispatch_harness.website_presentation import present_website_builds
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SPEC_DIR = _REPO_ROOT / "evals" / "battery"
@@ -117,9 +126,13 @@ _KEBAB_SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 #: Where the driver's REPORT phase emits its per-run scorecard (the W6 seam).
 DRIVER_SCORECARD_NAME = "scorecard.json"
 
-#: The blarai checkout root — the cwd for a re-booted `python -m launcher` (mirrors
-#: run-battery-night.ps1's ``$BlarRoot``). ``battery.py`` -> ``parents[2]``.
-_BLARAI_REPO_ROOT = _REPO_ROOT
+#: The blarai checkout root the AO is BOOTED from — the cwd for a re-booted
+#: `python -m launcher`, and the root the teardown barrier reads ``certs/launcher.lock``
+#: under. Defaults to this module's own tree and diverges from it only when the battery
+#: is pinned to a measurement worktree, which has no model weights to boot against
+#: (:mod:`tools.dispatch_harness.runtime_root` owns that contract). Resolved once at
+#: import: a night must not be able to change installations halfway through.
+_BLARAI_REPO_ROOT = resolve_runtime_root(_REPO_ROOT)
 
 # Windows detached-process flags so a re-booted launcher OUTLIVES this runner
 # (mirrors shared.fleet.swap_ops._spawn_detached_driver).
@@ -1074,24 +1087,109 @@ def _note(text: str) -> str:
     return one_line[:497] + "…" if len(one_line) > 500 else one_line
 
 
-def _git_head() -> str:
+def _git_read(*args: str) -> str | None:
+    """One bounded, fail-soft git read from the tree this run is ACTUALLY executing.
+
+    Returns ``None`` when git could not be consulted at all — deliberately distinct from
+    an empty-but-successful result, because the two mean opposite things to a caller
+    asking "was this tree clean?". Collapsing them would report an unknown as a clean.
+    """
     try:
         cp = subprocess.run(  # noqa: S603 — vector argv, no shell
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", *args],
             capture_output=True, text=True, timeout=10, cwd=_REPO_ROOT,
         )
-        return cp.stdout.strip() if cp.returncode == 0 else "unknown"
+        return cp.stdout.strip() if cp.returncode == 0 else None
     except Exception:  # noqa: BLE001 — versions stamp is best-effort, never fatal
-        return "unknown"
+        return None
+
+
+def _git_exit_code(*args: str) -> int | None:
+    """The EXIT CODE of one bounded git read — for the questions git answers 0/1.
+
+    Returns ``None`` when git could not be consulted at all, for the same reason
+    :func:`_git_read` does: "the answer is no" and "there was no answer" mean opposite
+    things to a caller deciding whether a night is attributable, and collapsing them
+    would let an unknown read as a pass.
+    """
+    try:
+        cp = subprocess.run(  # noqa: S603 — vector argv, no shell
+            ["git", *args],
+            capture_output=True, text=True, timeout=10, cwd=_REPO_ROOT,
+        )
+        return cp.returncode
+    except Exception:  # noqa: BLE001 — versions stamp is best-effort, never fatal
+        return None
+
+
+def _git_head() -> str:
+    return _git_read("rev-parse", "--short", "HEAD") or "unknown"
+
+
+def _git_on_main() -> str:
+    """Whether the commit this run executed is CONTAINED IN ``main``.
+
+    This is the property a reader is actually asking about when they ask which branch a
+    night ran: is the code that produced these numbers merged, so the night is
+    attributable and reproducible from ``main`` alone? The branch NAME only ever stood in
+    for it, and it is the wrong instrument for a measurement worktree — git refuses to
+    check out a branch a second worktree already holds, so such a tree is necessarily
+    detached and has no name to report. ``merge-base --is-ancestor`` asks the question
+    directly.
+
+    Returns ``"yes"``, ``"no"``, or ``"unknown"`` (git unreachable, or no ``main`` to
+    compare against). Anything but ``"yes"`` means NOT condition-matched: a reader must
+    never treat an unknown as a pass.
+    """
+    code = _git_exit_code("merge-base", "--is-ancestor", "HEAD", "main")
+    if code == 0:
+        return "yes"
+    if code == 1:
+        return "no"
+    return "unknown"
+
+
+def _git_tree_state() -> tuple[str, str]:
+    """Which branch this run executed, and whether that working tree was clean.
+
+    PROVENANCE, not the correctness test — :func:`_git_on_main` owns that. A branch name
+    answers "where did this code come from", which is useful in a report and useless as a
+    pass/fail: ``"detached"`` is what a correctly pinned measurement tree reports and also
+    what an abandoned bisect reports, and only containment tells the two apart. A run
+    whose tree carries uncommitted work is not condition-matched to the night before it,
+    which is the baseline the one-change-per-run attribution rule assumes
+    (``docs/runbooks/battery_cadence_and_targeted_runs.md``).
+    """
+    branch = _git_read("rev-parse", "--abbrev-ref", "HEAD") or "unknown"
+    if branch == "HEAD":
+        branch = "detached"
+    porcelain = _git_read("status", "--porcelain")
+    if porcelain is None:
+        tree = "unknown (git could not be consulted)"
+    elif porcelain:
+        n = len(porcelain.splitlines())
+        tree = f"dirty ({n} path{'' if n == 1 else 's'})"
+    else:
+        tree = "clean"
+    return branch, tree
 
 
 def runner_versions() -> dict[str, str]:
     """The reproducibility stamp. Models are deliberately 'unmeasured-at-runner':
     the residency's own PERFORMANCE_LOG entry names them (community-grade honesty —
-    name what is NOT measured)."""
+    name what is NOT measured).
+
+    ``blarai`` is a commit-ish, NOT a release: it is whatever the tree this runner was
+    loaded from had at HEAD. ``blarai_on_main`` + ``blarai_tree`` are the pair that says
+    whether the night is condition-matched — merged code, no uncommitted edits — and
+    ``blarai_branch`` rides along as provenance a human can read (#1181)."""
+    branch, tree = _git_tree_state()
     return {
         "battery_runner": "v1",
         "blarai": _git_head(),
+        "blarai_branch": branch,
+        "blarai_on_main": _git_on_main(),
+        "blarai_tree": tree,
         "python": platform.python_version(),
         "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)",
     }
@@ -1468,13 +1566,28 @@ def _evidence_str(text: str) -> str:
 
 
 def sandbox_evidence(fresh: SandboxFreshness, *, opted_out: bool) -> dict:
-    """The scorecard evidence block for one probed card (strings only — the S6
-    contract the fail-closed writer enforces). ``sandbox_opt_out`` appears IFF
-    the run carried the opt-out flag — the run's condition rides its own
-    record, which is the lesson's actual content."""
+    """The scorecard evidence block for one probed card, read BEFORE the dispatch
+    (strings only — the S6 contract the fail-closed writer enforces).
+    ``sandbox_opt_out`` appears IFF the run carried the opt-out flag — the run's
+    condition rides its own record, which is the lesson's actual content.
+
+    Every value here is a property of the PRE-DISPATCH gate read, and the count is
+    named ``sandbox_seed_commit_count`` to say so. It was ``sandbox_commit_count``
+    until #1341, and that name was the whole defect: a reader takes "commit count"
+    for how much the run BUILT, while the gate samples the seed. Measured on two
+    consecutive nights — ``night-20260807-195325/scorecards/B9`` banked
+    ``sandbox_commit_count: "1"`` for a GREEN run that ended at 14 commits, and
+    ``night-20260808-160336`` banked the same "1" for a run that reached 11. Wrong
+    on a success and on a failure, in the same direction, because in both cases it
+    measured the seed. The post-run figure is :func:`sandbox_build_evidence`'s.
+
+    The old key is RETIRED rather than redefined: an archive where one name means
+    "seed" before some date and "delivered" after it cannot be read at all, and the
+    ticket that produced this change exists because a field's meaning drifted out
+    from under its readers."""
     block: dict = {
         "sandbox_freshness": fresh.state,
-        "sandbox_commit_count": str(fresh.commit_count),
+        "sandbox_seed_commit_count": str(fresh.commit_count),
     }
     if fresh.agent_commits:
         block["sandbox_agent_commits"] = str(fresh.agent_commits)
@@ -1485,6 +1598,271 @@ def sandbox_evidence(fresh: SandboxFreshness, *, opted_out: bool) -> dict:
     if opted_out:
         block["sandbox_opt_out"] = SANDBOX_OPT_OUT_FLAG
     return block
+
+
+# ---------------------------------------------------------------------------
+# #1341 — the WRITE-TIME half: what the sandbox holds when the card is written
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SandboxCommitCount:
+    """One sandbox commit count read at scorecard-write time.
+
+    ``count`` is ``None`` when the history could not be read — deliberately NOT 0,
+    because an unread history and an empty one are opposite facts and a caller that
+    collapses them publishes a fabricated number."""
+
+    count: int | None = None
+    detail: str = ""   # why it could not be read ("" when it was)
+
+
+def count_sandbox_commits(
+    repo_dir: Path, *, timeout_s: float = SANDBOX_PROBE_TIMEOUT_S
+) -> SandboxCommitCount:
+    """Re-read *repo_dir*'s commit count, for the record rather than for the gate.
+
+    Delegates to :func:`probe_sandbox_freshness` — same bounded ``git log --all``,
+    same fail-closed reading, same registered timeout budget (this adds no new
+    duration to :mod:`shared.timeout_registry`; it re-uses the one that already
+    bounds a sandbox history read) — and keeps ONLY the count. The freshness
+    CLASSIFICATION is discarded on purpose: after a successful run the sandbox is
+    full of ``agent:`` commits and would classify DIRTY, which is the expected and
+    desired outcome of building, not a gate result. Reporting it here would look
+    like the #1058 gate had re-run and failed."""
+    fresh = probe_sandbox_freshness(repo_dir, timeout_s=timeout_s)
+    if fresh.state == SANDBOX_UNDETERMINED:
+        return SandboxCommitCount(None, detail=fresh.detail or "history unreadable")
+    return SandboxCommitCount(fresh.commit_count)
+
+
+def sandbox_build_evidence(seed_count: int | None, post: SandboxCommitCount) -> dict:
+    """The post-run half of the sandbox record: what is there NOW, and how much of
+    it this run added.
+
+    ``sandbox_commit_count_at_write`` is the answer to the question a reader is
+    actually asking. ``sandbox_commits_added`` is the delta, and it is emitted only
+    when BOTH operands are also in the record — a derived number whose inputs are
+    not published is arithmetic verified by nothing, which is the failure class
+    (#1231, #1324, this ticket) that keeps producing these defects.
+
+    An unreadable history yields ``sandbox_commit_count_error`` and NO count. Fail-
+    loud: the absence of a number is recorded as a named failure, never as silence
+    and never as a fallback to the seed value."""
+    block: dict = {}
+    if post.count is None:
+        block["sandbox_commit_count_error"] = _evidence_str(
+            post.detail or "commit count could not be re-read at scorecard-write time"
+        )
+        return block
+    block["sandbox_commit_count_at_write"] = str(post.count)
+    if seed_count is not None:
+        block["sandbox_commits_added"] = str(post.count - seed_count)
+    return block
+
+
+# ---------------------------------------------------------------------------
+# #1341 — evidence CAPTURED, not REFERENCED
+# ---------------------------------------------------------------------------
+#
+# A scorecard used to cite ``SUMMARY.txt`` by path and nothing else. The cited file
+# belongs to the run being scored, and the run keeps rewriting it: the STALLED card
+# for 20260808-160538-bd pointed at a SUMMARY.txt that had, by the time anyone read
+# the card, been rewritten to "RESULT: MERGED" — the scorecard's own evidence now
+# contradicting its verdict. A pointer is not evidence; it is a promise that
+# something else will still be true later, and nothing keeps that promise.
+#
+# So each pointer below is RESOLVED at write time into three values that cannot
+# drift: an excerpt (what it said), a sha256 of the full bytes (which content that
+# was), and the byte length. The pointer itself is kept — it is still the place to
+# go and look — but it is no longer the whole of the evidence.
+#
+# THE S6 CONTRACT IS PRESERVED, NOT WAIVED. "Pointers and short statuses, never raw
+# logs" exists so scorecards stay publishable; the excerpt is single-lined and
+# capped well under the 1000-char evidence ceiling the fail-closed writer enforces,
+# and the hash — not the excerpt — carries full-content identity. Publication still
+# routes through scripts/scrub_community_export.py, exactly as it did when these
+# values were absolute local paths.
+
+#: Evidence keys whose value is a path to a file the scored run keeps rewriting.
+#: Deliberately NOT every pointer a card carries: the streaming logs (``progress``,
+#: ``packs``) are unbounded and their content answers no question the verdict rests
+#: on, whereas these two are the artifacts a verdict is argued FROM.
+CAPTURED_POINTER_KEYS: tuple[str, ...] = ("summary", "job_summary")
+
+#: Excerpt bound. Under the writer's 1000-char evidence ceiling with headroom, so a
+#: capture can never be the thing that makes a card unwritable (#1324's lesson: a
+#: value composed here must survive the seam it is written through).
+EVIDENCE_EXCERPT_MAX_CHARS = 900
+
+#: Streaming-hash chunk. Within the size ceiling below the hash covers the WHOLE
+#: file, so the identity claim is never a partial one.
+_HASH_CHUNK_BYTES = 1 << 20
+
+#: Raw bytes read to build the excerpt from. Generous (a summary is kilobytes) so the
+#: excerpt is never short merely because the file opens with blank lines — the
+#: single-lining below drops those, and a stingy budget would under-fill the cap.
+_EXCERPT_SOURCE_BYTES = 1 << 16
+
+#: Hash ceiling. Past this the capture RECORDS ITS REFUSAL instead of hashing: a
+#: digest of the first N bytes presented as the file's identity would be a partial
+#: measurement wearing a whole one's name, which is the defect this module is fixing.
+EVIDENCE_CAPTURE_MAX_BYTES = 64 << 20
+
+
+def _capture_file(path: Path) -> dict:
+    """Resolve one pointer into drift-proof values, or name why it could not be.
+
+    Returns ``{"excerpt", "sha256", "bytes"}`` on success and ``{"error"}`` on any
+    failure — never both, so a reader can never mistake a failed capture for a file
+    that happened to be empty.
+
+    The ``is_file`` test is a bound, not a formality: a pointer is a string from a
+    driver-emitted scorecard, and on Windows a named pipe or a device name (``NUL``,
+    ``CON``, ``\\\\.\\pipe\\x``) opens fine and can block forever. Only a regular file
+    is read."""
+    try:
+        if not path.is_file():
+            return {"error": f"not a regular file: {path}"}
+        declared = path.stat().st_size
+        if declared > EVIDENCE_CAPTURE_MAX_BYTES:
+            return {"error": f"{declared} bytes exceeds the {EVIDENCE_CAPTURE_MAX_BYTES}-byte "
+                             "capture ceiling — not hashed rather than partially hashed"}
+        digest = sha256()
+        size = 0
+        head = b""
+        with path.open("rb") as handle:
+            while True:
+                chunk = handle.read(_HASH_CHUNK_BYTES)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                size += len(chunk)
+                if size > EVIDENCE_CAPTURE_MAX_BYTES:
+                    # It grew past the ceiling while being read (a live log). Same
+                    # refusal as above — an honest absence beats a partial claim.
+                    return {"error": f"grew past the {EVIDENCE_CAPTURE_MAX_BYTES}-byte "
+                                     "capture ceiling while being read — not hashed"}
+                if len(head) < _EXCERPT_SOURCE_BYTES:
+                    head += chunk
+    except Exception as exc:  # noqa: BLE001 — an uncapturable pointer is recorded, never raised
+        return {"error": f"{type(exc).__name__}: {exc}"}
+    text = head[:_EXCERPT_SOURCE_BYTES].decode("utf-8", errors="replace")
+    one_line = " / ".join(part.strip() for part in text.splitlines() if part.strip())
+    excerpt = (one_line[:EVIDENCE_EXCERPT_MAX_CHARS - 1] + "…"
+               if len(one_line) > EVIDENCE_EXCERPT_MAX_CHARS else one_line)
+    return {"excerpt": excerpt, "sha256": digest.hexdigest(), "bytes": str(size)}
+
+
+def capture_evidence_pointers(evidence: dict, *, captured_utc: str = "") -> dict:
+    """Return *evidence* with every :data:`CAPTURED_POINTER_KEYS` pointer resolved.
+
+    Pure and additive: the original pointer keys are left exactly as they were (a
+    path means the same thing in a pre-#1341 record and a post-#1341 one, so the
+    archive stays readable), and each gains ``<key>_excerpt`` + ``<key>_sha256`` +
+    ``<key>_bytes``, or ``<key>_capture_error`` if the file could not be read. One
+    shared ``evidence_captured_utc`` stamps the instant the pass ran, which is what
+    makes the values re-derivable: a later reader can hash the file again and see
+    whether it is still what the card cited.
+
+    Never raises — a capture fault records itself and the card still writes."""
+    if not evidence:
+        return dict(evidence or {})
+    out = dict(evidence)
+    touched = False
+    for key in CAPTURED_POINTER_KEYS:
+        pointer = out.get(key)
+        if not isinstance(pointer, str) or not pointer:
+            continue
+        touched = True
+        got = _capture_file(Path(pointer))
+        if "error" in got:
+            out[f"{key}_capture_error"] = _evidence_str(got["error"])
+            continue
+        out[f"{key}_excerpt"] = got["excerpt"]
+        out[f"{key}_sha256"] = got["sha256"]
+        out[f"{key}_bytes"] = got["bytes"]
+    if touched:
+        out["evidence_captured_utc"] = captured_utc or _now_utc()
+    return out
+
+
+# ---------------------------------------------------------------------------
+# #1341 — a terminal verdict may not be asserted over a live interval
+# ---------------------------------------------------------------------------
+
+#: Evidence key: what the process table said about dispatch drivers at the instant
+#: this card was written. Present on every LIVE card (its ABSENCE means the run was
+#: a dry run, never that nobody looked), and one of ``live`` / ``absent`` /
+#: ``unknown`` — three states, because "I could not look" is not "nothing is there".
+DRIVER_LIVE_KEY = "driver_live_at_write"
+
+#: The loud half. Prefixed to the note of any STALLED card written while a driver
+#: was still running, and FIRST in the string so the 500-char clip can never eat it.
+LIVE_AT_WRITE_MARKER = (
+    "OBSERVATION STOPPED OVER A LIVE INTERVAL (#1341): a dispatch driver was still "
+    "running when this card was written, so this verdict records where the harness "
+    "stopped watching, NOT that the run failed — see evidence." + DRIVER_LIVE_KEY
+)
+
+
+def stamp_live_dispatch(sc: Scorecard, live: LiveDispatch, *, log=print) -> Scorecard:
+    """Record what was observed of the box's dispatch drivers as this card is written,
+    and refuse to let a STALLED card's prose stand unqualified when one was alive.
+
+    The verdict itself is UNCHANGED. Writing a non-terminal verdict instead would mean
+    extending a CLOSED taxonomy that the campaign's zero-STALLED banking rule, the
+    runner exit code, the morning report and every reliability figure read as
+    exhaustive — a capability decision the Lead Architect owns, not one this function
+    may take. Nothing is lost by holding the line here: a STALLED already blocks
+    banking, so the safety property is intact and the defect being repaired is purely
+    what the record CLAIMS. The note now says the true thing ("this is where I stopped
+    looking") beside the thing it used to assert alone ("the job could not run").
+
+    An UNKNOWN state is recorded in the evidence but does NOT amend the note: on a
+    non-elevated box the blind spot is the common case, and a marker that fires on
+    every card is a marker nobody reads. The evidence carries it either way, which is
+    where a reader checking a verdict's standing will look."""
+    evidence = dict(sc.evidence or {})
+    evidence[DRIVER_LIVE_KEY] = live.state
+    if live.detail:
+        evidence["driver_live_detail"] = _evidence_str(live.detail)
+    if live.pids:
+        evidence["driver_live_pids"] = ",".join(str(p) for p in live.pids[:20])
+    if live.state == LIVE_DISPATCH_UNKNOWN:
+        log(f"[battery {sc.job_id}] dispatch-driver liveness UNKNOWN at write time: "
+            f"{live.detail}")
+    if not (live.state == LIVE_DISPATCH_LIVE and sc.verdict == VERDICT_STALLED):
+        return replace(sc, evidence=evidence)
+    log(f"[battery {sc.job_id}] !! {sc.verdict} WRITTEN WHILE A DISPATCH DRIVER IS LIVE "
+        f"({live.detail}) — the run may still be delivering; this card records the end of "
+        "OBSERVATION, not the end of the run.")
+    return replace(
+        sc,
+        evidence=evidence,
+        notes=_note(LIVE_AT_WRITE_MARKER + (f" [emitter note: {sc.notes}]" if sc.notes else "")),
+    )
+
+
+#: Evidence key carrying an advisory traceability-stage FAULT onto the durable per-job
+#: artifact. Distinct from an honest "nothing to assess": a run that seeded no oracle produces
+#: a sidecar saying ``available=false`` with its reason, whereas a crash produces no sidecar at
+#: all and is otherwise indistinguishable from the pre-feature world. This key is what makes
+#: the crash nameable on ``<id>.scorecard.json`` + ``battery-summary.json`` rather than only in
+#: battery stdout. Its ABSENCE is the normal case and carries no meaning.
+TRACEABILITY_ERROR_KEY = "traceability_error"
+
+
+def _stamp_traceability_error(card_sc: Scorecard, detail: str) -> None:
+    """Record a traceability-stage fault on *card_sc*'s evidence, in place.
+
+    Clipped through :func:`_evidence_str` because the S6 evidence contract forbids newlines
+    and caps length, and ``write_scorecard`` FAILS CLOSED on a violation — an unclipped
+    traceback here would turn a recorded fault into an unwritable scorecard, which is the
+    same defect one layer down."""
+    if card_sc.evidence is None:
+        card_sc.evidence = {}
+    card_sc.evidence[TRACEABILITY_ERROR_KEY] = _evidence_str(detail)
 
 
 def _stamp_sandbox_evidence(card_sc: Scorecard, block: dict) -> Scorecard:
@@ -1516,6 +1894,11 @@ class BatterySummary:
     #: :meth:`classify` so #827 reads the fresh green-quality.json sidecars. ``{}`` until then.
     #: ADVISORY: the audit annotates evidence + writes a sidecar, never a verdict/attribution.
     green_quality_block: dict = field(default_factory=dict)
+    #: #828/#1195 the oracle-mutation discrimination block (did the exams CATCH broken code —
+    #: killed/ran + the not-measured count). Populated by :meth:`oracle_mutation` at battery
+    #: close, AFTER :meth:`green_quality` and BEFORE :meth:`classify` so the sidecar is on disk
+    #: for the traceability stage. ``{}`` until then. ADVISORY: never a verdict/attribution.
+    oracle_mutation_block: dict = field(default_factory=dict)
 
     @property
     def false_done(self) -> int:
@@ -1578,9 +1961,13 @@ class BatterySummary:
         keys (verdict/attribution NEVER touched — a band that fed banking would be a new
         FALSE-DONE vector). Runs BEFORE :meth:`classify` so #827's failure-taxonomy reads the
         fresh sidecars. Wholly fail-soft: an audit fault leaves an empty block."""
-        from tools.dispatch_harness import green_quality as _ga
-
         try:
+            # Imported INSIDE the guard. An advisory stage that cannot be imported at all —
+            # a syntax error shipped in one of its modules — is still a fault OF THAT STAGE,
+            # and an import statement above the try is the one line of it that can still take
+            # the night's summary write down with it.
+            from tools.dispatch_harness import green_quality as _ga
+
             self.green_quality_block = _ga.audit_greens(
                 self.scorecards, runs_dir=runs_dir, out_dir=out_dir or (self.out_dir or None),
                 projects_dir=projects_dir, job_surfaces=job_surfaces, jurors=jurors, log=log,
@@ -1590,6 +1977,35 @@ class BatterySummary:
                 log(f"[battery] green-quality failed ({exc}); summary written without the block.")
             self.green_quality_block = {}
         return self.green_quality_block
+
+    def oracle_mutation(self, *, runs_dir=None, out_dir=None, projects_dir=None, log=None) -> dict:
+        """#828/#1195 — run the ADVISORY oracle-mutation audit over every GREEN at battery close.
+
+        For each GREEN it copies the delivered tree, mutates the feature code the job oracle
+        imports, re-runs that oracle against each mutant, and banks the killed/ran score as
+        ``oracle-mutation.json`` + the reserved ``oracle_mutation_*`` evidence keys. This is the
+        DISCRIMINATION question — an exam that still passes against deliberately broken code is
+        not an exam — and until #1195 nothing called the audit, so no run dir carried the answer.
+
+        Ordered AFTER :meth:`green_quality` (both are advisory and independent) and BEFORE
+        :meth:`classify`, whose traceability stage is the consumer that would read this sidecar
+        to fill its ``L4-KILLS`` rung. Bounded by a stage-wide wall-clock budget so an advisory
+        instrument can never extend the night without a ceiling. Wholly fail-soft: an audit fault
+        leaves an empty block and the summary still writes."""
+        try:
+            # Imported INSIDE the guard — see :meth:`green_quality` for why the import is the
+            # one line of an advisory stage that can still sink the summary write.
+            from tools.dispatch_harness.green_quality import mutation as _mut
+
+            self.oracle_mutation_block = _mut.audit_green_oracles(
+                self.scorecards, runs_dir=runs_dir, out_dir=out_dir or (self.out_dir or None),
+                projects_dir=projects_dir, log=log,
+            )
+        except Exception as exc:  # noqa: BLE001 — the audit is advisory; never sink the night
+            if log:
+                log(f"[battery] oracle-mutation failed ({exc}); summary written without the block.")
+            self.oracle_mutation_block = {}
+        return self.oracle_mutation_block
 
     def classify(self, *, runs_dir=None, out_dir=None, log=None) -> dict:
         """#827 QUALITY-9 — run the ADVISORY failure-taxonomy classifier over every
@@ -1601,9 +2017,19 @@ class BatterySummary:
         so the durable per-job artifact carries the stamp too. Wholly fail-soft: a
         classifier fault leaves an empty block and never sinks the summary write.
         Idempotent — a second call re-stamps to the same class."""
-        from tools.dispatch_harness import failure_taxonomy as _ftax
+        # Compute the DETERMINISTIC requirement->assertion traceability sidecar FIRST, so the
+        # classifier below has real coverage evidence to read instead of falling back to the
+        # #821 model declaration. Reads only what the run already banked (acceptance.json +
+        # the seeded job oracle); per-card fail-soft — a run with neither is simply skipped,
+        # and classify_green then behaves exactly as it did before this existed.
+        if runs_dir:
+            self._bank_traceability(runs_dir, log=log)
 
         try:
+            # Imported INSIDE the guard — see :meth:`green_quality` for why the import is the
+            # one line of an advisory stage that can still sink the summary write.
+            from tools.dispatch_harness import failure_taxonomy as _ftax
+
             self.failure_taxonomy = _ftax.classify_and_stamp(
                 self.scorecards, runs_dir=runs_dir, out_dir=out_dir or (self.out_dir or None),
             )
@@ -1624,6 +2050,42 @@ class BatterySummary:
                 except Exception:  # noqa: BLE001 — advisory re-write; never fatal
                     pass
         return self.failure_taxonomy
+
+    def _bank_traceability(self, runs_dir, *, log=None) -> None:
+        """Compute + bank each run's ``traceability.json``, and record any fault where the
+        operator will actually see it.
+
+        The stage is advisory and therefore fail-soft, but fail-soft is not fail-silent. A
+        crash here leaves no sidecar, and a missing sidecar renders as
+        ``oracle_coverage=unknown (no traceability map)`` — the byte-identical string a run
+        that simply never seeded an oracle produces. So the fault is stamped onto the
+        scorecard's evidence under :data:`TRACEABILITY_ERROR_KEY`, which rides into both
+        ``<id>.scorecard.json`` and ``battery-summary.json``. A stage whose only distress
+        signal is a line in battery stdout has degraded silently as far as the durable record
+        is concerned, which is the failure mode this key exists to close."""
+        try:
+            # Imported INSIDE the guard, for the reason given on :meth:`green_quality`: an
+            # unimportable module here would otherwise propagate out of classify() and kill
+            # battery close BEFORE battery-summary.json is written, destroying the night's
+            # results over a fault in a module that is not allowed to change a verdict.
+            from tools.dispatch_harness.green_quality import traceability as _trace
+        except Exception as exc:  # noqa: BLE001 — advisory; never sink the night
+            detail = f"traceability stage unavailable: {type(exc).__name__}: {exc}"
+            if log:
+                log(f"[battery] {detail}; every card stamped, summary written without it.")
+            for s in self.scorecards:
+                _stamp_traceability_error(s, detail)
+            return
+
+        for s in self.scorecards:
+            if not s.run_id:
+                continue
+            try:
+                _trace.assess_and_persist(Path(runs_dir) / s.run_id)
+            except Exception as exc:  # noqa: BLE001 — advisory; never sink the night
+                _stamp_traceability_error(s, f"{type(exc).__name__}: {exc}")
+                if log:
+                    log(f"[battery] traceability {s.job_id}: skipped ({exc})")
 
     @property
     def green_integrity_downgrades(self) -> int:
@@ -1705,6 +2167,11 @@ class BatterySummary:
             # audit annotates evidence + writes a per-run sidecar, never a verdict; ``{}``
             # until green_quality() runs at battery close.
             "green_quality": self.green_quality_block,
+            # #828/#1195: the oracle-mutation DISCRIMINATION block — could each GREEN's exam
+            # have failed? Carries the killed/ran score and, separately, the count of GREENs
+            # nobody could audit, so an unmeasured night never reads like a clean one.
+            # ADVISORY; ``{}`` until oracle_mutation() runs at battery close.
+            "oracle_mutation": self.oracle_mutation_block,
             "jobs": [s.to_dict() for s in self.scorecards],
         }
 
@@ -1749,6 +2216,13 @@ class BatterySummary:
             from tools.dispatch_harness import green_quality as _ga
 
             lines.extend(_ga.render_kpi(self.green_quality_block))
+        # #828/#1195: the advisory oracle-mutation KPI line. Renders whenever the stage saw a
+        # GREEN at all — a night whose exams were never tested for discrimination is exactly
+        # the state that must not be invisible on the summary the operator reads.
+        if self.oracle_mutation_block:
+            from tools.dispatch_harness.green_quality import mutation as _mut
+
+            lines.extend(_mut.render_kpi(self.oracle_mutation_block))
         return "\n".join(lines)
 
 
@@ -1876,6 +2350,11 @@ async def run_battery(
     # The base (campaign-default) monitor budget — restored for every card that
     # does not declare its own envelope (#740 B3 re-grain).
     _base_monitor_budget_s = getattr(harness, "overall_timeout_s", 0.0)
+    # #1343: which cards actually STARTED a dispatch — the same honest distinction
+    # _finalize_evidence draws for the liveness stamp. A card the #1058 gate refused
+    # built nothing this run, so presenting its sandbox would hand the operator a stale
+    # site under tonight's name.
+    dispatched_ids: set[str] = set()
     for card in cards:
         cid = str(card.get("id"))
         started = _now_utc()
@@ -1885,12 +2364,19 @@ async def run_battery(
         # containment contract), and every probed card's condition — pass, refuse
         # or opt-out — rides its scorecard evidence.
         sandbox_block: dict = {}
+        # #1341: hoisted out of the gate branch below. The write-time re-read needs the
+        # same sandbox the gate read, and a second derivation of the path is a second
+        # thing that can disagree with the first.
+        repo_dir: Path | None = None
+        seed_count: int | None = None
         if not dry_run:
             repo_dir = (Path(projects_dir) / str(card.get("repo", ""))
                         if projects_dir else None)
             fresh = (probe_sandbox_freshness(repo_dir) if repo_dir is not None
                      else SandboxFreshness(SANDBOX_UNDETERMINED,
                                            detail="harness config has no projects_dir"))
+            if fresh.state != SANDBOX_UNDETERMINED:
+                seed_count = fresh.commit_count
             sandbox_block = sandbox_evidence(fresh, opted_out=allow_dirty_sandbox)
             if fresh.state == SANDBOX_DIRTY and allow_dirty_sandbox:
                 log(f"[battery {cid}] sandbox DIRTY ({fresh.agent_commits} 'agent:' "
@@ -1919,6 +2405,10 @@ async def run_battery(
                 sc = stalled_scorecard(cid, reason, card=card, dry_run=dry_run)
                 sc = _stamp_sandbox_evidence(replace(sc, started_utc=started),
                                              sandbox_block)
+                # dispatched=False: the refusal happened BEFORE run_job, so this card
+                # has no interval to qualify (see _finalize_evidence).
+                sc = _finalize_evidence(sc, repo_dir=repo_dir, seed_count=seed_count,
+                                        dry_run=dry_run, dispatched=False, log=log)
                 summary.scorecards.append(sc)
                 _write(sc, out_dir, log)
                 continue
@@ -1935,6 +2425,7 @@ async def run_battery(
         _stage_card_run_budget(harness, card_budget, _base_monitor_budget_s, log, cid)
         log(f"[battery {cid}] dispatching {card.get('repo')} …")
         try:
+            dispatched_ids.add(cid)
             job = JobSpec(
                 repo=str(card["repo"]),
                 # #740: make the card's declared stack explicit so the coder builds the
@@ -1946,6 +2437,11 @@ async def run_battery(
         except Exception as exc:  # noqa: BLE001 — one job's crash must not sink the battery
             sc = stalled_scorecard(cid, f"harness exception: {exc}", card=card, dry_run=dry_run)
             sc = _stamp_sandbox_evidence(replace(sc, started_utc=started), sandbox_block)
+            # dispatched=True: run_job was ENTERED. A crash on the harness side says
+            # nothing about whether the dispatch it triggered is still running — which
+            # is precisely the interval this stamp exists to report.
+            sc = _finalize_evidence(sc, repo_dir=repo_dir, seed_count=seed_count,
+                                    dry_run=dry_run, dispatched=True, log=log)
             summary.scorecards.append(sc)
             _write(sc, out_dir, log)
             continue
@@ -1975,6 +2471,46 @@ async def run_battery(
         # #1058: the probed condition rides EVERY probed card's record — a fresh
         # pass, an opt-out dirty run, and the refusal above all carry it.
         sc = _stamp_sandbox_evidence(replace(sc, started_utc=started), sandbox_block)
+        # #1324: the EFFECTIVE budget rides the scorecard, so the failure classifier can
+        # COMPARE wall_clock_s against it instead of asserting budget exhaustion from the
+        # attribution alone. Stamped HERE, after both scorecard paths converge
+        # (adopt_driver_scorecard and synthesize_scorecard), so neither can ship without it.
+        #
+        # AS A STRING. Evidence is contractually {str: str | [str]} and the fail-closed
+        # writer REFUSES a float (scorecard.py _bad_string). The first cut of this stamped
+        # the raw float, and the refusal is caught below and degraded to a STALLED [HARNESS]
+        # card — so a GREEN B9 would have BANKED AS STALLED, taking the exit code and the
+        # pass banking with it. Every card declaring a budget was affected (B2/B3/B4/B9/B10).
+        # Caught by independent review; the regression lock is the validate() assertion in
+        # tests/integration/test_failure_taxonomy.py, which crosses the writer seam the
+        # classifier-only tests never touched.
+        #
+        # EFFECTIVE, not the card's raw field: effective_job_budget_s is the surface that
+        # OWNS this number — it clamps to CARD_RUN_BUDGET_MAX_S and falls back to the
+        # campaign default for a card declaring none. Reading card["run_budget_s"] directly
+        # recorded nothing for the five cards that run on the default, so the honest rule
+        # could not fire for half the fleet: a genuine default-budget exhaustion without a
+        # TIMEOUT line would read HARNESS-ENVIRONMENT — the same wrong-cause label #1324
+        # exists to remove, pointed the other way.
+        #
+        # Imported in function scope deliberately: battery_execution_limit imports
+        # load_cards from THIS module, so a module-level import is circular.
+        from tools.dispatch_harness.battery_execution_limit import effective_job_budget_s
+
+        _eff_budget = effective_job_budget_s(card, float(_base_monitor_budget_s or 0.0))
+        # A non-finite or non-positive budget is NOT a budget. Recording one would assert a
+        # ceiling nothing enforces, and the classifier reports "budget unmeasured" — true —
+        # rather than dividing by it.
+        if isfinite(_eff_budget) and _eff_budget > 0:
+            sc = replace(sc, evidence={
+                **(sc.evidence or {}), "run_budget_s": _evidence_str(_eff_budget)
+            })
+        # #1341: LAST, immediately before the write, because that is the whole point —
+        # the commit count, the cited files' contents and the drivers' liveness are all
+        # facts about an instant, and the instant that matters is the one the card
+        # claims to describe.
+        sc = _finalize_evidence(sc, repo_dir=repo_dir, seed_count=seed_count,
+                                dry_run=dry_run, dispatched=True, log=log)
         try:
             _write(sc, out_dir, log)
         except ValueError as exc:
@@ -1990,8 +2526,13 @@ async def run_battery(
                 cid, f"invalid composed scorecard: {exc}", card=card, dry_run=dry_run
             )
             # sandbox_block is contract-valid by construction (_evidence_str),
-            # so re-stamping cannot re-trip the writer this path degrades from.
+            # so re-stamping cannot re-trip the writer this path degrades from. The
+            # same is true of the #1341 block (see _finalize_evidence) — and the
+            # degraded card is a STALLED written over a run that may still be
+            # delivering, so it is exactly a card that must carry the liveness stamp.
             sc = _stamp_sandbox_evidence(replace(sc, started_utc=started), sandbox_block)
+            sc = _finalize_evidence(sc, repo_dir=repo_dir, seed_count=seed_count,
+                                    dry_run=dry_run, dispatched=True, log=log)
             _write(sc, out_dir, log)
         summary.scorecards.append(sc)
         # #749: fail-soft, knob-gated durable-ticket post — the single per-job
@@ -2006,13 +2547,101 @@ async def run_battery(
     job_surfaces = {str(c.get("id")): str(c.get("stack", "")) for c in cards}
     summary.green_quality(runs_dir=runs_dir, out_dir=out_dir, projects_dir=projects_dir,
                         job_surfaces=job_surfaces, log=log)
+    # #828/#1195: ask each GREEN's exam the discrimination question — mutate the feature code
+    # the oracle imports and check the oracle goes RED. Runs on a COPY of the delivered tree,
+    # so the archived evidence is never written to. Ordered BEFORE classify below so the
+    # sidecar is on disk before the traceability stage runs. That ordering is LOAD-BEARING:
+    # traceability's L4-KILLS rung folds this sidecar's per-mutant attribution, so a stage
+    # ordered after classify() would leave the rung unmeasured on every run.
+    summary.oracle_mutation(runs_dir=runs_dir, out_dir=out_dir, projects_dir=projects_dir, log=log)
     # #827: stamp every scorecard with its advisory failure/green class + the taxonomy block,
     # BEFORE the summary write so battery-summary.json carries it.
     summary.classify(runs_dir=runs_dir, out_dir=out_dir, log=log)
     (out_dir / "battery-summary.json").write_text(
         json.dumps(summary.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    # #1343: LAST — after every measurement has landed and been written. A website
+    # battery run must END by leaving him something to open: B9 built a complete
+    # multi-page site on two consecutive nights and nobody opened either, because the
+    # product archives three levels inside a state directory and the review had to be
+    # REMEMBERED. This writes a record + a double-click launcher per website card.
+    #
+    # Ordered here, not per-card, so it can only ever APPEND to a finished run: every
+    # scorecard and the summary are already on disk, so nothing below can move a verdict
+    # even if it misbehaves. The outer guard is belt to the module's own braces (every
+    # artifact is written under its own try in there) — presentation is not a control,
+    # and a night of GPU measurement must never be lost to a shortcut that would not
+    # write. See the module header for why fail-open is correct in this one place.
+    try:
+        present_website_builds(
+            [c for c in cards if str(c.get("id", "")) in dispatched_ids],
+            {sc.job_id: sc for sc in summary.scorecards},
+            out_dir=out_dir, runs_dir=runs_dir, projects_dir=projects_dir,
+            dry_run=dry_run, log=log,
+        )
+    except Exception as exc:  # noqa: BLE001 — a presentation fault never costs a night
+        log("[battery] website presentation failed (fail-soft; the run's results are "
+            f"unaffected — review by hand with 'Review Website.cmd'): {type(exc).__name__}: {exc}")
     return summary
+
+
+def _finalize_evidence(
+    sc: Scorecard,
+    *,
+    repo_dir: Path | None,
+    seed_count: int | None,
+    dry_run: bool,
+    dispatched: bool,
+    log=print,
+) -> Scorecard:
+    """The #1341 write-time pass — the LAST thing that touches a card before it is
+    written, and the only place the three drifting facts are resolved.
+
+    Every value it adds is contract-valid BY CONSTRUCTION (single-line, capped well
+    under the writer's ceilings), so it is safe on every write path including the
+    degrade-to-STALLED one, and it can never be the reason a card becomes unwritable
+    — the #1324 shape, where a composed value the writer refused turned a GREEN into
+    a STALLED. It never raises: a fault in recording a fact must not destroy the
+    record the fact belongs to.
+
+    ``dispatched`` gates the liveness stamp alone, and it is the honest distinction:
+    a card refused by the #1058 gate never started an interval, so a driver running
+    on the box at that moment belongs to somebody else's work and saying otherwise on
+    that card would be the same over-claim this ticket exists to remove. The key's
+    ABSENCE therefore means "this job was never dispatched" (refused, or a dry run) —
+    never "nobody looked".
+
+    ``dry_run`` suppresses both live-box reads: a dry run drives a fake AO over a
+    fixture projects dir, so a sandbox count and a process sweep would describe the
+    test box rather than a run."""
+    if dry_run:
+        return sc
+    evidence = dict(sc.evidence or {})
+    # THREE INDEPENDENT FACTS, THREE INDEPENDENT FAILURE DOMAINS. Sharing one try
+    # would let a wedged git suppress the summary capture — one instrument's fault
+    # silently erasing another instrument's reading, which is the same shape as the
+    # defect being repaired.
+    if repo_dir is not None:
+        try:
+            evidence.update(
+                sandbox_build_evidence(seed_count, count_sandbox_commits(repo_dir))
+            )
+        except Exception as exc:  # noqa: BLE001 — recording a fact never sinks the card
+            log(f"[battery {sc.job_id}] write-time commit-count read failed "
+                f"(fail-soft): {exc}")
+    try:
+        evidence = capture_evidence_pointers(evidence)
+    except Exception as exc:  # noqa: BLE001 — recording a fact never sinks the card
+        log(f"[battery {sc.job_id}] write-time evidence capture failed (fail-soft): {exc}")
+    sc = replace(sc, evidence=evidence)
+    if not dispatched:
+        return sc
+    try:
+        live = probe_live_dispatch()
+    except Exception as exc:  # noqa: BLE001 — the probe is fail-soft AND honest about it
+        live = LiveDispatch(LIVE_DISPATCH_UNKNOWN,
+                            detail=f"liveness probe raised {type(exc).__name__}: {exc}")
+    return stamp_live_dispatch(sc, live, log=log)
 
 
 def _write(sc: Scorecard, out_dir: Path, log) -> None:
@@ -2067,6 +2696,22 @@ def _post_job_ticket(cfg, card: dict, report: JobReport, sc: Scorecard, log) -> 
 # ---------------------------------------------------------------------------
 # Dry-run wiring (the harness's existing fake-AO mode, card-aware)
 # ---------------------------------------------------------------------------
+
+
+#: Prefix every battery session key carries. Named so a sweep of stale slots can recognise
+#: battery sessions without pattern-matching a literal in three places.
+BATTERY_SESSION_PREFIX: str = "battery-"
+
+
+def new_battery_session_id() -> str:
+    """A session key unique to THIS run.
+
+    The coordinator keys its pending dispatch by session id and parks it durably (#1116), so
+    a constant key lets a crashed run hand its stale plan to the next one (#1324). The stamp
+    is wall-clock to the second plus the pid: two runs cannot collide, and the value is
+    legible in a log, which matters when the question is "whose dispatch was this?".
+    """
+    return f"{BATTERY_SESSION_PREFIX}{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
 
 
 def build_dry_run_harness(cards: list[dict], *, session_id: str = "battery") -> DispatchHarness:
@@ -2204,7 +2849,19 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Override the AO default.toml path (port + fleet roots).")
     p.add_argument("--dev-mode", action="store_true",
                    help="LIVE over plaintext dev loopback instead of production mTLS.")
-    p.add_argument("--session-id", default="battery")
+    # UNIQUE PER RUN, not the constant "battery" it was until #1324. The coordinator's
+    # pending slot is keyed by session id AND durably parked to the encrypted store
+    # (#1116), so a run that stalls leaves its pending dispatch behind -- and the NEXT run
+    # opening the same key inherits it. Measured 2026-08-07 across four B9 attempts: run 4's
+    # scorecard carried run 1's run_id from 100 minutes earlier, because `pre_run_id` came
+    # from run 1's slot, and its `/dispatch approve` then fired against a plan whose sandbox
+    # had since been archived and never returned.
+    #
+    # A per-run key is STRUCTURAL SEVERANCE (principle 4): two runs that do not share a key
+    # cannot contaminate each other, and nobody has to remember a teardown step -- which is
+    # the property that matters, because the contaminating run had CRASHED. Evaluated once
+    # at parser construction, so it is stable for the whole run and distinct between runs.
+    p.add_argument("--session-id", default=new_battery_session_id())
     mon = p.add_argument_group("monitoring (live)")
     mon.add_argument("--poll-interval-s", type=float, default=5.0)
     mon.add_argument("--stall-grace-s", type=float, default=240.0)
@@ -2333,6 +2990,11 @@ def main(argv: list[str] | None = None) -> int:
         _job_surfaces = {str(c.get("id")): str(c.get("stack", "")) for c in selected}
         summary.green_quality(runs_dir=_runs_dir, out_dir=out_dir, projects_dir=_projects_dir,
                             job_surfaces=_job_surfaces, log=print)
+        # #828/#1195: re-run the mutation audit over the COMBINED set. Cheap on the second
+        # pass — a GREEN whose sidecar already records a MEASURED audit is re-stamped from the
+        # banked evidence rather than re-mutated, so this never pays for the night twice.
+        summary.oracle_mutation(runs_dir=_runs_dir, out_dir=out_dir, projects_dir=_projects_dir,
+                                log=print)
         # #827: re-classify over the COMBINED set (run_battery's stamped cards re-read
         # their sidecars idempotently; the appended unknown-id STALLED cards get stamped).
         summary.classify(runs_dir=_runs_dir, out_dir=out_dir, log=print)

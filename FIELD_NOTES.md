@@ -37,6 +37,12 @@ exists, the lesson or journal entry that paid for it.*
   class-creation time (observed under Python 3.14). Register the module in
   `sys.modules` BEFORE `exec_module`.
 
+- **Hostile invisible codepoints in test SOURCE survive review invisibly** *(2026-07-30,
+  #1165 M5)*. A test that feeds bidi-override, zero-width or over-length filenames must
+  carry the literals as `\uXXXX` escapes a reviewer can actually see, decoded to genuinely
+  hostile bytes at runtime. Pasting the raw codepoints makes the fixture correct and the
+  diff unreadable — and an unreadable adversarial fixture is one nobody can check.
+
 ## Windows / process & privilege boundaries
 
 - **UAC elevation relaunch starts with a fresh environment** *(lessons 11,
@@ -120,6 +126,12 @@ exists, the lesson or journal entry that paid for it.*
   with the action it gates; never pipe gate output through `tail`/`head` at
   capture time; and a gate whose wall-time ~doubles is reporting a contended,
   invalid environment — not a result.
+- **An empty file parses to `$null` WITHOUT throwing, so the `try` around
+  `ConvertFrom-Json` never fires** *(2026-07-30, #1180; lesson 329's entry)*. Under
+  `Set-StrictMode -Version Latest` the failure surfaces one line later, on the first
+  member read of the `$null` result, and a `try` narrowed to wrap only the parse lets it
+  escape to the caller. Guard the member reads, not just the parse — and fixture a
+  zero-byte file plus a valid-but-incomplete object whenever you tighten a JSON guard.
 
 ## WinUI / GUI automation
 
@@ -201,6 +213,18 @@ exists, the lesson or journal entry that paid for it.*
 
 ## Toolchain / runbooks
 
+- **A dispatched review agent's report does NOT arrive on its own — "idle" is
+  not "delivered"** *(2026-07-30, #1237/#1239)*. A subagent spawned with the
+  Agent tool signals completion as an `idle_notification` carrying no content;
+  its final text reaches the lead only via an explicit `SendMessage` asking for
+  it. Observed on two independent reviewers in one session, so it is the harness
+  and not the agent. The hazard is not the extra round-trip: a lead that reads
+  "idle" as "came back with nothing" can merge a branch believing the review
+  found no findings, when the review found several and was never asked for them
+  — silence and a clean verdict are indistinguishable, which is the same
+  unmeasured-instrument shape this arc keeps finding. **Never treat an absent
+  report as a clean one. Pull it, and if the agent says it did not finish, take
+  that over a complete-looking summary.**
 - **Pin the exact interpreter in every operator-facing runbook command**
   *(lesson 144)*. A bare `python` on a box with 3.11 (venv) and 3.14 (system)
   lets an early dependency-light step succeed and mask the trap until a later
@@ -305,10 +329,37 @@ exists, the lesson or journal entry that paid for it.*
   physical. The OS labels the immovable plainly and hides the movable;
   `In-Use = Total − Available` remains the only honest accounting.
 
+
+- **A stray control character inside a doc line makes `str.splitlines()` see two lines where
+  `split("\n")` sees one — and any per-line checker goes blind to everything after it.**
+  `LESSONS_ARCHIVE.md` carried a Windows path written as `WindowsPowerShell\v1.0` in some
+  earlier script, where `\v` had been interpreted as a vertical tab (`\x0b`). Nothing
+  rendered wrong. But `check_lesson_tallies.py` counts `*(recurred: …)*` markers PER LINE via
+  `splitlines()`, which treats U+000B as a line boundary — so lesson 46's eighth recurrence sat
+  in the file, invisible to the tool, and the index flag `↺8` looked like drift against a
+  counted 7. The instrument was right that something was wrong and wrong about what.
+  **When a per-line doc checker disagrees with your own reading, compare `splitlines()` against
+  `split("\n")` before adjudicating the content** — `splitlines()` also breaks on
+  `\x0c`, `\x1c`-`\x1e`, `\x85`, U+2028 and U+2029.
 ## Documentation
 
 - **`git mv` a doc into a subdirectory silently BREAKS its relative links** *(2026-07-16, #14)*. A credential-lifecycle doc authored for `docs/` (links `adrs/ADR-…`, `governance/weight-integrity.md`) was moved to `docs/governance/` for convention-consistency — every relative link then resolved a level too shallow (`docs/governance/adrs/…`, `docs/governance/governance/…`, both nonexistent) and shipped broken; a fleet peer caught it post-merge. `tools/doc_lint` checks frontmatter, NOT link resolution, so it did not catch this. Control: after ANY `git mv` of a `.md`, re-grep its `](relative/` links and fix depth (`adrs/`→`../adrs/`, drop the now-current-dir prefix), and `ls` each target to confirm it resolves before merging. Better: author the doc at its FINAL path, or check links as part of the move commit.
 
+
+- **A commit message written with `git commit -m "…"` in bash loses every backticked
+  identifier.** Backticks inside double quotes are command substitution, so a message full of
+  `symbol` references arrives with holes where the symbols were — and bash prints
+  `symbol: command not found` for each one, which is easy to read as noise while the commit
+  succeeds. It cost the #1237 merge commit its gate figure: the body now reads `absent: .`
+  where a measured result line belonged. History is not rewritten here, so the record went to
+  the ticket instead. **Always `git commit -F <file>` (or a quoted heredoc into `-F -`) for
+  any message containing backticks.** Note `git merge` does NOT accept `-F -` — it wants a
+  real path.
+- **A backslash escape written into a `python - <<'PY'` heredoc can arrive collapsed.** Writing
+  a replacement of `\\v` reached Python as `\v`, i.e. a vertical tab —
+  so a script replacing a vertical tab with a literal backslash-v silently replaced it with
+  itself and reported success. Build such literals with `chr(92)` instead of escapes when the
+  payload is itself a backslash sequence.
 ## Git on Windows
 
 - **A compound `cd <worktree> && git …` leaves the shell cwd IN the worktree —
@@ -464,3 +515,132 @@ exists, the lesson or journal entry that paid for it.*
   silently under `--all`. Use `--all` when "no history yet" is a legitimate state
   you must distinguish from "cannot read history" — and it also reads unmerged
   branch refs, which HEAD-only probes miss (a PARKED battery run's work lives there).
+- **A point-in-time inventory of a LIVE mutation harness is indistinguishable from a
+  stranded mutation** *(2026-07-23, #1044)* — both show one dirty source file with
+  mutated content and no obvious runner process. A mutation harness spends most of its
+  wall time with a file deliberately broken, and it spawns `python.exe -m pytest`, not a
+  `pytest` image, so a process check by name finds nothing; there is also a sub-second
+  window between the subprocess exiting and the restore write where the file is mutated
+  and truly nothing is running. Worked example, and it is the lead's: inventorying
+  `wt-mut-verify` during mutation **29 of 29** produced a confident, well-argued,
+  written-down finding that a run had died and stranded broken source. The run completed
+  normally seconds later — `restore verified`, `0 of 29`. The observation was a race; the
+  reasoning on top of it was sound and entirely wrong. **The guard shares the blind spot,
+  and that is the part worth writing down:** `_refuse_poisoned_baseline` aimed at a tree
+  with a run in flight refuses correctly *by accident*, while stating the wrong reason
+  ("poisoned baseline" for what is actually "busy"). A control that reaches the right
+  outcome through the wrong diagnosis will be trusted for the wrong reason the next time
+  it fires — and the fix is not the outcome, it is making the two states distinguishable
+  (a run-marker file, deferred as a named follow-up on the harness's review). Sixth ring
+  of the same family in one evening: manifest checker → ceremony-read config comments →
+  docstrings → stranded mutation → stale anchor → in-flight vs stranded.
+
+## Fleet dispatch / coder harness
+
+- **The coder runs on Windows but its shell commands execute under bash, and the model
+  does not reliably know which shell it is addressing** *(2026-07-23, #1073)* — a cmd.exe
+  redirect to a reserved device name (`nul`, `con`, `prn`, `aux`, `com1`–`9`, `lpt1`–`9`,
+  e.g. `del /q test_cards.json 2>nul`) run under bash creates a literal file with that
+  name, because bash has no `nul` special-case and `del` doesn't exist so the shell
+  writes the error text into a file called `nul` instead. Git cannot remove it: two
+  `git clean -fd` passes and four `git worktree remove --force` calls all leave it in
+  place, and it poisons the worktree for every later run. Plain `rm nul` from bash
+  removes it instantly — the capability was always there, the harness's own cleanup
+  just never took a path that could see the reserved name.
+
+- **`repos-archived/` inside a battery night directory holds the PREVIOUS night, not
+  that night** *(2026-07-30, #1180; lesson 328's entry)* — `run-battery-night.ps1:662-673`
+  renames the outgoing tree into place at 23:00 as the new run begins. A morning
+  inspection that opens `night-<date>/repos-archived/` is reading the night before, and
+  the mistake is invisible whenever two consecutive nights produce structurally identical
+  deliveries — which is the normal case for a frozen exam card. Name the night you mean
+  and check a scorecard timestamp before drawing a conclusion from a delivered tree.
+
+- **A pinned worktree is DETACHED by design, so any `-eq 'main'` freshness test is
+  `$false` forever** *(2026-07-30, #1181a; lesson 332's entry)* — git refuses to check
+  out `main` in a second worktree, so the detachment is forced rather than incidental.
+  Freshness must be tested by resolving the commit (ancestry against `main`), never by
+  comparing a branch name; a name test makes a correctly-pinned night indistinguishable
+  from a broken one and prints the alarm banner every single night.
+
+## Vikunja API
+
+- **Vikunja v2.3.0 answers `GET /users?s=<no match>` with JSON `null`, not `[]`**
+  *(2026-07-23, #1034)* — any code walking that endpoint through a shared page-walker
+  that wraps a non-list first page receives `[None]`: a truthy, one-row list whose row
+  is `None`, which defeats an `or []` guard downstream and raises `AttributeError` on
+  the first attribute access. Separately, `GET /tasks/{id}/assignees` returns HTTP 500
+  on every task in this server version, with or without paging parameters — a
+  pre-existing, unrelated defect (#1072), not a pagination issue.
+
+- **Public-mirror publisher: two desync signatures from one script** *(2026-07-24, #1104)*
+  — the publisher aborts at the leak-gate BEFORE `update-ref`, so a leak-gate block leaves
+  `refs/public-snapshots/main` untouched (stuck at the last good snapshot), whereas a PUSH
+  failure leaves the ref one commit AHEAD of the remote. Same script, two different desync
+  fingerprints; diagnose accordingly before touching either ref.
+
+- **Piped stdout on this host is cp1252, so a non-ASCII byte kills a fleet tool**
+  *(2026-07-30, #746)* — `python -c "sys.stdout.write('α')" | cat` raises
+  `UnicodeEncodeError`, and Node's `execFile` spawns the opencode tool wrappers exactly
+  that way. `agentic-setup/tools/search_docs.py` is safe only because `json.dump`'s
+  `ensure_ascii` defaults to True; "improving" that to `ensure_ascii=False` makes one
+  Greek letter in an MDN excerpt surface to the coder as `tool_error` while the corpus
+  holds the answer. Any new stdout-emitting tool on the fleet path needs a regression
+  lock driven through a real subprocess pipe with a non-ASCII payload — an in-process
+  test cannot see this.
+
+- **A stale 0-byte `.git/index.lock` blocks every commit and reports nothing useful**
+  *(2026-07-30)* — one left at 12:19 by an interrupted operation silently failed every
+  `git add`/`git commit` in the primary checkout for three hours, which is how a day's
+  work accumulates uncommitted while each session assumes the previous one chose not to
+  bank it. Diagnose with three checks before removing: zero length, age far beyond any
+  real operation, and no `git` process running. All three, or leave it alone.
+
+- **A pytest plugin injected via PYTHONPATH loads; a `conftest.py` there does not**
+  *(2026-07-30, #1204)* — conftest is collected only from the rootdir's own tree, so a
+  mutation harness that parks a `conftest.py` on `PYTHONPATH` runs entirely unmutated
+  code and reports every mutant as SURVIVED. Use `-p <module>` instead, and make the
+  harness assert it actually injected — a mutation run that cannot prove it mutated
+  anything is an instrument reporting confidently while measuring nothing.
+
+- **TWO `-m launcher` processes at the same start time is the HEALTHY shape, not a leak**
+  *(2026-07-31)* — a boot produces a venv `pythonw.exe -m launcher` supervisor holding
+  ~0.01 GB, which spawns a CHILD running the SYSTEM `Python311\pythonw.exe -m launcher`
+  that holds the resident 14B (~12.6 GB) and owns the `:5001` listener. Same
+  `StartTime` to the second, child's `ParentProcessId` == the supervisor. Two facts make
+  this read like an incident when it is not: the child runs a DIFFERENT interpreter from
+  the one that launched it, and agents running `services/ui_gateway/` suites also run
+  system Python, so a process list shows the same exe on both a test run and the live
+  app. Confirm with `ParentProcessId` and `StartTime` before concluding anything —
+  a documented prior incident is a leaked AO on 5001 turning gate failures into silent
+  skips, so the instinct to reap is right and the target here is wrong. Reaping the
+  child evicts the model; reaping the supervisor orphans it.
+
+- **`:5001` does not serve HTTP — a failed health probe is not evidence of a wedged app**
+  *(2026-07-31)* — `Invoke-WebRequest http://127.0.0.1:5001/` fails with a transport
+  error against a perfectly healthy assistant, because that port carries the IPC
+  protocol rather than HTTP. Liveness comes from the listener existing plus
+  `Get-Process -Id <pid>` reporting `Responding=True`, never from an HTTP status. An
+  overnight stall-detector keyed on an HTTP probe would kill a healthy app on its first
+  pass — measure the process, not a protocol it never spoke.
+
+### The LOCALAPPDATA safety redirect invalidates any measurement of environment-derived paths
+
+The standing rule redirects `LOCALAPPDATA` before every pytest run, because an unredirected run
+once corrupted the operator's live `sessions.db`. That redirect is correct and must stay.
+
+It also silently breaks any diagnostic that reads a path DERIVED from `LOCALAPPDATA`.
+
+2026-08-08, chasing #1350: `grade_env.uv_dir_overlay` appeared to pin only uv's interpreter
+directory and not its wheel cache — which looked like the cause of a month of `not-run` stamps.
+It was an artifact. The diagnostic ran under the safety redirect, so the overlay computed
+`%LOCALAPPDATA%\uv\cache` against the temporary directory, found nothing there, and correctly
+omitted it. Run with a clean environment the overlay pins both, against a real 26 GB cache.
+
+**When measuring anything derived from `LOCALAPPDATA`, `APPDATA` or `HOME` — uv/pip caches,
+managed interpreters, per-user tool state — run the probe WITHOUT the redirect.** The redirect
+protects writes; it falsifies reads. Both facts are true at once and only the first is
+documented anywhere else.
+
+Symptom to recognise: a path-resolution function that returns fewer entries than its docstring
+promises, with no error. It is omitting what it cannot find, exactly as designed.

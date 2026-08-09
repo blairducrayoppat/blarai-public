@@ -81,7 +81,15 @@ SIZE_BUDGETS = {
     TEST_GOVERNANCE: 40_000,
     ACTIVE_SPRINT: 4_000,
     COPILOT: 14_000,
-    LESSONS: 125_000,
+    # #1255: the file's OWN Rule 2 and Rule 7 both declare a 120 KB (122,880 B) hot
+    # budget, and the gate enforced 125,000 - so LESSONS.md sat ~348 bytes over its
+    # stated limit for an unknown period and nothing failed. A budget nothing checks
+    # reports compliance by not being asked, which is this repo's #1241 shape applied
+    # to its own doctrine. Tightened to the declared figure on 2026-08-08, when #1319's
+    # Canon-32 strip took the file to 102,217 B and made the two agree without a trim.
+    # If this ever needs raising, raise Rule 7 first and say why there - the constant
+    # follows the doctrine, never the other way round.
+    LESSONS: 122_880,
 }
 
 

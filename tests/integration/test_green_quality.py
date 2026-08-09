@@ -16,6 +16,7 @@ craft lints, the calibration measurement, and the #827 sidecar hand-off + batter
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -190,7 +191,10 @@ def _probe_dir(tmp_path: Path) -> Path:
 
 
 def _l1_with(reg: l1.RegressionFinding) -> l1.Layer1Result:
-    clean = l1.CraftFinding(False, "")
+    #: MEASURED-clean, because that is the only clean a real lint can produce. A
+    #: ``CraftFinding`` is born unmeasured (#1223), so omitting the flag here would build a
+    #: "looked and found nothing" fixture out of a "never looked" value.
+    clean = l1.CraftFinding(False, "", measured=True)
     return l1.Layer1Result(regression=reg, dead_scaffold=clean, stale_readme=clean,
                            no_entry_point=clean, ruff_findings=None, surface="python-lib")
 
@@ -228,13 +232,25 @@ def _reg(regressed=False, changed=False):
     return l1.RegressionFinding(regressed, changed, "detail", measured=True)
 
 
-def _l1(regressed=False, changed=False, dead=False, readme=False, no_entry=False, ruff=None):
+def _l1(regressed=False, changed=False, dead=False, readme=False, no_entry=False, ruff=None,
+        seed=None, craft_measured=True):
+    """``seed=None`` leaves the seed-divergence finding at its dataclass default, which is
+    UNKNOWN — deliberately not clean (see :class:`layer1.SeedDivergenceFinding`).
+
+    Craft lints are built MEASURED by default, because that is the only shape the real lints
+    emit for a decided answer: since #1223 a ``CraftFinding`` is born unmeasured, and a
+    ``flagged=True, measured=False`` finding is a shape no code path in ``layer1`` can
+    produce. Building one anyway is instance 8's defect in miniature — a fixture asserting
+    against a value production forbids — and it is what these helpers were doing until the
+    born-unmeasured default made them fail loudly. ``craft_measured=False`` is available for
+    the tests that deliberately exercise a lint that could not run."""
+    kwargs = {} if seed is None else {"seed_divergence": seed}
     return l1.Layer1Result(
         regression=_reg(regressed, changed),
-        dead_scaffold=l1.CraftFinding(dead, "scaffold"),
-        stale_readme=l1.CraftFinding(readme, "readme"),
-        no_entry_point=l1.CraftFinding(no_entry, "no entry"),
-        ruff_findings=ruff, surface="python-lib")
+        dead_scaffold=l1.CraftFinding(dead, "scaffold", measured=craft_measured),
+        stale_readme=l1.CraftFinding(readme, "readme", measured=craft_measured),
+        no_entry_point=l1.CraftFinding(no_entry, "no entry", measured=craft_measured),
+        ruff_findings=ruff, surface="python-lib", **kwargs)
 
 
 def test_band_regression_is_C():
@@ -435,6 +451,416 @@ def test_lint_entry_point_skipped_for_gui():
 
 
 # ---------------------------------------------------------------------------
+# The seed-divergence check (#1183) — the relational replacement for marker matching
+# ---------------------------------------------------------------------------
+
+#: The seed README exactly as #1142 neutralised it. It contains NONE of
+#: ``_README_SKELETON_MARKERS``, which is the whole point: the marker lint cannot see it, in
+#: the seed or in the untouched copy that ships. Held here as a literal so these tests keep
+#: reproducing the real defect even if the live seed is edited again.
+_SEED_README = "# Project\n\nBuilt with BlarAI.\n\nRun the tests with `pytest -q`.\n"
+
+#: The seed pyproject, trimmed to the parts that matter here: a build config the coder is told
+#: to KEEP, plus the one operator-facing field it is expected to rewrite.
+_SEED_PYPROJECT = (
+    '[build-system]\nrequires = ["setuptools>=68"]\n\n'
+    '[project]\nname = "app"\nversion = "0.1.0"\n'
+    'description = "A starting skeleton for a Python project (extend this)."\n'
+    'dependencies = []\n\n'
+    '[tool.pytest.ini_options]\ntestpaths = ["tests"]\npythonpath = ["."]\n'
+)
+
+#: AGENTS.md is instructions to the coder, not part of the product — an identical copy is
+#: CORRECT. Only the sentence that makes that true is needed here.
+_SEED_AGENTS = ("**This file is instructions to YOU, the coder. It is not part of the "
+                "delivered product.**\n")
+
+
+def _seed_dir(tmp_path: Path, name: str = "seed") -> Path:
+    """A stand-in for ``agentic-setup/build-infra/python/reference`` — the fleet's Python seed."""
+    root = tmp_path / name
+    (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "README.md").write_text(_SEED_README, encoding="utf-8")
+    (root / "pyproject.toml").write_text(_SEED_PYPROJECT, encoding="utf-8")
+    (root / "AGENTS.md").write_text(_SEED_AGENTS, encoding="utf-8")
+    (root / "tests" / "test_smoke.py").write_text("def test_smoke():\n    assert True\n",
+                                                  encoding="utf-8")
+    return root
+
+
+def _delivery(tmp_path: Path, seed: Path, name: str = "delivered", *,
+              readme: str | None = None, description: str | None = None) -> Path:
+    """A delivered project: a COPY of the seed, with whatever the coder actually rewrote.
+    ``None`` means "the coder left it exactly as seeded" — the case under test."""
+    root = tmp_path / name
+    (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "README.md").write_text(
+        _SEED_README if readme is None else readme, encoding="utf-8")
+    (root / "pyproject.toml").write_text(
+        _SEED_PYPROJECT if description is None
+        else _SEED_PYPROJECT.replace(
+            "A starting skeleton for a Python project (extend this).", description),
+        encoding="utf-8")
+    # Always copied verbatim — both are files the coder is told NOT to change.
+    (root / "AGENTS.md").write_text((seed / "AGENTS.md").read_text(encoding="utf-8"),
+                                    encoding="utf-8")
+    (root / "tests" / "test_smoke.py").write_text(
+        (seed / "tests" / "test_smoke.py").read_text(encoding="utf-8"), encoding="utf-8")
+    return root
+
+
+def test_seed_divergence_flags_an_untouched_delivery(tmp_path):
+    """THE REGRESSION LOCK: a delivery that shipped the seed's README and description unchanged
+    is flagged, naming both files. This is the 2026-07-29 B2/B4 shape exactly."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed)
+    finding = l1.lint_seed_divergence(delivered, seed_root=seed)
+    assert finding.flagged is True
+    assert finding.status == l1.SEED_STATUS_IDENTICAL
+    assert set(finding.identical) == {"README.md", "pyproject.toml"}
+    assert finding.measured is True
+
+
+def test_seed_divergence_is_the_lock_the_marker_lint_is_not(tmp_path):
+    """THE TOGGLE (security principle 12): with the lock OFF the probe FAILS.
+
+    Same subject, two checks. ``lint_stale_readme`` — the marker-matching lint — reads the
+    untouched seed README as CLEAN, because #1142's neutralised text contains none of its
+    markers. The seed-divergence check flags it. This test is the difference between the two,
+    and it is the reason the fix was not "extend the marker list": a control keyed on a string
+    can be edited into silence, and this one was."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed)
+    # Lock OFF — the existing marker lint cannot see the defect at all.
+    assert l1.lint_stale_readme(delivered).flagged is False
+    # Lock ON — the relational check does.
+    assert l1.lint_seed_divergence(delivered, seed_root=seed).flagged is True
+
+
+def test_seed_divergence_cannot_be_satisfied_by_editing_the_seed(tmp_path):
+    """Editing the seed cannot clear the finding, because the delivered file IS a copy of the
+    seed — an edit moves BOTH sides of the comparison at once. Rewrite the seed README to
+    something entirely different, re-seed the delivery from it, and the flag stands."""
+    seed = _seed_dir(tmp_path)
+    assert l1.lint_seed_divergence(_delivery(tmp_path, seed), seed_root=seed).flagged is True
+
+    # The "fix" that would silence a marker lint: change the template's own words.
+    new_text = "# Your new project\n\nCompletely different template prose.\n"
+    (seed / "README.md").write_text(new_text, encoding="utf-8")
+    reseeded = _delivery(tmp_path, seed, "delivered2", readme=new_text)
+    finding = l1.lint_seed_divergence(reseeded, seed_root=seed)
+    assert finding.flagged is True
+    assert "README.md" in finding.identical
+
+
+def test_seed_divergence_clean_when_the_coder_actually_wrote_something(tmp_path):
+    """The only way to clear it: write a real README and a real description."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed, readme="# Flashcards CLI\n\nDrills you on cards.\n",
+                          description="A command-line flashcard drill.")
+    finding = l1.lint_seed_divergence(delivered, seed_root=seed)
+    assert finding.flagged is False
+    assert finding.status == l1.SEED_STATUS_DIVERGED
+    assert set(finding.diverged) == {"README.md", "pyproject.toml"}
+
+
+def test_seed_divergence_never_punishes_a_file_the_coder_must_not_change(tmp_path):
+    """``AGENTS.md`` and ``tests/test_smoke.py`` are byte-identical to the seed in EVERY correct
+    delivery — AGENTS.md is instructions to the coder ("not part of the delivered product") and
+    test_smoke.py is the toolchain proof AGENTS.md says to keep. Neither may ever be flagged."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed, readme="# Real thing\n", description="A real thing.")
+    finding = l1.lint_seed_divergence(delivered, seed_root=seed)
+    assert finding.flagged is False
+    # Identical on disk, and deliberately outside the comparison set.
+    assert (delivered / "AGENTS.md").read_bytes() == (seed / "AGENTS.md").read_bytes()
+    assert "AGENTS.md" not in finding.identical + finding.diverged + finding.unknown
+    assert "tests/test_smoke.py" not in finding.identical + finding.diverged + finding.unknown
+
+
+def test_seed_divergence_keeps_pyproject_build_config_out_of_scope(tmp_path):
+    """AGENTS.md says "keep ``pyproject.toml``", so its build-system/packaging/pytest blocks are
+    LEGITIMATELY byte-identical. Only ``project.description`` is compared: a delivery that
+    rewrote the description but kept every other line is clean, even though the file as a whole
+    is nearly identical to the seed."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed, readme="# Real\n", description="A word counter.")
+    # The file really is otherwise unchanged — this is not a case of the coder rewriting it.
+    assert '[build-system]\nrequires = ["setuptools>=68"]' in (
+        delivered / "pyproject.toml").read_text(encoding="utf-8")
+    finding = l1.lint_seed_divergence(delivered, seed_root=seed)
+    assert finding.flagged is False
+    assert "pyproject.toml" in finding.diverged
+
+
+def test_seed_divergence_normalised_newlines_are_not_an_escape(tmp_path):
+    """Re-saving the seed README with CRLF line endings does not clear the finding — the
+    comparison normalises, so a trivial byte-level edit is not divergence."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed)
+    # write_text() on Windows already emits CRLF, so force the delivered copy to bare LF plus
+    # a stray trailing blank line — different bytes, identical text.
+    (delivered / "README.md").write_bytes((_SEED_README + "\n").encode("utf-8"))
+    assert (delivered / "README.md").read_bytes() != (seed / "README.md").read_bytes()
+    assert l1.lint_seed_divergence(delivered, seed_root=seed).flagged is True
+
+
+def test_seed_divergence_missing_seed_is_unknown_never_clean(tmp_path):
+    """THE FAIL-SOFT CONTRACT, and the sharp edge of it: an unlocatable seed degrades to
+    UNKNOWN — never a crash, never a false flag, and never a PASS. An unknown that reads as
+    clean is precisely the bug this check exists to end."""
+    delivered = _delivery(tmp_path, _seed_dir(tmp_path))
+    finding = l1.lint_seed_divergence(delivered, seed_root=tmp_path / "no-such-seed")
+    assert finding.flagged is False          # no false flag
+    assert finding.status == l1.SEED_STATUS_UNKNOWN
+    assert finding.measured is False         # and NOT readable as clean
+    assert set(finding.unknown) == {"README.md", "pyproject.toml"}
+
+
+def test_seed_divergence_unknown_is_reported_out_loud(tmp_path):
+    """FAIL-LOUD: a check that could not run says so in the findings. A silent unmeasured
+    control is indistinguishable from a passing one."""
+    unknown = l1.lint_seed_divergence(tmp_path / "repo", seed_root=tmp_path / "gone")
+    result = _l1()
+    assert result.seed_divergence.measured is False  # the dataclass DEFAULT is unknown, not clean
+    # Craft lints MEASURED-clean, so the only UNKNOWN in the report is the seed one under test.
+    _clean = l1.CraftFinding(False, "", measured=True)
+    assert any("seed divergence UNKNOWN" in f for f in l1.Layer1Result(
+        regression=_reg(), dead_scaffold=_clean,
+        stale_readme=_clean, no_entry_point=_clean,
+        seed_divergence=unknown).findings())
+
+
+def test_seed_divergence_unreadable_delivery_is_unknown_not_flagged(tmp_path):
+    """A delivery with no README/pyproject at all cannot be compared — unknown, not flagged
+    (the absent file is some other lint's business, never a false seed-identity claim)."""
+    seed = _seed_dir(tmp_path)
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    finding = l1.lint_seed_divergence(empty, seed_root=seed)
+    assert finding.flagged is False
+    assert finding.status == l1.SEED_STATUS_UNKNOWN
+
+
+def test_seed_divergence_malformed_toml_is_unknown_not_flagged(tmp_path):
+    """An unparseable delivered pyproject degrades that file to unknown while the README
+    comparison still stands — partial knowledge is reported, never inflated to a verdict."""
+    seed = _seed_dir(tmp_path)
+    delivered = _delivery(tmp_path, seed, readme="# Real\n")
+    (delivered / "pyproject.toml").write_text("[project\nname = broken", encoding="utf-8")
+    finding = l1.lint_seed_divergence(delivered, seed_root=seed)
+    assert finding.flagged is False
+    assert finding.diverged == ("README.md",)
+    assert finding.unknown == ("pyproject.toml",)
+    assert "not compared: pyproject.toml" in finding.detail
+
+
+def test_seed_divergence_default_root_resolves_without_a_hardcoded_path():
+    """The seed root comes from the harness config's ``agentic_setup_dir`` (env → TOML →
+    documented fallback), the same resolver every other external fleet path uses — never a
+    literal absolute path in the lint. ``None`` when it does not exist on this box."""
+    root = l1.default_seed_root()
+    assert root is None or root.name == "reference"
+    # A config object that names a root is honoured verbatim.
+    class _Cfg:
+        agentic_setup_dir = "C:/nowhere-at-all"
+    assert l1.default_seed_root(_Cfg()) is None
+
+
+def test_seed_divergence_moves_the_band_and_the_card(tmp_path):
+    """Wired, not merely built: a flagged seed-divergence is a B trigger and the operator card
+    says so in plain language. An UNMEASURED check moves nothing — the band states something
+    about the DELIVERABLE, and a seed the auditor could not read says nothing about it."""
+    seed = _seed_dir(tmp_path)
+    flagged = l1.lint_seed_divergence(_delivery(tmp_path, seed), seed_root=seed)
+    unknown = l1.lint_seed_divergence(tmp_path / "x", seed_root=tmp_path / "gone")
+
+    banded = _l1()
+    assert band_mod.compute_band(banded) == BAND_A          # unknown by default -> no signal
+    assert band_mod.compute_band(_l1(seed=flagged)) == BAND_B
+    assert band_mod.compute_band(_l1(seed=unknown)) == BAND_A
+
+    the_card = card_mod.build_card("B2", "python-lib", BAND_B, _l1(seed=flagged))
+    assert "word-for-word" in the_card.caveat
+    assert "starter template" in the_card.caveat
+
+
+def test_seed_divergence_reaches_the_audit_and_the_sidecar(tmp_path):
+    """REACHABILITY: driven through the real ``audit_greens`` entry point the battery calls, a
+    seed-copy delivery lands a named evidence key and a sidecar that records a STATUS STRING —
+    never a bare bool, so 'unknown' can never be read as 'clean' by a later reader."""
+    seed = _seed_dir(tmp_path)
+    out_dir = tmp_path / "battery" / "20260102"
+    repo = out_dir / "repos-archived" / "battery-b4-flashcards-cli"
+    _delivery(out_dir / "repos-archived", seed, "battery-b4-flashcards-cli")
+    (repo / "app").mkdir(parents=True, exist_ok=True)
+    runs = tmp_path / "runs"
+    sc = Scorecard(job_id="B4", verdict="GREEN", repo="battery-b4-flashcards-cli", run_id="R9")
+
+    audit_greens([sc], runs_dir=runs, out_dir=out_dir, seed_root=seed,
+                 probe_dir=tmp_path / "no-probes", job_surfaces={"B4": "python-cli"})
+
+    assert sc.evidence["green_quality_seed_identical"] == "README.md,pyproject.toml"
+    assert sc.evidence["green_quality_band"] == BAND_B
+    assert validate(sc) == []
+    sidecar = json.loads((runs / "R9" / "green-quality.json").read_text(encoding="utf-8"))
+    assert sidecar["craft"]["seed_divergence"] == l1.SEED_STATUS_IDENTICAL
+    assert sidecar["craft"]["seed_identical_files"] == ["README.md", "pyproject.toml"]
+    assert sidecar["craft"]["seed_root"] == str(seed)
+
+
+# --- The real deliveries (opportunistic — the live sandbox, not an immutable archive) -------
+
+_REAL_PROJECTS = ("battery-b2-text-stats", "battery-b4-flashcards-cli")
+
+
+def _seed_file_set(seed: Path | None) -> set[str]:
+    """Every file the fleet seed declares, repo-relative. Empty when the seed is absent."""
+    if seed is None:
+        return set()
+    return {p.relative_to(seed).as_posix() for p in seed.rglob("*") if p.is_file()}
+
+
+def _archive_holds_a_delivery(repo: Path, seed_files: set[str]) -> bool:
+    """Does this archived sandbox hold coder work, or only the seed?
+
+    Asserts the PRECONDITION the seed-divergence measurement needs — every file the seed
+    declares is present to be compared against. A sandbox that parked before the coder
+    committed is missing most of them, and the lint correctly reports those `unknown`.
+
+    Deliberately NOT a commit count. The previous form asked `> 1 commit`, reasoning that a
+    seeded sandbox carries only "init battery sandbox". #740 then added a second seed commit
+    and the discriminator silently stopped discriminating — see the caller for the incident.
+    A property of the tree cannot be invalidated by a change to the harness's commit habits.
+    """
+    if not seed_files:
+        return False
+    ls = subprocess.run(["git", "-C", str(repo), "ls-files"], capture_output=True, text=True)
+    if ls.returncode != 0:
+        return False
+    tracked = {line for line in ls.stdout.split() if line}
+    return not (seed_files - tracked)
+
+
+def _git_sandbox(root: Path, commits: list[dict[str, str]]) -> Path:
+    """A real git repo with one commit per element — no mock; the discriminator shells out.
+
+    Takes a LIST of commits rather than a flat file map because commit COUNT is the thing the
+    old discriminator keyed on: a fixture that always makes one commit would be rejected by
+    the old rule for the wrong reason and the regression lock would pass without proving
+    anything. Caught by mutating the discriminator back and watching the lock stay green.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "-C", str(root), "init", "-q"], capture_output=True, text=True)
+    for i, files in enumerate(commits):
+        for rel, body in files.items():
+            f = root / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(body, encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "-A"], capture_output=True, text=True)
+        subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-qm", f"c{i}"], capture_output=True, text=True)
+    return root
+
+
+def test_a_seed_only_sandbox_is_NOT_mistaken_for_a_delivery(tmp_path):
+    """REGRESSION LOCK for the 2026-08-07 red gate.
+
+    A B4 run parked before the coder committed anything. Its archive held exactly two
+    commits — `init battery sandbox` and #740's `seed protected job-level acceptance oracle`
+    — and the old `> 1 commit` discriminator read that as a delivery. It went to the top of
+    the newest-first list, the seed-divergence lint honestly reported `unknown` for a
+    `pyproject.toml` that was never there to compare, and `main` went red on a lint that was
+    working correctly.
+
+    The sandbox here makes TWO commits, mirroring the real pair, precisely so that the old
+    `> 1` rule WOULD accept it. That is what makes this a lock rather than a coincidence:
+    revert the discriminator and this test goes red.
+    """
+    seed_files = {"pyproject.toml", "README.md", "app/main.py", "tests/test_app.py"}
+    seed_only = _git_sandbox(tmp_path / "parked", [
+        {"README.md": "x"},                                  # init battery sandbox
+        {"tests/test_job_acceptance.py": "seeded oracle"},   # #740's oracle seed
+    ])
+    assert _archive_holds_a_delivery(seed_only, seed_files) is False, (
+        "a sandbox that parked before the coder committed was accepted as a delivery — "
+        "this is the 2026-08-07 red gate returning")
+
+
+def test_a_real_delivery_IS_recognised(tmp_path):
+    """CONTROL for the lock above: the discriminator must not simply reject everything."""
+    seed_files = {"pyproject.toml", "README.md", "app/main.py", "tests/test_app.py"}
+    delivered = _git_sandbox(tmp_path / "delivered", [
+        {"README.md": "x", "pyproject.toml": "[project]"},
+        {"app/main.py": "print(1)", "tests/test_app.py": "def test_x(): pass"},
+        {"app/extra.py": "coder work"},
+    ])
+    assert _archive_holds_a_delivery(delivered, seed_files) is True
+
+
+def test_an_absent_seed_affirms_nothing(tmp_path):
+    """[kill] Fail-closed: with no seed to compare against, nothing may be called a delivery."""
+    delivered = _git_sandbox(tmp_path / "d", [
+        {"README.md": "x"}, {"app/main.py": "y"}])
+    assert _archive_holds_a_delivery(delivered, set()) is False
+    assert _seed_file_set(None) == set()
+
+
+@pytest.mark.parametrize("project", _REAL_PROJECTS)
+def test_seed_divergence_returns_a_determinate_answer_on_the_real_deliveries(project):
+    """Against a REAL COMPLETED delivery and the REAL seed: the check must reach a DETERMINATE
+    answer (never crash, never 'unknown') on the projects the fleet actually produces.
+
+    Reads the most recent ARCHIVED delivery, never the live ``projects/`` tree. That is the
+    whole point: the wrapper archives the previous delivery by rename and ``git init``s a
+    fresh sandbox at the START of every run, so between 23:00 and the coder's first commit —
+    and for the entire duration of any run — the live tree holds only seed files and several
+    seed files do not exist there to be compared. The lint correctly reports those `unknown`,
+    and a gate asserting determinacy against them fails for a reason that has nothing to do
+    with the code under test. That is the "gate must not be killed by the live system" rule,
+    and it went RED on 2026-07-30 for exactly this. An archived delivery is immutable and
+    complete, so the assertion below means what it says.
+
+    Deliberately does NOT assert *flagged* — pinning the expected answer would turn a coder
+    finally writing a README into a gate failure. That both projects were flagged on
+    2026-07-30 is recorded in the shipping commit and on #1183."""
+    seed = l1.default_seed_root()
+    archived = sorted(
+        Path("C:/Users/mrbla/agentic-setup/state/battery").glob(f"night-*/repos-archived/{project}"),
+        reverse=True,
+    )
+    # Newest archive that actually holds a DELIVERY. An archived tree is not automatically a
+    # delivery: a run cancelled (or still in flight) before the coder's first commit archives
+    # a tree carrying only the seed, and 2026-07-30 put exactly such a tree at the top of the
+    # list.
+    #
+    # THE DISCRIMINATOR COUNTED COMMITS AND THE SEED GREW A SECOND ONE (2026-08-07). The
+    # original form asserted `> 1 commit`, on the reasoning that "a seeded sandbox carries the
+    # single 'init battery sandbox' commit and nothing else". #740 then added a second seed
+    # commit — `chore(m2): seed protected job-level acceptance oracle` — so a sandbox that
+    # parked before the coder ever committed carried TWO commits and read as a delivery. The
+    # 2026-08-06 23:00 B4 run did exactly that (PARKED-HONEST at 141 s, attribution BUILD),
+    # went to the top of this list, and turned `main` red on a lint that was working perfectly:
+    # a seed-only tree has no `pyproject.toml` to compare, so `unknown` is the HONEST answer
+    # and the assertion below is right to reject it. The test picked the wrong tree.
+    #
+    # So this no longer counts anything. It asserts the PRECONDITION the measurement needs:
+    # every file the seed declares is present to be compared against. A seed-only sandbox is
+    # missing four of the five; a real delivery has all of them plus its own work. That is a
+    # property of the tree rather than a fact about the harness's commit habits, so the next
+    # change to seeding cannot silently re-break it — which is exactly how this broke.
+    seed_files = _seed_file_set(seed)
+    repo = next((p for p in archived
+                 if p.is_dir() and _archive_holds_a_delivery(p, seed_files)), None)
+    if seed is None or repo is None:
+        pytest.skip("real fleet seed / a completed archived delivery not present on this box")
+    finding = l1.lint_seed_divergence(repo)
+    assert finding.measured is True
+    assert finding.status in (l1.SEED_STATUS_IDENTICAL, l1.SEED_STATUS_DIVERGED)
+    assert not finding.unknown
+
+
+# ---------------------------------------------------------------------------
 # The reference-GREEN finder
 # ---------------------------------------------------------------------------
 
@@ -565,3 +991,492 @@ def test_calibration_agreement_rate(tmp_path):
 
 def test_calibration_rejects_bad_verdict(tmp_path):
     assert calib.record_pair(tmp_path, calib.CalibrationPair("B2", "r", BAND_A, "maybe")) is False
+
+
+# ---------------------------------------------------------------------------
+# #1189 — the advisory ruff lint: a skipped lint must not read as a clean one
+# ---------------------------------------------------------------------------
+
+
+def test_ruff_not_run_is_stated_never_implied_by_silence():
+    """`None` (could not run) and `0` (ran, found nothing) are different answers.
+
+    The old render was `if self.ruff_findings:`, which suppressed BOTH — so a lint that had
+    never executed was indistinguishable from a clean one. It had never executed on any
+    night: `run_ruff_advisory` invoked a bare ``ruff``, and the harness runs the venv's
+    python.exe directly rather than through an activated venv, so the name could not resolve.
+    """
+    unmeasured = _l1(ruff=None).findings()
+    measured_clean = _l1(ruff=0).findings()
+    measured_dirty = _l1(ruff=7).findings()
+
+    assert any("NOT RUN" in s for s in unmeasured), unmeasured
+    assert any("absent measurement" in s for s in unmeasured), unmeasured
+    # the toggle: a real zero must NOT borrow the unmeasured wording, and vice versa
+    assert not any("NOT RUN" in s for s in measured_clean), measured_clean
+    assert any("0 advisory findings (measured)" in s for s in measured_clean), measured_clean
+    assert any("7 advisory finding(s)" in s for s in measured_dirty), measured_dirty
+
+
+# ---------------------------------------------------------------------------
+# #1244 — the producer must not mint a zero the run did not earn.
+#
+# What stood here was `test_ruff_is_invoked_by_module_not_by_a_bare_command_name`, which did
+# `inspect.getsource(l1.run_ruff_advisory)` and asserted `'["ruff", "check"' in src`. Its
+# subject was the SOURCE TEXT, so it passed on the textual presence of code — it would have
+# passed if the entire function body were deleted and replaced by that string in a comment.
+# It also certified a fallback that was UNREACHABLE at the time it was written. Deleted, not
+# repaired: a control whose subject is the source text is satisfiable by editing the source
+# text, and the three tests below take the RETURN VALUE as their subject instead.
+# ---------------------------------------------------------------------------
+
+
+def test_ruff_that_could_not_lint_reports_NOT_RUN_not_a_clean_zero(tmp_path):
+    """Real ruff, real failure, no mock — the deliverable's own config is the trigger.
+
+    An unknown rule selector makes ruff exit 2 with EMPTY stdout. The old
+    `json.loads(cp.stdout or "[]")` turned that into `0`, which `findings()` prints as
+    "ruff: 0 advisory findings (measured)" — the operator reading his card could not tell
+    it from a lint that ran and found nothing. The coder fleet writes these config files,
+    so this is reachable on a real deliverable and not a contrived shape.
+    """
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.ruff.lint]\nselect = ["ZZZ999"]\n', encoding="utf-8")
+
+    assert l1.run_ruff_advisory(tmp_path) is None
+
+    # and the render the operator actually reads must say so out loud
+    rendered = _l1(ruff=l1.run_ruff_advisory(tmp_path)).findings()
+    assert any("NOT RUN" in s for s in rendered), rendered
+    assert not any("(measured)" in s for s in rendered), rendered
+
+
+def test_ruff_that_DID_lint_still_reports_its_count(tmp_path):
+    """The control case. Without it, a function that returned ``None`` unconditionally would
+    pass the test above — "secure" would be indistinguishable from "the probe never reached
+    the control" (security_by_design principle 12).
+
+    MEASURED (ruff 0.16.1): a genuine run always writes at least the two-character document
+    ``[]``, so a clean tree is a MEASURED zero and must keep saying so.
+    """
+    (tmp_path / "a.py").write_text(
+        "def mean(xs):\n    return sum(xs) / len(xs)\n", encoding="utf-8")
+    assert l1.run_ruff_advisory(tmp_path) == 0
+
+    (tmp_path / "b.py").write_text("import os\nimport sys\n", encoding="utf-8")
+    dirty = l1.run_ruff_advisory(tmp_path)
+    assert isinstance(dirty, int) and dirty > 0, dirty
+
+
+def test_an_EMPTY_tree_is_a_measured_zero_and_not_an_absent_measurement(tmp_path):
+    """The boundary the guard must NOT cross, kept as its own test because it is the one way
+    this fix could be wrong in the expensive direction.
+
+    "Blank stdout means not-run" would be a defect if any genuine run printed nothing. Eleven
+    cases were measured looking for one — empty directory, only non-Python files,
+    ``exclude = ["*"]``, ``extend-exclude = ["*.py"]``, ``select = []``, a file-level
+    ``# ruff: noqa`` — and every one emitted ``[]`` with exit 0. This locks the two that are
+    cheap to express, so a future ruff that starts printing nothing on a real run breaks a
+    test here rather than silently converting clean trees into "NOT RUN".
+    """
+    assert l1.run_ruff_advisory(tmp_path) == 0, "an empty tree is a measured zero"
+
+    (tmp_path / "notes.txt").write_text("no python here\n", encoding="utf-8")
+    assert l1.run_ruff_advisory(tmp_path) == 0, "a tree with no .py files is a measured zero"
+
+
+def test_a_smart_quote_in_the_deliverable_does_not_make_the_lint_RAISE(tmp_path):
+    """The #1244 guard's own regression, found post-merge and fixed in the same night.
+
+    LLM-written code contains smart quotes routinely. ruff echoes the offending source into the
+    diagnostic's ``fix.content``, so its JSON carries U+201D (bytes E2 80 9D). ``text=True``
+    decodes with the LOCALE encoding -- cp1252 here -- where byte 0x9D is UNDEFINED. The decode
+    raises inside subprocess's reader THREAD, which cannot propagate, so ``subprocess.run``
+    returns normally with ``cp.stdout is None``.
+
+    The first #1244 guard did ``cp.stdout.strip()`` on that and raised ``AttributeError`` --
+    from a function whose docstring promises it never raises, into `battery.py`'s blanket
+    ``except Exception``, which would have blanked the ENTIRE green-quality stage for the night
+    rather than one lint. Pinning ``encoding="utf-8"`` is what actually fixes it: the lint now
+    RUNS on such a tree rather than merely failing to crash on it.
+    """
+    src = 'x = f"he said ”hi”"\n'
+    (tmp_path / "m.py").write_bytes(src.encode("utf-8"))
+
+    result = l1.run_ruff_advisory(tmp_path)          # must not raise
+
+    assert isinstance(result, int), (
+        f"a smart-quoted tree must yield a MEASURED count, got {result!r}"
+    )
+
+
+def test_a_None_stdout_is_NOT_RUN_and_never_an_exception(monkeypatch, tmp_path):
+    """Belt-and-braces control for the shape above, driven at the seam.
+
+    Even with the encoding pinned, ``cp.stdout`` being None must read as an absent measurement
+    rather than crash -- because the alternative failure is invisible (swallowed one frame up)
+    and costs a whole night. Asserts the guard tolerates None AND still answers NOT RUN.
+    """
+    class _CP:
+        returncode = 0
+        stdout = None
+        stderr = ""
+
+    monkeypatch.setattr(l1.subprocess, "run", lambda *a, **k: _CP())
+    assert l1.run_ruff_advisory(tmp_path) is None
+
+
+def test_the_NOT_RUN_answer_FAILS_when_the_guard_is_removed(tmp_path):
+    """The toggle-proof: prove the guard is what changes the answer, not something else.
+
+    Replays the exact shape captured from real ruff through the PRE-FIX expression and asserts
+    it produces the false zero. Without this, a green test above cannot distinguish "the guard
+    works" from "this input never reached the guard". The subprocess call is in the test rather
+    than mocked into the module so the shape is the real one, and the raw-spawn gate excludes
+    test paths (`test_no_new_raw_spawn_sites.py:212`).
+    """
+    import sys
+
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.ruff.lint]\nselect = ["ZZZ999"]\n', encoding="utf-8")
+
+    cp = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--output-format", "json", "."],
+        capture_output=True, text=True, cwd=str(tmp_path), timeout=60,
+    )
+    # the shape this fix was written against, asserted rather than assumed
+    assert cp.returncode == 2, cp.returncode
+    assert cp.stdout.strip() == "", repr(cp.stdout)
+
+    # PRE-FIX: `or "[]"` swallows the empty stdout and mints a zero
+    assert len(json.loads(cp.stdout or "[]")) == 0
+
+    # POST-FIX: the same run, through the real function, is an absent measurement
+    assert l1.run_ruff_advisory(tmp_path) is None
+
+
+# ---------------------------------------------------------------------------
+# #1223 F2 — the scorecard evidence stamp and the corpus rollup were FLAG-SHAPED
+#
+# An instrument that could not look emitted no key at all, and an absent key is exactly what
+# a measured-and-clean instrument emits. The security stamp had been given the three-way
+# treatment for that reason and said so in a comment four lines above; the other three keys,
+# and the two corpus counters the operator's KPI line is built from, were left flag-shaped.
+# ---------------------------------------------------------------------------
+
+
+def _audit_result(layer1):
+    """A GreenAuditResult carrying *layer1*, everything else measured-clean.
+
+    Hand-built on purpose: the RENDERER is what is under test here, and the stamp must be
+    provably three-way across status combinations a fixture tree cannot conveniently produce.
+    The SEAM — that the real entrypoints return unmeasured when they cannot measure — is
+    proved separately in tests/security/test_instrument_toggles.py."""
+    from tools.dispatch_harness.green_quality import GreenAuditResult
+    from tools.dispatch_harness.green_quality.security import SecurityResult
+
+    return GreenAuditResult(
+        job_id="B2", run_id="R1", repo="r", surface="python-lib", band=BAND_A,
+        mode="det-only", layer1=layer1, jury=None,
+        card=card_mod.build_card("B2", "python-lib", BAND_A, layer1),
+        reference_green=None,
+        security=SecurityResult(measured=True, files_scanned=3),
+    )
+
+
+def test_a_measured_clean_audit_stamps_no_layer1_disclosure():
+    """THE QUIET CASE, first, because noise is the failure mode of this fix.
+
+    Every layer-1 key stays absent when all four instruments looked and found nothing. If this
+    ever inverts, the stamp starts disclosing on healthy nights, the operator learns to skim
+    the green_quality_* block, and the loud keys below go unread along with it."""
+    clean_seed = l1.SeedDivergenceFinding(False, "all diverged", status=l1.SEED_STATUS_DIVERGED)
+    stamp = _audit_result(_l1(seed=clean_seed)).evidence_stamp("sidecar")
+
+    for key in ("green_quality_regressed", "green_quality_dead_scaffold",
+                "green_quality_seed_identical"):
+        assert key not in stamp, f"{key} was stamped on a measured-clean audit: {stamp.get(key)!r}"
+    # ...while the unconditional security key is still there, unchanged.
+    assert stamp["green_quality_security"].startswith("clean (")
+
+
+def test_an_unmeasured_layer1_instrument_stamps_a_disclosure_not_silence():
+    """THE LOUD CASE: a probe or lint that could not look says so ON THE SCORECARD.
+
+    Before this, ``if self.layer1.regression.regressed:`` wrote the key only on a finding, so a
+    probe that never ran produced the same stamp as one that ran clean — the #1223 collapse on
+    the surface a non-technical reader treats as the record of the night. The disclosure
+    carries the marker registered in shared/instrument_registry.py, so a reader (and any
+    downstream consumer) tells a disclosure from a finding by its VALUE, never by presence."""
+    unmeasured = l1.Layer1Result(
+        regression=l1.RegressionFinding(False, False, "probe could not run", measured=False),
+        dead_scaffold=l1.CraftFinding(False, "tree unreadable", measured=False),
+        stale_readme=l1.CraftFinding(False, "tree unreadable", measured=False),
+        no_entry_point=l1.CraftFinding(False, "tree unreadable", measured=False),
+        ruff_findings=None, surface="python-lib",
+    )
+    stamp = _audit_result(unmeasured).evidence_stamp("sidecar")
+
+    assert "regression probe NOT RUN" in stamp["green_quality_regressed"]
+    assert "dead scaffold lint NOT RUN" in stamp["green_quality_dead_scaffold"]
+    # the seed finding is left at its dataclass default, which is UNKNOWN
+    assert "seed divergence UNKNOWN" in stamp["green_quality_seed_identical"]
+
+
+def test_a_measured_finding_still_stamps_the_finding_not_the_disclosure():
+    """The third way, pinned so the fix cannot be 'completed' by disclosing unconditionally.
+
+    A key that always carries a caveat is as unreadable as one that never does."""
+    flagged_seed = l1.SeedDivergenceFinding(
+        True, "still the seed", status=l1.SEED_STATUS_IDENTICAL, identical=("README.md",))
+    stamp = _audit_result(_l1(regressed=True, dead=True, seed=flagged_seed)).evidence_stamp("s")
+
+    assert "NOT RUN" not in stamp["green_quality_regressed"]
+    assert stamp["green_quality_dead_scaffold"] == "residue"
+    assert stamp["green_quality_seed_identical"] == "README.md"
+
+
+def test_any_craft_residue_is_false_for_a_lint_that_could_not_look():
+    """``flagged=False`` out of a blind lint is not a clean answer, and the property no longer
+    reports it as one — the unmeasured lints are NAMED by its companion instead.
+
+    This property is what the corpus counter and the operator's KPI line are both derived
+    from, so the collapse rode all the way out to the night's headline number."""
+    blind = _l1(craft_measured=False)
+    assert blind.any_craft_residue is False
+    assert blind.craft_lints_unmeasured == ("dead scaffold", "stale README", "entry point",
+                                            "seed divergence")
+
+    clean_seed = l1.SeedDivergenceFinding(False, "diverged", status=l1.SEED_STATUS_DIVERGED)
+    looked = _l1(seed=clean_seed)
+    assert looked.any_craft_residue is False
+    assert looked.craft_lints_unmeasured == ()
+
+    # the toggle: a MEASURED residue is still reported, so the guard did not silence the
+    # finding it was added to qualify.
+    assert _l1(dead=True, seed=clean_seed).any_craft_residue is True
+    assert _l1(dead=True, craft_measured=False).any_craft_residue is False
+
+
+def test_the_corpus_rollup_pairs_every_count_with_its_unmeasured_partner():
+    """The night's summary block, which ``render_kpi`` prints straight to the operator.
+
+    ``regressed`` and ``craft_residue`` counted findings and said nothing about how many jobs
+    were never examined, while ``security_unmeasured`` sat two lines below doing it correctly.
+    A reader comparing ``regressed=0`` across nights could not tell a quiet night from a blind
+    one."""
+    from tools.dispatch_harness.green_quality import corpus_block, render_kpi
+
+    blind_l1 = _l1(craft_measured=False, seed=None)
+    blind_l1.regression = l1.RegressionFinding(False, False, "no reference GREEN", measured=False)
+    blind = _audit_result(blind_l1)
+    clean_seed = l1.SeedDivergenceFinding(False, "diverged", status=l1.SEED_STATUS_DIVERGED)
+    looked = _audit_result(_l1(seed=clean_seed))
+
+    block = corpus_block([blind, looked], "det-only")
+    assert block["audited"] == 2
+    assert block["regressed"] == 0 and block["regression_unmeasured"] == 1
+    assert block["craft_residue"] == 0 and block["craft_unmeasured"] == 1
+
+    kpi = "\n".join(render_kpi(block))
+    assert "regressed=0 (not-measured=1)" in kpi, kpi
+    assert "craft-residue=0 (not-measured=1)" in kpi, kpi
+
+
+def test_the_corpus_rollup_still_counts_a_measured_regression():
+    """The toggle on the guard added to the rollup: qualifying ``regressed`` with ``measured``
+    must not stop a REAL regression being counted. A guard that silences the finding it was
+    added to qualify is this defect class mirrored."""
+    from tools.dispatch_harness.green_quality import corpus_block
+
+    clean_seed = l1.SeedDivergenceFinding(False, "diverged", status=l1.SEED_STATUS_DIVERGED)
+    block = corpus_block([_audit_result(_l1(regressed=True, seed=clean_seed))], "det-only")
+    assert block["regressed"] == 1 and block["regression_unmeasured"] == 0
+
+
+# ---- #1269: silence is not a measurement -----------------------------------
+#
+# The defect these lock: run_probe returned [] when the child produced no output, and
+# _diff_probe then found [] and [] "comparable" -- any() over an empty sequence is False
+# and 0 != 0 is False, so NEITHER guard fired. archetype_regression stamped
+# measured=True with "no behaviour change vs the last archived GREEN", and the operator
+# KPI read "regressed=0 (not-measured=0)" about code no probe had run.
+#
+# These drive the REAL run_probe against REAL child processes -- no stubbed runner --
+# because a mocked runner is what let the original ship: every existing regression test
+# used a probe that returned output.
+
+from tools.dispatch_harness.green_quality import layer1 as _gq_layer1
+
+
+def _probe_repo(root: Path, body: str) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "app.py").write_text(body, encoding="utf-8")
+    return root
+
+
+_SILENT_AT_IMPORT = (
+    # SystemExit derives from BaseException, so _PYCALL_HARNESS's `except Exception`
+    # cannot catch it. The child dies before its print(). argparse writes to stderr, so
+    # stdout is empty. This is a very common LLM deliverable shape.
+    "import sys\n"
+    "def convert(x):\n"
+    "    return x * 2\n"
+    "sys.exit(0)\n"
+)
+_HEALTHY = "def convert(x):\n    return x * 2\n"
+
+
+def _pycall_probe() -> "_gq_layer1.Probe":
+    return _gq_layer1.Probe(
+        kind=_gq_layer1.PROBE_KIND_PYTHON_CALLABLE, module="app", attr="convert",
+        inputs=("1", "2"), argv=(),
+    )
+
+
+class _OneProbeSet:
+    def __init__(self, probe: "_gq_layer1.Probe") -> None:
+        self.probes = (probe,)
+
+
+def test_a_probe_that_produced_no_output_returns_the_could_not_run_sentinel(
+    tmp_path: Path,
+) -> None:
+    """run_probe's own docstring promises the sentinel 'on any failure'. Empty stdout was
+    the failure it did not honour."""
+    repo = _probe_repo(tmp_path / "cur", _SILENT_AT_IMPORT)
+    out = _gq_layer1.run_probe(repo, _pycall_probe())
+    assert len(out) == 1 and out[0].startswith("could-not-run"), out
+
+
+def test_two_silent_probes_are_not_comparable(tmp_path: Path) -> None:
+    """The exact vacuous-guard case: both sides silent, so both guards are satisfied by
+    emptiness rather than by agreement."""
+    cur = _probe_repo(tmp_path / "cur", _SILENT_AT_IMPORT)
+    ref = _probe_repo(tmp_path / "ref", _SILENT_AT_IMPORT)
+    comparable, diffs = _gq_layer1._diff_probe(cur, ref, _pycall_probe(), _gq_layer1.run_probe)
+    assert comparable is False and diffs == []
+
+
+def test_a_silent_probe_yields_measured_False_not_no_behaviour_change(
+    tmp_path: Path,
+) -> None:
+    """THE REGRESSION LOCK. Before the fix this returned
+    measured=True, 'no behaviour change vs the last archived GREEN'."""
+    cur = _probe_repo(tmp_path / "cur", _SILENT_AT_IMPORT)
+    ref = _probe_repo(tmp_path / "ref", _SILENT_AT_IMPORT)
+    probe = _pycall_probe()
+    finding = _gq_layer1.archetype_regression(
+        cur, ref, probe_set=_OneProbeSet(probe), run=_gq_layer1.run_probe,
+    )
+    assert finding.measured is False, "a probe that never ran must not read as measured"
+    assert "could not run" in finding.detail
+    assert finding.regressed is False and finding.changed is False
+
+
+def test_a_healthy_probe_still_measures(tmp_path: Path) -> None:
+    """THE CONVERSE. A control that refuses everything is not a control -- without this,
+    the lock above is satisfied by breaking the instrument entirely."""
+    cur = _probe_repo(tmp_path / "cur", _HEALTHY)
+    ref = _probe_repo(tmp_path / "ref", _HEALTHY)
+    probe = _pycall_probe()
+    finding = _gq_layer1.archetype_regression(
+        cur, ref, probe_set=_OneProbeSet(probe), run=_gq_layer1.run_probe,
+    )
+    assert finding.measured is True
+    assert finding.regressed is False and finding.changed is False
+
+
+def test_a_real_regression_is_still_caught_after_the_fix(tmp_path: Path) -> None:
+    """The seed proof's shape, in miniature: the fix must not blind the instrument to the
+    data-loss case it exists to catch."""
+    cur = _probe_repo(tmp_path / "cur", "def convert(x):\n    return ''\n")
+    ref = _probe_repo(tmp_path / "ref", _HEALTHY)
+    probe = _pycall_probe()
+    finding = _gq_layer1.archetype_regression(
+        cur, ref, probe_set=_OneProbeSet(probe), run=_gq_layer1.run_probe,
+    )
+    assert finding.measured is True and finding.regressed is True
+
+
+def test_a_short_result_list_is_not_compared_as_a_prefix(tmp_path: Path) -> None:
+    """The harness emits one result per input. Fewer means it died partway, and comparing
+    a prefix against a full run is a measurement of different things."""
+    repo = _probe_repo(tmp_path / "cur", _HEALTHY)
+    probe = _gq_layer1.Probe(
+        kind=_gq_layer1.PROBE_KIND_PYTHON_CALLABLE, module="app", attr="convert",
+        inputs=("1", "2", "3"), argv=(),
+    )
+    out = _gq_layer1.run_probe(repo, probe)
+    assert len(out) == 3, "sanity: a healthy probe returns one output per input"
+
+    def _truncating_runner(r: Path, p: "_gq_layer1.Probe") -> list[str]:
+        return _gq_layer1.run_probe(r, p)[:1]
+
+    comparable, _ = _gq_layer1._diff_probe(repo, repo, probe, _truncating_runner)
+    assert comparable is True, "equal-length truncation is still comparable"
+
+    def _empty_runner(r: Path, p: "_gq_layer1.Probe") -> list[str]:
+        return []
+
+    comparable2, _ = _gq_layer1._diff_probe(repo, repo, probe, _empty_runner)
+    assert comparable2 is False, (
+        "the second independent lock: a runner returning [] must never mint a measurement, "
+        "even though run_probe no longer does"
+    )
+
+
+# ---- #1270: a dropped card is counted, and a total failure is never silent ----
+#
+# audit_greens' per-card handler is correctly fail-soft, but the dropped card was counted
+# NOWHERE -- not audited, not unmeasured, not at all -- so `audited: len(results)`
+# described a partial night as a whole one. And render_kpi returned [] on audited==0, so a
+# night whose EVERY audit raised rendered byte-identically to a night with no GREENs: the
+# most reassuring output the function can emit, produced by its worst input.
+
+from tools.dispatch_harness import green_quality as _gq
+
+
+def test_corpus_block_counts_the_cards_that_raised() -> None:
+    block = _gq.corpus_block([], _gq.MODE_DET_ONLY, audit_failed=("B2", "B4", "B7"))
+    assert block["audited"] == 0
+    assert block["audit_failed"] == 3
+    assert block["audit_failed_jobs"] == ["B2", "B4", "B7"]
+
+
+def test_a_night_where_every_audit_raised_is_not_rendered_as_silence() -> None:
+    """THE REGRESSION LOCK. Before the fix this returned [] -- identical to a quiet night."""
+    block = _gq.corpus_block([], _gq.MODE_DET_ONLY, audit_failed=("B2", "B4"))
+    out = _gq.render_kpi(block)
+    assert out, "a total audit failure must not render as nothing"
+    joined = " ".join(out)
+    assert "NOT MEASURED" in joined and "B2" in joined and "B4" in joined
+
+
+def test_a_genuinely_quiet_night_still_renders_nothing() -> None:
+    """THE CONVERSE. Without this, the lock above is satisfied by making the KPI shout on
+    every night with no GREENs -- which would train the operator to ignore it."""
+    assert _gq.render_kpi(_gq.corpus_block([], _gq.MODE_DET_ONLY)) == []
+    assert _gq.render_kpi({}) == []
+
+
+def test_a_partial_failure_is_rendered_beside_the_counts_not_instead_of_them(
+    tmp_path: Path,
+) -> None:
+    """audited=N on a night where cards also raised is not wrong about the N -- it is silent
+    about the rest. Both must appear."""
+    block = dict(_gq.corpus_block([], _gq.MODE_DET_ONLY, audit_failed=("B7",)))
+    block["audited"] = 2  # pretend two cards did audit
+    out = _gq.render_kpi(block)
+    joined = " ".join(out)
+    assert "audit-failed=1" in joined, joined
+    assert "bands" in joined, "the ordinary counts must still render"
+
+
+def test_audit_failed_defaults_to_zero_so_existing_callers_are_unchanged() -> None:
+    """corpus_block's new parameter is keyword-only with a default: a caller that does not
+    pass it gets today's behaviour exactly, and the KPI stays quiet."""
+    block = _gq.corpus_block([], _gq.MODE_DET_ONLY)
+    assert block["audit_failed"] == 0 and block["audit_failed_jobs"] == []

@@ -1,0 +1,2370 @@
+{
+  "GPU.GpuTime": {
+    "whole": {
+      "avg": 792444.542,
+      "peak": 855416.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 774109.098,
+      "peak": 855312.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 793315.846,
+      "peak": 854739.0,
+      "min": 1354.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 819991.729,
+      "peak": 855416.0,
+      "min": 520.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 823390.036,
+      "peak": 855416.0,
+      "min": 156.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GpuCoreClocks": {
+    "whole": {
+      "avg": 1510953.465,
+      "peak": 1659880.0,
+      "min": 19.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1474902.935,
+      "peak": 1659880.0,
+      "min": 19.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1509588.639,
+      "peak": 1659880.0,
+      "min": 2580.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1572821.87,
+      "peak": 1659880.0,
+      "min": 1066.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1583357.208,
+      "peak": 1659880.0,
+      "min": 208.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.AvgGpuCoreFrequencyMHz": {
+    "whole": {
+      "avg": 1893.602,
+      "peak": 2528.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1906.441,
+      "peak": 2528.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1903.883,
+      "peak": 1967.0,
+      "min": 1531.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1917.749,
+      "peak": 2050.0,
+      "min": 1335.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1922.525,
+      "peak": 1976.0,
+      "min": 1333.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ResultUncertainty": {
+    "whole": {
+      "avg": 0.029,
+      "peak": 100.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.031,
+      "peak": 100.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.006,
+      "peak": 54.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.009,
+      "peak": 88.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.007,
+      "peak": 100.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_BUSY": {
+    "whole": {
+      "avg": 93.154,
+      "peak": 336.842,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 89.757,
+      "peak": 336.842,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 88.815,
+      "peak": 100.874,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 95.679,
+      "peak": 102.307,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 99.992,
+      "peak": 107.692,
+      "min": 4.719,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.IA_VERTEX": {
+    "whole": {
+      "avg": 215.697,
+      "peak": 18123.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 147.196,
+      "peak": 18117.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 155.049,
+      "peak": 18123.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 166.462,
+      "peak": 18123.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 158.686,
+      "peak": 18123.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPGPU_THREADGROUP_COUNT": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ASYNC_GPGPU_THREADGROUP_COUNT": {
+    "whole": {
+      "avg": 1077.967,
+      "peak": 112973.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 341.117,
+      "peak": 13712.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 328.884,
+      "peak": 5265.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1552.654,
+      "peak": 112973.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1568.701,
+      "peak": 16518.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.RASTERIZER_SAMPLE_OUTPUT": {
+    "whole": {
+      "avg": 15630.015,
+      "peak": 4088430.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 19817.84,
+      "peak": 4088430.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 9533.584,
+      "peak": 1140020.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 10163.177,
+      "peak": 1140030.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 9688.963,
+      "peak": 1140040.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ICACHE_HIT": {
+    "whole": {
+      "avg": 4276631.235,
+      "peak": 20252600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 5304112.344,
+      "peak": 20252600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 5436036.688,
+      "peak": 11031000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 3706476.858,
+      "peak": 14197500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 3906165.861,
+      "peak": 14232900.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ICACHE_MISS": {
+    "whole": {
+      "avg": 5171.354,
+      "peak": 65254.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 11532.101,
+      "peak": 57087.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 12437.066,
+      "peak": 53409.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1198.546,
+      "peak": 65254.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1508.631,
+      "peak": 59168.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_ACTIVE": {
+    "whole": {
+      "avg": 20.023,
+      "peak": 81.216,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 19.922,
+      "peak": 70.703,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 19.955,
+      "peak": 54.319,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 20.108,
+      "peak": 80.76,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 20.608,
+      "peak": 81.216,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_ALU0_ALL": {
+    "whole": {
+      "avg": 6792608.046,
+      "peak": 29082500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 8987568.845,
+      "peak": 21465500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 9446812.206,
+      "peak": 21369900.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 5489792.205,
+      "peak": 29082500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 5821269.129,
+      "peak": 23123600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_ALU1_ALL": {
+    "whole": {
+      "avg": 10005339.916,
+      "peak": 72142800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 10405338.393,
+      "peak": 52840500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 10486633.864,
+      "peak": 18681200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 9949218.618,
+      "peak": 71866400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 10327115.34,
+      "peak": 72142800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_SEND_ALL": {
+    "whole": {
+      "avg": 1659624.296,
+      "peak": 9814050.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1058455.567,
+      "peak": 7513010.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1046988.749,
+      "peak": 3050620.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 2060254.978,
+      "peak": 9456630.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 2085692.488,
+      "peak": 8508040.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_ISSUED_ALL": {
+    "whole": {
+      "avg": 16627638.237,
+      "peak": 78210400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 20468320.696,
+      "peak": 78210400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 20998249.214,
+      "peak": 41648100.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 14507811.636,
+      "peak": 62218700.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 15284822.267,
+      "peak": 62458800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_SHARED_FUNCTION_ACCESS_HOLD": {
+    "whole": {
+      "avg": 35.812,
+      "peak": 99.849,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 49.442,
+      "peak": 99.849,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 50.398,
+      "peak": 97.396,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 27.911,
+      "peak": 97.087,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 30.09,
+      "peak": 96.708,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_STALL": {
+    "whole": {
+      "avg": 64.202,
+      "peak": 98.318,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 56.916,
+      "peak": 97.811,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 56.503,
+      "peak": 93.606,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 70.52,
+      "peak": 98.318,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 74.322,
+      "peak": 97.964,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_THREADS_OCCUPANCY_ALL": {
+    "whole": {
+      "avg": 72.671,
+      "peak": 100.005,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 71.404,
+      "peak": 100.003,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 70.854,
+      "peak": 99.981,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 75.104,
+      "peak": 100.004,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 78.75,
+      "peak": 100.003,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_ALU2_ALL": {
+    "whole": {
+      "avg": 5459340.832,
+      "peak": 50719300.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 3463666.919,
+      "peak": 35532400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 3100632.773,
+      "peak": 14078400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 6842857.013,
+      "peak": 50588800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 6851004.864,
+      "peak": 50719300.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_MULTIPLE_PIPE_ACTIVE": {
+    "whole": {
+      "avg": 3.021,
+      "peak": 21.187,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 3.225,
+      "peak": 19.352,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 3.241,
+      "peak": 11.85,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 2.847,
+      "peak": 18.425,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 2.914,
+      "peak": 18.359,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.LOAD_STORE_CACHE_PARTIAL_WRITE_COUNT": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.SLM_BANK_CONFLICT_COUNT": {
+    "whole": {
+      "avg": 4109.284,
+      "peak": 1310720.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 113.846,
+      "peak": 1536.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 130.067,
+      "peak": 1536.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 6774.294,
+      "peak": 1310720.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 6900.786,
+      "peak": 1310720.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.SLM_BYTE_READ": {
+    "whole": {
+      "avg": 27399636.49,
+      "peak": 372427000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 14584175.687,
+      "peak": 372427000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 14338888.858,
+      "peak": 51719200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 36205557.751,
+      "peak": 326580000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 37976514.739,
+      "peak": 251911000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.SLM_BYTE_WRITE": {
+    "whole": {
+      "avg": 5584709.9,
+      "peak": 72977700.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 5716628.707,
+      "peak": 72977700.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 5978285.876,
+      "peak": 15535100.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 5649171.763,
+      "peak": 37390500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 6047636.1,
+      "peak": 37650400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.LOAD_STORE_CACHE_BYTE_READ": {
+    "whole": {
+      "avg": 209805793.564,
+      "peak": 1984350000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 126488816.996,
+      "peak": 1234200000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 113831589.369,
+      "peak": 390013000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 266472526.478,
+      "peak": 1984350000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 270910924.673,
+      "peak": 1982410000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.LOAD_STORE_CACHE_BYTE_WRITE": {
+    "whole": {
+      "avg": 22605.712,
+      "peak": 31116600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 2245.326,
+      "peak": 294912.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1328.308,
+      "peak": 11520.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 35774.482,
+      "peak": 30432800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 35.142,
+      "peak": 12672.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.LOAD_STORE_CACHE_ACCESS": {
+    "whole": {
+      "avg": 5884187.344,
+      "peak": 45155700.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 4581192.611,
+      "peak": 42518200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 4175858.538,
+      "peak": 12726600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 6828554.194,
+      "peak": 34453300.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 7033753.536,
+      "peak": 34428200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.LOAD_STORE_CACHE_HIT": {
+    "whole": {
+      "avg": 4803916.379,
+      "peak": 42121800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 3496368.663,
+      "peak": 40220000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 3105613.651,
+      "peak": 11091200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 5719932.1,
+      "peak": 32778400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 5887140.487,
+      "peak": 32746900.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.L3_ATOMIC_ACCESS": {
+    "whole": {
+      "avg": 5.342,
+      "peak": 1537.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1.678,
+      "peak": 1536.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1.234,
+      "peak": 1536.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 5.936,
+      "peak": 1536.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 9.776,
+      "peak": 1537.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.L3_HIT": {
+    "whole": {
+      "avg": 956320.518,
+      "peak": 10859900.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 549990.541,
+      "peak": 9217480.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 481658.128,
+      "peak": 1931490.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1244440.528,
+      "peak": 10826000.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1263934.987,
+      "peak": 10859900.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.L3_MISS": {
+    "whole": {
+      "avg": 355653.673,
+      "peak": 1674700.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 568463.49,
+      "peak": 1031010.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 616242.423,
+      "peak": 1012150.0,
+      "min": 9.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 225562.731,
+      "peak": 1674700.0,
+      "min": 7.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 241424.805,
+      "peak": 1650880.0,
+      "min": 3.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.L3_READ": {
+    "whole": {
+      "avg": 1220529.317,
+      "peak": 11356800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1101714.853,
+      "peak": 9361320.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1085764.905,
+      "peak": 1950350.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1334278.531,
+      "peak": 11356800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1369274.296,
+      "peak": 11350100.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.L3_WRITE": {
+    "whole": {
+      "avg": 148854.364,
+      "peak": 3110060.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 21747.064,
+      "peak": 1055870.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 15853.036,
+      "peak": 1684680.0,
+      "min": 9.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 226311.626,
+      "peak": 2790170.0,
+      "min": 9.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 228097.37,
+      "peak": 2778890.0,
+      "min": 9.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.L3_STALL": {
+    "whole": {
+      "avg": 6.263,
+      "peak": 73.582,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 12.338,
+      "peak": 51.647,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 13.385,
+      "peak": 65.298,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1.844,
+      "peak": 56.518,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 2.187,
+      "peak": 55.234,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMPRESSOR_INPUT": {
+    "whole": {
+      "avg": 912.067,
+      "peak": 171843.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 996.079,
+      "peak": 171843.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 571.972,
+      "peak": 68496.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 608.82,
+      "peak": 71708.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 580.554,
+      "peak": 70802.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMPRESSOR_OUTPUT": {
+    "whole": {
+      "avg": 6927.739,
+      "peak": 53164.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 5303.564,
+      "peak": 53164.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 4545.296,
+      "peak": 19156.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 8416.244,
+      "peak": 26862.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 8760.994,
+      "peak": 25893.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_BYTE_READ": {
+    "whole": {
+      "avg": 28531687.642,
+      "peak": 91680300.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 51405085.703,
+      "peak": 91596800.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 55731376.524,
+      "peak": 87189500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 14542751.78,
+      "peak": 91140600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 15956432.365,
+      "peak": 88179200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_BYTE_WRITE": {
+    "whole": {
+      "avg": 3616490.183,
+      "peak": 68545500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 400405.686,
+      "peak": 11986400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 258217.293,
+      "peak": 11151400.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 5690798.283,
+      "peak": 68545500.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 5718026.456,
+      "peak": 45810200.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_BYTE_READ_RATE": {
+    "whole": {
+      "avg": 33.994,
+      "peak": 107.438,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 61.261,
+      "peak": 107.34,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 66.153,
+      "peak": 102.175,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 17.263,
+      "peak": 106.805,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 18.925,
+      "peak": 103.335,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_BYTE_WRITE_RATE": {
+    "whole": {
+      "avg": 4.437,
+      "peak": 103.894,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.601,
+      "peak": 91.478,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.374,
+      "peak": 30.197,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 6.871,
+      "peak": 103.894,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 6.917,
+      "peak": 101.918,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_L3_READ": {
+    "whole": {
+      "avg": 140034.785,
+      "peak": 449135.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 209703.973,
+      "peak": 359844.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 223398.698,
+      "peak": 354281.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 98798.916,
+      "peak": 441769.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 105681.845,
+      "peak": 449135.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_L3_WRITE": {
+    "whole": {
+      "avg": 41971.631,
+      "peak": 294113.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 22778.699,
+      "peak": 177613.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 19328.492,
+      "peak": 78292.0,
+      "min": 9.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 55971.623,
+      "peak": 292759.0,
+      "min": 7.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 57456.394,
+      "peak": 188239.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPU_MEMORY_REQUEST_QUEUE_FULL": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 1.554,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.822,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.037,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.859,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.55,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.TLB_MISS": {
+    "whole": {
+      "avg": 40681.24,
+      "peak": 154123.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 27164.649,
+      "peak": 153543.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 22607.438,
+      "peak": 91122.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 52083.538,
+      "peak": 139668.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 54415.56,
+      "peak": 139590.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ASYNC_GPGPU_THREAD_EXIT_COUNT": {
+    "whole": {
+      "avg": 18650.117,
+      "peak": 516187.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 3368.65,
+      "peak": 52795.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 3642.993,
+      "peak": 168462.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 28343.06,
+      "peak": 516187.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 29081.787,
+      "peak": 401073.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.GPGPU_DISPATCH": {
+    "whole": {
+      "avg": 1.34,
+      "peak": 35.62,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.247,
+      "peak": 10.982,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.266,
+      "peak": 13.959,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 2.046,
+      "peak": 35.62,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 2.089,
+      "peak": 34.44,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMMAND_PARSER_COMPUTE_ENGINE_BUSY": {
+    "whole": {
+      "avg": 92.704,
+      "peak": 150.943,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 91.691,
+      "peak": 150.943,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 93.593,
+      "peak": 100.596,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 95.88,
+      "peak": 101.03,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 96.785,
+      "peak": 101.284,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMMAND_PARSER_COMPUTE_ENGINE_DISPATCH_KERNEL_COUNT": {
+    "whole": {
+      "avg": 3.477,
+      "peak": 55.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 7.815,
+      "peak": 50.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 8.583,
+      "peak": 48.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.79,
+      "peak": 50.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.938,
+      "peak": 54.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMMAND_PARSER_COPY_ENGINE_BUSY": {
+    "whole": {
+      "avg": 0.001,
+      "peak": 39.974,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.004,
+      "peak": 39.974,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMMAND_PARSER_FLUSH_COUNT": {
+    "whole": {
+      "avg": 5.525,
+      "peak": 89.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 12.147,
+      "peak": 71.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 14.194,
+      "peak": 68.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1.297,
+      "peak": 87.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1.389,
+      "peak": 89.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMMAND_PARSER_RENDER_ENGINE_BUSY": {
+    "whole": {
+      "avg": 2.875,
+      "peak": 103.018,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 2.418,
+      "peak": 101.689,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1.436,
+      "peak": 100.031,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1.608,
+      "peak": 102.139,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1.467,
+      "peak": 100.163,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.COMMAND_PARSER_RENDER_ENGINE_DISPATCH_KERNEL_COUNT": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_PIPE_ALU0_AND_ALU1_ACTIVE": {
+    "whole": {
+      "avg": 1.603,
+      "peak": 18.798,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1.912,
+      "peak": 12.325,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 2.031,
+      "peak": 11.85,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1.344,
+      "peak": 11.719,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1.396,
+      "peak": 11.786,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_PIPE_ALU0_AND_ALU2_ACTIVE": {
+    "whole": {
+      "avg": 0.781,
+      "peak": 10.882,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.798,
+      "peak": 6.466,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.801,
+      "peak": 4.928,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.778,
+      "peak": 7.97,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.81,
+      "peak": 7.947,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_ALU0_ALL_UTILIZATION": {
+    "whole": {
+      "avg": 6.903,
+      "peak": 47.619,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 8.969,
+      "peak": 33.91,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 9.349,
+      "peak": 32.725,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 5.469,
+      "peak": 32.312,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 5.743,
+      "peak": 32.772,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_ALU1_ALL_UTILIZATION": {
+    "whole": {
+      "avg": 9.971,
+      "peak": 67.913,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 10.311,
+      "peak": 50.269,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 10.358,
+      "peak": 29.471,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 9.758,
+      "peak": 67.651,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 10.062,
+      "peak": 67.913,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.XVE_INST_EXECUTED_ALU2_ALL_UTILIZATION": {
+    "whole": {
+      "avg": 10.564,
+      "peak": 95.49,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 6.749,
+      "peak": 70.048,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 6.034,
+      "peak": 27.596,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 13.204,
+      "peak": 95.242,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 13.16,
+      "peak": 95.49,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.CoreFrequencyMHz": {
+    "whole": {
+      "avg": 1927.016,
+      "peak": 1949.0,
+      "min": 399.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1948.868,
+      "peak": 1949.0,
+      "min": 1899.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1949.0,
+      "peak": 1949.0,
+      "min": 1949.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1948.089,
+      "peak": 1949.0,
+      "min": 1549.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1947.969,
+      "peak": 1949.0,
+      "min": 1699.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ReportReason": {
+    "whole": {
+      "avg": 1.555,
+      "peak": 16.0,
+      "min": 1.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1.654,
+      "peak": 16.0,
+      "min": 1.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1.496,
+      "peak": 16.0,
+      "min": 1.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 1.286,
+      "peak": 16.0,
+      "min": 1.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 1.246,
+      "peak": 8.0,
+      "min": 1.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ContextIdValid": {
+    "whole": {
+      "avg": 0.029,
+      "peak": 1.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.046,
+      "peak": 1.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.035,
+      "peak": 1.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.018,
+      "peak": 1.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.018,
+      "peak": 1.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.ContextId": {
+    "whole": {
+      "avg": 1350.111,
+      "peak": 41600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 1751.557,
+      "peak": 41600.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 1488.346,
+      "peak": 33920.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 931.298,
+      "peak": 32768.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 884.452,
+      "peak": 32768.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.SourceId": {
+    "whole": {
+      "avg": 0.55,
+      "peak": 9.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.802,
+      "peak": 9.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.611,
+      "peak": 9.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.319,
+      "peak": 9.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.298,
+      "peak": 9.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  },
+  "GPU.StreamMarker": {
+    "whole": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 186238
+    },
+    "baseline": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 35675
+    },
+    "idle": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 16041
+    },
+    "partner_op": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 56585
+    },
+    "contention": {
+      "avg": 0.0,
+      "peak": 0.0,
+      "min": 0.0,
+      "unit": "N/A",
+      "n_samples": 41665
+    }
+  }
+}

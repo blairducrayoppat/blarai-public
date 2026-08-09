@@ -1,0 +1,42 @@
+{
+  "capture": "coverage-gate worst-case PLAN timing, cold, live batched-S3 ceremony demo",
+  "date": "2026-07-29",
+  "time_local": "08:16:56-08:20:12 PDT",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (Xe2)",
+    "ram_gb_effective": 31.323
+  },
+  "software": {
+    "runtime": "OpenVINO GenAI (shared resident pipeline)",
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "openvino_genai": "2026.2.1.0-3123-7dea0459b2a",
+    "gpu_driver": "Intel Arc 140V 32.0.101.8826 (2026-05-28)",
+    "model": "Qwen3-14B INT4 resident, speculative decoding via pruned Qwen3-0.6B INT8 draft (ADR-012)",
+    "blarai_main": "fb0bc9d6 (batched S3 flip merge; measurement predates the 0367b73a routing fix, which touches no PLAN-time path)"
+  },
+  "methodology": {
+    "shape": "single /dispatch PLAN through the production corridor (TransportGateway -> mTLS -> live AO), FIRST plan after a fresh AO boot (model newly resident, prefix caches cold)",
+    "goal_class": "staged orphan part: python markdown converter + a hand-made ASCII banner file no exam can import-test",
+    "sequence_exercised": "criteria+assumptions single-pass authoring (S3-E) -> decomposition -> job-oracle authoring + QA -> coverage measurement (gap found) -> ONE bounded exam re-authoring repair (S3-F) -> re-measurement (gap survives) -> blocked card render",
+    "runs": 1,
+    "timer": "wall clock around the gateway handle_dispatch_command call, driver-side"
+  },
+  "measured": {
+    "cold_worst_case_plan_s": 195.5,
+    "plan_response_budget_s": 720,
+    "budget_fraction": 0.27,
+    "followup_gap_dropping_revise_s": 1.7,
+    "approve_refusal_s": 0.05
+  },
+  "context": {
+    "budget_provenance": "PLAN_RESPONSE_TIMEOUT_S raised 480->720 s on 2026-07-28 (#1152, ee09901a) under a WRONG timeout diagnosis, kept as harmless; S3-F review F8 asked for a re-measurement on exactly this repair-round shape",
+    "reading": "the worst-case observed cold shape (one repair round included) uses ~27% of the 720 s budget; even the pre-raise 480 s budget would have held this run with 2.4x headroom"
+  },
+  "not_measured": [
+    "warm-cache PLAN timing for the same repair-round shape (the 08:36 demo re-run planned a DIFFERENT, gap-free goal warm in 77.3 s - not the same shape, not comparable)",
+    "multi-run variance (n=1 by design: the ceremony's timed cold slot is unrepeatable without a boot cycle)",
+    "8-task frame-cap-era plan shapes (#1152's original failure class)",
+    "coverage-gate timing on the 30B coder (PLAN always runs on the resident 14B)"
+  ]
+}

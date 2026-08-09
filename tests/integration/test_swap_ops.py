@@ -1294,16 +1294,20 @@ def test_real_run_design_loop_parses_and_maps_json(tmp_path, monkeypatch):
             "capture: web tier rendered\n"
             '{"ShouldIterate":true,"NeedsWork":true,"Feedback":"tighten the hero",'
             '"LayoutHard":false,"CaptureTier":"web","Ok":true,'
-            '"RuntimeHard":true,"RuntimeCaptured":true}\n',
+            '"RuntimeHard":true,"RuntimeCaptured":true,'
+            '"SmokeDeclared":true,"SmokeMeasured":true,"SmokeStatus":"honoured"}\n',
             encoding="utf-8")
         return True, 0          # #1076: (ok, byte offset of THIS lap's output)
 
     monkeypatch.setattr(so, "_run_to_logfile_at", fake_logfile)
     out = so.real_run_design_loop(cfg, "RID-9", "C:/proj/app", "a landing page", '["hero"]')
     # #823: the browser-runtime channel round-trips through the coercion (a captured hard hit).
+    # The behaviour-contract channel rides the same hop: a declared, exercised contract arrives
+    # as a fact the driver can report, not as an inference from "nothing was flagged".
     assert out == {"should_iterate": True, "needs_work": True, "feedback": "tighten the hero",
                    "layout_hard": False, "capture_tier": "web", "ok": True,
-                   "runtime_hard": True, "runtime_captured": True}
+                   "runtime_hard": True, "runtime_captured": True,
+                   "smoke_declared": True, "smoke_measured": True, "smoke_status": "honoured"}
     # logfile lands under the per-run dir; the bounded subprocess uses the ~180s design timeout.
     assert seen["log_path"] == cfg.runs_dir / "RID-9" / "design-critique.log"
     assert seen["timeout_s"] == 180.0
@@ -1340,10 +1344,15 @@ def test_real_run_design_loop_fail_soft_on_nonzero_exit(tmp_path, monkeypatch):
     # ok=False (#740 c.1717): an unavailable critique must never read as a real,
     # satisfied review — the driver's clean-ending verdict reclass keys on ok.
     # #823: a fail-soft path is also runtime-blind — both runtime flags False (honest degraded).
+    # Contract-blind too: it exercised nothing and knows of no contract, so it claims neither, and
+    # the status says "unavailable" rather than asserting "none was declared" — a fact about the
+    # PLAN that this path never saw.
     assert out == {"should_iterate": False, "needs_work": False,
                    "feedback": "design critique unavailable", "layout_hard": False,
                    "capture_tier": "", "ok": False,
-                   "runtime_hard": False, "runtime_captured": False}
+                   "runtime_hard": False, "runtime_captured": False,
+                   "smoke_declared": False, "smoke_measured": False,
+                   "smoke_status": "unavailable"}
 
 
 def test_real_run_design_loop_fail_soft_on_unparseable(tmp_path, monkeypatch):
@@ -1365,10 +1374,13 @@ def test_coerce_design_loop_result_tolerates_snake_case_and_missing():
     # producer that never claims a real review can never trigger the clean reclass.
     # #823: missing RuntimeHard/RuntimeCaptured also default False — a legacy producer
     # that never emits the runtime channel reads as console-blind (no runtime verdict).
+    # The behaviour-contract channel defaults the same way and for the same reason: a producer
+    # that says nothing about the contract must not read as one that exercised it.
     out = so._coerce_design_loop_result({"should_iterate": 1, "feedback": "x"})
     assert out == {"should_iterate": True, "needs_work": False, "feedback": "x",
                    "layout_hard": False, "capture_tier": "", "ok": False,
-                   "runtime_hard": False, "runtime_captured": False}
+                   "runtime_hard": False, "runtime_captured": False,
+                   "smoke_declared": False, "smoke_measured": False, "smoke_status": ""}
 
 
 def test_coerce_design_loop_result_maps_runtime_channel_pascalcase():
@@ -1391,19 +1403,23 @@ def test_parse_design_loop_json_takes_last_object_with_key():
 
 def test_build_swap_ops_wires_run_design_loop(tmp_path, monkeypatch):
     # build_swap_ops threads config + run_id into real_run_design_loop, exposing the driver's
-    # 3-arg run_design_loop(app_dir, goal, visual_criteria_json) seam.
+    # run_design_loop(app_dir, goal, visual_criteria_json, declared_surface) seam.
+    # #1171: the 4th arg is the intake-declared surface (build_plan.surface). It rides to
+    # check-design-structural.ps1 so its no-XAML note states what the operator actually
+    # chose instead of asking them, in a report, a question their own spec had answered.
     cfg = _cfg(tmp_path)
     seen = {}
 
-    def fake_real(config, run_id, app_dir, goal, vcj):
-        seen.update(config=config, run_id=run_id, app_dir=app_dir, goal=goal, vcj=vcj)
+    def fake_real(config, run_id, app_dir, goal, vcj, surface=""):
+        seen.update(config=config, run_id=run_id, app_dir=app_dir, goal=goal, vcj=vcj,
+                    surface=surface)
         return {"should_iterate": False}
 
     monkeypatch.setattr(so, "real_run_design_loop", fake_real)
     ops = so.build_swap_ops(cfg, run_id="RID", old_pid=1, relaunch_argv=["py"], relaunch_cwd="C:/x")
-    result = ops.run_design_loop("C:/proj/app", "a landing page", '["hero"]')
+    result = ops.run_design_loop("C:/proj/app", "a landing page", '["hero"]', "web")
     assert seen == {"config": cfg, "run_id": "RID", "app_dir": "C:/proj/app",
-                    "goal": "a landing page", "vcj": '["hero"]'}
+                    "goal": "a landing page", "vcj": '["hero"]', "surface": "web"}
     assert result == {"should_iterate": False}
 
 

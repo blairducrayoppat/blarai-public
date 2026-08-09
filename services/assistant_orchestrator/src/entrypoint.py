@@ -598,6 +598,17 @@ class AssistantOrchestratorEntrypointConfig:
     the operator-less harness cannot hang on questions. Set False to disable the stage
     (every /dispatch goes straight to decompose == pre-#819 behaviour). Resolved from
     [fleet_dispatch].clarify."""
+    fleet_dispatch_project_memory_enabled: bool = False
+    """#1120/#1124 — PROJECT MEMORY gate. DORMANT DEFAULT (False), unlike its
+    proven-defaults-live neighbours, because flipping it True is a PRIVACY-POSTURE
+    decision the LA owns: it makes BlarAI retain the operator's typed goal text and
+    clarification answers INDEFINITELY (no expiry, no size cap) and replay them into
+    the planning prompt on every later dispatch for that project. Content is
+    born-encrypted at rest throughout and never leaves the machine — the decision is
+    about RETENTION, not exposure. False is FULL DORMANCY: nothing recalled, nothing
+    written, no row created, and the corridor behaves exactly as it did pre-#1120.
+    Resolved from [fleet_dispatch].project_memory; see
+    docs/runbooks/dispatch_project_memory_go_live.md."""
     fleet_dispatch_revise_enabled: bool = True
     """#820 — the plan-revision stage gate. When True (the default, proven-defaults-live) an
     operator who gives free-text feedback on a PENDING plan card gets the 14B to revise the
@@ -616,21 +627,176 @@ class AssistantOrchestratorEntrypointConfig:
     the wider ambition was withdrawn during review), and a delivery floor adding a
     machine-gated SMOKE criterion to a web/web-static spec. It does NOT widen the elicitation
     interview, does NOT co-author criteria, does NOT derive an oracle import contract, and
-    does NOT make the coverage check blocking — those are S2–S4 and are unbuilt (#1042: this
-    docstring previously described the whole programme as though S1 shipped it).
+    does NOT make the coverage check blocking (#1042: this docstring previously described the
+    whole programme as though S1 shipped it). It also does not, on its own, add the bad-input
+    exam floor or engage the coherence gate — those are two SEPARATE keys below
+    (``advanced_intake_bad_input_floor`` and ``advanced_intake_coherence_gate``), each
+    independently requiring this flag AND its own to be True before it acts.
 
     False is byte-identical to today's planning. Fail-closed AND validate-don't-coerce: a
     missing key, an unresolved config, or any non-boolean value all resolve False; only an
     explicit boolean ``True`` enables it. Resolved from [fleet_dispatch].advanced_intake."""
+    fleet_dispatch_bad_input_floor_enabled: bool = False
+    """#1044 — the BAD-INPUT EXAM FLOOR, a sub-gate of the advanced-intake front. DORMANT
+    DEFAULT ``False``, and it requires ``fleet_dispatch_advanced_intake_enabled`` as well:
+    BOTH must resolve True before the floor acts.
+
+    True makes a python acceptance exam carry machine-injected assertions that every entry
+    point it drives survives malformed input (empty / None / wrong-type / missing-key).
+    Rejecting bad input passes; only an unhandled crash fails. It is a SEPARATE key from the
+    front it rides because it changes what a build is GRADED on — a build that only ever
+    worked on the happy path now fails an exam it used to pass — so its go-live is its own
+    LA ceremony rather than a rider on an already-live flag. A card-driven (battery/headless)
+    dispatch never receives it: the card IS the exam, frozen for cross-night comparability.
+
+    False leaves the exam bytes, the compiled tasks and the plan-time coverage warning
+    byte-identical, and no floor code runs. (#1044 review N1 RETRACTION: this previously said
+    "and the ruler module is never imported". The seed-time fail-to-pass gate imports it for a
+    string constant on every run, regardless of either flag. Nothing of the FLOOR executes,
+    which is the claim that was meant and the one under test.) Fail-closed AND
+    validate-don't-coerce, exactly as above (#1042): only an explicit boolean ``True`` enables
+    it. Resolved from [fleet_dispatch].advanced_intake_bad_input_floor."""
+    fleet_dispatch_advanced_intake_coherence_gate_enabled: bool = False
+    """#1054 (S3 slice E) — COHERENCE BY SINGLE AUTHORSHIP, its own sub-gate inside the
+    advanced-intake front. DORMANT DEFAULT ``False`` and REQUIRES ``advanced_intake`` as well:
+    a sub-flag may not engage a capability inside a front that is itself off, and the front
+    being live is not consent for what lands inside it afterwards.
+
+    True does two things and nothing else. (1) The acceptance criteria and the product
+    assumptions are authored in ONE model call whose prompt carries both jobs plus a scope
+    anchor, replacing the two uncoordinated calls that let a live plan assume a reset button
+    was unnecessary while requiring one in a graded criterion. (2) The authored pair is checked
+    by a deterministic contradiction gate that REFUSES the plan when a criterion requires a
+    capability an assumption ruled out, or the reverse — a refusal the operator reads in plain
+    language, with no tasks enqueued.
+
+    That refusal is the capability change: a dispatch that could previously only be planned can
+    now be declined at plan time — including, when the patterns misread ordinary English, a
+    plan that was fine. Which is why this ships dormant behind its OWN key rather than riding
+    the live front's. The gate's reach and its measured error rates in BOTH directions are
+    documented on the key itself in ``config/default.toml`` and in
+    :mod:`shared.fleet.coherence`; they are deliberately not restated here, where they would
+    rot out of step with the surface the operator actually reads.
+
+    False is byte-identical to the two-call authoring path. Fail-closed AND
+    validate-don't-coerce, exactly like the key above: a missing key, an unresolved config, or
+    any non-boolean value all resolve False; only an explicit boolean ``True`` enables it.
+    Resolved from [fleet_dispatch].advanced_intake_coherence_gate."""
+    fleet_dispatch_advanced_intake_coverage_gate_enabled: bool = False
+    """#1069 (S3 slice F) — the intake COVERAGE GATE, its own sub-gate inside the
+    advanced-intake front. DORMANT DEFAULT ``False`` and REQUIRES ``advanced_intake`` as
+    well: a sub-flag may not engage a capability inside a front that is itself off, and the
+    front being live is not consent for what lands inside it afterwards.
+
+    True does three things and nothing else, on the multi-task job-exam shape only, never
+    for a battery card: the exam author's prompt carries a deterministic 1:1 import pin
+    derived from the task contracts; a residual #989 coverage gap triggers ONE bounded
+    re-authoring with the gap named; and a gap that survives marks the plan
+    approval-BLOCKED — the card renders with the gap named, revise and reject stay open,
+    and the gateway re-evaluates the block after every revision. That refusal is the
+    capability change, which is why this ships dormant behind its OWN key. The quick path's
+    warn-loud behaviour and its rationale are unchanged.
+
+    False is byte-identical: no pin in the authoring prompt, no re-authoring, never a
+    blocking marker. Fail-closed AND validate-don't-coerce, exactly like the keys above:
+    only an explicit boolean ``True`` enables it. Resolved from
+    [fleet_dispatch].advanced_intake_coverage_gate."""
+    fleet_dispatch_advanced_intake_criteria_revise_enabled: bool = False
+    """#1069 (S3 slice G) — CRITERIA REVISION, its own sub-gate inside the advanced-intake
+    front. DORMANT DEFAULT ``False`` and REQUIRES ``advanced_intake`` as well: a sub-flag
+    may not engage a capability inside a front that is itself off.
+
+    True enables exactly one path: criteria/scope feedback on a pending plan runs the
+    criteria-revise model call (ops over the operator-judged criteria; machine-gated tiers
+    are keep-only — the wall is enforced in the shared ruler) instead of only the honest
+    can't-do-that message. The compiled task prompts and the riding exam are byte-identical
+    through any criteria revision, by construction.
+
+    False is byte-identical operator behaviour: a criteria-revise request is refused
+    Fail-Closed AO-side and the gateway renders today's honest #1055 message. Fail-closed
+    AND validate-don't-coerce, exactly like the keys above. Resolved from
+    [fleet_dispatch].advanced_intake_criteria_revise."""
+    fleet_dispatch_advanced_intake_interview_enabled: bool = False
+    """#1031 (S2) — the ADVANCED-INTAKE INTERVIEW, its own sub-gate inside the front.
+    DORMANT DEFAULT ``False`` and REQUIRES ``advanced_intake`` as well — the front
+    flag's own comment promises "NO wider elicitation interview" from that key alone,
+    and this field is where that promise is kept.
+
+    True enables exactly one path: a ``/dispatch advanced`` request runs the FULLER
+    requirements interview — three additional decision areas (content, edge cases,
+    non-goals), a one-per-axis structural cap of eight — through the existing clarify
+    corridor, sufficiency check and fail-soft included. A normal ``/dispatch`` is
+    byte-identical to today in both states; the interview also requires the clarify stage
+    itself ([fleet_dispatch].clarify) to be on.
+
+    False is byte-identical everywhere: the mode token does not parse, the marker is inert
+    text, and the eight-axis vocabulary is unreachable. Fail-closed AND
+    validate-don't-coerce, exactly like the keys above. Resolved from
+    [fleet_dispatch].advanced_intake_interview."""
+    fleet_dispatch_advanced_intake_assets_pipeline_enabled: bool = False
+    """#1165 (M5) — the OPERATOR-ASSETS PIPELINE, its own sub-gate inside the
+    advanced-intake front. DORMANT DEFAULT ``False`` and REQUIRES ``advanced_intake``
+    as well: a sub-flag may not engage a capability inside a front that is itself off.
+    Deliberately INDEPENDENT of the interview sub-flag: files the operator placed in a
+    project's ``assets/`` folder are explicit intent on any advanced-front dispatch,
+    and the plan card's acknowledgment keeps the result visible and vetoable.
+
+    True enables exactly one path: at PLAN time the project's ``assets/`` folder is
+    enumerated once, AO-side — rooted, ALL reparse points excluded fail-closed,
+    filename-hygiene allowlisted, extension-classified, size-capped — and the manifest
+    rides ``spec.operator_assets`` into the card acknowledgment, the deterministic
+    use floors, and the conditional ``operator_assets_json`` task stamp; new projects
+    additionally seed the ``assets/`` + ``assets/reference/`` folder contract.
+
+    False is byte-identical everywhere: no enumeration runs, no spec field is
+    attached, no card line renders, and created projects keep the pre-M5 scaffold.
+    Fail-closed AND validate-don't-coerce, exactly like the keys above. Resolved from
+    [fleet_dispatch].advanced_intake_assets_pipeline."""
+    fleet_dispatch_advanced_intake_interview_playback_enabled: bool = False
+    """#1165 (M4) — the interview's PLAYBACK turn, its own sub-gate inside the front.
+    DORMANT DEFAULT ``False`` and REQUIRES ``advanced_intake`` AND
+    ``advanced_intake_interview`` as well — the playback extends the interview's
+    approval turn, so it may not exist where the interview does not.
+
+    True closes an INTAKE-mode plan card with the interview template's two playback
+    questions and routes a pipe-less free-text reply at that approval turn into the
+    EXISTING bounded revise path as feedback. Both seams are gateway-side (the card
+    render and the approval-turn routing); no AO plan knob rides this key.
+
+    False is byte-identical everywhere: the card renders today's footer and a pipe-less
+    reply keeps the #1116 usage/keep-text answer. Fail-closed AND validate-don't-coerce,
+    exactly like the keys above. Resolved from
+    [fleet_dispatch].advanced_intake_interview_playback."""
+    fleet_dispatch_advanced_intake_interview_voice_enabled: bool = False
+    """#1165 (M1) — the INTERVIEW VOICE, its own sub-gate inside the interview. DORMANT
+    DEFAULT ``False`` and REQUIRES ``advanced_intake`` AND ``advanced_intake_interview``
+    as well — a sub-flag may not engage a capability inside a front that is itself off.
+
+    True enables exactly one path: the fuller ``advanced`` interview speaks the approved
+    novice-interview template — the Part 1 area wordings (life-not-software; the visual
+    area as paired opposites) with the question-writing mistake rules in the authoring
+    prompt, the Phase-0 preamble on the intake question render, and a WHOLE-reply
+    "I don't know" recognized as "you decide" (recorded as assumptions the card shows).
+
+    False is byte-identical everywhere: the S2 template constant drives the interview
+    (the builder's all-off output, identity-locked), the render carries no preamble, and
+    the decide recognizer is untouched. Fail-closed AND validate-don't-coerce, exactly
+    like the keys above. Resolved from [fleet_dispatch].advanced_intake_interview_voice."""
     swap_min_free_gb: float = 21.0
     """Pre-load headroom gate for the increment-2 model swap (design §4.3), in **GiB**:
     the driver aborts the 30B load (gracefully, restoring the 14B) if free RAM is below
-    this after the full step-aside. 21 GiB (LA-set) matches start-llm's own coder-30b
-    gate (``$needGB=21`` over ``Available MBytes``/1024 = GiB) — the number the operator's
-    real 30B runs succeed from on this box. (Milestone-1's one-time marginal load measured
-    a ~22-23 GiB peak; the gate matches start-llm's proven value, and is GRACEFUL anyway —
-    a marginal load thrashes-then-loads, never a hard fail.) Resolved from
-    [fleet_dispatch].swap_min_free_gb."""
+    this after the full step-aside, measured over ``Available MBytes``/1024 = GiB.
+
+    THE LIVE FLOOR IS NOT THIS NUMBER. It is ``[fleet_dispatch].swap_min_free_gb`` in
+    default.toml, whose comment on the key carries the current value and its provenance;
+    read that, never this default. The floor is LA-set and has moved (21 at ADR-034
+    acceptance, 20 by measurement in #777, 19 by directive in #1313) and is held in
+    lockstep with start-llm's ``$needGB`` — so any specific number written here rots.
+    This 21.0 survives only as the value used when config resolution finds no key at all,
+    and is deliberately left HIGHER than the live floor: a fallback below it would
+    silently admit swaps the operator's gate refuses. That a missing safety threshold is
+    guessed rather than refused outright is itself a defect, tracked at #1315. The gate is
+    GRACEFUL either way — a marginal load thrashes-then-loads, a refusal restores the 14B."""
     swap_run_budget_s: float = 10800.0
     """Out-of-band OVERALL-run budget for the model swap (#670 Problem 2), in **seconds**: a
     watchdog in the detached driver force-kills a wedged run-fleet child and tears down to
@@ -656,6 +822,15 @@ class AssistantOrchestratorEntrypointConfig:
     serial queue. Fail-closed: a missing key resolves to False — byte-identical
     today-behavior. Resolved from [fleet_dispatch].plan_graph; flips to true only after
     the W8 live proof (the proven-features-default-LIVE rule, recorded on #740)."""
+    fleet_dispatch_research_grounding: bool = False
+    """#746 research substrate — PLAN-TIME grounding. When True, the PLAN step prefixes
+    the 14B decompose prompt with a bounded block of the most relevant LOCAL doc
+    excerpts (shared/research/ over the staged docset index; deterministic-first +
+    floor-gated BM25) so the plan is written against real API names/semantics. Fail-closed
+    + DORMANT: a missing key resolves to False — the decompose prompt is BYTE-IDENTICAL
+    to today and shared.research is never imported. Zero egress (local index only).
+    Resolved from [fleet_dispatch].research_grounding; flips to true only at an explicit
+    night-boundary once the corpus is staged + the before/after battery has measured it."""
     fleet_dispatch_vikunja_bridge: bool = False
     """#749 dispatch→Vikunja bridge: post one durable ticket per dispatched job.
     Fail-closed: a missing key resolves to False (dormant). Dispatch-side dev
@@ -1019,6 +1194,21 @@ class AssistantOrchestratorService:
         return self._last_failure
 
     @property
+    def resolved_max_message_bytes(self) -> int | None:
+        """The frame cap this AO is ACTUALLY serving with, or None before ``start()``.
+
+        #1152: the gateway must enforce the SAME cap as the AO or the channel
+        disagrees — the AO encodes a frame the gateway then refuses on receive, which
+        surfaces as "No response from the Assistant Orchestrator" while the AO is
+        healthy. The launcher threads THIS value (the live resolved one, the same
+        object the listener and framer were built from) rather than re-reading the
+        TOML, so there is exactly ONE read and no second parse that could disagree —
+        structural absence over vigilance (security_by_design principle 4).
+        """
+        cfg = self._resolved_config
+        return None if cfg is None else int(cfg.vsock_config.max_message_bytes)
+
+    @property
     def knowledge_images_enabled(self) -> bool:
         """Resolved ``[knowledge].images_enabled`` weld-lock (UC-003 #1).
 
@@ -1083,6 +1273,21 @@ class AssistantOrchestratorService:
         )
 
     @property
+    def fleet_dispatch_project_memory_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].project_memory`` gate (#1120/#1124).
+
+        Default ``False`` — DORMANT — before ``start()`` resolves the config and on a
+        missing key, unlike the proven-defaults-live neighbours. Retention of operator
+        goal text is a privacy-posture decision reserved to the LA, so the fail-closed
+        resolution is off. Never re-parses the TOML."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_project_memory_enabled", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
     def fleet_dispatch_revise_enabled(self) -> bool:
         """Resolved ``[fleet_dispatch].revise`` gate (#820, plan-feedback revision).
 
@@ -1113,6 +1318,148 @@ class AssistantOrchestratorService:
         cfg = self._resolved_config
         return (
             getattr(cfg, "fleet_dispatch_advanced_intake_enabled", False) is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_bad_input_floor_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_bad_input_floor`` gate (#1044).
+
+        Default ``False`` — FAIL-CLOSED, same shape as the advanced-intake gate above: an
+        unresolved config, a missing key, a pre-``start()`` read, or any non-boolean value all
+        yield False, and only an explicit boolean ``True`` resolves True. Never re-parses the
+        TOML.
+
+        This resolves ONE of the two knobs the floor needs; ``generate_plan`` requires
+        ``advanced_intake`` as well, so reading True here does not on its own mean the floor
+        acts. Its go-live is an LA ceremony: it changes what a build is graded on."""
+        cfg = self._resolved_config
+        return (
+            getattr(cfg, "fleet_dispatch_bad_input_floor_enabled", False) is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_coherence_gate_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_coherence_gate`` sub-gate (#1054).
+
+        Default ``False`` — FAIL-CLOSED, same shape and the same ``is True``
+        validate-don't-coerce rule as the front's own gate above: an unresolved config, a
+        missing key, a non-boolean value, or a pre-``start()`` read all yield False.
+
+        It is resolved INDEPENDENTLY of ``advanced_intake`` and is deliberately not ANDed
+        here. The conjunction lives at the one place that acts on it
+        (:func:`shared.fleet.acceptance.generate_plan`), so this property answers exactly one
+        question — what does the config say — and a reader of either surface cannot mistake a
+        combined answer for the key's own value. Its go-live is an LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(cfg, "fleet_dispatch_advanced_intake_coherence_gate_enabled", False)
+            is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_coverage_gate_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_coverage_gate`` sub-gate (#1069 S3-F).
+
+        Default ``False`` — FAIL-CLOSED, same shape and the same ``is True``
+        validate-don't-coerce rule as the sub-gates above: an unresolved config, a missing
+        key, a non-boolean value, or a pre-``start()`` read all yield False.
+
+        Resolved INDEPENDENTLY of ``advanced_intake``, deliberately not ANDed here — the
+        conjunction lives at the one place that acts on it
+        (:func:`shared.fleet.acceptance.generate_plan`), so this property answers exactly
+        one question: what does the config say. Its go-live is an LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(cfg, "fleet_dispatch_advanced_intake_coverage_gate_enabled", False)
+            is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_criteria_revise_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_criteria_revise`` sub-gate
+        (#1069 S3-G). Default ``False`` — FAIL-CLOSED, same shape and the same ``is True``
+        validate-don't-coerce rule as the sub-gates above; resolved independently of
+        ``advanced_intake`` (the conjunction lives in ``generate_plan``). Its go-live is an
+        LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(cfg, "fleet_dispatch_advanced_intake_criteria_revise_enabled", False)
+            is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_interview_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_interview`` sub-gate (#1031 S2).
+        Default ``False`` — FAIL-CLOSED, same shape and the same ``is True``
+        validate-don't-coerce rule as the sub-gates above; resolved independently of
+        ``advanced_intake`` (the conjunction lives in ``generate_plan`` and at the
+        gateway's token gate). Its go-live is an LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(cfg, "fleet_dispatch_advanced_intake_interview_enabled", False)
+            is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_assets_pipeline_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_assets_pipeline`` sub-gate
+        (#1165 M5). Default ``False`` — FAIL-CLOSED, same shape and the same
+        ``is True`` validate-don't-coerce rule as the sub-gates above; resolved
+        independently of ``advanced_intake`` (the conjunction lives in
+        ``generate_plan`` and at the gateway's create-project seeding). Its go-live
+        is an LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(
+                cfg, "fleet_dispatch_advanced_intake_assets_pipeline_enabled", False
+            )
+            is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_interview_playback_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_interview_playback`` sub-gate
+        (#1165 M4). Default ``False`` — FAIL-CLOSED, same shape and the same ``is True``
+        validate-don't-coerce rule as the sub-gates above; resolved independently of its
+        parents (the three-key conjunction lives at the gateway's construction seam).
+        Its go-live is an LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(
+                cfg, "fleet_dispatch_advanced_intake_interview_playback_enabled", False
+            )
+            is True
+            if cfg is not None
+            else False
+        )
+
+    @property
+    def fleet_dispatch_advanced_intake_interview_voice_enabled(self) -> bool:
+        """Resolved ``[fleet_dispatch].advanced_intake_interview_voice`` sub-gate
+        (#1165 M1). Default ``False`` — FAIL-CLOSED, same shape and the same ``is True``
+        validate-don't-coerce rule as the sub-gates above; resolved independently of its
+        parents (the conjunction lives in ``generate_plan``'s intake engagement and at
+        the gateway). Its go-live is an LA ceremony."""
+        cfg = self._resolved_config
+        return (
+            getattr(
+                cfg, "fleet_dispatch_advanced_intake_interview_voice_enabled", False
+            )
+            is True
             if cfg is not None
             else False
         )
@@ -1455,6 +1802,19 @@ class AssistantOrchestratorService:
         )
 
     @property
+    def fleet_dispatch_research_grounding(self) -> bool:
+        """Resolved ``[fleet_dispatch].research_grounding`` (#746). Fail-closed:
+        ``False`` before ``start()`` resolves the config and on a missing key — the
+        PLAN step decomposes with a byte-identical prompt and never imports
+        shared.research (dormant default)."""
+        cfg = self._resolved_config
+        return (
+            bool(getattr(cfg, "fleet_dispatch_research_grounding", False))
+            if cfg is not None
+            else False
+        )
+
+    @property
     def fleet_dispatch_vikunja_bridge(self) -> bool:
         """Resolved ``[fleet_dispatch].vikunja_bridge`` (#749). Fail-closed: ``False``
         before ``start()`` resolves the config and on a missing key — the bridge
@@ -1635,6 +1995,16 @@ class AssistantOrchestratorService:
             )
             logger.error("Orchestrator JWT validator init failed (Fail-Closed).")
             return False
+
+        # #1152: bind the FRAMER to the resolved `[ipc].max_message_bytes` too. The
+        # framer is built in __init__ (before any config is read), so it used to keep
+        # MessageFramer's compiled-in default FOREVER while the transport honored the
+        # configured value — two caps on one channel, disagreeing silently. That is why
+        # the 2026-07-28 failures reported "exceeds limit 65536" (the framer's raise)
+        # even though the knob is config-driven: raising the config alone would have
+        # changed NOTHING. The framer is the binding cap on encode, so it must be the
+        # configured one.
+        self._framer = MessageFramer(resolved.vsock_config.max_message_bytes)
 
         listener = VsockListener(
             resolved.vsock_config,
@@ -2062,6 +2432,10 @@ class AssistantOrchestratorService:
             # -> False (dormant) -> /dispatch refuses, no subprocess ever spawned.
             fleet_dispatch_enabled=bool(fleet_dispatch.get("enabled", False)),
             fleet_dispatch_clarify_enabled=bool(fleet_dispatch.get("clarify", True)),
+            # #1124: fail-closed default — a MISSING key means dormant, never on.
+            fleet_dispatch_project_memory_enabled=bool(
+                fleet_dispatch.get("project_memory", False)
+            ),
             fleet_dispatch_revise_enabled=bool(fleet_dispatch.get("revise", True)),
             # #1031: fail-closed default False — a missing key leaves the advanced front OFF.
             # #1042: `is True`, NOT bool(). bool() COERCES rather than validates, and
@@ -2074,6 +2448,48 @@ class AssistantOrchestratorService:
             # truthy accident is not a posture change for them (pre-merge review scope note).
             fleet_dispatch_advanced_intake_enabled=(
                 fleet_dispatch.get("advanced_intake", False) is True
+            ),
+            # #1044: the bad-input exam floor, a SEPARATE key from the front it rides —
+            # `advanced_intake = true` alone must never engage it, because it changes what a
+            # build is graded on. Same `is True` validate-don't-coerce rule as above.
+            fleet_dispatch_bad_input_floor_enabled=(
+                fleet_dispatch.get("advanced_intake_bad_input_floor", False) is True
+            ),
+            # #1054: the S3 slice-E sub-gate, same `is True` rule for the same reason — it
+            # gates a plan-time REFUSAL, so a truthy string must not engage it either.
+            fleet_dispatch_advanced_intake_coherence_gate_enabled=(
+                fleet_dispatch.get("advanced_intake_coherence_gate", False) is True
+            ),
+            # #1069 S3-F: the coverage-gate sub-key, same `is True` rule — it gates an
+            # approval REFUSAL, so a truthy string must not engage it either.
+            fleet_dispatch_advanced_intake_coverage_gate_enabled=(
+                fleet_dispatch.get("advanced_intake_coverage_gate", False) is True
+            ),
+            # #1069 S3-G: the criteria-revise sub-key, same `is True` rule — it gates a
+            # spec-editing capability, so a truthy string must not engage it either.
+            fleet_dispatch_advanced_intake_criteria_revise_enabled=(
+                fleet_dispatch.get("advanced_intake_criteria_revise", False) is True
+            ),
+            # #1031 S2: the interview sub-key, same `is True` rule — it gates an
+            # operator-facing mode, so a truthy string must not engage it either.
+            fleet_dispatch_advanced_intake_interview_enabled=(
+                fleet_dispatch.get("advanced_intake_interview", False) is True
+            ),
+            # #1165 M5: the assets-pipeline sub-key, same `is True` rule — it gates
+            # what a build is planned FROM and graded on, so a truthy string must not
+            # engage it either.
+            fleet_dispatch_advanced_intake_assets_pipeline_enabled=(
+                fleet_dispatch.get("advanced_intake_assets_pipeline", False) is True
+            ),
+            # #1165 M4: the playback sub-key, same `is True` rule — it changes the
+            # operator-facing card, so a truthy string must not engage it either.
+            fleet_dispatch_advanced_intake_interview_playback_enabled=(
+                fleet_dispatch.get("advanced_intake_interview_playback", False) is True
+            ),
+            # #1165 M1: the interview-voice sub-key, same `is True` rule — it changes
+            # what the interview asks, so a truthy string must not engage it either.
+            fleet_dispatch_advanced_intake_interview_voice_enabled=(
+                fleet_dispatch.get("advanced_intake_interview_voice", False) is True
             ),
             swap_min_free_gb=float(fleet_dispatch.get("swap_min_free_gb", 21.0)),
             # #670 P2: out-of-band overall-run budget (s); the resolver property + the driver's
@@ -2121,6 +2537,11 @@ class AssistantOrchestratorService:
             # M2 plan-graph (W1-W6, #740). Fail-closed: absent key -> False (the flat
             # serial queue, byte-identical today-behavior).
             fleet_dispatch_plan_graph=bool(fleet_dispatch.get("plan_graph", False)),
+            # #746 research substrate plan-time grounding. Fail-closed: absent key ->
+            # False (dormant) -> the decompose prompt is byte-identical to today.
+            fleet_dispatch_research_grounding=bool(
+                fleet_dispatch.get("research_grounding", False)
+            ),
             # #749 dispatch→Vikunja bridge. Fail-closed: absent keys -> off / unset.
             fleet_dispatch_vikunja_bridge=bool(fleet_dispatch.get("vikunja_bridge", False)),
             fleet_dispatch_vikunja_bridge_project_id=int(
@@ -3113,6 +3534,9 @@ class AssistantOrchestratorService:
             except Exception:  # noqa: BLE001 — a battery lookup must never crash a real plan
                 decomposition_override = None
 
+            # #746: thread plan-time grounding through DORMANT — research_grounding is
+            # the AO-resolved [fleet_dispatch].research_grounding (default False ⇒ the
+            # decompose prompt is byte-identical and shared.research is never imported).
             plan = generate_plan(
                 clean_goal,
                 repo,
@@ -3132,18 +3556,77 @@ class AssistantOrchestratorService:
                 # is byte-identical to today. A battery card never enters the advanced front
                 # (the card IS the spec), same self-suppression as clarify above.
                 advanced_intake=self.fleet_dispatch_advanced_intake_enabled,
+                # #1044: the bad-input exam floor. Its own gate, deliberately NOT folded into
+                # the one above — generate_plan requires BOTH, so flipping the front on cannot
+                # change what a build is graded on as a side effect.
+                bad_input_floor=self.fleet_dispatch_bad_input_floor_enabled,
+                # #1054: the S3 slice-E sub-gate — single-pass criteria+assumptions authoring
+                # and the deterministic contradiction gate behind it. generate_plan requires
+                # advanced_intake as well, so this alone engages nothing.
+                coherence_gate=(
+                    self.fleet_dispatch_advanced_intake_coherence_gate_enabled
+                ),
+                # #1069 S3-F: the intake coverage gate — 1:1 import pin + ONE bounded
+                # re-authoring + the approval-BLOCKING marker. generate_plan requires
+                # advanced_intake as well, so this alone engages nothing.
+                coverage_gate=(
+                    self.fleet_dispatch_advanced_intake_coverage_gate_enabled
+                ),
+                # #1069 S3-G: criteria revision on a pending plan. generate_plan requires
+                # advanced_intake as well, so this alone engages nothing.
+                criteria_revise=(
+                    self.fleet_dispatch_advanced_intake_criteria_revise_enabled
+                ),
+                # #1031 S2: the fuller intake interview. generate_plan requires
+                # advanced_intake as well AND the intake marker on the goal, so this
+                # alone engages nothing.
+                interview=(
+                    self.fleet_dispatch_advanced_intake_interview_enabled
+                ),
+                # #1165 M5: the operator-assets pipeline. generate_plan requires
+                # advanced_intake as well (interview-independent), so this alone
+                # engages nothing; card-driven dispatches self-suppress inside.
+                assets_pipeline=(
+                    self.fleet_dispatch_advanced_intake_assets_pipeline_enabled
+                ),
+                # #1165 M1: the interview VOICE. generate_plan reads it only inside an
+                # engaged interview (front AND interview AND the marker), so this alone
+                # engages nothing.
+                interview_voice=(
+                    self.fleet_dispatch_advanced_intake_interview_voice_enabled
+                ),
+                # #746 slice 2: plan-time research grounding. Dormant by default; when off,
+                # decompose's prompt construction is byte-identical to today.
+                research_grounding=self.fleet_dispatch_research_grounding,
             )
         except Exception as exc:  # noqa: BLE001 — fail-closed: never crash the AO loop
             logger.error("PLAN request failed: %s", exc, exc_info=True)
+            # #1152: BOUND the interpolated exception. `exc` comes from generate_plan,
+            # which parses model output — its text is not length-limited, so an
+            # unbounded interpolation can itself exceed the frame cap and unwind to the
+            # serve loop, reproducing the original "No response" defect on the ERROR
+            # path (the one the operator hits when something has already gone wrong).
             return transport.send(
                 self._framer.encode_plan_result(
                     ok=False,
-                    message=f"Planning failed (Fail-Closed): {exc}",
+                    message=f"Planning failed (Fail-Closed): {str(exc)[:2000]}",
                     request_id=request_id,
                 )
             )
-        return transport.send(
-            self._framer.encode_plan_result(
+        # #1152 FAIL-LOUD: the plan can SUCCEED and still not fit the IPC frame cap
+        # (`[ipc].max_message_bytes`). Payload size is O(n_tasks x (goal + requirements)) —
+        # the operator's clarified requirements are threaded into EVERY compiled task prompt
+        # by design — so a long goal plus a long free-text answer plus one extra task can
+        # cross the cap. Before this guard, `encode` raised, the exception unwound to the
+        # serve loop, the connection was dropped, and the gateway reported "No response from
+        # the Assistant Orchestrator" — which says the AO went SILENT when in fact it had
+        # finished the work and could not deliver it. That misdirection cost a full
+        # diagnostic arc on 2026-07-28 (two live failures at 65891 and 66938 bytes against
+        # the then-65536 cap). A control that degrades into a misleading message is worse
+        # than none (security_by_design principle 11), so an over-cap result now returns a
+        # SMALL, honest, plain-language refusal the operator can act on.
+        try:
+            frame = self._framer.encode_plan_result(
                 ok=plan.ok,
                 message=plan.message,
                 fell_back=plan.fell_back,
@@ -3151,9 +3634,40 @@ class AssistantOrchestratorService:
                 criteria=plan.spec.to_dict(),
                 questions=plan.questions,  # #819: non-empty only on the CLARIFY early-return
                 revision=plan.revision,  # #820: non-empty only on the REVISE early-return
+                # #1069 S3-F: non-empty only when the intake coverage gate is blocking.
+                coverage_blocked=plan.coverage_blocked,
+                # #1069 S3-G: non-empty only on the CRITERIA-REVISE early-return.
+                criteria_revision=plan.criteria_revision,
                 request_id=request_id,
             )
-        )
+        except ValueError as exc:
+            logger.error(
+                "PLAN result exceeds the IPC frame cap and cannot be delivered "
+                "(tasks=%d): %s",
+                len(plan.tasks or []),
+                exc,
+                exc_info=True,
+            )
+            # Metadata only — no task/criteria payload — so this refusal always fits.
+            # request_id is TRUNCATED because it is peer-supplied and unvalidated: the
+            # refusal is the last thing standing between an over-cap plan and a dropped
+            # connection, so nothing unbounded may ride it. Measured ~444 bytes with a
+            # normal id, and bounded well under the config validator's 1024-byte floor
+            # even with a hostile one.
+            return transport.send(
+                self._framer.encode_plan_result(
+                    ok=False,
+                    message=(
+                        "I built the plan, but it came out too large to send back "
+                        "in one piece, so I could not show it to you. Nothing was "
+                        "started. Try again with a shorter description, or with a "
+                        "shorter answer to my questions — that text is repeated into "
+                        "every task, so trimming it shrinks the plan a lot."
+                    ),
+                    request_id=request_id[:64],
+                )
+            )
+        return transport.send(frame)
 
     # ── Headless-coding dispatch — EXECUTE handler (#670) ───────────────
     # Fire the operator-APPROVED dispatch (reachable ONLY via /dispatch approve): enqueue
@@ -3236,40 +3750,72 @@ class AssistantOrchestratorService:
                 )
             )
 
-        from shared.fleet.dispatch import build_default_config
-
-        config = build_default_config(
-            self.fleet_dispatch_agentic_setup_dir or None,
-            self.fleet_dispatch_projects_dir or None,
-            # M2 (#740): the plan-graph knob rides the config -> the spec -> the
-            # detached driver. False (default) keeps the flat queue byte-identical.
-            plan_graph=self.fleet_dispatch_plan_graph,
-            # #749: the durable-ticket knobs ride the config -> the spec -> the
-            # detached driver, whose REPORT leg posts the job outcome (wired
-            # 2026-07-14 at the LA-present supervised proof; find-or-create +
-            # scorecard comment; GREEN+oracle closes, PARKED/STALLED stay open).
-            vikunja_bridge=self.fleet_dispatch_vikunja_bridge,
-            vikunja_bridge_project_id=self.fleet_dispatch_vikunja_bridge_project_id,
-            # #744: the guest-oracle knob rides the config -> the spec -> the
-            # detached driver. False (default) never touches the guest seams.
-            guest_oracle_enabled=self.fleet_dispatch_guest_oracle_enabled,
-            # #1049: the already-satisfied pre-check knob rides the same chain.
-            # False (default) never consults the pre-check seam.
-            already_satisfied_precheck=self.fleet_dispatch_already_satisfied_precheck,
+        from shared.fleet.dispatch import (
+            FleetScriptsDirUnavailable,
+            build_default_config,
         )
-        # UC-010 SEAM A (DORMANT behind BLARAI_ENABLE_ASSET_GENERATION): with the 14B
-        # STILL resident and BEFORE the swap, generate the planned image assets and commit
-        # them into the target repo baseline the coder candidates inherit. Wholly fail-soft
-        # — it never raises into this handler (see the method), so the swap is unaffected.
-        self._maybe_generate_dispatch_assets(tasks, config, session_id)
+
+        # GUARDED, because this call can RAISE and this handler's docstring promises it
+        # cannot. build_default_config resolves the scripts pin, and a corrupt, unreadable
+        # or ambiguous declaration under state/fleet-swap/pins/ makes it raise
+        # FleetScriptsDirUnavailable — fail-closed, which is right. What was wrong is where
+        # that landed: this call sits OUTSIDE the try below, so the exception escaped
+        # _handle_execute_request entirely, past "Fail-closed throughout (never crashes the
+        # AO loop, never steps aside on error)", and the carefully-worded operator-facing
+        # refusal the pin code composes was never delivered to anyone.
+        #
+        # A corrupt pin file is not exotic: any unreadable leftover, or psutil.AccessDenied
+        # on a recycled pid, produces one, and pruning only runs the next time a pin is
+        # published — so without this the WinUI waits on an EXECUTE_RESULT that never
+        # arrives. Refusing loudly is the whole point; refusing invisibly is worse than not
+        # refusing. Found by independent review (#1301 BLOCKING 3).
         try:
-            result = self._fire_swap(run_id, session_id, tasks, config)
-        except Exception as exc:  # noqa: BLE001 — fail-closed; never step aside on error
-            logger.error("EXECUTE request failed: %s", exc, exc_info=True)
+            config = build_default_config(
+                self.fleet_dispatch_agentic_setup_dir or None,
+                self.fleet_dispatch_projects_dir or None,
+                # M2 (#740): the plan-graph knob rides the config -> the spec -> the
+                # detached driver. False (default) keeps the flat queue byte-identical.
+                plan_graph=self.fleet_dispatch_plan_graph,
+                # #749: the durable-ticket knobs ride the config -> the spec -> the
+                # detached driver, whose REPORT leg posts the job outcome (wired
+                # 2026-07-14 at the LA-present supervised proof; find-or-create +
+                # scorecard comment; GREEN+oracle closes, PARKED/STALLED stay open).
+                vikunja_bridge=self.fleet_dispatch_vikunja_bridge,
+                vikunja_bridge_project_id=self.fleet_dispatch_vikunja_bridge_project_id,
+                # #744: the guest-oracle knob rides the config -> the spec -> the
+                # detached driver. False (default) never touches the guest seams.
+                guest_oracle_enabled=self.fleet_dispatch_guest_oracle_enabled,
+                # #1049: the already-satisfied pre-check knob rides the same chain.
+                # False (default) never consults the pre-check seam.
+                already_satisfied_precheck=self.fleet_dispatch_already_satisfied_precheck,
+            )
+            # UC-010 SEAM A (DORMANT behind BLARAI_ENABLE_ASSET_GENERATION): with the 14B
+            # STILL resident and BEFORE the swap, generate the planned image assets and commit
+            # them into the target repo baseline the coder candidates inherit. Wholly fail-soft
+            # — it never raises into this handler (see the method), so the swap is unaffected.
+            self._maybe_generate_dispatch_assets(tasks, config, session_id)
+            # The behaviour-smoke CONTRACT rides the same pre-swap window: seed it into the
+            # baseline the coder candidates inherit, so the coder is TOLD what the headless
+            # capture will exercise before it writes a line. Fail-soft (see the method).
+            self._maybe_seed_smoke_contract(tasks, config)
+            try:
+                result = self._fire_swap(run_id, session_id, tasks, config)
+            except Exception as exc:  # noqa: BLE001 — fail-closed; never step aside on error
+                logger.error("EXECUTE request failed: %s", exc, exc_info=True)
+                return transport.send(
+                    self._framer.encode_execute_result(
+                        ok=False, run_id=run_id,
+                        message=f"Dispatch failed (Fail-Closed): {exc}",
+                        request_id=request_id,
+                    )
+                )
+        except FleetScriptsDirUnavailable as exc:
+            # The pin refused, in the one channel the operator actually reads.
+            logger.error("EXECUTE refused - scripts pin unusable: %s", exc)
             return transport.send(
                 self._framer.encode_execute_result(
                     ok=False, run_id=run_id,
-                    message=f"Dispatch failed (Fail-Closed): {exc}",
+                    message=f"Could not dispatch - {exc}",
                     request_id=request_id,
                 )
             )
@@ -3299,7 +3845,12 @@ class AssistantOrchestratorService:
         swap, generate the planned image assets, write them as plain PNGs into the target
         repo, and commit them into the baseline every coder candidate inherits.
 
-        DORMANT behind BLARAI_ENABLE_ASSET_GENERATION (default off). Wholly FAIL-SOFT:
+        Gated by :func:`_asset_generation_enabled` — read THAT for the live default; this
+        line used to assert "DORMANT ... (default off)" and had been false since the
+        2026-06-30 go-live (#714), which is precisely why `coding_standards` forbids a
+        docstring from restating current wiring. It is the claim a reader checking
+        dormancy finds FIRST, because it sits on the function that does the work.
+        Wholly FAIL-SOFT:
         every failure path (flag off, no specs, unavailable model, PA deny, generate /
         write / commit error) is swallowed with a log and the swap proceeds unchanged —
         the coder then falls back to inline SVG. NOTHING here may raise into the EXECUTE
@@ -3375,10 +3926,24 @@ class AssistantOrchestratorService:
                     "dispatch assets: wrote %s (%d bytes) into %s",
                     rel, len(png), repo_path.name,
                 )
+            # #1127: RELEASE THE IMAGE PIPELINE BEFORE THE SWAP. This stage runs
+            # immediately before step_aside(), and the swap driver's headroom gate then
+            # measures free RAM within seconds. The pipeline unloads itself on an idle
+            # timer (`[image_generation].idle_unload_s`, default 60 s) — a timer the very
+            # next step outruns. On 2026-07-27 that cost the operator a whole dispatch:
+            # assets finished 21:13:02, the gate measured 20.0 GiB against a 20 GiB
+            # requirement at 21:13:09 and aborted, while ~2.5 GiB of the shortfall was
+            # this pipeline holding memory it was about to release anyway. The eviction is
+            # already explicit in the other direction (the 14B is evicted TO generate);
+            # this is the symmetric counterpart, and without it generating images makes
+            # the very next swap MORE likely to fail — penalising exactly the image-heavy
+            # projects that need the coder. Idempotent and fail-soft by contract.
+            image_gen.unload()
             avail_after = _host_available_gib()
             logger.info(
                 "dispatch assets: %d/%d written; host RAM available %.1f -> %.1f GiB "
-                "(14B evicted for generation; reloads lazily / after the swap).",
+                "(14B evicted for generation; image pipeline released for the swap; "
+                "14B reloads lazily / after the swap).",
                 len(written), len(specs), avail_before, avail_after,
             )
             if written:
@@ -3386,6 +3951,67 @@ class AssistantOrchestratorService:
         except Exception as exc:  # noqa: BLE001 — SEAM A is wholly fail-soft; never derail the swap
             logger.error(
                 "dispatch assets: unexpected error (Fail-Soft, swap proceeds): %s",
+                exc, exc_info=True,
+            )
+
+    def _maybe_seed_smoke_contract(self, tasks: list, config) -> None:
+        """Seed the plan's behaviour-smoke CONTRACT into the target repo baseline, so
+        every coder candidate worktree inherits it and the coder can be told what the
+        headless capture will exercise.
+
+        The contract names two DOM hooks the coder must place — the primary action control
+        and the region that must change when it is used. Without this file the capture's
+        declared arm is unreachable and its behaviour check degrades to a guess whose
+        failures are only a soft note, which is what every web build has done to date.
+
+        Wholly FAIL-SOFT and NOTHING here may raise into the EXECUTE handler (a raise
+        would abort the dispatch): no contract, an unvalidatable one, a repo that fails
+        validation, or a write/commit error all leave the delivery byte-identical to
+        today. Absence is legal by construction — a plan that declared no contract writes
+        no file, and the capture keeps its heuristic."""
+        try:
+            from shared.fleet.acceptance import (
+                SMOKE_SPEC_FILENAME,
+                decode_smoke_spec,
+                write_smoke_spec_file,
+            )
+            from shared.fleet.dispatch import validate_repo
+
+            spec = decode_smoke_spec(tasks)
+            if not spec:
+                return
+            # The dispatch targets ONE repo; take it from the first task and re-validate
+            # it under projects_dir — the SAME fail-fast the swap validation performs.
+            repo_raw = str(tasks[0].get("repo", "")) if tasks else ""
+            if validate_repo(Path(repo_raw), config.projects_dir) is not None:
+                logger.warning(
+                    "smoke contract: repo %r failed validation — skipping (Fail-Soft).",
+                    repo_raw,
+                )
+                return
+            repo_path = Path(repo_raw).resolve()
+            if not write_smoke_spec_file(repo_path, spec):
+                logger.warning(
+                    "smoke contract: could not write %s (Fail-Soft) — the capture will "
+                    "fall back to its heuristic.", SMOKE_SPEC_FILENAME,
+                )
+                return
+            logger.info(
+                "smoke contract: seeded %s into %s (action=%r, result=%r).",
+                SMOKE_SPEC_FILENAME, repo_path.name,
+                spec.get("actionLabel", ""), spec.get("resultLabel", ""),
+            )
+            self._commit_dispatch_assets(
+                repo_path, [SMOKE_SPEC_FILENAME],
+                message=(
+                    "test: declare the behaviour-smoke contract for this dispatch "
+                    "(BlarAI plan-authored)"
+                ),
+                label="smoke contract",
+            )
+        except Exception as exc:  # noqa: BLE001 — fail-soft; never derail the swap
+            logger.error(
+                "smoke contract: unexpected error (Fail-Soft, swap proceeds): %s",
                 exc, exc_info=True,
             )
 
@@ -3403,6 +4029,29 @@ class AssistantOrchestratorService:
             style = MessageFramer.IMAGE_GEN_STYLE_CARTOON
         subject = str(spec.get("prompt", "")).strip()
         if not subject:
+            return None
+        # Re-check the config HERE, not only in the caller. `_maybe_generate_dispatch_assets`
+        # already guards `_resolved_config is None` before the loop — so this is not a
+        # missing check, it is a RACE: `stop()` sets `_resolved_config = None` (and calls
+        # `image_gen.unload()`) while assets are still in flight, and the check that passed
+        # at the top of the loop is stale by the time this line runs.
+        #
+        # What it cost: on 2026-08-08 the 23:00 battery booted its own AO, this dereferenced
+        # a None config mid-generation, and the AttributeError escaped into
+        # `_image_gen_config_for_style` (`resolved.image_gen_model_dir`). The run STALLED at
+        # approve with "No response from the Assistant Orchestrator" — a whole night of GPU
+        # time. Re-reading the attribute once, immediately before use, closes the window
+        # this code path can actually observe.
+        #
+        # A dispatch asset is a NICETY; the dispatch is the product. Degrading to no-asset
+        # is always correct here, and the very next branch already does exactly that when
+        # the generator is unavailable. The lifecycle race itself is wider than this call
+        # site and is ticketed separately — this guard makes it survivable, not absent.
+        if self._resolved_config is None:
+            logger.warning(
+                "dispatch assets: no resolved config yet, skipping asset generation "
+                "(the dispatch continues without it)"
+            )
             return None
         # Force hires OFF: a dispatch asset stays in the proven base-1024² co-resident
         # envelope so the about-to-be-swapped 14B is never evicted/reloaded mid-dispatch.
@@ -3445,13 +4094,26 @@ class AssistantOrchestratorService:
         finally:
             image_gen.unload()
 
-    def _commit_dispatch_assets(self, repo_path: "Path", rel_paths: list) -> None:
-        """git add + commit ONLY the generated asset files into the target repo's baseline,
-        so every coder candidate worktree (branched from HEAD after step-aside) inherits
-        them. Surgical (named paths, never ``git add -A``). Fail-soft: a git failure logs
-        and leaves the files in the working tree (the fleet's own dirty-tree safety net
-        then folds them into the baseline). The commit identity is passed per-command
-        (``-c``), never written to the target repo's config."""
+    def _commit_dispatch_assets(
+        self,
+        repo_path: "Path",
+        rel_paths: list,
+        *,
+        message: str = (
+            "assets: generated image asset(s) for the dispatch (BlarAI UC-010 SEAM A)"
+        ),
+        label: str = "dispatch assets",
+    ) -> None:
+        """git add + commit ONLY the named files into the target repo's baseline, so every
+        coder candidate worktree (branched from HEAD after step-aside) inherits them.
+        Surgical (named paths, never ``git add -A``). Fail-soft: a git failure logs and
+        leaves the files in the working tree (the fleet's own dirty-tree safety net then
+        folds them into the baseline). The commit identity is passed per-command (``-c``),
+        never written to the target repo's config.
+
+        ``message``/``label`` default to the UC-010 image-asset wording this was built for;
+        the behaviour-smoke contract seeds through the same primitive with its own, so the
+        two pre-swap baseline writes cannot drift in their git discipline."""
         import subprocess
 
         def _git(*args: str) -> "tuple[bool, str]":
@@ -3467,26 +4129,25 @@ class AssistantOrchestratorService:
         ok, err = _git("add", "--", *rel_paths)
         if not ok:
             logger.warning(
-                "dispatch assets: git add failed (%s) — leaving files for the fleet safety net.",
-                err,
+                "%s: git add failed (%s) — leaving files for the fleet safety net.",
+                label, err,
             )
             return
         ok, err = _git(
             "-c", "user.email=dispatch@blarai.local",
             "-c", "user.name=BlarAI Dispatch",
-            "commit", "-m",
-            "assets: generated image asset(s) for the dispatch (BlarAI UC-010 SEAM A)",
+            "commit", "-m", message,
             "--", *rel_paths,
         )
         if ok:
             logger.info(
-                "dispatch assets: committed %d asset(s) into the %s baseline.",
-                len(rel_paths), repo_path.name,
+                "%s: committed %d file(s) into the %s baseline.",
+                label, len(rel_paths), repo_path.name,
             )
         else:
             logger.warning(
-                "dispatch assets: git commit failed (%s) — files remain for the fleet safety net.",
-                err,
+                "%s: git commit failed (%s) — files remain for the fleet safety net.",
+                label, err,
             )
 
     # ── Substrate (USE-CASE-002, ADR-016) ───────────────────────────────

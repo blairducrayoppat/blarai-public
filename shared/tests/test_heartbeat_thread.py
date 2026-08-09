@@ -461,7 +461,10 @@ def test_graduation_reset_stamps_current_mode_immediately(tmp_path: Path) -> Non
         StallSeenState(fingerprints=frozenset({"Standard:42"})), path=seen_path
     )
     beat.start()
-    deadline = time.monotonic() + 5.0
+    # #1163: this deadline bounds only the FAILURE path (a green run exits the
+    # poll in well under a second) — 5 s proved thread-starvable under a
+    # model-load storm (two dated gate hits, 2026-07-28/29); 30 s is not.
+    deadline = time.monotonic() + 30.0
     stamp = None
     while time.monotonic() < deadline:
         raw = json.loads(stamp_path.read_text(encoding="utf-8"))

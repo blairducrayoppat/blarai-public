@@ -40,10 +40,15 @@ VERDICT_ORDER: tuple[str, ...] = (
     "GREEN", "PARKED-HONEST", "RECOVERED", "STALLED", "FALSE-DONE",
 )
 
-# The #827 failure classes, stable order (failure_taxonomy.FAILURE_CLASSES).
+# The #827 failure classes, stable order. This is a DELIBERATE LITERAL COPY of
+# failure_taxonomy.FAILURE_CLASSES: this module is loaded as a script from scripts/, where
+# tools/ is not reliably importable, so the dashboard must not depend on that import
+# resolving. The copy is kept honest by a gate test rather than by hope —
+# tests/integration/test_failure_taxonomy.py::test_dashboard_class_order_matches_the_taxonomy
+# fails if the two ever disagree. Add a class in ONE place and that test names the other.
 FAILURE_CLASS_ORDER: tuple[str, ...] = (
     "ORACLE-DEFECT", "INTEGRATION-SEAM", "BLIND-FIX-LOOP",
-    "DECOMPOSE-DOWNGRADE", "HARNESS-BUDGET", "UNCLASSIFIED",
+    "DECOMPOSE-DOWNGRADE", "HARNESS-BUDGET", "HARNESS-ENVIRONMENT", "UNCLASSIFIED",
 )
 
 # The #827 GREEN-side classes (failure_taxonomy.GREEN_CLASSES).

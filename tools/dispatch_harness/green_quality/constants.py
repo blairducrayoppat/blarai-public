@@ -99,6 +99,27 @@ RUBRIC_FIELDS: dict[str, tuple[str, ...]] = {
 ABSTAIN = "uncertain"
 
 # ---------------------------------------------------------------------------
+# Security-scan severities (#1182 — the deterministic security floor, :mod:`.security`)
+#
+# The severity ladder is separate from the rubric enums above because it is not a model's
+# answer space: a security finding is a MEASURED construct at a named file and line, and its
+# severity is a property of the construct, not a judgment about it.
+# ---------------------------------------------------------------------------
+
+#: A construct that is exploitable as written — credential material in source, text executed
+#: as code, a query or markup assembled from unescaped input. Band-forcing (C).
+SEVERITY_HIGH = "high"
+#: A construct that wants a human look but is not exploitable on its own — a typed-looking
+#: password literal, an unsafe deserializer over trusted input. A caveat (B).
+SEVERITY_MEDIUM = "medium"
+#: Recorded for transparency, never band-moving: a placeholder credential, a literal-only
+#: ``eval``, or any finding demoted for living in the test suite.
+SEVERITY_INFO = "info"
+
+#: Worst-last ordering, so ``max`` over this mapping selects the sharpest finding.
+SEVERITY_ORDER: dict[str, int] = {SEVERITY_INFO: 0, SEVERITY_MEDIUM: 1, SEVERITY_HIGH: 2}
+
+# ---------------------------------------------------------------------------
 # Reserved evidence keys (the classifier-style advisory stamp — the audit is their SOLE
 # writer; it writes nothing else, and NEVER touches verdict/attribution)
 # ---------------------------------------------------------------------------
@@ -108,18 +129,28 @@ EV_REGRESSED = "green_quality_regressed"             # Layer-1 archetype-diff fi
 EV_RUNNABLE = "green_quality_runnable_surface"       # rubric field (jury majority)
 EV_BAD_INPUT = "green_quality_bad_input"             # rubric field (jury majority)
 EV_DEAD_SCAFFOLD = "green_quality_dead_scaffold"     # Layer-1 lint (also a rubric lens; det wins)
+EV_SEED_IDENTICAL = "green_quality_seed_identical"   # Layer-1 relational check — NAMES the
+                                                     # files still identical to the fleet seed
+                                                     # (never a bool; "unknown" != "clean")
 EV_NAMING = "green_quality_naming_structure"         # rubric field (jury majority)
 EV_CORRECTNESS = "green_quality_correctness_probe"   # rubric field (jury majority)
 EV_UNCERTAIN = "green_quality_uncertain"             # fields the jury abstained on (array)
 EV_FINDINGS = "green_quality_findings"               # POINTER to the sidecar, never content
 EV_CARD = "green_quality_card"                       # one-line "what you got" caveat (operator legibility)
 EV_MODE = "green_quality_mode"                       # which layers ran: "det-only" | "det+14b-x3"
+EV_SECURITY = "green_quality_security"               # #1182 security scan (no model); ALWAYS stamped
+EV_PROSE = "green_quality_prose"                     # #1281 placeholder-prose floor (no model);
+                                                     # ALWAYS stamped, four-way in its VALUE
+                                                     # (unmeasured / not-applicable / clean /
+                                                     # findings) — a library has no prose, which
+                                                     # is not the same claim as clean prose
 
 #: Every reserved key — the advisory-stamp allowlist (the invariant test asserts the
 #: audit writes only these + never a verdict/attribution).
 RESERVED_EVIDENCE_KEYS: frozenset[str] = frozenset({
-    EV_BAND, EV_REGRESSED, EV_RUNNABLE, EV_BAD_INPUT, EV_DEAD_SCAFFOLD,
+    EV_BAND, EV_REGRESSED, EV_RUNNABLE, EV_BAD_INPUT, EV_DEAD_SCAFFOLD, EV_SEED_IDENTICAL,
     EV_NAMING, EV_CORRECTNESS, EV_UNCERTAIN, EV_FINDINGS, EV_CARD, EV_MODE,
+    EV_SECURITY, EV_PROSE,
 })
 
 # ---------------------------------------------------------------------------

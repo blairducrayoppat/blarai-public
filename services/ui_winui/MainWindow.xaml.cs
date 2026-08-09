@@ -253,9 +253,19 @@ public sealed partial class MainWindow : Window
             AcceptsReturn = false,
             Margin = new Thickness(0, 10, 0, 0),
         };
+        // Inline validation message: lives INSIDE the dialog, so it is visible while the
+        // operator still has their text in front of them.
+        var validationText = new TextBlock
+        {
+            Foreground = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0),
+            Visibility = Visibility.Collapsed,
+        };
         var panel = new StackPanel { Spacing = 4 };
         panel.Children.Add(goalBox);
         panel.Children.Add(nameBox);
+        panel.Children.Add(validationText);
         var dialog = new ContentDialog
         {
             Title = "New project",
@@ -265,16 +275,45 @@ public sealed partial class MainWindow : Window
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.Content.XamlRoot,
         };
+
+        // #1117 — VALIDATE BEFORE THE DIALOG IS DESTROYED, NEVER AFTER.
+        //
+        // The original handler checked for empty fields AFTER ShowAsync() returned. By then
+        // the ContentDialog and both TextBoxes are gone, so a blank name silently destroyed
+        // every character typed into the goal box. On 2026-07-27 that cost the operator a
+        // ~2,200-character project description, recoverable only by taking a 674 MB memory
+        // dump of the live process and scanning the managed heap for UTF-16 runs — a
+        // recovery that worked solely because the app had not been restarted, and which is
+        // not repeatable in general.
+        //
+        // Cancelling the Closing event keeps the dialog — and therefore the operator's text —
+        // alive. The text is never destroyed because nothing is ever torn down on a failed
+        // check. This is the structurally-safe form: it does not depend on the handler
+        // stashing the strings and re-opening a prefilled dialog, which would still have a
+        // window where the only copy lives in a local.
+        dialog.Closing += (_, args) =>
+        {
+            if (args.Result != ContentDialogResult.Primary) return;   // Cancel always closes
+            bool goalMissing = string.IsNullOrWhiteSpace(goalBox.Text);
+            bool nameMissing = string.IsNullOrWhiteSpace(nameBox.Text);
+            if (!goalMissing && !nameMissing) return;
+
+            args.Cancel = true;                                        // keep the dialog open
+            validationText.Text = (goalMissing && nameMissing)
+                ? "Please enter both what to build and a short name."
+                : goalMissing
+                    ? "Please enter what you want to build."
+                    : "Please enter a short project name.";
+            validationText.Visibility = Visibility.Visible;
+            (goalMissing ? goalBox : nameBox).Focus(FocusState.Programmatic);
+        };
+
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        // Reaching here means Closing let the dialog through, so both fields are non-blank.
         string goal = goalBox.Text.Trim();
         string name = nameBox.Text.Trim();
-        if (string.IsNullOrEmpty(goal) || string.IsNullOrEmpty(name))
-        {
-            ShowStatus(InfoBarSeverity.Warning, "New project",
-                "Please enter both what to build and a short name.");
-            return;
-        }
+
         // A new project starts its own chat so the plan/build conversation is clean.
         _activeSessionId = null;
         SessionsList.SelectedItem = null;

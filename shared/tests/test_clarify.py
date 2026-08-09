@@ -188,6 +188,60 @@ def test_compose_requirements_block_empty():
     assert clarify.compose_requirements_block([{"answer": ""}]) == ""
 
 
+# ---- #1197 — a system default is never attributed to the operator -----------------
+#
+# Run 20260729-164648-bd rendered five system-chosen defaults under the single header
+# "The person clarified these requirements — build to them:". The person had clarified
+# nothing; they had taken the "just decide for me" escape hatch. The operator read that
+# line in the run log. These lock the two groups apart.
+
+
+def test_an_assumed_answer_is_never_rendered_under_the_operator_header():
+    """THE regression lock for #1197. An all-assumed block — the exact shape of the
+    operator's failing run — must not carry the "the person clarified" claim at all."""
+    block = clarify.compose_requirements_block([
+        {"question": "q1", "answer": "a simple command-line tool", "assumed": True},
+        {"question": "q2", "answer": "a clean, simple look", "assumed": True},
+    ])
+    assert clarify._REQUIREMENTS_HEADER not in block
+    assert clarify._ASSUMED_HEADER in block
+    # And the claim is not merely absent as a constant — the CLAIM is absent.
+    assert "person clarified" not in block
+
+
+def test_the_operator_header_covers_only_what_the_operator_authored():
+    """A mixed block: both headers appear, and each answer sits under the right one."""
+    block = clarify.compose_requirements_block([
+        {"question": "q1", "answer": "in a web browser", "assumed": False},
+        {"question": "q2", "answer": "a clean, simple look", "assumed": True},
+    ])
+    authored_at = block.index(clarify._REQUIREMENTS_HEADER)
+    assumed_at = block.index(clarify._ASSUMED_HEADER)
+    assert authored_at < block.index("in a web browser") < assumed_at
+    assert assumed_at < block.index("a clean, simple look")
+
+
+def test_an_operator_only_block_never_grows_the_assumed_header():
+    """Toggle-off bar: nothing assumed -> the assumed header does not appear, so a fully
+    answered dispatch reads exactly as it did before #1197."""
+    block = clarify.compose_requirements_block([
+        {"question": "q1", "answer": "in a web browser", "assumed": False},
+    ])
+    assert block == clarify._REQUIREMENTS_HEADER + "\n- in a web browser"
+
+
+def test_the_assumed_header_says_who_chose_in_plain_language():
+    """The wording is the fix, so it is asserted. A non-technical reader must be able to
+    tell, from this line alone, that they did not ask for what follows."""
+    header = clarify._ASSUMED_HEADER
+    assert "did NOT ask for these" in header
+    assert "I picked them" in header
+    assert "my choices" in header
+    # No jargon leaks into the one line the operator is relied on to read.
+    for jargon in ("axis", "axes", "assumed=", "default", "clarification", "spec"):
+        assert jargon not in header.lower()
+
+
 # ---- operator_answers_from_block — the inverse that keeps house prose out of ------
 # ---- the oracle-QA grounding corpus (#1043 review F1) -----------------------------
 
@@ -207,11 +261,20 @@ def test_operator_answers_round_trip_through_the_real_composer():
         {"question": "q2", "answer": answers[1], "assumed": True},
         {"question": "q3", "answer": answers[2], "assumed": False},
     ])
-    assert clarify.operator_answers_from_block(block) == tuple(answers)
+    # #1197 groups by AUTHORSHIP, so the round-trip order is authored-then-assumed rather
+    # than as-supplied. Every answer still survives exactly once — the extractor's contract
+    # is completeness, not input order.
+    assert clarify.operator_answers_from_block(block) == (
+        answers[0], answers[2], answers[1]
+    )
 
-    # Nothing the renderer wrote survives: not the header, not the assumed tag.
+    # Nothing the renderer wrote survives: neither header, not the assumed tag. This is the
+    # control that fails if a header is added without teaching the extractor about it —
+    # #1197's assumed header contains "person", "requirements" and "build to them", so an
+    # unskipped one is caught here rather than in a grounding corpus months later.
     joined = " ".join(clarify.operator_answers_from_block(block)).lower()
-    for house_word in ("person", "clarified", "requirements", "build to them", "assumed"):
+    for house_word in ("person", "clarified", "requirements", "build to them", "assumed",
+                       "you decide", "my choices", "picked them"):
         assert house_word not in joined
 
 

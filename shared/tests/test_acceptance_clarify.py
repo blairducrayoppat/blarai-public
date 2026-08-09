@@ -195,11 +195,14 @@ def test_requirements_thread_into_prompts_and_tasks_and_spec_goal_stays_clean(tm
     assert plan.questions == [] and not any(_MARKER_CLARIFY in p for p in calls)
     # the requirements seeded the sub-generation prompts...
     assert any("on my computer" in p for p in calls)
-    # ...and ride EVERY compiled task context, verbatim + delimited...
+    # ...and ride EVERY compiled task context, verbatim + delimited. #1197 renamed the
+    # section: "Clarified requirements" asserted the operator supplied them, which on a
+    # "just decide for me" run was false of every line beneath it.
     assert plan.tasks and all(
-        "Clarified requirements" in t["prompt"] and "on my computer" in t["prompt"]
+        "Requirements for this build" in t["prompt"] and "on my computer" in t["prompt"]
         for t in plan.tasks
     )
+    assert not any("Clarified requirements" in t["prompt"] for t in plan.tasks)
     # ...while spec.goal stays the CLEAN original (no block in the preview header).
     assert plan.spec.goal == "a todo app"
 
@@ -371,7 +374,13 @@ def test_spec_clarifications_roundtrip_and_render():
         ),
     )
     back = AcceptanceSpec.from_dict(spec.to_dict())
-    assert back.clarifications == spec.clarifications
+    # #1120 added the carried-forward marker, which the coercion NORMALISES onto every
+    # record (a clarification is always either remembered or not). A pre-#1120 payload
+    # without the key reconstructs as remembered=False — i.e. "said in this turn", which
+    # is what every historical record actually was.
+    assert back.clarifications == tuple(
+        dict(c, remembered=False) for c in spec.clarifications
+    )
     preview = acc.render_criteria_preview(back, ecosystem="python")
     assert "what you told me" in preview.lower()          # the answered one
     assert "on my computer" in preview
@@ -392,7 +401,11 @@ def test_coerce_clarifications_fail_closed():
         "junk",
         {"question": "q2", "answer": "on my computer", "assumed": 1},
     ])
-    assert out == ({"question": "q2", "answer": "on my computer", "assumed": True},)
+    # #1120: ``remembered`` is normalised onto every coerced record, defaulting False.
+    assert out == (
+        {"question": "q2", "answer": "on my computer", "assumed": True,
+         "remembered": False},
+    )
 
 
 # ---------------------------------------------------------------------------

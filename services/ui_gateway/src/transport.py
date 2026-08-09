@@ -98,6 +98,7 @@ from shared.ipc import (
     require_str,
     require_str_list,
 )
+from shared.ipc.protocol import DEFAULT_MAX_MESSAGE_BYTES
 from shared.ipc.vsock import AF_HYPERV, HV_PROTOCOL_RAW
 from shared.ttl_dict import TtlDict
 
@@ -108,6 +109,45 @@ from shared.ttl_dict import TtlDict
 PROMPT_HISTORY_MAX_BYTES: int = 40_000
 
 logger = logging.getLogger(__name__)
+
+
+def _build_dispatch_state_store_or_none(dev_mode: bool):
+    """The born-encrypted /dispatch pending-state store, or ``None`` (#1116).
+
+    DEGRADES, NEVER REFUSES. This store buys DURABILITY (a parked question survives a
+    restart), not safety — so a construction failure must not stop the assistant from
+    booting the way a ``sessions.db`` failure rightly does. Without it the corridor
+    behaves exactly as it did before #1116, and the operator's typed text is still
+    kept by the coordinator's no-state paths.
+
+    The SECURITY property is still fail-closed and lives one layer down:
+    ``build_dispatch_state_store`` REFUSES to construct without a provisioned DEK
+    keystore, so the outcome of a missing key is "no store at all", never "a store
+    holding the operator's goals in plaintext".
+
+    Returns ``None`` when %LOCALAPPDATA% is unset (no durable home to write to).
+    """
+    from services.ui_gateway.src.constants import DISPATCH_STATE_DB_PATH
+    from services.ui_gateway.src.dispatch_state_store import (
+        build_dispatch_state_store,
+    )
+
+    if not DISPATCH_STATE_DB_PATH:
+        logger.warning(
+            "%%LOCALAPPDATA%% not set — /dispatch pending state will NOT survive a "
+            "restart (no durable location to write it to)."
+        )
+        return None
+    try:
+        return build_dispatch_state_store(DISPATCH_STATE_DB_PATH, dev_mode=dev_mode)
+    except Exception as exc:  # noqa: BLE001 — durability must never block boot
+        logger.error(
+            "Dispatch state store unavailable (%s) — /dispatch works, but a pending "
+            "question or plan card will NOT survive a restart (#1116). Nothing is "
+            "written unencrypted; the store simply does not exist.",
+            exc,
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -308,12 +348,19 @@ class TransportGateway:
         ca_cert_path: str = "",
         images_enabled: bool = False,
         fleet_dispatch_enabled: bool = False,
+        fleet_dispatch_project_memory_enabled: bool = False,
+        fleet_dispatch_advanced_intake_enabled: bool = False,
+        fleet_dispatch_advanced_intake_interview_enabled: bool = False,
+        fleet_dispatch_advanced_intake_assets_pipeline_enabled: bool = False,
+        fleet_dispatch_advanced_intake_interview_playback_enabled: bool = False,
+        fleet_dispatch_advanced_intake_interview_voice_enabled: bool = False,
         fleet_dispatch_agentic_setup_dir: str = "",
         fleet_dispatch_projects_dir: str = "",
         coordinator_enabled: bool = False,
         coordinator_projects: "dict[str, int] | None" = None,
         coordinator_campaign_state_path: str = "",
         session_state_ttl_s: float = SESSION_STATE_TTL_S,
+        max_message_bytes: int = DEFAULT_MAX_MESSAGE_BYTES,
     ) -> None:
         """Initialize the Transport Gateway.
 
@@ -373,6 +420,16 @@ class TransportGateway:
         self._host_mode: bool = host_mode
         self._host: str = host
         self._port: int = port
+        # #1152: the AO-channel frame cap, threaded from the AO's own
+        # `[ipc].max_message_bytes` by the launcher so BOTH ENDS AGREE. A one-sided
+        # raise is not a fix: the AO would encode a frame the gateway then refuses on
+        # receive (`length > max_message_bytes` -> None), reproducing the very same
+        # "No response from the Assistant Orchestrator" it was meant to cure. The
+        # DEFAULT stays at 64 KB so nothing else on the transport widens by accident —
+        # this is a per-channel raise, not the transport-wide loosening ADR-031
+        # rejected. It feeds both the framer (the binding cap on encode) and every
+        # VsockConfig this gateway builds for the AO channel.
+        self._max_message_bytes: int = max_message_bytes
         # mTLS cert paths for the gateway client → PA server channel.
         # Populated by the launcher from per-boot provisioning (ADR-026).
         # Empty strings in dev_mode — the loopback path skips mTLS.
@@ -411,7 +468,7 @@ class TransportGateway:
 
         # Live IPC state (P1.11)
         self._transport: VsockTransport | None = None
-        self._framer: MessageFramer = MessageFramer()
+        self._framer: MessageFramer = MessageFramer(max_message_bytes)
         self._pgov_cache: dict[str, GatewayPGOVResult] = {}
         self._active_request_id: str | None = None
 
@@ -479,6 +536,35 @@ class TransportGateway:
         # makes handle_command return the disabled notice BEFORE either seam — nothing fires
         # even with both wired (the built-but-wired guard test asserts this). The fleet target
         # roots are config-driven (#670; empty -> compiled-in fallback).
+        # #1031 S2: the intake-interview token gate — the AO-resolved conjunction of the
+        # front flag AND the interview sub-flag, mirrored here so the gateway's parser
+        # gate and the AO's engagement gate cannot disagree about what the config says
+        # (they stay two independent locks in two processes, each defaulting False).
+        self._dispatch_intake_token_enabled = bool(
+            fleet_dispatch_advanced_intake_enabled
+        ) and bool(fleet_dispatch_advanced_intake_interview_enabled)
+        # #1165 M5: the assets-pipeline conjunction, same two-seam discipline — the
+        # gateway mirrors the AO-resolved front AND own so create_project seeding and
+        # the AO's plan-time engagement cannot disagree about what the config says.
+        # Interview-independent: the interview sub-flag is deliberately absent here.
+        self._dispatch_assets_pipeline_enabled = bool(
+            fleet_dispatch_advanced_intake_enabled
+        ) and bool(fleet_dispatch_advanced_intake_assets_pipeline_enabled)
+        # #1165 M4: the playback turn engages only inside a live interview — the
+        # coordinator receives the resolved THREE-key conjunction (front AND interview
+        # AND playback), the same single-source rule as the token gate above.
+        self._dispatch_intake_playback_enabled = (
+            self._dispatch_intake_token_enabled
+            and bool(fleet_dispatch_advanced_intake_interview_playback_enabled)
+        )
+        # #1165 M1: the interview-voice gate, gateway side — the resolved conjunction of
+        # the front, the interview, AND the voice sub-flag (all three AO-resolved), so
+        # the render preamble and the I-don't-know hatch can engage only inside a live
+        # fuller interview. Defaults False at every seam.
+        self._dispatch_intake_voice_enabled = (
+            self._dispatch_intake_token_enabled
+            and bool(fleet_dispatch_advanced_intake_interview_voice_enabled)
+        )
         self._dispatch_coordinator: DispatchCoordinator = DispatchCoordinator(
             config=_build_fleet_config(
                 agentic_setup_dir=fleet_dispatch_agentic_setup_dir or None,
@@ -487,7 +573,23 @@ class TransportGateway:
             enabled=bool(fleet_dispatch_enabled),
             plan_fn=self._dispatch_plan_fn,
             execute_fn=self._dispatch_execute_fn,
+            state_store=_build_dispatch_state_store_or_none(dev_mode),
+            project_memory_enabled=bool(fleet_dispatch_project_memory_enabled),
+            advanced_intake_interview_enabled=self._dispatch_intake_token_enabled,
+            advanced_intake_assets_pipeline_enabled=(
+                self._dispatch_assets_pipeline_enabled
+            ),
+            advanced_intake_interview_playback_enabled=(
+                self._dispatch_intake_playback_enabled
+            ),
+            advanced_intake_interview_voice_enabled=(
+                self._dispatch_intake_voice_enabled
+            ),
         )
+        # #1116: repopulate any dispatch parked by a previous process, so a question
+        # the transcript is still displaying is a question this process can still
+        # answer. A no-op when the store is None or empty.
+        self._dispatch_coordinator.restore_at_boot()
 
         # Coordinator program C1 read surface (#843, ADR-039 — DORMANT):
         # /coord status composes a READ-ONLY snapshot of fleet-swap state +
@@ -667,6 +769,7 @@ class TransportGateway:
                 config = VsockConfig(
                     address=VsockAddress(cid=0, port=self._port),
                     timeout_ms=int(PA_HANDSHAKE_TIMEOUT_S * 1000),
+                    max_message_bytes=self._max_message_bytes,
                 )
                 transport = VsockTransport(config, dev_mode=True)
                 connected = await asyncio.to_thread(transport.connect)
@@ -746,6 +849,7 @@ class TransportGateway:
             config = VsockConfig(
                 address=VsockAddress(cid=0, port=self._port),
                 timeout_ms=int(timeout_s * 1000),
+                max_message_bytes=self._max_message_bytes,
             )
             transport = VsockTransport(config, dev_mode=True)
             connected = await asyncio.to_thread(transport.connect)
@@ -894,6 +998,7 @@ class TransportGateway:
                 mtls_key_path=self._mtls_key_path,
                 ca_cert_path=self._ca_cert_path,
                 timeout_ms=int(timeout_s * 1000),
+                max_message_bytes=self._max_message_bytes,
             )
             return VsockTransport(
                 config,
@@ -980,6 +1085,7 @@ class TransportGateway:
             mtls_key_path=self._mtls_key_path,
             ca_cert_path=self._ca_cert_path,
             timeout_ms=int(timeout_s * 1000),
+            max_message_bytes=self._max_message_bytes,
         )
         raw: _socket_mod.socket | None = None
         try:
@@ -1346,6 +1452,12 @@ class TransportGateway:
             # #820: the REVISE early-return payload (empty on a normal plan). The coordinator
             # applies these ops to the pending plan (byte-stable keeps + new adds).
             revision=list(result.get("revision", [])),
+            # #1069 S3-F: the intake coverage-gate blocking marker (empty on a normal plan
+            # and on every older-frame decode). The coordinator refuses approve while set.
+            coverage_blocked=str(result.get("coverage_blocked", "")),
+            # #1069 S3-G: the CRITERIA-REVISE early-return payload (empty on a normal plan).
+            # The coordinator applies these ops to the pending spec.
+            criteria_revision=list(result.get("criteria_revision", [])),
         )
 
     # ── Headless-coding dispatch — EXECUTE seam (#670) ──────────────────
@@ -1486,6 +1598,24 @@ class TransportGateway:
         self._persist_informational_turn(session_id, stripped, reply)
         return reply
 
+    def forget_dispatch_state(self, session_id: str) -> bool:
+        """Erase any parked /dispatch state for a DELETED chat (#1136).
+
+        The gateway owns the coordinator, so the ui_backend delete handler asks here
+        rather than reaching for the store itself. Fail-soft: an error while erasing must
+        never make "delete this chat" report failure — the transcript deletion has already
+        succeeded and is the part the operator can see."""
+        try:
+            return self._dispatch_coordinator.forget_session(session_id)
+        except Exception as exc:  # noqa: BLE001 — deletion must not fail on cleanup
+            logger.error(
+                "Dispatch state: could not erase parked state for deleted session=%s "
+                "(%s). The transcript IS deleted; the parked dispatch may survive until "
+                "the idle sweep.",
+                session_id, exc,
+            )
+            return False
+
     async def handle_dispatch_command(self, session_id: str, text: str) -> str | None:
         """Intercept /dispatch BEFORE prompt dispatch (headless-coding, brief §9).
 
@@ -1498,7 +1628,9 @@ class TransportGateway:
         stripped = text.strip()
         if not stripped:
             return None
-        command = parse_dispatch_command(stripped)
+        command = parse_dispatch_command(
+            stripped, intake_token=self._dispatch_intake_token_enabled
+        )
         if command is None:
             return None
         reply = await self._dispatch_coordinator.handle_command(session_id, command)
@@ -1872,6 +2004,7 @@ class TransportGateway:
             config = VsockConfig(
                 address=VsockAddress(cid=0, port=self._port),
                 timeout_ms=int(PROMPT_RESPONSE_TIMEOUT_S * 1000),
+                max_message_bytes=self._max_message_bytes,
             )
             transport = VsockTransport(config, dev_mode=True)
             return transport if transport.connect() else None

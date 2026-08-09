@@ -49,6 +49,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
+from shared import procspawn
 from shared.fleet import grade_env
 
 # ---------------------------------------------------------------------------
@@ -105,6 +107,51 @@ CLASS_F2P_VACUOUS = "f2p_vacuous"
 #: a comfortable generic not-run (r3adversary H5).
 CLASS_REGENERATE_EXHAUSTED = "regenerate_exhausted"
 
+#: Stamp values that mean a probe DID NOT RUN. The module that writes a stamp owns what
+#: it means, so this vocabulary lives here rather than in each consumer — `swap_driver`
+#: imports it. Anything outside this set is a real result and therefore evidence.
+STAMPS_NOT_MEASURED: frozenset[str] = frozenset({"", "not-run", "skipped", "unknown"})
+
+#: Which STAGE each finding class comes from. This is the map that makes a count of zero
+#: interpretable: `f2p_vacuous: 0` means "we looked for vacuous tests and found none" ONLY
+#: if the fail-to-pass baseline actually ran. When the producing stage did not run, the
+#: class's zero is the absence of a measurement, not the measurement of an absence —
+#: #1342, where `f2p_vacuous: 0` sat beside `f2p_baseline: "not-run"` on an oracle that
+#: was three-fifths vacuous, and every reader took the zero at face value.
+STAGE_STATIC = "static_scan"
+STAGE_COLLECTABILITY = "collectability_probe"
+STAGE_F2P = "f2p_baseline"
+STAGE_COVERAGE = "coverage_map"
+STAGE_ALWAYS = "bookkeeping"
+
+CLASS_STAGE: dict[str, str] = {
+    CLASS_COLLECTABILITY: STAGE_COLLECTABILITY,
+    CLASS_F2P_VACUOUS: STAGE_F2P,
+    CLASS_TRACEABILITY: STAGE_COVERAGE,
+    CLASS_STRATEGY: STAGE_STATIC,
+    CLASS_INTERACTIVE_IO: STAGE_STATIC,
+    CLASS_INVENTED_CONTRACT: STAGE_STATIC,
+    CLASS_INVENTED_RETURN: STAGE_STATIC,
+    CLASS_IMPORT_CONTRACT: STAGE_STATIC,
+    CLASS_ADEQUACY_FLOOR: STAGE_STATIC,
+    # The regeneration counter is written by the loop itself, so it is always measured.
+    CLASS_REGENERATE_EXHAUSTED: STAGE_ALWAYS,
+}
+
+#: Plain-language name for each stage, for the ``not_measured`` disclosure. These are read
+#: by people deciding whether to trust a delivery, so they say what was not done, not which
+#: function did not run.
+_STAGE_PROSE: dict[str, str] = {
+    STAGE_STATIC: "the oracle's source was never scanned, so nothing about how it is "
+                  "written was checked",
+    STAGE_COLLECTABILITY: "the oracle was never loaded, so whether its tests can even be "
+                          "collected is unknown",
+    STAGE_F2P: "the oracle was never run against a tree where the product does not exist, "
+               "so it has NOT been shown capable of failing",
+    STAGE_COVERAGE: "no requirement-to-assertion map was built, so which of the operator's "
+                    "requirements this exam covers is unknown",
+}
+
 #: Every class, for a zero-initialised count map (so evidence always carries the full
 #: taxonomy, even the classes that did not fire this run — a stable shape for #827).
 ALL_CLASSES: tuple[str, ...] = (
@@ -137,12 +184,20 @@ _HARD_CLASSES: frozenset[str] = frozenset({
 # ---------------------------------------------------------------------------
 
 #: The advisory collectability subprocess (``py_compile`` is in-process; this bounds
-#: the ``pytest --collect-only`` confirmation against the synthesised stub skeleton).
+#: the ``pytest --collect-only`` confirmation against the synthesised stub skeleton, and
+#: its node dual — the ``node --check`` parse of a ``.mjs`` oracle, which needs a small
+#: fraction of the same budget and shares the bound rather than minting a second one).
 ORACLE_QA_COLLECT_TIMEOUT_S: float = 60.0
 #: The FAIL-TO-PASS baseline subprocess (the oracle run once against the pre-wave
 #: skeleton). Bounds a slow property test / a cold ``uv`` resolve; the oracle grades in
 #: seconds, so this is an abort bound with wide margin — well under grade-time's 600 s.
 ORACLE_QA_F2P_TIMEOUT_S: float = 120.0
+#: The NODE FAIL-TO-PASS baseline subprocess (``node --test`` over the raw oracle against
+#: the pre-wave skeleton). Its own bound rather than a reuse of the python one: node
+#: resolves no wheels and starts cold in well under a second, so the python bound's margin
+#: is entirely `uv`-shaped and would only delay an abort here. On expiry the stamp is
+#: ``not-run`` — fail-soft, exactly as the python path.
+ORACLE_QA_NODE_F2P_TIMEOUT_S: float = 60.0
 
 #: Bounded regeneration rounds (matches the ticket's "bounded retries, 2"). ONE named
 #: defect per round; after the cap a HARD residual is a COUNTED regenerate-exhausted.
@@ -208,7 +263,10 @@ class OracleQAResult:
     regen_rounds: int = 0
     regen_exhausted: bool = False
     f2p_baseline: str = "not-run"
-    collectability: str = "unconfirmed"
+    #: ``not-run`` until the subprocess probe has actually run: the plan-time path never
+    #: reaches it, and a default of ``unconfirmed`` there claimed a verdict on an exam
+    #: nothing had looked at. Set by :func:`confirm_collectable` via :func:`f2p_seed_gate`.
+    collectability: str = "not-run"
     language: str = "python"
     validated: bool = True
 
@@ -223,18 +281,68 @@ class OracleQAResult:
             return "unknown"
         return f"{len(self.covered)}/{self.coverage_denominator}"
 
+    def stage_measured(self) -> dict[str, bool]:
+        """Which QA stages actually produced a result on this run.
+
+        A stage that did not run cannot have found anything, so every finding class it
+        owns is unmeasured rather than clean (see :data:`CLASS_STAGE`)."""
+        return {
+            STAGE_STATIC: bool(self.validated),
+            STAGE_COLLECTABILITY: (
+                str(self.collectability).strip().lower() not in STAMPS_NOT_MEASURED
+            ),
+            STAGE_F2P: str(self.f2p_baseline).strip().lower() not in STAMPS_NOT_MEASURED,
+            STAGE_COVERAGE: self.coverage_denominator > 0,
+            STAGE_ALWAYS: True,
+        }
+
+    def not_measured(self) -> list[str]:
+        """Plain sentences naming every check that did not happen. Empty ⇒ all ran."""
+        measured = self.stage_measured()
+        return [_STAGE_PROSE[s] for s in _STAGE_PROSE if not measured.get(s, False)]
+
     def to_evidence(self) -> dict:
         """The ``oracle_qa`` evidence block (stable shape) stamped into the run
         scorecard for #827 (classifier) + #832 (green-audit). Carries the full
         taxonomy count map, the coverage disclosure, the f2p stamp, and the
-        regeneration accounting."""
+        regeneration accounting.
+
+        #1342 item 2 — WHY THE MEASUREMENT BLOCK EXISTS. This record used to read
+        ``validated: true, findings_total: 0`` beside ``f2p_baseline: "not-run"`` and
+        ``collectability: "skipped"``. Every reader takes zero findings to mean *we looked
+        and found nothing*; here it meant *we did not look*, and the oracle it was
+        certifying was three-fifths vacuous. The honest field sat next to the confident one
+        and lent it credibility. So the block now says, in the same breath as the count,
+        which stages ran — and ``findings_conclusive`` is the single field a reader can
+        trust: false whenever any stage that could have produced a finding did not run.
+
+        Additive only: every pre-existing key keeps its name, position and meaning, so no
+        consumer of this shape has to change to keep working.
+        """
         counts = {c: int(self.counts.get(c, 0)) for c in ALL_CLASSES}
+        measured = self.stage_measured()
+        # A class is conclusive only if the stage that produces it ran.
+        conclusive = {c: measured.get(CLASS_STAGE.get(c, STAGE_STATIC), False) for c in ALL_CLASSES}
+        unmeasured = self.not_measured()
+        if all(measured.values()):
+            status = "measured"
+        elif any(measured[s] for s in (STAGE_STATIC, STAGE_COLLECTABILITY, STAGE_F2P, STAGE_COVERAGE)):
+            status = "partial"
+        else:
+            status = "unmeasured"
         return {
             "validated": self.validated,
             "language": self.language,
             "verdict": self.verdict,
             "findings": counts,
             "findings_total": sum(counts.values()),
+            # The three fields that stop a zero being misread. `findings_conclusive` is
+            # false when ANY stage did not run, because the total is then a floor, not a
+            # count: unrun checks can only have missed things, never over-reported them.
+            "findings_conclusive": all(conclusive.values()),
+            "findings_measured": conclusive,
+            "measurement": {"status": status, "stages": measured},
+            "not_measured": unmeasured,
             "regeneration": {"rounds": self.regen_rounds, "exhausted": self.regen_exhausted},
             "oracle_coverage": self.coverage_fraction(),
             "covered": list(self.covered),
@@ -462,28 +570,44 @@ def scan_interactive_io(code: str) -> list[OracleFinding]:
     return list(uniq.values())
 
 
-def scan_invented_contracts(code: str, declared_exports: set[str]) -> list[OracleFinding]:
+def scan_invented_contracts(
+    code: str,
+    declared_exports: set[str],
+    declared_modules: "set[str] | None" = None,
+) -> list[OracleFinding]:
     """A first-party imported NAME the plan never promised is an invented contract
     (B4's ``check_answer``). Precise + conservative: only a name imported ``from
-    <first-party> import <name>`` and ABSENT from the union of declared task exports is
+    <first-party> import <name>`` and ABSENT from the declared task contracts is
     flagged — a local helper, a stdlib name, or an exported name is never touched.
+
+    A declared name is EITHER a declared export OR a declared SUBMODULE: ``from
+    flashcard_app import card_manager`` names a module the plan's ``creates`` promised,
+    not a function, and Python resolves it identically. Judging a submodule import
+    against the function-export set alone convicted valid work (#967 D1 — the
+    20260719-002208-bd run burned both regeneration rounds re-authoring around
+    ``card_manager``/``quiz_engine``/``score_tracker`` while ``oracle_coverage`` sat at
+    0/6). Only these two declared sets are honoured — an unknown name is still flagged,
+    which is the whole value of the check.
+
     Empty ``declared_exports`` disables the check (no contract to judge against →
-    fail-soft, never invent a false invention)."""
+    fail-soft, never invent a false invention); ``declared_modules`` only ever WIDENS
+    what counts as declared, so it can never manufacture a new conviction."""
     if not declared_exports:
         return []
+    declared = declared_exports | (declared_modules or set())
     out: list[OracleFinding] = []
     seen: set[str] = set()
     for imp in _first_party_imports(code):
         if not imp.is_from:
             continue
         for name in imp.names:
-            if name in declared_exports or name in seen:
+            if name in declared or name in seen:
                 continue
             seen.add(name)
             out.append(OracleFinding(
                 CLASS_INVENTED_CONTRACT,
                 f"imports `{name}` from `{imp.module}` but the plan declares no such "
-                "export — an invented contract that convicts valid work",
+                "export or submodule — an invented contract that convicts valid work",
                 subject=name,
             ))
     return out
@@ -831,12 +955,14 @@ def verify_traceability(
 def _default_run(cmd: list[str], cwd: str, timeout_s: float, env: dict) -> tuple[bool, str, str]:
     """The QA's own bounded subprocess primitive (injectable for tests). Returns
     ``(ok, stdout, stderr)`` — ``ok = (returncode == 0)``, fail-closed. Console-less on
-    Windows; the caller owns the isolated cwd + env (LOCALAPPDATA/PYTHONPATH)."""
+    Windows; the caller owns the isolated cwd + env (LOCALAPPDATA/PYTHONPATH).
+
+    Routed through ``shared.procspawn.hidden_console`` (#774 sub-task 2): the blessed twin
+    of this shape (``subprocess.run`` + ``CREATE_NO_WINDOW`` == ``_NO_WINDOW`` above). The
+    caller's full ``env`` is passed as-is (hidden_console replaces the child env with it,
+    exactly as before) plus the lesson-219 UTF-8/DEVNULL-stdin pins."""
     try:
-        cp = subprocess.run(  # noqa: S603 — argv list, no shell
-            cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_s,
-            env=env, creationflags=_NO_WINDOW,
-        )
+        cp = procspawn.hidden_console(cmd, cwd=cwd, timeout_s=timeout_s, env=env)
         return (cp.returncode == 0, cp.stdout or "", cp.stderr or "")
     except subprocess.TimeoutExpired:
         return (False, "", "TIMEOUT")
@@ -862,8 +988,13 @@ def _qa_env(isolated_home: Path, extra_path: "str | None" = None) -> dict:
     The clean-env overlay (PYTHONSAFEPATH + the PYTHONPATH base) is the ``grade_env`` SSOT
     (#839). QA-specific deviation preserved for byte-identical behavior: this PREPENDS
     ``extra_path`` onto any inherited PYTHONPATH (the collect-stub / skeleton root wins, but
-    a carried path still resolves), where ``grade_env.clean_grade_env`` REPLACES."""
+    a carried path still resolves), where ``grade_env.clean_grade_env`` REPLACES.
+
+    uv's own directories are pinned to their real locations FIRST — see
+    :func:`grade_env.uv_dir_overlay` for why the redirect would otherwise silently change
+    which interpreter runs the probes below."""
     env = dict(os.environ)
+    env.update(grade_env.uv_dir_overlay(env))
     env["LOCALAPPDATA"] = str(isolated_home)
     env["APPDATA"] = str(isolated_home)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -880,11 +1011,25 @@ def _pytest_cmd(oracle_path: str, clean_ini: Path, *, collect_only: bool) -> "li
     """Build the clean-env pytest invocation (uv-with-pins for grade-time parity, falling
     back to the current interpreter). The clean-recipe flags (``--noconftest -c clean.ini
     -o addopts= --import-mode=importlib``) are the ``grade_env`` SSOT (#839). ``None`` if no
-    runner is available."""
+    runner is available.
+
+    VERBOSITY IS LOAD-BEARING and is owned here rather than by the caller. A collect-only
+    run is read by exit code plus a collection signal, so it stays quiet; an executing run
+    is read PER TEST by :func:`_passed_tests`, which needs the ``<file>::<name> PASSED``
+    lines only ``-v`` emits. ``-q`` and ``-v`` are a single counter in pytest, so the two
+    together cancel to the default dot output and every per-test name parses as absent.
+
+    Keeping ``-q`` on the collect-only path is a CHOICE, not a necessity, and it has a cost
+    worth naming: pytest's non-quiet header prints ``platform win32 -- Python 3.13.12 ...``,
+    which would have exposed #1200's interpreter substitution directly in the output. It is a
+    version banner rather than an interpreter identity, and reading it would put the collect
+    parser in the business of headers it otherwise ignores — so parity is established from the
+    environment BEFORE the spawn (:func:`grade_env.uv_parity_is_vouched`) instead. If that
+    pre-spawn check ever proves insufficient, this is the first lever to revisit."""
     import shutil
 
     base = [
-        "-m", "pytest", "-q",
+        "-m", "pytest", "-q" if collect_only else "-v",
         *grade_env.clean_pytest_args(clean_ini),
         "-p", "no:cacheprovider",
     ]
@@ -945,7 +1090,8 @@ def confirm_collectable(
 ) -> tuple[str, Optional[OracleFinding]]:
     """ADVISORY collectability confirmation (r3adversary H6): synthesise inert stubs so
     the oracle's imports resolve, then ``pytest --collect-only --noconftest -c clean.ini``.
-    Returns ``(stamp, finding)`` where stamp ∈ {``confirmed``, ``unconfirmed``, ``skipped``}.
+    Returns ``(stamp, finding)`` where stamp ∈ {``confirmed``, ``parity-unverified``,
+    ``unconfirmed``, ``not-run``, ``skipped``}.
 
     Deliberately CANNOT false-park a valid oracle: a clean collect stamps ``confirmed``;
     a non-zero exit stamps ``unconfirmed`` (the stub synthesis could be imperfect — an
@@ -953,7 +1099,24 @@ def confirm_collectable(
     output carries an unambiguous structural-defect signature that the stubs could not
     have caused (a SyntaxError, or a Hypothesis InvalidArgument with no import error).
     The sound HARD collectability finding is :func:`check_syntax`'s in-process compile;
-    this only ever ADDS confidence, never subtracts it."""
+    this only ever ADDS confidence, never subtracts it.
+
+    ``not-run`` is the fail-loud stamp and the reason this probe can be trusted at all: a
+    runner that dies BEFORE pytest reports anything (a missing runner, a timeout, an
+    interpreter whose site-packages break plugin load) produced no evidence about the
+    oracle, and saying ``unconfirmed`` there would dress a machinery miss as a verdict on
+    the exam. Checked FIRST, because nothing a runner printed on its way down is evidence.
+    An unrun probe is the one result a reader must never be able to mistake for a measured
+    one — which is exactly what ``unconfirmed`` did on every invocation on this host.
+
+    ``parity-unverified`` closes the gap ``not-run`` cannot. Pinning uv's directories is
+    AVOIDANCE, and avoidance fails silently: where the pin does not take and the fallback
+    interpreter happens to WORK, the collect genuinely succeeds and ``confirmed`` is true
+    about collectability while being silently false about the thing the pin exists for — that
+    this verdict was reached on the interpreter the grade will use. Nothing fails, so no
+    fail-loud stamp can fire. The precondition is therefore checked BEFORE spawning, from the
+    env we are about to hand over, and a run we cannot vouch for reports what it is instead
+    of borrowing the clean word."""
     with tempfile.TemporaryDirectory(prefix="oracle_qa_collect_") as td:
         workdir = Path(td)
         oracle = workdir / "test_job_acceptance.py"
@@ -963,11 +1126,17 @@ def confirm_collectable(
         cmd = _pytest_cmd("test_job_acceptance.py", clean, collect_only=True)
         if cmd is None:
             return ("skipped", None)
-        ok, out, err = run(cmd, str(workdir), ORACLE_QA_COLLECT_TIMEOUT_S,
-                           _qa_env(workdir, extra_path=str(workdir)))
+        env = _qa_env(workdir, extra_path=str(workdir))
+        # Checked BEFORE the spawn: once uv has silently fallen back, a successful collect
+        # looks identical either way, so the only place this is still decidable is here.
+        unpinned = (grade_env.runner_is_uv(cmd)
+                    and not grade_env.uv_parity_is_vouched(env))
+        ok, out, err = run(cmd, str(workdir), ORACLE_QA_COLLECT_TIMEOUT_S, env)
         if ok:
-            return ("confirmed", None)
+            return ("parity-unverified" if unpinned else "confirmed", None)
         blob = (out + "\n" + err)
+        if not _run_completed(blob):
+            return ("not-run", None)
         low = blob.lower()
         import_miss = ("modulenotfounderror" in low or "importerror" in low)
         structural = (
@@ -993,12 +1162,22 @@ def fail_to_pass_baseline(
     test to fail/error. A test that PASSES there is vacuous / non-discriminating — it can
     only ever mint a false GREEN.
 
-    Returns ``(stamp, findings)`` where stamp ∈ {``all-fail``, ``vacuous:<names>``,
-    ``not-run``}. ``all-fail`` (or a collection error — nothing passed) is clean.
-    ``vacuous:...`` names the passing tests and yields a HARD finding per test. Any
+    Returns ``(stamp, findings)`` where stamp ∈ {``all-fail``, ``parity-unverified``,
+    ``vacuous:<names>``, ``not-run``}. ``all-fail`` (or a collection error — nothing passed)
+    is clean. ``vacuous:...`` names the passing tests and yields a HARD finding per test. Any
     machinery failure (no runner, timeout, unreadable output) is an honest ``not-run``
     with NO finding — the discrimination check is best-effort, and a machinery miss must
-    never block a dispatch (only a CONFIRMED vacuous pass is a gate defect)."""
+    never block a dispatch (only a CONFIRMED vacuous pass is a gate defect).
+
+    ``parity-unverified`` is ``all-fail``'s honest form when the runner could not be vouched
+    for (see :func:`grade_env.uv_parity_is_vouched`). ONLY the clean outcome is
+    downgraded, and deliberately so. A CLEAN verdict from an interpreter nobody chose is the
+    false-green this gate exists to prevent, so it does not get to borrow the clean word. A
+    vacuous verdict is left convicting: a test that PASSES with no implementation present is
+    evidence whichever interpreter observed it, and downgrading a HARD finding would weaken
+    the gate — a capability change, not a defect fix. Findings are identical either way, so
+    the seed proceeds exactly as before; what changes is that the evidence stops claiming
+    more than it measured."""
     try:
         repo = Path(skeleton_dir)
         if not repo.is_dir():
@@ -1011,13 +1190,16 @@ def fail_to_pass_baseline(
             cmd = _pytest_cmd(rel, clean, collect_only=False)
             if cmd is None:
                 return ("not-run", [])
-            # verbose so PASSED/FAILED lines are per-test parseable
-            cmd = cmd + ["-v"]
+            # (verbosity is _pytest_cmd's — appending -v here cancelled its -q instead)
             with tempfile.TemporaryDirectory(prefix="oracle_qa_home_") as home:
-                ok, out, err = run(cmd, str(repo), ORACLE_QA_F2P_TIMEOUT_S,
-                                  _qa_env(Path(home), extra_path=str(repo)))
+                env = _qa_env(Path(home), extra_path=str(repo))
+                # Decided BEFORE the spawn, as in confirm_collectable: after a silent uv
+                # fallback a successful run is indistinguishable from a vouched one.
+                unpinned = (grade_env.runner_is_uv(cmd)
+                            and not grade_env.uv_parity_is_vouched(env))
+                ok, out, err = run(cmd, str(repo), ORACLE_QA_F2P_TIMEOUT_S, env)
             blob = out + "\n" + err
-            passed = _passed_tests(blob)
+            passed = _discriminating_tests(_passed_tests(blob))
             if passed:
                 findings = [
                     OracleFinding(
@@ -1031,9 +1213,10 @@ def fail_to_pass_baseline(
                 return (f"vacuous:{','.join(passed)}", findings)
             # Nothing passed. Distinguish a real discriminating run (every test failed /
             # errored on the missing implementation → clean) from a machinery miss (uv
-            # absent, a timeout, a crash → honest not-run, never a false 'clean').
+            # absent, a timeout, a crash → honest not-run, never a false 'clean') — and
+            # from a run that completed on an interpreter we could not vouch for.
             if _run_completed(blob):
-                return ("all-fail", [])
+                return ("parity-unverified" if unpinned else "all-fail", [])
             return ("not-run", [])
         finally:
             try:
@@ -1046,6 +1229,31 @@ def fail_to_pass_baseline(
                 pass
     except Exception:  # noqa: BLE001 — machinery failure is an honest not-run
         return ("not-run", [])
+
+
+def _discriminating_tests(passed: list[str]) -> list[str]:
+    """Drop the tests F2P's premise does not apply to, leaving those whose pre-implementation
+    PASS really is evidence of vacuity.
+
+    Exactly one class is dropped today: the machine-injected bad-input floor (#1044, reserved
+    prefix ``bad_input_floor.FLOOR_TEST_PREFIX``). F2P asks "does this test discriminate an
+    implemented build from an empty one", and treats a pre-implementation pass as proof the
+    test can only ever mint a false GREEN. A floor test legitimately answers no. It is a FLOOR,
+    not a discriminator: on a brownfield tree whose entry point already exists and already
+    validates its input, it passes before any wave runs and is still doing precisely its job.
+    Left in the set it would be classed CONFIRMED-vacuous, which is a HARD finding, which
+    REFUSES the whole job oracle — so a floor added to strengthen grading would instead delete
+    grading for the entire dispatch, and the more defensively the existing code was written the
+    more certainly it would happen.
+
+    Deliberately a PREFIX allowlist over reserved, machine-owned names and nothing else: a
+    model-authored test that passes pre-implementation is still vacuous and still convicted.
+    The parsing stays in :func:`_passed_tests`, which reports what the run said; this decides
+    what that means, and the two are kept apart so neither has to lie for the other.
+    """
+    from shared.fleet.bad_input_floor import FLOOR_TEST_PREFIX
+
+    return [name for name in passed if not name.startswith(FLOOR_TEST_PREFIX)]
 
 
 def _passed_tests(output: str) -> list[str]:
@@ -1067,23 +1275,65 @@ def _passed_tests(output: str) -> list[str]:
     return out
 
 
+#: Pytest's end-of-run count line — ``1 failed in 0.02s``, ``no tests collected, 1 error``.
+#: Anchored on a COUNT so a prose sentence containing the same word cannot match.
+_PYTEST_COUNT_RE = re.compile(
+    r"\b\d+\s+(passed|failed|error|errors|skipped|deselected|xfailed|xpassed)\b")
+
+#: Pytest's collection line — the other shape that only exists once pytest has run.
+_PYTEST_COLLECTED_RE = re.compile(r"\bcollected\s+\d+\s+items?\b")
+
+#: Pytest's FAILURES section header. A repo whose ``addopts`` suppresses the short summary
+#: (``-rN --tb=no``) produces a RED run carrying this banner and NO count line — so without
+#: this, such a run reads as a machinery miss.
+#:
+#: THIS ONE IS NOT OPTIONAL, AND DROPPING IT MOVED A REGISTERED INSTRUMENT. The old
+#: unanchored ``"=== "`` acceptance was removed here for a good reason (a uv network error
+#: matched it), but ``_run_completed`` is NOT private to this module: ``oracle_mutation``
+#: calls it from ``_mutant_verdict``, where "the run completed and failed" means the mutant
+#: was KILLED and "the run did not complete" means NOT COUNTED. Measured on this branch
+#: before the fix: ``_mutant_verdict(False, <banner>)`` returned ``None`` where main returned
+#: ``False`` — a genuine kill silently leaving both ``oracle_mutation_killed`` and
+#: ``oracle_mutation_ran`` (registered counts, ``shared/instrument_registry.py``). Main's own
+#: ``test_oracle_mutation.py`` stayed GREEN through that change, because ``failing_tests``
+#: and ``_run_completed`` read the same blob by different routes.
+#:
+#: Anchored to a whole line so the sentence "=== FAILURES ===" in prose cannot match, which
+#: keeps the win the anchoring pass was for.
+_PYTEST_FAILURES_RE = re.compile(r"^=+\s*FAILURES\s*=+$", re.M)
+
+#: Phrases pytest emits verbatim when it ran and had nothing to report.
+_PYTEST_COMPLETION_PHRASES = (
+    "no tests ran",
+    "no tests collected",
+    "errors during collection",
+    "error collecting",
+)
+
+
 def _run_completed(output: str) -> bool:
     """True iff pytest actually RAN the file (vs a machinery miss). Matches a pytest
     summary/collection signal so a timeout / missing-runner / crash (no such signal) is
-    an honest ``not-run`` rather than a false ``all-fail``."""
-    import re
+    an honest ``not-run`` rather than a false ``all-fail``.
 
+    DELIBERATELY ANCHORED, and the anchoring is load-bearing. This once accepted the bare
+    substrings ``" passed"``, ``" failed"``, ``" error"`` and ``"=== "``, which any English
+    sentence can contain — ``error: Failed to fetch ... Request failed after 3 retries`` is a
+    uv network failure that matched ``" failed"``, and :func:`fail_to_pass_baseline` would
+    read the resulting "completed run with nothing passing" as ``all-fail``: CLEAN, from a run
+    that never executed a test. A machinery miss must never be able to spell itself like a
+    result, so every accepted shape here is one only pytest produces — a count, a collection
+    line, or a phrase it emits verbatim."""
     if not output:
         return False
     low = output.lower()
-    if re.search(r"\d+\s+(passed|failed|error|errors|skipped|deselected|xfailed)", low):
+    if _PYTEST_COUNT_RE.search(low) or _PYTEST_COLLECTED_RE.search(low):
         return True
-    return any(
-        s in low for s in (
-            "no tests ran", "errors during collection", "collected 0 items",
-            "error collecting", "=== ", " passed", " failed", " error",
-        )
-    )
+    # Searched against the ORIGINAL, not ``low``: the banner is upper-case and the pattern
+    # is written that way so it reads like the thing it matches.
+    if _PYTEST_FAILURES_RE.search(output):
+        return True
+    return any(s in low for s in _PYTEST_COMPLETION_PHRASES)
 
 
 def _tail(text: str, cap: int = 300) -> str:
@@ -1245,7 +1495,7 @@ def _static_findings(
     floor = adequacy_floor(code)
     if floor is not None:
         findings.append(floor)
-    findings += scan_invented_contracts(code, exports)
+    findings += scan_invented_contracts(code, exports, modules)
     findings += scan_invented_return_contracts(code, spec_corpus)
     findings += check_import_contract(code, modules)
     return findings
@@ -1391,6 +1641,533 @@ def validate_authored_oracle(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Node ecosystem — static vacuity + the FAIL-TO-PASS baseline for a `.mjs` oracle
+# ---------------------------------------------------------------------------
+#
+# Why this exists (#1342): every non-python oracle used to skip the execution stages
+# outright and seed unconditionally, so the ONE exam with authority over a whole job was
+# the one exam never proven able to fail. Measured on B9's `20260807-195617-bd`: a
+# 33-line, five-test node oracle with two EMPTY bodies passed, the `already_satisfied`
+# optimisation (#1049) read that pass as proof of completeness, and a required page was
+# deleted from the plan. The stages below are the dual of the python path — same stamps,
+# same fail-soft-on-machinery / fail-closed-on-confirmed-defect asymmetry.
+#
+# The static and execution stages are deliberately INDEPENDENT, because neither subsumes
+# the other and the escaped artifact proves it: F2P convicts a vacuous test only where the
+# skeleton lets the oracle's imports RESOLVE, and on a greenfield tree the whole file dies
+# at import, which node reports as ONE failing aggregate — a clean `all-fail`. Measured,
+# that is exactly what the escaped oracle produces. The static pass is what convicts there.
+
+#: Node's own runner, in the shape the driver grades with (`npm test` → `node --test`).
+#: TAP is requested EXPLICITLY: the default reporter's glyphs are TTY/locale-dependent,
+#: while TAP's ``ok <n> - <name>`` is a stable per-test contract this module can parse.
+_NODE_TAP_ARGS: tuple[str, ...] = ("--test", "--test-reporter=tap")
+
+#: Node test-declaration heads. ``.skip``/``.todo`` are DELIBERATELY absent: a skipped or
+#: todo test is an explicit, honest non-assertion, and a ``todo`` body is empty BY
+#: CONTRACT — flagging either would convict a correctly-marked placeholder.
+_NODE_TEST_HEAD_RE = re.compile(r"\b(?:it|test)\s*(?:\.\s*(?:only|concurrent)\s*)*\(")
+
+#: What counts as an assertion. Deliberately GENEROUS (node:assert, chai, jest-style
+#: matchers, bare ``ok(``/``fail(``): a missed vacuous test costs one weak exam, while a
+#: false positive REFUSES a whole job and blocks real work. The asymmetry is the design.
+_NODE_ASSERTION_RE = re.compile(
+    r"\bassert\b|\bexpect\s*\(|\bshould\b|\bthrows?\b|\brejects?\b"
+    r"|\bdoesNotThrow\b|\bdoesNotReject\b|\bfail\s*\(|\bok\s*\("
+    r"|\.\s*to[A-Z]\w*\s*\(|\bmust\s*\("
+)
+
+#: ESM import statements, read from the RAW source (the masker blanks literal bodies, and
+#: the specifier is the thing being read).
+_NODE_IMPORT_RE = re.compile(
+    r"\bimport\s+(?P<clause>[^;]*?)\s+from\s*(?P<q>['\"])(?P<spec>[^'\"]+)(?P=q)"
+)
+
+#: TAP's per-test result line.
+_NODE_TAP_OK_RE = re.compile(r"^\s*ok\s+\d+\s*-\s*(?P<name>.*?)\s*$")
+
+#: TAP end-of-run signals — the node dual of :func:`_run_completed`. Their ABSENCE is how a
+#: machinery miss (no node, a timeout, a runner that died before TAP said anything) stays
+#: an honest ``not-run`` instead of borrowing the clean ``all-fail`` word.
+_NODE_TAP_DONE_RE = re.compile(r"^\s*(?:1\.\.\d+|#\s+(?:tests|pass|fail)\s+\d+)\s*$", re.M)
+
+#: Characters after which a ``/`` begins a REGEX rather than a division, plus the keywords
+#: with the same property. Used only by the masker's fail-soft scan.
+_JS_REGEX_PRECEDERS = frozenset("(,=:[!&|?{};+-*%^~<>")
+_JS_REGEX_KEYWORDS = frozenset({
+    "return", "typeof", "case", "in", "of", "new", "delete", "void", "instanceof",
+    "do", "else", "yield", "await",
+})
+
+
+def _node_mask(code: str) -> "str | None":
+    """Blank every COMMENT and string/template LITERAL body in ``code``, preserving length
+    and newlines, so brace-matching and token scans read code and only code.
+
+    Returns ``None`` on any ambiguity — an unterminated string/comment/regex, or a frame
+    stack that does not unwind. That is the fail-soft contract the whole node static pass
+    rests on: this module would rather see nothing than mis-tokenise a legitimate oracle
+    into a REFUSE, so an unparseable file yields no findings at all (``node --check`` owns
+    the "is it even valid" question, and unlike this scan it is sound)."""
+    out = list(code)
+    n = len(code)
+    i = 0
+    # Each frame is [mode, brace_depth]; a `${` inside a template pushes a code frame.
+    frames: list[list] = [["code", 0]]
+
+    def blank(a: int, b: int) -> None:
+        for k in range(a, min(b, n)):
+            if out[k] != "\n":
+                out[k] = " "
+
+    while i < n:
+        mode = frames[-1][0]
+        c = code[i]
+        if mode == "template":
+            if c == "\\":
+                blank(i, i + 2)
+                i += 2
+                continue
+            if c == "`":
+                frames.pop()
+                i += 1
+                continue
+            if c == "$" and i + 1 < n and code[i + 1] == "{":
+                frames.append(["code", 0])
+                i += 2
+                continue
+            blank(i, i + 1)
+            i += 1
+            continue
+        # --- code mode ---
+        if c == "/" and i + 1 < n and code[i + 1] == "/":
+            j = code.find("\n", i)
+            j = n if j == -1 else j
+            blank(i, j)
+            i = j
+            continue
+        if c == "/" and i + 1 < n and code[i + 1] == "*":
+            j = code.find("*/", i + 2)
+            if j == -1:
+                return None
+            blank(i, j + 2)
+            i = j + 2
+            continue
+        if c in ("'", '"'):
+            j = i + 1
+            while j < n:
+                if code[j] == "\\":
+                    j += 2
+                    continue
+                if code[j] == c or code[j] == "\n":
+                    break
+                j += 1
+            if j >= n or code[j] != c:
+                return None
+            blank(i + 1, j)
+            i = j + 1
+            continue
+        if c == "`":
+            frames.append(["template", 0])
+            i += 1
+            continue
+        if c == "/":
+            k = i - 1
+            while k >= 0 and out[k] in " \t\r\n":
+                k -= 1
+            prev = out[k] if k >= 0 else ""
+            word = ""
+            if prev.isalnum() or prev == "_":
+                w = k
+                while w >= 0 and (out[w].isalnum() or out[w] == "_"):
+                    w -= 1
+                word = "".join(out[w + 1:k + 1])
+            if k < 0 or prev in _JS_REGEX_PRECEDERS or word in _JS_REGEX_KEYWORDS:
+                j = i + 1
+                in_class = False
+                while j < n:
+                    if code[j] == "\\":
+                        j += 2
+                        continue
+                    if code[j] == "\n":
+                        return None
+                    if code[j] == "[":
+                        in_class = True
+                    elif code[j] == "]":
+                        in_class = False
+                    elif code[j] == "/" and not in_class:
+                        break
+                    j += 1
+                if j >= n or code[j] != "/":
+                    return None
+                blank(i + 1, j)
+                i = j + 1
+                continue
+        if c == "{":
+            frames[-1][1] += 1
+        elif c == "}":
+            if frames[-1][1] == 0:
+                if len(frames) == 1:
+                    return None  # unbalanced — refuse to guess
+                frames.pop()  # closes a `${ ... }` interpolation
+                i += 1
+                continue
+            frames[-1][1] -= 1
+        i += 1
+    if len(frames) != 1 or frames[0][1] != 0:
+        return None
+    return "".join(out)
+
+
+def _node_import_bindings(code: str) -> "list[tuple[str, set[str]]]":
+    """``(specifier, local binding names)`` for every ESM ``import … from '<spec>'``.
+
+    The raw material BOTH first-party rules are built from, and the reason it is its own
+    function: this module decides first-party status from the ``./`` prefix (a relative
+    specifier is the deliverable by construction), while the harness's traceability
+    assessor decides it from the run's own banked resolve-probe. Same parse, two
+    predicates — and one parse, so the two can never disagree about what the file imported.
+
+    Read from the raw source deliberately: a commented-out import contributes a name that
+    is never called, which can only ADD names and therefore only ever makes a caller MORE
+    forgiving — the safe direction."""
+    out: "list[tuple[str, set[str]]]" = []
+    for m in _NODE_IMPORT_RE.finditer(code):
+        names: set[str] = set()
+        clause = m.group("clause").strip()
+        head, brace, braced = clause.partition("{")
+        head = head.strip().rstrip(",").strip()
+        if head.startswith("*"):
+            names.add(head.split(" as ")[-1].strip())
+        elif head:
+            names.add(head)
+        if brace:
+            for item in braced.rstrip("}").split(","):
+                item = item.strip()
+                if item:
+                    names.add(item.split(" as ")[-1].strip())
+        out.append((m.group("spec"),
+                    {n for n in names if re.fullmatch(r"[A-Za-z_$][\w$]*", n or "")}))
+    return out
+
+
+def _node_first_party_names(code: str) -> set[str]:
+    """Local binding names imported from a RELATIVE specifier — the node analogue of
+    :func:`_first_party_imports`. A relative specifier (``./`` / ``../``) is first-party by
+    construction; a bare specifier is a dependency and ``node:*`` is the platform."""
+    names: set[str] = set()
+    for spec, bound in _node_import_bindings(code):
+        if spec.startswith("."):
+            names |= bound
+    return names
+
+
+def _node_test_bodies(masked: str) -> list[tuple[int, str]]:
+    """``(declaration_offset, body_slice)`` for every ``test(...)``/``it(...)`` in the
+    masked source. Handles a braced callback body and a concise arrow body
+    (``test('x', () => assert.ok(v))``). A declaration whose body cannot be delimited is
+    SKIPPED rather than guessed at — the same fail-soft rule as :func:`_node_mask`."""
+    out: list[tuple[int, str]] = []
+    n = len(masked)
+    for m in _NODE_TEST_HEAD_RE.finditer(masked):
+        open_paren = m.end() - 1
+        depth = 0
+        close_paren = -1
+        for k in range(open_paren, n):
+            if masked[k] == "(":
+                depth += 1
+            elif masked[k] == ")":
+                depth -= 1
+                if depth == 0:
+                    close_paren = k
+                    break
+        if close_paren == -1:
+            continue
+        args = masked[open_paren + 1:close_paren]
+        arrow = args.find("=>")
+        if arrow != -1:
+            rest = args[arrow + 2:]
+            if rest.lstrip().startswith("{"):
+                body = _node_braced_body(rest)
+                if body is None:
+                    continue
+                out.append((m.start(), body))
+            else:
+                out.append((m.start(), rest))
+            continue
+        fn = re.search(r"\bfunction\b[^{]*\{", args)
+        if not fn:
+            continue
+        body = _node_braced_body(args[fn.end() - 1:])
+        if body is None:
+            continue
+        out.append((m.start(), body))
+    return out
+
+
+def _node_braced_body(text: str) -> "str | None":
+    """The contents of the first ``{...}`` block in ``text`` by brace matching, or ``None``
+    when it does not close (fail-soft: the declaration is then skipped, never guessed)."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    for k in range(start, len(text)):
+        if text[k] == "{":
+            depth += 1
+        elif text[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:k]
+    return None
+
+
+def _node_declared_name(code: str, offset: int) -> str:
+    """The test's declared name, recovered from the RAW source at the masked declaration's
+    offset (the masker blanked the literal holding it). ``""`` when unrecoverable — the
+    finding still stands, it just names the test positionally."""
+    m = re.compile(r"\(\s*(['\"`])(?P<name>[^'\"`]*)\1").search(code, offset)
+    if not m or m.start() > offset + 200:
+        return ""
+    return m.group("name")
+
+
+# --- The node tokeniser, exported (#1348) ----------------------------------------------
+#
+# ``tools/dispatch_harness/green_quality/traceability.py`` reads the SAME ``.mjs`` oracles
+# this module validates, and needs the same four answers: where are the literals, what did
+# the file import, where are the test bodies, what is each test called. These aliases exist
+# so it reuses THIS tokeniser rather than the repository growing a second one — and a second
+# JavaScript tokeniser is not a duplicate, it is a divergence waiting to happen, where two
+# instruments disagree about what a test body contains and neither is wrong on its own terms.
+#
+# Underscore-private is still the right default for the rest of this file; these five names
+# are the deliberate, documented seam. Behaviour is unchanged by exporting them.
+node_mask = _node_mask
+node_import_bindings = _node_import_bindings
+node_first_party_names = _node_first_party_names
+node_test_bodies = _node_test_bodies
+node_declared_name = _node_declared_name
+#: Deliberately GENEROUS — see :data:`_NODE_ASSERTION_RE`. A consumer whose failure
+#: asymmetry is INVERTED (where a generous match MINTS a claim rather than withholding one)
+#: must not use this as its predicate; traceability uses it only for the "does this test
+#: assert anything at all" flag, never to award coverage.
+NODE_ASSERTION_RE = _NODE_ASSERTION_RE
+
+
+def node_static_vacuity(code: str) -> list[OracleFinding]:
+    """Per-test STATIC vacuity — the shapes that need no execution to convict, and the only
+    stage that can convict the escaped B9 oracle at all (its imports do not resolve on a
+    greenfield skeleton, so F2P legitimately reports ``all-fail`` there).
+
+    Two HARD shapes, both the existing adequacy floor (:data:`CLASS_ADEQUACY_FLOOR`)
+    applied per TEST rather than per file:
+
+      * an EMPTY body (statements absent; comments already blanked) — it cannot fail on any
+        tree, for any implementation, ever;
+      * a body with NO assertion AND NO call of a first-party symbol — nothing in it can
+        throw on a missing implementation, so it cannot discriminate either.
+
+    Deliberately NOT flagged: an assertion-free body that DOES call a first-party symbol
+    (the bare no-raise smoke test). That is this module's own established floor rule — see
+    :func:`_exercises_first_party`, whose docstring exists precisely so a legitimate smoke
+    oracle "passes the floor and is not false-flagged". Such a test still fails on a
+    skeleton (the call throws), so it genuinely discriminates; where the skeleton lets its
+    imports resolve, :func:`node_fail_to_pass_baseline` convicts it BY MEASUREMENT.
+    Hard-refusing it statically would contradict a rule written to prevent a false flag.
+
+    Fail-soft by construction: an unmaskable source yields ``[]``."""
+    masked = _node_mask(code)
+    if masked is None:
+        return []
+    first_party = _node_first_party_names(code)
+    findings: list[OracleFinding] = []
+    for idx, (offset, body) in enumerate(_node_test_bodies(masked), start=1):
+        subject = _node_declared_name(code, offset) or f"test #{idx}"
+        if not body.strip():
+            findings.append(OracleFinding(
+                CLASS_ADEQUACY_FLOOR,
+                f"test `{subject}` has an EMPTY body — it asserts nothing and cannot fail "
+                "on any tree, so it can only ever mint a false GREEN",
+                subject=subject,
+            ))
+            continue
+        if _NODE_ASSERTION_RE.search(body):
+            continue
+        if not any(
+            re.search(r"\b" + re.escape(name) + r"\s*(?:\(|\.\s*\w+\s*\()", body)
+            for name in first_party
+        ):
+            findings.append(OracleFinding(
+                CLASS_ADEQUACY_FLOOR,
+                f"test `{subject}` makes no assertion and calls no first-party symbol — "
+                "nothing in it can fail on a missing implementation",
+                subject=subject,
+            ))
+    return findings
+
+
+def node_confirm_collectable(
+    code: str, *, run: "Callable[..., tuple[bool, str, str]]" = _default_run
+) -> tuple[str, Optional[OracleFinding]]:
+    """The node dual of :func:`confirm_collectable`: ``node --check`` PARSES the oracle
+    without executing it. Returns ``(stamp, finding)``, stamp ∈ {``confirmed``,
+    ``unconfirmed``, ``not-run``}.
+
+    A parse failure here is SOUND — unlike the python collect probe nothing is stubbed and
+    nothing is imported, ``--check`` only parses — so it yields a HARD collectability
+    finding. A missing runner is ``not-run`` with no finding: the node oracle previously
+    stamped a flat ``skipped`` on this axis regardless, which read as a measurement to
+    every consumer of ``oracle-qa.json`` while measuring nothing."""
+    import shutil
+
+    node = shutil.which("node")
+    if not node:
+        return ("not-run", None)
+    with tempfile.TemporaryDirectory(prefix="oracle_qa_node_check_") as td:
+        workdir = Path(td)
+        probe = workdir / "acceptance.job.test.mjs"
+        probe.write_text(code, encoding="utf-8")
+        ok, out, err = run(
+            [node, "--check", probe.name], str(workdir),
+            ORACLE_QA_COLLECT_TIMEOUT_S, _qa_env(workdir),
+        )
+        if ok:
+            return ("confirmed", None)
+        blob = (out + "\n" + err).strip()
+        if not blob:
+            return ("not-run", None)
+        return ("unconfirmed", OracleFinding(
+            CLASS_COLLECTABILITY,
+            f"node could not parse the oracle: {_tail(blob)}",
+        ))
+
+
+def node_fail_to_pass_baseline(
+    code: str,
+    skeleton_dir: str,
+    *,
+    run: "Callable[..., tuple[bool, str, str]]" = _default_run,
+) -> tuple[str, list[OracleFinding]]:
+    """The node dual of :func:`fail_to_pass_baseline`: run the oracle ONCE against the REAL
+    pre-implementation skeleton with ``node --test`` and require every test to fail. A test
+    that PASSES with no implementation present is vacuous and yields a HARD finding.
+
+    Stamps: ``all-fail`` (clean), ``vacuous:<names>``, ``not-run``. The asymmetry is the
+    python path's, unchanged and deliberate — any MACHINERY failure (node absent, timeout,
+    a runner that died before TAP said anything) is a fail-soft ``not-run`` with NO finding,
+    while a CONFIRMED pre-implementation pass is fail-closed.
+
+    The probe is written into the pinned oracle's OWN directory
+    (:data:`shared.fleet.acceptance.JOB_ORACLE_PATH_NODE`'s parent), not the repo root: ESM
+    relative specifiers resolve from the importing file's location, so a root-level probe
+    would resolve the oracle's ``../src/...`` imports outside the tree entirely and turn
+    every run into a meaningless import error."""
+    import shutil
+
+    probe: "Path | None" = None
+    created_dir = False
+    try:
+        repo = Path(skeleton_dir)
+        if not repo.is_dir():
+            return ("not-run", [])
+        node = shutil.which("node")
+        if not node:
+            return ("not-run", [])
+        from shared.fleet.acceptance import JOB_ORACLE_PATH_NODE
+
+        rel_parent = Path(JOB_ORACLE_PATH_NODE).parent
+        probe_dir = repo / rel_parent
+        created_dir = not probe_dir.exists()
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        probe = probe_dir / "_qa_f2p_probe.test.mjs"
+        probe.write_text(code, encoding="utf-8")
+        rel = (rel_parent / probe.name).as_posix()
+        with tempfile.TemporaryDirectory(prefix="oracle_qa_node_home_") as home:
+            ok, out, err = run(
+                [node, *_NODE_TAP_ARGS, rel], str(repo),
+                ORACLE_QA_NODE_F2P_TIMEOUT_S, _qa_env(Path(home)),
+            )
+        blob = out + "\n" + err
+        passed = _node_passed_tests(blob)
+        if passed:
+            return (f"vacuous:{','.join(passed)}", [
+                OracleFinding(
+                    CLASS_F2P_VACUOUS,
+                    f"test `{name}` PASSES on the pre-implementation skeleton — it is "
+                    "vacuous (asserts nothing that needs the implementation)",
+                    subject=name,
+                )
+                for name in passed
+            ])
+        if _NODE_TAP_DONE_RE.search(blob):
+            return ("all-fail", [])
+        return ("not-run", [])
+    except Exception:  # noqa: BLE001 — machinery failure is an honest not-run
+        return ("not-run", [])
+    finally:
+        try:
+            if probe is not None and probe.exists():
+                probe.unlink()
+            if created_dir and probe is not None:
+                probe.parent.rmdir()
+        except OSError:
+            pass
+
+
+def _node_passed_tests(output: str) -> list[str]:
+    """TAP ``ok <n> - <name>`` lines — the names that PASSED. ``# SKIP``/``# TODO``
+    directives are dropped (a skipped test is not a pass, and counting one would invent a
+    vacuity finding against a test that never ran). De-duped, order-preserving."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for line in output.splitlines():
+        m = _NODE_TAP_OK_RE.match(line)
+        if not m:
+            continue
+        name = m.group("name")
+        if re.search(r"#\s*(SKIP|TODO)\b", name, re.I):
+            continue
+        name = name.strip()
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def _node_seed_gate(
+    code: str,
+    skeleton_dir: str,
+    result: OracleQAResult,
+    *,
+    run: "Callable[..., tuple[bool, str, str]]" = _default_run,
+) -> OracleQAResult:
+    """Assemble the node verdict: ``node --check`` + static vacuity + the F2P baseline,
+    merged into the plan-time evidence exactly as the python path merges its own."""
+    result.language = "node"
+    stamp, collect_finding = node_confirm_collectable(code, run=run)
+    result.collectability = stamp
+    f2p_stamp, f2p_findings = node_fail_to_pass_baseline(code, skeleton_dir, run=run)
+    result.f2p_baseline = f2p_stamp
+
+    new_findings = list(result.findings)
+    for f in (collect_finding, *node_static_vacuity(code), *f2p_findings):
+        if f is None:
+            continue
+        new_findings.append(f)
+        result.counts[f.cls] = result.counts.get(f.cls, 0) + 1
+    result.findings = new_findings
+
+    if any(f.hard for f in new_findings):
+        result.verdict = "refuse"
+    elif any(not f.hard for f in new_findings) or result.uncovered:
+        result.verdict = "seed-partial"
+    else:
+        result.verdict = "seed"
+    return result
+
+
 def f2p_seed_gate(
     code: str,
     rel_path: str,
@@ -1407,11 +2184,19 @@ def f2p_seed_gate(
     ``refuse`` iff a CONFIRMED vacuous test exists (a real defect → don't seed → honest
     not-run). Any machinery failure (no runner, timeout) is fail-soft: the f2p stamp is
     ``not-run`` and the seed proceeds (the gate fails closed only on a CONFIRMED defect,
-    never on a machinery miss — pipeline degradation is fail-soft-honest). Non-python
-    oracles skip the execution stages (there is no pytest for a ``.mjs`` oracle) and seed."""
+    never on a machinery miss — pipeline degradation is fail-soft-honest).
+
+    A ``.mjs`` oracle takes the node dual of the same stages (:func:`_node_seed_gate`) —
+    ``node --check``, the per-test static vacuity pass, and the ``node --test`` FAIL-TO-PASS
+    baseline. It previously returned an unconditional ``seed`` with both execution stamps
+    faked flat, which made the operator's stated priority (websites — node jobs) precisely
+    the case where the highest-authority exam was never proven able to fail (#1342). Any
+    OTHER ecosystem still seeds unstamped: there is no runner here to make a claim with,
+    and the stamps say so rather than borrowing a measured word."""
     result = _result_from_prior(code, prior_evidence)
+    if rel_path.endswith(".mjs"):
+        return _node_seed_gate(code, skeleton_dir, result, run=run)
     if not rel_path.endswith(".py"):
-        result.language = "node" if rel_path.endswith(".mjs") else result.language
         result.collectability = "skipped"
         result.f2p_baseline = "not-run"
         if result.verdict != "refuse":

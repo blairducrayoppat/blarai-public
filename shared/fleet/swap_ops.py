@@ -29,13 +29,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Callable
 
+from shared import procspawn
 from shared.fleet import grade_env
+from shared.fleet import image_placement, link_lint
 from shared.fleet import static_pregate
 from shared.fleet import swap_state as ss
 from shared.fleet.decompose import DEFAULT_MAX_TASKS, decompose_request
 from shared.fleet.dispatch import (
+    FLEET_SCRIPTS_DIR_ENV,
     FleetDispatchConfig,
+    FleetScriptsDirUnavailable,
     TaskOutcome,
+    read_live_declaration,
+    scripts_dir_provenance,
+    scripts_pin_dir,
     _pwsh,
     _safe_run,
     build_default_config,
@@ -71,7 +78,113 @@ _DESIGN_LOOP_FALLBACK: dict = {
     # so BOTH default False — a degraded design pass must never fake a runtime verdict.
     "runtime_hard": False,
     "runtime_captured": False,
+    # Behavior-contract channel: a fail-soft path exercised no contract and knows of none, so
+    # it claims neither. ``smoke_status="unavailable"`` says the capture could not report —
+    # deliberately NOT "not-declared", which would assert a fact about the plan this path
+    # never saw.
+    "smoke_declared": False,
+    "smoke_measured": False,
+    "smoke_status": "unavailable",
 }
+
+# ---- behaviour-smoke contract: the honesty vocabulary -----------------------
+#
+# The producer of these statuses is ``scripts/capture-web-cdp.mjs`` in agentic-setup, which
+# exports them as named constants. They are MIRRORED here rather than re-derived because the
+# two repos have to admit the same language: a status the capture emits and this side does not
+# recognise would silently fall through every branch below and read as "not exercised", which
+# is the same collapse the contract exists to retire, one repo further along.
+
+#: A contract was declared and the capture ACTUALLY exercised it. The only status that means so.
+SMOKE_HONOURED = "honoured"
+#: No contract for this product — the honest no-op, and the common case (every non-web dispatch).
+SMOKE_NOT_DECLARED = "not-declared"
+#: A contract was read and validated but the smoke never reached a verdict. Reading a file is
+#: not exercising a contract, so the read step deliberately cannot mint ``honoured``.
+SMOKE_DECLARED = "declared"
+#: The capture could not report at all (an evaluate that threw, no sidecar, a legacy producer).
+#: NOT the same as ``not-declared``, which asserts a fact about the plan a blind path never saw.
+SMOKE_UNAVAILABLE = "unavailable"
+#: A contract was present and could not be honoured — a defect in the WRITER.
+SMOKE_UNREADABLE = "unreadable"
+SMOKE_INVALID = "invalid-selector"
+#: The coder was told to place the hook and did not — a defect in the DELIVERY.
+SMOKE_ACTION_HOOK_MISSING = "action-hook-missing"
+SMOKE_RESULT_HOOK_MISSING = "result-hook-missing"
+
+#: Every status the capture can emit. A value outside this set is a cross-repo drift signal.
+SMOKE_STATUSES: frozenset[str] = frozenset({
+    SMOKE_HONOURED, SMOKE_NOT_DECLARED, SMOKE_DECLARED, SMOKE_UNAVAILABLE,
+    SMOKE_UNREADABLE, SMOKE_INVALID, SMOKE_ACTION_HOOK_MISSING, SMOKE_RESULT_HOOK_MISSING,
+})
+
+#: The four dispositions a reader branches on — the same four-state shape #1281 arrived at
+#: independently, because three states cannot express this population. ``NOT_APPLICABLE`` is a
+#: CLAIM about the plan; ``UNAVAILABLE`` is the absence of any claim at all.
+SMOKE_DISPOSITION_EXERCISED = "exercised"
+SMOKE_DISPOSITION_NOT_EXERCISED = "declared-not-exercised"
+SMOKE_DISPOSITION_NOT_APPLICABLE = "no-contract-declared"
+SMOKE_DISPOSITION_UNAVAILABLE = "could-not-determine"
+
+
+def smoke_contract_is_measured(result: "dict | None") -> bool:
+    """Whether *result* records a behaviour-smoke contract the capture ACTUALLY exercised.
+
+    The single predicate every reader uses, so a heuristic run that happened to click the right
+    thing can never be confused with a declared check that was graded and passed — the exact
+    collapse #1289 was built to retire, and the one a Python-side reader could not see until
+    this predicate existed (the channel was rendered only in PowerShell).
+
+    Deliberately strict: ALL THREE fields must agree. A producer that sets ``smoke_measured``
+    while reporting a status that does not mean "exercised" is drifting, and a predicate that
+    trusted the bool alone would launder that drift into a pass."""
+    if not isinstance(result, dict):
+        return False
+    return (
+        bool(result.get("smoke_declared"))
+        and bool(result.get("smoke_measured"))
+        and str(result.get("smoke_status", "")) == SMOKE_HONOURED
+    )
+
+
+def smoke_contract_disposition(result: "dict | None") -> str:
+    """Which of the four states *result* is in — the read every renderer makes.
+
+    Fail-closed at both ends: a non-dict, a missing key, an empty status and a status this side
+    does not recognise all resolve to :data:`SMOKE_DISPOSITION_UNAVAILABLE`. "I could not tell"
+    is the only honest answer to evidence this side cannot parse, and it is never
+    ``no-contract-declared``, which would assert something about the plan on no evidence.
+
+    ``smoke_declared`` is consulted BEFORE status membership, and the order is the whole point.
+    Refusing to make a CLAIM on evidence this side cannot parse is right; refusing to make a
+    DISCLOSURE is not. "A contract existed and this reader did not grade it" stays true however
+    the JS side spells the status — so a rename there must degrade the DETAIL, never delete the
+    disclosure. Checking membership first did exactly that: a declared, unmeasured contract
+    carrying a renamed status resolved to ``could-not-determine``, which
+    :meth:`~shared.fleet.swap_driver.SwapDriver._smoke_contract_note` is deliberately silent
+    on — a failed contract dropped without a word, by the branch that exists to prevent
+    exactly that."""
+    if not isinstance(result, dict):
+        return SMOKE_DISPOSITION_UNAVAILABLE
+    status = str(result.get("smoke_status", "") or "")
+    if smoke_contract_is_measured(result):
+        return SMOKE_DISPOSITION_EXERCISED
+    if bool(result.get("smoke_declared")) and status != SMOKE_NOT_DECLARED:
+        # A contract was declared and (by the check above) not exercised. True regardless of
+        # whether this side recognises the status, so it is answered before membership.
+        # ``not-declared`` alongside ``smoke_declared`` is a producer contradicting itself:
+        # fall through, where an unrecognised status resolves fail-closed to "could not tell".
+        return SMOKE_DISPOSITION_NOT_EXERCISED
+    if status not in SMOKE_STATUSES:
+        return SMOKE_DISPOSITION_UNAVAILABLE
+    if status == SMOKE_NOT_DECLARED:
+        return SMOKE_DISPOSITION_NOT_APPLICABLE
+    if status == SMOKE_UNAVAILABLE:
+        return SMOKE_DISPOSITION_UNAVAILABLE
+    # declared / unreadable / invalid-selector / *-hook-missing: a contract EXISTED and was not
+    # exercised. Whether the fault is the writer's or the delivery's is the status's business;
+    # for a reader deciding "was this graded?", they are one state.
+    return SMOKE_DISPOSITION_NOT_EXERCISED
 
 #: Fail-soft sentinel for the 14B critic: ANY failure yields this so the driver's critic phase
 #: no-ops rather than raising (#687 task 2). ``should_iterate=False`` leaves teardown unblocked.
@@ -95,6 +208,80 @@ def sentinel_path(config: FleetDispatchConfig) -> Path:
 
 def swap_dir(config: FleetDispatchConfig) -> Path:
     return state_dir(config) / "fleet-swap"
+
+
+def runs_dir_for(config: FleetDispatchConfig, run_id: str) -> Path:
+    """The run's output directory — where the operator's "how did it go" surfaces read from."""
+    return config.runs_dir / run_id
+
+
+def scripts_pin_expectation_path(config: FleetDispatchConfig) -> Path:
+    """Where pinned runs DECLARE which scripts directory the dispatch must use.
+
+    #1181a F4. ``BLARAI_FLEET_SCRIPTS_DIR`` reaches the dispatch only by process-environment
+    INHERITANCE, and the process that writes ``scripts_dir`` into the spec is the running
+    Assistant Orchestrator (``entrypoint.py`` ``execute_swap_dispatch`` — the only caller).
+    An AO the battery launcher did not boot never saw the variable: it resolves the PRIMARY
+    checkout, writes that into the spec, and the night runs stale scripts while the launcher
+    happily logs ``fleet dispatch scripts PINNED``. ``Ensure-AoHeadless`` has a branch for
+    exactly that AO (``already-up-preexisting``), and the ``-Now`` hand-run path skips the
+    preflight reclaim altogether — so this is the ordinary case for an on-demand run with the
+    operator's app already up, not a corner.
+
+    The expectation therefore travels ON DISK rather than through the broken chain: it lives
+    under the STATE root, which both the launcher and any AO resolve identically. Absent (the
+    default, and every unpinned run) means "no expectation" — byte-identical legacy behaviour.
+    """
+    # ONE definition, in shared.fleet.dispatch, so the resolver that READS the pin and the
+    # validation that CHECKS it can never drift to different paths. state_dir(config) is
+    # <state root>/state, so the declarations' own root is that dir's parent.
+    return scripts_pin_dir(state_dir(config).parent)
+
+
+def read_scripts_pin_expectation(config: FleetDispatchConfig) -> "Path | None":
+    """The pin declared by a RUNNING run, or None when no live run declared one.
+
+    Routed through :func:`shared.fleet.dispatch.read_live_declaration` — the SAME reader the
+    resolver uses — so the validation and the resolution can never disagree about whether a
+    declaration still applies. A declaration whose run has ended is not an expectation.
+
+    A declaration whose launcher is gone resolves to None rather than raising: this is consulted
+    on the dispatch path, and a spent declaration must not be the thing that blocks a run the
+    operator asked for. The MISMATCH is the fail-closed case, not the absence. A CORRUPT
+    declaration still raises out of the shared reader — see the caller at ``run_swap``."""
+    declared = read_live_declaration(state_dir(config).parent)
+    return Path(declared) if declared else None
+
+
+def scripts_pin_violation(config: FleetDispatchConfig) -> str:
+    """"" when the resolved ``scripts_dir`` honours the declared pin, else the plain-language
+    reason it does not. Comparison is case-insensitive on the normalised absolute path —
+    Windows, and the two sides are written by different processes (PowerShell and Python)."""
+    expected = read_scripts_pin_expectation(config)
+    if expected is None:
+        return ""
+    try:
+        same = os.path.normcase(os.path.abspath(str(expected))) == os.path.normcase(
+            os.path.abspath(str(config.scripts_dir))
+        )
+    except (OSError, ValueError):
+        same = False
+    if same:
+        return ""
+    # The REMEDY has to be one that actually works, and the earlier wording failed that twice:
+    # it blamed an assistant that started before the run, and told the operator to restart it.
+    # Since the declaration became a resolution SOURCE, a restarted assistant reads the same
+    # declaration and resolves the same path, so restarting changes nothing — and the cause is
+    # no longer inheritance at all. The only way the two can now disagree is an explicit
+    # environment override pointing somewhere else, so that is what this names. Operator-facing
+    # strings are production surface: he is non-technical and will do exactly what they say.
+    return (
+        f"this run's coder scripts are pinned to {expected}, but the process doing the "
+        f"dispatching resolved {config.scripts_dir} instead. Something is overriding the pin "
+        f"for that process — the {FLEET_SCRIPTS_DIR_ENV} setting is the only thing that can. "
+        "Nothing was dispatched and nothing was changed. Clearing that setting, or deleting "
+        f"the pin files in {scripts_pin_expectation_path(config)}, will let the run proceed."
+    )
 
 
 def swap_state_path(config: FleetDispatchConfig) -> Path:
@@ -230,10 +417,10 @@ def real_ovms_alive() -> bool:
     except Exception:  # noqa: BLE001 — fall through to tasklist
         pass
     try:
-        cp = subprocess.run(  # noqa: S603,S607 — short, parsed; no long-lived grandchildren
-            ["tasklist", "/FI", "IMAGENAME eq ovms.exe", "/NH"],
-            capture_output=True, text=True, timeout=10,
-            creationflags=_NO_WINDOW,  # console child of a console-less driver (#761)
+        # #774 sub-task 2: tasklist is the textbook blessed-hidden-console child (short,
+        # parsed, non-interactive, console-subsystem child of the console-less driver).
+        cp = procspawn.hidden_console(
+            ["tasklist", "/FI", "IMAGENAME eq ovms.exe", "/NH"], timeout_s=10.0,
         )
         return "ovms" in (cp.stdout or "").lower()
     except Exception:  # noqa: BLE001 — unreadable -> False (boot reconciler is the backstop)
@@ -760,7 +947,14 @@ def _coerce_design_loop_result(data: dict) -> dict:
     DECLARED-behavior failure sets ``runtime_hard`` (the verbatim finding already LEADS ``feedback``).
     ``runtime_captured`` records whether the console channel actually ran — both default False so a
     console-blind capture (WinUI, the msedge fallback, or a legacy producer) degrades to today's
-    pixel-only behavior and can never fake a runtime verdict."""
+    pixel-only behavior and can never fake a runtime verdict.
+
+    ``smoke_declared`` / ``smoke_measured`` / ``smoke_status`` carry the BEHAVIOR-CONTRACT honesty
+    channel: whether the plan declared what the capture must exercise, and whether the capture
+    actually exercised it. Both bools default False and the status defaults to ``""``, so a producer
+    that says nothing about the contract can never claim it ran — the same fail-closed discipline the
+    other measured-ness flags carry, aimed at the collapse where a heuristic guess and a declared,
+    passing check read identically in a green report."""
     def _b(*keys: str) -> bool:
         for k in keys:
             if k in data and data[k] is not None:
@@ -782,6 +976,9 @@ def _coerce_design_loop_result(data: dict) -> dict:
         "ok": _b("Ok", "ok"),
         "runtime_hard": _b("RuntimeHard", "runtime_hard"),
         "runtime_captured": _b("RuntimeCaptured", "runtime_captured"),
+        "smoke_declared": _b("SmokeDeclared", "smoke_declared"),
+        "smoke_measured": _b("SmokeMeasured", "smoke_measured"),
+        "smoke_status": _s("SmokeStatus", "smoke_status"),
     }
 
 
@@ -799,6 +996,7 @@ def real_run_design_loop(
     app_dir: str,
     goal: str,
     visual_criteria_json: str,
+    declared_surface: str = "",
 ) -> dict:
     """ONE capture+critique pass over the BUILT app, via the fleet's ``critique-loop.ps1`` (#688).
 
@@ -814,7 +1012,15 @@ def real_run_design_loop(
     (#740 c.1717) is True only when a REAL VLM critique ran (the clean-ending verdict-reclass
     gate; every fail-soft path is ``ok=False``). FAIL-SOFT: ANY failure (pwsh missing, non-zero
     exit, non-JSON, timeout ~180s, unreadable log) returns a COPY of
-    :data:`_DESIGN_LOOP_FALLBACK` and NEVER raises — the design phase is best-effort, never blocking."""
+    :data:`_DESIGN_LOOP_FALLBACK` and NEVER raises — the design phase is best-effort, never blocking.
+
+    ``declared_surface`` (#1171) is the spec's ``build_plan.surface`` — what the OPERATOR
+    chose from the intake platform menu ("On this computer" / "In a web browser" / "On my
+    phone"). It rides to ``check-design-structural.ps1``, whose no-XAML note used to end
+    "only a finding if this project was supposed to have a WinUI front end" — an open
+    question put to the one reader who cannot answer it from a report, when the answer was
+    already recorded at intake. Empty is a legitimate value (an unclarified ``ambiguous``
+    or ``unknown`` spec) and reproduces the pre-#1171 wording exactly."""
     try:
         script = config.scripts_dir / "critique-loop.ps1"
         command = (
@@ -823,7 +1029,8 @@ def real_run_design_loop(
             f"$r = Invoke-CritiquePass -AppDir '{_ps_single_quote(app_dir)}' "
             f"-Goal '{_ps_single_quote(goal)}' "
             f"-VisualCriteriaJson '{_ps_single_quote(visual_criteria_json)}' "
-            f"-BlarAiRepo '{_ps_single_quote(str(_BLARAI_REPO_ROOT))}'; "
+            f"-BlarAiRepo '{_ps_single_quote(str(_BLARAI_REPO_ROOT))}' "
+            f"-DeclaredSurface '{_ps_single_quote(declared_surface)}'; "
             "$r | ConvertTo-Json -Compress"
         )
         cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-Command", command]
@@ -1231,7 +1438,11 @@ def _oracle_qa_seed_gate(
         except Exception:  # noqa: BLE001 — a gate machinery failure must not block the seed
             refusal = None
     else:
+        # Both execution-stage stamps, or the persisted evidence claims a verdict for a probe
+        # that never ran: an absent key reads as "not measured here" to a human and as None to
+        # a reader, and neither is the honest "the QA was off" this branch means.
         evidence.setdefault("f2p_baseline", "not-run")
+        evidence.setdefault("collectability", "not-run")
     # Persist the merged evidence for #827/#832 (best-effort, never fatal).
     if evidence:
         try:
@@ -1780,10 +1991,11 @@ def _default_hermetic_run(
             merged["TMP"] = str(tmp)
             merged["HYPOTHESIS_STORAGE_DIRECTORY"] = str(hyp)
             merged["PYTHONDONTWRITEBYTECODE"] = "1"
-            cp = subprocess.run(  # noqa: S603 — vector argv, no shell
-                cmd, capture_output=True, text=True, timeout=bound,
-                cwd=cwd or None, env=merged, creationflags=_NO_WINDOW,
-            )
+            # #774 sub-task 2: same blessed hidden-console shape as _safe_run one level up
+            # (subprocess.run + CREATE_NO_WINDOW). ``merged`` (os.environ + clean-env recipe
+            # + the #829 hermetic channels) is passed whole; hidden_console replaces the
+            # child env with it, preserving the grader-integrity recipe byte-for-byte.
+            cp = procspawn.hidden_console(cmd, cwd=cwd or None, timeout_s=bound, env=merged)
             return (cp.returncode == 0, cp.stdout or "", cp.stderr or "")
     except subprocess.TimeoutExpired:
         return (False, "", f"hermetic re-run timed out after {bound:.0f}s")
@@ -2156,34 +2368,147 @@ def _default_web_console_capture(_repo: str, _web_root: str) -> dict:
             "evidence": "web console capture not wired at this call site (#823 default not-run)"}
 
 
+def _link_report(repo: str) -> dict:
+    """Resolve every link in the delivered site (#1345, DoD capability 15).
+
+    REPORTS, NEVER GATES. The operator's instruction was that every reference "resolve or
+    the delivery is REPORTED" — so this rides along with the web floor's evidence and
+    reaches him through the review loop, and ``ok`` is untouched on every path below.
+    Turning it into a blocking gate would add a brand-new way for a build to fail, which
+    is a capability change and therefore his ceremony, not a wiring decision. The flip is
+    one line here when he asks for it.
+
+    Fail-soft: a raise degrades to an honest not-checked record rather than taking the
+    executability floor down with it.
+    """
+    try:
+        return link_lint.lint_site(repo)
+    except Exception as exc:  # noqa: BLE001 — a lint raise is could-not-run, never a fail
+        return {
+            "schema": "link-lint/v1",
+            "checked": False,
+            "reason": f"link check raised: {type(exc).__name__}",
+            "findings": [],
+            "hard": False,
+            "counts": {},
+            "not_measured": ["the link check did not complete; nothing here was verified"],
+        }
+
+
+def _with_link_report(result: dict, link: dict) -> dict:
+    """Attach the link report to a floor result and append its headline to the evidence.
+
+    The evidence string is what lands in ``exec-smoke.log`` and in the coder's feedback,
+    so a broken link has to appear there or the check is invisible to everyone who is not
+    reading JSON.
+    """
+    result["link_lint"] = link
+    broken = int(link.get("counts", {}).get("broken", 0) or 0)
+    if broken:
+        result["evidence"] = f"{result.get('evidence', '')} | {broken} broken link(s)".strip(" |")
+    elif not link.get("checked", False):
+        result["evidence"] = f"{result.get('evidence', '')} | links NOT checked".strip(" |")
+    return result
+
+
+def _media_report(repo: str) -> dict:
+    """Grade the delivered site's media PLACEMENT (#1345, DoD capability 18).
+
+    REPORTS, NEVER GATES — identically to :func:`_link_report`, and for the same reason. The
+    operator's finding was that a six-product shop shipped two pictures and put a banner
+    photograph under a bowl; he asked for that to be SEEN, not for the build to start failing
+    on it. A brand-new way for a build to RED is a capability change and therefore his
+    ceremony, so ``ok`` and ``fingerprint`` are untouched on every path below. The flip is one
+    line here when he asks for it.
+
+    Fail-soft: a raise degrades to an honest not-graded record rather than taking the
+    executability floor down with it.
+    """
+    try:
+        return image_placement.grade_site(repo)
+    except Exception as exc:  # noqa: BLE001 — a grader raise is could-not-run, never a fail
+        return {
+            "schema": "image-placement/v1",
+            "checked": False,
+            "nothing_to_grade": False,
+            "reason": f"media placement grader raised: {type(exc).__name__}",
+            "findings": [],
+            "hard": False,
+            "checks": {},
+            "counts": {},
+            "not_measured": ["the media placement grader did not complete; nothing here was graded"],
+        }
+
+
+def _with_media_report(result: dict, media: dict) -> dict:
+    """Attach the media report to a floor result and append its headline to the evidence.
+
+    Three distinct evidence states, because collapsing them is the #1342 defect in miniature:
+    findings say so, a site with no media at all says THAT (it is not a pass), and a grading
+    pass that could not run says that loudest. A clean graded site adds nothing — silence
+    there means "graded, nothing wrong", and it is the only state that earns silence.
+    """
+    result["image_placement"] = media
+    findings = len(media.get("findings", []) or [])
+    if media.get("checked", False):
+        if findings:
+            result["evidence"] = (
+                f"{result.get('evidence', '')} | {findings} media placement finding(s)".strip(" |")
+            )
+    elif media.get("nothing_to_grade", False):
+        result["evidence"] = f"{result.get('evidence', '')} | no media to grade".strip(" |")
+    else:
+        result["evidence"] = f"{result.get('evidence', '')} | media placement NOT graded".strip(" |")
+    return result
+
+
 def _exec_smoke_web(repo: str, web_console_capture) -> dict:
     """Web floor: delegate serve+load+console-read to the #823 capture seam. A False verdict
     (console/pageerror) reds the floor with the errors quoted; True passes; unavailable /
-    no web root ⇒ honest not-run (non-blocking)."""
+    no web root ⇒ honest not-run (non-blocking).
+
+    Every return path also carries two deterministic, server-free reports on the delivered
+    tree: ``link_lint`` (#1345, capability 15) resolves every href/src, and
+    ``image_placement`` (#1345, capability 18) grades whether the media a page implies exists
+    and whether one asset is doing the work of six. Both are advisory — see
+    :func:`_link_report` and :func:`_media_report` for why neither touches ``ok``.
+    """
+    link = _link_report(repo)
+    media = _media_report(repo)
+
+    def _finish(result: dict) -> dict:
+        return _with_media_report(_with_link_report(result, link), media)
+
     web_root = _find_web_root(Path(repo))
     if web_root is None:
-        return {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
-                "evidence": "no web entrypoint (index.html) found"}
+        return _finish(
+            {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
+             "evidence": "no web entrypoint (index.html) found"})
     capture = web_console_capture or _default_web_console_capture
     try:
         res = capture(str(repo), str(web_root))
     except Exception as exc:  # noqa: BLE001 — a capture raise is could-not-run
-        return {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
-                "evidence": f"web console capture raised: {type(exc).__name__}"}
+        return _finish(
+            {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
+             "evidence": f"web console capture raised: {type(exc).__name__}"})
     if not isinstance(res, dict):
-        return {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
-                "evidence": "web console capture returned a non-dict"}
+        return _finish(
+            {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
+             "evidence": "web console capture returned a non-dict"})
     ok = res.get("ok")
     errors = [str(e) for e in (res.get("errors") or []) if str(e)]
     if ok is False:
         tail = "; ".join(errors[:5]) or str(res.get("evidence") or "console errors")
-        return {"ok": False, "language": "web", "fingerprint": f"web-console:{len(errors)}",
-                "unresolved": [], "evidence": f"web app threw console/runtime errors: {tail}"[:600]}
+        return _finish(
+            {"ok": False, "language": "web", "fingerprint": f"web-console:{len(errors)}",
+             "unresolved": [], "evidence": f"web app threw console/runtime errors: {tail}"[:600]})
     if ok is True:
-        return {"ok": True, "language": "web", "fingerprint": "", "unresolved": [],
-                "evidence": str(res.get("evidence") or "served + loaded + zero console errors")}
-    return {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
-            "evidence": str(res.get("evidence") or "web console capture unavailable")}
+        return _finish(
+            {"ok": True, "language": "web", "fingerprint": "", "unresolved": [],
+             "evidence": str(res.get("evidence") or "served + loaded + zero console errors")})
+    return _finish(
+        {"ok": None, "language": "web", "fingerprint": "", "unresolved": [],
+         "evidence": str(res.get("evidence") or "web console capture unavailable")})
 
 
 def _log_exec_smoke(config: FleetDispatchConfig, run_id: str, result: dict) -> None:
@@ -2204,6 +2529,21 @@ def _log_exec_smoke(config: FleetDispatchConfig, run_id: str, result: dict) -> N
                      f"{result.get('evidence', '')}\n")
     except OSError:
         pass
+
+    # #1345 — bank each advisory report as its own sidecar so the operator review loop can
+    # read it without parsing a log line. Written whenever one exists (including a
+    # not-checked one): the record that a check DID NOT run is the half this project keeps
+    # losing. `image-placement.json` is capability 18's half of the same motion.
+    for key, name in (("link_lint", "link-lint.json"), ("image_placement", "image-placement.json")):
+        payload = result.get(key)
+        if not isinstance(payload, dict):
+            continue
+        try:
+            sidecar = config.runs_dir / run_id / name
+            sidecar.parent.mkdir(parents=True, exist_ok=True)
+            sidecar.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError:
+            pass
 
 
 def real_run_exec_smoke(
@@ -3020,36 +3360,26 @@ def build_swap_ops(
     relaunch_holder: dict = {"proc": None}
 
     def restart_launcher() -> None:
-        # #761 live-verify catch (2026-07-08): the relaunch child MUST get real,
-        # valid standard handles. This Popen used to pass none — survivable only
-        # because the pre-#761 python.exe child got a fresh VISIBLE console (the
-        # exact window #761 removes). Under the pythonw chain the child's stderr
-        # wrapper was a cp1252 dead end and the launcher crashed encoding its own
-        # startup BANNER (UnicodeEncodeError at _banner, three retries, SWAP_FAILED)
-        # — the AO never came back. Mirror the PROVEN boot_launcher_detached
-        # wiring: DEVNULL stdin, UTF-8 append log for stdout+stderr, and
-        # PYTHONIOENCODING=utf-8 so every wrapper Python builds on these handles
-        # is banner-safe.
+        # #761 live-verify catch (2026-07-08): the relaunch child MUST get real, valid
+        # standard handles. This spawn used to pass none — survivable only because the
+        # pre-#761 python.exe child got a fresh VISIBLE console (the exact window #761
+        # removes). Under the pythonw chain the child's stderr wrapper was a cp1252 dead
+        # end and the launcher crashed encoding its own startup BANNER (SWAP_FAILED) — the
+        # AO never came back.
+        #
+        # #774 sub-task 2: this IS the blessed detached-no-console shape, so it now routes
+        # through shared.procspawn.detached_no_console — which owns the exact proven
+        # boot_launcher_detached wiring (DEVNULL stdin, UTF-8 append log for stdout+stderr,
+        # PYTHONUTF8/PYTHONIOENCODING pins, DETACHED|NEW_GROUP|BREAKAWAY with the breakaway ->
+        # detached-only OSError fallback, and NEVER CREATE_NO_WINDOW on this python-launcher
+        # child). relaunch_argv[0] already carries pythonw via the spec (compute_relaunch_argv),
+        # so the helper's R1 resolution is a safe no-op. The returned Popen is HELD so the
+        # retry loop can tell "still starting" from "dead".
         log_path = swap_dir(config) / "ao-relaunch.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        env = dict(os.environ)
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        fh = open(  # noqa: SIM115 — handle is inherited by the child
-            log_path, "a", encoding="utf-8", errors="replace")
-        try:
-            try:
-                relaunch_holder["proc"] = subprocess.Popen(  # noqa: S603
-                    relaunch_argv, cwd=relaunch_cwd or None,
-                    stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
-                    creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY,
-                    close_fds=True, env=env)
-            except OSError:
-                relaunch_holder["proc"] = subprocess.Popen(  # noqa: S603
-                    relaunch_argv, cwd=relaunch_cwd or None,
-                    stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
-                    creationflags=_DETACHED | _NEW_GROUP, close_fds=True, env=env)
-        finally:
-            fh.close()  # the child inherited the fd; our handle is free to close
+        relaunch_holder["proc"] = procspawn.detached_no_console(
+            relaunch_argv, cwd=relaunch_cwd or None, log_path=log_path,
+            env=dict(os.environ), breakaway=True,
+        )
 
     def relaunch_in_flight() -> bool:
         proc = relaunch_holder.get("proc")
@@ -3131,8 +3461,8 @@ def build_swap_ops(
         # #688 Phase 3: the end-of-run VLM design loop runs ONE capture+critique pass per call
         # over the built app, with the 30B already unloaded so the GPU is free (the driver
         # choreographs the unload/reload). Threads config + run_id like the other real_* closures.
-        run_design_loop=lambda app_dir, goal, vcj: real_run_design_loop(
-            config, run_id, app_dir, goal, vcj),
+        run_design_loop=lambda app_dir, goal, vcj, surface="": real_run_design_loop(
+            config, run_id, app_dir, goal, vcj, surface),
         # #687 task 2: the cross-model 14B critic — loads the 14B via start-llm -Force (swaps
         # from 30B), runs critic-run.ps1, and parses VERDICT. Fail-soft; NEVER raises into driver.
         # DORMANT by default: the coder-30b<->qwen3-14b OVMS swap is NOT yet hardware-verified (a
@@ -3345,6 +3675,10 @@ def prepare_and_launch_swap(
         "gate_gb": gate_gb,
         "run_budget_s": run_budget_s,
         "scripts_dir": str(config.scripts_dir),
+        # #1181a: WHERE that path came from (env | declaration | default), so a later
+        # session can tell which scripts this run used without re-deriving it from an
+        # environment that no longer exists. The spec is the run's durable record.
+        "scripts_dir_source": scripts_dir_provenance(state_dir(config).parent),
         "queue_path": str(config.queue_path),
         "runs_dir": str(config.runs_dir),
         "projects_dir": str(config.projects_dir),
@@ -3390,21 +3724,18 @@ def _spawn_detached_driver(spec_path: Path) -> None:
     # boot_launcher_detached does (DEVNULL in, UTF-8 append log out,
     # PYTHONIOENCODING=utf-8), so a stray print/traceback lands in the log
     # instead of crashing or vanishing.
+    # #774 sub-task 2: the blessed detached-no-console shape — route through
+    # shared.procspawn.detached_no_console, which owns R1 (sys.executable python.exe shim
+    # -> pythonw.exe sibling, the same resolution the old explicit ``pythonw_sibling`` call
+    # did), the DEVNULL-in / UTF-8-append-log-out / PYTHONUTF8+PYTHONIOENCODING wiring, and
+    # DETACHED|NEW_GROUP|BREAKAWAY. It ADDS the breakaway -> detached-only OSError fallback
+    # this site previously lacked (matching restart_launcher's robustness); never
+    # CREATE_NO_WINDOW on this python-launcher child.
     log_path = spec_path.with_name("driver-stdio.log")
-    env = dict(os.environ)
-    env.setdefault("PYTHONIOENCODING", "utf-8")
-    fh = open(  # noqa: SIM115 — handle is inherited by the child
-        log_path, "a", encoding="utf-8", errors="replace")
-    try:
-        subprocess.Popen(  # noqa: S603
-            [pythonw_sibling(sys.executable), "-m", "shared.fleet.swap_ops",
-             "--spec", str(spec_path)],
-            stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
-            creationflags=_DETACHED | _NEW_GROUP | _BREAKAWAY, close_fds=True,
-            env=env,
-        )
-    finally:
-        fh.close()  # the child inherited the fd; our handle is free to close
+    procspawn.detached_no_console(
+        [sys.executable, "-m", "shared.fleet.swap_ops", "--spec", str(spec_path)],
+        log_path=log_path, env=dict(os.environ), breakaway=True,
+    )
 
 
 def _coerce_budget(value) -> float:
@@ -3636,6 +3967,38 @@ def run_swap(spec_path: Path):
         vikunja_bridge=bool(spec.get("vikunja_bridge", False)),
         vikunja_bridge_project_id=int(spec.get("vikunja_bridge_project_id", 0) or 0),
     )
+    # #1181a F4, second independent lock. The reason first written here — "a spec re-read
+    # after crash recovery" — names a path that does not exist: the only spawn is
+    # prepare_and_launch_swap -> _spawn_detached_driver with a freshly written spec, and this
+    # function's other caller is the __main__ CLI. The lock is still genuine, for the two
+    # reasons it actually has: it re-checks LATER IN TIME, so a declaration that changed
+    # between dispatch and driver start is caught; and it covers a hand-run `--spec`, which
+    # never passes through execute_swap_dispatch at all.
+    # The CORRUPT path raises out of scripts_pin_violation itself (read_live_declaration is
+    # fail-closed), which happened ABOVE the reporting below — so the one case with no other
+    # signal was also the one that wrote nothing. Both paths now converge on the same report.
+    try:
+        _pin_violation = scripts_pin_violation(config)
+    except FleetScriptsDirUnavailable as _exc:
+        _pin_violation = str(_exc)
+    if _pin_violation:
+        # VISIBLE, not just fatal. This raises inside a DETACHED driver whose stderr goes to
+        # driver-stdio.log, and the assistant has already told the operator the dispatch
+        # started — so on its own he would watch a run that began and then simply never
+        # progressed. Write the refusal where he is already looking for the run's outcome.
+        try:
+            summary = runs_dir_for(config, str(spec.get("run_id", ""))) / "SUMMARY.txt"
+            summary.parent.mkdir(parents=True, exist_ok=True)
+            summary.write_text(
+                "\n".join(
+                    ["- dispatch: refused",
+                     f"    RESULT: NOT STARTED - {_pin_violation}", ""]
+                ),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass  # best-effort: never let the reporting failure mask the refusal itself
+        raise FleetScriptsDirUnavailable(_pin_violation)
     state = ss.read_swap_state(swap_state_path(config))
     tasks = state.tasks if state else []
     # #758: stamp THIS (the detached driver) process into the swap state, so a concurrent
@@ -3703,7 +4066,12 @@ def run_swap(spec_path: Path):
     return SwapDriver(
         run_id=spec["run_id"], session_id=spec["session_id"], tasks=driver_tasks,
         swap_state_path=swap_state_path(config), ops=ops,
-        gate_gb=float(spec.get("gate_gb", 20.0)), budget_watchdog=watchdog,
+        # The REACHABLE fallback for the headroom floor: the detached driver rehydrates
+        # from `spec`, and a spec written by an older AO (or by hand) can lack the key.
+        # Held in lockstep with [fleet_dispatch].swap_min_free_gb — a fallback laxer than
+        # the configured floor would admit swaps the operator's gate refuses, a stricter
+        # one would refuse dispatches the floor allows (#1313).
+        gate_gb=float(spec.get("gate_gb", 19.0)), budget_watchdog=watchdog,
         plan=plan, plan_store=store, plan_degraded=degraded,
         guest_oracle_enabled=config.guest_oracle_enabled,
         already_satisfied_precheck=config.already_satisfied_precheck,
@@ -3843,6 +4211,28 @@ def execute_swap_dispatch(
         return SwapDispatchResult(
             ok=False, run_id=run_id,
             message="No approved tasks to dispatch — nothing was run.",
+        )
+    # #1181a F4: refuse BEFORE the spec is written and the driver spawned. This is the point
+    # of use — the config resolved HERE is the one serialised into the spec and handed to
+    # real_run_task, so a mismatch here is a night that would have measured stale scripts.
+    # Checked alongside the repo validation deliberately: both are "this dispatch cannot be
+    # trusted to do what was asked", and both refuse without touching anything.
+    # GUARDED the same way run_swap's call is, and for the same reason. The CORRUPT path
+    # raises FleetScriptsDirUnavailable out of scripts_pin_violation itself
+    # (read_live_declaration is fail-closed), so a bare call turns the one case with no other
+    # signal into an exception nobody converts into a refusal the operator can read.
+    #
+    # Independent review found this applied at ONE of the two call sites: run_swap was fixed,
+    # this one — the path entrypoint.py actually uses for EXECUTE — was not. Fail-closed with
+    # no reachable remedy and no readable message is not fail-closed.
+    try:
+        pin_violation = scripts_pin_violation(config)
+    except FleetScriptsDirUnavailable as exc:
+        pin_violation = str(exc)
+    if pin_violation:
+        return SwapDispatchResult(
+            ok=False, run_id=run_id,
+            message=f"Could not dispatch — {pin_violation}",
         )
     for task in tasks:
         err = validate(Path(str(task.get("repo", ""))), config.projects_dir)

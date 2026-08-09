@@ -599,7 +599,8 @@ def _failure_taxonomy_card(nights: list[NightRecord]) -> str:
             "Failure-class trend (#827)",
             "failure_taxonomy",
             "Deterministic failure classes at battery close (ORACLE-DEFECT, INTEGRATION-SEAM, "
-            "BLIND-FIX-LOOP, DECOMPOSE-DOWNGRADE, HARNESS-BUDGET, UNCLASSIFIED). Its UNCLASSIFIED "
+            "BLIND-FIX-LOOP, DECOMPOSE-DOWNGRADE, HARNESS-BUDGET, HARNESS-ENVIRONMENT, "
+            "UNCLASSIFIED). Its UNCLASSIFIED "
             "rate is the instrument’s own health metric — a rising share means a new leak "
             "class. oracle-defect / seam / blind park counts read straight off this block.",
             "The first datapoint lands after a battery run with the #827 classifier wired at "

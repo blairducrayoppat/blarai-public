@@ -2,8 +2,12 @@
 
 **Status (Phase 3, 2026-06-30):** SHIPPED via **SEAM A** — the dispatch generates image assets
 through the **in-runtime `image_gen.py`** path (the same governed generator `/imagine` uses),
-AO-side, while the 14B is resident, BEFORE the model swap (`feat/uc010-dispatch-asset-gen`, #714;
-dormant behind `BLARAI_ENABLE_ASSET_GENERATION`). This **supersedes the Phase-2b design recorded
+AO-side, while the 14B is resident, BEFORE the model swap (`feat/uc010-dispatch-asset-gen`, #714).
+Its live default is owned by `_asset_generation_enabled()` in
+`services/assistant_orchestrator/src/entrypoint.py` — read that, never this line. (It said
+"dormant behind `BLARAI_ENABLE_ASSET_GENERATION`" until 2026-08-06 and had been wrong since the
+2026-06-30 go-live in the same ticket: only an EXPLICIT falsy value disables it, so unset means
+ENABLED.) This **supersedes the Phase-2b design recorded
 below**, which sketched a *separate* build-time tool (`asset_gen.py`, Playground v2.5). The Phase-2b
 record is kept for its measured findings.
 

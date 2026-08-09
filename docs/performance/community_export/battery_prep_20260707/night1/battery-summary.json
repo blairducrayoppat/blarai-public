@@ -1,0 +1,137 @@
+{
+  "schema": "battery-summary/v1",
+  "dry_run": false,
+  "out_dir": "<home>\\agentic-setup\\state\\battery\\night-20260706-001026\\scorecards",
+  "total": 4,
+  "verdicts": {
+    "FALSE-DONE": 0,
+    "GREEN": 0,
+    "PARKED-HONEST": 2,
+    "RECOVERED": 0,
+    "STALLED": 2
+  },
+  "hard_gates": {
+    "false_done": 0,
+    "interventions_total": 0
+  },
+  "jobs": [
+    {
+      "job_id": "B1",
+      "verdict": "PARKED-HONEST",
+      "attribution": "BUILD",
+      "wall_clock_s": 3877.609999999986,
+      "samples_consumed": -1,
+      "packs_consumed": 0,
+      "interventions": 0,
+      "run_id": "20260706-001307-bd",
+      "plan_id": "20260706-001307-bd",
+      "repo": "battery-b1-expense-cli",
+      "card_path": "evals/battery/B1.json",
+      "evidence": {
+        "plan": "<home>\\agentic-setup\\state\\fleet-swap\\plan.json",
+        "oracle_status": "not-run",
+        "summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-001307-bd\\SUMMARY.txt",
+        "job_summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-001307-bd\\JOB_SUMMARY.txt",
+        "progress": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-001307-bd\\swap-progress.log",
+        "packs": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-001307-bd\\context-packs.log"
+      },
+      "versions": {
+        "battery_runner": "v1",
+        "blarai": "755ec39",
+        "python": "3.11.9",
+        "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+      },
+      "started_utc": "2026-07-06T07:11:14Z",
+      "finished_utc": "2026-07-06T08:15:51Z",
+      "dry_run": false,
+      "notes": "",
+      "schema": "battery-scorecard/v1"
+    },
+    {
+      "job_id": "B2",
+      "verdict": "PARKED-HONEST",
+      "attribution": "BUILD",
+      "wall_clock_s": 2281.484999999986,
+      "samples_consumed": -1,
+      "packs_consumed": 0,
+      "interventions": 0,
+      "run_id": "20260706-011856-bd",
+      "plan_id": "20260706-011856-bd",
+      "repo": "battery-b2-text-stats",
+      "card_path": "evals/battery/B2.json",
+      "evidence": {
+        "plan": "<home>\\agentic-setup\\state\\fleet-swap\\plan.json",
+        "oracle_status": "not-run",
+        "summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\SUMMARY.txt",
+        "job_summary": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\JOB_SUMMARY.txt",
+        "progress": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\swap-progress.log",
+        "packs": "<home>\\agentic-setup\\state\\fleet-runs\\20260706-011856-bd\\context-packs.log"
+      },
+      "versions": {
+        "battery_runner": "v1",
+        "blarai": "755ec39",
+        "python": "3.11.9",
+        "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+      },
+      "started_utc": "2026-07-06T08:15:51Z",
+      "finished_utc": "2026-07-06T08:53:53Z",
+      "dry_run": false,
+      "notes": "",
+      "schema": "battery-scorecard/v1"
+    },
+    {
+      "job_id": "B4",
+      "verdict": "STALLED",
+      "attribution": "HARNESS",
+      "wall_clock_s": 2.125,
+      "samples_consumed": -1,
+      "packs_consumed": -1,
+      "interventions": 0,
+      "run_id": "",
+      "plan_id": "",
+      "repo": "battery-b4-flashcards-cli",
+      "card_path": "evals/battery/B4.json",
+      "evidence": {
+        "oracle_status": "unknown"
+      },
+      "versions": {
+        "battery_runner": "v1",
+        "blarai": "755ec39",
+        "python": "3.11.9",
+        "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+      },
+      "started_utc": "2026-07-06T08:53:53Z",
+      "finished_utc": "2026-07-06T08:53:55Z",
+      "dry_run": false,
+      "notes": "job could not run: could not connect to the Assistant Orchestrator (is it running on :5001?)",
+      "schema": "battery-scorecard/v1"
+    },
+    {
+      "job_id": "B6",
+      "verdict": "STALLED",
+      "attribution": "HARNESS",
+      "wall_clock_s": 2.047000000020489,
+      "samples_consumed": -1,
+      "packs_consumed": -1,
+      "interventions": 0,
+      "run_id": "",
+      "plan_id": "",
+      "repo": "battery-b6-inventory-cli",
+      "card_path": "evals/battery/B6.json",
+      "evidence": {
+        "oracle_status": "unknown"
+      },
+      "versions": {
+        "battery_runner": "v1",
+        "blarai": "755ec39",
+        "python": "3.11.9",
+        "models": "unmeasured-at-runner (see the residency's PERFORMANCE_LOG entry)"
+      },
+      "started_utc": "2026-07-06T08:53:55Z",
+      "finished_utc": "2026-07-06T08:53:57Z",
+      "dry_run": false,
+      "notes": "job could not run: could not connect to the Assistant Orchestrator (is it running on :5001?)",
+      "schema": "battery-scorecard/v1"
+    }
+  ]
+}

@@ -18,7 +18,8 @@ param(
   [Parameter(Mandatory)][string]$Tag,
   [Parameter(Mandatory)][string]$Partner,
   [Parameter(Mandatory)][string]$OutDir,
-  [int]$CooldownS = 0
+  [int]$CooldownS = 0,
+  [string]$ExtraArgs = ""   # extra args appended to the harness call, e.g. "--partner-warmup-gens 1"
 )
 $ErrorActionPreference = "Continue"
 
@@ -44,7 +45,7 @@ Remove-Item "$perf\benchmark_coresident_${Tag}_*.json" -ErrorAction SilentlyCont
 
 Write-Host "=== [$Tag] FOREGROUND capture START $(Get-Date -Format o) ==="
 & "$ut\bin\ut.exe" -o $prefix --config-level medium --enable socwatch,level-zero `
-    -a "$py $harness --partners $Partner --out-tag $Tag"
+    -a "$py $harness --partners $Partner --out-tag $Tag $ExtraArgs"
 Write-Host "=== [$Tag] ut exit $LASTEXITCODE ==="
 
 $hj = Get-ChildItem "$perf\benchmark_coresident_${Tag}_*.json" -ErrorAction SilentlyContinue |

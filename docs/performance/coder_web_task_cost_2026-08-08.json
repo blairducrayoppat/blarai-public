@@ -1,0 +1,83 @@
+{
+  "measurement": "Per-task wall-clock cost of node/web coder tasks on a real 9-unit operator dispatch, and the measured effect of the #1337 file-tool guidance fix on consecutive tasks of that same run",
+  "date": "2026-08-08",
+  "ticket": "#1322 (B9 cadence + cost model), #1337 (the guidance fix), #1321 (resume)",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "ram_gb_effective": 31.323,
+    "gpu": "Intel Arc 140V (Xe2) - coder model served by OpenVINO Model Server on :8000",
+    "npu": "present, not used by this stage",
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "toolchain": {
+    "coder_model": "local/coder-30b (Qwen3-Coder-30B-A3B INT4, OVMS)",
+    "assistant_model": "Qwen3-14B INT4 on GPU (swapped out while the coder runs)",
+    "agent_runtime": "opencode ACP via tools.dispatch_harness.acp_coder",
+    "acp_limits": "--timeout-sec 3600 --idle-sec 600 --max-steps 45 --spin-steps 10",
+    "candidates_per_task": "up to 3 (best-of-N), review budget 2"
+  },
+  "subject": {
+    "run_id": "20260808-104536-bd",
+    "origin": "operator-initiated `/dispatch advanced new pottery-studio | <goal>` from the BlarAI desktop app - NOT a battery card",
+    "goal": "a 4-page pottery studio website: home, pieces list, per-piece page, contact form",
+    "planned_tasks": 9,
+    "stack": "node / JavaScript (language-pinned so the acceptance oracle grades what was built)",
+    "repo": "C:/Users/mrbla/projects/pottery-studio"
+  },
+  "methodology": "Wall clock taken from the fleet journal's TASK-START/TASK-END pairs, which bracket the whole per-task cycle: decomposition handoff, candidate builds, gates, merge, and the post-merge visual-critique loop. n=1 per task; no task was repeated. The box was otherwise idle except for this session's own tooling. The #1337 guidance fix was applied to the LIVE AGENTS.md between task 1 and task 2, mid-run - so tasks 1 and 2+ differ in that one variable AND in their visual-fix counts, which is the confound named below.",
+  "results": [
+    {
+      "task": "home-page",
+      "minutes": 67.3,
+      "window_local": "10:56:47 -> 12:04:07",
+      "outcome": "delivered, merged",
+      "file_tool_denials": 11,
+      "note": "Ran under the PRE-fix AGENTS.md. Every read/write/edit in the fix1 attempt was refused (0 OK / 8 denied) because the coder emitted leading-slash paths; it burned 40 steps and ~17 minutes routing around them with cat/cp/echo before self-correcting to drive-qualified paths. 3 visual-fix cycles."
+    },
+    {
+      "task": "pieces-list-page",
+      "minutes": 50.2,
+      "window_local": "12:04:11 -> 12:54:26",
+      "outcome": "delivered, merged",
+      "file_tool_denials": 0,
+      "note": "First task under the corrected AGENTS.md. Every filePath emitted was fully drive-qualified."
+    },
+    {
+      "task": "individual-piece-page",
+      "minutes": 53.4,
+      "window_local": "12:54:28 -> 13:47:54",
+      "outcome": "delivered, merged",
+      "file_tool_denials": 0,
+      "note": "3 visual-fix cycles."
+    },
+    {
+      "task": "contact-page",
+      "minutes": null,
+      "window_local": "13:47:55 -> (no TASK-END)",
+      "outcome": "PARKED",
+      "file_tool_denials": 0,
+      "note": "Coder mid-stream at 13:55:59 (step 15, 3 edits); OVMS still serving that request at 13:56:29; assistant swapped back 13:56:36; all driving processes then exited. coord_redispatch staged a redispatch proposal at 14:02:35 which nothing consumes (#1321). The run ended here - the remaining 5 planned tasks were never dispatched."
+    }
+  ],
+  "cost_reading": {
+    "post_fix_per_task_minutes": [50.2, 53.4],
+    "post_fix_mean_minutes": 51.8,
+    "pre_fix_per_task_minutes": [67.3],
+    "delta_minutes": 15.5,
+    "delta_pct": 23,
+    "prior_estimate_range_minutes": "40-85 (B3's first campaign run, the figure B9's budget was extrapolated from)",
+    "projection_9_units_hours": 7.8,
+    "b9_declared_run_budget_s": 28800,
+    "b9_budget_hours": 8.0,
+    "margin_note": "9 units at the post-fix rate is ~7.8 h against an 8 h budget. The extrapolated budget is roughly right and has almost NO margin: one task needing a second dispatch attempt (max_task_dispatches=4) exhausts it."
+  },
+  "not_measured": [
+    "MODEL time vs HARNESS overhead - #1322 DECISION 4's actual ask. These are end-to-end wall-clock figures only; the split needs instrumentation that does not exist.",
+    "Whether the 15.5-minute improvement is attributable to the #1337 fix ALONE. The denial count (11 -> 0) is exact and directly attributable; the minutes are confounded because task 1 also ran 3 visual-fix cycles and n=1 per arm. Do not quote the 23% as a clean causal figure.",
+    "GPU utilisation, power draw and thermals across the run.",
+    "Why contact-page parked. The coder was mid-request when OVMS stopped; whether that was a swap-back race, a resource event, or a coder failure is not established here.",
+    "Any figure for the 5 tasks that never dispatched - the run's total cost for a COMPLETE 9-unit product remains unmeasured.",
+    "This is NOT the B9 battery card. Same shape (4 pages, shared layout, one data source, contact form) on the same stack, but a different instrument. Treat as a strong prior for B9's per-unit cost, not as B9's measurement - B9 has still never completed a run."
+  ],
+  "schema": "blarai-performance/v1"
+}

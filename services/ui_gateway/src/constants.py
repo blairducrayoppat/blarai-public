@@ -26,6 +26,20 @@ SESSION_DB_PATH: str = (
 )
 """Full path to the session database. Empty if %LOCALAPPDATA% unset."""
 
+DISPATCH_STATE_DB_FILENAME: str = "dispatch_state.db"
+"""SQLite file for the born-encrypted /dispatch pending-state store (#1116)."""
+
+DISPATCH_STATE_DB_PATH: str = (
+    os.path.join(SESSION_DB_DIR, DISPATCH_STATE_DB_FILENAME) if SESSION_DB_DIR else ""
+)
+"""Full path to the dispatch pending-state store. Empty if %LOCALAPPDATA% unset.
+
+Deliberately a SEPARATE file from ``sessions.db``: the transcript and the parked
+dispatch have different lifetimes (a parked slot is transient and is cleared the
+moment the operator answers), and keeping them apart means a durability store can
+never put the operator's irreplaceable conversation history at risk.
+"""
+
 # ---------------------------------------------------------------------------
 # Boot-Phase-3 Handshake
 # ---------------------------------------------------------------------------
@@ -114,18 +128,32 @@ AO was in fact still producing — surfacing to the user as a spurious validatio
 error. The VLM-eviction memory fix keeps real turns well under this; the larger
 budget is headroom so a legitimate vision turn is never mistaken for a hang."""
 
-PLAN_RESPONSE_TIMEOUT_S: float = 480.0
-"""Receive timeout (seconds) for a dispatch PLAN_REQUEST specifically (#766).
+PLAN_RESPONSE_TIMEOUT_S: float = 720.0
+"""Receive timeout (seconds) for a dispatch PLAN_REQUEST specifically (#766, raised again #1152).
 
 A PLAN is not one generation — it is the whole plan-time sequence on the 14B
 (decompose + criteria + assumptions + build-signal + asset-specs + the job
-oracle), ~6 chained model calls. Against a freshly swap-back-booted AO (cold
+oracle), ~6-7 chained model calls. Against a freshly swap-back-booted AO (cold
 pipeline, empty prefix cache, first-generation warm-up) that legitimately
 exceeds the per-prompt 180 s: the 2026-07-07 battery lost B4+B6 on attempt 1
 and B6 on attempt 3 to exactly this — the gateway's receive gave up at 180 s
 ("No response from the Assistant Orchestrator") while the AO was still
-generating, and the job STALLED [HARNESS]. 480 s dominates the measured cold
-worst case with headroom; a genuinely dead AO still fails fast at the per-job
+generating, and the job STALLED [HARNESS]. #766 raised this to 480 s for that
+case.
+
+#1152 (2026-07-29): the requirements-answer re-plan (the operator's FREE-TEXT
+answer to the #819 clarifying questions, re-threaded and PLANNED IN FULL) hit
+the same "No response" shape against an AO that had booted minutes earlier —
+a fresh launcher boot is the same cold-pipeline class #766 describes, just
+via a different trigger than a mid-session swap-back. The FIRST PLAN pass
+(with clarify on) only runs ONE generation (the sufficiency check), so it
+looks fast and gives false confidence the AO is warm; the answer re-plan is
+the first call that actually runs the full chain, on a large, image-heavy,
+heavily-clarified goal. A live warm-state repro of the same goal+answer took
+170 s — comfortably inside the OLD 480 s budget — so this is real cold-boot
+headroom, not a goal-size ceiling; raised to 720 s to leave slack a warm
+measurement alone cannot rule out. 720 s stays well under the #766-pinned
+900 s test ceiling; a genuinely dead AO still fails fast at the per-job
 mTLS-verified re-ensure — this budget only stretches the wait for an AO that
 is provably alive and working."""
 

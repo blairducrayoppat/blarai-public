@@ -993,14 +993,26 @@ class MessageFramer:
         criteria: "dict[str, Any] | None" = None,
         questions: "list[dict] | None" = None,
         revision: "list[dict] | None" = None,
+        coverage_blocked: str = "",
+        criteria_revision: "list[dict] | None" = None,
         request_id: str = "",
     ) -> bytes:
         """Encode a PLAN result (AO → gateway): tasks + the validated AcceptanceSpec.
 
         Metadata only — the compiled ``{repo, task, prompt}`` tasks + the spec dict
-        (``{goal, criteria:[...]}``).  The 64 KB frame cap holds easily (a handful of
-        short task prompts + plain-English criteria); an over-cap payload raises at
-        ``encode`` (Fail-Closed), never a silent truncation.
+        (``{goal, criteria:[...]}``).  An over-cap payload raises at ``encode``
+        (Fail-Closed), never a silent truncation.
+
+        SIZE IS NOT SMALL, and the pre-#1152 claim here that "the 64 KB frame cap holds
+        easily" was FALSIFIED in production on 2026-07-28 (two live failures at 65891 and
+        66938 bytes). This payload grows as O(n_tasks x (goal + requirements)): the
+        operator's clarified requirements are threaded into EVERY compiled task prompt by
+        design (see :func:`shared.fleet.acceptance.generate_plan`), so a long goal plus a
+        long free-text answer plus one more task than the last run can cross a cap the run
+        before it cleared. Do not restate a specific cap here — it is per-deployment (the
+        host and guest configs differ); read ``[ipc].max_message_bytes``. The caller is
+        expected to handle the raise: the AO's PLAN handler returns a small honest refusal
+        rather than letting it unwind (#1152 fail-loud).
 
         ``questions`` (#819) is the CLARIFY early-return payload — a list of
         ``{axis, question}`` dicts, NON-EMPTY only when the AO asked requirements-
@@ -1010,6 +1022,16 @@ class MessageFramer:
         on a pending plan (then ``tasks``/``criteria`` are empty; the coordinator applies the
         ops to the existing plan). Both are additive + optional: an older receiver ignores the
         key; ``decode_plan_result`` tolerates their absence.
+
+        ``coverage_blocked`` (#1069 S3-F) is the intake coverage-gate blocking marker —
+        plain-language text naming the exam's coverage gap, non-empty only when the gate
+        was active and the gap survived its one bounded re-authoring. Additive + optional,
+        same discipline as the two above: absent decodes to ``""``.
+
+        ``criteria_revision`` (#1069 S3-G) is the CRITERIA-REVISE early-return payload — a
+        list of ``{op, ref, text, check}`` edit ops over the pending spec's criteria,
+        non-empty only when the operator's criteria feedback rode the criteria-revise
+        sentinel and the stage was on. Additive + optional: absent decodes to ``[]``.
         """
         return self.encode(
             MessageType.PLAN_RESULT,
@@ -1021,6 +1043,8 @@ class MessageFramer:
                 "criteria": dict(criteria or {}),
                 "questions": list(questions or []),
                 "revision": list(revision or []),
+                "coverage_blocked": coverage_blocked,
+                "criteria_revision": list(criteria_revision or []),
             },
             request_id,
         )
@@ -1048,6 +1072,13 @@ class MessageFramer:
             "questions": list(require_list(payload, "questions")),
             # #820 additive: the REVISE edit-ops payload, same typed-guard discipline.
             "revision": list(require_list(payload, "revision")),
+            # #1069 S3-F additive: the intake coverage-gate blocking marker; absent
+            # (older frames) -> "" via require_str's default, a present non-str fails
+            # the decode (#803 typed-guard, Fail-Closed).
+            "coverage_blocked": require_str(payload, "coverage_blocked"),
+            # #1069 S3-G additive: the criteria-revision edit-ops payload, same
+            # typed-guard discipline as questions/revision.
+            "criteria_revision": list(require_list(payload, "criteria_revision")),
         }
 
     def encode_execute_request(

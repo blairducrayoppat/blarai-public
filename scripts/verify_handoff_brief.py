@@ -32,6 +32,17 @@ The ANCHORS block (fenced ```anchors) is a pipe-delimited table. Each row:
 
 Any value still carrying a ``<placeholder>`` is treated as unfilled -> FAIL.
 
+LANDING-CARD GATES (#1144): briefs dated on/after the cutover in
+``_LANDING_CUTOVER`` must be landing cards (see
+``docs/governance/handoff-brief-template.md``): ``template: landing-card-v1``
+frontmatter, size within the budget, the required sections present, and no
+pasted ops block (cite ``docs/governance/session-ops-surface.md`` instead).
+An undated brief cannot claim the legacy exemption (fail-closed). Briefs
+dated before the cutover verify under the legacy anchors-only rules with a
+WARN — history is never retroactively failed. A stale or missing
+machine-state stamp WARNs, never fails (generate the section with
+``scripts/author_landing_card.py``).
+
 Exit code: 0 only when every hard check passes (warnings are allowed);
 non-zero on any drift, malformed anchor, or missing/duplicate block.
 
@@ -44,6 +55,7 @@ Usage (from repo root, or anywhere with ``--repo``):
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import re
 import shutil
 import subprocess
@@ -70,6 +82,30 @@ _INT_RE = re.compile(r"^\d+$")
 _PLACEHOLDER_RE = re.compile(r"[<>]")
 
 _DERIVATION_TIMEOUT_S = 30
+
+# --- Landing-card template gates (#1144, LA-ratified 2026-07-28) -----------
+_FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*(?:\n|\Z)", re.DOTALL)
+_LANDING_TEMPLATE = "landing-card-v1"
+_LANDING_CUTOVER = _dt.date(2026, 7, 29)
+_LANDING_MAX_LINES = 150
+_LANDING_MAX_BYTES = 8 * 1024
+_LANDING_REQUIRED_SECTIONS = (
+    "## Objective",
+    "## Deltas",
+    "## Machine state",
+    "## Next step",
+    "## Pointers",
+    "## Retractions & dead ends",
+)
+# Sentinels of the retired world-report shape. The board owns the queue and
+# the ops surface owns process control; a card carries deltas and citations.
+_LANDING_FORBIDDEN = (
+    ("## Work queue", "world-report queue table - the board is the SSOT; carry deltas + pointers"),
+    ("STANDING AUTHORIZATION (User-Operator)", "pasted ops block - cite docs/governance/session-ops-surface.md"),
+    ("Start-Process -FilePath", "pasted ops block - cite docs/governance/session-ops-surface.md"),
+)
+_STAMP_RE = re.compile(r"<!--\s*machine-state generated\s+(\S+)")
+_STALE_STAMP_S = 3600
 
 
 class AnchorsError(Exception):
@@ -106,13 +142,16 @@ class BriefReport:
     repo_root: Path
     main_ref: str
     results: list[AnchorResult] = field(default_factory=list)
+    structure: list[tuple[Status, str]] = field(default_factory=list)
     fatal: str | None = None
 
     @property
     def ok(self) -> bool:
-        """True iff there is no fatal block error and no anchor FAILED.
-        Warnings do not fail the brief."""
+        """True iff there is no fatal block error, no anchor FAILED, and no
+        template-structure check FAILED. Warnings do not fail the brief."""
         if self.fatal is not None:
+            return False
+        if any(status == "FAIL" for status, _ in self.structure):
             return False
         return all(r.status != "FAIL" for r in self.results)
 
@@ -220,6 +259,121 @@ def parse_anchors(block_body: str, first_body_lineno: int = 1) -> list[Anchor]:
             "one anchor to verify (deny-by-default)"
         )
     return anchors
+
+
+# ---------------------------------------------------------------------------
+# Template-structure checks (pure - unit-tested)
+# ---------------------------------------------------------------------------
+
+
+def parse_frontmatter(text: str) -> dict[str, str]:
+    """The brief's leading ``--- ... ---`` block as a flat key: value dict.
+    Missing or malformed frontmatter returns {} (handled fail-closed by the
+    caller - an undated brief cannot claim the legacy exemption)."""
+    m = _FRONTMATTER_RE.match(text)
+    if not m:
+        return {}
+    out: dict[str, str] = {}
+    for line in m.group(1).splitlines():
+        key, sep, value = line.partition(":")
+        if sep:
+            out[key.strip()] = value.strip()
+    return out
+
+
+def _filename_date(filename: str) -> "_dt.date | None":
+    """The YYYYMMDD embedded in a brief's dated filename, if any."""
+    m = re.search(r"(20\d{6})", filename)
+    if not m:
+        return None
+    try:
+        return _dt.datetime.strptime(m.group(1), "%Y%m%d").date()
+    except ValueError:
+        return None
+
+
+def check_structure(text: str, *, mtime: float | None = None, filename: str | None = None) -> list[tuple[Status, str]]:
+    """Landing-card template gates for one brief (#1144).
+
+    Briefs dated on/after ``_LANDING_CUTOVER`` MUST be landing cards; a
+    missing or unparseable date is treated as post-cutover (fail-closed).
+    Earlier briefs return a single legacy WARN so history never
+    retroactively fails. The machine-state stamp only ever WARNs - a broken
+    probe must not block grounding, it just loses its freshness claim.
+    """
+    fm = parse_frontmatter(text)
+    raw_date = fm.get("date", "")
+    try:
+        brief_date: _dt.date | None = _dt.date.fromisoformat(raw_date)
+    except ValueError:
+        brief_date = None
+    if brief_date is not None and brief_date < _LANDING_CUTOVER:
+        name_date = _filename_date(filename) if filename else None
+        if name_date is not None and name_date >= _LANDING_CUTOVER:
+            return [(
+                "FAIL",
+                f"frontmatter date {raw_date} predates the cutover but the filename "
+                f"says {name_date.isoformat()} - a copied legacy date cannot claim "
+                f"the legacy exemption; author the card fresh "
+                f"(scripts/author_landing_card.py)",
+            )]
+        return [(
+            "WARN",
+            f"legacy world-report template (dated {raw_date}, pre-{_LANDING_CUTOVER}) "
+            f"- verified under legacy anchors-only rules",
+        )]
+
+    results: list[tuple[Status, str]] = []
+    if brief_date is None:
+        results.append((
+            "FAIL",
+            f"frontmatter 'date:' missing or unparseable ({raw_date!r}) - an undated "
+            f"brief cannot claim the legacy exemption",
+        ))
+    if fm.get("template") != _LANDING_TEMPLATE:
+        results.append((
+            "FAIL",
+            f"frontmatter 'template: {_LANDING_TEMPLATE}' required for briefs dated "
+            f"{_LANDING_CUTOVER}+ (docs/governance/handoff-brief-template.md)",
+        ))
+    lines = text.splitlines()
+    nbytes = len(text.encode("utf-8"))
+    if len(lines) > _LANDING_MAX_LINES or nbytes > _LANDING_MAX_BYTES:
+        results.append((
+            "FAIL",
+            f"size {len(lines)} lines / {nbytes:,} bytes exceeds the landing-card "
+            f"budget ({_LANDING_MAX_LINES} lines / {_LANDING_MAX_BYTES:,} bytes) - "
+            f"bank the content in its durable home, then shrink the card",
+        ))
+    for section in _LANDING_REQUIRED_SECTIONS:
+        if not any(ln.strip().startswith(section) for ln in lines):
+            results.append(("FAIL", f"required section missing: {section!r}"))
+    for sentinel, why in _LANDING_FORBIDDEN:
+        if sentinel in text:
+            results.append(("FAIL", f"forbidden content {sentinel!r}: {why}"))
+    stamp = _STAMP_RE.search(text)
+    if stamp is None:
+        results.append((
+            "WARN",
+            "machine-state stamp missing - hand-rolled machine state (generate it "
+            "with scripts/author_landing_card.py)",
+        ))
+    elif mtime is not None:
+        try:
+            stamped = _dt.datetime.fromisoformat(stamp.group(1))
+        except ValueError:
+            results.append(("WARN", "machine-state stamp unparseable"))
+        else:
+            age_s = mtime - stamped.timestamp()
+            if age_s > _STALE_STAMP_S:
+                results.append((
+                    "WARN",
+                    f"machine-state stamp is {age_s / 60:.0f} min older than the file "
+                    f"- regenerate before handing off",
+                ))
+    if not any(status == "FAIL" for status, _ in results):
+        results.insert(0, ("PASS", "landing-card structure ok"))
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -442,10 +596,15 @@ def verify_brief(
     """
     report = BriefReport(brief_path=brief_path, repo_root=repo_root, main_ref=main_ref)
     try:
-        text = brief_path.read_text(encoding="utf-8")
-    except OSError as exc:
+        text = brief_path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
         report.fatal = f"cannot read brief: {exc}"
         return report
+    try:
+        mtime: float | None = brief_path.stat().st_mtime
+    except OSError:
+        mtime = None
+    report.structure = check_structure(text, mtime=mtime, filename=brief_path.name)
     try:
         body, first_line = find_anchors_block(text)
         anchors = parse_anchors(body, first_line)
@@ -465,6 +624,8 @@ def render_report(report: BriefReport) -> str:
     lines.append(f"Handoff-brief anchor verification: {report.brief_path}")
     lines.append(f"  repo: {report.repo_root}   main-ref: {report.main_ref}")
     lines.append("")
+    for status, detail in report.structure:
+        lines.append(f"  [{status}] struct {detail}")
     if report.fatal is not None:
         lines.append(f"  [FATAL] {report.fatal}")
         lines.append("")

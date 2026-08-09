@@ -582,6 +582,203 @@ def test_compile_prompts_oracle_ignored_for_multi_feature():
     assert all("acceptance_test_code" not in t for t in out)             # oracle not stamped
 
 
+# ---- compile_prompts + the #763 JOB-level oracle (multi-feature grain) ----
+#
+# #763: in plan-graph (>=2-feature) mode, the job-level oracle (M2 W4, #740) is fed to the
+# coder as INPUT -- mirroring #690 at job grain -- instead of the blind "write your own
+# tests" instruction. Ticket: "Feed the JOB-level oracle to the coder as INPUT in
+# plan-graph mode (#688 item 2, Path B)".
+
+#: A small, valid job-level pytest oracle (mirrors _ORACLE_PY's shape/conventions above).
+_JOB_ORACLE_PY = (
+    "from app.core import add, subtract\n\n"
+    "def test_add():\n    assert add(2, 3) == 5\n\n"
+    "def test_subtract():\n    assert subtract(5, 2) == 3\n"
+)
+
+_JOB_ORACLE_PATH = "tests/test_job_acceptance.py"  # == acc.JOB_ORACLE_PATH_PYTHON
+
+
+def test_compile_prompts_job_oracle_feeds_every_build_task():
+    # The core #763 fix: EVERY build task (not just a dedicated final task) is told the job
+    # oracle exists and must not be edited -- replacing the blind test-writing instruction.
+    tasks = [
+        {"repo": "R", "task": "f1", "prompt": "build the add module",
+         "contract": {"creates": ["app/core.py"], "exports": ["add"]}},
+        {"repo": "R", "task": "f2", "prompt": "build the subtract module",
+         "contract": {"creates": ["app/core.py"], "exports": ["subtract"]}},
+    ]
+    spec = AcceptanceSpec(
+        goal="calculator",
+        criteria=(AcceptanceCriterion("c1", "2 + 3 shows 5", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "moderate", "components": []},
+    )
+    out = acc.compile_prompts(
+        tasks, spec, job_oracle_code=_JOB_ORACLE_PY, job_oracle_path=_JOB_ORACLE_PATH,
+    )
+    assert len(out) == 3  # 2 build + 1 dedicated acceptance task, same shape as blind mode
+    # each build task keeps its ORIGINAL instruction, with the oracle block appended
+    assert out[0]["prompt"].startswith("build the add module")
+    assert out[1]["prompt"].startswith("build the subtract module")
+    for t in out[:2]:
+        assert "DO NOT EDIT" in t["prompt"]
+        assert _JOB_ORACLE_PATH in t["prompt"]
+        assert "WHOLE multi-part goal" in t["prompt"]
+        assert "Write automated tests" not in t["prompt"]  # never the blind instruction
+    # the dedicated acceptance task is told NOT to author a second, competing test file
+    final = out[-1]
+    assert final["task"] == acc.ACCEPTANCE_TASK_SLUG
+    assert "NOT to author another test file" in final["prompt"]
+    assert "Write automated tests" not in final["prompt"]
+    assert "DO NOT EDIT" in final["prompt"] and _JOB_ORACLE_PATH in final["prompt"]
+    # inputs not mutated (the compile_prompts contract, preserved)
+    assert tasks[0]["prompt"] == "build the add module"
+    assert tasks[0]["contract"]["exports"] == ["add"]
+
+
+def test_compile_prompts_job_oracle_per_task_relevance_uses_own_contract():
+    # Per-task relevance framing (#763's fix sketch): each build task sees ITS OWN declared
+    # W2 contract, not its sibling's -- "a build task should satisfy the assertions its
+    # contract feeds".
+    tasks = [
+        {"repo": "R", "task": "f1", "prompt": "p1",
+         "contract": {"creates": ["app/add.py"], "exports": ["add"]}},
+        {"repo": "R", "task": "f2", "prompt": "p2",
+         "contract": {"creates": ["app/sub.py"], "exports": ["subtract"]}},
+    ]
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "2 + 3 shows 5", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "moderate", "components": []},
+    )
+    out = acc.compile_prompts(
+        tasks, spec, job_oracle_code=_JOB_ORACLE_PY, job_oracle_path=_JOB_ORACLE_PATH,
+    )
+    assert "exports add" in out[0]["prompt"] and "exports subtract" not in out[0]["prompt"]
+    assert "exports subtract" in out[1]["prompt"] and "exports add" not in out[1]["prompt"]
+
+
+def test_compile_prompts_job_oracle_fallback_relevance_when_no_contract():
+    # A task with NO declared contract still gets an honest, non-empty relevance line (never
+    # a silent no-op) naming that the oracle spans the whole job.
+    tasks = [{"repo": "R", "task": "f1", "prompt": "p1"}, {"repo": "R", "task": "f2", "prompt": "p2"}]
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "2 + 3 shows 5", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "moderate", "components": []},
+    )
+    out = acc.compile_prompts(
+        tasks, spec, job_oracle_code=_JOB_ORACLE_PY, job_oracle_path=_JOB_ORACLE_PATH,
+    )
+    assert "across the WHOLE job" in out[0]["prompt"]
+    assert "across the WHOLE job" in out[1]["prompt"]
+
+
+def test_compile_prompts_job_oracle_surfaces_import_contract():
+    # #752 F3's import-contract analogue at the job grain (named in #763's fix sketch): the
+    # coder is told the EXACT first-party names the protected job oracle imports, on both a
+    # build task and the acceptance task.
+    tasks = [{"repo": "R", "task": "f1", "prompt": "p1"}, {"repo": "R", "task": "f2", "prompt": "p2"}]
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "2 + 3 shows 5", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "moderate", "components": []},
+    )
+    out = acc.compile_prompts(
+        tasks, spec, job_oracle_code=_JOB_ORACLE_PY, job_oracle_path=_JOB_ORACLE_PATH,
+    )
+    assert "app.core.add" in out[0]["prompt"] and "app.core.subtract" in out[0]["prompt"]
+    assert "app.core.add" in out[-1]["prompt"] and "app.core.subtract" in out[-1]["prompt"]
+
+
+def test_compile_prompts_job_oracle_single_feature_unaffected():
+    # [kill] job_oracle_code/path must have ZERO effect when len(feature) == 1 -- the #690
+    # single-feature branch (#763 must never regress it, per #763's own "don't regress #690"
+    # framing). Both the plain fold-in path and the #690 per-task-oracle path are exercised,
+    # each byte-identical to their job-oracle-less counterparts.
+    spec = AcceptanceSpec(
+        goal="g", criteria=(AcceptanceCriterion("c1", "2 + 3 shows 5", "behavior", ""),),
+        build_plan={"surface": "command-line", "language_hint": "python",
+                    "complexity": "simple", "components": []},
+    )
+    tasks = [{"repo": "R", "task": "only", "prompt": "build the calc"}]
+
+    baseline = acc.compile_prompts(tasks, spec)
+    with_job_oracle = acc.compile_prompts(
+        tasks, spec, job_oracle_code=_JOB_ORACLE_PY, job_oracle_path=_JOB_ORACLE_PATH,
+    )
+    assert with_job_oracle == baseline
+    assert _JOB_ORACLE_PATH not in with_job_oracle[0]["prompt"]
+
+    # AND with the #690 single-feature oracle ALSO supplied (both present): still identical
+    # to the #690-only baseline -- job_oracle_* is ignored whenever len(feature) == 1.
+    baseline_690 = acc.compile_prompts(tasks, spec, oracle_code=_ORACLE_PY)
+    with_both = acc.compile_prompts(
+        tasks, spec, oracle_code=_ORACLE_PY,
+        job_oracle_code=_JOB_ORACLE_PY, job_oracle_path=_JOB_ORACLE_PATH,
+    )
+    assert with_both == baseline_690
+
+
+def test_compile_prompts_without_job_oracle_multi_feature_unaffected():
+    # [kill] the DEFAULT (no job oracle supplied) multi-feature shape is byte-identical to
+    # pre-#763 -- the blind test_block instruction on the dedicated acceptance task, nothing
+    # appended to the build tasks. Covers both the omitted-kwarg and explicit-empty-string
+    # calling conventions.
+    tasks = [{"repo": "R", "task": "f1", "prompt": "p1"}, {"repo": "R", "task": "f2", "prompt": "p2"}]
+    spec = AcceptanceSpec("g", (AcceptanceCriterion("c1", "2 + 3 shows 5", "behavior", ""),))
+    baseline = acc.compile_prompts(tasks, spec)
+    explicit_empty = acc.compile_prompts(tasks, spec, job_oracle_code="", job_oracle_path="")
+    assert baseline == explicit_empty
+    assert "Write automated tests" in baseline[-1]["prompt"]
+    assert baseline[0]["prompt"] == "p1" and baseline[1]["prompt"] == "p2"
+
+
+def test_generate_plan_job_oracle_wiring_reaches_compiled_prompts(tmp_path):
+    # End-to-end (#763): the JOB-level oracle computed at PLAN time (generate_plan step 2g)
+    # must actually REACH compile_prompts and shape the compiled prompts -- not just ride
+    # the final task as an inert data blob for the driver to seed (the #688 c.1412 gap this
+    # ticket closes: "no build task's prompt tells the coder the specification-tests
+    # exist"). Uses DecompositionOverride (#752 F2, a generic caller-authorized seam) so the
+    # test does not depend on the 14B's own job-oracle-authoring call.
+    projects = tmp_path / "projects"
+    repo = _git_repo(projects)
+    override = acc.DecompositionOverride(
+        tasks=[
+            {"repo": repo, "task": "f1", "prompt": "build add",
+             "contract": {"creates": ["app/core.py"], "exports": ["add"]}},
+            {"repo": repo, "task": "f2", "prompt": "build subtract",
+             "contract": {"creates": ["app/core.py"], "exports": ["subtract"]}},
+        ],
+        job_oracle_code=_JOB_ORACLE_PY,
+        job_oracle_path=acc.JOB_ORACLE_PATH_PYTHON,
+    )
+    gen = _fake_model(
+        tasks_json="[]",  # unused -- decompose is bypassed by the override
+        criteria_json=json.dumps([{"text": "2 + 3 shows 5", "tier": "behavior", "check": ""}]),
+        build_plan_json=_PY_BUILD_PLAN,
+    )
+    res = acc.generate_plan(
+        "a calculator", repo, generate_fn=gen, projects_dir=projects,
+        decomposition_override=override,
+    )
+    assert res.ok
+    assert len(res.tasks) == 3  # 2 build + 1 dedicated acceptance task
+    build_tasks = [t for t in res.tasks if t["task"] != acc.ACCEPTANCE_TASK_SLUG]
+    assert len(build_tasks) == 2
+    for t in build_tasks:
+        assert "DO NOT EDIT" in t["prompt"]
+        assert acc.JOB_ORACLE_PATH_PYTHON in t["prompt"]
+    final = res.tasks[-1]
+    assert final["task"] == acc.ACCEPTANCE_TASK_SLUG
+    assert "NOT to author another test file" in final["prompt"]
+    # the driver-seeding data channel (pre-existing, #740) is UNCHANGED by this ticket --
+    # it still rides tasks[-1] alongside the now-oracle-aware prompt text.
+    assert final[acc.JOB_ORACLE_CODE_KEY] == _JOB_ORACLE_PY
+    assert final[acc.JOB_ORACLE_PATH_KEY] == acc.JOB_ORACLE_PATH_PYTHON
+
+
 # ---- generate_acceptance_oracle (the 14B writes the spec-blind scorecard) --
 
 
@@ -1801,6 +1998,9 @@ def test_preview_omits_line_when_no_build_plan():
 def test_generate_plan_emits_build_plan_threads_it_and_previews_it(tmp_path):
     # The whole increment-1 path with a fake 14B: surface lands on the spec, threads onto the
     # task object (single feature folds), and the preview shows the friendly line.
+    # The goal NAMES desktop: on an empty repo a platform-silent goal now takes the
+    # #1161 gradeable default (locked in shared/tests/test_platform_default.py); this
+    # test's subject is the THREADING mechanics, so the operator names the platform.
     projects = tmp_path / "projects"
     repo = _git_repo(projects)
     gen = _fake_model(
@@ -1808,7 +2008,9 @@ def test_generate_plan_emits_build_plan_threads_it_and_previews_it(tmp_path):
         criteria_json=json.dumps([{"text": "2 + 3 shows 5", "tier": "behavior", "check": ""}]),
         build_plan_json=_GOOD_BUILD_PLAN,
     )
-    res = acc.generate_plan("a rocket calculator", repo, generate_fn=gen, projects_dir=projects)
+    res = acc.generate_plan(
+        "a rocket calculator desktop app", repo, generate_fn=gen, projects_dir=projects
+    )
     assert res.ok
     assert res.spec.build_plan["surface"] == "desktop-gui"
     assert res.spec.build_plan["complexity"] == "complex"
@@ -1889,6 +2091,273 @@ def test_refine_web_static_ignores_server_static_and_serverless():
         "a serverless web app on AWS Lambda",
     ]:
         assert acc._refine_web_static(dict(base), goal)["surface"] == "web", goal
+
+
+# ---- #1118: the multi-page veto on the static narrow ----------------------
+#
+# THE INCIDENT. On 2026-07-27 the operator dispatched an author website whose goal says
+# "the website will contain four webpages" (and "three additional webpages", and a
+# four-button menu). BlarAI's own CLARIFY stage then asked him a question, and his answer
+# said "the website is static for now". The bare token "static" narrowed the surface to
+# ``web-static`` — whose coder prompt says "EXTEND THAT ONE FILE -- do NOT add ... a second
+# project". A four-page ask had been capped at one page, by the operator's own correct
+# answer to BlarAI's own question. He caught it on the plan card and rejected.
+
+
+def test_refine_web_static_veto_the_la_incident_goal_stays_web():
+    """The REGRESSION LOCK, on the operator's real text (2026-07-27)."""
+    base = {"surface": "web", "language_hint": None, "complexity": "complex", "components": []}
+    goal = (
+        "A website for an author named, Blair DuCray-Oppat. the website will contain four "
+        "webpages. There needs to be a landing webpage. there should be three additional "
+        "webpages that are linked to by the landing page. the menu needs to have four buttons."
+    )
+    answer = "yes, of course. the website is static for now."
+
+    # The goal ALONE never tripped the static signal — his helpful answer is what broke it,
+    # so the regression must be driven through the COMBINED text, not the goal alone.
+    assert acc._refine_web_static(dict(base), goal)["surface"] == "web"
+    combined = f"{goal} {answer}"
+    assert acc._STATIC_WEB_RE.search(combined), "the static signal must still fire"
+    assert acc._refine_web_static(dict(base), combined)["surface"] == "web"
+    # ...and the downstream symptom the operator ALSO reported ("it couldn't tell the
+    # language") resolves with it — same root cause, one fix.
+    assert acc.scaffold_gated_ecosystem(
+        acc._refine_web_static(dict(base), combined)
+    ) == "node"
+
+
+#: #1123 — THE INDEPENDENT-REVIEW CORPUS, verbatim. The v1 test that stood here was a
+#: LEXICON ECHO: every goal in it was assembled from an alternative already present in
+#: `_MULTI_PAGE_RE`, so it was written FROM the pattern rather than against it and could
+#: not fail unless someone deleted a branch. It answered "did I type the alternatives I
+#: meant to type", not "does this detect a multi-page ask". Against this corpus the v1
+#: detector scored 0 of 20.
+#:
+#: These are the reviewer's strings, unedited. Editing them to suit the implementation
+#: would recreate exactly the failure the corpus exists to prevent.
+_REVIEW_MULTI_PAGE_GOALS = [
+    "a static site with a home page and an about page, no server",
+    "plain html: a landing page, an about page, and a contact page",
+    "no backend; four sections, each its own page",
+    "static site with pages for each book I wrote",
+    "a static site: index.html, about.html and contact.html",
+    "no server; a home page linking to a second page for the bio",
+    "plain html site with a blog page and a contact page",
+    "static, no build step; one page per album",
+    "a site with a landing page plus a gallery page, no backend",
+    "no server: a page for each chapter of my novel",
+    "static html, a menu with four buttons that each open a new page",
+    "plain html; a second page for reviews",
+    "no backend, a couple of pages",
+    "static site, a few pages",
+    "no build step, lots of pages",
+    "plain html, many pages",
+    "static, both pages link to each other",
+    "no server, two html files",
+    "plain html, 4 separate html files",
+    "static site with a nav bar linking to the other three htmls",
+]
+
+#: Goals that REFUSE multiple pages, or count something that is not a web page. The v1
+#: detector had no polarity check at all and fired on the first three, handing a
+#: genuinely single-page static ask to the node-server seed whose `fetch('/api/health')`
+#: hangs forever on `file://` — the verbatim #886 failure, re-introduced by the fix
+#: built beside it. The last three count BOOK pages and CHART pages; books are the exact
+#: domain this ticket came from.
+_REVIEW_NOT_MULTI_PAGE_GOALS = [
+    "no build step; I do NOT want multiple pages, just one",
+    "plain html, no server - avoid multiple pages please",
+    "static site, one file, tabs instead of separate pages",
+    "static, one html file, with 12 book pages rendered as cards",
+    "a plain html dashboard with 3 chart pages inside one file",
+    "a static scoreboard, no server, 5 star ratings pages",
+]
+
+
+def test_refine_web_static_veto_covers_the_review_corpus():
+    """All 20 phrasings the v1 lexicon missed must now stay `web`."""
+    base = {"surface": "web", "language_hint": None, "complexity": "moderate", "components": []}
+    missed = [
+        goal for goal in _REVIEW_MULTI_PAGE_GOALS
+        if acc._refine_web_static(dict(base), goal)["surface"] != "web"
+    ]
+    assert not missed, f"multi-page goals still capped at one page: {missed}"
+
+
+def test_a_negated_multi_page_ask_does_not_fire_the_veto():
+    """#1123 D2 — the polarity check. Firing here re-introduces #886.
+
+    "no server" / "no backend" / "no build step" are the STATIC signals themselves, so
+    the negation must be CLAUSE-SCOPED: a refusal only counts when it is in the same
+    clause as the phrase it would invert. A naive window check suppressed 8 of the 20
+    real asks above.
+    """
+    base = {"surface": "web", "language_hint": None, "complexity": "simple", "components": []}
+    wrong = [
+        goal for goal in _REVIEW_NOT_MULTI_PAGE_GOALS
+        if acc._refine_web_static(dict(base), goal)["surface"] != "web-static"
+    ]
+    assert not wrong, f"these are single-page asks and must still narrow: {wrong}"
+
+
+#: #1126 — clarify ANSWERS that mention a file. THE SEAM THE CORPUS CANNOT SEE.
+#: Independent verification of #1123 found that the one-file rule, written to return
+#: False unconditionally and first, re-ran the original #1118 incident: four of five
+#: plausible answers to BlarAI's own clarifying question capped the operator's real
+#: four-page goal at one page. The corpus could not catch it because corpus entries are
+#: goal-only strings, while the REAL input is the planning_seed — goal + the composed
+#: requirements block. Each of these is an answer, not a goal.
+_ANSWERS_MENTIONING_A_FILE = [
+    "yes, of course. the website is static for now.",
+    "yes, static for now - one html file per page is fine",   # MANY files
+    "static for now. keep all the styling in one file.",       # about CSS
+    "yes. static, and the whole thing should be a single file per page.",
+    "static for now, and I do not want a single file - separate pages please",
+]
+
+
+def test_the_incident_goal_survives_every_file_mentioning_answer():
+    """Drives the REAL composer, not a hand-joined string.
+
+    `f"{goal} {answer}"` is fixture drift: production builds
+    `compose_planning_goal(goal, compose_requirements_block(...))`, which inserts a
+    sentinel and its own framing. The bug this locks lived in that joined text.
+    """
+    from shared.fleet import clarify as _clarify
+
+    base = {"surface": "web", "language_hint": None, "complexity": "complex",
+            "components": []}
+    goal = (
+        "A website for an author named, Blair DuCray-Oppat. the website will contain "
+        "four webpages. There needs to be a landing webpage. there should be three "
+        "additional webpages that are linked to by the landing page. the menu needs to "
+        "have four buttons."
+    )
+    capped = []
+    for answer in _ANSWERS_MENTIONING_A_FILE:
+        seed = _clarify.compose_planning_goal(
+            goal,
+            _clarify.compose_requirements_block(
+                [{"question": "Where will you use this?", "answer": answer,
+                  "assumed": False}]
+            ),
+        )
+        if acc._refine_web_static(dict(base), seed)["surface"] != "web":
+            capped.append(answer)
+    assert not capped, (
+        "a four-page goal was capped at ONE page by an answer mentioning a file — the "
+        f"#1118 incident, recurring: {capped}"
+    )
+
+
+def test_a_single_file_mention_never_outvotes_a_strong_multi_page_signal():
+    """The five cases #1123 regressed against the #1118 lexicon it replaced.
+
+    A file mention may discount a bare COUNT ("12 book pages"); it may not discount a
+    plural, a multiplicity word, or an html-file count. Alternation is leftmost-first,
+    so "four webpages" was being consumed by the count arm and silently downgraded.
+    """
+    base = {"surface": "web", "language_hint": None, "complexity": "moderate",
+            "components": []}
+    for goal in [
+        "one index.html per section - several separate pages, no build step",
+        "plain html, one file per page, four pages total",
+        "not just one file - I want four separate pages, no server",
+        "no server, and I don't want a single file; give me multiple pages",
+        "no build step. four webpages. the shared script can live in a single file.",
+    ]:
+        assert acc._refine_web_static(dict(base), goal)["surface"] == "web", goal
+
+
+def test_enumeration_does_not_fire_on_page_collocations_or_synonym_pairs():
+    """#1126 — the exclusion list failed OPEN, which is the dangerous polarity.
+
+    v1's inclusion list missed asks (safe); an exclusion list makes any unlisted
+    adjective a page name (straight into the #886 hang). The fix is STRUCTURAL — a
+    named page must be introduced by a determiner and terminated by a delimiter — with
+    the word list demoted to a backstop.
+    """
+    for goal in [
+        "a static login page that runs a script on page load, no server",
+        "a plain html landing page with a full page background image",
+        "no server: a home page with a full page hero and a sticky nav",
+        "a static landing page (also called a splash page), plain html, no server",
+        "the main page is the only page - plain html, no server",
+        "a static home page; this is the front page of my site, no backend",
+        "plain html: a hero page, also known as a splash page, nothing else",
+    ]:
+        assert not acc._goal_wants_multiple_pages(goal), goal
+
+
+def test_an_explicit_one_file_declaration_outranks_a_page_count():
+    """The operator saying "one html file" in words beats any number near "pages"."""
+    assert not acc._goal_wants_multiple_pages(
+        "static, one html file, with 12 book pages rendered as cards"
+    )
+    # ...but it is about FILES, never "one page": "one page per album" is multi-page.
+    assert acc._goal_wants_multiple_pages("static, no build step; one page per album")
+
+
+def test_enumeration_alone_is_enough_without_any_plural_or_count():
+    """Two distinctly-NAMED pages is a multi-page ask — the commonest phrasing, and the
+    one the v1 lexicon had no arm for at all."""
+    assert acc._goal_wants_multiple_pages("a home page and an about page")
+    # A single named page is not, however many times "page" appears in other roles.
+    assert not acc._goal_wants_multiple_pages("a landing page for my shop")
+    assert not acc._goal_wants_multiple_pages("a single page with several sections")
+
+
+def test_refine_web_static_veto_does_not_break_genuine_single_page_asks():
+    """TOGGLE-OFF DIRECTION: the #886 behaviour must survive the veto.
+
+    If the veto over-fired, this suite would go green while silently retiring the static
+    seed — which is the failure the veto is not allowed to cause.
+    """
+    base = {"surface": "web", "language_hint": None, "complexity": "simple", "components": []}
+    for goal in [
+        "a static site, no build step, one index.html, opens in a browser",
+        "a single-file web page with no frameworks",
+        "just plain HTML that opens in the browser",
+        "a webpage with no server, client-side only",
+        "one html file I can double-check — no build tools",
+        "a one page scoreboard, plain html, no server",
+    ]:
+        assert acc._refine_web_static(dict(base), goal)["surface"] == "web-static", goal
+
+
+def test_multi_page_detector_ignores_a_bare_singular_page():
+    # The veto keys on plurals and counts, never a bare "page" — every web goal has one, and
+    # matching it would retire the static seed entirely.
+    assert not acc._goal_wants_multiple_pages("a single page that shows the weather")
+    assert not acc._goal_wants_multiple_pages("one page, plain html")
+    assert not acc._goal_wants_multiple_pages("a landing page for my shop")
+    assert acc._goal_wants_multiple_pages("four webpages")
+    assert acc._goal_wants_multiple_pages("multiple pages")
+
+
+def test_static_page_disclosure_names_the_real_reason(tmp_path):
+    """#1118 honesty: a lone static page's language is KNOWN — it has no test runner.
+
+    The generic "I couldn't tell this project's language" line sent the operator hunting
+    for a detection bug that did not exist, and hid the actual limitation.
+    """
+    spec = acc.AcceptanceSpec(
+        "a one page scoreboard",
+        (acc.AcceptanceCriterion("c1", "the page opens", "build", ""),),
+        build_plan={"surface": "web-static", "language_hint": None,
+                    "complexity": "simple", "components": []},
+    )
+    out = acc.render_criteria_preview(spec, ecosystem="unknown", tasks=[])
+    assert "plain HTML page" in out
+    assert "no automatic test runner" in out
+    assert "couldn't tell this project's language" not in out
+
+    # A genuinely unclassified project still gets the original wording.
+    other = acc.AcceptanceSpec("a thing", (acc.AcceptanceCriterion("c1", "it builds", "build", ""),))
+    assert "couldn't tell this project's language" in acc.render_criteria_preview(
+        other, ecosystem="unknown", tasks=[]
+    )
 
 
 def test_refine_web_static_only_touches_web_surface():
@@ -2189,6 +2658,9 @@ def test_generate_plan_build_signal_survives_the_smoke_floor(tmp_path):
 def test_generate_plan_build_signal_survives_assumptions(tmp_path):
     # Both the assumptions rebuild AND the build-signal fire in one plan; the spec must carry
     # BOTH at the end (the assumptions rebuild must not clobber the signal, nor vice-versa).
+    # The goal NAMES desktop for the same reason as the threading test above: this test's
+    # subject is ordering/survival, and a silent goal on an empty repo now takes the
+    # #1161 gradeable default (locked in shared/tests/test_platform_default.py).
     projects = tmp_path / "projects"
     repo = _git_repo(projects)
     gen = _fake_model(
@@ -2197,7 +2669,9 @@ def test_generate_plan_build_signal_survives_assumptions(tmp_path):
         assumptions_json=json.dumps(["Assumed a normal resizable window"]),
         build_plan_json=json.dumps({"surface": "desktop-gui", "complexity": "moderate"}),
     )
-    res = acc.generate_plan("a calculator", repo, generate_fn=gen, projects_dir=projects)
+    res = acc.generate_plan(
+        "a desktop calculator", repo, generate_fn=gen, projects_dir=projects
+    )
     assert res.ok
     assert res.spec.assumptions == ("Assumed a normal resizable window",)
     assert res.spec.build_plan["surface"] == "desktop-gui"
@@ -2731,3 +3205,99 @@ def test_generate_plan_asset_spec_model_error_is_non_fatal(tmp_path):
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+# ---- #1130: the image model cannot spell -----------------------------------
+#
+# Measured 2026-07-27 on the operator's book covers. He asked for the title above the
+# picture and his name below it in clear print. The generator produced five garbled text
+# regions across two covers:
+#     "The Day the Gods Died" -> "THE GODS THE CLED"
+#     "Blair DuCray-Oppat"    -> "THE BLIARI DUARCARY" / "BLAIIR DUCRAY"
+# The artwork was excellent. Diffusion models draw text as plausible letter-SHAPES with
+# no concept of spelling; no prompt wording fixes it. Text belongs in the PAGE.
+
+_REAL_COVER_SPECS = [
+    ("a photo-realistic image of several Greek gods fighting, with the title "
+     "'The Day the Gods Died' above the image and the author's name "
+     "'Blair DuCray-Oppat' below the image"),
+    ("a photo-realistic image of a World War I battlefront, with the title "
+     '"The Western Front" above the picture. The author\'s name, Blair DuCray-Oppat, '
+     "appears in clear print below the picture"),
+]
+
+
+def test_text_directives_are_stripped_from_the_real_cover_prompts():
+    """The artwork survives; the un-renderable instruction does not."""
+    for subject in _REAL_COVER_SPECS:
+        cleaned, removed = acc.strip_text_directives(subject)
+        assert removed, f"a literal-text directive should have been found in: {subject[:60]}"
+        assert "title" not in cleaned.lower(), cleaned
+        assert "author" not in cleaned.lower() or "imagined" in cleaned.lower(), cleaned
+        # the SUBJECT of the picture must remain intact
+        assert "photo-realistic image" in cleaned, cleaned
+
+
+@pytest.mark.parametrize("subject", [
+    "a friendly cartoon elephant waving hello",
+    "a warm bakery storefront with fresh bread",
+    "a dark atmospheric photo of a writing study at night, a desk lit by a single lamp",
+    "a portrait of an imagined male author",
+])
+def test_ordinary_image_prompts_are_untouched(subject):
+    """The strip is narrow on purpose — a prompt with no text directive must not change."""
+    cleaned, removed = acc.strip_text_directives(subject)
+    assert cleaned == subject
+    assert removed == ""
+
+
+def test_a_prompt_that_is_ONLY_a_text_directive_is_left_alone():
+    """Never trade a flawed prompt for an unusable one.
+
+    Stripping "the title 'Hello'" would leave nothing to generate from. A garbled title
+    is a poor image; an empty prompt is no image at all.
+    """
+    cleaned, removed = acc.strip_text_directives("the title 'Hello'")
+    assert cleaned == "the title 'Hello'"
+    assert removed == ""
+
+
+def test_the_strip_is_disclosed_on_the_plan_card_not_silent():
+    """A silent strip swaps one dishonesty for another — garbled text for a quietly
+    narrowed instruction. The operator must be told the picture will not carry words."""
+    spec = acc.AcceptanceSpec(
+        "an author website",
+        (acc.AcceptanceCriterion("c1", "it builds", "build", ""),),
+        asset_specs=({"name": "cover", "prompt": "greek gods fighting", "style": "photoreal",
+                      "width": 1024, "height": 1024,
+                      "target_rel_path": "public/assets/cover.png",
+                      "text_removed": "with the title 'The Day the Gods Died' above"},),
+    )
+    out = acc.render_criteria_preview(spec, ecosystem="node", tasks=[])
+    assert "can't spell" in out
+    assert "on the PAGE" in out
+
+
+def test_no_disclosure_when_nothing_was_stripped():
+    spec = acc.AcceptanceSpec(
+        "an author website",
+        (acc.AcceptanceCriterion("c1", "it builds", "build", ""),),
+        asset_specs=({"name": "cover", "prompt": "greek gods fighting", "style": "photoreal",
+                      "width": 1024, "height": 1024,
+                      "target_rel_path": "public/assets/cover.png"},),
+    )
+    assert "can't spell" not in acc.render_criteria_preview(spec, ecosystem="node", tasks=[])
+
+
+def test_text_removed_survives_the_spec_round_trip():
+    """The card is rendered from a COERCED spec. Dropping the marker in coercion would
+    restore the pre-#1130 silence while leaving the prompt stripped — a narrowed
+    instruction with no notice, which is worse than either failure alone."""
+    spec = acc.AcceptanceSpec(
+        "g", asset_specs=({"name": "cover", "prompt": "greek gods fighting",
+                           "style": "photoreal", "width": 1024, "height": 1024,
+                           "target_rel_path": "public/assets/cover.png",
+                           "text_removed": "with the title 'X' above"},),
+    )
+    back = acc.AcceptanceSpec.from_dict(spec.to_dict())
+    assert back.asset_specs[0].get("text_removed") == "with the title 'X' above"
