@@ -150,7 +150,7 @@ adjudicates **every** tool call, data-access request, and egress attempt any
 agent generates. It uses a hybrid model:
 
 1. Each action is reduced to a **Canonical Action Representation (CAR)** and
-   evaluated by a deterministic checker (allowlist + schema + semantic-distance
+   evaluated by a deterministic checker (allowlist + schema
    constraints).
 2. Only actions the deterministic layer admits proceed; a probabilistic
    classifier backstops semantic intent.
