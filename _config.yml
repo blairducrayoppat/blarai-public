@@ -1,7 +1,8 @@
-# GitHub Pages (Jekyll) build config for the public mirror. Jekyll renders every
-# document that starts with front matter through Liquid, and these archived
-# documents contain template-like text that it rejects, which fails the whole
-# Pages build. A new offender is caught by tests/security/test_public_pages_build_inputs.py.
+# GitHub Pages (Jekyll) build config for the public mirror. Pages renders every
+# Markdown file through Liquid, and these documents contain template-like text
+# (a chat-template snippet) that it rejects, which fails the whole Pages build.
+# A new offender is caught by tests/security/test_public_pages_build_inputs.py.
 exclude:
+  - FIELD_NOTES.md
   - docs/archive/journal/2026-09.md
   - docs/archive/2026/phase5-prompts/PR_PACKAGE_ISSUE_34617.md

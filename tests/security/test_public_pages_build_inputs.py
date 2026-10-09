@@ -40,22 +40,23 @@ def _is_excluded(path: str, excluded: list[str]) -> bool:
     return any(path == e or path.startswith(e.rstrip("/") + "/") for e in excluded)
 
 
-def _would_be_rendered_with_liquid(body: bytes) -> bool:
-    return bool(_FRONT_MATTER.match(body)) and bool(_LIQUID.search(body.decode("utf-8", "replace")))
+def _would_be_rendered_with_liquid(path: str, body: bytes) -> bool:
+    """GitHub Pages enables jekyll-optional-front-matter, so every Markdown file is rendered
+    through Liquid, front matter or not; any other file only if it carries front matter.
+    Jekyll skips directories whose names start with '.' or '_'."""
+    if any(seg.startswith((".", "_")) for seg in path.split("/")[:-1]):
+        return False
+    rendered = path.lower().endswith((".md", ".markdown")) or bool(_FRONT_MATTER.match(body))
+    return rendered and bool(_LIQUID.search(body.decode("utf-8", "replace")))
 
 
 def _offenders(excluded: list[str]) -> list[str]:
     found = []
     for p in _tracked():
-        if _is_excluded(p, excluded):
-            continue
         f = REPO_ROOT / p
-        if not f.is_file():
+        if _is_excluded(p, excluded) or not f.is_file():
             continue
-        with f.open("rb") as fh:
-            if not _FRONT_MATTER.match(fh.read(8)):
-                continue
-        if _would_be_rendered_with_liquid(f.read_bytes()):
+        if _would_be_rendered_with_liquid(p, f.read_bytes()):
             found.append(p)
     return found
 
@@ -78,9 +79,13 @@ def test_the_exclude_is_what_keeps_the_known_offenders_out() -> None:
     assert _offenders([]), "no document trips the scan with nothing excluded; the scan or the premise is blind"
 
 
-def test_the_detector_fires_on_the_failing_shape_and_on_a_bom() -> None:
-    body = b"---\ntitle: t\n---\n{% if a is defined and a is false %}x{% endif %}\n"
-    assert _would_be_rendered_with_liquid(body)
-    assert _would_be_rendered_with_liquid(b"\xef\xbb\xbf" + body)
-    assert not _would_be_rendered_with_liquid(body.replace(b"---", b"==="))
-    assert not _would_be_rendered_with_liquid(b"---\ntitle: t\n---\nplain text\n")
+def test_the_detector_fires_on_the_failing_shapes() -> None:
+    tag = b"{% if a is defined and a is false %}x{% endif %}\n"
+    fm = b"---\ntitle: t\n---\n" + tag
+    assert _would_be_rendered_with_liquid("a.md", fm)
+    assert _would_be_rendered_with_liquid("a.md", b"\xef\xbb\xbf" + fm)
+    assert _would_be_rendered_with_liquid("a.md", tag), "optional front matter: a bare Markdown file is rendered"
+    assert _would_be_rendered_with_liquid("a.txt", fm)
+    assert not _would_be_rendered_with_liquid("a.txt", tag), "no front matter, not Markdown: copied as-is"
+    assert not _would_be_rendered_with_liquid("_site/a.md", tag), "underscore directories are skipped"
+    assert not _would_be_rendered_with_liquid("a.md", b"plain text\n")
