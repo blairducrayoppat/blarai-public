@@ -143,21 +143,18 @@ This is the part of BlarAI that matters. The capabilities above are table stakes
 the differentiator is that every one of them operates behind a deterministic,
 fail-closed governance boundary.
 
-### The Policy Agent — every tool call is adjudicated
+### The Policy Agent — model-initiated tool calls are adjudicated
 
-BlarAI's Policy Agent is a resident semantic gatekeeper that intercepts and
-adjudicates **every** tool call, data-access request, and egress attempt any
-agent generates. It uses a hybrid model:
+BlarAI's Policy Agent is a resident semantic gatekeeper: every model-initiated
+tool call and fetch in the assistant is reduced to a canonical action and checked
+deterministically (the coding fleet's dispatch gate is by repository name). It
+uses a hybrid model:
 
 1. Each action is reduced to a **Canonical Action Representation (CAR)** and
    evaluated by a deterministic checker (allowlist + schema
    constraints).
 2. Only actions the deterministic layer admits proceed; a probabilistic
    classifier backstops semantic intent.
-3. An approved action is bound to a signed **Decision Artifact** — an
-   instance-scoped, single-use JSON Web Token carrying a 128-bit nonce, a 5-second hard time-to-live,
-   and a monotonic epoch for lazy revocation. Destination code validates the
-   receipt before executing. No receipt, no execution.
 
 The deterministic-first design is a direct response to a documented weakness: a
 sub-8B classifier alone is empirically insufficient against adversarial
@@ -249,7 +246,7 @@ controls rather than a per-item rubber-stamp.
   natural-language goal into tasks with verifiable acceptance criteria and dispatch
   them to a local coding fleet, orchestrating a host-level model swap (the 14B and
   the fleet's larger model cannot co-reside) with never-zero teardown and
-  idempotent crash recovery. Local subprocess only, zero egress.
+  idempotent crash recovery. Local subprocess only.
 
 ---
 
