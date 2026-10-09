@@ -1,3 +1,5 @@
+# enforces-rule: security_by_design.principles.fail-closed -- egress screen only
+# enforces-rule: security_by_design.principles.deny-by-default -- egress allowlist only
 """Egress-machinery mechanism locks — exfil screen + PA carve-out (C3, H-b).
 
 Sprint 17 "The Boot Cluster", criterion C3 (ADR-027 egress machinery,

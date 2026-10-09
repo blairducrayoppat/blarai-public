@@ -1,0 +1,31 @@
+{
+  "question": "which model exports can this 31.32 GB box actually load, and at what memory cost",
+  "date": "2026-09-22",
+  "prompted_by": "operator: I asserted a 28.7 GB model would not fit from arithmetic rather than testing",
+  "scope_limit": "HARDWARE FEASIBILITY ONLY. Constructs the pipeline directly, so the signed-manifest verification of the production path is NOT exercised. Two of these models carry no manifest. No behavioural or quality claim may rest on this.",
+  "host": "Intel Core Ultra 7 258V, Arc 140V iGPU, 31.32 GB shared",
+  "results": [
+    {
+      "model": "Qwen3-30B-A3B int4",
+      "disk_gb": 15.22,
+      "layout": "text",
+      "loaded": true,
+      "seconds": 30.1,
+      "baseline_in_use_gb": 5.36,
+      "peak_in_use_gb": 21.27,
+      "delta_gb": 15.91,
+      "error": ""
+    },
+    {
+      "model": "Qwen3-30B-A3B int8",
+      "disk_gb": 28.67,
+      "layout": "text",
+      "loaded": true,
+      "seconds": 74.7,
+      "baseline_in_use_gb": 6.08,
+      "peak_in_use_gb": 30.35,
+      "delta_gb": 24.27,
+      "error": ""
+    }
+  ]
+}

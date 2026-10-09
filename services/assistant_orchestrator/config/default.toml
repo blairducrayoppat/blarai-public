@@ -36,6 +36,37 @@ priority = 1                                       # DEC-AO priority=1 (MEDIUM h
 # knob (e.g. "u8" or "u4"); leave empty until measured.
 kv_cache_precision = ""
 
+# --- BRAIN SWITCH (#930) --------------------------------------------------
+# Which model serves as the resident brain for BOTH the Policy Agent and the
+# Assistant Orchestrator. EMPTY = the compiled-in Qwen3-14B above, which is
+# the shipped default and the only configuration that has been through a
+# go-live ceremony. Boot is byte-identical while this is empty.
+#
+# Setting it selects a different brain. The DRAFT model is NOT configured
+# here: whether speculative decoding applies is a property of the model's
+# LAYOUT, decided from the files on disk. A natively multimodal export
+# (Qwen3.6-35B-A3B, Gemma 4) is served through VLMPipeline, which has NO
+# speculative decoding at all — measured 2026-09-22, the 35B still runs 2.4x
+# faster than the 14B WITH its draft, because ~3B of its parameters are
+# active per token.
+#
+# Requirements before setting this, each fail-closed at boot:
+#   - the directory must exist (a set-but-missing path REFUSES to boot rather
+#     than falling back to the 14B silently)
+#   - manifest.json must be present, TPM-signed, and cover every weight binary
+#     (stage with scripts/stage_model_manifest.py, then
+#     shared.models.manifest_signer.sign_manifest — an operator ceremony)
+#
+# Flipping this is a CAPABILITY + QUALITY change and an ADR-012 amendment:
+# it is an LA-present go-live decision, not a config tweak.
+# capabilities(gpu.brain_model_dir):
+#   brain-override-read = launcher/__main__.py::_resolve_brain_override
+#   brain-layout-detect = shared/inference/shared_pipeline.py::detect_brain_layout
+#   brain-pipeline-build = shared/inference/shared_pipeline.py::build_shared_pipeline
+#   brain-weight-integrity = shared/models/weight_integrity.py::verify_all_manifest_entries
+#   brain-manifest-signature = shared/models/manifest_signer.py::verify_manifest_signature
+brain_model_dir = ""
+
 [generation]
 max_new_tokens = 4096
 temperature = 0.0
@@ -68,13 +99,27 @@ min_p = 0.0
 tool_call_grammar = false
 response_depth_mode = "standard"   # concise | standard | detailed
 
-[preemption]
-timing_multiplier = 5.0    # Flag preemption if step > N× running median
-min_detection_samples = 3  # Min steps before detection activates
+# [preemption] and [circuit_breaker] were REMOVED 2026-09-20 (#1582). Nothing read
+# either section -- verified by AST over every config_data.get() call in the AO
+# entrypoint -- and [circuit_breaker].max_tool_call_depth said 5 while the loop
+# enforced 3. A settings file the operator reads is a governance surface: a
+# number in it that nothing enforces is a false statement about what the system
+# will do, and this one was wrong in the reassuring direction. The live caps are
+# shared/constants.py MAX_OUTPUT_TOKENS and MAX_TOOL_CALL_DEPTH. The preemption
+# values survive as AO constants (see #1601 -- they have no production caller
+# either).
 
-[circuit_breaker]
-max_output_tokens = 4096
-max_tool_call_depth = 5
+[trust_spine_canary]
+# #1584 - prove the adjudication doors are ALIVE, not merely not-yet-denying.
+# A fail-closed door that never loaded is silent, and so is one that loaded
+# and has had nothing to deny. At boot the canary submits one action each
+# door MUST refuse and one each MUST allow, and logs what it established.
+#
+# It WRITES NOTHING: the egress probes adjudicate without recording, so no
+# row is appended to the signed audit chain. It opens no door and renders no
+# verdict of its own. On is the default because a canary that does not run
+# is the silence it exists to break.
+enabled = true
 
 [pgov]
 cosine_similarity_threshold = 0.85
@@ -243,11 +288,22 @@ max_parse_depth = 12
 # controls (the #570 PA RULE 3 + the kagi.com allowlist + the exfil screen),
 # never instead of them.
 #
-# N default = 3 (LA decision 2026-07-02). The tool loop is hard-capped at 3
-# iterations/turn, so N=3 is effectively "at most one fingerprint per turn" while
-# every query is still disclosed. Relax path if the friction bites is per-session
-# grain (looser). Set N=1 for a fingerprint on EVERY outbound query.
-searches_per_fingerprint = 3
+# N = 1: a fingerprint on EVERY outbound query (#1594, decided 2026-09-19 when the
+# LA delegated the call). It was 3 from 2026-07-02, and that decision was sound on
+# its own terms — the tool loop is hard-capped at `_TOOL_LOOP_MAX = 3`
+# (entrypoint.py), so N=3 did mean at most one fingerprint per turn while every
+# query was still disclosed live in chat.
+#
+# What changed is the weight put on "disclosed" versus "approved". Chat disclosure
+# is PASSIVE: it scrolls past whether or not anyone is at the screen. The
+# fingerprint touch is the AFFIRMATIVE act, and under N=3 searches two and three
+# rode on an approval given for a different string. An approval nobody gave is not
+# an approval.
+#
+# The cost is real and bounded: a turn that chains three searches now asks three
+# times instead of once. Relax path if the friction bites is raising N here — a
+# posture LOOSENING, so it is the LA's call, not a session's.
+searches_per_fingerprint = 1
 # Bounded wait (seconds) for the operator's fingerprint answer; on expiry the
 # egress is DENIED (fail-closed). Matches escalation_consent's default; a console
 # operator answers in seconds — this is the wedged-surface backstop, not the path.
@@ -1239,3 +1295,131 @@ timeout_ms = 5000
 # NOT a proof the payload fits. The honest over-cap refusal in the AO PLAN handler is
 # the control; if it ever fires, chunk the result (ADR-031 Am.1), do not raise again.
 max_message_bytes = 262144
+
+[organise_userdata]
+# Moving files inside the operator's own data folder (#1568) -- the assistant's
+# FIRST file surface, and the most dangerous tool in the set.
+#
+# DORMANT. This flag is the go-live switch and stays false until an LA-present
+# ceremony. Moves ONLY: there is no delete, no overwrite and no copy anywhere in
+# shared/governance/userdata_move.py, so those are absent rather than disabled.
+# A destination collision REFUSES the whole request -- silent renaming is how a
+# move tool loses a file.
+#
+# Dormancy is STRUCTURAL: with this false the AO registers neither the runner
+# nor the rehearsal, so the registry body returns a notice and no path is ever
+# resolved. Reversal is the flag plus a restart.
+#
+# Note the SECOND lock: every move is routed to simulate-first, which is itself
+# dormant behind [simulate_first].enabled. Both must be true before a single
+# file can be moved by the assistant.
+#
+# capabilities(organise_userdata.enabled):
+#   organise-runner = services/assistant_orchestrator/src/tools.py::register_organise_userdata_runner
+#   organise-validation = services/assistant_orchestrator/src/tools.py::parse_organise_args
+#   organise-containment = shared/governance/userdata_move.py::resolve_within
+#   organise-plan = shared/governance/userdata_move.py::plan_moves
+#   organise-apply = shared/governance/userdata_move.py::apply_moves
+#   organise-rehearsal = services/assistant_orchestrator/src/entrypoint.py::_rehearse_organise_userdata
+#   organise-execution = services/assistant_orchestrator/src/entrypoint.py::_run_organise_userdata_tool
+#   organise-dispatch-gate = services/assistant_orchestrator/src/entrypoint.py::organise_userdata_enabled
+enabled = false
+
+[curate_knowledge]
+# Knowledge curation (#1567): erase or mark-as-saved the documents matching a
+# selector, with `delete` always rehearsed first through simulate-first.
+#
+# DORMANT. This flag is the go-live switch and stays false until an LA-present
+# ceremony. Erasure is IRREVERSIBLE -- secure_delete=ON zeroes the freed pages
+# and ON DELETE CASCADE reaps each document's chunks and images.
+#
+# Note the dormancy is STRUCTURAL, not merely this flag: with it false the AO
+# registers neither the tool's runner nor its rehearsal, so the registry body
+# returns a notice and no code path reaches the knowledge bank. Reversal is the
+# flag plus a restart.
+#
+# Note also the SECOND lock: erasing is routed to simulate-first, which is
+# itself dormant behind [simulate_first].enabled. Both must be true before a
+# single document can be erased by the assistant.
+#
+# capabilities(curate_knowledge.enabled):
+#   curate-runner = services/assistant_orchestrator/src/tools.py::register_curate_knowledge_runner
+#   curate-validation = services/assistant_orchestrator/src/tools.py::parse_curate_args
+#   curate-rehearsal = services/assistant_orchestrator/src/entrypoint.py::_rehearse_curate_knowledge
+#   curate-execution = services/assistant_orchestrator/src/entrypoint.py::_run_curate_knowledge_tool
+#   curate-selector = services/assistant_orchestrator/src/knowledge_bank.py::select_docs_for_curation
+#   curate-erase = services/assistant_orchestrator/src/knowledge_bank.py::delete_docs
+#   curate-dispatch-gate = services/assistant_orchestrator/src/entrypoint.py::curate_knowledge_enabled
+enabled = false
+
+[simulate_first]
+# Simulate-first as a FOURTH route outcome (#1548, ACCEPTED by the LA 2026-09-17
+# against a recommendation to decline). An action runs as a dry run whose result
+# the operator sees at the escalation prompt, before the real execution is
+# approved.
+#
+# DORMANT. This flag is the go-live switch and stays false until an LA-present
+# ceremony. Reversal is this flag plus a restart, restoring byte-identical prior
+# behaviour.
+#
+# Note the second, independent lock: even with this true, a tool is routable only
+# if it DECLARES a dry run (tools._SIMULATE_FIRST_TOOLS, EMPTY at merge), and
+# web_search is barred outright (tools._SIMULATE_FIRST_BARRED) because a dry run
+# of the only egress tool performs the egress it is meant to gate. Flipping this
+# flag alone therefore changes nothing — which is the point.
+# What flipping this does TODAY: the tool loop begins consulting the route above
+# tools.execute. The dry-run EXECUTOR does not exist, so a routed tool is REFUSED
+# rather than executed — fail-closed, because a tool reported as simulated and in
+# fact executed is the inversion this outcome exists to prevent. With the
+# declaring set empty, no live tool routes and behaviour is unchanged.
+#
+# capabilities(simulate_first.enabled):
+#   simulate-first-route = services/assistant_orchestrator/src/tools.py::route_simulate_first
+#   simulate-first-declaration = services/assistant_orchestrator/src/tools.py::declares_dry_run
+#   simulate-first-dispatch-gate = services/assistant_orchestrator/src/entrypoint.py::simulate_first_enabled
+enabled = false
+
+[reference_corpus]
+# Offline reference corpus (#1616) -- a read-only encyclopedia snapshot the
+# assistant can quote instead of answering from the model's own memory.
+#
+# WHY IT EXISTS, measured rather than assumed. A 40-subject stratified probe
+# against the resident Qwen3-14B: on 20 uniformly-random Wikipedia articles the
+# model produced nothing usable for 16, and of the 11 most-read subjects it did
+# attempt, 6 answers carried a confident error -- one a total fabrication with
+# an invented director, cast and plot. The probe explicitly invited "I do not
+# know", so that is the BEST case for honesty, not the typical one.
+#
+# DORMANT. This flag is the go-live switch and stays false until an LA-present
+# ceremony. It is not the only lock: with it false the AO registers no
+# search_reference runner at all, so the tool's registry body returns a
+# deterministic notice and no store path is ever opened (structural absence,
+# security principle 4). Flipping it with no db_path, a missing store, or a
+# manifest that does not verify leaves the capability dormant with a loud log
+# rather than serving unverified text.
+#
+# capabilities(reference_corpus.enabled):
+#   corpus-open-verified = shared/corpus/reader.py::ReferenceCorpus
+#   corpus-integrity-refuse = shared/corpus/reader.py::CorpusError
+#   corpus-query-sanitise = shared/corpus/reader.py::fts_match_expr
+#   corpus-tool-body = services/assistant_orchestrator/src/tools.py::_search_reference
+#   corpus-runner-register = services/assistant_orchestrator/src/tools.py::register_search_reference_runner
+#   corpus-runner = services/assistant_orchestrator/src/entrypoint.py::_run_search_reference_tool
+#   corpus-embedder-bind = services/assistant_orchestrator/src/entrypoint.py::_embed_for_reference_corpus
+#   corpus-provenance-tier = services/assistant_orchestrator/src/context_manager.py::Provenance
+enabled = false
+
+# Absolute path to the store built by tools/corpus/build_corpus.py. Empty
+# resolves the same as disabled.
+db_path = ""
+
+# Integrity manifest for the store. The corpus is INTEGRITY-SIGNED, NOT
+# ENCRYPTED (LA decision D1, 2026-09-21): the content is a public encyclopedia,
+# so encryption buys no confidentiality and costs a decrypt on every read,
+# while what the operator ASKED and what was RETURNED stay in the encrypted
+# session store as they always have. A deliberate, scoped deviation from the
+# born-encrypted default, recorded in ADR-023 Amendment 5. Empty resolves to
+# the manifest the builder writes beside the store (<db_path>.manifest.json).
+# A SHA-256 mismatch or a missing manifest makes the reader REFUSE to open --
+# fail-closed; there is no setting that opens the store unverified.
+manifest_path = ""

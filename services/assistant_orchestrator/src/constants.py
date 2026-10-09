@@ -42,9 +42,12 @@ SPECULATIVE_DECODING: bool = SPECULATIVE_DECODING_ENABLED
 ASSISTANT_TOKENS: int = NUM_ASSISTANT_TOKENS
 MODEL_DIR: str = TARGET_MODEL_OV_PATH
 
-# Circuit breaker limits
+# Turn caps. OUTPUT_TOKEN_CAP is live: gpu_inference uses it as the default
+# max_new_tokens. TOOL_CALL_DEPTH_CAP was removed with the CircuitBreaker class
+# in #1596 — it aliased a constant nothing enforced, and the tool loop now reads
+# `shared.constants.MAX_TOOL_CALL_DEPTH` directly rather than through an alias
+# that existed only for a dead consumer.
 OUTPUT_TOKEN_CAP: int = MAX_OUTPUT_TOKENS
-TOOL_CALL_DEPTH_CAP: int = MAX_TOOL_CALL_DEPTH
 
 # PGOV thresholds (P1.9)
 PGOV_COSINE_THRESHOLD: float = COSINE_SIMILARITY_THRESHOLD

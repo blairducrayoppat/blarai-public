@@ -1,0 +1,4 @@
+#!/bin/sh
+# Pass-through shim: keeps the previously configured post-rewrite hook running (see _lib.sh).
+. "${0%/*}/_lib.sh"
+passthrough "$@"

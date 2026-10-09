@@ -1,0 +1,353 @@
+{
+  "benchmark": "vlm_text_inference",
+  "model": "qwen36-35b-a3b-int4-ov-OFFICIAL",
+  "device": "GPU",
+  "timestamp": "2026-09-22T00:34:54",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "environment": {
+    "box_state_at_start": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": false,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 23.91,
+      "gpu_budget": {
+        "real_budget_gib": 27.25,
+        "keys_agree": true,
+        "real_commit_limit_pct": 87,
+        "reported_budget_gib": 25.175,
+        "reported_pinning_limit_pct": 87
+      },
+      "machine_uptime_s": 2055.4,
+      "captured_utc": "2026-09-22T04:29:32Z"
+    },
+    "box_state_at_end": {
+      "vm_states": [
+        {
+          "name": "BlarAI-Orchestrator",
+          "state": "Off"
+        }
+      ],
+      "ao_listening": false,
+      "ovms_listening": false,
+      "ovms_process": false,
+      "ram_available_gib": 5.59,
+      "gpu_budget": {
+        "real_budget_gib": 27.25,
+        "keys_agree": true,
+        "real_commit_limit_pct": 87,
+        "reported_budget_gib": 25.175,
+        "reported_pinning_limit_pct": 87
+      },
+      "machine_uptime_s": 2380.4,
+      "captured_utc": "2026-09-22T04:34:57Z"
+    }
+  },
+  "prompt_set_version": "v1",
+  "prefill_probe_version": "pp-v1",
+  "runs": 5,
+  "warmup": 2,
+  "cooldown_s": 30.0,
+  "max_new_tokens": 256,
+  "load_seconds": 48.1,
+  "sys_available_gb_before_load": 23.91,
+  "sys_available_gb_after_load": 5.74,
+  "sys_available_gb_min_during": 5.61,
+  "generation": {
+    "median_tps": 33.29,
+    "mean_tps": 33.33,
+    "p95_tps": 34.36,
+    "median_ttft_ms": 370.0,
+    "errors": []
+  },
+  "prefill": {
+    "median_pp_tok_per_sec": 505.0,
+    "runs": [
+      {
+        "input_tokens": 441,
+        "prefill_ms": 1337.316400000418,
+        "prefill_tok_per_sec": 329.7648933340398,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 867.9954000003818,
+        "prefill_tok_per_sec": 508.06720865088226,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 861.7157000003317,
+        "prefill_tok_per_sec": 511.7697170886294,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 872.4196000002848,
+        "prefill_tok_per_sec": 505.4907065360017,
+        "error": null
+      },
+      {
+        "input_tokens": 441,
+        "prefill_ms": 872.5228999996943,
+        "prefill_tok_per_sec": 505.4308603248746,
+        "error": null
+      }
+    ]
+  },
+  "coherence_note": "Full output texts below are the openvino.genai #3870 reproduction evidence \u2014 judged by the reviewer, not by this script.",
+  "gen_runs": [
+    {
+      "prompt_index": 0,
+      "token_count": 134,
+      "latency_first_token_ms": 313.0946999999651,
+      "latency_total_ms": 4213.3732000002055,
+      "throughput_tok_per_sec": 34.35652095100176,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking for the capital city of France.\n2.  **Retrieve knowledge**: I know from general knowledge that the capital of France is Paris.\n3.  **Verify**: Is there any ambiguity or recent change? No, Paris has been the capital of France for centuries and remains so today.\n4.  **Formulate response**: State clearly and concisely that the capital city of France is Paris.\n5.  **Output**: \"The capital city of France is Paris.\"\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null,
+      "run_index": 0,
+      "machine_uptime_s": 2108.9,
+      "elapsed_session_s": 0.004
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 401.8530000003011,
+      "latency_total_ms": 7998.755000000074,
+      "throughput_tok_per_sec": 33.697946873608174,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the ambiguity**: The term \"kilobyte\" has two common definitions depending on context:\n   - SI/metric definition: 1 kilobyte = 1,000 bytes (10^3)\n   - Binary/IEC definition: 1 kibibyte = 1,024 bytes (2^10), but historically \"kilobyte\" was often used to mean 1,024 bytes in computing contexts.\n\n3.  **Determine the standard/official answer**: \n   - According to the International System of Units (SI), \"kilo\" means 1,000.\n   - The International Electrotechnical Commission (IEC) introduced \"kibibyte\" (KiB) to mean 1,024 bytes to avoid confusion.\n   - However, in common computing usage, especially historically and in many operating systems (like Windows), \"kilobyte\" often refers to 1,024 bytes.\n   - Modern standards (SI,",
+      "error": null,
+      "run_index": 0,
+      "machine_uptime_s": 2113.1,
+      "elapsed_session_s": 4.218
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 402.6389000000563,
+      "latency_total_ms": 8104.955700000119,
+      "throughput_tok_per_sec": 33.236752868954696,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language\n   - **Goal:** Make it accessible to someone without a technical background while maintaining accuracy.\n\n2.  **Identify Key Concepts of Transformers:**\n   - Architecture type: Neural network for sequence data (text, audio, etc.)\n   - Core mechanism: Self-attention\n   - Key innovation: Parallel processing, context understanding\n   - Applications: LLMs (like me), translation, image recognition, etc.\n   - How it works: Looks at all words/tokens at once, weighs their importance relative to each other, builds context.\n\n3.  **Avoid Jargon (or Explain It Simply):**\n   - Skip heavy math, backpropagation details, positional encoding specifics unless necessary.\n   - Use analogies: Reading a sentence, understanding relationships, teamwork, etc.\n\n4.  **Structure the Explanation:**\n   - Start with a simple definition/analogy\n   - Explain the core idea (attention/context)\n   - Contrast with older methods (RNNs) briefly if helpful\n   - Give a concrete example\n   -",
+      "error": null,
+      "run_index": 0,
+      "machine_uptime_s": 2121.1,
+      "elapsed_session_s": 12.218
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 726.7405000002327,
+      "latency_total_ms": 8429.661300000134,
+      "throughput_tok_per_sec": 33.23414671484137,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Key Question 1:** What is it? (Definition/Mechanism).\n    *   **Key Question 2:** Why does it help with inference speed? (Benefits/Mechanism of speedup).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of a high-resolution photo vs. a low-resolution pixelated one. Or a 32-bit number vs. an 8-bit number.\n    *   *Technical definition:* It's the process of mapping continuous values (floats) to discrete values (integers).\n    *   *Standard:* Most ML models use 32-bit floating-point numbers (FP32). Quantization usually reduces this to 8-bit integers (INT8) or even lower (INT4, binary).\n    *   *Process:*\n        1.  Calibration (finding the range of values).\n        2.  Mapping (scaling floats to integers).\n        3.  Execution (",
+      "error": null,
+      "run_index": 0,
+      "machine_uptime_s": 2129.2,
+      "elapsed_session_s": 20.324
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 134,
+      "latency_first_token_ms": 309.6448999999666,
+      "latency_total_ms": 4211.936199999855,
+      "throughput_tok_per_sec": 34.33879987380846,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking for the capital city of France.\n2.  **Retrieve knowledge**: I know from general knowledge that the capital of France is Paris.\n3.  **Verify**: Is there any ambiguity or recent change? No, Paris has been the capital of France for centuries and remains so today.\n4.  **Formulate response**: State clearly and concisely that the capital city of France is Paris.\n5.  **Output**: \"The capital city of France is Paris.\"\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null,
+      "run_index": 1,
+      "machine_uptime_s": 2169.0,
+      "elapsed_session_s": 60.096
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 348.5372999998617,
+      "latency_total_ms": 8025.449299999764,
+      "throughput_tok_per_sec": 33.34674150231282,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the ambiguity**: The term \"kilobyte\" has two common definitions depending on context:\n   - SI/metric definition: 1 kilobyte = 1,000 bytes (10^3)\n   - Binary/IEC definition: 1 kibibyte = 1,024 bytes (2^10), but historically \"kilobyte\" was often used to mean 1,024 bytes in computing contexts.\n\n3.  **Determine the standard/official answer**: \n   - According to the International System of Units (SI), \"kilo\" means 1,000.\n   - The International Electrotechnical Commission (IEC) introduced \"kibibyte\" (KiB) to mean 1,024 bytes to avoid confusion.\n   - However, in common computing usage, especially historically and in many operating systems (like Windows), \"kilobyte\" often refers to 1,024 bytes.\n   - Modern standards (SI,",
+      "error": null,
+      "run_index": 1,
+      "machine_uptime_s": 2173.2,
+      "elapsed_session_s": 64.308
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 369.64739999984886,
+      "latency_total_ms": 8085.737599999902,
+      "throughput_tok_per_sec": 33.177424494078394,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language\n   - **Goal:** Make it accessible to someone without a technical background while maintaining accuracy.\n\n2.  **Identify Key Concepts of Transformers:**\n   - Architecture type: Neural network for sequence data (text, audio, etc.)\n   - Core mechanism: Self-attention\n   - Key innovation: Parallel processing, context understanding\n   - Applications: LLMs (like me), translation, image recognition, etc.\n   - How it works: Looks at all words/tokens at once, weighs their importance relative to each other, builds context.\n\n3.  **Avoid Jargon (or Explain It Simply):**\n   - Skip heavy math, backpropagation details, positional encoding specifics unless necessary.\n   - Use analogies: Reading a sentence, understanding relationships, teamwork, etc.\n\n4.  **Structure the Explanation:**\n   - Start with a simple definition/analogy\n   - Explain the core idea (attention/context)\n   - Contrast with older methods (RNNs) briefly if helpful\n   - Give a concrete example\n   -",
+      "error": null,
+      "run_index": 1,
+      "machine_uptime_s": 2181.2,
+      "elapsed_session_s": 72.334
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 480.45090000005075,
+      "latency_total_ms": 8257.541599999968,
+      "throughput_tok_per_sec": 32.91719357214166,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Key Question 1:** What is it? (Definition/Mechanism).\n    *   **Key Question 2:** Why does it help with inference speed? (Benefits/Mechanism of speedup).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of a high-resolution photo vs. a low-resolution pixelated one. Or a 32-bit number vs. an 8-bit number.\n    *   *Technical definition:* It's the process of mapping continuous values (floats) to discrete values (integers).\n    *   *Standard:* Most ML models use 32-bit floating-point numbers (FP32). Quantization usually reduces this to 8-bit integers (INT8) or even lower (INT4, binary).\n    *   *Process:*\n        1.  Calibration (finding the range of values).\n        2.  Mapping (scaling floats to integers).\n        3.  Execution (",
+      "error": null,
+      "run_index": 1,
+      "machine_uptime_s": 2189.3,
+      "elapsed_session_s": 80.42
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 134,
+      "latency_first_token_ms": 312.28879999980563,
+      "latency_total_ms": 4205.578799999785,
+      "throughput_tok_per_sec": 34.41819129836224,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking for the capital city of France.\n2.  **Retrieve knowledge**: I know from general knowledge that the capital of France is Paris.\n3.  **Verify**: Is there any ambiguity or recent change? No, Paris has been the capital of France for centuries and remains so today.\n4.  **Formulate response**: State clearly and concisely that the capital city of France is Paris.\n5.  **Output**: \"The capital city of France is Paris.\"\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null,
+      "run_index": 2,
+      "machine_uptime_s": 2228.5,
+      "elapsed_session_s": 119.546
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 343.8701999998557,
+      "latency_total_ms": 7955.535200000213,
+      "throughput_tok_per_sec": 33.632588927650914,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the ambiguity**: The term \"kilobyte\" has two common definitions depending on context:\n   - SI/metric definition: 1 kilobyte = 1,000 bytes (10^3)\n   - Binary/IEC definition: 1 kibibyte = 1,024 bytes (2^10), but historically \"kilobyte\" was often used to mean 1,024 bytes in computing contexts.\n\n3.  **Determine the standard/official answer**: \n   - According to the International System of Units (SI), \"kilo\" means 1,000.\n   - The International Electrotechnical Commission (IEC) introduced \"kibibyte\" (KiB) to mean 1,024 bytes to avoid confusion.\n   - However, in common computing usage, especially historically and in many operating systems (like Windows), \"kilobyte\" often refers to 1,024 bytes.\n   - Modern standards (SI,",
+      "error": null,
+      "run_index": 2,
+      "machine_uptime_s": 2232.7,
+      "elapsed_session_s": 123.752
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 368.2067999998253,
+      "latency_total_ms": 7999.353599999722,
+      "throughput_tok_per_sec": 33.54672721012305,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language\n   - **Goal:** Make it accessible to someone without a technical background while maintaining accuracy.\n\n2.  **Identify Key Concepts of Transformers:**\n   - Architecture type: Neural network for sequence data (text, audio, etc.)\n   - Core mechanism: Self-attention\n   - Key innovation: Parallel processing, context understanding\n   - Applications: LLMs (like me), translation, image recognition, etc.\n   - How it works: Looks at all words/tokens at once, weighs their importance relative to each other, builds context.\n\n3.  **Avoid Jargon (or Explain It Simply):**\n   - Skip heavy math, backpropagation details, positional encoding specifics unless necessary.\n   - Use analogies: Reading a sentence, understanding relationships, teamwork, etc.\n\n4.  **Structure the Explanation:**\n   - Start with a simple definition/analogy\n   - Explain the core idea (attention/context)\n   - Contrast with older methods (RNNs) briefly if helpful\n   - Give a concrete example\n   -",
+      "error": null,
+      "run_index": 2,
+      "machine_uptime_s": 2240.6,
+      "elapsed_session_s": 131.707
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 512.3138000003564,
+      "latency_total_ms": 8201.47840000027,
+      "throughput_tok_per_sec": 33.29360383311379,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Key Question 1:** What is it? (Definition/Mechanism).\n    *   **Key Question 2:** Why does it help with inference speed? (Benefits/Mechanism of speedup).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of a high-resolution photo vs. a low-resolution pixelated one. Or a 32-bit number vs. an 8-bit number.\n    *   *Technical definition:* It's the process of mapping continuous values (floats) to discrete values (integers).\n    *   *Standard:* Most ML models use 32-bit floating-point numbers (FP32). Quantization usually reduces this to 8-bit integers (INT8) or even lower (INT4, binary).\n    *   *Process:*\n        1.  Calibration (finding the range of values).\n        2.  Mapping (scaling floats to integers).\n        3.  Execution (",
+      "error": null,
+      "run_index": 2,
+      "machine_uptime_s": 2248.6,
+      "elapsed_session_s": 139.707
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 134,
+      "latency_first_token_ms": 329.8884000000726,
+      "latency_total_ms": 4311.762499999986,
+      "throughput_tok_per_sec": 33.65249544178278,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking for the capital city of France.\n2.  **Retrieve knowledge**: I know from general knowledge that the capital of France is Paris.\n3.  **Verify**: Is there any ambiguity or recent change? No, Paris has been the capital of France for centuries and remains so today.\n4.  **Formulate response**: State clearly and concisely that the capital city of France is Paris.\n5.  **Output**: \"The capital city of France is Paris.\"\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null,
+      "run_index": 3,
+      "machine_uptime_s": 2287.7,
+      "elapsed_session_s": 178.771
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 353.8837999999487,
+      "latency_total_ms": 8042.993300000035,
+      "throughput_tok_per_sec": 33.293842414391044,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the ambiguity**: The term \"kilobyte\" has two common definitions depending on context:\n   - SI/metric definition: 1 kilobyte = 1,000 bytes (10^3)\n   - Binary/IEC definition: 1 kibibyte = 1,024 bytes (2^10), but historically \"kilobyte\" was often used to mean 1,024 bytes in computing contexts.\n\n3.  **Determine the standard/official answer**: \n   - According to the International System of Units (SI), \"kilo\" means 1,000.\n   - The International Electrotechnical Commission (IEC) introduced \"kibibyte\" (KiB) to mean 1,024 bytes to avoid confusion.\n   - However, in common computing usage, especially historically and in many operating systems (like Windows), \"kilobyte\" often refers to 1,024 bytes.\n   - Modern standards (SI,",
+      "error": null,
+      "run_index": 3,
+      "machine_uptime_s": 2292.0,
+      "elapsed_session_s": 183.083
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 381.2439999996968,
+      "latency_total_ms": 8118.110699999761,
+      "throughput_tok_per_sec": 33.08833018927389,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language\n   - **Goal:** Make it accessible to someone without a technical background while maintaining accuracy.\n\n2.  **Identify Key Concepts of Transformers:**\n   - Architecture type: Neural network for sequence data (text, audio, etc.)\n   - Core mechanism: Self-attention\n   - Key innovation: Parallel processing, context understanding\n   - Applications: LLMs (like me), translation, image recognition, etc.\n   - How it works: Looks at all words/tokens at once, weighs their importance relative to each other, builds context.\n\n3.  **Avoid Jargon (or Explain It Simply):**\n   - Skip heavy math, backpropagation details, positional encoding specifics unless necessary.\n   - Use analogies: Reading a sentence, understanding relationships, teamwork, etc.\n\n4.  **Structure the Explanation:**\n   - Start with a simple definition/analogy\n   - Explain the core idea (attention/context)\n   - Contrast with older methods (RNNs) briefly if helpful\n   - Give a concrete example\n   -",
+      "error": null,
+      "run_index": 3,
+      "machine_uptime_s": 2300.0,
+      "elapsed_session_s": 191.126
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 496.49330000011105,
+      "latency_total_ms": 8219.363499999872,
+      "throughput_tok_per_sec": 33.1482976368045,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Key Question 1:** What is it? (Definition/Mechanism).\n    *   **Key Question 2:** Why does it help with inference speed? (Benefits/Mechanism of speedup).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of a high-resolution photo vs. a low-resolution pixelated one. Or a 32-bit number vs. an 8-bit number.\n    *   *Technical definition:* It's the process of mapping continuous values (floats) to discrete values (integers).\n    *   *Standard:* Most ML models use 32-bit floating-point numbers (FP32). Quantization usually reduces this to 8-bit integers (INT8) or even lower (INT4, binary).\n    *   *Process:*\n        1.  Calibration (finding the range of values).\n        2.  Mapping (scaling floats to integers).\n        3.  Execution (",
+      "error": null,
+      "run_index": 3,
+      "machine_uptime_s": 2308.2,
+      "elapsed_session_s": 199.244
+    },
+    {
+      "prompt_index": 0,
+      "token_count": 134,
+      "latency_first_token_ms": 330.825200000163,
+      "latency_total_ms": 4289.952800000265,
+      "throughput_tok_per_sec": 33.845840179537674,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking for the capital city of France.\n2.  **Retrieve knowledge**: I know from general knowledge that the capital of France is Paris.\n3.  **Verify**: Is there any ambiguity or recent change? No, Paris has been the capital of France for centuries and remains so today.\n4.  **Formulate response**: State clearly and concisely that the capital city of France is Paris.\n5.  **Output**: \"The capital city of France is Paris.\"\u2705\n</think>\n\nThe capital city of France is **Paris**.",
+      "error": null,
+      "run_index": 4,
+      "machine_uptime_s": 2347.2,
+      "elapsed_session_s": 238.337
+    },
+    {
+      "prompt_index": 1,
+      "token_count": 256,
+      "latency_first_token_ms": 370.2391000001626,
+      "latency_total_ms": 8770.710700000109,
+      "throughput_tok_per_sec": 30.47447955183869,
+      "output_text": "Here's a thinking process:\n\n1.  **Identify the core question**: The user is asking \"How many bytes are in one kilobyte?\"\n\n2.  **Recognize the ambiguity**: The term \"kilobyte\" has two common definitions depending on context:\n   - SI/metric definition: 1 kilobyte = 1,000 bytes (10^3)\n   - Binary/IEC definition: 1 kibibyte = 1,024 bytes (2^10), but historically \"kilobyte\" was often used to mean 1,024 bytes in computing contexts.\n\n3.  **Determine the standard/official answer**: \n   - According to the International System of Units (SI), \"kilo\" means 1,000.\n   - The International Electrotechnical Commission (IEC) introduced \"kibibyte\" (KiB) to mean 1,024 bytes to avoid confusion.\n   - However, in common computing usage, especially historically and in many operating systems (like Windows), \"kilobyte\" often refers to 1,024 bytes.\n   - Modern standards (SI,",
+      "error": null,
+      "run_index": 4,
+      "machine_uptime_s": 2351.5,
+      "elapsed_session_s": 242.628
+    },
+    {
+      "prompt_index": 2,
+      "token_count": 256,
+      "latency_first_token_ms": 380.6358000001637,
+      "latency_total_ms": 8132.0120999998835,
+      "throughput_tok_per_sec": 33.026393003266946,
+      "output_text": "Here's a thinking process:\n\n1.  **Understand User Request:**\n   - **Topic:** Transformer neural network\n   - **Requirement:** Explain in plain language\n   - **Goal:** Make it accessible to someone without a technical background while maintaining accuracy.\n\n2.  **Identify Key Concepts of Transformers:**\n   - Architecture type: Neural network for sequence data (text, audio, etc.)\n   - Core mechanism: Self-attention\n   - Key innovation: Parallel processing, context understanding\n   - Applications: LLMs (like me), translation, image recognition, etc.\n   - How it works: Looks at all words/tokens at once, weighs their importance relative to each other, builds context.\n\n3.  **Avoid Jargon (or Explain It Simply):**\n   - Skip heavy math, backpropagation details, positional encoding specifics unless necessary.\n   - Use analogies: Reading a sentence, understanding relationships, teamwork, etc.\n\n4.  **Structure the Explanation:**\n   - Start with a simple definition/analogy\n   - Explain the core idea (attention/context)\n   - Contrast with older methods (RNNs) briefly if helpful\n   - Give a concrete example\n   -",
+      "error": null,
+      "run_index": 4,
+      "machine_uptime_s": 2360.3,
+      "elapsed_session_s": 251.399
+    },
+    {
+      "prompt_index": 3,
+      "token_count": 256,
+      "latency_first_token_ms": 505.77500000008513,
+      "latency_total_ms": 8270.365800000036,
+      "throughput_tok_per_sec": 32.97018562781204,
+      "output_text": "Here's a thinking process that leads to the explanation of quantization in machine learning:\n\n1.  **Deconstruct the Request:**\n    *   **Topic:** Quantization in Machine Learning (ML).\n    *   **Key Question 1:** What is it? (Definition/Mechanism).\n    *   **Key Question 2:** Why does it help with inference speed? (Benefits/Mechanism of speedup).\n\n2.  **Define Quantization (The \"What\"):**\n    *   *Analogy:* Think of a high-resolution photo vs. a low-resolution pixelated one. Or a 32-bit number vs. an 8-bit number.\n    *   *Technical definition:* It's the process of mapping continuous values (floats) to discrete values (integers).\n    *   *Standard:* Most ML models use 32-bit floating-point numbers (FP32). Quantization usually reduces this to 8-bit integers (INT8) or even lower (INT4, binary).\n    *   *Process:*\n        1.  Calibration (finding the range of values).\n        2.  Mapping (scaling floats to integers).\n        3.  Execution (",
+      "error": null,
+      "run_index": 4,
+      "machine_uptime_s": 2368.5,
+      "elapsed_session_s": 259.531
+    }
+  ],
+  "not_measured": [
+    "speculative decoding (does not exist for this pipeline class/model family)",
+    "co-resident cost (benchmarked alone)",
+    "vision/image inputs (text-only probe)",
+    "long-context decode (256-token generations only)"
+  ]
+}

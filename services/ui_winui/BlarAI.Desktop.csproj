@@ -46,6 +46,15 @@
     <!-- Ship the brand mark next to the build so AppWindow.SetIcon (the live
          taskbar button + titlebar icon, MainWindow.xaml.cs) resolves it from
          AppContext.BaseDirectory at runtime. -->
+    <!-- #1583: ship THE auditability card (#1544) next to the build, so the
+         in-app disclosure screen reads the one copy rather than a re-typed
+         mirror of it. Link fixes where it lands; AuditabilityCard.RelativePath
+         must match, and a gate test asserts the two agree, because a copy
+         landing anywhere else renders the refusal screen forever. -->
+    <Content Include="..\..\docs\governance\auditability-card.md"
+             Link="Governance\auditability-card.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\blair.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

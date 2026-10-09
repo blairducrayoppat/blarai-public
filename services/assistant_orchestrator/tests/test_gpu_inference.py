@@ -330,8 +330,14 @@ class TestGenerationWithMock:
         assert result.tokens == [10]
         assert result.truncated is False
 
-    def test_circuit_breaker_caps_tokens(self) -> None:
-        """max_tokens hard cap prevents runaway generation."""
+    def test_the_token_cap_stops_runaway_generation(self) -> None:
+        """max_tokens hard cap prevents runaway generation.
+
+        Renamed in #1596: it was `test_circuit_breaker_caps_tokens`, and the
+        CircuitBreaker class it was named after never ran — imported by nothing
+        but its own test. THIS is where the token cap is actually enforced, and
+        the name now says so.
+        """
         # Generate tokens that never produce EOS
         long_tokens = list(range(3, 103))  # 100 tokens, none are EOS (2)
         engine = _make_mock_engine(
@@ -764,14 +770,25 @@ class TestSystemPromptCapabilityScope:
         All four registry keys must appear in the prompt's TOOL USE section.
         No unbuilt tool names may appear anywhere in the prompt.
         """
+        from services.assistant_orchestrator.src import tools as _t
+        from services.assistant_orchestrator.src.gpu_inference import (
+            render_default_system_prompt,
+        )
         from services.assistant_orchestrator.src.tools import _REGISTRY
 
-        # Every built tool must be mentioned.
+        # Every built tool must be mentioned once every runner-gated tool is
+        # live (#1616: a runner-gated tool is described only while its runner
+        # is registered; the go-live render is the complete one).
+        gated = frozenset(_t._ADVERTISED_ONLY_WHEN_RUNNER_REGISTERED)
+        live_prompt = render_default_system_prompt(gated)
         for tool_name in _REGISTRY:
-            assert tool_name in _DEFAULT_SYSTEM_PROMPT, (
+            assert tool_name in live_prompt, (
                 f"Built tool '{tool_name}' is not mentioned in the system prompt. "
                 "The model needs to know which tools it can invoke."
             )
+        # And every tool the dormant prompt advertises is a built tool.
+        for tool_name in _t.advertised_tool_names():
+            assert tool_name in _DEFAULT_SYSTEM_PROMPT, tool_name
 
         # No unbuilt tool name may appear.
         for unbuilt in self._UNBUILT_CAPABILITY_NAMES:
@@ -823,7 +840,18 @@ class TestSystemPromptCapabilityScope:
             received.append(chunk)
             return True
 
-        def fake_generate(prompt: str, gen_config: object, streamer_fn: object = None) -> str:
+        # Parameter NAMES mirror the real pipeline API (`generation_config`,
+        # `streamer`), because production calls them by keyword — a VLMPipeline
+        # reads the 2nd/3rd positional slots as `images`/`videos`, so the
+        # positional form cannot be used for a multimodal brain (#930). A fake
+        # whose names diverge from the real object only works positionally and
+        # silently stops binding the moment production does the right thing.
+        def fake_generate(
+            prompt: str,
+            generation_config: object = None,
+            streamer: object = None,
+        ) -> str:
+            streamer_fn = streamer
             if callable(streamer_fn):
                 streamer_fn("<think>")
                 streamer_fn("reasoning step 1")

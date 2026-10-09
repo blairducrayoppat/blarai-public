@@ -1,0 +1,62 @@
+{
+  "mode": "feasibility",
+  "started": "2026-10-05T16:02:18.944-04:00",
+  "pid": 19136,
+  "model_dir": "B:/models/Qwen3.5-4B-int8-ov",
+  "device_requested": "GPU",
+  "prompt": "Explain in three sentences why the sky is blue.",
+  "versions": {
+    "python": "3.11.9",
+    "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+    "openvino_genai": "2026.4.0.0-3407-7ea2546852a"
+  },
+  "devices": [
+    "CPU",
+    "GPU",
+    "NPU"
+  ],
+  "device_names": {
+    "CPU": "Intel(R) Core(TM) Ultra 7 258V",
+    "GPU": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+    "NPU": "Intel(R) AI Boost"
+  },
+  "runtime_imported": true,
+  "load": {
+    "ok": true,
+    "seconds": 13.973,
+    "error": null,
+    "started": "2026-10-05T16:02:18.944-04:00",
+    "finished": "2026-10-05T16:02:33.750-04:00"
+  },
+  "runs": [
+    {
+      "started": "2026-10-05T16:02:33.750-04:00",
+      "ok": true,
+      "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+      "wall_ms": 16463.6,
+      "first_chunk_s": 3.8895,
+      "generated_tokens": 64,
+      "ttft_ms": 3393.25,
+      "tpot_ms": 207.36,
+      "tok_per_s_wall": 3.89,
+      "tok_per_s_tpot": 4.82,
+      "finished": "2026-10-05T16:02:50.211-04:00",
+      "index": 1
+    },
+    {
+      "started": "2026-10-05T16:02:50.211-04:00",
+      "ok": true,
+      "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+      "wall_ms": 14267.4,
+      "first_chunk_s": 0.7144,
+      "generated_tokens": 64,
+      "ttft_ms": 266.19,
+      "tpot_ms": 222.21,
+      "tok_per_s_wall": 4.49,
+      "tok_per_s_tpot": 4.5,
+      "finished": "2026-10-05T16:03:04.485-04:00",
+      "index": 2
+    }
+  ],
+  "finished": "2026-10-05T16:03:04.485-04:00"
+}

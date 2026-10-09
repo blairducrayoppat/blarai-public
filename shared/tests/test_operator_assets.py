@@ -35,7 +35,9 @@ import pytest
 
 from shared.fleet.acceptance import (
     OPERATOR_ASSET_CLASSES,
+    OPERATOR_ASSET_MAX_FILE_BYTES,
     OPERATOR_ASSET_MAX_FILES,
+    OPERATOR_ASSET_MAX_TOTAL_BYTES,
     OPERATOR_ASSETS_DIRNAME,
     OPERATOR_ASSETS_FLOOR_ID,
     OPERATOR_ASSETS_README_NAME,
@@ -479,14 +481,64 @@ def test_spec_to_dict_emits_no_key_when_absent_and_round_trips():
 
 
 def test_machine_floor_injects_on_web_with_quoted_names_idempotently():
-    spec = _web_spec(_manifest("logo.svg", "prices.xlsx"))
+    spec = _web_spec(_manifest("logo.svg", "clip.mp4", "prices.xlsx"))
     out = _ensure_operator_assets_floor(spec)
     floor = [c for c in out.criteria if c.id == OPERATOR_ASSETS_FLOOR_ID]
     assert len(floor) == 1 and floor[0].tier == TIER_SMOKE
-    assert '"logo.svg"' in floor[0].check and '"prices.xlsx"' in floor[0].check
+    # MEDIA is named — a page references it by file.
+    assert '"logo.svg"' in floor[0].check and '"clip.mp4"' in floor[0].check
+    # A SPREADSHEET is not: the honest assertion over a data file is that its content
+    # was used, and demanding its filename in markup asks for a link to the file
+    # instead. This assertion is inverted from the pre-2026-08-30 rule deliberately.
+    assert '"prices.xlsx"' not in floor[0].check
     assert "not that they render" in floor[0].check  # the honest limit, named
     again = _ensure_operator_assets_floor(out)
     assert again == out  # idempotent by the reserved id
+
+
+def test_machine_floor_silent_when_the_manifest_is_documents_only():
+    """A bio and a CV earn their place by having their WORDS used, which no
+    filename-presence check can assert — so no markup floor is injected at all, and the
+    operator-tier visual criterion carries the requirement alone."""
+    spec = _web_spec(_manifest("bio.md", "resume.pdf", "prices.xlsx"))
+    out = _ensure_operator_assets_floor(spec)
+    assert out == spec
+    assert not [c for c in out.criteria if c.id == OPERATOR_ASSETS_FLOOR_ID]
+    # ...but the VISUAL criterion still fires, so the requirement is never lost.
+    seen = _ensure_operator_assets_visual(spec)
+    assert [c for c in seen.criteria if c.id == OPERATOR_ASSETS_VISUAL_ID]
+
+
+def test_video_and_audio_classify_and_survive_the_raised_caps():
+    """#1165 / LA 2026-08-30: phone and camera video are first-class assets."""
+    for name, cls in (
+        ("clip.mov", "video"), ("clip.mp4", "video"), ("clip.mkv", "video"),
+        ("clip.m4v", "video"), ("clip.avi", "video"), ("clip.webm", "video"),
+        ("theme.mp3", "audio"), ("theme.m4a", "audio"), ("theme.flac", "audio"),
+        ("body.woff2", "other"),
+    ):
+        assert _operator_asset_class(name) == cls, name
+    # The ceiling is sized for one long video, and is a CEILING — not removed.
+    assert OPERATOR_ASSET_MAX_FILE_BYTES == 2 * 1024 * 1024 * 1024
+    assert OPERATOR_ASSET_MAX_TOTAL_BYTES == 3 * 1024 * 1024 * 1024
+    assert OPERATOR_ASSET_MAX_FILE_BYTES <= OPERATOR_ASSET_MAX_TOTAL_BYTES
+
+
+def test_card_discloses_total_size_only_once_it_is_worth_noticing():
+    """Approving the card is what commits the bytes, and that history cannot be
+    rewritten — so the cost is disclosed where the decision is made. A small folder
+    reads exactly as it did before, so the notice never becomes noise."""
+    small = {"files": [{"name": "bio.md", "class": "document", "size": 2048}],
+             "skipped_names": 0, "skipped_other": 0}
+    assert not any("kept in its history" in ln
+                   for ln in operator_assets_card_lines(small))
+
+    big = {"files": [{"name": "reel.mp4", "class": "video",
+                      "size": 1500 * 1024 * 1024}],
+           "skipped_names": 0, "skipped_other": 0}
+    lines = operator_assets_card_lines(big)
+    notice = [ln for ln in lines if "kept in its history" in ln]
+    assert len(notice) == 1 and "1.5 GB" in notice[0]
 
 
 def test_machine_floor_needs_web_surface_and_files():

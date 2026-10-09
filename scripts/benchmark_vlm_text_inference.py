@@ -47,7 +47,10 @@ if str(_REPO_ROOT) not in sys.path:
 
 # #816 Part 2: box-state stamp for the result JSON (shape-locked by
 # tests/integration/test_perf_harness_env_capture.py).
-from shared.perf_env_capture import capture_box_state  # noqa: E402
+from shared.perf_env_capture import (  # noqa: E402
+    capture_box_state,
+    probe_machine_uptime_s,
+)
 
 try:
     import openvino as ov  # type: ignore[import-untyped]
@@ -147,6 +150,12 @@ class SingleRunMetrics:
     throughput_tok_per_sec: float
     output_text: str
     error: str | None
+    # WHEN this run happened (#1487): its ordinal in the sweep and the machine's
+    # age. Throughput on this box decays across a session; a run with no clock
+    # behind it cannot be compared with one taken later in the same boot.
+    run_index: int = -1
+    machine_uptime_s: float | None = None
+    elapsed_session_s: float | None = None
 
 
 @dataclass
@@ -200,6 +209,21 @@ def _greedy_config(max_new_tokens: int) -> "ov_genai.GenerationConfig":
     cfg.max_new_tokens = max_new_tokens
     cfg.do_sample = False
     return cfg
+
+
+def _stamp_generation(
+    m: SingleRunMetrics, run_index: int, started_uptime: float | str, elapsed_session_s: float
+) -> SingleRunMetrics:
+    """Attach WHEN a generation happened, from clocks read BEFORE it was dispatched.
+
+    Mirrors ``scripts/measure_coder_sustained.py::stamp_run``: captured before the
+    call so a failed or slow run still carries its true position in time, not a
+    position late by its own duration. An ``"unknown"`` clock stamps ``None``.
+    """
+    m.run_index = run_index
+    m.machine_uptime_s = started_uptime if isinstance(started_uptime, float) else None
+    m.elapsed_session_s = round(elapsed_session_s, 3)
+    return m
 
 
 def _measure_one(pipe: object, prompt: str, prompt_index: int) -> SingleRunMetrics:
@@ -332,11 +356,15 @@ def main() -> int:
         _measure_one(pipe, PROMPTS[0], 0)
 
     gen_runs: list[SingleRunMetrics] = []
+    session_t0 = time.perf_counter()
     pp_runs: list[PrefillRunMetrics] = []
     mem_min_during = mem_after_load
     for r in range(args.runs):
         for i, prompt in enumerate(PROMPTS):
+            started_uptime = probe_machine_uptime_s()  # BEFORE the call, like the coder bench
+            started_session_s = time.perf_counter() - session_t0
             m = _measure_one(pipe, prompt, i)
+            _stamp_generation(m, r, started_uptime, started_session_s)
             gen_runs.append(m)
             status = m.error or f"{m.token_count} tok, {m.throughput_tok_per_sec:.1f} tok/s"
             print(f"run {r + 1}/{args.runs} P{i + 1}: {status}")

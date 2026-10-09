@@ -419,6 +419,41 @@ def find_reference_green(
 # Craft lints (map 1:1 to the dossier §1.3 findings — one deterministic check each)
 # ---------------------------------------------------------------------------
 
+#: Directories that are never the coder's authored Python. #1397: the craft walks below are
+#: bounded, and before this they spent that bound on whatever ``rglob`` yielded first — so a
+#: deliverable shipping a ``.venv`` could burn all 400 slots inside ``site-packages`` and
+#: report "no seed scaffold placeholder found" having never reached the coder's own code.
+#:
+#: MEASURED before adding, because ``no_entry_point.flagged`` is a band-B trigger and a change
+#: to what a lint SEES can move a band: across every archived delivery the largest tree holds
+#: 29 python files against a 400 bound (13.8x headroom) and NONE ships a vendored directory.
+#: So this changes no band today. Its only possible effect is to REMOVE a future false
+#: positive — a vendored tree hiding a real ``main.py`` and earning a wrongful B — never to
+#: create one, which is why it is a defect fix rather than a posture change.
+_SKIP_DIRS: frozenset[str] = frozenset({
+    ".venv", "venv", "env", "node_modules", "site-packages", "__pycache__",
+    ".git", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build", ".eggs",
+})
+
+
+def _walk_python(root: Path, cap: int) -> tuple[list[Path], bool]:
+    """Up to *cap* authored ``.py`` files under *root*, and whether the bound truncated the walk.
+
+    Returns the truncation flag rather than leaving the caller to infer it from
+    ``len(files) == cap``, which cannot distinguish "hit the bound" from "the tree holds
+    exactly that many" — the same exact-boundary ambiguity #1400 records for the security
+    scanner. Here it is decidable, because the walk is consumed lazily and stops one past."""
+    out: list[Path] = []
+    truncated = False
+    for path in root.rglob("*.py"):
+        if any(part in _SKIP_DIRS for part in path.parts):
+            continue
+        if len(out) >= cap:
+            truncated = True
+            break
+        out.append(path)
+    return out, truncated
+
 
 @dataclass(frozen=True)
 class CraftFinding:
@@ -441,6 +476,17 @@ class CraftFinding:
     #: Whether the lint could actually look. False == the tree (or the file it needed) could
     #: not be read, so ``flagged=False`` says nothing about the deliverable.
     measured: bool = False
+    #: The THIRD fact (#1397), matching the field of the same name on ``SecurityResult`` and
+    #: ``ProseResult``: ``measured`` says the looking HAPPENED, this says it FINISHED. A lint
+    #: that walked a bounded slice of the tree, or could not read some of the files in it,
+    #: is ``measured=True`` and ``coverage_partial=True`` — and a ``flagged=False`` from such
+    #: a walk is "nothing found where I looked", never "nothing there".
+    #:
+    #: Before this, ``lint_dead_scaffold`` computed exactly that shortfall, wrote it into
+    #: ``detail`` as English, and then :meth:`Layer1Result.findings` dropped it: that method
+    #: prints a craft detail only when ``measured and flagged`` or when ``not measured``, and
+    #: a bounded-but-clean lint is neither. The sentence existed and reached nobody.
+    coverage_partial: bool = False
 
 
 #: The seed skeleton's placeholder marker (``core.py`` docstring literally says PLACEHOLDER)
@@ -483,7 +529,7 @@ def lint_dead_scaffold(repo: Path) -> CraftFinding:
     try:
         if not root.is_dir():
             return CraftFinding(False, f"repo not found at {root.name} (scaffold lint could not run)")
-        files = list(root.rglob("*.py"))[:400]
+        files, walk_truncated = _walk_python(root, 400)
     except OSError as exc:
         return CraftFinding(False, f"repo could not be walked ({type(exc).__name__})")
     unreadable = 0
@@ -502,11 +548,20 @@ def lint_dead_scaffold(repo: Path) -> CraftFinding:
     if unreadable and unreadable == len(files):
         return CraftFinding(False, f"none of the {unreadable} python file(s) could be read")
     detail = "no seed scaffold placeholder found"
+    shortfall = []
     if unreadable:
         # Partial coverage, NAMED. A bound the reader cannot see is a bound that becomes a
         # false clean — the same rule the security scan applies to its skipped trees.
-        detail += f" ({unreadable} file(s) unreadable, so coverage is partial)"
-    return CraftFinding(False, detail, measured=True)
+        shortfall.append(f"{unreadable} file(s) unreadable")
+    if walk_truncated:
+        # #1397: the BOUND itself, which was previously neither counted nor named. A tree
+        # past 400 authored files reported an unqualified "no placeholder found" having
+        # examined an arbitrary prefix of it.
+        shortfall.append("the walk stopped at the 400-file bound")
+    if shortfall:
+        detail += f" ({', '.join(shortfall)}, so coverage is partial)"
+    return CraftFinding(False, detail, measured=True,
+                        coverage_partial=bool(unreadable or walk_truncated))
 
 
 def lint_stale_readme(repo: Path) -> CraftFinding:
@@ -561,10 +616,8 @@ def lint_no_entry_point(repo: Path, surface: str) -> CraftFinding:
     if not root.is_dir():
         return CraftFinding(False, f"repo not found at {root.name} (entry-point lint could not run)")
     try:
-        named_entry = any(
-            p.name in _RUNNABLE_ENTRY_NAMES
-            for p in list(root.rglob("*.py"))[:800]
-        )
+        entry_files, entry_truncated = _walk_python(root, 800)
+        named_entry = any(p.name in _RUNNABLE_ENTRY_NAMES for p in entry_files)
     except OSError as exc:
         # The walk is the whole evidence for the commonest entry-point shape. Swallowing the
         # error and carrying on produced "no runnable entry point" — an ACCUSATION derived
@@ -577,12 +630,27 @@ def lint_no_entry_point(repo: Path, surface: str) -> CraftFinding:
     console_script = ("console_scripts" in pyproject or "console_scripts" in setup_cfg
                       or "project.scripts" in pyproject or '"bin"' in package_json)
     if named_entry or bin_dir or console_script:
-        return CraftFinding(False, "a runnable entry point is present", measured=True)
+        # Found. A truncated walk cannot invalidate a POSITIVE — the file was seen — but the
+        # coverage fact is still recorded, because it is a property of the scan, not of the
+        # verdict, and a later reader asking "did this lint see everything" deserves the truth.
+        return CraftFinding(False, "a runnable entry point is present", measured=True,
+                            coverage_partial=entry_truncated)
     if not (py_ok and cfg_ok and pkg_ok):
         # No entry point FOUND, but a manifest that could declare one was unreadable — so the
         # flag would be an accusation the evidence does not carry.
         return CraftFinding(False, "a packaging manifest could not be read, so a declared "
-                                   "console-script entry point cannot be ruled out")
+                                   "console-script entry point cannot be ruled out",
+                            coverage_partial=entry_truncated)
+    if entry_truncated:
+        # #1397. THE SAME REASONING AS THE MANIFEST BRANCH ABOVE, and the reason this branch
+        # has to exist: the walk stopped at the bound, so the entry point may simply be past
+        # it. Flagging here would be an accusation the evidence does not carry — and this is
+        # a band-B trigger, so the accusation costs the operator a worse verdict on a build
+        # that may be fine. Refusing to flag on incomplete evidence is the fail-safe reading;
+        # it can only ever REMOVE a false B, never create one.
+        return CraftFinding(False, "the python walk stopped at the 800-file bound before an "
+                                   "entry point was found, so one cannot be ruled out",
+                            measured=True, coverage_partial=True)
     return CraftFinding(True, "no runnable entry point for a non-coder (no demo/__main__/bin/console-script)",
                         measured=True)
 
@@ -595,6 +663,26 @@ def lint_no_entry_point(repo: Path, surface: str) -> CraftFinding:
 #: COPY of this directory, which is what makes the check below relational rather than textual:
 #: the seed is not a list of phrases to match, it is the other side of a diff.
 _SEED_REL: tuple[str, ...] = ("build-infra", "python", "reference")
+
+#: WHERE ALL THE SEEDS LIVE, and why the check no longer looks only at the Python one (#1385).
+#: ``build-infra/`` holds a reference tree per surface — python, web, web-static, node-cli,
+#: dotnet-console, powershell, cpp, android, winui. A delivery is a copy of ONE of them, and
+#: until 2026-08-15 this lint compared every delivery against ``python`` alone.
+#:
+#: MEASURED CONSEQUENCE, on the operator's own priority surface. The web seed README is 1,461
+#: normalised characters; the Python seed README is 68. A web delivery shipping its seed README
+#: untouched was compared against the PYTHON text, differed from it, and was reported CLEAN —
+#: the exact false-clean this lint was built to retire. Verified on the 2026-08-14 B9 run: the
+#: delivered README normalises character-for-character identical to ``web/reference/README.md``,
+#: still titled "Web project skeleton (BlarAI dispatch fleet)", and mentions the pottery studio
+#: it was supposed to describe ZERO times. Nothing flagged it.
+#:
+#: The question this check asks is "is the delivered file still A SEED'S OWN file?", so the
+#: answer must be sought in every seed, not in one. Sweeping them all needs no language
+#: plumbing and cannot manufacture a false positive: a README the coder actually wrote does not
+#: byte-match any reference tree.
+_SEED_FAMILY_REL: tuple[str, ...] = ("build-infra",)
+_SEED_LEAF = "reference"
 
 #: The documented agentic-setup root for this box, used only when the harness config names
 #: none. Mirrors ``battery_execution_limit._DEFAULT_AGENTIC_ROOT`` and the same resolution
@@ -727,6 +815,40 @@ def default_seed_root(cfg: object = None) -> Optional[Path]:
         return None
 
 
+def all_seed_roots(cfg: object = None) -> "tuple[Path, ...]":
+    """EVERY seeded reference tree under ``build-infra/``, not just Python's (#1385).
+
+    Sorted for determinism. Empty when the family directory cannot be read, which the caller
+    reports as UNKNOWN — never as clean, since "I could not find the seeds" and "the delivery
+    diverges from the seeds" are different facts.
+
+    :func:`default_seed_root` is deliberately left as it was and still returns the Python tree:
+    it is part of this module's public surface, other callers and tests resolve the fleet root
+    through it, and widening its meaning would change what those callers get. The sweep is a
+    new function rather than a redefinition of an old one."""
+    root: Optional[Path] = None
+    try:
+        if cfg is None:
+            from ..config import load_harness_config
+
+            cfg = load_harness_config()
+        configured = getattr(cfg, "agentic_setup_dir", "")
+        if configured:
+            root = Path(str(configured))
+    except Exception:  # noqa: BLE001 — a config fault never sinks an advisory lint
+        root = None
+    try:
+        family = (root or _DEFAULT_AGENTIC_ROOT).joinpath(*_SEED_FAMILY_REL)
+        if not family.is_dir():
+            return ()
+        return tuple(sorted(
+            child / _SEED_LEAF for child in family.iterdir()
+            if (child / _SEED_LEAF).is_dir()
+        ))
+    except OSError:
+        return ()
+
+
 def _normalized(path: Path) -> Optional[str]:
     """*path*'s text with line endings and trailing whitespace normalised, or ``None`` when it
     cannot be read.
@@ -812,12 +934,22 @@ def lint_seed_divergence(
     metadata yields ``unknown`` for that file and NEVER a flag; when nothing at all could be
     compared the finding is ``unknown``, which is deliberately not ``clean``. ``seed_root``
     overrides the resolved default (tests and a caller with a non-standard checkout)."""
-    root = Path(seed_root) if seed_root is not None else default_seed_root()
+    # #1385: sweep EVERY seed tree, not only Python's. An explicit `seed_root` still pins the
+    # comparison to that one tree — tests and a non-standard checkout depend on that — so the
+    # override keeps its old single-root meaning and only the DEFAULT widened.
+    if seed_root is not None:
+        roots: tuple[Path, ...] = (Path(seed_root),)
+    else:
+        roots = all_seed_roots()
+        if not roots:
+            fallback = default_seed_root()
+            roots = (fallback,) if fallback is not None else ()
     try:
-        located = root is not None and Path(root).is_dir()
+        roots = tuple(r for r in roots if r is not None and Path(r).is_dir())
     except OSError:
-        located = False
-    if not located:
+        roots = ()
+    root = roots[0] if roots else (Path(seed_root) if seed_root is not None else None)
+    if not roots:
         return SeedDivergenceFinding(
             False,
             f"seed directory could not be located ({root or 'no configured agentic-setup root'}) "
@@ -830,9 +962,22 @@ def lint_seed_divergence(
     identical: list[str] = []
     diverged: list[str] = []
     unknown: list[str] = []
+    matched_root: "Path | None" = None
     for spec in SEED_FILES:
-        verdict = _compare_to_seed(Path(repo), root, spec)
-        (unknown if verdict is None else identical if verdict else diverged).append(spec.rel_path)
+        # Identical to ANY seed is identical: the delivery is a copy of one of these trees and
+        # we do not know which. Diverging from every tree that could be compared is divergence;
+        # if no tree could be compared at all the file is unknown, never clean.
+        verdicts = [_compare_to_seed(Path(repo), r, spec) for r in roots]
+        comparable = [v for v in verdicts if v is not None]
+        if not comparable:
+            unknown.append(spec.rel_path)
+        elif any(comparable):
+            identical.append(spec.rel_path)
+            if matched_root is None:
+                matched_root = next(r for r, v in zip(roots, verdicts) if v)
+        else:
+            diverged.append(spec.rel_path)
+    root = matched_root or root
 
     tail = f" (not compared: {', '.join(unknown)})" if unknown else ""
     if identical:
@@ -1020,6 +1165,15 @@ class Layer1Result:
             elif not f.measured:
                 out.append(f"{name} lint NOT RUN — {f.detail} "
                            f"(this is an absent measurement, not a clean one)")
+            elif f.coverage_partial:
+                # #1397: the branch that did not exist. A lint that RAN, found nothing, and
+                # KNOWS its coverage was partial satisfied neither arm above, so it printed
+                # nothing at all — and `lint_dead_scaffold` had been computing exactly that
+                # shortfall and writing it into `detail` since it was built. The sentence
+                # existed and reached nobody, which is the same lesson-354 shape as #1396:
+                # the object carried the caveat and the shipped record dropped it.
+                out.append(f"{name} lint found nothing, but its coverage was PARTIAL — "
+                           f"{f.detail} (a lower bound, not a clean result)")
         if self.seed_divergence.measured and self.seed_divergence.flagged:
             out.append(self.seed_divergence.detail)
         elif not self.seed_divergence.measured:

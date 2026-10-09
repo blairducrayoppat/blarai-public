@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -202,15 +203,113 @@ class EgressEnvelopeManager:
         return EgressDecision(True, False, "within approved window")
 
 
-def extract_query(canonical_args: str) -> str:
-    """Best-effort pull of the ``query`` field from a tool's canonical-args JSON.
+#: The longest query permitted to leave, as a SEND constraint rather than a
+#: display one — see :func:`extract_query`. Measured on the DISCLOSURE RENDERING
+#: (:func:`render_for_disclosure`), because that is the string the operator
+#: actually reads, and an escaped character costs six of it.
+#:
+#: **THIS NUMBER IS A BOUND I CHOSE, NOT A MEASUREMENT, and saying so is the
+#: point.** It rests on an argument — a legitimate search query is short by
+#: nature, and an approval must cover every byte it authorises — not on data. An
+#: earlier version of this comment presented a fixture census as the measured
+#: half and stated it wrongly twice (#1592 review, finding 3: the quoted figures
+#: described no single population). A threshold dressed as a measurement is worse
+#: than an argued threshold.
+#:
+#: What the corpus does say, re-runnable via `tools/probes/census_query_literals.py`
+#: which states its method: at `e8f682cb`, 117 string literals are bound to a
+#: `query` key in tracked .py/.json/.jsonl files, 1 to 49 characters, median 26.
+#: That key is shared with SQL — the longest is `SELECT name FROM sqlite_master
+#: WHERE type='table'`, not a search — so it is an UPPER BOUND on search-query
+#: length rather than a sample of it, and it is a fixture corpus in a system with
+#: no production use. It shows the cap is not binding in practice. It does not
+#: derive the cap.
+#:
+#: MEASURED 2026-09-20, with the operator present (#1593): the Windows Hello
+#: credential dialog DOES render a 200-character query in full. The real dialog
+#: was raised via `tools/hello_verify` carrying the exact 344-character message
+#: this path produces at the cap, with the query's first 11 characters and last
+#: 9 set to unmistakable markers. Both markers rendered, as did the entire
+#: trailing clause after the query. The message wrapped across six lines with no
+#: ellipsis and no truncation marker. No search was issued and nothing left the
+#: machine.
+#:
+#: So the SEEN half is no longer a hypothesis: at this cap, what the operator
+#: approves is what gets sent, and #1592's fix is not undone one layer down.
+#:
+#: What that observation does NOT license: raising this number. It establishes
+#: that 344 characters render on this machine at its current display settings;
+#: it does not locate the ceiling, and it says nothing about other scaling or a
+#: narrower window. Raising the cap would need its own observation.
+MAX_DISCLOSABLE_QUERY_CHARS: int = 200
 
-    Returns the query string for the Hello dialog + the chat disclosure. On any
+#: Unicode general categories whose members are ESCAPED before the query is
+#: shown to the operator, because a reader cannot see them: control (Cc),
+#: format (Cf — zero-width joiners, bidi overrides like U+202E), surrogate (Cs),
+#: private-use (Co), unassigned (Cn), and line/paragraph separators (Zl, Zp).
+#:
+#: Chosen by character CLASS rather than as a blocklist of code points: the set
+#: of characters that can hide text from a reader is not one anybody can
+#: enumerate, and the printable set is.
+#:
+#: **These are escaped, never refused, and that distinction is the whole design.**
+#: An earlier version of this control REFUSED any query containing one. It was
+#: correct about the danger and wrong about the remedy: U+200C and U+200D are
+#: orthographically required in Persian and Devanagari and carried by ordinary
+#: emoji sequences, ``Cc`` contains TAB, and ``Cn`` is every code point assigned
+#: after the running interpreter's Unicode table — so refusal meant an operator
+#: searching in their own language had the turn ended under a security
+#: justification (#1592 review, finding 1). Escaping keeps the disclosure
+#: guarantee and costs no capability at all.
+_INVISIBLE_CATEGORIES: frozenset[str] = frozenset(
+    {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
+)
+
+
+class QueryNotDisclosableError(ValueError):
+    """The query cannot be shown to the operator in full, so it must not be sent.
+
+    Raised rather than returned so no caller can treat it as a descriptor and
+    proceed. The whole value of the Hello envelope is that a human looked at the
+    string; a truncated view is worth exactly the fraction of the string it shows.
+    """
+
+
+def extract_query(canonical_args: str) -> str:
+    """Pull the ``query`` field from a tool's canonical-args JSON, or REFUSE.
+
+    Returns the DISCLOSURE RENDERING of the query — what the Hello dialog and the
+    chat disclosure show — which is the query itself for any string containing no
+    invisible characters, and otherwise a lossless escaped form of it (see
+    :func:`render_for_disclosure`). On any
     parse failure / missing field, returns a generic descriptor — the gate never
     depends on this for its allow/deny (that is the envelope + fingerprint), only
     for what the operator is SHOWN, so a degraded descriptor is safe (the operator
-    can still deny). The result is length-capped so a pathological query cannot
-    bloat the dialog or a stream frame.
+    can still deny).
+
+    **A query that cannot be shown to the operator IN FULL raises rather than
+    being shown partially (#1592).** There are two ways a string can fail to be
+    disclosed — it can be too LONG to fit, or short enough to fit and still able
+    to HIDE its own tail from the reader — and they get different answers. The
+    hiding characters are ESCAPED by :func:`render_for_disclosure`, so they cost
+    no capability and become visible; only length still refuses, and it is
+    measured on the RENDERED string, because that is what the operator actually
+    reads. This used to return ``descriptor[:200]``, and that
+    200-character string was what the Windows Hello dialog displayed while the
+    adapter sent the full, untruncated query — so a 5,000-character query showed
+    the operator 200 characters and sent 5,000, with everything after character
+    200 approved without ever being displayed. The cap bounded the DISPLAY, not
+    the PAYLOAD, and the asymmetry was an exfiltration channel through a control
+    whose entire value is that a human read the string.
+
+    Refusing is the fail-closed direction, and it is also the structural control
+    the published landscape prefers to content inspection: a bounded field is a
+    smaller channel. A legitimate search query is short by nature. A model that
+    wants five thousand characters of query is doing something the operator
+    should see refused, not approve unseen.
+
+    Raises:
+        QueryNotDisclosableError: the query exists but cannot be shown in full.
     """
     descriptor = "(query unavailable)"
     try:
@@ -221,9 +320,67 @@ def extract_query(canonical_args: str) -> str:
                 descriptor = q.strip()
     except (json.JSONDecodeError, TypeError, ValueError):
         pass
-    # Cap for the OS dialog + the disclosure stream frame (a query is short by
-    # nature; this bounds a pathological one).
-    return descriptor[:200]
+
+    rendered = render_for_disclosure(descriptor)
+    if len(rendered) > MAX_DISCLOSABLE_QUERY_CHARS:
+        raise QueryNotDisclosableError(
+            f"outbound query renders to {len(rendered)} characters, which exceeds "
+            f"the {MAX_DISCLOSABLE_QUERY_CHARS} that can be shown to the operator "
+            f"in full. REFUSED rather than truncated: an approval covering only "
+            f"the first {MAX_DISCLOSABLE_QUERY_CHARS} characters would approve "
+            f"the rest unseen."
+        )
+    return rendered
+
+
+def render_for_disclosure(query: str) -> str:
+    """Return ``query`` with every character a reader cannot see made visible.
+
+    **The invariant this establishes:** what the operator is shown is a LOSSLESS,
+    UNAMBIGUOUS rendering of exactly the bytes that will be sent. Not the same
+    string — a faithful one, from which the sent string can be recovered exactly.
+
+    A length cap alone is not a disclosure guarantee. A THIRTY-TWO character
+    query — ``"cats" + "\\n" * 12 + " ssn 123-45-6789"`` — passes any cap
+    untouched and reaches both the Hello prompt and the chat disclosure verbatim,
+    with its tail scrolled off whatever the operator is reading. ``q.strip()``
+    removes outer whitespace and nothing else, so control characters, zero-width
+    characters and bidi overrides all survive it (#1592 review, finding 3).
+
+    Escaping rather than refusing is the second turn of that review (finding 1).
+    Refusal was over-broad in a way that cost capability and bought nothing:
+    U+200C/U+200D are orthographically required in Persian and Devanagari,
+    ``Cc`` contains TAB, and ``Cn`` membership changes with the interpreter's
+    Unicode table — so the same query could be refused on one Python and sent on
+    the next. Escaped, all of those searches work, and the hidden-tail attack the
+    control exists for becomes *visible to the operator* rather than merely
+    blocked: they see the planted tail and deny it, which is strictly more
+    information than a refusal message gives them.
+
+    The backslash is escaped too. Without that the encoding is ambiguous — a
+    query containing the six literal characters ``\\u200c`` would render
+    identically to one containing an actual zero-width non-joiner, and an
+    ambiguous rendering is not a disclosure.
+
+    Not covered, stated rather than implied: combining marks (``Mn``) can be
+    stacked to obscure neighbouring glyphs, and confusable/homoglyph substitution
+    is a different problem entirely. Neither can hide the TAIL of a string, which
+    is what this function bounds.
+    """
+    out: list[str] = []
+    for char in query:
+        if char == "\\":
+            out.append("\\\\")
+        elif unicodedata.category(char) in _INVISIBLE_CATEGORIES:
+            code_point = ord(char)
+            out.append(
+                f"\\u{code_point:04x}"
+                if code_point <= 0xFFFF
+                else f"\\U{code_point:08x}"
+            )
+        else:
+            out.append(char)
+    return "".join(out)
 
 
 def request_egress_fingerprint(

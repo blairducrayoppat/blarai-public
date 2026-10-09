@@ -22,6 +22,12 @@ live baseline line in the SAME commit. This is gate-enforced:
 pytest shared/ services/ launcher/ tests/integration/ tests/security/ -m "not hardware and not winui and not slow"
 ```
 
+**Fast form (development and merges):** `python scripts/run_standing_gate.py` runs the SAME selection as 6 concurrent
+pytest processes over disjoint groups of whole files (the fixed-port files alone afterwards), prints one combined
+line, and exits 3 if the groups ran a different number of tests than the single collection found. About 12 minutes
+against about 24 for the sequential form; use `--groups 3` while you work at the machine. The sequential form above
+remains the definition of the bar and the only form that yields a timing figure (rule 8).
+
 **Bar:** 0 failed, 0 skipped in a clean environment. A skip is investigated, never waved
 through. Always redirect `LOCALAPPDATA` (§2.6); run from a TERM-bearing shell with no
 `PYTHONIOENCODING` override (the PowerShell tool shell false-fails 3 tests — bash is the
@@ -32,134 +38,60 @@ proven runner).
 > *(2026-08-08, when this file breached its 40,000-byte budget). Nothing was deleted; the
 > retractions and corrections are there in full.*
 >
-> **LIVE_GATE_BASELINE: 10845 passed / 0 failed / 0 skipped / 133 deselected**
-> *(**CONFIRMED on merged `main`**, 2026-08-09, **started 04:59:07, finished 05:05:13**
-> local, **362.82 s** — assistant STOPPED, no dispatch, no battery. **+2 over 10843**:
-> `6e7a15bd` (#1352 — a dispatch-asset nicety crashed the Assistant Orchestrator and cost
-> the 2026-08-08 night; it degrades to no-asset now).*
+> ### How to run a gate so the figure means something
 >
-> *This baseline is stamped after a RED gate, and the red is the lesson. Three
-> `test_image_placement.py` tests failed at 04:56 with nothing about the grader changed:
-> they asserted exact figures against `~/projects/battery-b9-pottery-site`, which the
-> overnight battery had rebuilt. **A working directory the fleet rewrites is
-> evidence-by-reference, and the reference moved while the tests slept** — capability 16
-> (#1318) committed by tests written to enforce it. Retargeted to a dated
-> `repos-archived/` snapshot with byte-identical findings. The rule: assert exact numbers
-> only against immutable artifacts.*
+> Accumulated the hard way; moved here from the `CLAUDE.md` snapshot on 2026-09-20 because
+> that bullet had grown into a paragraph, which its own staleness rule names as rot.
 >
-> *Previous: **10843** @ `88a634eb` — (2026-08-08, **started 22:04:53, finished
-> 22:12:28** local, **450.47 s** — primary checkout, assistant STOPPED, no dispatch, no
-> battery. **+33 over 10810**: `c9fc9633` (#1349, +5 — the grader stopped calling the
-> operator's own photographs pipeline waste) and `88a634eb` (#1348, +28 — requirement
-> coverage can finally see a website; the assessor globbed `*.py` and then reported "no
-> seeded job oracle" while a `.mjs` one sat in the same directory).*
->
-> *A merge lesson banked with the figure: the first #1348 merge at 21:55 took only the
-> branch's FIRST commit, because I merged while its agent was still working. The second
-> commit — the reachability tests proving the node path is reached at BATTERY CLOSE, not
-> just from `assess_run` — landed in a second merge. Merging a branch whose author has not
-> reported is merging a moving target.*
->
-> *Previous: **10810** @ `e8038c95` — (**CONFIRMED on merged `main`**, 2026-08-08, **started
-> 21:00:01, finished 21:07:40** local, **455.06 s** — the CONFIRMING run, stamped rather
-> than the 20:50:48 run that carried the same count but FAILED on the grammar gate; a
-> baseline must cite the run that actually passed. Primary checkout, models
-> present, assistant STOPPED, no dispatch and no battery live (the guard's own pattern —
-> image AND invocation form — returned 0 driving processes). **+86 over 10724**, from the
-> evening's second arc: every instrument that publishes a verdict now has to say what it did
-> not measure.*
-> - *`83633ce0` (#1342 item 2, +19, `test_oracle_qa_measurement_honesty.py`) — the QA record
->   reported `findings_total: 0` beside `f2p_baseline: "not-run"`. `findings_conclusive` is
->   now false whenever any producing stage did not run.*
-> - *`74257ce7` (#1345, +38, `test_image_placement.py`) — grades where a site's pictures
->   LAND. Catches the operator's own two remaining complaints on the real delivery.*
-> - *`ca742a99` (#1346, +24, `test_morning_website_section.py`) — the morning report names
->   the site built last night, or says why it cannot.*
-> - *`95e007be` (lesson 33's owed control, +5,
->   `test_graders_disclose_what_they_did_not_measure.py`) — deny-by-default: a module that
->   publishes a findings total must carry some way to say a check did not run. Found zero
->   real offenders; it is a ratchet against the next one, proved able to fire by planting one.*
->
-> *This run FAILED once before passing, and the failure was worth having:
-> `test_coder_dod_grammar.py` rejected a `Status: STARTED` line written into capability 12
-> earlier the same evening. STARTED is not in the legend, and PARTIAL was the honest word
-> anyway — one reviewed delivery is a data point, not the published rate the row asks for.
-> The grammar gate caught a status claim that had drifted past its own legend.*
->
-> *Previous: **10724** @ `75e8e24f`, 2026-08-08 19:48:05→19:55:09, 419.62 s, **+69 over
-> 10655**, from two merges that give the delivered PRODUCT its first automated examination:*
-> - *`32a9ed1f` (#1345, +26, `shared/tests/test_link_lint.py`) — every href/src in a
->   delivered site resolved against the root a server actually mounts. The operator found a
->   broken "View Details" button by hand in under a minute that four gates had passed;
->   nothing was asking whether a link's target existed. Advisory, not a gate: a regression
->   lock proves a broken site and a clean site produce identical verdicts.*
-> - *`75e8e24f` (#1343, +43, `tests/integration/test_battery_website_presentation.py`) — a
->   website battery run now ends by leaving him a record and a double-click launcher, after
->   every measurement has landed. Fail-open by design in this one place, proved
->   byte-identical across seven forced failure paths.*
->
-> *Previous: **10655** @ `462c55cb`, 2026-08-08 18:37:54→18:43:50, 353.32 s, **+81 over
-> 10574**, from the evening's three merges, all of them locks on instruments that were reporting
-> passes they had not measured:*
-> - *`4a51fb5e` (#1342, +38, `shared/tests/test_oracle_qa_node.py`) — node oracles skipped BOTH
->   execution-stage probes unconditionally, so a website was exactly the case where nobody
->   checked whether the exam could fail. Fail-to-pass baseline + static vacuity for node.*
-> - *`7821bab4` (#1342, +19, `test_already_satisfied_precheck.py` 16→35) — an oracle never shown
->   capable of failing may no longer delete work from the plan.*
-> - *`462c55cb` (#1341, +27, `tests/integration/test_battery_evidence_capture.py` and its
->   `live_dispatch` witness) — the scorecard cited a mutable file as evidence and stamped a
->   pre-build commit count as a run property.*
->
-> *Measured AFTER all three merges, so it is the merge tree's own figure, not inherited from any
-> branch. Each of the three ships its refusal case (principle 12): the #1342 precheck lock was
-> toggle-proven by forcing its probe to `return True` — 14 locks fail, while the
-> still-skips test keeps passing, so the suite tells "correctly gated" from "broken outright".*
->
-> *(prior — CONFIRMED on merged `main` @ `0ea1f32b`, 2026-08-08, 14:31:48→14:37:38, 346.57 s,
-> **10574**; +9 over 10565, all `test_failure_taxonomy.py`, #1324's honesty split.)*
->
-> *(prior — CONFIRMED on merged `main` @ `be0ad99b`, 2026-08-07, 23:28:25→23:33:57, 325.96 s,
-> **10565**.)*
->
-> *(**RE-MEASURED on the resolved merge tree** of `docs/dod-ratification-20260807` × `main@49e4cb18`,
-> 2026-08-07, **started 23:21:58, finished 23:27:32** local, **327.66 s** — worktree
-> `blarai-wt-dod-rat` at model parity, venv interpreter, AO stopped, no battery live. **The
-> re-merge was CLEAN — no conflicts in this file or in the `CLAUDE.md` snapshot**, contrary to
-> the landing brief's expectation, because the branch already carried main's measurement history
-> and the four commits main gained since (`cce07cc6`, `43e30e59`, `a6bfd39a`, `49e4cb18`) touched
-> neither. The figure the files already carried was therefore MEASURED rather than inherited —
-> a clean merge of two independent baseline edits is precisely the case the doctrine-freshness
-> gate cannot catch, since it compares the two documents to each other and never to reality.*
->
-> *(**MEASURED on the merge tree** of `docs/dod-ratification-20260807` × `main@bcaf2cd7`,
-> 2026-08-07, **started 19:56:24, finished 20:04:43** local, **490.93 s** — dedicated worktree
-> `blarai-wt-dod-rat` at model parity (junction-completed; an earlier same-tree run skipped ONE
-> test, `test_benchmark_kv_cache_sweep.py`, on a missing linked model file — completed, re-run
-> 27/27, then clean full runs only), venv interpreter, AO stopped (launcher pid 9752 stopped
-> 19:21 for the gate window, restarted after the post-merge confirmation), no dispatch, no
-> concurrent gate. **+13 over 10552**, all of it `tests/security/test_coder_dod_grammar.py` —
-> the DoD status-grammar gate ratified with capability 11 (#1325): status presence on all 21
-> rows, legend vocabulary, LIVE-requires-dated-citation, acceptance-test Executed lines, four
-> checker fail-proofs and one conforming-pass proof, plus 2 beyond-range hardening tests from
-> the pre-merge review. Reconciles across tonight's three parallel arcs:
-> 10526 + 21 (#1327) + 5 (#1324) + 13 = 10565. Deselected unchanged at 133.*
+> 1. **A GATE IS A MEASUREMENT.** Nothing else heavy on the box, and never against a live
+>    battery. One loaded run took 21:32 against ~10:00 quiet, and an earlier one produced a
+>    failure that took three sessions to diagnose (#1597).
+> 2. **PREDICT THE FIGURE BEFORE RUNNING IT** — and **predict the SKIP column too.** A run
+>    read 11658 passed / 3 skipped against a predicted 11661 / 0. The total reconciled, so it
+>    looked green, and it hid an env-skip that could never lift (#1594). Three consecutive
+>    merges had confirmed the pass count exactly while nobody predicted the other column.
+> 3. **CAPTURE FULL OUTPUT.** Summarise for display, never the reverse. A `tail`ed gate
+>    discards the traceback, which cost three sessions one misdiagnosis each (#1597).
+> 4. **NEVER EDIT THE TREE MID-GATE.**
+> 5. **A WORKTREE FIGURE IS NOT THE BASELINE.** Reconcile as
+>    `branch_passed + skipped + failed = primary_passed` and write the prediction down first.
+>    At `eb0af7db` the worktree reads 11671/2/26 against the primary's 11699.
+> 6. **STATE ELEVATION WITH EVERY FIGURE.** 0 skipped is the elevated reading; a non-elevated
+>    run reads 3 — the symlink delta. Assistant DOWN; up adds 7 port-5001 skips.
+> 7. `.venv/Scripts/python.exe`, bash, stamp start→finish.
+> 8. **A TIMING FIGURE COMES FROM THE INSTRUMENT.** `scripts/gate_timing_runner.py` starts a run only after 15 minutes of
+>    input idle on AC power with a quiet CPU, samples idle, power and CPU through the run, and voids it on any input,
+>    non-AC sample, second test runner or silent log. A hand-started run is a correctness run: its wall-clock is not a
+>    figure. Run-to-run spread on this machine, measured with it: 1.4 % (09-22 tree) to 3.5 % (current).
+> 9. **TRIMMING THE GATE.** A speed-up that keeps every test in is made freely (the installer batching, #1699). A test leaves the
+>    standing gate only by the operator's decision. The parallel form keeps every test in (#1707, rule 10).
+> 10. **A PARALLEL FIGURE NAMES ITS GROUP COUNT** and is not comparable with a sequential one. Real checkout, 13288 tests, elevated, app down:
+>     3 groups 848.7 / 894.6 / 894.1 s; 6 groups 704.3 / 700.8 / 708.6 s; sequential about 1450 s. Whole files only, in collection
+>     order within a group (some tests leave module state a later test expects clean, which sequential order had hidden: #1707);
+>     files that bind the fixed ports 5000/5001 run alone after the parallel phase.
 
-**Documented environmental deltas (benign only because named and bounded):**
-non-elevated shell → 2 symlink skips · isolated worktree without the gitignored models →
-~21 router env-skips · live app on :5001 → 7 skips · PowerShell tool shell → 3
-false-fails (TERM / PYTHONIOENCODING) · a `PYTHONUNBUFFERED`/`-u` override → 2
-`launcher/tests/test_import_side_effects.py` false-fails (2026-07-21 — do not add
-output-buffering overrides to gate invocations). An unexplained skip is a defect.
+> **LIVE_GATE_BASELINE: 13302 passed / 0 failed / 0 skipped / 620 deselected**
+>
+> *(**MERGED `main` at `ea7ee8c3`, REAL checkout**, 2026-10-08, 07:30 to 07:42 -04:00, **ELEVATED**, app down, `LOCALAPPDATA`
+> redirected, `scripts/run_standing_gate.py` (6 groups + serial tail): 13302 passed / 0 failed / 0 skipped / 620 deselected in
+> 698.0 s; the same form at `dda7e90a` (13288 tests) ran three times in a row: 704.3 s, 700.8 s and 708.6 s. 13302 = 13288 + 13 tests
+> (#1707 follow-ups) + 1 timeout-registry case; counted by collection before the run.
+> The previous stamp (`c5b83a31`, 13253 tests) was the SEQUENTIAL form, idle-controlled by `scripts/gate_timing_runner.py`:
+> 1448.0 s. The 09-22 tree read 703.0 s and 693.0 s and the pre-batching tree 1631.7 s and 1687.2 s in worktrees, same box.
+> Parallel runs were not idle-controlled (the operator may have been at the machine). Data and method:
+> `docs/performance/gate_runtime_2026-10-07/`. Older stamps: `docs/archive/test-governance-baseline-history.md`.)*
+>
 
-**Deselected tiers** run at their own dev-machine ceremonies: `@hardware` (model-loaded,
-real Arc 140V), `@winui` (GUI harness), `@slow` (socket E2E). Model-quality eval gate:
-`python -m evals.run --suite all` — committed baselines, regression exit codes with teeth.
-
-**History:** every prior baseline chapter and the Sprint-8-era named-scope tables live in
-[`docs/archive/testing/baseline_history.md`](archive/testing/baseline_history.md) — do
-NOT append chapters here; the live line above and the shipping ticket are the record.
-
----
+> **READ THE SKIP COLUMN BEFORE COMPARING.** The figure above is the **ELEVATED** reading, so
+> **0 skipped** is expected, not lucky. A NON-ELEVATED run of the same tree reads **12083 / 0 / 3**
+> — the 3 are the documented symlink skips (rule 6) and are benign ONLY because they are named.
+> A branch WORKTREE reads lower again by the gitignored-asset skips (rule 5: the worktree figure
+> plus its skips must reconcile to the elevated total); a WORKTREE FIGURE IS NOT THIS NUMBER.
+> A live app adds 7 port-5001 skips. An unexplained skip is a defect, never a rounding error.
+>
+> Earlier per-merge entries and their lessons (prediction by collection, the skip column, the nested-checkout
+> walk, the 21:32 loaded gate, retractions) are in `docs/archive/test-governance-baseline-history.md`; rules 1-9 above
+> carry what they taught.
 
 ## 2. Scope Selection Guide
 
@@ -349,6 +281,7 @@ Application rule: Apply at module level via `pytestmark`, not per-test.
 **Current `slow` usage:**
 - `tests/integration/test_p110_end_to_end.py` — `pytestmark = pytest.mark.slow`
 - `tests/integration/test_p114_ui_end_to_end.py` — `pytestmark = pytest.mark.slow`
+- Rules-tooling slow tier (`tests/security/test_git_*.py`, per-test marks via `_git_hook_helpers.mark_slow_except`): `pytest tests/security -m slow -k "git_rules or reference_transaction or git_native or git_hooks or git_install or git_update or git_swap"` (~45 min). Run before changing the guard, hooks, installer or CLAUDE.md git rules; at least monthly.
 
 ### Future Marker Guidelines
 

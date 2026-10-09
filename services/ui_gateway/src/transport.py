@@ -26,6 +26,7 @@ See ADR-009 for the full interaction flow and data flow diagram.
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 import logging
 import os
@@ -75,6 +76,7 @@ from services.ui_gateway.src.session_store import (
 from services.ui_gateway.src.constants import (
     PA_HANDSHAKE_BUDGET_S,
     PA_HANDSHAKE_TIMEOUT_S,
+    EXECUTE_RESPONSE_TIMEOUT_S,
     PLAN_RESPONSE_TIMEOUT_S,
     PROMPT_RESPONSE_TIMEOUT_S,
     SESSION_STATE_TTL_S,
@@ -99,6 +101,7 @@ from shared.ipc import (
     require_str_list,
 )
 from shared.ipc.protocol import DEFAULT_MAX_MESSAGE_BYTES
+from shared.ipc.slash_commands import BACKEND_PASSTHROUGH_SLASH_COMMANDS
 from shared.ipc.vsock import AF_HYPERV, HV_PROTOCOL_RAW
 from shared.ttl_dict import TtlDict
 
@@ -109,6 +112,27 @@ from shared.ttl_dict import TtlDict
 PROMPT_HISTORY_MAX_BYTES: int = 40_000
 
 logger = logging.getLogger(__name__)
+
+
+def _is_backend_command(text: str) -> bool:
+    """Is *text* one of the slash commands the backend owns (#1406)?
+
+    Read from :data:`~shared.ipc.slash_commands.BACKEND_PASSTHROUGH_SLASH_COMMANDS`, the
+    same SSOT the WinUI's ``IsBackendCommand`` uses, with the same verb-plus-whitespace
+    rule — so the two surfaces cannot drift, and a family added later is recognised here
+    without anyone editing this function.
+
+    Exists because the #1406 fallback's precision guarantee was positional and the position
+    was not sufficient: ``/external``'s parser lives inside ``send_prompt``, downstream of
+    every interception, so a message wearing that verb reached the fallback with all five
+    upstream families having honestly declined it. Position tells you what already ran;
+    only the registry tells you what a message IS.
+    """
+    stripped = (text or "").strip()
+    if not stripped.startswith("/"):
+        return False
+    verb = stripped.split(None, 1)[0].lower()
+    return verb in {c.lower() for c in BACKEND_PASSTHROUGH_SLASH_COMMANDS}
 
 
 def _build_dispatch_state_store_or_none(dev_mode: bool):
@@ -1472,7 +1496,15 @@ class TransportGateway:
         def _error(message_text: str) -> dict[str, Any]:
             return {"ok": False, "run_id": "", "message": message_text}
 
-        transport = await self._open_prompt_transport()
+        # #1353: EXECUTE generates the plan's dispatch assets on the GPU BEFORE the swap
+        # (SEAM A, 14B still resident) at ~59.9 s/image measured. On the 180 s per-prompt
+        # default that made the budget a THRESHOLD: two images fit, four did not, and four
+        # consecutive battery nights were lost to the crossing. See
+        # EXECUTE_RESPONSE_TIMEOUT_S for the arithmetic and its honest limit.
+        _t0 = time.monotonic()
+        transport = await self._open_prompt_transport(
+            timeout_s=EXECUTE_RESPONSE_TIMEOUT_S
+        )
         if transport is None:
             return _error(
                 "Could not connect to the Assistant Orchestrator (Fail-Closed)."
@@ -1483,7 +1515,23 @@ class TransportGateway:
                 return _error("IPC send to the Assistant Orchestrator failed.")
             resp_bytes = await asyncio.to_thread(transport.receive)
             if resp_bytes is None:
-                return _error("No response from the Assistant Orchestrator.")
+                # #1353: SAY WHICH. "No response" collapsed a receive timeout and a closed
+                # connection into one sentence that reads as "the assistant is dead", and it
+                # cost six wrong diagnoses across four lost nights. The elapsed time against
+                # the budget is what distinguishes them, so it travels with the message.
+                waited = time.monotonic() - _t0
+                if waited >= EXECUTE_RESPONSE_TIMEOUT_S * 0.95:
+                    return _error(
+                        "No response from the Assistant Orchestrator: the gateway stopped "
+                        f"waiting after {waited:.0f}s (budget "
+                        f"{EXECUTE_RESPONSE_TIMEOUT_S:.0f}s). The assistant was most likely "
+                        "STILL WORKING - dispatch-asset generation runs inside EXECUTE."
+                    )
+                return _error(
+                    "No response from the Assistant Orchestrator: the connection closed "
+                    f"after {waited:.0f}s, well inside the {EXECUTE_RESPONSE_TIMEOUT_S:.0f}s "
+                    "budget - the assistant went away rather than ran long."
+                )
             try:
                 return self._framer.decode_execute_result(resp_bytes)
             except ValueError as exc:
@@ -1634,6 +1682,56 @@ class TransportGateway:
         if command is None:
             return None
         reply = await self._dispatch_coordinator.handle_command(session_id, command)
+        self._persist_informational_turn(session_id, stripped, reply)
+        return reply
+
+    async def handle_unanswered_question(
+        self, session_id: str, text: str
+    ) -> str | None:
+        """LAST-RESORT interception (#1406): ordinary text arriving while a /dispatch
+        question is on screen waiting for an answer.
+
+        Called by the dispatcher after the interception chain — ingest, dispatch, coord,
+        imagine, preferences — has declined the message.
+
+        THAT IS NOT SUFFICIENT ON ITS OWN, and the first draft of this claimed it was.
+        ``/external`` is a sixth command family whose only parser lives INSIDE
+        :meth:`send_prompt` (``_parse_external_command``), i.e. DOWNSTREAM of the
+        dispatcher — so "every family above declined it" was true and still left this
+        method swallowing a real command whenever a dispatch question was parked. A
+        pre-merge review found it by running every parser against ``/external <text>``
+        rather than by reading the chain.
+
+        So the decline is taken from the SSOT instead of from position:
+        :data:`~shared.ipc.slash_commands.BACKEND_PASSTHROUGH_SLASH_COMMANDS` is the list
+        of verbs the WinUI must hand to the backend, and a message wearing one of them is a
+        command, never an answer. Reading it here means a family added later — wherever its
+        parser ends up living — is declined without anyone remembering this method exists.
+        Returns ``None`` for anything it does not own, which is the unchanged
+        ``send_prompt`` path.
+
+        Persists an informational turn like every sibling. The load-bearing consequence is
+        that NO model call occurs on this turn — the defect being fixed is precisely a
+        model call that produced nothing. Stated narrowly on purpose: the informational
+        marking keeps the ASSISTANT half out of later prompts (the history filter admits
+        an assistant turn only at ``pgov_status == "approved"``), while the operator's own
+        text is written as a user turn and is forwarded on a later turn exactly as any
+        chat message is. This surface changes what happens NOW, not what the model
+        remembers.
+
+        ``ttl_s`` is threaded from the same idle window the reaper uses, because an
+        intercepted turn never reaches the reaper's only caller — see
+        :meth:`DispatchCoordinator.unanswered_question_notice` for why omitting it would
+        brick the session rather than merely skew a timestamp.
+        """
+        stripped = text.strip()
+        if not stripped or _is_backend_command(stripped):
+            return None
+        reply = self._dispatch_coordinator.unanswered_question_notice(
+            session_id, stripped, ttl_s=self._session_state_ttl_s
+        )
+        if reply is None:
+            return None
         self._persist_informational_turn(session_id, stripped, reply)
         return reply
 

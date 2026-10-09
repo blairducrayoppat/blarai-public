@@ -166,3 +166,32 @@ MODE_DET_JURY = "det+14b-x3"
 #: One-line cap for any evidence value (mirrors the scorecard S6 discipline — pointers +
 #: short statuses, never raw logs; the scorecard writer caps at 1000, we stay well under).
 EVIDENCE_VALUE_CAP = 300
+
+
+def clip_rule_list(body: str, rules: "list[str]", cap: int = EVIDENCE_VALUE_CAP) -> str:
+    """``body`` + a comma-joined ``rules``, trimmed to ``cap`` and SAYING when it trimmed.
+
+    Lives here, shared, rather than in either scanner. #1400 fixed this in ``security.py``
+    and left the identical naive ``[:cap]`` slice in ``placeholder_prose.py``; that is the
+    third time in one review pass that a fix landed on one sibling and not the other, so the
+    remedy is one implementation both call rather than a rule that both be remembered.
+
+    The defect being prevented: building the line whole and then slicing it drops the tail of
+    the rule list silently, so a reader cannot tell a two-rule finding from a nine-rule
+    finding whose last seven fell off the end — a disclosure surface committing this ticket
+    family's own defect. Room for the ``", +N more"`` suffix is reserved BEFORE trimming, so
+    the honesty note can never itself be the thing clipped.
+
+    ``"info-only"`` when *rules* is empty: an empty tail would render ``"1 info: "`` with
+    nothing after the colon, which reads as a truncation rather than as a real state."""
+    kept: list[str] = []
+    for rule in rules:
+        room = cap - len(body) - len(", ".join(kept)) - len(f", +{len(rules)} more")
+        if kept and len(rule) + 2 > room:
+            break
+        kept.append(rule)
+    dropped = len(rules) - len(kept)
+    tail = ", ".join(kept) or "info-only"
+    if dropped:
+        tail += f", +{dropped} more"
+    return f"{body}{tail}"[:cap]

@@ -1,0 +1,13 @@
+### 2026-10-07 — An instrument that can say "clean" has to be shown saying "void"
+
+*Plain summary: To time the test gate honestly I built a runner that only starts on an idle laptop on mains power; an independent reviewer found it would have recorded a battery run as clean and missed any keyboard touch near the start, which is exactly what it exists to prevent.*
+
+The operator is at the machine for unknown stretches, and a 25-minute wall-clock figure is only a measurement if nothing else moved: no input, no battery transition, no second test runner. So the timing arc needed a mechanism that decides for itself, on a repeating elevated Scheduled Task, when the box is quiet enough to start, watches the whole run, and throws the run away when anything changes. I wrote it in an afternoon and tested its decision functions; they all passed.
+
+The reviewer ran the tick itself, with the Windows probes replaced by a scripted clock, and the first round came back with three blockers. A run that started on battery was recorded clean, because power was only checked on a reading taken twenty seconds before the process began and the baseline for the later checks was whatever that run began with. Input in the fifty seconds around the start was never noticed, because I had given the idle comparison a thirty-second grace that was based on a wrong picture of the clock: idle and elapsed are read in the same instant, so with no input idle simply equals the starting idle plus elapsed, and any touch at all breaks that. And a stale lock file whose process id had been reused would have disabled the whole thing silently for three days. The second round found a visible console window popping up on the operator's screen from the kill command, and that the test for the highest-severity fix was exercising the wrong code path: the battery case blocked at the first probe and never reached the re-read it was supposed to certify.
+
+What I take from it is narrower than "test more". The decision functions were correct against the cases I imagined, and every real defect lived where the functions are wired to a clock, a lock and a child process. A mutation sweep of thirty edits showed twelve survivors in the first round; the fix was end-to-end tick tests, not more unit cases, and each fix now has a test that fails when the fix is removed.
+
+Trade-off: voided runs are repeated, up to eight, so a persistent cause (a genuinely slow test that looks like a stall) cannot loop forever, at the price of the plan being abandoned with a logged reason instead of finishing.
+
+**Next:** register the task, let it take alternating runs of the 09-22 tree and current main whenever the box goes idle, and read the per-file sums.

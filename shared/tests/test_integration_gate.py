@@ -1686,6 +1686,21 @@ def _contract_tasks(n: int = 2) -> list[dict]:
     ]
 
 
+def _node_contract_tasks(n: int = 2) -> list[dict]:
+    """The node twin of :func:`_contract_tasks`, declaring importable ES modules.
+
+    #1474: the node oracle is only authored when a task declares something Node can
+    actually import. The python fixture above creates ``src/m0.py``, which no node job
+    ever does — it was reused here only because the paths used to be incidental to the
+    assertion (ecosystem SELECTION). They are load-bearing now, so the node tests get a
+    node-shaped fixture instead of a python one wearing a node hint."""
+    return [
+        {"repo": "X", "task": f"t{i}", "prompt": f"p{i}",
+         "contract": {"creates": [f"src/m{i}.mjs"], "exports": [f"f{i}(x)"], "notes": ""}}
+        for i in range(n)
+    ]
+
+
 def test_job_oracle_python_multi_task():
     code, path = generate_job_acceptance_oracle(
         "a budget tracker", _spec(language_hint="python"), _contract_tasks(),
@@ -1696,11 +1711,34 @@ def test_job_oracle_python_multi_task():
 
 
 def test_job_oracle_node_via_hint_and_via_web_surface():
+    """Ecosystem SELECTION: an explicit node hint, or a web surface with no other hint,
+    routes to the node job-oracle path. #1474 gave this a node-shaped fixture — the
+    assertion is unchanged."""
     for spec in (_spec(language_hint="node"), _spec(surface="web")):
         code, path = generate_job_acceptance_oracle(
-            "g", spec, _contract_tasks(), generate_fn=lambda p: _NODE_ORACLE)
+            "g", spec, _node_contract_tasks(), generate_fn=lambda p: _NODE_ORACLE)
         assert path == JOB_ORACLE_PATH_NODE
         assert "node:test" in code
+
+
+def test_job_oracle_refuses_a_node_job_that_creates_nothing_importable():
+    """[kill] #1474, from run 20260830-225825-bd: a static-site decomposition declared
+    ``creates: src/<section>/index.html``, and the authored exam imported those as ES
+    modules — ERR_UNKNOWN_FILE_EXTENSION at load, unpassable by construction. Worse, that
+    import contract is surfaced to every task prompt, so a ONE-PAGE goal was instructed to
+    build six pages. No importable contract must mean NO exam, and the author must not even
+    be called."""
+    def gen(_prompt):  # pragma: no cover - reaching this is the bug
+        raise AssertionError("the author must not be asked for an unrunnable exam")
+
+    html_tasks = [
+        {"repo": "X", "task": f"t{i}", "prompt": f"p{i}",
+         "contract": {"creates": [f"src/section{i}/index.html"], "notes": ""}}
+        for i in range(2)
+    ]
+    code, path = generate_job_acceptance_oracle(
+        "a one-page site", _spec(surface="web"), html_tasks, generate_fn=gen)
+    assert (code, path) == ("", "")
 
 
 def test_job_oracle_prompt_carries_contracts_and_criteria():
@@ -2184,6 +2222,107 @@ def test_real_seed_job_oracle_writes_guarded_file_and_commits(tmp_path, monkeypa
                                    _PY_ORACLE, run=fake_run)
     assert res2["ok"] is True and "already" in res2["evidence"]
     assert ran == []
+
+
+def test_the_seed_failure_MESSAGE_does_not_promise_a_grade_that_cannot_happen():
+    """#1418 item 2. The tail read "it still grades the final tree" on EVERY seed failure.
+
+    True for a mechanical failure — the oracle exists and grades at the end even though the
+    coder never saw it. FALSE when no oracle was authored, because `real_run_job_oracle`
+    returns `not-run` at its first statement and never touches the tree.
+
+    This is locked as a STRING because the string is the defect: it cost real investigation
+    time by asserting a grade would happen, which sent someone hunting an ecosystem-detection
+    bug that did not exist. Pinning the code path without pinning the sentence would miss the
+    thing that actually misled a human."""
+    src = (Path(__file__).resolve().parents[2]
+           / "shared" / "fleet" / "swap_driver.py").read_text(encoding="utf-8")
+    i = src.index("Job oracle NOT seeded")
+    window = src[i - 1200:i + 600]
+    assert 'no_oracle = "no job oracle was generated" in evidence' in window, (
+        "the message must branch on whether an oracle EXISTS; a fixed tail cannot be true "
+        "for both cases"
+    )
+    assert "will NOT be graded at all" in window
+    assert "job acceptance for this run is not-run, not a failure" in window, (
+        "and it must say the non-grade is an honest not-run rather than a failure, or the "
+        "operator reads a missing grade as something having gone wrong"
+    )
+
+
+def test_every_pre_gate_refusal_BANKS_its_evidence(tmp_path, monkeypatch):
+    """#1418. `_oracle_qa_seed_gate` is the ONLY writer of `<run>/oracle-qa.json`, and THREE
+    returns in `real_seed_job_oracle` sit above it — an ungenerated oracle, an unpinned path,
+    and a pinned path with no designed guard. Every one of them banked nothing.
+
+    The ticket named only the first. The two containment refusals are what a tampered plan or
+    an undesigned extension look like from outside, which is precisely when a human wants a
+    record — and `state/fleet-runs/20260815-161349-bd/` has no `oracle-qa.json` for exactly
+    this reason: its exam was refused, and that run was the one that would have proved #1410's
+    repair loop works.
+
+    Two docstrings in swap_ops.py asserted the evidence was "always" written. One was true of
+    the function carrying it; the other was false of the function carrying it, and it is the
+    one a reader checking this behaviour would open."""
+    import json as _json
+
+    config = _config(tmp_path)
+    repo = _mk_repo(tmp_path, "refusals")
+    plan_time = _json.dumps({"adequacy_floor": 2, "regeneration": {"rounds": 1}})
+    quiet = lambda c, t, cwd=None: (True, "", "")  # noqa: E731
+
+    cases = {
+        "R-nocode": (JOB_ORACLE_PATH_PYTHON, "", "no job oracle was generated"),
+        "R-unpinned": ("../../evil.py", "code", "not a pinned oracle path"),
+    }
+    for run_id, (rel, code, expect) in cases.items():
+        res = so.real_seed_job_oracle(config, run_id, str(repo), rel, code,
+                                      qa_evidence_json=plan_time, run=quiet)
+        assert res["ok"] is False and expect in res["evidence"]
+
+        banked = config.runs_dir / run_id / "oracle-qa.json"
+        assert banked.is_file(), (
+            f"{run_id}: a refusal banked NOTHING. The record of WHY a job was left ungraded "
+            "is the one an operator reconstructs from"
+        )
+        rec = _json.loads(banked.read_text(encoding="utf-8"))
+        assert expect in rec["seed_refused_before_qa"]
+        # It must not read as a QA verdict on an oracle nobody examined -- that would be the
+        # same absence-as-a-confident-value defect one layer over.
+        assert rec["f2p_baseline"] == "not-run"
+        assert rec["collectability"] == "not-run"
+        # And the plan-time evidence survives rather than being replaced by the refusal.
+        assert rec["adequacy_floor"] == 2
+
+
+def test_a_refusal_record_is_not_written_when_there_is_nothing_to_say(tmp_path):
+    """The converse. `_persist_oracle_qa` writes nothing for empty evidence, and the refusal
+    path always has something -- so this pins that the DISTINCTION exists rather than the
+    writer being unconditional. A file that always appears carries no information."""
+    import json as _json
+
+    config = _config(tmp_path)
+    so._persist_oracle_qa(config, "R-empty", {})
+    assert not (config.runs_dir / "R-empty" / "oracle-qa.json").exists()
+    so._persist_oracle_qa(config, "R-said", {"f2p_baseline": "not-run"})
+    rec = _json.loads((config.runs_dir / "R-said" / "oracle-qa.json").read_text(encoding="utf-8"))
+    assert rec["f2p_baseline"] == "not-run"
+
+
+def test_malformed_plan_time_evidence_never_blocks_a_refusal_record(tmp_path):
+    """Fail-soft, matching every other path here: a plan-time blob that will not parse must
+    still leave a record naming the refusal, not raise and lose it."""
+    import json as _json
+
+    config = _config(tmp_path)
+    repo = _mk_repo(tmp_path, "badjson")
+    res = so.real_seed_job_oracle(config, "R-bad", str(repo), JOB_ORACLE_PATH_PYTHON, "",
+                                  qa_evidence_json="{not json at all",
+                                  run=lambda c, t, cwd=None: (True, "", ""))
+    assert res["ok"] is False
+    rec = _json.loads((config.runs_dir / "R-bad" / "oracle-qa.json").read_text(encoding="utf-8"))
+    assert "no job oracle was generated" in rec["seed_refused_before_qa"]
+    assert rec["f2p_baseline"] == "not-run"
 
 
 def test_real_seed_job_oracle_containment_refusals(tmp_path, monkeypatch):

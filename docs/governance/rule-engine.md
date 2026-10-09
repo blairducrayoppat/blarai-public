@@ -1,5 +1,26 @@
 # Rule Engine & CAR Validation Governance
 
+## Status
+
+**DESIGN-INTENT — real, tested, and not the live host-mode adjudication
+boundary (ADR-041, 2026-07-15).** Everything below is accurate: the
+five-stage pipeline this doc documents is real code, `run_rule_engine` is
+genuinely called by `services/policy_agent/src/adjudicator.py`, and the
+resulting `DecisionArtifact` JWT is genuinely minted and validated by tests.
+What this doc does not say, because ADR-041 postdates it, is that **nothing
+outside `services/policy_agent/` calls into this pipeline for live
+traffic** — no production code sends a CAR to the Policy Agent over vsock,
+so this pipeline never adjudicates a real tool call or fetch today. The live
+in-process checkpoint is `DeterministicPolicyChecker.check()` in
+`services/policy_agent/src/gpu_inference.py`, called directly by the
+Assistant Orchestrator's tool-dispatch loop and by
+`shared/security/guarded_fetch.py`'s egress door. See
+[credential-lifecycle.md §9.2](credential-lifecycle.md) for the fullest
+existing statement of this finding, and
+[trust-spine-claim-register.md, claim 25](trust-spine-claim-register.md) for
+the register entry that cross-referenced it here. This pipeline is slated
+for removal as dead code (#910).
+
 ## Audience
 
 **Primary**: developer — extends the deterministic rule set in

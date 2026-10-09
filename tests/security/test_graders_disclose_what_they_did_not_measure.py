@@ -191,3 +191,101 @@ def test_the_two_worked_examples_are_on_the_right_side_of_the_gate() -> None:
         assert (_REPO / module).is_file(), f"{module} is missing"
         assert module not in offenders, f"{module} lost its not-measured disclosure"
         assert module not in _ALLOWLIST, f"{module} must pass on merit, not by exemption"
+
+
+# ---------------------------------------------------------------------------
+# LESSON 342's STRUCTURAL CONTROL, third instance (2026-08-15).
+#
+# The lesson: "the comment you write to justify why THIS site needs the honest
+# treatment is a PREDICATE, not an explanation — run it over every sibling
+# before the commit lands." I broke it three times in one night, each time on
+# the same fact: a scan records that its coverage was partial, and one rendering
+# surface drops it. #1396 (summary + card + sidecar), #1397 (layer1 findings),
+# #1375 (the multi-page capture's findings list).
+#
+# Remembering to sweep is not a control. This is: the third fact is DISCOVERED
+# from the dataclasses rather than listed here, so an instrument added later is
+# covered without anyone thinking of it, and an instrument that carries the flag
+# internally while dropping it from the archive FAILS.
+# ---------------------------------------------------------------------------
+
+
+def _coverage_partial_bearers() -> list[type]:
+    """Every result dataclass that carries the third fact, discovered not listed."""
+    import dataclasses
+
+    from tools.dispatch_harness.green_quality import layer1, placeholder_prose, security
+
+    found = []
+    for module in (security, placeholder_prose, layer1):
+        for name in dir(module):
+            obj = getattr(module, name)
+            if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):
+                continue
+            if any(f.name == "coverage_partial" for f in dataclasses.fields(obj)):
+                found.append(obj)
+    return found
+
+
+def test_every_instrument_carrying_the_third_fact_is_known_to_this_gate() -> None:
+    """Discovery sanity. If this returns nothing the two tests below are vacuous — they would
+    pass by iterating an empty list, which is the exact shape of a lock that cannot fail."""
+    bearers = _coverage_partial_bearers()
+    names = sorted(c.__name__ for c in bearers)
+    assert len(bearers) >= 3, f"expected at least the three known bearers, found {names}"
+    assert "SecurityResult" in names
+    assert "ProseResult" in names
+    assert "CraftFinding" in names
+
+
+def test_the_third_fact_defaults_to_FALSE_on_every_instrument() -> None:
+    """`coverage_partial=True` is a claim that the scan fell short; the honest default for a
+    result assembled without running anything is "no shortfall recorded", matching how
+    `measured` defaults to False for the opposite reason. A bearer that defaulted True would
+    make every hand-built result claim a shortfall it never had."""
+    import dataclasses
+
+    for cls in _coverage_partial_bearers():
+        field = next(f for f in dataclasses.fields(cls) if f.name == "coverage_partial")
+        assert field.default is False, (
+            f"{cls.__name__}.coverage_partial defaults to {field.default!r}, not False"
+        )
+
+
+def test_the_third_fact_REACHES_THE_ARCHIVE_for_every_instrument() -> None:
+    """THE CONTROL. Carrying the fact internally is not the point — the archive is what later
+    sweeps count, and dropping it there is where I put it twice in one night.
+
+    Asserted against the SOURCE of `to_sidecar`, because building a real GreenAuditResult here
+    would need a repo, a scorecard and a jury; what must never regress is that the writer
+    mentions each bearer's flag at all. A renderer that cannot name the field cannot ship it.
+    """
+    import dataclasses
+
+    from tools.dispatch_harness.green_quality.layer1 import CraftFinding, Layer1Result
+
+    src = Path("tools/dispatch_harness/green_quality/__init__.py").read_text(encoding="utf-8")
+    sidecar_src = src[src.index("def to_sidecar"):]
+    if "\n    def " in sidecar_src:
+        sidecar_src = sidecar_src[:sidecar_src.index("\n    def ")]
+    # COMMENTS STRIPPED FIRST, and that is not tidiness. My first draft of this control
+    # counted occurrences of the word "coverage_partial" and required five — and the
+    # explanatory comment above this function contains it five times, so the threshold was
+    # met by prose. I proved it by deleting a real flag from the sidecar: all eight tests
+    # still passed. A control whose own explanation satisfies it is the vacuous-lock shape
+    # this file exists to refuse, written into the fix meant to prevent it.
+    code = "\n".join(ln for ln in sidecar_src.splitlines() if not ln.lstrip().startswith("#"))
+
+    # DERIVED, not listed: every CraftFinding on Layer1Result must ship its flag under
+    # "<field>_coverage_partial". A craft lint added later is covered without anyone
+    # remembering to extend this test.
+    craft = [f.name for f in dataclasses.fields(Layer1Result) if f.type in (CraftFinding, "CraftFinding")]
+    assert craft, "no CraftFinding fields discovered — this assertion would be vacuous"
+    for name in craft:
+        assert f'"{name}_coverage_partial"' in code, (
+            f"the archive does not record whether the {name} lint finished. Carrying the fact "
+            f"internally is not the point: the sidecar is what later sweeps count, and "
+            f"dropping it there is #1396 and #1397 committed again."
+        )
+    for owner in ("self.security.coverage_partial", "self.prose.coverage_partial"):
+        assert owner in code, f"the sidecar no longer writes {owner}"

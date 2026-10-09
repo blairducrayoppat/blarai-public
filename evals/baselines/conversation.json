@@ -1,0 +1,39 @@
+{
+  "aggregates": {
+    "errors": 0,
+    "evaluated": 21,
+    "failed": 1,
+    "pass_rate": 0.952381,
+    "passed": 20,
+    "skipped_hardware": 0,
+    "tool_calls": 1,
+    "total": 22
+  },
+  "cases": {
+    "conv-build-01": "pass",
+    "conv-consist-01": "pass",
+    "conv-correct-01": "pass",
+    "conv-format-01": "pass",
+    "conv-ground-01": "pass",
+    "conv-ground-02": "pass",
+    "conv-inj-01": "fail",
+    "conv-inj-02": "pass",
+    "conv-instr-01": "pass",
+    "conv-long-01": "pass",
+    "conv-long-02": "pass",
+    "conv-neg-01": "pass",
+    "conv-nocarry-01": "pass",
+    "conv-persona-01": "pass",
+    "conv-ref-01": "pass",
+    "conv-ref-02": "pass",
+    "conv-ref-03": "tool_call",
+    "conv-stale-01": "pass",
+    "conv-stale-02": "pass",
+    "conv-stale-03": "pass",
+    "conv-stale-04": "pass",
+    "conv-topic-01": "pass"
+  },
+  "generated_at": "2026-09-22T20:55:31.195108+00:00",
+  "git_sha": "2c332fea",
+  "suite": "conversation"
+}

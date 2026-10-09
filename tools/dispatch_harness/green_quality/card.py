@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Protocol
 
 from .constants import BAND_A, BAND_B, BAND_C, EVIDENCE_VALUE_CAP, SEVERITY_HIGH, SEVERITY_MEDIUM
 from .layer1 import Layer1Result
@@ -70,10 +70,30 @@ class WhatYouGotCard:
         return flat[:EVIDENCE_VALUE_CAP]
 
 
-def _and_unfinished(caveat: str, measured: bool) -> str:
+class _ScanCoverage(Protocol):
+    """The two bits any scan result must expose for the card to reason about coverage.
+
+    ``measured`` — did the looking HAPPEN. ``coverage_partial`` — did the looking FINISH.
+    Both :class:`~.security.SecurityResult` and :class:`~.placeholder_prose.ProseResult`
+    satisfy this, and any third scanner added later must."""
+
+    measured: bool
+    coverage_partial: bool
+
+
+def _and_unfinished(caveat: str, result: _ScanCoverage) -> str:
     """Carry a finding's caveat AND the fact that the scan stopped early, in one sentence the
-    operator reads once. The finding leads because it is the half he can act on."""
-    if measured:
+    operator reads once. The finding leads because it is the half he can act on.
+
+    TAKES THE RESULT, NOT A BOOL, and that signature is the fix rather than a style choice.
+    This helper first took ``measured``, which is the wrong bit: a capped scan is
+    ``measured=True`` and did not finish, and "there may be more it never looked at" is
+    precisely as true of a scan that hit its file bound as of one that crashed. The first
+    repair passed a ``finished`` bool computed at each call site — and the very next reviewer
+    found the prose call site still passing ``measured``, because a bool parameter cannot stop
+    a caller handing it the wrong bool. Deriving the predicate HERE, from the object, means a
+    third call site cannot reintroduce the defect by getting an argument wrong."""
+    if result.measured and not result.coverage_partial:
         return caveat
     return (caveat.rstrip().rstrip(".")
             + " — and the check did not finish, so there may be more it never looked at.")
@@ -99,15 +119,38 @@ def _caveat_from_security(security: Optional[SecurityResult]) -> str:
     if high:
         return _and_unfinished(RULE_PLAIN_LANGUAGE.get(
             high[0].rule, "the security check flagged something worth a look before you rely "
-                          "on it."), security.measured)
+                          "on it."), security)
     medium = [f for f in security.at_or_above(SEVERITY_MEDIUM) if f.severity == SEVERITY_MEDIUM]
     if medium:
         return _and_unfinished(RULE_PLAIN_LANGUAGE.get(
             medium[0].rule, "the security check flagged something minor worth knowing about."),
-            security.measured)
+            security)
     if not security.measured:
         return ("the automatic security check could not run on this one, so treat "
                 "'no problems found' as unknown rather than as a clean bill of health.")
+    if security.coverage_partial:
+        # The scan ran and found nothing, but did not cover the whole deliverable. This used to
+        # fall through to '' and the card said nothing at all, which the operator reads as "the
+        # check looked everywhere and was happy" — the strongest possible reading of the weakest
+        # possible evidence.
+        #
+        # IT DOES DISPLACE a prose or craft finding, and that is the deliberate call rather than
+        # an oversight: build_card composes `_caveat_from_security(...) or _caveat_from_prose(...)
+        # or _caveat_from_layer1(...)`, so any non-empty return here takes the slot. It is the
+        # SAME call the `not security.measured` branch above has always made, on the same
+        # reasoning — security's silence is the one silence worth the operator's single slot,
+        # because acting on the deliverable is what makes that problem expensive. An earlier
+        # draft of this comment claimed the opposite ("costs the slot only when there is no
+        # finding to displace"); that was false, the branches above it are security-only.
+        # #1400: OPENS BY NAMING WHAT IT QUALIFIES. The card renders a band-A headline —
+        # "Looks clean — no problems the automatic audit could find" — directly above this
+        # line, and the two read against each other with nothing joining them. Both sentences
+        # are true, which is exactly why a non-technical reader should not be left to notice
+        # the tension himself: the headline is generated from the band and is correct, and
+        # this caveat narrows the word "clean" in it rather than disagreeing with it.
+        return ("that \"looks clean\" is narrower than it sounds — the security check found "
+                "nothing, but it did not get through the whole project, so treat it as "
+                "'nothing found so far' rather than as a clean bill of health.")
     return ""
 
 
@@ -141,7 +184,7 @@ def _caveat_from_prose(prose: Optional[ProseResult]) -> str:
     if high:
         return _and_unfinished(PROSE_PLAIN_LANGUAGE.get(
             high[0].rule, "one of its pages still carries placeholder text rather than real "
-                          "words."), prose.measured)
+                          "words."), prose)
     return ""
 
 

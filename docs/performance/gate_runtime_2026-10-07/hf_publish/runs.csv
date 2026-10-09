@@ -1,0 +1,9 @@
+arm,rep,status,wall_ms,passed,failed,total
+old_3be0e22e_wt,1,clean,703000,12049,7,12086
+old_3be0e22e_wt,2,clean,693000,12050,6,12086
+new_ca4fab46_wt,1,clean,1631700,13148,5,13179
+new_ca4fab46_wt,2,clean,1687200,13148,5,13179
+fixed_f407d2af_wt,1,clean,1371500,13219,5,13250
+fixed_f407d2af_wt,2,clean,1419900,13218,6,13250
+fixed_f407d2af_real,1,clean,1449800,13250,0,13250
+fixed_f407d2af_real,2,clean,1498800,13249,1,13250

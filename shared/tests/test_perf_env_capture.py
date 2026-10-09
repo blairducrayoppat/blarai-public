@@ -25,12 +25,20 @@ import pytest
 from shared import perf_env_capture
 from shared.perf_env_capture import (
     BOX_STATE_KEYS,
+    GPU_BUDGET_KEYS,
+    GPU_BUDGET_REAL_KEY,
+    GPU_BUDGET_REAL_VALUE,
+    GPU_BUDGET_REPORTED_KEY,
+    GPU_BUDGET_REPORTED_VALUE,
     UNKNOWN,
     capture_box_state,
     capture_vm_states,
+    probe_gpu_budget,
+    probe_machine_uptime_s,
     probe_ovms_process,
     probe_port_listening,
     probe_ram_available_gib,
+    reported_budget_bytes,
 )
 
 # ---------------------------------------------------------------------------
@@ -251,11 +259,17 @@ def test_capture_box_state_every_probe_failing_never_raises() -> None:
         raise RuntimeError("boom")
         yield  # pragma: no cover — makes this a generator function
 
+    def bad_reg(*_a: Any) -> int:
+        raise OSError("boom")
+
     box = capture_box_state(
         ps_runner=_ps_raises,
         connector=_connector_broken,
         process_names=bad_names(),
         mem_prober=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        reg_reader=bad_reg,
+        total_mem_prober=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        tick_reader=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     assert set(box) == set(BOX_STATE_KEYS)
     assert box["vm_states"] == UNKNOWN
@@ -263,6 +277,9 @@ def test_capture_box_state_every_probe_failing_never_raises() -> None:
     assert box["ovms_listening"] == UNKNOWN
     assert box["ovms_process"] == UNKNOWN
     assert box["ram_available_gib"] == UNKNOWN
+    assert set(box["gpu_budget"]) == set(GPU_BUDGET_KEYS)
+    assert all(v == UNKNOWN for v in box["gpu_budget"].values())
+    assert box["machine_uptime_s"] == UNKNOWN
     assert _ISO_Z.match(box["captured_utc"])  # the clock still stamps
 
 
@@ -285,9 +302,12 @@ def test_capture_box_state_ports_are_configurable() -> None:
     assert ("127.0.0.1", 18000) in probed
 
 
-def test_box_state_keys_is_the_locked_six_key_contract() -> None:
+def test_box_state_keys_is_the_locked_eight_key_contract() -> None:
     # The canonical shape downstream scrapers key on; changing it is a
-    # deliberate schema decision, not a drive-by.
+    # deliberate schema decision, not a drive-by.  Grew from six to eight on
+    # 2026-09-21 (#1611): the graphics-memory budget keys and machine uptime
+    # were the two quantities every August/September regression had in
+    # common and no record carried.
     assert BOX_STATE_KEYS == frozenset(
         {
             "vm_states",
@@ -295,6 +315,125 @@ def test_box_state_keys_is_the_locked_six_key_contract() -> None:
             "ovms_listening",
             "ovms_process",
             "ram_available_gib",
+            "gpu_budget",
+            "machine_uptime_s",
             "captured_utc",
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# gpu_budget — the two registry percentages (#1485 / #1501)
+# ---------------------------------------------------------------------------
+
+_TOTAL_BYTES = 33_630_777_344.0  # this box, as psutil reports it
+
+
+def _reg(values: dict[tuple[str, str], int]) -> Any:
+    def reader(subkey: str, name: str) -> int:
+        return values[(subkey, name)]
+
+    return reader
+
+
+def test_reported_budget_formula_reproduces_both_logged_readings_to_the_byte() -> None:
+    # PERFORMANCE_LOG 2026-09-01: P=87 and P=57 on 33,630,777,344 bytes.
+    assert reported_budget_bytes(87, _TOTAL_BYTES) == 27_031_388_160
+    assert reported_budget_bytes(57, _TOTAL_BYTES) == 17_547_509_760
+
+
+def test_gpu_budget_disagreeing_keys_are_stamped_as_disagreeing() -> None:
+    # The 2026-09-21 state: the real key at 57, the reported key at 87.
+    box = probe_gpu_budget(
+        _reg({(GPU_BUDGET_REAL_KEY, GPU_BUDGET_REAL_VALUE): 57,
+              (GPU_BUDGET_REPORTED_KEY, GPU_BUDGET_REPORTED_VALUE): 87}),
+        lambda: _TOTAL_BYTES,
+    )
+    assert set(box) == set(GPU_BUDGET_KEYS)
+    assert box["real_commit_limit_pct"] == 57
+    assert box["reported_pinning_limit_pct"] == 87
+    assert box["real_budget_gib"] == 17.85
+    assert box["reported_budget_gib"] == 25.175
+    assert box["keys_agree"] is False
+
+
+def test_gpu_budget_agreeing_keys() -> None:
+    box = probe_gpu_budget(
+        _reg({(GPU_BUDGET_REAL_KEY, GPU_BUDGET_REAL_VALUE): 87,
+              (GPU_BUDGET_REPORTED_KEY, GPU_BUDGET_REPORTED_VALUE): 87}),
+        lambda: _TOTAL_BYTES,
+    )
+    assert box["keys_agree"] is True
+    assert box["real_budget_gib"] == 27.25
+
+
+def test_gpu_budget_one_unreadable_key_is_unknown_not_agreeing() -> None:
+    # 'Cannot read the real key' must never stamp as 'the keys agree'.
+    box = probe_gpu_budget(
+        _reg({(GPU_BUDGET_REPORTED_KEY, GPU_BUDGET_REPORTED_VALUE): 87}),
+        lambda: _TOTAL_BYTES,
+    )
+    assert box["real_commit_limit_pct"] == UNKNOWN
+    assert box["real_budget_gib"] == UNKNOWN
+    assert box["reported_pinning_limit_pct"] == 87
+    assert box["keys_agree"] == UNKNOWN
+
+
+def test_gpu_budget_nonsense_total_leaves_the_gib_figures_unknown_but_keeps_the_keys() -> None:
+    # Review of db20daab: a non-finite or non-positive total used to raise out of a
+    # probe whose docstring says it never raises, collapsing gpu_budget to a str.
+    reader = _reg({(GPU_BUDGET_REAL_KEY, GPU_BUDGET_REAL_VALUE): 57,
+                   (GPU_BUDGET_REPORTED_KEY, GPU_BUDGET_REPORTED_VALUE): 57})
+    for bad_total in (float('nan'), float('inf'), 0.0, -1.0):
+        box = probe_gpu_budget(reader, lambda t=bad_total: t)
+        assert set(box) == set(GPU_BUDGET_KEYS)
+        assert box["real_commit_limit_pct"] == 57
+        assert box["real_budget_gib"] == UNKNOWN
+        assert box["reported_budget_gib"] == UNKNOWN
+        assert box["keys_agree"] is True
+
+
+def test_gpu_budget_everything_failing_never_raises() -> None:
+    def boom(*_a: Any) -> int:
+        raise OSError("registry unavailable")
+
+    box = probe_gpu_budget(boom, lambda: (_ for _ in ()).throw(RuntimeError()))
+    assert set(box) == set(GPU_BUDGET_KEYS)
+    assert all(v == UNKNOWN for v in box.values())
+
+
+# ---------------------------------------------------------------------------
+# machine_uptime_s (#1487)
+# ---------------------------------------------------------------------------
+
+
+def test_machine_uptime_from_reader_rounded() -> None:
+    assert probe_machine_uptime_s(lambda: 12345.678) == 12345.7
+
+
+def test_machine_uptime_nonfinite_or_negative_is_unknown_not_a_number() -> None:
+    for bad in (float('nan'), float('inf'), -5.0):
+        assert probe_machine_uptime_s(lambda b=bad: b) == UNKNOWN
+
+
+def test_machine_uptime_reader_failure_is_unknown() -> None:
+    def boom() -> float:
+        raise RuntimeError("no clock")
+
+    assert probe_machine_uptime_s(boom) == UNKNOWN
+
+
+def test_capture_box_state_carries_budget_and_uptime_through_the_seams() -> None:
+    box = capture_box_state(
+        ps_runner=_ps_ok(""),
+        connector=_connector_refused,
+        process_names=[],
+        mem_prober=lambda: 0.0,
+        reg_reader=_reg({(GPU_BUDGET_REAL_KEY, GPU_BUDGET_REAL_VALUE): 57,
+                         (GPU_BUDGET_REPORTED_KEY, GPU_BUDGET_REPORTED_VALUE): 87}),
+        total_mem_prober=lambda: _TOTAL_BYTES,
+        tick_reader=lambda: 3600.0,
+    )
+    assert box["gpu_budget"]["keys_agree"] is False
+    assert box["gpu_budget"]["real_budget_gib"] == 17.85
+    assert box["machine_uptime_s"] == 3600.0

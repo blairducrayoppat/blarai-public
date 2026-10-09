@@ -610,12 +610,22 @@ _ASSETS_README_NAME = "README.txt"
 #: instructions the operator ever needs. Excluded from the plan-time manifest by name
 #: (the enumeration side owns that rule).
 _ASSETS_README_TEXT = (
-    "Put photos, documents, and other material for the build in here; "
-    "screenshots to emulate go in the reference folder.\n"
+    "Put photos, videos, documents and other material for the build in here. "
+    "The plan lists what it finds, and the build is graded on using it. "
+    "(The reference folder is for screenshots to copy the look of - not used yet.)\n"
 )
+#: HONEST ABOUT ITS OWN STATE (2026-08-30). This folder's consumer is the reference
+#: extraction family, which is not built: the enumeration excludes the whole subtree
+#: and no other surface reads it, so a file placed here has NO effect on any build.
+#: The previous text asked the operator to sort screenshots by whether he meant how it
+#: LOOKS or how it WORKS -- an instruction he could follow perfectly and get silence
+#: for. An operator instruction is a production surface, and promising a capability the
+#: code does not have is the same defect as a docstring asserting a lock that is off.
+#: Restore the fuller wording in the change that makes the channel real, not before.
 _ASSETS_REFERENCE_README_TEXT = (
-    "Put screenshots or pictures to emulate in here - say in the interview "
-    "whether you mean how it LOOKS or how it WORKS.\n"
+    "For screenshots or pictures to emulate. NOT USED YET - files in this folder "
+    "are ignored for now, so put anything the build should actually use in the "
+    "folder above.\n"
 )
 
 

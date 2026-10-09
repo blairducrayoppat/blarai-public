@@ -1058,11 +1058,46 @@ def test_validate_spends_regeneration_on_the_real_gap_not_a_submodule_phantom_96
     assert result.verdict == "seed-partial"
 
 
-def test_validate_node_oracle_skips_deep_qa():
+def test_validate_node_oracle_REFUSES_a_thin_exam_after_trying_to_repair_it():
+    """#1410. This test previously asserted ``verdict == "seed"`` on this exact fixture —
+    and the fixture is ``test('x', () => {})``, an EMPTY test body. It was asserting that a
+    vacuous website exam gets seeded, which is the defect, encoded as the expected result.
+
+    Node used to return early from ``validate_authored_oracle`` ("we cannot AST-scan JS" —
+    true when written, false since ``node_static_vacuity`` was built), so the bounded repair
+    loop never ran. Nine consecutive B9 runs recorded ``verdict: refuse`` with
+    ``regeneration.rounds: 0``: the model was never asked to fix anything.
+
+    Now the loop runs. ``generate_fn`` here returns ``""``, so the repair produces nothing
+    usable and the residual stands — which is the honest outcome and the one this fixture
+    should always have had. ``language`` and ``collectability`` are unchanged: the execution
+    probes still belong to the seed gate."""
     result = oq.validate_authored_oracle(
         "import test from 'node:test';\ntest('x', () => {});", "node",
         _spec(_crit("c2", "x")), _tasks(), generate_fn=lambda p: "")
+    assert result.verdict == "refuse"
+    assert result.regen_exhausted, "refused without the repair having been attempted"
+    assert result.language == "node"
+    assert result.collectability == "skipped"
+
+
+def test_validate_node_oracle_still_seeds_an_ADEQUATE_exam():
+    """The precision half. Without this, the test above is satisfied by a validator that
+    refuses every node exam, which would be a worse defect than the one being fixed —
+    it would stop websites being graded at all rather than graded badly."""
+    adequate = (
+        "import test from 'node:test'; import assert from 'node:assert';\n"
+        "import { getPieces } from '../src/pieces/data.js';\n"
+        "test('pieces load', async () => {\n"
+        "  const pieces = await getPieces();\n"
+        "  assert.ok(pieces.length > 0);\n"
+        "});\n"
+    )
+    result = oq.validate_authored_oracle(
+        adequate, "node", _spec(_crit("c2", "x")), _tasks(),
+        generate_fn=lambda p: "")
     assert result.verdict == "seed"
+    assert result.regen_rounds == 0, "an adequate exam needs no repair round"
     assert result.language == "node"
     assert result.collectability == "skipped"
 
@@ -1507,25 +1542,34 @@ def test_TOGGLE_without_the_uv_pinning_the_probe_stops_confirming(monkeypatch):
     if not real_python_dir:
         pytest.skip("uv has no managed interpreter installed here; nothing to hide")
 
-    def resolve(env: dict) -> str:
+    def resolve(env: dict, cwd: str) -> str:
+        # cwd IS LOAD-BEARING and was missing (found 2026-08-15, the first time these
+        # @slow tests were ever run). Without it the probe inherits pytest's working
+        # directory — the BlarAI checkout — where `uv run` discovers `.venv/` and reports
+        # THAT interpreter, so the precondition below failed against a correct product.
+        # Production never resolves from the repo root: oracle_qa spawns with cwd set to
+        # the isolated grade dir. Measured both ways: from the repo root uv returns
+        # `BlarAI\.venv\Scripts\python.exe`, from an isolated dir it returns the managed
+        # `uv\python\cpython-3.13-...\python.exe`.
         out = subprocess.run(  # noqa: S603 — argv list, no shell
             [shutil.which("uv"), "run", "--no-project", "python", "-c",
              "import sys; print(sys.executable)"],
-            capture_output=True, text=True, env=env, timeout=300,
+            capture_output=True, text=True, env=env, timeout=300, cwd=cwd,
         )
         return out.stdout.strip()
 
     with tempfile.TemporaryDirectory(prefix="oracle_qa_toggle_") as home:
+        isolated = tempfile.mkdtemp(prefix="oracle_qa_toggle_cwd_")
         pinned = oq._qa_env(Path(home))
         unpinned = dict(pinned)
         for var in ("UV_PYTHON_INSTALL_DIR", "UV_CACHE_DIR"):
             unpinned.pop(var, None)
 
-        assert resolve(pinned).lower().startswith(real_python_dir.lower()), (
+        assert resolve(pinned, isolated).lower().startswith(real_python_dir.lower()), (
             "the pinned env did not reach uv's managed interpreter — the fix is not doing "
             "what the tests above credit it for"
         )
-        assert not resolve(unpinned).lower().startswith(real_python_dir.lower()), (
+        assert not resolve(unpinned, isolated).lower().startswith(real_python_dir.lower()), (
             "removing the pinning changed nothing, so this host cannot demonstrate the "
             "defect and the tests above prove nothing about it"
         )
@@ -1826,3 +1870,192 @@ def test_the_two_edges_disagree_so_the_predicate_is_doing_real_work(tmp_path, mo
 
     assert not grade_env.uv_parity_is_vouched({"UV_PYTHON_INSTALL_DIR": str(hollow)})
     assert grade_env.uv_parity_is_vouched({"UV_PYTHON_INSTALL_DIR": str(real)})
+
+
+# ---------------------------------------------------------------------------
+# #1374 — the coverage map used to be gated on `_HARD_CLASSES` being empty, which
+# meant `adequacy_floor` suppressed it. Measured 2026-08-10: every B9 run reported
+# `adequacy_floor: 2`, so the requirement→assertion map was skipped on EVERY run
+# that had ever happened and DoD capability 17 had no data at all.
+#
+# The old guard is right for oracles that cannot be collected, parsed or driven.
+# It is wrong for a THIN oracle, which parses fine — and a thin exam is exactly
+# when you most want to know which of the operator's requirements nobody asserted.
+# That is #1342, where an exam that could not fail deleted a page he asked for.
+# ---------------------------------------------------------------------------
+
+#: A THIN oracle by the adequacy floor's own definition: it imports a first-party module
+#: and no test EXERCISES a first-party symbol (no assertion on one, no no-raise call).
+#: It parses and collects perfectly well — which is the whole point. Its requirements CAN
+#: be traced, and tracing them is the most useful thing anyone could do with it.
+#: (`_VACUOUS_ASSERT` above is exactly this shape; aliased so the intent reads locally.)
+_THIN_ORACLE = _VACUOUS_ASSERT
+
+
+def _coverage_spy(map_dict):
+    """structured_generate_fn that RECORDS whether the coverage map was requested."""
+    seen: list[str] = []
+
+    def structured(prompt, schema):
+        if "list the test function name" in prompt:
+            seen.append(prompt)
+            return json.dumps(map_dict)
+        return ""
+
+    return structured, seen
+
+
+def test_a_THIN_oracle_still_gets_its_requirement_map_measured():
+    """The #1374 fix: adequacy_floor must no longer suppress the coverage map."""
+    crits = [_crit("c2", "sums expenses")]
+    structured, seen = _coverage_spy({"c2": ["test_it_runs"]})
+    result = oq.validate_authored_oracle(
+        _THIN_ORACLE, "python", _spec(*crits), _tasks(),
+        generate_fn=lambda p: "", structured_generate_fn=structured,
+    )
+    assert any(f.cls == oq.CLASS_ADEQUACY_FLOOR for f in result.findings), (
+        "precondition: this oracle must trip the adequacy floor, or the test proves nothing"
+    )
+    assert seen, (
+        "the requirement-to-assertion map must be REQUESTED on a thin oracle — this is the "
+        "case capability 17 exists for, and it was silently skipped before #1374"
+    )
+    assert result.coverage_denominator > 0, "coverage must be MEASURED, not reported unknown"
+    assert result.stage_measured()[oq.STAGE_COVERAGE] is True
+
+
+def test_the_blocking_set_is_exactly_the_untraceable_classes():
+    """Gate on what a finding MEANS, not on its severity.
+
+    A thin or vacuous oracle parses; an uncollectable or ill-posed one does not. Only the
+    second kind makes a map impossible, and this locks that distinction so a future edit
+    cannot quietly fold `adequacy_floor` back in and re-suppress the measurement.
+    """
+    assert oq._COVERAGE_BLOCKING_CLASSES == frozenset({
+        oq.CLASS_COLLECTABILITY, oq.CLASS_STRATEGY, oq.CLASS_INTERACTIVE_IO,
+    })
+    for thin in (oq.CLASS_ADEQUACY_FLOOR, oq.CLASS_F2P_VACUOUS):
+        assert thin in oq._HARD_CLASSES, "still HARD — the oracle is still refused"
+        assert thin not in oq._COVERAGE_BLOCKING_CLASSES, (
+            f"{thin} means the exam is too THIN, not untraceable; it must not suppress the map"
+        )
+
+
+def test_an_ILLPOSED_oracle_still_skips_the_map(pytestconfig):
+    """The half of the original guard that was right, kept.
+
+    You cannot trace assertions through an oracle whose strategy is ill-posed, and paying
+    for a model call each round to rediscover that is the waste the guard was written for.
+    """
+    crits = [_crit("c2", "sums expenses")]
+    structured, seen = _coverage_spy({"c2": ["test_total"]})
+    result = oq.validate_authored_oracle(
+        _ILLPOSED_STRATEGY, "python", _spec(*crits), _tasks(),
+        generate_fn=lambda p: "", structured_generate_fn=structured,
+    )
+    if not any(f.cls == oq.CLASS_STRATEGY for f in result.findings):
+        pytest.skip("fixture no longer trips the strategy class; the lock below needs it")
+    assert not seen, "an untraceable oracle must NOT pay for a coverage map"
+    assert result.coverage_fraction() == "unknown"
+
+
+def test_toggle_proof_the_guard_split_is_what_measures_coverage():
+    """security_by_design principle 12 — prove the probe FAILS when the control is off.
+
+    Restores the pre-#1374 guard (block on every HARD class) and shows the SAME thin
+    oracle goes back to reporting `unknown`. Without this, a green suite cannot tell
+    "capability 17 is measured" from "the assertion cannot reach the thing it checks".
+
+    The two answers are the whole point, and they are #1342's distinction exactly:
+
+        with the fix  -> coverage "0/1"      (MEASURED: it covers none of his criteria)
+        without it    -> coverage "unknown"  (NOT measured: nobody looked)
+    """
+    crits = [_crit("c2", "sums expenses")]
+
+    def measure():
+        structured, seen = _coverage_spy({"c2": ["test_math"]})
+        r = oq.validate_authored_oracle(
+            _THIN_ORACLE, "python", _spec(*crits), _tasks(),
+            generate_fn=lambda p: "", structured_generate_fn=structured,
+        )
+        return bool(seen), r.coverage_fraction()
+
+    asked_now, cov_now = measure()
+    assert asked_now and cov_now == "0/1", (
+        f"precondition: the fix must MEASURE zero coverage on a thin oracle (got {cov_now})"
+    )
+
+    original = oq._COVERAGE_BLOCKING_CLASSES
+    try:
+        oq._COVERAGE_BLOCKING_CLASSES = oq._HARD_CLASSES   # the pre-#1374 guard
+        asked_then, cov_then = measure()
+    finally:
+        oq._COVERAGE_BLOCKING_CLASSES = original
+
+    assert not asked_then and cov_then == "unknown", (
+        "with the old guard restored the map must NOT be requested and coverage must read "
+        f"unknown — got requested={asked_then}, coverage={cov_then}. If it still measures, "
+        "something else is doing the work and this guard is not what protects us."
+    )
+    assert measure() == (True, "0/1"), "the control must be restored"
+
+
+# ---------------------------------------------------------------------------
+# #1200, third lock: colour must not blind the readers (measured 2026-08-15)
+# ---------------------------------------------------------------------------
+
+_COLOURED_PASS = (
+    "\x1b[1m============================= test session starts "
+    "=============================\x1b[0m\n"
+    "collected 1 item\n\n"
+    "_qa_f2p_probe.py::test_always_green \x1b[32mPASSED\x1b[0m\x1b[32m       [100%]\x1b[0m\n\n"
+    "\x1b[32m============================== \x1b[32m\x1b[1m1 passed\x1b[0m\x1b[32m "
+    "in 0.44s\x1b[0m\x1b[32m ==============================\x1b[0m\n"
+)
+
+
+def test_a_coloured_PASSED_line_is_still_read_per_test():
+    """The defect, reduced to the parse. With FORCE_COLOR set in the parent environment the
+    escape sits between the test name and PASSED, so the per-test matcher missed and a
+    VACUOUS oracle — one that passes with no implementation present — was stamped `not-run`
+    rather than convicted. Measured end to end before this lock existed."""
+    assert oq._passed_tests(_COLOURED_PASS) == ["test_always_green"]
+
+
+def test_a_summary_whose_COUNT_PHRASE_is_interrupted_still_counts_as_a_completed_run():
+    """DEFENCE IN DEPTH, and labelled as such because the honest version is less dramatic.
+
+    On real coloured output `_run_completed` was NOT blinded: pytest wraps its escapes
+    around `1 passed`, leaving the count phrase contiguous, so the anchors still matched.
+    I wrote a lock against `_COLOURED_PASS` first and it passed with the strip DISABLED —
+    a vacuous test asserting a defect that was never there. Kept, rearmed against a genuinely
+    hostile shape: an escape INSIDE the phrase, which nothing produces today and which the
+    matcher must survive anyway, since its correctness otherwise rests on where a third party
+    chooses to put its escapes."""
+    interrupted = "===== 1\x1b[0m passed\x1b[32m in 0.44s =====\n"
+    assert oq._run_completed(interrupted) is True
+
+
+def test_stripping_colour_did_NOT_loosen_the_anchoring():
+    """Precision, and the reason the fix strips rather than widens.
+
+    `_run_completed`'s patterns are deliberately anchored on shapes only pytest emits,
+    because a uv network error containing the word "failed" once read as a completed run
+    with nothing passing — i.e. CLEAN — from a run that never executed a test. Removing
+    decoration must not resurrect that: the same error, coloured, must still be refused."""
+    coloured_network_error = (
+        "\x1b[31merror\x1b[0m: Failed to fetch: `https://pypi.org/simple/pytest/`\n"
+        "  Caused by: Request failed after 3 retries\n"
+    )
+    assert oq._run_completed(coloured_network_error) is False
+    assert oq._passed_tests(coloured_network_error) == []
+
+
+def test_the_plain_uncoloured_shapes_are_unaffected():
+    """The toggle. If the strip had broken plain parsing, every real battery run — which is
+    uncoloured — would have regressed while these colour tests stayed green."""
+    plain = ("_qa_f2p_probe.py::test_always_green PASSED   [100%]\n"
+             "============================== 1 passed in 0.44s ==============================\n")
+    assert oq._passed_tests(plain) == ["test_always_green"]
+    assert oq._run_completed(plain) is True

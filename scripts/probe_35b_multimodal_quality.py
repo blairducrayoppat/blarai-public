@@ -33,7 +33,7 @@ from PIL import Image
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SUBJECTS = _REPO_ROOT / "docs" / "performance" / "subjects"
-MODEL_DIR = Path("C:/Users/mrbla/models/qwen36-35b-a3b-int4-ov-OFFICIAL")
+MODEL_DIR = Path("B:/models/Qwen3.6-35B-A3B-int4-ov")
 
 CASES = [
     {

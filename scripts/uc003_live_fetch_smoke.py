@@ -81,7 +81,7 @@ def _bring_up_parser():
 def main() -> int:
     from services.cleaner.src.pipeline import clean_from_guest_parse
     from services.ui_gateway.src.url_adjudicator import (
-        make_deterministic_url_adjudicate,
+        make_request_keyed_url_adjudicate,
         register_url_ingest_adjudicator,
     )
     from shared.security import guarded_fetch
@@ -92,7 +92,8 @@ def main() -> int:
 
     print("[2] registering the PA adjudicator — bleepingcomputer host allowlisted "
           "for ONE fetch (ADR-027 Am.1 per-action carve-out)…")
-    register_url_ingest_adjudicator(make_deterministic_url_adjudicate(HOST_ALLOWLIST))
+    # #1586: ONE adjudicator; the request's purpose picks the allowlist policy.
+    register_url_ingest_adjudicator(make_request_keyed_url_adjudicate(HOST_ALLOWLIST))
     try:
         print(f"[3] >>> FIRST SANCTIONED EGRESS — GET {URL}")
         result = guarded_fetch.fetch_external(URL, purpose="uc003-url-ingest", timeout_s=30.0)

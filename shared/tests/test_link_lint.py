@@ -484,3 +484,346 @@ def test_cli_rejects_a_missing_directory_with_exit_two(tmp_path: Path) -> None:
         cwd=str(Path(__file__).resolve().parents[2]),
     )
     assert proc.returncode == 2
+
+
+# ---------------------------------------------------------------------------
+# #1375 — fetch targets. The operator opened the delivered pottery site on
+# 2026-08-10 and the gallery said "Failed to load pieces." in red. Both central
+# pages ran `fetch('./data/pieces.json')`; the file existed at the project root
+# while the server mounted `public/`, so every visitor got a 404.
+#
+# Nothing could have caught it: an href/src scan does not see a fetch, the
+# console smoke only ever loaded the entry page, and image_placement read that
+# very JSON off the FILESYSTEM without asking whether a browser could reach it.
+# A file that exists is not a file that is served.
+# ---------------------------------------------------------------------------
+
+#: The delivered site as it stood when the operator found the defect — the IMMUTABLE
+#: operator-review snapshot, not the live project tree.
+#:
+#: `~/projects/` is rewritten on every dispatch, so a test pinned there asserts figures
+#: that expire at the next run; `tests/security/test_evidence_is_immutable.py` refuses it
+#: and refused this file when it first pointed there. The night-*/repos-archived/ copies
+#: it suggests instead do NOT carry this defect — the archive holds the tree from BEFORE
+#: the run that built these pages, so the delivery exists in no archive.
+#:
+#: The review workspace is the right answer: `review-website.ps1` COPIES a build to a
+#: dated directory before serving it, precisely so the reviewed bytes cannot change under
+#: the reviewer. This is that copy — the exact tree the operator was looking at when he
+#: reported the empty gallery on 2026-08-10.
+_BROKEN_FETCH_SITE = Path(
+    "C:/Users/mrbla/agentic-setup/state/operator-review/"
+    "20260810-094231-battery-b9-pottery-site"
+)
+
+
+@pytest.mark.skipif(not _BROKEN_FETCH_SITE.is_dir(), reason="delivered project not on this box")
+def test_the_real_unreachable_data_file_is_found_in_both_pages() -> None:
+    """Drives the ACTUAL site the operator reviewed, not a fixture.
+
+    Both `pieces.html` and `piece-detail.html` fetch the same unreachable path, so a
+    checker that found one and not the other would still leave a dead page shipping.
+    """
+    report = link_lint.lint_site(_BROKEN_FETCH_SITE)
+    fetches = [f for f in report["findings"] if "pieces.json" in f["reference"]]
+    assert len(fetches) == 2, (
+        "both delivered pages fetch './data/pieces.json' and both are unreachable from the "
+        f"served root; found {len(fetches)} finding(s): {[f['file'] for f in fetches]}"
+    )
+    assert all(f["severity"] == link_lint.SEVERITY_HIGH for f in fetches)
+    assert report["hard"] is True, "an unreachable data file must force a FIX, not advise"
+
+
+@pytest.mark.skipif(not _BROKEN_FETCH_SITE.is_dir(), reason="delivered project not on this box")
+def test_the_finding_does_not_tell_the_operator_someone_clicked_it() -> None:
+    """A fetch is not clicked. The operator reads these words; they must be true of it."""
+    report = link_lint.lint_site(_BROKEN_FETCH_SITE)
+    fetches = [f for f in report["findings"] if "pieces.json" in f["reference"]]
+    assert fetches, "precondition: the real finding must be present"
+    for f in fetches:
+        assert "clicks" not in f["message"], (
+            "a fetch finding must not be described as a click — the page asks for this "
+            f"itself and fails silently: {f['message']}"
+        )
+        assert "asks the server" in f["message"]
+
+
+def test_a_fetch_naming_a_FILE_outside_the_served_root_is_hard(tmp_path: Path) -> None:
+    """The #1375 shape, reduced: data beside the mount rather than inside it."""
+    root = _site(
+        tmp_path,
+        {
+            "public/index.html": "<script>fetch('./data/pieces.json').then(r=>r.json())</script>",
+            "data/pieces.json": '[{"id":1}]',  # exists, but OUTSIDE public/
+        },
+    )
+    report = link_lint.lint_site(root)
+    assert report["hard"] is True
+    assert any("pieces.json" in f["reference"] for f in report["findings"])
+
+
+def test_the_same_fetch_is_CLEAN_once_the_file_is_reachable(tmp_path: Path) -> None:
+    """The positive control. Without this, a checker that flags everything looks correct."""
+    root = _site(
+        tmp_path,
+        {
+            "public/index.html": "<script>fetch('./data/pieces.json').then(r=>r.json())</script>",
+            "public/data/pieces.json": '[{"id":1}]',  # inside the served root
+        },
+    )
+    report = link_lint.lint_site(root)
+    assert report["hard"] is False, f"unexpected findings: {report['findings']}"
+
+
+def test_api_routes_are_NOT_flagged(tmp_path: Path) -> None:
+    """The false-positive class `extract_references_js` was written to avoid, preserved.
+
+    Its docstring said a broader sweep "would flag fetch() calls against API routes, which
+    are not files and are not defects." That reasoning is right and this locks it: only a
+    target carrying a recognised web extension is decidable as a file.
+    """
+    root = _site(
+        tmp_path,
+        {
+            "public/index.html": (
+                "<script>"
+                "fetch('/api/pieces');"
+                "fetch('/api/enquiries', {method:'POST'});"
+                "fetch(`/api/piece/${id}`);"
+                "fetch(someUrlVariable);"
+                "</script>"
+            ),
+        },
+    )
+    report = link_lint.lint_site(root)
+    assert report["hard"] is False, (
+        f"an API route is not a file and must not be flagged: {report['findings']}"
+    )
+
+
+def test_a_fetch_inside_an_inline_script_tag_is_seen(tmp_path: Path) -> None:
+    """The defect lived in an inline <script>, where no HTML attribute parser looks.
+
+    This is the reason the extractor runs over .html as well as .js — without it the
+    checker would pass the exact delivery it was written to catch, which is the trap this
+    module's own header warns about.
+    """
+    root = _site(tmp_path, {"public/index.html": "<script>fetch('./missing.json')</script>"})
+    report = link_lint.lint_site(root)
+    assert any("missing.json" in f["reference"] for f in report["findings"])
+
+
+def test_toggle_proof_the_fetch_extractor_is_what_catches_it(tmp_path: Path) -> None:
+    """security_by_design principle 12: prove the probe FAILS when the control is off.
+
+    With `extract_fetch_targets` neutralised, the same site must come back clean — so a
+    green result on the real site can be distinguished from a checker that cannot see.
+    """
+    root = _site(tmp_path, {"public/index.html": "<script>fetch('./data/pieces.json')</script>"})
+    assert link_lint.lint_site(root)["hard"] is True, "precondition: the control catches it"
+
+    original = link_lint.extract_fetch_targets
+    try:
+        link_lint.extract_fetch_targets = lambda text, source: []
+        disabled = link_lint.lint_site(root)
+    finally:
+        link_lint.extract_fetch_targets = original
+
+    assert disabled["hard"] is False, (
+        "with the fetch extractor disabled the defect must go UNSEEN — if it is still "
+        "found, something else is doing the work and this control is not what protects us"
+    )
+    assert link_lint.lint_site(root)["hard"] is True, "the control must be restored"
+
+
+# ---------------------------------------------------------------------------
+# #1367 — the entry point. The operator opened a six-page site and got a page
+# saying "App" with a blue circle: public/index.html was the scaffold's 1044-byte
+# placeholder, untouched by all seven delivered tasks, and the server mounts / to
+# it. Four gates passed that tree, because each asks whether a page it was HANDED
+# is well-formed and none asks whether the page a visitor REACHES is the product.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _BROKEN_FETCH_SITE.is_dir(), reason="review snapshot not on this box")
+def test_the_real_front_door_that_reached_nothing_is_found() -> None:
+    """The immutable snapshot of the site he actually opened."""
+    report = link_lint.lint_site(_BROKEN_FETCH_SITE)
+    entry = [f for f in report["findings"] if f["rule"] == "entry-reaches-nothing"]
+    assert len(entry) == 1, f"expected the front-door finding, got {[f['rule'] for f in report['findings']]}"
+    assert entry[0]["severity"] == link_lint.SEVERITY_HIGH
+    # It must name what could not be reached, or the coder is left guessing.
+    for page in ("home.html", "pieces.html", "contact.html"):
+        assert page in entry[0]["message"], f"the finding must name {page}"
+
+
+def test_an_entry_that_links_to_the_site_is_CLEAN(tmp_path: Path) -> None:
+    """Positive control. Without it, a rule that fires on everything looks correct."""
+    root = _site(
+        tmp_path,
+        {
+            "public/index.html": '<a href="home.html">Home</a> <a href="pieces.html">Shop</a>',
+            "public/home.html": "<h1>home</h1>",
+            "public/pieces.html": "<h1>pieces</h1>",
+            "public/contact.html": "<h1>contact</h1>",
+        },
+    )
+    report = link_lint.lint_site(root)
+    assert not [f for f in report["findings"] if f["rule"] == "entry-reaches-nothing"]
+    assert report["hard"] is False
+
+
+def test_a_single_page_site_is_NOT_flagged(tmp_path: Path) -> None:
+    """The one real false-positive class: an entry with nothing to reach.
+
+    A genuine single-page delivery has no siblings to link to. The rule requires two or
+    more before it can fire, so a one-page site is exempt by construction rather than by
+    a heuristic that could drift.
+    """
+    root = _site(tmp_path, {"public/index.html": "<h1>the whole app</h1>"})
+    assert not [f for f in link_lint.lint_site(root)["findings"] if f["rule"] == "entry-reaches-nothing"]
+
+    root2 = _site(tmp_path / "two", {
+        "public/index.html": "<h1>app</h1>",
+        "public/about.html": "<h1>about</h1>",
+    })
+    assert not [f for f in link_lint.lint_site(root2)["findings"] if f["rule"] == "entry-reaches-nothing"], (
+        "one sibling is under the two-page threshold and must not fire"
+    )
+
+
+def test_the_scaffold_placeholder_shape_is_flagged(tmp_path: Path) -> None:
+    """#1367 reduced: the seed's entry survives untouched beside everything that was built."""
+    root = _site(
+        tmp_path,
+        {
+            "public/index.html": "<h1>App</h1><svg><circle/></svg><p id='status'>Loading…</p>",
+            "public/home.html": "<h1>Welcome to the studio</h1>",
+            "public/pieces.html": "<h1>Our pieces</h1>",
+            "public/contact.html": "<h1>Contact</h1>",
+        },
+    )
+    report = link_lint.lint_site(root)
+    entry = [f for f in report["findings"] if f["rule"] == "entry-reaches-nothing"]
+    assert len(entry) == 1
+    assert report["hard"] is True, "a site with no front door must force a FIX, not advise"
+
+
+def test_toggle_proof_the_entry_rule_is_what_catches_it(tmp_path: Path) -> None:
+    """security_by_design principle 12 — prove the probe FAILS when the control is off."""
+    root = _site(
+        tmp_path,
+        {
+            "public/index.html": "<h1>App</h1>",
+            "public/home.html": "<h1>home</h1>",
+            "public/pieces.html": "<h1>pieces</h1>",
+        },
+    )
+    assert link_lint.lint_site(root)["hard"] is True, "precondition: the control catches it"
+
+    original = link_lint._check_entry_reaches_the_site
+    try:
+        link_lint._check_entry_reaches_the_site = lambda root: None
+        disabled = link_lint.lint_site(root)
+    finally:
+        link_lint._check_entry_reaches_the_site = original
+
+    assert disabled["hard"] is False, (
+        "with the entry rule disabled this site must come back CLEAN — if it is still hard, "
+        "something else is doing the work and this rule is not what protects us"
+    )
+    assert link_lint.lint_site(root)["hard"] is True, "the control must be restored"
+
+
+# ---------------------------------------------------------------------------
+# #1389 — the denominator. DoD row 13 names this module as the class's THIRD
+# instance, found by looking rather than by being bitten.
+#
+# The published total used to be `resolved + broken + undecidable + external +
+# in_page` — a denominator derived from the numerators it is meant to check. A
+# reference landing in no bucket left the numerator and the denominator
+# TOGETHER, so the arithmetic stayed self-consistent while under-reporting.
+# ---------------------------------------------------------------------------
+
+
+def test_the_denominator_is_the_POPULATION_not_the_sum_of_the_buckets(tmp_path: Path) -> None:
+    """`references` must count what was EXAMINED, independently of classification.
+
+    This is #1231's property stated directly for this instrument. It is the one that must
+    never regress: a grader that derives its total from its own counters cannot detect its
+    own losses, because a lost item leaves both sides of the fraction at once.
+    """
+    site = _site(tmp_path, {
+        "index.html": (
+            '<a href="a.html">a</a>'
+            '<a href="missing.html">gone</a>'
+            '<a href="#top">anchor</a>'
+            '<a href="https://example.com">out</a>'
+        ),
+        "a.html": "<p>a</p>",
+    })
+    report = link_lint.lint_site(site)
+
+    assert report["checked"] is True
+    counts = report["counts"]
+    assert report["references"] == sum(counts.values()), (
+        f"population {report['references']} disagrees with the buckets {counts} — every "
+        f"examined reference must appear in exactly one"
+    )
+    assert report["references"] >= 4, "precondition: the fixture really has references"
+
+
+def test_a_status_no_bucket_recognises_CANNOT_be_counted_silently(tmp_path: Path,
+                                                                  monkeypatch) -> None:
+    """The defect itself: could a sixth status be added and lose references quietly?
+
+    Before #1389 the answer was yes. `_Tally` was a plain dataclass and the classification
+    loop increments by computed name, so `setattr(tally, "skipped", 1)` created a NEW
+    attribute nothing read — no exception, no red, and the reference gone from both the
+    bucket and the total. Nothing PRODUCED a sixth status; nothing PREVENTED one either, and
+    adding it was a one-line change two hundred lines from the tally.
+
+    `slots=True` makes it an AttributeError at the increment. This test is the proof, and it
+    is written against the mechanism rather than the current status list, so it keeps holding
+    when the list changes.
+    """
+    tally = link_lint._Tally()
+    with pytest.raises(AttributeError):
+        setattr(tally, "some_new_status", 1)
+
+    assert tally.unaccounted() == 0, "a fresh tally has lost nothing"
+
+
+def test_the_reconciliation_notices_a_loss_and_says_so_loudly(tmp_path: Path) -> None:
+    """The belt to slots' brace: if a reference is ever lost, the REPORT says so.
+
+    Constructed directly, because the whole point is that no live path can produce it. A
+    control that can only be proved by the absence of a failure is not proved at all.
+    """
+    tally = link_lint._Tally()
+    tally.examined = 10
+    tally.resolved = 7
+    assert tally.unaccounted() == 3, "the residual is examined minus the buckets"
+
+    tally.resolved = 10
+    assert tally.unaccounted() == 0, "a balanced tally reports no residual"
+
+
+def test_the_population_counter_is_not_vacuous(tmp_path: Path) -> None:
+    """The toggle. If `examined` were incremented in the same place as the buckets, it would
+    agree with them by construction and the invariant above would prove nothing.
+
+    Drives a real site and checks the counter moved with real references — so a future edit
+    that quietly stops incrementing it fails here rather than passing a tautology.
+    """
+    empty = _site(tmp_path / "none", {"index.html": "<p>no links at all</p>"})
+    linked = _site(tmp_path / "some", {
+        "index.html": '<a href="a.html">a</a><a href="b.html">b</a>',
+        "a.html": "<p>a</p>",
+        "b.html": "<p>b</p>",
+    })
+
+    assert link_lint.lint_site(empty)["references"] == 0
+    assert link_lint.lint_site(linked)["references"] == 2, (
+        "the population counter did not track real references"
+    )

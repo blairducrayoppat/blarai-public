@@ -282,7 +282,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 
 219. **A process-creation control can be defeated by an intermediary the platform inserts between you and the process you think you are spawning — verify the observable end property, never the flag at the spawn site.** The swap chain's DETACHED_PROCESS flag was verified at every spawn site and the operator still screenshotted a closable console: the Windows venv `python.exe` is a launcher shim that re-spawns the real interpreter as a *child*, and the flag does not inherit — it worked, one process too early. The pythonw fix then proved the lesson's second half live: twelve fresh unit locks pinned the argv and flags faithfully, and the first live swap-back still crashed, because the relaunch had never passed standard handles and the old visible console — the bug itself — had been silently providing working stdio; remove the window and the child inherits a broken cp1252 stderr that kills the banner print. Both halves are one discipline: the property the control exists for (no closable window; the assistant comes back) lives at the end of a chain the platform quietly extends, so the merge gate must observe the END PROPERTY on the final process in the real environment — and when a change inverts the environment (a console-less parent), re-derive the hazard for every child and every assumption ("a stray print is a silent no-op" was false) rather than porting the old analysis. (#761; the C15 sweep + the live merge gate; cf. lessons 46, 73, 218; FIELD_NOTES: the venv-shim/pythonw/CREATE_NO_WINDOW triad.)
 
-221. **When one component's watchdog window overlaps another component's granted budget, the shorter window silently wins and the budget is fiction — every liveness window must be provably longer than the longest legitimately-silent phase it can observe, or the phase must emit a heartbeat.** The battery monitor's 90-second no-progress doom sat inside the verify gate's own 600-second budget: the gate's checks write nothing until they finish and its native workers were absent from the watched-process names, so a working verify was indistinguishable from a dead run — and the monitor killed a healthy B4 at one-seventh of the time the pipeline had explicitly promised the step. Neither number was wrong in isolation; the PAIR was incoherent, and nothing owned the question. The durable discipline: audit (window, budget) as a unit whenever either changes — enumerate every legitimately-silent phase the window can observe and prove the window exceeds the longest one, or give that phase a heartbeat so the window can stay tight. The timeout-registry row carries both the raised window and the named shrink path (a per-step heartbeat from the verify gate), so the pair stays visible instead of re-diverging one incident at a time. (The detector that doomed the verify, 2026-07-09; #740 c.1517; sibling of lesson 217 — the registry makes the values visible; this governs their COMPOSITION; cf. lessons 213, 216.) *(THIRD INSTANCE — control shipped with the tally: the registry relation lock binding `PA_HANDSHAKE_BUDGET_S >= real_backend_ready(timeout_s)` plus a shared schedule function that makes the TUI banner and the retry loop one arithmetic, and both new budgets registered in `shared/timeout_registry.py`. #808.)*
+221. **When one component's watchdog window overlaps another component's granted budget, the shorter window silently wins and the budget is fiction — every liveness window must be provably longer than the longest legitimately-silent phase it can observe, or the phase must emit a heartbeat.** The battery monitor's 90-second no-progress doom sat inside the verify gate's own 600-second budget: the gate's checks write nothing until they finish and its native workers were absent from the watched-process names, so a working verify was indistinguishable from a dead run — and the monitor killed a healthy B4 at one-seventh of the time the pipeline had explicitly promised the step. Neither number was wrong in isolation; the PAIR was incoherent, and nothing owned the question. The durable discipline: audit (window, budget) as a unit whenever either changes — enumerate every legitimately-silent phase the window can observe and prove the window exceeds the longest one, or give that phase a heartbeat so the window can stay tight. The timeout-registry row carries both the raised window and the named shrink path (a per-step heartbeat from the verify gate), so the pair stays visible instead of re-diverging one incident at a time. (The detector that doomed the verify, 2026-07-09; #740 c.1517; sibling of lesson 217 — the registry makes the values visible; this governs their COMPOSITION; cf. lessons 213, 216.) *(THIRD INSTANCE — control shipped with the tally: the registry relation lock binding `PA_HANDSHAKE_BUDGET_S >= real_backend_ready(timeout_s)` plus a shared schedule function that makes the TUI banner and the retry loop one arithmetic, and both new budgets registered in `shared/timeout_registry.py`. #808.)* *(recurred: 2026-08-09 — FOURTH INSTANCE, and it shows the #808 control was RIGHT AND INSUFFICIENT. That control locked the relation `PA_HANDSHAKE_BUDGET_S >= real_backend_ready(timeout_s)`; both were 180 s and the lock held perfectly. The defect happened anyway, because a NEW legitimately-silent phase grew inside the same window and nobody re-asked the question: dispatch-asset generation now runs before the model swap at a measured 59.9 s/image, so B9's declared 8 assets are ~479 s of GPU saturation the Policy Agent cannot answer through. The handshake fail-closed at 180 s and tore down the Assistant Orchestrator MID-DISPATCH; four consecutive battery nights produced nothing. The one night that succeeded generated 2 images (98 s) and beat the deadline — which is also why it survived my own elimination pass twice: I struck the handshake off because it failed on the successful night too, and 'present during a success' disproves a FAULT but says nothing about a DEADLINE, where the only question is what finished before it. The lesson's own words already contained the fix — 'every liveness window must be provably longer than the longest legitimately-silent phase it can OBSERVE' — and the relation lock bound the window to the phase that mattered in 2026-07, not to the one added since. Budgets raised to 600/30/30 with the shrink condition registered; the durable gap is that a relation lock pins a PAIR while the set of observable silent phases keeps growing. #1353.)*
 
 222. **A verdict-issuing instrument needs a positive control before its failure class is believed — prove it can produce PASS on a known-good subject under production conditions, or every systematic blindness it has becomes a fleet of plausible failures wearing measurement's authority.** The web design-verify screenshotted apps over `file://`, where browsers block module JavaScript entirely — and the fleet's own web scaffold is a module app, so the instrument could not EVER see a working app: B5's coder built a working habit tracker (proven by serving the same merged code over its own server) and was convicted as a capability failure by a reviewer accurately describing a page that could never live. Nothing had ever demonstrated the tier could pass a known-good app, so its reds carried authority they had not earned — and "the coder can't build charts" nearly entered the capability ledger as a measured fact. Negative controls (B8's rigged tasks) catch false green; only a positive control catches false red. When an instrument's verdicts feed decisions, budget the run that proves it can say yes. (The screenshot that convicted an innocent app, 2026-07-09; #772; cf. lessons 2, 30, 215, 221.)
 
@@ -291,7 +291,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 
 ## Index of every lesson (the pre-mint search surface)
 
-*One line per lesson — search HERE before minting a number (Rule 2). ↺n = recorded recurrences · ✓ctrl = a structural control shipped · ✓ctrl(partial) = a control exists but a named sub-class of the lesson escapes it, with that gap ticketed · ⚠debt(#N) = a third-instance control is OWED and tracked on #N; the debt is visible here so a Rule-3 pass finds it without opening another lesson · ★ = Canon-32. Full text: the archive volume.*
+*One line per lesson — search HERE before minting a number (Rule 2). ↺n = recorded recurrences · ✓ctrl = a structural control shipped · ✓ctrl(partial) = a control exists but a named sub-class of the lesson escapes it, with that gap ticketed · ⚠debt(#N) = a third-instance control is OWED and tracked on #N; the debt is visible here so a Rule-3 pass finds it without opening another lesson · ⚠ctrl-inert(#N) = a control was shipped and has NEVER FUNCTIONED, measured, tracked on #N — distinct from ✓ctrl(partial), where a control works and a named sub-class escapes it, and MORE dangerous than ⚠debt, because a ✓ctrl flag was standing here reading as reassurance while the class kept recurring (added 2026-08-09, lesson 221) · ★ = Canon-32. Full text: the archive volume.*
 
 1. Process is not progress  · ★
 2. "Show me it running."  · ★
@@ -300,7 +300,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 5. Read the rules, not just the task
 6. What you configure is not what runs
 7. A measurement can flatter you
-8. Fixing the instrument once does not make it trustworthy  · ↺5 ✓ctrl ★
+8. Fixing the instrument once does not make it trustworthy  · ↺7 ✓ctrl ★
 9. Two Claudes on one machine share one HEAD
 10. Continuity of intent across agents is a file-system property, not a memory property  · ↺1 ★
 11. A setting that must cross a privilege boundary has to travel by a channel that crosses it
@@ -309,12 +309,12 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 14. A handoff brief is a map, not proof the terrain is passable — probe the load-bearing unknowns before building on them  · ↺3 ✓ctrl ★
 15. Routing around a broken tool beats fixing it, when the tool is not on your path
 16. For the layer your tests cannot reach, instrument it — do not guess across the boundary
-17. A decision can be right for a reason that is false — re-test the rationale, not just the result
+17. A decision can be right for a reason that is false — re-test the rationale, not just the result  · ↺1
 18. A security design is only as real as the hardware it assumes — verify the silicon, not the spec sheet or your own inference
 19. Sell the capability you have, not the one they hope for — name the limits before they build on them
 20. The privilege-lowering fix and the capability fix can be the same change
 21. Verify the artifact, not just the data inside it — with the real tool, not a proxy
-22. Fail-closed is not fail-shut: a deny-by-default control must still enumerate — and prove — the legitimate-allow set  · ★
+22. Fail-closed is not fail-shut: a deny-by-default control must still enumerate — and prove — the legitimate-allow set  · ↺1 ★
 23. A capability proven is not a control enforced — a finding closes when production points at the strong path and the weak one is gone
 24. A problem the live boot surfaces next to your change makes the change a suspect, not a culprit — let the instrument decide before you reach for the fix
 25. One shared event loop makes any single blocking call a whole-app freeze — fix it structurally (off the loop), not locally (make the blocker faster)
@@ -322,7 +322,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 27. A deferred resource risk comes due as a hard failure, not a graceful one — and a fail-closed default can disguise it as another subsystem's bug
 28. The safest feature flag is the fail-soft path you already built — disable-by-config and degrade-by-failure should be one code path
 29. Escalate what the user experiences; own how it is wired — a quality or capability tradeoff is the operator's call, never an implementation detail you slip in  · ★
-30. A guard you have not watched go red against the bug is decoration — and a bug in the interaction between parts is invisible to tests that exercise each part alone  · ↺1 ★
+30. A guard you have not watched go red against the bug is decoration — and a bug in the interaction between parts is invisible to tests that exercise each part alone  · ↺4 ✓ctrl ★
 31. Fix the symptom with a bound; fix the cause when the bound lets you
 32. The layer you call "untestable" is usually just "untested" — hunt for the seam before you fence it off
 33. Capturing data and publishing data are two separate disciplines — and a record that implies more coverage than it has is worse than none at all  · ↺3 ✓ctrl
@@ -338,9 +338,9 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 43. A component's primary purpose is fixed by its use case, not by the sprint you happen to be viewing it through
 44. A safety control that depends on a human remembering to do the right thing is not a control  · ↺1 ✓ctrl
 45. When a mess keeps reappearing, find the doctrine producing it before you clean it up again  · ↺1
-46. A control wired into a function but not into the boot path is still "built but wired into nothing" — a green suite proves the mechanism, never that the running system invokes it  · ↺9 ✓ctrl ★
+46. A control wired into a function but not into the boot path is still "built but wired into nothing" — a green suite proves the mechanism, never that the running system invokes it  · ↺15 ✓ctrl ★
 47. A comment that claims a property the code does not enforce is governance debt that surfaces later as an audit finding  · ↺3 ✓ctrl
-48. A load-bearing factual premise gets verified on disk, not inherited through the review chain  · ↺5 ✓ctrl
+48. A load-bearing factual premise gets verified on disk, not inherited through the review chain  · ↺8 ✓ctrl
 49. A design gate — the ADR written and reviewed before a line of cipher code — turns the hard seam-choices into translation work, and moves the review surface from the code to the ADR
 50. Encrypt the derived representations, not just the raw text — a stored embedding is an invertible shadow of its source
 51. Tamper-evident is not non-forgeable, and the difference belongs in a test, not a comment
@@ -356,13 +356,13 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 61. Transport topology and security mechanism are orthogonal decisions — conflating them leaves the real production path unbuilt behind a fully-specified one
 62. Config-to-provisioner correspondence must be tested as a unit, or the gap surfaces only at production boot
 63. Fail-closed is a property of a call site relative to its unit of accountability, not a uniform property of a component
-64. When you fix a defect of a particular shape, scan the codebase for the same shape before you close — finding one and fixing only one is a half-fix  · ↺3 ✓ctrl
+64. When you fix a defect of a particular shape, scan the codebase for the same shape before you close — finding one and fixing only one is a half-fix  · ↺5 ✓ctrl
 65. A correct downstream fix can mask an upstream defect by moving its symptom past the gate that used to catch it — so test the seam between configuration and connection, not each side alone
 66. A test can lock a *defect*, not just a feature — so "it's test-locked" is not proof "it's a decision to escalate."
 67. An integrity check on a multi-file artifact must cover the whole manifest — and reject whatever the manifest omits
 68. A lock you cannot run green yet must still verify everything the missing resource does not gate — so its first real run is a confirmation, not a discovery
 69. A gate checklist never re-verified against the code drifts in both directions
-70. A regression lock only locks if the gate that actually runs includes its scope
+70. A regression lock only locks if the gate that actually runs includes its scope  · ↺1
 71. Version pins are containment, not supply-chain integrity
 72. Closing the debt a sprint exists to close is act-not-ask — escalate trade-offs, not the obvious completion of the stated goal  · ↺2 ★
 73. A long-"deferred" code path is where bugs hide from each other — activating it is a discovery exercise, not a one-liner
@@ -389,7 +389,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 94. A merged capability is not an activated one — say which it is
 95. An activated control is not an exercised one — verify it against the real producers, not assumed ones
 96. Prove the property on the load-bearing artifact, not an equivalent of it
-97. A security control must not claim more than it delivers  · ↺1 ★
+97. A security control must not claim more than it delivers  · ↺2 ★
 98. When a read contradicts the premise of your task, the read wins — pause before you write
 99. A decision is only a decision if the options differ on security, capability, or quality — otherwise it is mechanics the builder owns  · ★
 100. An "unbounded by default" comment is often an unclosed gap wearing a decision's clothes
@@ -441,22 +441,22 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 146. A "zero-change" or "already handled" claim in a docstring is a load-bearing assertion — verify it against the code before trusting it
 147. Backend-complete is not operator-reachable
 148. A "saved" flag is memory; a content hash is truth
-149. A hand-copied cross-language allowlist drifts in silence — guard it with a gate test, not vigilance  · ↺4 ✓ctrl ★
+149. A hand-copied cross-language allowlist drifts in silence — guard it with a gate test, not vigilance  · ↺5 ✓ctrl ★
 150. A test double standing in for an async object must itself be async, or it proves a path production never runs  · ↺2 ★
 151. Confirm the measurement and the ground-truth fact are about the same scenario before you let one override the other  · ↺3
 152. Dispatch to the capability; don't become it
 153. Inject the danger so you can test the logic
 154. Read the system you're dispatching to before you map onto it
 155. An unrun check is not a pass
-156. When a value becomes centrally-sourced — config-driven, env-overridable, or a computed seed threaded to N sites — audit every consumer; a half-promoted value is worse than a hardcoded one  · ↺2 ✓ctrl
+156. When a value becomes centrally-sourced — config-driven, env-overridable, or a computed seed threaded to N sites — audit every consumer; a half-promoted value is worse than a hardcoded one  · ↺3 ✓ctrl
 157. Reply before you exit; a daemon thread can't take down its own process
 158. A control tested in isolation can still rest on an unstated single-instance assumption  · ↺1 ✓ctrl
 159. When you depend on a signal being delivered, guarantee termination — don't widen the window
-160. The log decides, not the hypothesis — verify the failure mechanism before you fix it  · ★
+160. The log decides, not the hypothesis — verify the failure mechanism before you fix it  · ↺2 ✓ctrl ★
 161. Capturing a subprocess's output deadlocks if it spawns a long-lived grandchild  · ↺1
 162. Red-team the design before the diff, and let an independent gate certify what you certified — your own adversarial pass shares your blind spot  · ↺1
-163. Verify the brief's "where," not just its "what."
-164. A deterministic gate's dangerous direction is the one that drops work — verify *that* direction adversarially, in a separate pass, never with a green run
+163. Verify the brief's "where," not just its "what."  · ↺1
+164. A deterministic gate's dangerous direction is the one that drops work — verify *that* direction adversarially, in a separate pass, never with a green run  · ↺1
 165. Verification can shrink a change, not just confirm it
 166. Ship the trigger, not a second mechanism
 167. An end-state assertion is not a guard on the step that produced it
@@ -507,14 +507,14 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 212. A pinned cross-lane contract that references an operation it does not define is a latent integration break — implement a reference for it, flag it loudly for the owning lane to adopt-or-supersede, and never guess it silently  · ↺1
 213. A readiness signal for a slow-starting singleton must verify the property the caller depends on, and the retry that owns it must probe in-flight before it respawns — a false-ready cascades  · ↺2 ✓ctrl
 214. Fail-closed is the right posture; fail-closed-and-mute is a defect factory  · ↺3
-215. A negative control is only proof if the REAL gate catches it — and a test-only saboteur must be structurally unable to fire in production
+215. A negative control is only proof if the REAL gate catches it — and a test-only saboteur must be structurally unable to fire in production  · ↺1
 216. A recovery path is a loaded weapon pointed at whatever it believes crashed — it must verify the death, not infer it from its own start  · ↺2 ✓ctrl ★
 217. Configuration values that accrete one incident at a time form an invisible taxonomy — when a value CLASS earns its third scar, give the class a registered, gate-locked table  · ↺1 ★
 218. Before you fix a long-broken behavior, find out what grew around it — a bug that has been failing in the same direction for long enough becomes load-bearing  · ↺1
 219. A process-creation control can be defeated by an intermediary the platform inserts between you and the process you think you are spawning — verify the observable end property, never the flag at the spawn site  · ↺2 ✓ctrl ★
-220. A fail-closed gate inside a loop needs a containment boundary at the loop body — refusing one record is the gate's job; whether the refusal costs the item or the run is the LOOP's design decision, and leaving it implicit means the strictest gate anywhere becomes a whole-run kill switch
-221. When one component's watchdog window overlaps another component's granted budget, the shorter window silently wins and the budget is fiction — every liveness window must be provably longer than the longest legitimately-silent phase it can observe, or the phase must emit a heartbeat  · ↺4 ✓ctrl ★
-222. A verdict-issuing instrument needs a positive control before its failure class is believed — prove it can produce PASS on a known-good subject under production conditions, or every systematic blindness it has becomes a fleet of plausible failures wearing measurement's authority  · ↺9 ✓ctrl ★
+220. A fail-closed gate inside a loop needs a containment boundary at the loop body — refusing one record is the gate's job; whether the refusal costs the item or the run is the LOOP's design decision, and leaving it implicit means the strictest gate anywhere becomes a whole-run kill switch  · ↺1
+221. When one component's watchdog window overlaps another component's granted budget, the shorter window silently wins and the budget is fiction — every liveness window must be provably longer than the longest legitimately-silent phase it can observe, or the phase must emit a heartbeat  · ↺6 ✓ctrl(partial)(#1366,#1507) ★
+222. A verdict-issuing instrument needs a positive control before its failure class is believed — prove it can produce PASS on a known-good subject under production conditions, or every systematic blindness it has becomes a fleet of plausible failures wearing measurement's authority  · ↺13 ✓ctrl ★
 223. When a workflow forks from a mirror, the mirror's refresh cadence becomes an invisible upper bound on the workflow's correctness — fork from the source of truth, and treat "it worked the other day" as the calendar luck it is
 224. A parameterized run's isolation is only as complete as the side effects you enumerated — scoping the DATA while a shared-resource write stays keyed to the code path makes every "safe, isolated" test run carry a loaded global consequence  · ↺1
 225. Gate the expensive resource on the cheapest probe of the experiment's validity precondition — and read the system's own emitted evidence, never an assumption  · ↺2 ✓ctrl
@@ -535,16 +535,16 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 240. A control written into an enforcement plane is a claim about the PLANE, not just the rule — verify the plane enforces *anything at all* (a one-rule positive control) before trusting any rule written into it
 241. Surface the grader's contract to the builder — a hidden acceptance interface guarantees layout divergence
 242. Session-keyed in-RAM state needs a named death path at the moment it is born
-243. An enumeration that covers a subset while implying the whole is a false-clean — and a probe that cannot see must not report clean  · ↺1 ✓ctrl
+243. An enumeration that covers a subset while implying the whole is a false-clean — and a probe that cannot see must not report clean  · ↺2 ✓ctrl
 244. Order a new pre-flight stage AFTER the cheap validity gate it front-runs
 245. When "preserve the parts the user didn't change" is a requirement, have the model emit an EDIT over the existing artifact — references to keep plus adds — and apply it deterministically, never a full rewrite you hope doesn't churn  · ✓ctrl
 246. A gate protects the *artifact* it inspects, but the party under test often owns the gate's *execution environment* — grade in a hermetic environment the subject cannot influence (deny its config, hooks, and path), or the environment becomes the evasion
 247. A gate can only catch what its sensors read — when a failure mode is invisible to the current sensor, add a sensor, don't tune the blind one; and put the sensor where the artifact can't reach it
 248. An error-triggered repair is blind to a malformation that parses cleanly into the wrong shape — guard on the divergence between intent and result, not on the exception
 249. An invented interface has more than one axis — the NAME, the SIGNATURE, and the RETURN — and enforcing only the layer you can see cheaply leaves the others as silent parks; enforce the contract at the grain the failure actually occupies, not the grain that is easy to check
-250. A second instrument that judges the first only has signal if it is strictly cleaner than the first — a same-state re-run of a deterministic grade proves nothing
+250. A second instrument that judges the first only has signal if it is strictly cleaner than the first — a same-state re-run of a deterministic grade proves nothing  · ↺1
 251. An automated gate must be calibrated to the ACTOR that consumes it, not to the linter's defaults
-252. The suppression/allowlist for a control that audits an artifact must be sourced from the TRUSTED side, never from the artifact being audited — otherwise the audited party can ship its own exoneration
+252. The suppression/allowlist for a control that audits an artifact must be sourced from the TRUSTED side, never from the artifact being audited — otherwise the audited party can ship its own exoneration  · ↺1
 253. A manifest that claims to be *descriptive of today* must record what the system actually does, never a research dossier's recommended future — the two must not be conflated in a data file the next consumer will read as ground truth
 254. A deterministic diff can prove *changed*, never *worse* — severity that distinguishes a lateral reformat from a data-loss regression needs a second deterministic signal (here, material output shrink), decided by a formula, not deferred to a model
 255. Freeze the test set the day you start tuning, not the day you evaluate — a protective split against overfitting is time-sensitive, and it needs a fail-loud gate shipped WITH the rule, not documented and deferred
@@ -561,7 +561,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 266. Accept an operator-facing surface through the operator's own entry point — reachability is not transitive across UI layers
 267. The first honest reading of a new observability surface by its actual user generates design findings at a rate no review pass matches — schedule the user's first look as part of the ship
 268. Exit codes are not judgments — any automation shaped "check X then do Y" must route X through something that actually reads it
-269. A fresh recommendation is a hypothesis until checked against the project's own decision and measurement record
+269. A fresh recommendation is a hypothesis until checked against the project's own decision and measurement record  · ↺1
 270. Reclaim lives where the accounting hides it
 271. Size a fix — and its proof — from the code, not the ticket's framing of it
 272. A cross-repo fix whose halves are each a safe no-op needs ONE ticket that stays open until BOTH mains carry it
@@ -582,16 +582,16 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 287. When an autonomous system has a deterministic layer and a model layer, grade them SEPARATELY against the same ground truth — an aggregate precision number averages a graduation-grade actor with a disproven speaker
 288. A document whose stated maintainer is a retired role is stale by definition — re-own it or retire it the day the role dies; and a cleanup ends when its freshness gate ships, not when the files look tidy  · ✓ctrl
 289. An approval list is an allowlist — treat silence as denial
-290. An obligation with no owner is not a process, it is a hope — it fails silently every time rather than loudly once
+290. An obligation with no owner is not a process, it is a hope — it fails silently every time rather than loudly once  · ↺1
 291. A verdict that assigns fault must adjudicate the instrument before it attributes the finding — an instrument that measured nothing has produced evidence about itself, not about its subject
-292. A documentation correction is a claim-generating act — verify the fix to the same standard as the defect, with an independent verifier, until a round returns empty; diff-scoped review cannot see a defect that has stopped appearing in diffs
+292. A documentation correction is a claim-generating act — verify the fix to the same standard as the defect, with an independent verifier, until a round returns empty; diff-scoped review cannot see a defect that has stopped appearing in diffs  · ↺1
 293. A structural control's trust is engineered, not free — measure the false-positive rate before gating, prefer a self-describing declaration cross-checked against the authority over any hand-maintained map, and pin the honest form passing as an equal partner to the defect failing  · ↺1
 294. An adversarial review panel graded against a rubric verifies that a piece is TRUE and INTERNALLY CONSISTENT, never that it is WORTH READING — only a human with a real stake can judge the second axis, and a clean panel pass must never read as validation of it
 295. An unmeasured "now" is a fabricated input that every downstream duration inherits — and durations are what kill decisions are made of; measure the clock in the same breath as the judgment, cross-check one independent timestamp source, and treat contradicting evidence as a probe of your premise before inventing a mechanism to rescue the theory
 296. Migrating doctrine out of a repo being sunset is COPY-THEN-VERIFY, not rewrite-from-memory — diff the new text against the source and account for every dropped clause, because the retired repo will not be there to check against later  · ✓ctrl
-297. Name the surface that OWNS a claim and read THAT — a ticket's DESCRIPTION is its spec (comments are only history), a sentinel's meaning belongs to its own docstring, a duration to the timeout registry, and what happened in a repo to git history  · ✓ctrl
+297. Name the surface that OWNS a claim and read THAT — a ticket's DESCRIPTION is its spec (comments are only history), a sentinel's meaning belongs to its own docstring, a duration to the timeout registry, and what happened in a repo to git history  · ↺2 ✓ctrl
 298. An instruction that names a command and also demands a precondition that command does not establish is worse than no instruction — it manufactures false confidence in the exact step it was written to protect  · ↺1
-299. A destructive command is most dangerous during CLEANUP, because cleanup does not feel like an operation — pair every "put it back" with the same non-destructive tool used to take it out, and note that a destructive command which succeeds is quieter than one that fails  · ✓ctrl
+299. A destructive command is most dangerous during CLEANUP, because cleanup does not feel like an operation — pair every "put it back" with the same non-destructive tool used to take it out, and note that a destructive command which succeeds is quieter than one that fails  · ↺1 ✓ctrl
 300. A handoff is authored at maximum attachment to your own in-flight work, so the QUEUE is the predictable omission — especially what your own ship just unblocked; the predecessor is structurally the worst-placed person to notice  · ✓ctrl
 301. A bulk-derived index is a measurement event — reconcile it against its authority the day it is born, with the instrument that will later gate it  · ✓ctrl
 302. Fix the exam before fixing the student — a repaired contract can remove the behaviour a code fix was built for; sequence contract quality first
@@ -601,7 +601,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 306. A skip the verdict arithmetic cannot represent becomes a punishment — walk the aggregation code for where a new outcome class falls through before shipping it
 307. Dead code with a seeded test looks alive to every tool except judgment — reference-counting cannot distinguish product logic from furniture you bolted to the floor yourself
 308. A record that states a fact but not the reason cannot answer "why" later — write the reason when it is true, not reconstruct it afterward
-309. Evidence-handling on a repair path deserves the same scrutiny as the repair itself — a retry that overwrites its predecessor's failure record makes every future diagnosis of that class strictly harder
+309. Evidence-handling on a repair path deserves the same scrutiny as the repair itself — a retry that overwrites its predecessor's failure record makes every future diagnosis of that class strictly harder  · ↺1
 310. A verdict-issuing instrument judging a question genuinely hard to decide from text needs permission to abstain, or it launders its uncertainty into a confident number
 311. Being confidently wrong on the same narrow problem two or three times running is a broken self-assessment, not a knowledge gap — hand off with a complete spec rather than attempt the next fix from the same head
 312. A review-fix round is a higher-risk edit than the original build — the finding supplies a narrow frame, and the frame is what stops you checking the neighbourhood
@@ -621,7 +621,7 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 326. A configuration knob is only real if every consumer reads it — two consumers on one channel each falling back to a compiled-in default make a documented, validated setting completely inert while the config file looks correct
 327. A default nobody chose still makes the decision — when an unanswered question resolves silently onto the one path the system's own checking cannot see, default to the checkable path and disclose the risky pick
 328. A verification surface keyed on a string it does not own will be broken by a colleague doing the right thing elsewhere — anchor on an identifier the watched block owns, or make the check relational so an edit moves both sides at once  · ↺1 ✓ctrl
-329. Every narrowing of a control is a coverage change — a tighter guard, a better detector or a bound on the output can each lose the thing the control exists to find, and a truncation must never decide a verdict
+329. Every narrowing of a control is a coverage change — a tighter guard, a better detector or a bound on the output can each lose the thing the control exists to find, and a truncation must never decide a verdict  · ↺1
 330. A check that can fail to run needs a third answer that is not "pass", and the TYPE must carry it — a convention the callers are asked to remember is a fail-open with extra steps  · ↺1 ✓ctrl
 331. When someone warns that a failure class applies to your work, reproduce it rather than agree to it — an agreed-with warning changes a comment, a reproduced one changes the design
 332. A fail-loud control that fires on every normal run has already been switched off by its reader  · ✓ctrl
@@ -630,12 +630,50 @@ design-review trigger. *(Lessons 38, 191, 193.)*
 335. A lock whose expected value is DEFINED as the code's own output is a tautology — when a constant becomes a builder, pin the pre-builder literal as its own bytes
 336. A rendered promise is state — card text offering a future action must derive from the same state that gates the action, and the check is per-STATE, not per-card
 337. A branch gate is evidence about the COMMIT it ran on, not about the branch — re-run it on the exact tip you are merging, because a green result carried forward across later commits is an unmeasured tree wearing a measured badge
-338. A finding stated one clause past what was measured is more fragile than the same finding stated exactly — the reader checks the weakest claim first, and one false premise retires a true row
+338. A finding stated one clause past what was measured is more fragile than the same finding stated exactly — the reader checks the weakest claim first, and one false premise retires a true row  · ↺1
 339. A control keyed on a string is a control that can be edited into silence, and it will be edited by someone doing the right thing elsewhere
-340. When a control admits or rejects, ask what QUESTION it is really asking — two gates that both ask "is this a documented thing" are one gate however independent their mechanisms look
+340. When a control admits or rejects, ask what QUESTION it is really asking — two gates that both ask "is this a documented thing" are one gate however independent their mechanisms look · ↺1
 341. A test whose subject is created at RUN TIME must prove the subject loaded before it reads the result — an unimportable fixture returns errors, errors are truthy, and `assert findings` cannot tell a conviction from a failure to look
-342. The comment you write to justify why THIS site needs the honest treatment is a PREDICATE, not an explanation — run it over every sibling before the commit lands
+342. The comment you write to justify why THIS site needs the honest treatment is a PREDICATE, not an explanation — run it over every sibling before the commit lands  · ↺2 ✓ctrl
 343. An advisory stage whose caller swallows its exception into an empty sentinel cannot fail visibly — the unit gate measures the stage and the caller measures nothing
+344-348. *RESERVED by #1319 for the pre-computed curation of the July/August fragment backlog — assigned in fragment DATE order. Not a numbering error: 349 was minted first because its source entry (2026-08-11) postdates every fragment in that block, and numbers are permanent.*
+349. Under time pressure the evidence nearest to hand gets promoted to sufficient, and nothing about it announces that it is not — before asserting a cause, name what would DISTINGUISH it from the alternatives and go get that  · ↺1
+350. A test that encodes HOW the code says something, rather than WHAT it says, does not merely fail to catch the bug — it becomes an argument for keeping it — never let one assertion carry both the property and the syntax  · ⚠debt(general detector: #1332)
+351. A failure COUNT is not a defect count and must never be reported as one — ask every red WHY before publishing it, because a red that can never go green stops being read, and a permanently-red check is where a real alarm hides in plain sight for a month
+352. A test's SUBJECT must be immutable at the time it runs — a fixture that resolves to a live working directory measures whatever last ran there, so the test's meaning changes without its code changing, and a scanner for path LITERALS cannot see a subject reached through a helper at runtime
+353. An absolute NEGATIVE claim — never, cannot, no run, 0 of — is a claim about the ENTIRE search space, and is almost always written from the one corner of it the author was looking at; give it the same burden a positive status claim carries and say WHEN you looked  · ✓ctrl(dod-grammar-gate)
+354. Lock the surface that SHIPS, not the surface where the honest value is computed — a status field and the stamp built from it are different objects, and a second rendering that REBUILDS rather than incorporates will quietly drop every caveat the first one earned
+355. An instruction telling the operator what to type is a routing CLAIM, and the parser is its oracle — drive the printed literal through the machine that must accept it, per CLAUSE, because a per-line check certifies the very sentence naming the wrong thing in its other half  · ✓ctrl(test_operator_instructions_parse)
+356. A DEFENSIVE GUARD written as a bare read IS the unsafe operation it guards against — and the safe replacement can silence the values it was meant to read, so lock BOTH directions: that it does not throw, AND that it still answers  · ✓ctrl(verify-coder-test-qa SM1/SM2)
+357. EXISTENCE IS NOT REACHABILITY, and an instrument that greps for a feature measures the first while REPORTING the second — before crediting any capability found by reading source, ask what upstream gate decides whether that source runs for the specific input the requirement names  · ✓ctrl(delivery_criteria_report three-state reachability)  · ↺2
+358. A regression lock encodes its author's PREMISE with the authority of a green suite — when a premise is retracted, grep the locks for it, because a lock built on a retracted premise mandates the defect it was written to prevent  · cf. 30, 39, 70
+359. A negative lookahead placed after a variable-width quantifier excludes nothing — the quantifier backtracks to zero width and the assertion passes; state what a match MUST contain rather than what it must not, because in a measuring instrument a silent overcount is indistinguishable from the thing being measured improving  · cf. 130, 134
+360. Comparing two configurations by running them one after the other measures the MACHINE'S DRIFT as well as the variable, and the arm that runs second loses — interleave or randomise arms, and record run-index and elapsed session time in every performance stamp  · ✓ctrl(session_clock, cf0cceb6)
+361. The last piece of a ship is done AFTER the moment that feels like completion, so it is the piece most likely to go unrecorded — and a completion artifact whose filename omits the identifier of the work it completes is invisible to the one search a later reader actually runs  · cf. 300 · ↺1
+362. An upstream fix that lands does not update the downstream ticket waiting for it — merge-unblock sweeps are written for OUR merges, where an agent stands at the moment of maximum knowledge; when the unblocking event happens in someone else's repository nobody is standing there, so any ticket blocked on an external event needs a dated check-back of its OWN
+363. A null result is only as good as the instrument that produced it — before explaining why a change did not work, confirm that the thing measured is the thing the change affects
+364. An instrument can be arithmetically flawless and still measure the wrong REPRESENTATION — sanity checks confirm consistency, never correctness, and a split whose total is server-reported and whose ratio reproduces its own inputs passes every check available to it while reading the other key
+365. A schema that is hard to fill in FALSELY is worth more than one that is easy to fill in correctly — where a claim depends on knowledge the record cannot have, refuse the claim rather than defaulting it
+366. A compilation's headline is a COUNT, computed over the compiled artefact by an instrument before it is narrated — when inputs arrive under different legends, re-score every cell from the prose under one legend and let the script write the sentence, because a survey's "Yes" and a compilation's "Y" are two instruments
+367. When an artefact disagrees with its documentation, check WHICH DIRECTION the gap runs before deciding what it means — prose that overstates what ships is a trap, prose that understates it is an opportunity, and "documentation is not evidence" covers both while implying only the first
+368. Build the boundary BEFORE the thing it bounds — a rule written after the first import is a rule fitted to what already crossed, and the import that most needs stopping is usually the one that looks like documentation
+369. An instrument that TRANSMITS an instruction to its subject is not observing it — when a measurement's own setup can cause the behaviour it scores, read the setup's rendered output before believing any verdict, because the subject obeying you is indistinguishable from the subject failing you  · cf. 222, 363, 204
+370. Before comparing two subjects, prove each is REPRODUCIBLE ON ITS OWN — a subject that answers differently to identical input cannot be compared to anything, and when one arm is the incumbent its stability is the control that tells you which side the variance lives on  · cf. 8, 360, 222 · ↺1
+371. Read an instrument's REACH before its verdict — how many cases it actually SCORED, not whether it said OK; a suite whose every case is gated on hardware evaluates nothing, prints 0/0 and exits green, so total blindness and total success are the same output  · cf. 222, 8, 369, 30
+372. Driving a production FUNCTION is not driving the production PATH through it — before trusting a harness that calls real code, evaluate the CONDITIONS that select branches inside it, because the branch you skip is usually the one carrying the defence you meant to test  · cf. 371, 369, 222, 8
+373. Run the experiment that could REFUTE you before the one that dresses you up — a claim polished for an audience is a claim you have started defending, and the cheapest refutation is usually one variable you assumed instead of measuring  · cf. 372, 371, 370, 8
+374. Knowledge parked in a comment is knowledge the system does not have — a property correctly determined and argued in prose beside the data it describes cannot be consulted by a rule, bound into a hash or checked by a gate; a comment that states one is a typed field not yet written  · cf. 47, 308, 142
+375. An action earns a preview by the SHAPE of its argument, not the severity of its effect — an argument that names a TARGET is already its own preview, one that names a SELECTOR is a promise about a set nobody has seen; severity decides whether to gate, argument shape decides whether a gate can be honest without a dry run  · cf. 259
+376. A capability approved over your recommendation is a default to design, not a decision to re-argue — once the objection has been heard, ship it deny-by-default with zero consumers and the dangerous consumer barred by a lock with its own toggle-test, so the cost of having been wrong in either direction collapses to a config flag  · cf. 189, 12, 38
+377. When a control must let a human read something, escaping beats refusing — refuse only where no faithful rendering exists, because a refused attack is invisible and a lossless rendering of the exact bytes is evidence  · cf. 132, 191, 220
+378. A control that constrains a proxy for the property it exists to guarantee — a length cap, a character class — has fixed one instance of the defect; name the property, and where no predicate over the input can state it, stop accepting that shape of input  · cf. 259, 329, 64 · ↺1
+379. A gate that checks A against B is blind to B — when a document is the reference for a gate, something else must be the reference for the document, or the gate becomes a faithful delivery mechanism for whatever the document says  · cf. 3, 69, 335, 354
+380. Before commissioning a measurement or parking a question behind an event, look for the measurement on disk and price the experiment — a ticket that says measure X deserves a grep of the record before it deserves a GPU, and blocked on the next ceremony is a claim about cost that deserves the same scrutiny as any other  · cf. 269, 303, 86 · ↺1
+381. When you mirror an instrument, the ORDER of its reads is part of the contract — port the sequence, not just the fields; a clock read after the call dates every run by its own duration, and a lock on the field names passes whatever order they were captured in  · cf. 360, 281, 8
+382. A resource envelope that a driver installer can rewrite belongs in every performance stamp and in a boot-time check — a version string identifies the install, never the envelope it left behind, and every install between two measurements moves the one variable nobody stamps  · cf. 360, 364, 39
+383. When review keeps landing on the same pattern, find the one place every instance passes through and make it the only way in, with a lint that fails when a use goes around it — and treat that funnel as unverified until a review has attacked it, because the lint was the next finding  · cf. 64, 259, 312, 293
+384. A parser of command text and the program that executes the command are two parsers, and a control built on the first can never be airtight — enforce at the seam that executes (a git hook sees every ref update by any route) and keep the text guard only where nothing better exists, labelled best-effort  · cf. 34, 236, 329, 339
+385. A column that says "enforced" is a claim by whoever wrote the marker, never an inference from a test mentioning the rule's words — generate the list of what nothing enforces beside it, because that list is the finding  · cf. 365, 243, 97, 47
 
 ---
 

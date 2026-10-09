@@ -32,7 +32,7 @@ from evals import baseline as baseline_mod
 from evals import run as run_mod
 from evals.baseline import BaselineError, compare, load_baseline
 from evals.loader import GOLDEN_DIR, GoldenDataError, load_golden
-from evals.suites import SUITE_NAMES, get_runner
+from evals.suites import HARDWARE_TIER_SUITES, SUITE_NAMES, get_runner
 from evals.suites.governance import layer3_lock_decision
 from evals.types import CaseResult, CaseStatus, SuiteReport
 
@@ -130,6 +130,65 @@ class TestDeterministicSuitesGreen:
         report = suite_reports[suite]
         assert report.skipped_hardware == 0
         assert report.evaluated == report.total
+
+    @pytest.mark.parametrize("suite", _DETERMINISTIC_SUITES)
+    def test_no_suite_is_accidentally_inert(
+        self, suite: str, suite_reports: dict[str, SuiteReport]
+    ) -> None:
+        """A suite that scores nothing in CI is protecting nothing (#1624).
+
+        The check this replaces was parametrised over a hard-coded pair, so two
+        brand-new suites could report ``0/0 passed`` and exit green without
+        anything noticing. The rule now covers EVERY suite: evaluate at least
+        one case, or be declared hardware-tier.
+        """
+        report = suite_reports[suite]
+        if suite in HARDWARE_TIER_SUITES:
+            # Declared inert: assert it, never skip. A skip would make this
+            # suite's reach unreported, which is the failure being locked out.
+            assert report.evaluated == 0, (
+                f"{suite} is declared in HARDWARE_TIER_SUITES but evaluated "
+                f"{report.evaluated} cases. It has a deterministic floor now: "
+                f"remove the declaration so the floor is protected."
+            )
+            return
+        assert report.evaluated > 0, (
+            f"{suite} evaluated 0 cases in a default run: it contributes no "
+            f"signal to the gate. Give it a deterministic floor, or declare it "
+            f"in evals.suites.HARDWARE_TIER_SUITES."
+        )
+
+    def test_the_hardware_tier_declaration_is_exact(
+        self, suite_reports: dict[str, SuiteReport]
+    ) -> None:
+        """The declaration must MATCH reality in both directions.
+
+        Declaring a suite hardware-tier is how a model-only suite stays honest;
+        it must not become a way to silence the check. So a declared suite that
+        does evaluate cases fails here too — which is what forces the
+        declaration to be removed the moment a deterministic floor is added.
+        """
+        observed_inert = {
+            name for name in _DETERMINISTIC_SUITES if suite_reports[name].evaluated == 0
+        }
+        assert observed_inert == set(HARDWARE_TIER_SUITES), (
+            f"HARDWARE_TIER_SUITES is {sorted(HARDWARE_TIER_SUITES)} but the "
+            f"suites that actually evaluate nothing are {sorted(observed_inert)}"
+        )
+
+    def test_an_undeclared_inert_suite_is_a_harness_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """THE CONTROL SEEN RED.
+
+        Without this, 'the runner refuses an inert suite' is an assertion about
+        a branch nobody has entered. Dropping the declaration must turn the
+        clean run into exit 2.
+        """
+        monkeypatch.setattr(run_mod, "HARDWARE_TIER_SUITES", frozenset())
+        assert (
+            run_mod.main(["--suite", "conversation"]) == run_mod.EXIT_HARNESS_ERROR
+        ), "an undeclared suite that evaluates nothing must not exit OK"
 
 
 # ---------------------------------------------------------------------------

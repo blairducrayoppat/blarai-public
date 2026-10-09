@@ -1,5 +1,20 @@
 # IPC Protocol & Message Format Governance
 
+## Status
+
+**Partially superseded — read this note before citing the CAR / JWT
+sections.** The wire formats this doc documents for streaming
+(`STREAM_TOKEN`, `PGOV_RESULT`, `GENERATION_COMPLETE`, the handshake
+messages) are live and accurate as written. The `ADJUDICATION_REQUEST` /
+`ADJUDICATION_RESPONSE` / `DecisionArtifact` (Agentic JWT) sections describe
+a real, tested wire contract that is **not exercised in the live host-mode
+topology** (ADR-041, 2026-07-15): no production caller sends a CAR to the
+Policy Agent over this channel today. The live tool-call and web-fetch
+checkpoint is in-process (`DeterministicPolicyChecker.check()` in
+`services/policy_agent/src/gpu_inference.py`), not this vsock round-trip.
+See [credential-lifecycle.md §9.2](credential-lifecycle.md) and
+[trust-spine-claim-register.md, claim 25](trust-spine-claim-register.md).
+
 ## Audience
 
 **Primary**: developer — authors new inter-agent messages and destination

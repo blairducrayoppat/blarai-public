@@ -42,6 +42,7 @@ exists, the lesson or journal entry that paid for it.*
   carry the literals as `\uXXXX` escapes a reviewer can actually see, decoded to genuinely
   hostile bytes at runtime. Pasting the raw codepoints makes the fixture correct and the
   diff unreadable — and an unreadable adversarial fixture is one nobody can check.
+- **A toggle test must restore the SAVED original of a module-level global, never a literal** *(lesson 30; 2026-09-17, #1548)*. A `finally` that resets the global to a hardcoded value (here `frozenset()`) is correct for the first test and wrong for every later one: under a whole-file run the first toggle blanks the global and every later reader sees the blank, so a tripwire written to fire on a change to that set cannot fire. Measured: a reviewer added a tool to the set and the file reported 19 passed. Save before mutating, restore the saved object, and run the mutation under the whole-file selection the gate runs, not the single test.
 
 ## Windows / process & privilege boundaries
 
@@ -132,6 +133,7 @@ exists, the lesson or journal entry that paid for it.*
   member read of the `$null` result, and a `try` narrowed to wrap only the parse lets it
   escape to the caller. Guard the member reads, not just the parse — and fixture a
   zero-byte file plus a valid-but-incomplete object whenever you tighten a JSON guard.
+- **A file another thread rewrites atomically is briefly UNOPENABLE on Windows: a tight poll that reads it RAISES, it does not time out** *(lesson 160 tally, 2026-09-19; #1597)*. `test_graduation_reset_stamps_current_mode_immediately` polled the heartbeat's `heartbeat-liveness.json` with `sleep(0.01)` while the heartbeat thread replaced the file; a read that landed inside the replace window raised `PermissionError: [Errno 13]`, which no deadline can catch, so two deadline widenings (5 s to 30 s) fixed nothing. Retry a transient read failure and keep the deadline for a genuine hang. Machine load widens the window, which is why the failure correlated with a busy box. The traceback was invisible for two months because the gate script piped pytest through `tail`.
 
 ## WinUI / GUI automation
 
@@ -341,6 +343,37 @@ exists, the lesson or journal entry that paid for it.*
   **When a per-line doc checker disagrees with your own reading, compare `splitlines()` against
   `split("\n")` before adjudicating the content** — `splitlines()` also breaks on
   `\x0c`, `\x1c`-`\x1e`, `\x85`, U+2028 and U+2029.
+- **OVMS refuses `--cache_dir` and `--plugin_config` together, and dies with an EMPTY
+  stderr** *(2026-08-31, #1477)*. On the continuous-batching LLM servable OVMS folds
+  `--cache_dir` INTO the plugin config as `CACHE_DIR` (#747), so supplying both yields
+  `Failed to create plugin config: Plugin config is in wrong format`, the server shuts
+  down during load, and the `.err` file is **zero bytes** — it looks exactly like a model
+  or memory failure. Put the cache directory INSIDE the JSON
+  (`{"CACHE_DIR":"B:/...","OFFLOAD_RATIO":"30"}`) and drop `--cache_dir`. Forward slashes
+  remain mandatory (a backslash makes the folded JSON invalid — that is #747's original
+  finding). Killed two measurement arms before being understood.
+- **PowerShell `Start-Process -ArgumentList` does not escape embedded double quotes**
+  *(2026-08-31, #1477)*. A JSON argument written the obvious way arrives at the child
+  process as `{OFFLOAD_RATIO:30}` — quotes stripped, invalid JSON, same fatal error as
+  above and equally silent. Write the escapes literally in the PowerShell string
+  (`'{\"OFFLOAD_RATIO\":\"30\"}'`) so the child receives real quotes, and **verify by
+  reading the launched command line back out of `Win32_Process`** rather than trusting the
+  script's own echo — the echo prints the array join and looks identical either way. Bash
+  quoting on the same box is predictable and was used to isolate the cause.
+- **This machine's decode rate falls monotonically under sustained GPU load, and it
+  outweighs configuration** *(2026-08-31, #1487)*. One unchanged config measured 16.55,
+  11.82 then 9.59 tok/s across a single hour on an idle box (first run of the session
+  16.82, last 8.07) with GPU-shared memory flat throughout, so it is not the #1477 memory
+  mechanism. Consequence for method: **never A/B two configurations by running them in
+  sequence here** — the second arm is penalised by elapsed session time, and the effect
+  (~40%) is bigger than any config difference measured so far (~12%). Interleave
+  (A,B,A,B) or randomise, and record run-index and elapsed-session-time in the stamp.
+- **The only readable ACPI thermal zone on this box is a fixed trip point, not a sensor**
+  *(2026-08-31, #1477)*. It reports a constant 91.1 °C idle AND loaded. Do not cite it as
+  evidence of thermal behaviour in either direction; there is currently no usable
+  temperature reading on this hardware, which is why #1487's leading hypothesis cannot be
+  confirmed or excluded.
+
 ## Documentation
 
 - **`git mv` a doc into a subdirectory silently BREAKS its relative links** *(2026-07-16, #14)*. A credential-lifecycle doc authored for `docs/` (links `adrs/ADR-…`, `governance/weight-integrity.md`) was moved to `docs/governance/` for convention-consistency — every relative link then resolved a level too shallow (`docs/governance/adrs/…`, `docs/governance/governance/…`, both nonexistent) and shipped broken; a fleet peer caught it post-merge. `tools/doc_lint` checks frontmatter, NOT link resolution, so it did not catch this. Control: after ANY `git mv` of a `.md`, re-grep its `](relative/` links and fix depth (`adrs/`→`../adrs/`, drop the now-current-dir prefix), and `ls` each target to confirm it resolves before merging. Better: author the doc at its FINAL path, or check links as part of the move commit.
@@ -360,7 +393,30 @@ exists, the lesson or journal entry that paid for it.*
   so a script replacing a vertical tab with a literal backslash-v silently replaced it with
   itself and reported success. Build such literals with `chr(92)` instead of escapes when the
   payload is itself a backslash sequence.
+## Searching Python for call sites
+
+- **A bare `name(` grep MISSES call sites passed as callables — `asyncio.to_thread(self.store.add_turn, ...)`
+  never matches `add_turn(`** *(2026-09-17, #1547)*. Tracing every writer to the encrypted session
+  store, a `add_turn(` grep found the WinUI dispatcher and missed the Textual shell entirely, because
+  `ui_shell` hands the method to `asyncio.to_thread` as a bare reference. An entire persistence surface
+  was invisible to the search, and a trace that concluded from it would have been confidently wrong about
+  which UIs write what. Grep the bare NAME (no paren) when enumerating call sites for a security trace,
+  then filter; the noise is cheaper than a missing surface.
+
 ## Git on Windows
+
+- **A mutation-testing reviewer edits the working tree LIVE. Never commit while one is
+  running, and re-check `git status` immediately before every commit, not merely before the
+  batch** *(2026-09-17, #1543)*. An adversarial reviewer asked to prove a control's tests are
+  real does it by NEUTERING the control and confirming the tests fail — so for a few seconds
+  at a time the working tree holds a security control with its check removed. A `git status`
+  taken during that window shows a modified file; seconds later the reviewer restores it and
+  the diff is empty. Both readings are correct and neither is the whole picture. The failure
+  this guards against is the worst shape available: `git add` landing mid-mutation would
+  commit a **disabled control together with the tests that certify it works**, and the gate
+  would pass, because the tests were written against the working version. The reviewer is not
+  misbehaving — restoring after each probe is exactly right. The hazard is concurrency with a
+  commit, not the reviewer.
 
 - **A compound `cd <worktree> && git …` leaves the shell cwd IN the worktree —
   the NEXT git command runs there, not in the primary checkout** *(2026-07-16,
@@ -535,6 +591,23 @@ exists, the lesson or journal entry that paid for it.*
   of the same family in one evening: manifest checker → ceremony-read config comments →
   docstrings → stranded mutation → stale anchor → in-flight vs stranded.
 
+### A backtick in a bash heredoc commit message is COMMAND SUBSTITUTION, and it eats the word silently
+
+Writing a commit message with `git commit -F - <<'EOF'` protects `$` and backticks — the quoted
+`'EOF'` makes the heredoc literal. Writing one with `git merge -m "..."` in the same bash call
+does NOT: the message is an ordinary double-quoted shell argument, so `` `raw` `` is executed as
+a command and replaced by its (empty) output.
+
+Measured 2026-08-15: a merge message reading *"DispatchCommand gains `raw`, carried beside the
+parser's interpretation"* landed as *"DispatchCommand gains , carried beside…"*, with
+`bash: line 1: raw: command not found` printed above the successful merge — easy to read as
+noise from the merge itself rather than as damage to the message.
+
+**Practice:** use the quoted heredoc form (`-F - <<'EOF'`) for ANY message containing backticks,
+including merges. If one slips through, do NOT `--amend` to fix prose — that is a history
+rewrite for a typo, and this repo forbids rewrites outright. Record the correction where it will
+be read (the ticket, the journal) and leave the commit alone.
+
 ## Fleet dispatch / coder harness
 
 - **The coder runs on Windows but its shell commands execute under bash, and the model
@@ -562,6 +635,7 @@ exists, the lesson or journal entry that paid for it.*
   Freshness must be tested by resolving the commit (ancestry against `main`), never by
   comparing a branch name; a name test makes a correctly-pinned night indistinguishable
   from a broken one and prints the alarm banner every single night.
+- **A mutation harness that counts a crashed run as KILLED reports a kill rate it cannot lose** *(2026-10-05, #1691, round one of the fused-leg review)* — the harness copied three files into each mutant sandbox, the suite read a fourth, every mutant copy errored on the missing file, and an error was counted as a kill. A reviewer added a mutant known to survive and the harness still reported "22 of 22 killed"; the builder's reported kills were real, the harness simply could not report a survivor. Run an UNMUTATED control through the same harness and require it to pass, and define "killed" as a named failing check, never as a non-zero exit. (Sibling of the 2026-07-30 PYTHONPATH/conftest note, which fails the other way: every mutant SURVIVED. cf. lessons 222, 215.)
 
 ## Vikunja API
 
@@ -665,6 +739,29 @@ to be the battery was the query that went looking for it. Confirm with three ind
 witnesses — the task reporting `Running`, `CommandLine -like '*battery-bootstrap.ps1*'` on a
 process that is not `$PID`, and a NEW `night-*` directory on disk.
 
+**The anchored form, because the three-witness rule above did not stop the recurrence.**
+2026-08-11 the same class bit both watchdogs, two days after this note was written: their
+liveness probes used the bare substring match and counted the authoring session's own tool
+shell. Match the INVOCATION FORM bound to the image that can host it, never the text alone:
+
+```powershell
+$_.Name -match '^(pwsh|powershell)\.exe$' -and
+  $_.CommandLine -match '-File\s+"?[^"]*[\\/](battery-bootstrap|run-battery-night)\.ps1'
+$_.Name -match '^pythonw?\.exe$' -and $_.CommandLine -match '-m\s+tools\.dispatch_harness\.battery'
+```
+
+Reference implementation: `agentic-setup/scripts/run-battery-night.ps1`, `Get-LiveDispatch`.
+Note which DIRECTION each failure runs, because they are opposite bugs: in a watchdog looking
+for a DEAD night a self-match is a false negative (the watch goes quiet, and quiet is
+indistinguishable from healthy); in an archive guard looking for a LIVE dispatch it is a false
+positive that stands the night down forever. A control that can be silenced by writing its own
+name is not a control.
+
+**And a directory is not an event.** `night-<today>-*` existing does not mean tonight's trigger
+fired — Windows' missed-task catch-up can create one at any hour (measured 2026-08-14: a 13:28
+catch-up attempt satisfied a 23:30 trigger-miss check). Parse the stamp's TIME and compare it
+against the trigger's own hour, not just its date.
+
 ### Battery logs contain verdict strings inside CONFIG PROSE — anchor your patterns
 
 `launcher.log` records why each card was excluded, and those exclusion reasons quote past
@@ -717,3 +814,665 @@ comparing logs to each other.
 
 Corollary for any battery diagnosis: establish what the run ACTUALLY did (run-dir mtimes,
 scorecard `wall_clock_s`, merged commits) before reading a word of any log.
+
+### A restored file can still run MUTATED — CPython's `.pyc` staleness check is second-granular
+
+Any mutation harness on this tree (edit production code → run → confirm red → restore) can get
+a **false green on the restore**, and the source will look perfectly correct while it happens.
+
+CPython validates cached bytecode on `(int(mtime_seconds), size)`. A same-SIZE edit reverted
+inside the same wall-clock second leaves the `.pyc` looking valid, so the interpreter keeps
+running the mutated bytecode against a restored source file.
+
+Found 2026-08-09 while toggle-proving the instrument registry: the mutation was
+`REPEAT_THRESHOLD = 3` → `= 1`, which is byte-identical in length. Everything else that day
+changed size and never showed the fault.
+
+**After restoring a mutated file, delete `__pycache__` before re-running** — do not trust a
+green that follows a same-size revert. The general rule: a size-preserving edit is the case
+where every mtime-plus-size cache lies to you, and toggle-proofs are exactly where size-preserving
+edits live (flipping a constant, `True`→`Fals`, `and`→`or `).
+
+### Session cron is NOT a dead-man control — it silently does not fire
+
+Measured twice, 2026-08-09. Five one-shot `CronCreate` jobs armed across the day to catch a
+battery run; **not one fired.** They stay listed as pending past their fire time and simply never
+arrive. They are session-only (nothing on disk), they only fire while the REPL is idle, and even
+a genuinely idle 105-minute window did not produce a single firing.
+
+**Do not use cron as the thing that catches a missed signal.** It is a reminder that sometimes
+works, not a control. The only mechanism observed to fire reliably is a **`Monitor`** — a live
+loop that emits on its own stdout — and it must be `persistent: true` or it dies at its timeout
+(default 5 min, max 1 h) partway through anything worth watching.
+
+Three ways a Monitor still fails to notice, all committed on the same afternoon:
+
+1. **Watching the wrong file.** `night-*/battery-runner.log` is written at battery START and END
+   only. Every per-task event — `TASK-START`, `TASK-END`, park, retry — goes to
+   `state/fleet-runs/<runid>/journal.log`. A monitor on the night log sees nothing for hours while
+   tasks complete and park.
+2. **An upper bound on the staleness window.** A hang check written as
+   `AGE -gt 200 && AGE -lt 900` excludes every stall longer than 15 minutes — i.e. exactly the
+   ones worth waking for. Staleness alarms take a floor, never a ceiling.
+3. **Emitting only on change.** "Nothing has happened" is then indistinguishable from "nothing has
+   gone wrong". A dead-man must emit on SILENCE, on a timer, and keep re-emitting.
+
+And the trap underneath all three: **quiet ≠ stuck.** A finished coder candidate stops writing its
+`*.agent.log` exactly like a hung one does. What separates them is the terminal marker
+(`exiting loop` / `disposing instance`) in the tail — require its ABSENCE before calling a hang,
+or the watcher cries wolf on every successful candidate.
+
+---
+
+- **Restarting the launcher by hand: use `boot_launcher_detached`, never `Start-Process`** (2026-08-10)
+
+  Stopping the launcher for a clean gate run is routine. Bringing it back is not, and three
+  reasonable-looking attempts failed:
+
+  | attempt | result |
+  |---|---|
+  | `Start-Process pythonw.exe -m launcher` (system python) | died before writing a log line |
+  | `Start-Process .venv\Scripts\pythonw.exe … -RedirectStandardOutput/-Error` | full boot, then `AssertionError: Driver must be in application mode` |
+  | `Start-Process .venv\Scripts\pythonw.exe … -WindowStyle Hidden` | same crash, same line |
+
+  Every failure is the **Textual driver**, and every one of them happens AFTER a completely
+  successful boot — Policy Agent up, AO up, preflight passed, heartbeat started — so the log
+  looks healthy right up to the crash and the cleanup that follows reads like a normal shutdown.
+
+  Two independent causes, both about what the child's std handles are:
+
+  1. **Redirecting stdout/stderr** gives Textual handles whose `fileno()` is `None`.
+  2. **A hidden console** (`-WindowStyle Hidden`, and equally `CREATE_NO_WINDOW`) is worse than
+     either a real console or none at all — Textual takes the Windows driver path and then cannot
+     enter application mode.
+
+  The repo already says so, at `shared/fleet/swap_ops.py` `_NO_WINDOW`: *"NEVER apply this flag to
+  a python/pythonw LAUNCHER spawn … a HIDDEN console is the exact shape that crashed Textual on
+  2026-07-06 ('Driver must be in application mode')."* Same crash, same message, sixteen months of
+  calendar apart in the log and one `grep` away the whole time.
+
+  **Do this instead** — the production path, which spawns `pythonw` with
+  `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB`, `stdin=DEVNULL`, and
+  stdout to a real file handle, so Textual gets *no console at all* and takes its headless fallback:
+
+  ```
+  .venv/Scripts/python.exe -c "
+  import sys; sys.path.insert(0, '.')
+  from pathlib import Path
+  from tools.dispatch_harness.battery import boot_launcher_detached
+  boot_launcher_detached(Path('C:/Users/mrbla/BlarAI'),
+                         Path('C:/Users/mrbla/AppData/Local/BlarAI/launcher-restart.log'))
+  "
+  ```
+
+  It runs the teardown barrier first (proving any prior AO holding the instance lock is dead), so
+  it is also the safe thing to run when you are not certain the old one is gone. Boot to
+  `Boot-Phase-3: OPERATIONAL — input enabled` takes **35-50 s** on a warm box — a check at 12 s
+  reports "not running" for an instance that is booting perfectly well.
+
+### An ad-hoc probe has none of the defences the real code has earned
+
+Three times on 2026-08-14 a five-minute probe disagreed with a verifier and the probe was wrong.
+Each is a distinct trap and all three cost real minutes:
+
+1. **A `Write-Log` stub written with `Write-Output` pollutes the return value.** PowerShell's
+   success stream IS the return value, so a function that logs with `Write-Output` returns
+   `@(logline, actualResult)`. A `$null` return then fails `$null -eq $r`, and the probe reports
+   a guard BLOCKING when it cleared. Production code is locked against this
+   (`verify-battery-ao-lifecycle.ps1` A6, "Write-Log does NOT use Write-Output"); a throwaway
+   stub is not. Use `$script:Log.Add($m) | Out-Null`, or `Write-Host`.
+
+2. **`powershell` is 5.1, `pwsh` is 7.** Invoking a PS7 verifier with `powershell -File` fails on
+   `??`, `?.`, and ternaries — surfacing as bogus assertion failures rather than a syntax error.
+   A verifier that is green under `pwsh` and red under `powershell` is telling you which shell
+   you used, not what the code does.
+
+3. **Bash-nested quoting silently mangles a PowerShell parse check.** `powershell -Command "...
+   \$(@(\$e).Count) ..."` from a bash heredoc reported 3 parse errors in a file that has none.
+   Run parse checks through the PowerShell tool directly, never through a quoting layer.
+
+The general rule, learned the same day three times: **when a probe you just wrote disagrees with
+a verifier that has been green for months, suspect the probe first.** The verifier has toggle
+tests, seam tests and a history; the probe has none of that and was written while you were
+already convinced of the answer. (2026-08-14; #1380, #1375; lesson 349's mechanism at probe
+scale.)
+
+### agentic-setup verifiers do NOT share a summary format — a one-shape grep reports the others as silent
+
+Sweeping the verifier suite on 2026-08-15 I grepped every result for `Passed: *[0-9]+` and read
+two blanks as "no output". Both were passing:
+
+| verifier | its summary line |
+|---|---|
+| most `verify-*.ps1` | `Passed:  138` |
+| `verify-website-review-loop.ps1` | `107 passed, 0 failed` |
+| `verify-capture-cdp.mjs` (node) | `pass 66` |
+
+A silent verifier and a passing one are indistinguishable through a grep for one shape, and the
+failure is in the reporting direction that reads as success. Match all three, or check the exit
+code, and never infer green from a summary line you did not see.
+
+### The verifier harness exits at its Result section — tests appended after it never run
+
+Appending cases to the end of `verify-complexity.ps1` (2026-08-15) put them AFTER
+`Section 'Result'`, which prints the tally and exits. The suite ran, reported `Passed: 37`, went
+green, and silently executed none of the ten new checks. Moving them above the anchor took the
+count 37 -> 47, which was the only tell.
+
+Insert before the Result section, and read the COUNT rather than the exit code — a suite that
+drops tests silently still exits 0. Same shape in `verify-mutationgate.ps1` and any sibling that
+ends with a tally-then-exit block.
+
+### `Get-Process` has no `CommandLine` under `powershell.exe` — a process probe written that way reads QUIET while the box is busy
+
+`powershell.exe` is Windows PowerShell 5.1, whose `Get-Process` objects carry no `CommandLine`
+property. So this:
+
+```powershell
+@(Get-Process -Name node,python,pwsh | Where-Object { $_.CommandLine -match 'run-fleet|battery' }).Count
+```
+
+returns **0** with six battery processes running — the filter matched nothing because the
+property does not exist. It does not error. Use `Get-CimInstance Win32_Process` instead, which
+carries `CommandLine` on both editions:
+
+```powershell
+@(Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pwsh.exe' OR Name='node.exe'" |
+  Where-Object { $_.CommandLine -match 'run-fleet|dispatch_harness\.battery' }).Count
+```
+
+`pwsh.exe` (7+) DOES populate `CommandLine` on `Get-Process`, so the same line works
+interactively and fails when a script shells out through `powershell.exe`. That difference is
+why it survives a read-through. Caught 2026-08-15 by running the probe against a live battery
+and expecting a refusal that never came.
+
+### A process probe can match ITSELF — filter by process name or it never reaches zero
+
+A `Where-Object { $_.CommandLine -match 'run-fleet|battery' }` scan run from bash matches the
+`bash.exe` and `powershell.exe` in its own pipeline, because the pattern text is *in their
+command lines*. The count then never reaches 0 and any "wait until quiet" loop waits forever —
+fail-closed, and uselessly so. The `-Filter "Name='...'"` clause is what excludes the probe's
+own shell; it is load-bearing, not an optimisation.
+
+Toggle-check any such probe both ways: the real pattern must count the live work, and an
+impossible pattern must return 0. If the impossible pattern does not return 0, the probe is
+counting itself.
+
+### `verify_disposition.py`: write a disposition row starting with its ticket number and it used to vanish
+
+Rows are naturally written `#1391 item 3 | FIXED | <sha>`, and the parser treated every line
+beginning with `#` as a comment — so those rows never existed, and the verifier printed a
+self-consistent `3 ok of 3` over a record holding eight. Fixed 2026-08-15 (`02177ca4`): a `#`
+line is a comment only when it lacks the two pipes that make it a row, with the block's own
+column header excluded by its literal `status` middle field. If you are reading an older
+disposition record, check its row count by eye before trusting its total.
+
+### The doctrine-freshness gate compares the two gate-figure surfaces only to EACH OTHER
+
+`CLAUDE.md`'s `<status_snapshot>` "Standing gate:" line and `TEST_GOVERNANCE.md` §1's
+`LIVE_GATE_BASELINE` must agree — and a **wrong-but-consistent pair passes silently**. Take the
+number from the run, not from a landing card or from arithmetic. Predicting it first and then
+checking the prediction against the gate output is cheap and catches a dropped test file: on
+2026-08-15 the count moved 11057 → 11072 → 11080, each step exactly the number of tests added,
+which is what proved none had been silently skipped.
+
+### Watching a live battery run: three signals that look like liveness and are not
+
+Three false readings in one session (2026-08-15), all the same shape — a watcher pointed at
+something that does not move *while the work is happening*, so a healthy run and a dead one
+produce identical silence. Grep this before writing any run monitor.
+
+| signal | why it fools you |
+|---|---|
+| `state/battery/night-<stamp>/battery-runner.log` | **stays 0 bytes for the whole run.** Nothing ever writes it. A `tail -f` on it reports silence for five hours. |
+| the launcher pid from `Start-Process battery-bootstrap.ps1` | **exits by design, minutes in.** Its own `swap-progress.log` says so: *"Swap driver spawned; the launcher is exiting now."* A liveness check on that pid fires a false end-of-run. |
+| `state/fleet-runs/<run-id>/` file mtimes | written only **between** candidates. A candidate may take 30–60 min, so the directory is legitimately quiet for half an hour mid-task. A 12-minute idle threshold fires on a perfectly healthy run. |
+
+**What actually moves while a candidate is generating:**
+
+1. **`ovms.exe` CPU time climbs.** Measured on the 16:09 run: 293 s → 941 s → 1167 s → 2541 s
+   across the first two tasks. This is the strongest single signal.
+2. **`state/worktrees/<repo>-<task-slug>/`** gains and changes files — the coder builds in an
+   isolated worktree, not in the sandbox and not in the run dir.
+3. `state/fleet-runs/<run-id>/journal.log` gains `TASK-START` / `TASK-END` at task boundaries
+   only. Good for progress, useless for liveness.
+
+**Use at least two, and treat a stall as confirmed only when all of them are flat.** A single
+flat signal is the default state of a working run, not evidence of a hang — which is the same
+trap as `acp.idle_sec`, where a blind "no session update" signal was raised 120 s → 600 s
+without ever becoming able to tell a slow generation from a wedged one.
+
+Note the sandbox `C:/Users/mrbla/projects/<repo>` is NOT a liveness signal either: it changes
+only at merge time, so it can sit untouched for an entire wave.
+
+### Starting the launcher unattended: a HIDDEN console is worse than NO console
+
+**Headless is designed, proven and named** — `Ensure-AoHeadless` (`run-battery-night.ps1:1312`),
+and Textual ships a headless driver. It has worked for months. If a restart fails, the capability
+is not missing; the spawn shape is wrong.
+
+`shared/fleet/swap_ops.py:459-464` states it, and this note exists because the comment did not stop
+a session from doing it anyway on 2026-08-15 — nine days after the same defect on 2026-07-06:
+
+> **NEVER apply CREATE_NO_WINDOW to a python/pythonw LAUNCHER spawn**: a HIDDEN console is the
+> exact shape that crashed Textual ("Driver must be in application mode"). The launcher chain uses
+> pythonw.exe (no console AT ALL → Textual's proven headless-driver fallback).
+
+**Three states, and the middle one is the trap:**
+
+| spawn shape | result |
+|---|---|
+| real console | works, TUI renders |
+| **hidden / partial console** (Scheduled Task, `CREATE_NO_WINDOW`) | **crashes** — Textual picks the Windows driver, which has no writer thread |
+| **no console at all** (`pythonw.exe`) | **works** — headless driver |
+
+**The authoritative command is already recorded**, not to be re-derived:
+`state/fleet-swap/spec.json` → `relaunch_argv` = `["...\.venv\Scripts\pythonw.exe", "-m", "launcher"]`,
+with `relaunch_cwd`. Read that before inventing a launch.
+
+### The launcher also SELF-ELEVATES — a non-elevated start exits after ~44 seconds, quietly and cleanly
+
+`python -m launcher` requests UAC elevation and then **terminates the current process** to relaunch
+elevated. In a headless or detached context there is nothing to answer the prompt, so the relaunch
+never happens and you are left with nothing running. The tell is one line in
+`%LOCALAPPDATA%\BlarAI\launcher.log`:
+
+```
+[blarai.launcher] INFO: Elevation requested — current process exiting
+[blarai.launcher] INFO: Cleanup: shutting down components
+[blarai.launcher] INFO: Cleanup: complete
+```
+
+**It looks like a healthy shutdown**, because it is one — orderly cleanup, VM left as-is, lock
+released. Nothing says "failed". A foreground run looks even healthier: token hardening, per-boot
+mTLS certs, signed-manifest and weight-integrity checks all pass, the shared pipeline starts
+building — and *then* it exits. Every early signal is green.
+
+**Elevation is only the FIRST blocker, and a Scheduled Task is NOT the fix** — it supplies the
+hidden console above, which is the second failure:
+
+```
+[blarai.launcher] ERROR: TUI crashed: Driver must be in application mode
+  textual/drivers/windows_driver.py:53
+  assert self._writer_thread is not None, "Driver must be in application mode"
+```
+
+That "Driver" is **Textual's terminal driver, not the GPU driver** — the name misleads badly on a
+project where a GPU driver assertion is entirely plausible. The launcher's default surface is the
+Textual TUI (ADR-014; `--winui` selects the other), and Textual needs a real console. A Scheduled
+Task has none, so it starts, passes every security check, opens port 5001 for about fifteen
+seconds, then crashes and cleans up.
+
+**So a scheduled task gets FURTHER, not all the way.** `-RunLevel Highest` is necessary and not
+sufficient.
+
+**What actually works** is a relaunch from a process already inside the operator's interactive
+desktop session — which is exactly what the battery's swap-back does. Its own recorded command
+(`state/fleet-swap/spec.json`) is **byte-identical to the one that fails from a task**:
+
+```json
+"relaunch_argv": ["C:\Users\mrbla\BlarAI\.venv\Scripts\pythonw.exe", "-m", "launcher"]
+```
+
+**The command is not the variable. The session is.** Do not conclude from a failed restart that
+the argv is wrong; check where it was spawned from.
+
+```powershell
+$a = New-ScheduledTaskAction -Execute 'C:\Users\mrbla\BlarAI\.venv\Scripts\pythonw.exe' `
+       -Argument '-m launcher' -WorkingDirectory 'C:\Users\mrbla\BlarAI'
+$p = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
+Register-ScheduledTask -TaskName '<name>' -Action $a -Principal $p -Force
+Start-ScheduledTask -TaskName '<name>'
+```
+
+`-RunLevel Limited` fails exactly as a bare `Start-Process` does. This is the same rule the
+overnight GPU work already lives under — *hand-launched consoles strand on UAC* — and it applies
+to the assistant itself, which is easy to miss because the battery's swap-back restores it
+without anyone thinking about elevation (the battery already runs elevated).
+
+**Two costs, both paid on 2026-08-15.** The assistant was stopped at 18:48 for a clean gate and
+stayed down until 22:02, across three restart attempts, because each attempt produced processes
+that existed when checked at 5–12 seconds and were gone by the time anyone looked again.
+
+**And do not judge the restart by the port.** Port 5001 does not open until the 14B has compiled,
+which is minutes. `netstat` at twelve seconds proves nothing either way — the correct check is
+*process alive AND log advancing*, with the port as the final confirmation.
+
+### A default value that is never overwritten looks exactly like a computed one
+
+`REVIEW VERDICT: UNCLEAR` appears in **554 of 576** banked task logs. It reads as a reviewer
+that could not decide. It is the **initialiser**:
+
+```powershell
+$verdict = 'UNCLEAR'; $reviewTail = ''
+# [4/5] REVIEW ... Only runs when the gates are NOT both green (Test-ShouldRunReview)
+# ... Green-gated work skips review entirely (the deterministic gate already decided).
+```
+
+554 means 554 tasks passed build + tests + verify and **correctly skipped review**. The system
+working as designed. Nothing was undecided because nothing was asked.
+
+**The check that would have caught it, in one line:** does an artifact exist that only the
+computing code could have produced? Here, `*.review.log` — and there is none for any B9 run; the
+newest on disk is from June, on a different project. *An output with no corresponding log was not
+computed.*
+
+**The trap that made it worse, and this is the transferable part.** The wrong hypothesis was
+tested properly first: `new-agent-task.ps1:757` genuinely forces `UNCLEAR` when the review agent
+times out, so that was a real candidate — and it was refuted with real data (3 logs corpus-wide
+mention a review timeout, 2 of them UNCLEAR: **0.4%**). Refuting it correctly *increased*
+confidence in the surrounding framing, which had never been checked at all.
+
+> **Checking how a value can be OVERRIDDEN is not the same as checking whether the code that SETS
+> it ever RUNS.** Eliminating a competing explanation says nothing about the one you started with.
+
+Measured cost on 2026-08-16: twenty-five minutes and a high-priority ticket asserting a working
+component was broken, filed and then retracted (#1426).
+
+**Where else this shape lives in this codebase** — worth grepping before trusting any of them:
+a skipped review reported as a verdict; `not_measured: []` on a run that measured almost nothing;
+`DEFAULT_ORACLE_PATH` standing in for an oracle that was never generated (#1417); `gamed: False`
+from a scan that read no delivered code (#1416). **The failure is never a blank — it is a
+confident, plausible value where a blank belonged.**
+
+### A slow coder-30b number is invalid while the BlarAI app is up — two causes, one symptom
+
+`scripts/benchmark_ovms_http.py` now REFUSES to measure while `:5001` has a listener (exit 2,
+before the warmup). If you are reading this because the guard fired: close the app or stop the
+launcher, re-run, restart it afterwards. `--allow-ao-resident` measures anyway and stamps
+`ao_resident: true` into the record so it can never be mistaken for a baseline.
+
+**Why the refusal, rather than a warning.** On this iGPU "GPU shared memory" IS system RAM, so a
+resident 14B does not merely compete with the 30B for a pool — the coder's weights spill and
+decode collapses ~13x. **That collapse is byte-identical in shape to the `--cache_size` defect
+(#1477): same ~3 tok/s, same watchdog kills, same everything.** Measured on one OVMS process
+with nothing else changed: launcher UP → 2.11 / 3.20 tok/s; launcher STOPPED → 34.31 / 39.01.
+
+So the two causes are indistinguishable from the number alone, and the wrong one sends you into
+an OVMS bisect that will exonerate every flag — because there is nothing wrong with the server.
+
+**A real dispatch never hits this**, which is why it is a measurement condition and not a defect:
+`prepare_and_launch_swap` hands off to the detached driver and the coordinator then exits the
+launcher for the whole run. The contended state is one a *diagnostic* session creates by hand-
+starting OVMS next to a live app — i.e. exactly what you are doing when you reach for this bench.
+
+> **A benchmark that cannot state the condition it was taken under is not evidence.** The guard is
+> in the harness rather than in a ticket comment because guidance does not survive a context
+> window; a non-zero exit does.
+
+**What the record does NOT tell you.** The condition is sampled TWICE — at pre-flight and again
+before the record is written — and `condition_samples: 2` says so in the record itself. The
+interval between them is unsampled, so **both flags false means "clean at both ends", not "clean
+throughout"**. An app that appears and exits inside the window is invisible here *and* leaves a
+persistent depression behind it, because a 14B evicts the 30B's weights from shared memory and
+that does not reverse when the launcher does (#1483). Also: `ao_resident_override` means THE
+START GATE WAS OVERRIDDEN, not "this record is trustworthy" — **to select clean baselines filter
+on `ao_resident == false`, never on the override field.**
+
+Lock: `tests/integration/test_benchmark_ovms_http_ao_guard.py` (17 tests, including the toggle
+proving `--allow-ao-resident` is what lifts the refusal — a guard with no off-switch and a guard
+that never fires look identical from a green — and the lock proving an AO appearing mid-run is
+caught by the end sample).
+
+### A text-mode "restore" rewrites every line ending in the file — toggle-proofs must use bytes
+
+*(lesson 359's arc, 2026-08-17.)* On Windows, `Path.write_text` and `open(mode="w")` translate
+every `\n` to `\r\n`. So a save-mutate-restore cycle — toggle-proving a lock, patching a file in
+place, mutating a fix back out to check the lock goes red — **does not restore the file**. It
+rewrites it, silently, adding one byte per line. Measured once at **1,137 bytes of invisible
+damage** in a single file, and separately a file that *grew by 281 bytes* while the edit was
+trying to shrink it by 121.
+
+**Use `read_bytes` / `write_bytes` for the whole cycle, and verify the restored sha256 equals the
+original.** The hash check is the only thing that catches it; the file looks correct, `git diff`
+shows the whole file changed, and by then you no longer know which lines you meant to touch.
+
+The wider trap: a toggle that did not actually apply looks **exactly** like a lock that cannot
+fail. Assert the file changed before running the tests, and assert it changed back afterwards.
+
+---
+
+### HTML `required` blocks the page's own submit handler — validation code can exist and be unreachable
+
+*(lesson 357's arc, 2026-08-17.)* A control carrying the HTML `required` attribute is enforced by
+the browser's **interactive constraint validation, which runs BEFORE the `submit` event fires**. A
+page's own `submit` handler therefore never runs while any required field is blank — the browser
+blocks submission and shows its own grey bubble instead.
+
+Consequence when reading a page's source to decide whether it validates: custom per-field messages
+written in a `submit` handler **cannot fire for blank input**. They can only appear for input that
+passes `required` and then fails a JavaScript rule — a one-character name, a malformed email. Blank
+is precisely the case they cannot cover, and blank is usually the case being asked about.
+
+**Escapes that genuinely restore reachability**, all of which must be checked before concluding the
+validation is dead:
+
+- a listener on a non-submit event — `blur`, `input`, `change`, `click`
+- `novalidate` on the `<form>`
+- `formnovalidate` on the submit button
+- a control without `required`
+
+Attribute listeners to the **innermost** enclosing handler, not the outermost: two of three banked
+deliveries nest `submit` inside `DOMContentLoaded`, and an outermost-span rule credits every
+message to `DOMContentLoaded`, reads that as a non-submit trigger, and calls dead code reachable.
+
+### A shell heredoc eats backslashes out of a regex — and `` can become a literal 0x08 byte
+
+*(lesson 359's arc, 2026-08-31. This note was PROPOSED in a journal fragment, the fold's prose
+claimed "all four are now field notes", and this was the one that never landed — recovered from
+the deleted fragment during an independent review of the fold.)*
+
+Writing a Python patch script into a `bash` heredoc collapses backslash escapes before Python
+ever sees them, even when the delimiter is quoted in ways you expect to protect it:
+
+- `and` silently becomes `and` — the word-boundary anchors are gone and the pattern now
+  matches inside other words.
+- Worse, `` can arrive as a literal **0x08** (backspace) byte *inside* the pattern, which is
+  invisible in every editor and in most terminal output.
+
+**Prefer patterns that need no backslashes at all** — `r",| and "` over `r",|and"` — and
+**scan the written file for control bytes before trusting it**:
+
+```python
+bad = [(i, b) for i, b in enumerate(open(p, "rb").read()) if b < 9 or 13 < b < 32]
+assert not bad, f"control bytes in the written file: {bad[:5]}"
+```
+
+Related failure in the same family: a `python - <<'PY'` heredoc whose payload is itself a
+backslash sequence (see the `` note above). The general rule is that the shell is a second
+escaping layer you did not design, so keep payloads escape-free rather than escaping them twice.
+
+## `git checkout-index` is destructive and was not in the guard (2026-09-20)
+
+The destructive-git hook (`~/.claude/hooks/block_destructive_git.py`) covered
+`git checkout -- <path>`, `git restore`, `git reset --hard`, `git clean -f`,
+`git branch -D`, force-push, rebase, filter-branch and `commit --amend`. It did
+**not** cover `git checkout-index`, which overwrites working-tree files from the
+index with no prompt and no undo.
+
+I used it to "restore" a file during a mutation-test cleanup and destroyed an
+uncommitted config change. Then, while adding the rule, I destroyed the same
+file a second time. **Two mechanics, both worth knowing:**
+
+1. **The guard is an allowlist-shaped blocklist.** A destructive git verb that
+   is not named in `_RULES` is permitted, and a miss is silent. When reaching
+   for an unfamiliar git verb, assume it is unguarded rather than assuming the
+   hook has you covered. `cp` aside and `cp` back needs no verb at all.
+
+2. **Editing the hook and exercising it in the SAME tool call does not work.**
+   The hook evaluates the command before the call runs, so it reads the
+   pre-edit file. The rule only takes effect from the next call onward — which
+   is why the second destruction happened inside the very command that added
+   the rule meant to prevent it.
+
+**Verify a guard by MATCHING, never by executing.** Import the hook module and
+run its `_RULES` regexes against candidate command strings. Executing the real
+destructive command to see whether it is blocked is a test that destroys
+something whenever it fails:
+
+```python
+import importlib.util, pathlib, re
+spec = importlib.util.spec_from_file_location(
+    "guard", pathlib.Path.home() / ".claude" / "hooks" / "block_destructive_git.py")
+guard = importlib.util.module_from_spec(spec); spec.loader.exec_module(guard)
+hit = next((label for pat, label, _ in guard._RULES if re.search(pat, cmd)), None)
+```
+
+Note the guard matches the raw command text, so the verb appearing inside a
+quoted string in an unrelated script also trips it. That is a false positive in
+the safe direction; build the verb at runtime (`"checkout" + "-index"`) if a
+script genuinely needs to name it.
+
+
+## The iGPU memory budget is a registry percentage that the display-driver installer rewrites (2026-09-21)
+
+Two `HKLM` values decide how much system memory the Arc 140V may commit, and
+they are not the same number (PERFORMANCE_LOG 2026-09-01, #1485, #1501):
+
+- `SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MemoryManager\SystemPartitionCommitLimitPercentage`
+  — the budget PERFORMANCE_LOG 2026-09-01 identifies as the binding one (`pct/100 ×
+  total RAM`; 87 → 27.25 GiB, 57 → 17.85 GiB). That entry calls it a strong candidate
+  rather than a closed answer — #1485 owns settling it — but its 17.85 GiB predicted
+  the measured cliff to the gigabyte.
+- `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0001\GMM\GpuSystemMemoryPinninglimit`
+  — what OpenVINO REPORTS, through `alignDown(floor(0.94 × pct/100 × total) − 450 MiB, 4096)`
+  (87 → 27,031,388,160 bytes; 57 → 17,547,509,760 — both reproduced to the byte).
+
+Mechanics observed on this box, all from key last-write times against the event
+log: an Intel display-driver package install writes the DXGK key to 57 (26 Aug
+18:04:55, oem180.inf; 14 Sep 23:08:17, the Windows Update install of
+32.0.101.8831), and the Intel Arc software syncs the REPORTED key to the real one
+about a minute after boot (1 Sep 03:26; 21 Sep 17:28:45). Between an install and
+the next boot the two disagree and OpenVINO reports a budget ~7.3 GiB larger than
+the DXGK one — the "instrument lies" week of 26 Aug–1 Sep. When weights plus the
+reserved KV pool cross the DXGK figure, decode collapses by reservation, not
+occupancy (the 13× coder cliff).
+
+Read both keys before trusting any throughput number on this machine, and after
+any driver or Arc-software install. `shared.perf_env_capture.capture_box_state()`
+stamps both (`gpu_budget`) plus `machine_uptime_s` since #1611; a boot-time check
+that refuses a model whose weights + pool exceed the real budget is #1455's. The
+`Get-Item` cmdlet does not expose a key's last-write time; `RegQueryInfoKey` via
+`Add-Type` does. Key last-write time = the second the value was written, which is
+how the installer was identified.
+
+## Qwen3.5/3.6 chat templates open a `<think>` block unless you say otherwise (2026-09-22)
+
+*Grep this before building a prompt for, or reading an eval of, any Qwen3.5/3.6
+export — including the 35B-A3B and the 27B. It cost a wrong model verdict that
+stood for two months (#1611 S0c; lesson 369).*
+
+**The template's default branch is the thinking branch.** In
+`chat_template.jinja` of `OpenVINO/Qwen3.6-35B-A3B-int4-ov` (lines 171-175, and
+the same shape in siblings):
+
+```jinja
+{%- if enable_thinking is defined and enable_thinking is false %}
+    {{- '<think>\n\n</think>\n\n' }}      <- closed EMPTY block = do not think
+{%- else %}
+    {{- '<think>\n' }}                    <- a BARE OPEN = think now
+{%- endif %}
+```
+
+`enable_thinking` **undefined takes the else branch**. There is no neutral
+setting: a prompt that says nothing is a prompt that has opened a reasoning
+block and is asking the model to fill it in. Omission is not a default here, it
+is an instruction.
+
+**Three ways to get the closed block, all verified to render correctly:**
+
+- `Tokenizer.apply_chat_template(msgs, True, extra_context={"enable_thinking": False})`
+  — the API built for it, and the cheapest way to CHECK a render without a GPU.
+- Hand-built ChatML ending in the literal `<think>\n\n</think>\n\n`, with
+  `GenerationConfig.apply_chat_template = False` set **explicitly** — this is
+  what the Policy Agent ships. Leave that flag at its default `True` and the
+  template wraps your string a second time.
+- `set_chat_template` with the condition inverted so no-think is the default.
+  Note this MUTATES the pipeline, so run it last in any multi-arm comparison.
+  The patch that applies is on the **condition**; a naive replace of the
+  `{{- '<think>\n' }}` literal is the fiddly one to get right.
+
+**Cheap pre-flight, no model load:** `ov_genai.Tokenizer(model_dir)` loads only
+the tokenizer IR. Render the prompt and assert on the tail before spending a
+GPU window. `<think>` = token 248068 and `</think>` = 248069 on this export;
+both round-trip through `decode()` as literal text, so they are NOT skipped as
+special tokens and WILL appear in output text.
+
+**The strip needs a matched pair, so a prompt-opened block is unstrippable.**
+`shared/fleet/model_profiles.py:201-212` builds
+`<think>.*?</think>|<tool_call>.*?</tool_call>`. If the prompt opened the block,
+the generation contains only the orphan `</think>` and the regex matches
+nothing:
+
+```
+'<think>\nx\n</think>\n\nYes.'  ->  'Yes.'        (matched pair, stripped)
+'hmm\n</think>\n\nYes.'         ->  unchanged     (orphan, survives)
+```
+
+**The corollary that bites hardest in an eval:** a `no_think_tags` rubric check
+passing is **not** evidence that thinking was suppressed. A model that reasons
+in a *well-formed* block has that block stripped before scoring and passes
+silently. The only honest witness is the FIRST GENERATED TOKEN — read it from a
+streamer callback (`VLMDecodedResults` exposes no raw ids), and prove the
+witness first by asserting `encode("<think>") == [248068]` and
+`decode([248068]) == "<think>"`, else report the check unmeasurable.
+
+---
+
+## `ruff check --fix` deletes imports used only in annotations
+
+Under `from __future__ import annotations` every annotation is a string at
+runtime, so `F401` cannot see a module that appears **only** in one. Ruff's
+autofix deletes the import and the file still imports, runs and passes its
+tests — the breakage surfaces only at `typing.get_type_hints()`, or in the next
+ruff run as `F821 Undefined name`.
+
+Hit on 2026-09-22 in `evals/suites/answer_quality.py`: `import re` was used
+solely in `def _production_tool_call_pattern() -> re.Pattern[str]`. The fix
+removed it silently and the whole eval harness still ran green.
+
+```
+# ruff --fix removes `import re`; nothing fails until:
+typing.get_type_hints(_production_tool_call_pattern)   # NameError: re
+```
+
+**Always re-run `ruff check` after `ruff check --fix` and read the NEW errors,**
+not just the count. An `F821` that appears after a fix is the fix's own damage.
+Grep the diff for removed imports before staging: `git diff -U0 <paths> | grep
+-E '^-(import |from )'`.
+
+## What the git-rules guard refuses in a Bash/PowerShell call (2026-10-07)
+
+Four shapes, each hit while landing #1616 and #1699; none is a fault in the guard.
+
+- `git commit` with arguments while the checkout is on `main`: refused. Work on a feature
+  branch and land it with a `--no-ff` merge.
+- `git add` and `git commit` in ONE call: refused. Two calls.
+- A shell variable anywhere in a command line that builds a git command (`$V`, `$D`,
+  `"$(...)"`): refused as "unresolved variable". Write literal paths; this also catches a
+  non-git line that merely shares a call with a git command.
+- `git merge -F -` (message from stdin): not supported. Write the message to a file and use
+  `-F <file>`.
+
+Also: a Windows checkout stores these files CRLF, so a Python `read`/`replace` that matches
+`"
+"` finds nothing; match bytes with `
+` or edit through the Edit tool.
+
+## Editing and publishing gotchas from the #1699 arc (2026-10-07)
+
+- **The Bash tool collapses a doubled backslash inside a heredoc.** Python source written as a backslash-backslash-n
+  escape arrived with one backslash, so it became a real line break inside a string literal and the file stopped
+  parsing. Four edits broke this way. Write the file with the Write tool, or build the character with `chr(92)`, then run it.
+- **A Windows working copy is CRLF while the index is LF.** Reading a file in text mode and writing it back with
+  `\r\n` made a one-paragraph change show as 1460 insertions and 1442 deletions. Replace `\r\n` with `\n` on read and
+  write LF; check `git diff --stat` before staging.
+- **The git-rules guard also refuses** `git add -u`, `git add $VAR`, and any shell variable in a call that builds a
+  git command. Use literal paths.
+- **`scripts/hf_publish.py` takes derived tables only**: `.json .jsonl .csv .md .txt`, CSV columns from a fixed list
+  (`KNOWN_CSV_COLUMNS`), id cells of at most 48 characters of `[A-Za-z0-9_.:@/+()-]`, no raw logs, no gzip, no local
+  user name. Build a publishable copy (`scripts/build_gate_runtime_dataset.py` is the pattern) instead of editing the
+  data. `plan` guesses the first CSV for the card's `data_files`; pass `--data-file` to `plan` (the `upload`
+  subcommand has no such option), and fetch the live card read-only with `hf download ... README.md` before editing it.
+- **A process scan on this box takes about 7 s** (380 processes, command lines read one by one): never put one in a
+  per-sample loop.

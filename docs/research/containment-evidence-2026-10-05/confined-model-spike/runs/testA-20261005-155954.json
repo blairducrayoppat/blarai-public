@@ -1,0 +1,333 @@
+{
+  "run_id": "testa-20261005-155914",
+  "started": "2026-10-05T15:59:14.991-04:00",
+  "finished": "2026-10-05T15:59:54.014-04:00",
+  "schema_violations": [],
+  "verdict": {
+    "Code": 0,
+    "Reason": "all steps passed"
+  },
+  "task_result": {
+    "schema_version": 1,
+    "run_id": "testa-20261005-155914",
+    "mode": "feasibility",
+    "started": "2026-10-05T15:59:15.667-04:00",
+    "finished": "2026-10-05T15:59:53.519-04:00",
+    "overall": "pass",
+    "hold_seconds": 5,
+    "expected_blocked": false,
+    "host": {
+      "computer": "_MACHINE_",
+      "ps_version": "5.1.26100.9444",
+      "machine_clock": "2026-10-05 15:59:15 -04:00"
+    },
+    "steps": [
+      {
+        "name": "identity",
+        "status": "pass",
+        "started": "2026-10-05T15:59:15.732-04:00",
+        "finished": "2026-10-05T15:59:15.828-04:00",
+        "detail": "ran as the spike SID, not elevated, session 0",
+        "data": {
+          "whoami_user": "\"_MACHINE_\\blarai-spike\",\"S-1-5-21-1000000001-1000000002-1000000003-1010\"",
+          "token_user": "_MACHINE_\\blarai-spike",
+          "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+          "expected_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+          "groups": [
+            "S-1-5-21-1000000001-1000000002-1000000003-513",
+            "S-1-1-0",
+            "S-1-5-32-545",
+            "S-1-5-3",
+            "S-1-2-1",
+            "S-1-5-11",
+            "S-1-5-15",
+            "S-1-5-113",
+            "S-1-2-0",
+            "S-1-5-64-10"
+          ],
+          "mandatory_label": [
+            "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+          ],
+          "is_admin_role": false,
+          "session_id": 0,
+          "user_interactive": false,
+          "auth_type": "NTLM"
+        }
+      },
+      {
+        "name": "memory",
+        "status": "pass",
+        "started": "2026-10-05T15:59:15.830-04:00",
+        "finished": "2026-10-05T15:59:16.095-04:00",
+        "detail": "free 19.56 GB >= 14 GB",
+        "data": {
+          "free_gb": 19.56,
+          "total_gb": 31.32,
+          "in_use_gb": 11.76,
+          "required_free_gb": 14
+        }
+      },
+      {
+        "name": "gpu_feasibility",
+        "status": "pass",
+        "started": "2026-10-05T15:59:16.095-04:00",
+        "finished": "2026-10-05T15:59:53.299-04:00",
+        "detail": "GPU load 17.192 s; run1 ttft 2368.44 ms 8.47 tok/s; run2 ttft 162.11 ms 7.77 tok/s",
+        "data": {
+          "python_exit_code": null,
+          "python_result_file": "C:\\blarai-spike\\results\\python-testa-20261005-155914.json",
+          "python": {
+            "mode": "feasibility",
+            "started": "2026-10-05T15:59:16.274-04:00",
+            "pid": 19360,
+            "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+            "device_requested": "GPU",
+            "prompt": "Explain in three sentences why the sky is blue.",
+            "versions": {
+              "python": "3.11.9",
+              "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+              "openvino_genai": "2026.4.0.0-3407-7ea2546852a"
+            },
+            "devices": [
+              "CPU",
+              "GPU",
+              "NPU"
+            ],
+            "device_names": {
+              "CPU": "Intel(R) Core(TM) Ultra 7 258V",
+              "GPU": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+              "NPU": "Intel(R) AI Boost"
+            },
+            "runtime_imported": true,
+            "load": {
+              "ok": true,
+              "seconds": 17.192,
+              "error": null,
+              "started": "2026-10-05T15:59:16.274-04:00",
+              "finished": "2026-10-05T15:59:34.067-04:00"
+            },
+            "runs": [
+              {
+                "started": "2026-10-05T15:59:34.069-04:00",
+                "ok": true,
+                "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+                "wall_ms": 9815.9,
+                "first_chunk_s": 2.5809,
+                "generated_tokens": 64,
+                "ttft_ms": 2368.44,
+                "tpot_ms": 118.12,
+                "tok_per_s_wall": 6.52,
+                "tok_per_s_tpot": 8.47,
+                "finished": "2026-10-05T15:59:43.886-04:00",
+                "index": 1
+              },
+              {
+                "started": "2026-10-05T15:59:43.886-04:00",
+                "ok": true,
+                "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+                "wall_ms": 8277.3,
+                "first_chunk_s": 0.3643,
+                "generated_tokens": 64,
+                "ttft_ms": 162.11,
+                "tpot_ms": 128.76,
+                "tok_per_s_wall": 7.73,
+                "tok_per_s_tpot": 7.77,
+                "finished": "2026-10-05T15:59:52.162-04:00",
+                "index": 2
+              }
+            ],
+            "finished": "2026-10-05T15:59:52.162-04:00"
+          },
+          "stderr": {}
+        }
+      },
+      {
+        "name": "file_denial",
+        "status": "pass",
+        "started": "2026-10-05T15:59:53.299-04:00",
+        "finished": "2026-10-05T15:59:53.411-04:00",
+        "detail": "all 8 secret reads and 4 outside writes denied; positive controls allowed",
+        "data": {
+          "secret_reads": [
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.ssh",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.ssh' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.git-credentials",
+              "kind": "read",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.git-credentials' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\AppData\\Local\\BlarAI",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\AppData\\Local\\BlarAI' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.aws",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.aws' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.azure",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.azure' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\BlarAI",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\BlarAI' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\blarai-research-data",
+              "kind": "list",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\blarai-research-data' is denied."
+            }
+          ],
+          "outside_writes": [
+            {
+              "path": "C:\\Windows\\System32\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Windows\\System32\\spike-write-test.tmp' is denied."
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\Users\\_OPERATOR_\\spike-write-test.tmp' is denied."
+            },
+            {
+              "path": "C:\\blarai-spike\\bin\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\blarai-spike\\bin\\spike-write-test.tmp' is denied."
+            },
+            {
+              "path": "C:\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "denied",
+              "exception": "UnauthorizedAccessException",
+              "message": "Access to the path 'C:\\spike-write-test.tmp' is denied."
+            }
+          ],
+          "informational_writes": [
+            {
+              "path": "C:\\Windows\\Temp\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            },
+            {
+              "path": "B:\\models\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            }
+          ],
+          "positive_controls": [
+            {
+              "path": "C:\\blarai-spike\\work\\write-control-testa-20261005-155914.tmp",
+              "kind": "write",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            },
+            {
+              "path": "C:\\blarai-spike\\bin\\spike-config.json",
+              "kind": "read",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            },
+            {
+              "path": "B:\\models\\Qwen3.5-4B-int8-ov\\config.json",
+              "kind": "read",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            }
+          ]
+        }
+      },
+      {
+        "name": "outbound_probe",
+        "status": "pass",
+        "started": "2026-10-05T15:59:53.411-04:00",
+        "finished": "2026-10-05T15:59:53.519-04:00",
+        "detail": "outbound 1.1.1.1:443: CONNECTED; expected_blocked=False",
+        "data": {
+          "probe": {
+            "target": "1.1.1.1:443",
+            "connected": true,
+            "ms": 68,
+            "error": "",
+            "t": "2026-10-05T15:59:53.512-04:00"
+          },
+          "blocked": false,
+          "expected_blocked": false
+        }
+      }
+    ]
+  },
+  "wrapped_env": {
+    "machine_clock": "2026-10-05 15:59:54 -04:00",
+    "uptime_hours": 34.95,
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "ps_version": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "svc_mpssvc": "Running/Automatic",
+    "svc_BFE": "Running/Automatic"
+  }
+}

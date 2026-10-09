@@ -90,6 +90,7 @@ from .constants import (
     SEVERITY_INFO,
     SEVERITY_MEDIUM,
     SEVERITY_ORDER,
+    clip_rule_list,
 )
 
 # ---------------------------------------------------------------------------
@@ -302,6 +303,26 @@ class SecurityResult:
     measured: bool = False
     status: str = "security scan did not run"
     files_scanned: int = 0
+    #: True when the scan RAN but part of the tree it INTENDED to examine went unexamined —
+    #: the file bound was hit, a file could not be read, a python file would not parse (so the
+    #: AST tier never ran on it), or the walk was abandoned on the high-severity ceiling.
+    #: A THIRD independent fact, on exactly the reasoning the docstring above gives for the
+    #: first two: ``measured`` answers "did the looking HAPPEN", this answers "did the looking
+    #: FINISH", and a bounded scan answers True to both.
+    #:
+    #: NOT set by deliberately excluded content — ``_present_skipped_dirs`` (.git, caches) and
+    #: build output. Those were never in scope, and ``.git`` is present in every archived
+    #: delivery measured, so counting them would make this true on every run and leave it
+    #: carrying no information. The exclusions are disclosed in ``status`` regardless.
+    #: An excluded region is not a shortfall; an intended region that went unread is.
+    #:
+    #: Before #1396 this fact existed only as English appended to ``status``, so any rendering
+    #: that did not substring-match that English dropped it silently. ``summary()`` did, and
+    #: ``summary()`` is the string that reaches the scorecard. The field exists so that a
+    #: renderer written later cannot lose the caveat by simply not knowing to look for it —
+    #: which is also why the card's helper takes the RESULT and derives the predicate itself
+    #: rather than accepting a bool a caller can get wrong.
+    coverage_partial: bool = False
 
     @property
     def worst_severity(self) -> Optional[str]:
@@ -331,17 +352,47 @@ class SecurityResult:
 
         An unfinished scan that nonetheless FOUND something states both halves. Reporting only
         "could-not-determine" dropped the findings out of the stamp while the KPI line went on
-        counting them, so the two disagreed about the same run."""
+        counting them, so the two disagreed about the same run.
+
+        A BOUNDED scan says so on BOTH branches (#1396). The prefix used to key off ``measured``
+        alone, and a capped scan is ``measured=True`` — so the one combination that most needs
+        the caveat, *ran fine and found nothing but did not look everywhere*, was the one
+        combination that rendered as an unqualified "clean". The word "clean" is not used at
+        all when coverage was partial: what was established is that nothing was found in the
+        part that was reached, which is a different claim and is the one worth publishing."""
         if not self.measured and not self.findings:
             return f"could-not-determine: {self.status}"[:EVIDENCE_VALUE_CAP]
+        # THE GUARD IS INLINED AT BOTH BRANCHES, not bound to a local name, and that is a
+        # requirement rather than a style choice. `instrument_registry.guard_alias_reads`
+        # refuses a local alias of a registered status, because the guard analysis matches on
+        # the dotted PATH and `if incomplete:` is invisible to it. This function held exactly
+        # such an alias until #1400 tightened that refusal to see compound boolean bindings,
+        # and the first thing the tightened control convicted was this line.
+        #
+        # The duplication is the accepted cost: two reads two lines apart, against a guard no
+        # analysis can follow. If the expression ever grows past this, the honest move is a
+        # JUSTIFIED_COLLAPSES entry carrying an argument, never a quiet re-alias.
         if not self.findings:
+            if not self.measured or self.coverage_partial:
+                return (f"PARTIAL SCAN — nothing found in the {self.files_scanned} file(s) "
+                        f"reached, coverage incomplete")[:EVIDENCE_VALUE_CAP]
             return f"clean ({self.files_scanned} files scanned)"[:EVIDENCE_VALUE_CAP]
         counts = {s: sum(1 for f in self.findings if f.severity == s)
                   for s in (SEVERITY_HIGH, SEVERITY_MEDIUM, SEVERITY_INFO)}
         rules = sorted({f.rule for f in self.at_or_above(SEVERITY_MEDIUM)})
         head = ", ".join(f"{n} {s}" for s, n in counts.items() if n)
-        prefix = "" if self.measured else "PARTIAL SCAN — "
-        return f"{prefix}{head}: {', '.join(rules) or 'info-only'}"[:EVIDENCE_VALUE_CAP]
+        prefix = "PARTIAL SCAN — " if (not self.measured or self.coverage_partial) else ""
+        # #1400: THE RULE LIST IS TRIMMED TO FIT AND SAYS WHEN IT TRIMMED. The line used to be
+        # built whole and then sliced by [:EVIDENCE_VALUE_CAP], so a stamp with many distinct
+        # rule ids simply lost its tail — and adding the "PARTIAL SCAN — " prefix made that
+        # 15 characters likelier. A silently clipped list is this ticket family's own defect
+        # committed by its own disclosure: the reader cannot tell a two-rule finding from a
+        # nine-rule finding whose last seven fell off the end.
+        #
+        # The trimming itself now lives in constants.clip_rule_list, shared with
+        # placeholder_prose, because the first version of this fix landed HERE and not on the
+        # sibling — one implementation cannot drift the way two did.
+        return clip_rule_list(f"{prefix}{head}: ", rules)
 
 
 # ---------------------------------------------------------------------------
@@ -837,10 +888,21 @@ def _present_skipped_dirs(root: Path) -> list[str]:
 
 
 def _iter_source_files(root: Path) -> Iterable[Path]:
-    """Every scannable source file under *root*, dependency and build trees excluded."""
+    """Every scannable source file under *root*, dependency and build trees excluded.
+
+    YIELDS ONE PAST THE BOUND ON PURPOSE (#1400). `scanned >= _MAX_FILES` cannot distinguish
+    "the walk was cut short" from "the tree happens to hold exactly that many", so a repo of
+    exactly _MAX_FILES files claimed partial coverage on a scan that was complete. Handing the
+    caller one extra item makes the distinction decidable without a second walk: the extra
+    item exists only when there was more to see.
+
+    Kept a GENERATOR rather than returning ``(files, truncated)`` — which is how the sibling
+    ``layer1._walk_python`` reports the same fact — because two tests monkeypatch this with
+    their own generators to simulate a tree that dies mid-walk, and changing the shape here
+    would break a fault-injection path that has nothing to do with counting."""
     count = 0
     for path in sorted(root.rglob("*")):
-        if count >= _MAX_FILES:
+        if count > _MAX_FILES:
             return
         try:
             if not path.is_file():
@@ -879,17 +941,39 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> SecurityResult:
     findings: list[SecurityFinding] = []
     scanned = 0
     unreadable = 0
+    walk_abandoned = False
+    truncated_reads = 0
     truncated = False
     unparsed_python = 0
     build_output_files = 0
     skipped_dirs = _present_skipped_dirs(root)
+    file_cap_hit = False
     try:
-        for path in _iter_source_files(root):
+        for seen, path in enumerate(_iter_source_files(root)):
+            if seen >= _MAX_FILES:
+                # #1400: the iterator hands us ONE past the bound, so arriving here proves
+                # there was more tree to walk — as opposed to `scanned >= _MAX_FILES`, which
+                # is also true of a repo holding exactly that many and nothing more.
+                file_cap_hit = True
+                break
             try:
-                text = path.read_text(encoding="utf-8", errors="replace")[:_MAX_FILE_BYTES]
+                # #1395: the slice is the whole defect. The file is read in full and then cut
+                # to _MAX_FILE_BYTES, so everything past the cut is never scanned — and nothing
+                # recorded that it happened. A credential below the cut in a large bundled file
+                # was simply not looked for, and the result said "clean".
+                #
+                # NOTE the units, because the constant's name is wrong and a reader will trust
+                # it: `read_text` returns str, so this slices CHARACTERS, not bytes. On non-ASCII
+                # source the real byte ceiling is higher than 256 KiB. Renaming the constant is
+                # left alone deliberately — it is referenced by name in tests and tickets, and a
+                # rename inside a fix is how a fix becomes hard to review.
+                raw = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 unreadable += 1
                 continue
+            text = raw[:_MAX_FILE_BYTES]
+            if len(raw) > _MAX_FILE_BYTES:
+                truncated_reads += 1
             try:
                 rel = str(path.relative_to(root)).replace("\\", "/")
             except ValueError:
@@ -943,6 +1027,13 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> SecurityResult:
                 truncated = True
                 findings.extend(f for f in raw if f.severity == SEVERITY_HIGH)
                 if len(findings) >= _MAX_HIGH_FINDINGS:
+                    # ABANDONS THE WALK — every remaining file goes unexamined. Distinct from
+                    # `truncated` above, which is partial RECORDING of a completed look; this
+                    # is partial COVERAGE and must reach the reader as such. Measured on a
+                    # real 430-file tree with findings front-loaded: the walk stopped at 10
+                    # files, 97.7% of the tree unexamined, and the result rendered as a
+                    # finished search on both the stamp and the card.
+                    walk_abandoned = True
                     break
     except OSError as exc:
         # A tree that became unwalkable mid-scan: keep what was found, but the result is
@@ -967,13 +1058,37 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> SecurityResult:
                    f"(not graded as authored code)")
     if unparsed_python:
         status += f", {unparsed_python} python file(s) did not parse (regex fallback used)"
-    if scanned >= _MAX_FILES:
+    if file_cap_hit:
         # Partial COVERAGE, unlike the finding cap below which is partial RECORDING. Both are
         # named in the status for the same reason: a bound the reader cannot see is a bound
         # that turns into a false clean.
         status += f", file list capped at {_MAX_FILES} (coverage is partial)"
     if truncated:
         status += f", finding list capped at {_MAX_FINDINGS} (high-severity findings kept in full)"
+    if truncated_reads:
+        status += (f", {truncated_reads} file(s) read only in part (first {_MAX_FILE_BYTES} "
+                   f"characters scanned; the rest was never examined)")
+    if walk_abandoned:
+        status += (f", scan ABANDONED after {_MAX_HIGH_FINDINGS} high-severity findings — the "
+                   f"rest of the tree was never examined")
     if surface:
         status += f" [surface: {surface}]"
-    return SecurityResult(tuple(findings), measured=True, status=status, files_scanned=scanned)
+    return SecurityResult(
+        tuple(findings), measured=True, status=status, files_scanned=scanned,
+        # EVERY shortfall that means "part of the tree was not examined". Each disjunct is the
+        # same variable that writes its own sentence into `status` above, so the flag and the
+        # prose cannot drift apart.
+        #
+        # `unreadable` is in here for a specific reason: `scanned` counts only SUCCESSFUL reads,
+        # so an unreadable file SHRINKS the counter and can hold `scanned >= _MAX_FILES` false
+        # on a walk that really was truncated. Keying solely on the bound left the fact
+        # droppable by the very files that prove it.
+        #
+        # DELIBERATELY ABSENT: `skipped_dirs` and `build_output_files`. Both are content that
+        # was never in scope — .git and the caches are not authored code, build output is not
+        # graded as authored code — and `.git` is present in every archived delivery measured
+        # (183 of 183), so counting them would make the flag true on every run and therefore
+        # worthless. Both are still NAMED in `status`; a disclosed exclusion is not a shortfall.
+        coverage_partial=bool(file_cap_hit or unreadable or unparsed_python
+                              or walk_abandoned or truncated_reads),
+    )

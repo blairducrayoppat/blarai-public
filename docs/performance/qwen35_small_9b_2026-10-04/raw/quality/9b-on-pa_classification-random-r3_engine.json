@@ -1,0 +1,30 @@
+[
+  {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-9B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+      "cache_size_gb": 3,
+      "max_num_seqs": 1
+    },
+    "compile_properties": {
+      "PERFORMANCE_HINT": "LATENCY",
+      "INFERENCE_PRECISION_HINT": "f16",
+      "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+      "CACHE_DIR": "",
+      "KV_CACHE_PRECISION": "f16",
+      "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 16.31,
+    "generations": 13,
+    "generated_tokens": 202,
+    "draft_tokens": 117,
+    "accepted_tokens": 117,
+    "acceptance_rate": 1.0,
+    "think_first_chunk_count": 0
+  }
+]

@@ -94,7 +94,7 @@ def _datamark_chunk(chunk: str, marker: str) -> str:
 class Provenance(str, Enum):
     """Provenance tier of a grounded-context chunk — where the content came
     from. Drives the Layer-3 action-lock and the leakage/injection controls
-    (ADR-023). The two trusted tiers never trip any control. All three
+    (ADR-023). The two trusted tiers never trip any control. All FOUR
     untrusted tiers trip the Layer-3 action-lock and are datamarked; they
     differ in ONE respect only — the Stage-5 cosine leakage OUTPUT block:
 
@@ -110,6 +110,11 @@ class Provenance(str, Enum):
         semantics as ``UNTRUSTED_KNOWLEDGE``; kept a DISTINCT tier because web
         results are not the operator's curated knowledge bank — the audit
         trail and any future per-source policy must tell them apart.
+      * ``UNTRUSTED_CORPUS`` — EXEMPT from the leakage detector on the same
+        public-content argument as ``UNTRUSTED_WEB`` (ADR-023 Amendment 5,
+        #1616), but still untrusted everywhere else. Distinct again, so an
+        audit can separate a bulk offline encyclopedia from both the curated
+        bank and live web results.
 
     ``TRUSTED_LOCAL`` and ``TRUSTED_MEMORY`` apply identical controls (none)
     and are kept distinct for audit legibility and continuity with the #543
@@ -134,6 +139,30 @@ class Provenance(str, Enum):
     recall is not held as a false-positive leak (ADR-023 Amendment 2, #664). The
     operator deliberately curated this content into the bank for recall; echoing it
     back is the point. Trust is NOT promoted — only the leakage feed is exempted."""
+
+    UNTRUSTED_CORPUS = "untrusted_corpus"
+    """Offline reference-corpus content (#1616) retrieved into a turn.
+
+    Same leak-exempt-but-untrusted semantics as ``UNTRUSTED_KNOWLEDGE`` and
+    ``UNTRUSTED_WEB`` (ADR-023 Amendment 5): untrusted for the Layer-3
+    action-lock + datamarking — an injection hidden in a vandalised
+    encyclopedia article still cannot fire a tool and is still delimiter-
+    wrapped + per-line marked — but EXEMPT from the Stage-5 cosine leakage
+    OUTPUT block, so a faithful quotation of a public reference work back to
+    the operator who asked for it is not held as a false-positive leak.
+
+    The exemption rests on the ``UNTRUSTED_WEB`` argument (public content
+    relayed to the requesting operator is not exfiltration), NOT on the
+    knowledge-bank argument: a bulk import of millions of articles is in no
+    sense operator-curated, and reasoning from the curated-bank rationale
+    would be borrowing a justification that does not hold here.
+
+    Kept a DISTINCT tier from both, for the reason Amendment 3 gives for
+    keeping web separate: the audit trail and any future per-source policy
+    must be able to tell a bulk encyclopedia from the operator's own approved
+    knowledge, even while the two gate identically today. Trust is NOT
+    promoted — only the leakage feed is exempted.
+    """
 
     UNTRUSTED_WEB = "untrusted_web"
     """Web-search-result content (ADR-024 W4 ``web_search``, #719) relayed into a
@@ -410,15 +439,17 @@ class ContextManager:
 
         Fail-closed: a chunk whose provenance is anything other than
         ``TRUSTED_LOCAL`` or ``TRUSTED_MEMORY`` (including ``UNTRUSTED_EXTERNAL``,
-        ``UNTRUSTED_KNOWLEDGE``, ``UNTRUSTED_WEB``, or an unrecognized/unset
-        value) counts as untrusted and trips the gate. An unknown session returns
+        ``UNTRUSTED_KNOWLEDGE``, ``UNTRUSTED_WEB``, ``UNTRUSTED_CORPUS``, or an
+        unrecognized/unset value) counts as untrusted and trips the gate. An unknown session returns
         False (the caller treats 'session not found' as a separate error path),
         matching the lifecycle of ``has_grounded_context``.
 
-        ``UNTRUSTED_KNOWLEDGE`` (ADR-023 Amendment 2, #664) and ``UNTRUSTED_WEB``
-        (ADR-023 Amendment 3, #719) both deliberately trip this gate exactly like
-        ``UNTRUSTED_EXTERNAL``: a prompt-injection hidden in an ingested knowledge
-        article OR in a web-search result must STILL be unable to fire a tool. The
+        ``UNTRUSTED_KNOWLEDGE`` (Amendment 2, #664), ``UNTRUSTED_WEB``
+        (Amendment 3, #719) and ``UNTRUSTED_CORPUS`` (Amendment 5, #1616) all
+        deliberately trip this gate exactly like ``UNTRUSTED_EXTERNAL``: a
+        prompt-injection hidden in an ingested knowledge article, a web-search
+        result, or a vandalised encyclopedia paragraph must STILL be unable to
+        fire a tool. The
         Amendment-2/3 carve-outs exempt those tiers from the Stage-5 leakage feed
         ONLY — never from this action-lock. The ``not in (trusted...)`` test
         captures the new tiers automatically, which is the intended behaviour;
@@ -535,6 +566,54 @@ class ContextManager:
             parts.append(f"{turn.role}: {turn.content}")
 
         return "\n".join(parts)
+
+    def build_context_messages(
+        self, session_id: str
+    ) -> "tuple[str, list[dict[str, str]]] | None":
+        """Structured sibling of :meth:`build_context` (#1621).
+
+        ``build_context`` FLATTENS the whole conversation into one string of
+        ``"role: content"`` lines, which the caller then sends as a SINGLE user
+        message. A model therefore sees a pseudo-transcript rather than real
+        turns, and has to guess which line is the live question. Qwen3-14B
+        tolerates it; Qwen3.6-35B-A3B does not — with an UNANSWERED earlier
+        user turn (two ``user:`` lines in a row) it answers the FIRST one and
+        ignores the current question. Measured 2026-09-22, reproducible, and
+        fixed outright by sending real turns.
+
+        Returns ``(preamble, turns)``:
+
+        - ``preamble`` is everything that precedes the conversation: the
+          system-prompt delimiters, the grounded chunks, and the recency note.
+          It is returned SEPARATELY and the caller must keep it inside a USER
+          message. It must never be promoted into the system message: grounded
+          chunks are untrusted content, and the datamarking/spotlighting that
+          protects them is meaningless if the text is handed system authority.
+        - ``turns`` is the real conversation, oldest first, each
+          ``{"role": ..., "content": ...}``.
+
+        ``None`` if the session is unknown (Fail-Closed), matching
+        ``build_context``.
+        """
+        ctx = self._sessions.get(session_id)
+        if ctx is None:
+            return None
+
+        preamble_parts: list[str] = []
+        if ctx.system_prompt:
+            preamble_parts.append(ctx.system_prompt)
+        preamble_parts.extend(ctx.grounded_chunks)
+        if ctx.grounded_chunks and ctx.recent_document:
+            preamble_parts.append(
+                f"[System note: the most recently loaded document is "
+                f"'{ctx.recent_document}'. If the user refers to a document "
+                f"without naming one (for example 'it', 'this file', 'the "
+                f"document'), treat the request as being about "
+                f"'{ctx.recent_document}'.]"
+            )
+        preamble = chr(10).join(preamble_parts)
+        turns = [{"role": t.role, "content": t.content} for t in ctx.turns]
+        return preamble, turns
 
     def trim_to_budget(self, session_id: str) -> int:
         """Evict oldest turns to fit within the token budget.
@@ -755,8 +834,9 @@ class ContextManager:
         than ``not in (trusted...)`` — the equality is what carves knowledge AND
         web results out of the leakage feed while ``has_untrusted_content`` (the
         action-lock) still catches them. Do NOT broaden this to include
-        ``UNTRUSTED_KNOWLEDGE`` or ``UNTRUSTED_WEB``; that would re-break
-        knowledge recall (#664) / web-search relay (#719). ``/external`` pasted
+        ``UNTRUSTED_KNOWLEDGE``, ``UNTRUSTED_WEB`` or ``UNTRUSTED_CORPUS``; that
+        would re-break knowledge recall (#664), web-search relay (#719) or
+        reference-corpus quotation (#1616). ``/external`` pasted
         content stays ``UNTRUSTED_EXTERNAL`` and is therefore STILL fed here —
         the carve-out is web-search-specific, not an all-external exemption.
         """

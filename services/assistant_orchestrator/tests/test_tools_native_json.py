@@ -358,10 +358,19 @@ class TestSchemaCoupling:
 
 class TestSystemPromptRendering:
     def test_tools_block_carries_every_tool(self) -> None:
-        block = tools.render_tools_system_block()
+        """Every schema'd tool renders once every runner-gated tool is live;
+        the default render carries exactly the advertised set (#1616)."""
+        every = tools.advertised_tool_names(
+            frozenset(tools._ADVERTISED_ONLY_WHEN_RUNNER_REGISTERED)
+        )
+        assert set(every) == set(tools.TOOL_SCHEMAS)
+        block = tools.render_tools_system_block(every)
         assert "<tools>" in block and "</tools>" in block
         for name in tools.TOOL_SCHEMAS:
             assert name in block
+        default_block = tools.render_tools_system_block()
+        for name in tools.advertised_tool_names():
+            assert name in default_block
 
     def test_tools_block_teaches_native_format(self) -> None:
         block = tools.render_tools_system_block()

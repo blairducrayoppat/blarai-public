@@ -2263,16 +2263,34 @@ def _stage_card_run_budget(harness, card_budget_s: float, base_monitor_s: float,
     ``base_monitor_s`` for a default card). A card with no budget clears the
     pending file AND restores the base monitor — byte-identical to today. Fail-soft:
     a staging error just leaves the campaign default in force."""
-    from shared.fleet.swap_ops import write_pending_run_budget
+    from shared.fleet.swap_ops import pending_run_budget_path, write_pending_run_budget
 
     try:
         cfg = getattr(harness, "config", None)
-        if cfg is not None:
-            write_pending_run_budget(cfg, card_budget_s)  # >0 stages; 0 clears
+        if cfg is None:
+            # #1359. NOT the cause of run 20260809-154357-bd — checked:
+            # DispatchHarness.config is a required dataclass field and every
+            # construction site passes it, so this branch does not fire in a battery
+            # run. Hardened anyway because the SHAPE is the one that cost that run: a
+            # skipped write followed by an envelope log that announces a driver budget
+            # nobody staged. A missing config is a STAGING FAILURE, not a silent no-op.
+            log(f"[battery {cid}] !! per-card budget {card_budget_s:.0f}s NOT STAGED — the "
+                f"harness has no config, so the driver never received it and will use the "
+                f"config default. The envelope line below covers the MONITOR half only.")
+        else:
+            staged = write_pending_run_budget(cfg, card_budget_s)  # >0 stages; 0 clears
+            if not staged:
+                # A stage that never landed used to be indistinguishable from a card
+                # that never asked for one — silent at the writer AND at the reader.
+                log(f"[battery {cid}] !! per-card budget {card_budget_s:.0f}s FAILED TO STAGE "
+                    f"(unwritable {pending_run_budget_path(cfg)}) — the driver will use the "
+                    f"config default and this card will be cut short.")
         if card_budget_s and card_budget_s > 0:
             harness.overall_timeout_s = card_budget_s
             log(f"[battery {cid}] per-card run envelope: {card_budget_s:.0f}s "
-                f"(driver + monitor) — over the campaign default {base_monitor_s:.0f}s.")
+                f"(driver + monitor) — over the campaign default {base_monitor_s:.0f}s. "
+                f"The DRIVER half only applies if the AO consumes the staged file within "
+                f"its freshness window; watch the AO's 'run budget:' line for the verdict.")
         else:
             harness.overall_timeout_s = base_monitor_s
     except Exception as exc:  # noqa: BLE001 — never sink the battery over a budget
@@ -2864,7 +2882,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--session-id", default=new_battery_session_id())
     mon = p.add_argument_group("monitoring (live)")
     mon.add_argument("--poll-interval-s", type=float, default=5.0)
-    mon.add_argument("--stall-grace-s", type=float, default=240.0)
+    mon.add_argument("--stall-grace-s", type=float, default=900.0)
     mon.add_argument("--overall-timeout-s", type=float, default=0.0,
                      help="Hard per-run cap (0 = the AO's swap_run_budget_s).")
     return p

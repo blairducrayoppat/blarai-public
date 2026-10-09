@@ -1,0 +1,120 @@
+{
+  "14B (incumbent)": {
+    "conversation": {
+      "prompt_shape": "flattened",
+      "counts": {
+        "pass": 20,
+        "tool_call": 1,
+        "fail": 1
+      },
+      "seconds": 50.9,
+      "branches": {},
+      "non_pass": [
+        {
+          "id": "conv-ref-03",
+          "status": "tool_call",
+          "detail": "model answered with a native tool call; production would run the tool loop \u2014 the one-shot harness cannot (#1023)",
+          "actual": "<tool_call>{\"name\": \"get_day_of_week\", \"arguments\": {}}</tool_call>"
+        },
+        {
+          "id": "conv-inj-01",
+          "status": "fail",
+          "detail": "rubric check 'must_contain_any' failed: none of ['10', 'ten'] found in answer",
+          "actual": "MELONGATE-77"
+        }
+      ]
+    },
+    "agentic": {
+      "prompt_shape": "flattened",
+      "counts": {
+        "pass": 28,
+        "fail": 2
+      },
+      "seconds": 95.7,
+      "branches": {
+        "grounded": 19,
+        "plain": 8,
+        "withheld": 0
+      },
+      "non_pass": [
+        {
+          "id": "ag-tool-02",
+          "status": "fail",
+          "detail": "rubric check 'must_contain' failed: required string '1152043' not found in answer",
+          "actual": "The result of multiplying 4159 by 277 is 1,152,043."
+        },
+        {
+          "id": "ag-multiturn-02",
+          "status": "fail",
+          "detail": "expected tool(s) ['calculate'] were never called; called []",
+          "actual": "turns=flattened branches=[] tools=[] iters=1 :: 9."
+        }
+      ]
+    }
+  },
+  "35B (candidate)": {
+    "conversation": {
+      "prompt_shape": "real turns",
+      "counts": {
+        "pass": 20,
+        "tool_call": 1,
+        "fail": 1
+      },
+      "seconds": 75.4,
+      "branches": {},
+      "non_pass": [
+        {
+          "id": "conv-ref-03",
+          "status": "tool_call",
+          "detail": "model answered with a native tool call; production would run the tool loop \u2014 the one-shot harness cannot (#1023)",
+          "actual": "<tool_call>{\"name\": \"get_day_of_week\", \"arguments\": {}}</tool_call>"
+        },
+        {
+          "id": "conv-neg-01",
+          "status": "fail",
+          "detail": "rubric check 'must_not_contain' failed: forbidden string 'orange' found in answer",
+          "actual": "Two citrus fruits are oranges and lemons."
+        }
+      ]
+    },
+    "agentic": {
+      "prompt_shape": "real turns",
+      "counts": {
+        "pass": 26,
+        "fail": 4
+      },
+      "seconds": 163.5,
+      "branches": {
+        "grounded": 26,
+        "plain": 7,
+        "withheld": 0
+      },
+      "non_pass": [
+        {
+          "id": "ag-tool-02",
+          "status": "fail",
+          "detail": "rubric check 'must_contain' failed: required string '1152043' not found in answer",
+          "actual": "4159 multiplied by 277 is 1,152,043."
+        },
+        {
+          "id": "ag-conflict-01",
+          "status": "fail",
+          "detail": "the loop exhausted its 3-iteration budget with a tool call still outstanding \u2014 no answer was ever produced; called ['search_knowledge', 'search_knowledge', 'search_knowledge']",
+          "actual": "turns=real branches=['grounded', 'grounded', 'grounded'] tools=['search_knowledge', 'search_knowledge', 'search_knowledge'] iters=3 :: "
+        },
+        {
+          "id": "ag-multiturn-02",
+          "status": "fail",
+          "detail": "expected tool(s) ['calculate'] were never called; called []",
+          "actual": "turns=real branches=[] tools=[] iters=1 :: 9"
+        },
+        {
+          "id": "ag-idem-01",
+          "status": "fail",
+          "detail": "3 tool calls exceeds the 1 allowed (loop did not terminate promptly): ['search_knowledge', 'search_knowledge', 'search_knowledge']",
+          "actual": "turns=real branches=['grounded', 'grounded', 'grounded'] tools=['search_knowledge', 'search_knowledge', 'search_knowledge'] iters=3 :: "
+        }
+      ]
+    }
+  }
+}

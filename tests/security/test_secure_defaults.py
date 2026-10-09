@@ -1,3 +1,4 @@
+# enforces-rule: security_by_design.principles.born-encrypted -- shipped config defaults only
 """Secure-by-default config regression guard (Tier 1 hardening).
 
 ADR-023 §1 diagnosed the root failure that motivated Sprint 12: the Layer-3

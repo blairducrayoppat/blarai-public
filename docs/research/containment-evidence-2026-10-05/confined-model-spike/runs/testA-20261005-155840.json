@@ -1,0 +1,333 @@
+{
+  "run_id": "testa-20261005-155730",
+  "started": "2026-10-05T15:57:30.454-04:00",
+  "finished": "2026-10-05T15:58:36.455-04:00",
+  "schema_violations": [],
+  "verdict": {
+    "Code": 4,
+    "Reason": "failed steps: file_denial"
+  },
+  "task_result": {
+    "schema_version": 1,
+    "run_id": "testa-20261005-155730",
+    "mode": "feasibility",
+    "started": "2026-10-05T15:57:31.795-04:00",
+    "finished": "2026-10-05T15:58:34.856-04:00",
+    "overall": "fail",
+    "hold_seconds": 5,
+    "expected_blocked": false,
+    "host": {
+      "computer": "_MACHINE_",
+      "ps_version": "5.1.26100.9444",
+      "machine_clock": "2026-10-05 15:57:31 -04:00"
+    },
+    "steps": [
+      {
+        "name": "identity",
+        "status": "pass",
+        "started": "2026-10-05T15:57:31.868-04:00",
+        "finished": "2026-10-05T15:57:31.993-04:00",
+        "detail": "ran as the spike SID, not elevated, session 0",
+        "data": {
+          "whoami_user": "\"_MACHINE_\\blarai-spike\",\"S-1-5-21-1000000001-1000000002-1000000003-1010\"",
+          "token_user": "_MACHINE_\\blarai-spike",
+          "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+          "expected_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+          "groups": [
+            "S-1-5-21-1000000001-1000000002-1000000003-513",
+            "S-1-1-0",
+            "S-1-5-32-545",
+            "S-1-5-3",
+            "S-1-2-1",
+            "S-1-5-11",
+            "S-1-5-15",
+            "S-1-5-113",
+            "S-1-2-0",
+            "S-1-5-64-10"
+          ],
+          "mandatory_label": [
+            "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+          ],
+          "is_admin_role": false,
+          "session_id": 0,
+          "user_interactive": false,
+          "auth_type": "NTLM"
+        }
+      },
+      {
+        "name": "memory",
+        "status": "pass",
+        "started": "2026-10-05T15:57:31.997-04:00",
+        "finished": "2026-10-05T15:57:32.509-04:00",
+        "detail": "free 19.4 GB >= 14 GB",
+        "data": {
+          "free_gb": 19.4,
+          "total_gb": 31.32,
+          "in_use_gb": 11.92,
+          "required_free_gb": 14
+        }
+      },
+      {
+        "name": "gpu_feasibility",
+        "status": "pass",
+        "started": "2026-10-05T15:57:32.509-04:00",
+        "finished": "2026-10-05T15:58:34.474-04:00",
+        "detail": "GPU load 24.773 s; run1 ttft 3847.72 ms 4.94 tok/s; run2 ttft 525.37 ms 3.72 tok/s",
+        "data": {
+          "python_exit_code": null,
+          "python_result_file": "C:\\blarai-spike\\results\\python-testa-20261005-155730.json",
+          "python": {
+            "mode": "feasibility",
+            "started": "2026-10-05T15:57:32.723-04:00",
+            "pid": 18908,
+            "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+            "device_requested": "GPU",
+            "prompt": "Explain in three sentences why the sky is blue.",
+            "versions": {
+              "python": "3.11.9",
+              "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+              "openvino_genai": "2026.4.0.0-3407-7ea2546852a"
+            },
+            "devices": [
+              "CPU",
+              "GPU",
+              "NPU"
+            ],
+            "device_names": {
+              "CPU": "Intel(R) Core(TM) Ultra 7 258V",
+              "GPU": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+              "NPU": "Intel(R) AI Boost"
+            },
+            "runtime_imported": true,
+            "load": {
+              "ok": true,
+              "seconds": 24.773,
+              "error": null,
+              "started": "2026-10-05T15:57:32.723-04:00",
+              "finished": "2026-10-05T15:57:58.404-04:00"
+            },
+            "runs": [
+              {
+                "started": "2026-10-05T15:57:58.406-04:00",
+                "ok": true,
+                "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+                "wall_ms": 16622.5,
+                "first_chunk_s": 4.1882,
+                "generated_tokens": 64,
+                "ttft_ms": 3847.72,
+                "tpot_ms": 202.47,
+                "tok_per_s_wall": 3.85,
+                "tok_per_s_tpot": 4.94,
+                "finished": "2026-10-05T15:58:15.030-04:00",
+                "index": 1
+              },
+              {
+                "started": "2026-10-05T15:58:15.030-04:00",
+                "ok": true,
+                "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+                "wall_ms": 17478.1,
+                "first_chunk_s": 1.0064,
+                "generated_tokens": 64,
+                "ttft_ms": 525.37,
+                "tpot_ms": 269.02,
+                "tok_per_s_wall": 3.66,
+                "tok_per_s_tpot": 3.72,
+                "finished": "2026-10-05T15:58:32.508-04:00",
+                "index": 2
+              }
+            ],
+            "finished": "2026-10-05T15:58:32.510-04:00"
+          },
+          "stderr": {}
+        }
+      },
+      {
+        "name": "file_denial",
+        "status": "fail",
+        "started": "2026-10-05T15:58:34.474-04:00",
+        "finished": "2026-10-05T15:58:34.681-04:00",
+        "detail": "NOT denied: reads 8, writes 4",
+        "data": {
+          "secret_reads": [
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.ssh",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\.ssh' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.git-credentials",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"The directory name is invalid.\r\n\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\AppData\\Local\\BlarAI",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\AppData\\Local\\BlarAI' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.aws",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\.aws' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\.azure",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\.azure' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\BlarAI",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\BlarAI' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\blarai-research-data",
+              "kind": "list",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"GetFileSystemEntries\" with \"1\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\blarai-research-data' is denied.\""
+            }
+          ],
+          "outside_writes": [
+            {
+              "path": "C:\\Windows\\System32\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"Open\" with \"4\" argument(s): \"Access to the path 'C:\\Windows\\System32\\spike-write-test.tmp' is denied.\""
+            },
+            {
+              "path": "C:\\Users\\_OPERATOR_\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"Open\" with \"4\" argument(s): \"Access to the path 'C:\\Users\\_OPERATOR_\\spike-write-test.tmp' is denied.\""
+            },
+            {
+              "path": "C:\\blarai-spike\\bin\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"Open\" with \"4\" argument(s): \"Access to the path 'C:\\blarai-spike\\bin\\spike-write-test.tmp' is denied.\""
+            },
+            {
+              "path": "C:\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "error",
+              "exception": "MethodInvocationException",
+              "message": "Exception calling \"Open\" with \"4\" argument(s): \"Access to the path 'C:\\spike-write-test.tmp' is denied.\""
+            }
+          ],
+          "informational_writes": [
+            {
+              "path": "C:\\Windows\\Temp\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            },
+            {
+              "path": "B:\\models\\spike-write-test.tmp",
+              "kind": "write",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            }
+          ],
+          "positive_controls": [
+            {
+              "path": "C:\\blarai-spike\\work\\write-control-testa-20261005-155730.tmp",
+              "kind": "write",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            },
+            {
+              "path": "C:\\blarai-spike\\bin\\spike-config.json",
+              "kind": "read",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            },
+            {
+              "path": "B:\\models\\Qwen3.5-4B-int8-ov\\config.json",
+              "kind": "read",
+              "outcome": "allowed",
+              "exception": null,
+              "message": ""
+            }
+          ]
+        }
+      },
+      {
+        "name": "outbound_probe",
+        "status": "pass",
+        "started": "2026-10-05T15:58:34.681-04:00",
+        "finished": "2026-10-05T15:58:34.854-04:00",
+        "detail": "outbound 1.1.1.1:443: CONNECTED; expected_blocked=False",
+        "data": {
+          "probe": {
+            "target": "1.1.1.1:443",
+            "connected": true,
+            "ms": 107,
+            "error": "",
+            "t": "2026-10-05T15:58:34.825-04:00"
+          },
+          "blocked": false,
+          "expected_blocked": false
+        }
+      }
+    ]
+  },
+  "wrapped_env": {
+    "machine_clock": "2026-10-05 15:58:36 -04:00",
+    "uptime_hours": 34.93,
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "ps_version": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "svc_mpssvc": "Running/Automatic",
+    "svc_BFE": "Running/Automatic"
+  }
+}

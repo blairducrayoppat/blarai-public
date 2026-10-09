@@ -171,7 +171,7 @@ class TestLoadGeometry:
         assert geom["full_attention_layers"] == 10
 
     def test_reads_real_35b_config_if_present(self) -> None:
-        model_dir = Path("C:/Users/mrbla/models/qwen36-35b-a3b-int4-ov-OFFICIAL")
+        model_dir = Path("B:/models/Qwen3.6-35B-A3B-int4-ov")
         if not (model_dir / "config.json").exists():
             pytest.skip("35B official IR config.json not present in this environment")
         geom = lc.load_geometry(model_dir)

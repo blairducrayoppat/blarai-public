@@ -906,3 +906,77 @@ def test_a_conviction_test_cannot_pass_on_a_module_that_never_loaded() -> None:
 
     with pytest.raises(AssertionError, match="never loaded"):
         _defects_of(entry)
+
+
+# ---------------------------------------------------------------------------
+# #1400 — the refusal was narrower than its docstring. A COMPOUND boolean
+# binding of a registered status escaped it, because `dotted()` resolves only a
+# bare path. Measured: the simple form fired 1 hit, both compound forms fired 0.
+# ---------------------------------------------------------------------------
+
+
+def _entry_with_field_guard():
+    from shared import instrument_registry as reg
+    return next(e for e in reg.REGISTRY
+                if "measured" in e.guard_names and e.status_kind != reg.STATUS_PREDICATE)
+
+
+def _refusals(src: str):
+    import ast
+    from shared import instrument_registry as reg
+    fn = ast.parse(src).body[0]
+    return reg.guard_alias_reads(fn, _entry_with_field_guard())
+
+
+def test_a_compound_boolean_alias_of_the_guard_is_refused():
+    """`incomplete = not self.measured or self.coverage_partial` is the same alias the simple
+    form is, wearing an expression. It escaped until #1400."""
+    src = ("def f(self):\n"
+           "    incomplete = not self.measured or self.coverage_partial\n"
+           "    if incomplete:\n"
+           "        return 'partial'\n"
+           "    return 'clean'\n")
+    assert _refusals(src), "a compound boolean binding of the status was not refused"
+
+
+def test_the_simple_alias_is_still_refused():
+    """The behaviour #1400 must not have broken while widening."""
+    src = ("def f(self):\n"
+           "    ok = self.measured\n"
+           "    if ok and self.findings:\n"
+           "        return 'x'\n"
+           "    return 'clean'\n")
+    assert _refusals(src), "the original simple-alias refusal regressed"
+
+
+def test_a_STRING_chosen_by_the_guard_is_NOT_refused():
+    """THE FALSE-CONVICTION LOCK, and the reason the widening is narrow.
+
+    `l4 = (f"..." if self.attribution.available else "L4 not measured")` in traceability.py
+    binds a RENDERED STRING chosen by the guard, not the guard itself. The obvious widening —
+    "the value mentions the guard anywhere" — convicts it, and a false accusation is the one
+    failure this control must never produce, by its own docstring. Measured before writing
+    the fix: exactly two compound bindings exist in the registered modules and this is one.
+    """
+    for src in (
+        "def f(self):\n"
+        "    l4 = (f'k:{self.count()}' if self.measured else 'not measured')\n"
+        "    return l4\n",
+        "def f(self):\n"
+        "    msg = 'clean' if self.measured else 'unknown'\n"
+        "    return msg\n",
+        "def f(self):\n"
+        "    n = len(self.findings)\n"
+        "    return str(n)\n",
+    ):
+        assert _refusals(src) == [], (
+            f"a legitimate rendering was convicted as a guard alias:\n{src}"
+        )
+
+
+def test_the_live_tree_carries_no_guard_alias():
+    """The ratchet. Every registered renderer today is alias-free, including under the
+    widened rule — so this passing means the tree is clean, not that the check is asleep."""
+    from shared import instrument_registry as reg
+    convicted = [(r[0].name, r[1]) for r in reg.audit() if r[1]]
+    assert convicted == [], f"registered renderers carry guard aliases: {convicted}"

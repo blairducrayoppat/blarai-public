@@ -41,3 +41,10 @@ docs/performance/**/subjects/*.md text eol=lf
 # the interpreter rather than the line endings. Same class as the measurement-subject
 # rule above: a platform default silently rewriting content that is read byte-wise.
 *.sh text eol=lf
+
+# The git-native hook shim runs under git for Windows sh: CRLF would reach the interpreter.
+scripts/githooks/** text eol=lf
+
+# The containment evidence bundle is evidence of bytes: checkouts must be LF on every machine (its manifest and tests also
+# hash LF-normalised bytes, so they do not depend on this, but the files must read the same everywhere).
+docs/research/containment-evidence-2026-10-05/** text eol=lf

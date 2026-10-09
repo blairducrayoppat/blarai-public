@@ -185,12 +185,19 @@ class GreenAuditResult:
                 # nothing to examine, because the record kept the finding and discarded the fact
                 # of looking. An instrument has to RECORD that it measured, not merely be
                 # willing to answer when asked.
+                # #1397: each lint ships its THIRD fact beside the first two. `measured` says
+                # the lint looked; `coverage_partial` says whether it finished. The archive
+                # previously kept only the pair, so a bounded walk and a complete one wrote
+                # byte-identical records and no later sweep could tell them apart.
                 "dead_scaffold": self.layer1.dead_scaffold.flagged,
                 "dead_scaffold_measured": self.layer1.dead_scaffold.measured,
+                "dead_scaffold_coverage_partial": self.layer1.dead_scaffold.coverage_partial,
                 "stale_readme": self.layer1.stale_readme.flagged,
                 "stale_readme_measured": self.layer1.stale_readme.measured,
+                "stale_readme_coverage_partial": self.layer1.stale_readme.coverage_partial,
                 "no_entry_point": self.layer1.no_entry_point.flagged,
                 "no_entry_point_measured": self.layer1.no_entry_point.measured,
+                "no_entry_point_coverage_partial": self.layer1.no_entry_point.coverage_partial,
                 # A STATUS STRING, never a bool: "unknown" (the seed could not be read) must be
                 # impossible to mistake for "clean" by any later reader of this file. The
                 # per-file lists below carry which files landed in which state.
@@ -205,9 +212,23 @@ class GreenAuditResult:
                 # measured=False is the honest "could not determine" — a reader must never
                 # infer clean from an empty findings list without checking this flag.
                 "measured": self.security.measured,
+                # #1396: the THIRD fact. `measured` says the looking happened, this says it
+                # FINISHED, and `clean` below is a claim about the whole tree that only holds
+                # when both are true. Persisted rather than left inside `status`, because a
+                # fact that lives only as English in a clipped prose field is a fact every
+                # later sweep has to substring-match to find — which is the defect this
+                # ticket exists to retire, and leaving it out here would simply relocate it
+                # into the archive the sweeps actually count.
+                "coverage_partial": self.security.coverage_partial,
                 "status": _clip(self.security.status),
                 "files_scanned": self.security.files_scanned,
                 "worst_severity": self.security.worst_severity,
+                # NOTE the ordering above: read `clean` together with `coverage_partial`.
+                # `is_clean()` is deliberately NOT redefined to fold coverage in — it is a
+                # named predicate ("scanned, and nothing found") whose meaning 44 archived
+                # green-quality.json already carry, and silently changing what it asserts
+                # would retroactively alter what every past sweep measured. The qualifier
+                # goes BESIDE it, not inside it.
                 "clean": self.security.is_clean(),
                 "findings": [
                     {"rule": f.rule, "severity": f.severity, "path": f.path,
@@ -224,6 +245,11 @@ class GreenAuditResult:
                 "disposition": self.prose.disposition(),
                 "measured": self.prose.measured,
                 "applicable": self.prose.applicable,
+                # #1396, sibling of the security block above. NOT folded into `disposition`:
+                # that enum is four-way by construction and `corpus_block` counts all four
+                # (see its own argument in placeholder_prose), so widening it would change
+                # what every prose counter means. Carried alongside instead.
+                "coverage_partial": self.prose.coverage_partial,
                 "status": _clip(self.prose.status),
                 "pages_scanned": self.prose.pages_scanned,
                 "worst_severity": self.prose.worst_severity,

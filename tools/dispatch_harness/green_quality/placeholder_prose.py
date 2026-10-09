@@ -123,6 +123,7 @@ from .constants import (
     SEVERITY_INFO,
     SEVERITY_MEDIUM,
     SEVERITY_ORDER,
+    clip_rule_list,
 )
 
 # ---------------------------------------------------------------------------
@@ -457,6 +458,26 @@ class ProseResult:
     applicable: bool = False
     status: str = "placeholder-prose scan did not run"
     pages_scanned: int = 0
+    #: True when the scan RAN but part of what it INTENDED to read went unread — a bound was
+    #: hit, a page could not be read, a page would not parse, a page went silent mid-document.
+    #: ``measured`` answers "did the looking HAPPEN", this answers "did the looking FINISH",
+    #: and a bounded scan answers True to both. The sibling field on
+    #: :class:`~.security.SecurityResult` carries the same contract, disjunct for disjunct,
+    #: including the deliberate exclusion below — they were reconciled against each other in
+    #: #1396 after review found them documented alike and implemented differently.
+    #:
+    #: KNOWN GAP (#1399): when NO page is readable at all the scan returns early with
+    #: ``applicable=False`` and this flag never gets set, so an unreadable site reports the
+    #: positive claim "no prose surface here" rather than "could not look". Fixing that moves
+    #: a ``disposition()`` bucket and therefore every corpus counter, which is why it is its
+    #: own change and not this one.
+    #:
+    #: DELIBERATELY EXCLUDED CONTENT DOES NOT SET IT. ``_SKIP_DIRS`` (node_modules, vendor,
+    #: .git, the caches) is not authored prose and was never in scope, so counting it as a
+    #: shortfall would make the flag true on every web delivery ever graded and therefore
+    #: worthless. Those directories are still NAMED in ``status`` — the blind spot is
+    #: disclosed, it is simply not a failure to finish.
+    coverage_partial: bool = False
 
     @property
     def worst_severity(self) -> Optional[str]:
@@ -509,19 +530,29 @@ class ProseResult:
         if not self.measured and not self.findings:
             return f"could-not-determine: {self.status}"[:EVIDENCE_VALUE_CAP]
         if not self.measured:
-            rules = ", ".join(sorted({f.rule for f in self.findings}))
-            return (f"PARTIAL SCAN — {len(self.findings)} placeholder finding(s): "
-                    f"{rules}")[:EVIDENCE_VALUE_CAP]
+            # #1400 item 1, carried from security.py: the rule list is trimmed to fit and says
+            # so, instead of losing its tail to a bare slice.
+            return clip_rule_list(
+                f"PARTIAL SCAN — {len(self.findings)} placeholder finding(s): ",
+                sorted({f.rule for f in self.findings}))
         if not self.applicable:
             return (f"not-applicable: no user-visible prose surface "
                     f"({self.status})")[:EVIDENCE_VALUE_CAP]
         if not self.findings:
+            if self.coverage_partial:
+                # #1396: this branch is reached with measured=True, so the `not self.measured`
+                # arm above cannot speak for it. "Nothing found where I looked" is the claim
+                # that is actually supported; "no placeholder prose" is a claim about the
+                # whole deliverable and was not established.
+                return (f"PARTIAL SCAN — no placeholder prose in the {self.pages_scanned} "
+                        f"page(s) read, coverage incomplete")[:EVIDENCE_VALUE_CAP]
             return f"no placeholder prose ({self.pages_scanned} page(s) read)"[:EVIDENCE_VALUE_CAP]
         counts = {s: sum(1 for f in self.findings if f.severity == s)
                   for s in (SEVERITY_HIGH, SEVERITY_MEDIUM, SEVERITY_INFO)}
         head = ", ".join(f"{n} {s}" for s, n in counts.items() if n)
-        rules = ", ".join(sorted({f.rule for f in self.findings}))
-        return f"{head}: {rules}"[:EVIDENCE_VALUE_CAP]
+        prefix = "PARTIAL SCAN — " if self.coverage_partial else ""
+        return clip_rule_list(f"{prefix}{head}: ",
+                              sorted({f.rule for f in self.findings}))
 
 
 # ---------------------------------------------------------------------------
@@ -810,10 +841,18 @@ def _present_skipped_dirs(root: Path) -> list[str]:
 
 
 def _iter_web_files(root: Path) -> Iterable[Path]:
-    """Every page and template under *root*, dependency and VCS trees excluded."""
+    """Every page and template under *root*, dependency and VCS trees excluded.
+
+    YIELDS ONE PAST THE BOUND ON PURPOSE (#1400), exactly as its security sibling
+    ``_iter_source_files`` does. ``scanned >= _MAX_FILES`` cannot tell "the walk was cut
+    short" from "the tree happens to hold exactly that many", so a site of exactly
+    ``_MAX_FILES`` pages claimed partial coverage on a scan that was complete — crying wolf
+    on the honest case, which is how a coverage caveat stops being read. The extra item
+    exists only when there was genuinely more to see, making the distinction decidable
+    without a second walk."""
     count = 0
     for path in sorted(root.rglob("*")):
-        if count >= _MAX_FILES:
+        if count > _MAX_FILES:
             return
         try:
             if not path.is_file():
@@ -859,14 +898,30 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> ProseResult:
     unparsed = 0
     silenced = 0
     truncated = False
+    walk_abandoned = False
+    file_cap_hit = False
+    truncated_reads = 0
     skipped_dirs = _present_skipped_dirs(root)
     try:
-        for path in _iter_web_files(root):
+        for seen, path in enumerate(_iter_web_files(root)):
+            # The walk hands over one item past the bound so this is decidable; that item is
+            # evidence there was more, not something to scan.
+            if seen >= _MAX_FILES:
+                file_cap_hit = True
+                break
             try:
-                text = path.read_text(encoding="utf-8", errors="replace")[:_MAX_FILE_BYTES]
+                raw = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 unreadable += 1
                 continue
+            # #1395, carried from security.py's `truncated_reads`. The slice below is a REAL
+            # bound on what was examined: past 256 KiB the page is simply not looked at, and
+            # a placeholder string — or a credential, in the sibling's case — sitting after
+            # the cut is reported as absent. Counting it is what keeps "clean" meaning "clean
+            # in what I read" rather than a claim about the whole file.
+            if len(raw) > _MAX_FILE_BYTES:
+                truncated_reads += 1
+            text = raw[:_MAX_FILE_BYTES]
             try:
                 rel = str(path.relative_to(root)).replace("\\", "/")
             except ValueError:
@@ -910,6 +965,14 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> ProseResult:
                 truncated = True
                 findings.extend(f for f in raw if f.severity == SEVERITY_HIGH)
                 if len(findings) >= _MAX_HIGH_FINDINGS:
+                    # THIS BREAK LEAVES FILES UNREAD, which `truncated` above does not say:
+                    # that flag means the finding LIST was abbreviated while every page was
+                    # still examined, and it is deliberately not a coverage signal. Walking
+                    # out early is a different fact and its security sibling has recorded it
+                    # as `walk_abandoned` since #1396; prose had no equivalent, so a scan that
+                    # stopped partway through the tree could still publish complete coverage.
+                    # Found by writing the parity control, not by reading this loop.
+                    walk_abandoned = True
                     break
     except OSError as exc:
         # A tree that became unwalkable mid-scan: keep what was found, but the result is
@@ -920,6 +983,26 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> ProseResult:
                            pages_scanned=pages + templates)
 
     scanned = pages + templates
+    if scanned == 0 and unreadable:
+        # #1399, THE FAIL-OPEN. This case used to fall into the not-applicable branch below,
+        # which asserts "this deliverable has no user-visible prose" — a POSITIVE claim about
+        # the delivery. What actually happened is that every page found was unreadable, and
+        # the `unreadable` counter was then discarded entirely on that path.
+        #
+        # `disposition()` already argues the fix in its own docstring: it asks `measured`
+        # FIRST because "a scan that could not run knows nothing about applicability either".
+        # So the honest answer is measured=False -> DISPOSITION_UNMEASURED, and the ordering
+        # carries it without touching the four-way enum.
+        #
+        # Its security sibling is fail-closed on the identical tree (`scan_repo` returns
+        # measured=False on an unreadable root), which is what made this a defect rather than
+        # a design difference between two instruments.
+        return ProseResult(
+            measured=False, applicable=False, pages_scanned=0, coverage_partial=True,
+            status=f"{unreadable} page(s) or template(s) were found in {root.name} and NONE "
+                   f"could be read, so whether this delivery has user-visible prose is unknown"
+                   + (f" [surface: {surface}]" if surface else ""),
+        )
     if scanned == 0:
         # MEASURED and NOT APPLICABLE — the state this instrument has and its sibling does
         # not. The tree was read; it simply has no user-visible prose in it, which is the
@@ -943,14 +1026,36 @@ def scan_repo(repo: Optional[Path], surface: str = "") -> ProseResult:
         status += (f", {silenced} page(s) went silent mid-document on an unclosed code or "
                    f"template tag (unambiguous rules re-run over their raw source; contact "
                    f"and title rules did not run past the break)")
-    if scanned >= _MAX_FILES:
+    if file_cap_hit:
         status += f", file list capped at {_MAX_FILES} (coverage is partial)"
+    if truncated_reads:
+        status += (f", {truncated_reads} file(s) longer than {_MAX_FILE_BYTES // 1024} KiB were "
+                   f"read only up to that point (anything past it was NOT examined)")
     if truncated:
         status += f", finding list capped at {_MAX_FINDINGS} (high-severity findings kept in full)"
+    if walk_abandoned:
+        status += (f", the scan STOPPED at {_MAX_HIGH_FINDINGS} high-severity findings and the "
+                   f"remaining files were NOT read (coverage is partial)")
     if surface:
         status += f" [surface: {surface}]"
     return ProseResult(tuple(findings), measured=True, applicable=True, status=status,
-                       pages_scanned=scanned)
+                       pages_scanned=scanned,
+                       # Each disjunct is the SAME variable that wrote its sentence into
+                       # `status` above — one derivation, so the flag and the prose cannot
+                       # drift apart. `skipped_dirs` is absent by design; see the field.
+                       #
+                       # `unreadable` is here for the reason its security sibling is: `scanned`
+                       # counts only pages successfully read, so an unreadable page SHRINKS the
+                       # counter and can hold the bound test false on a read that really was
+                       # short. The files that prove the shortfall must not be the ones that
+                       # hide it.
+                       # `truncated` is DELIBERATELY ABSENT and its absence is asserted by
+                       # test_sibling_scanner_parity: it means the finding LIST was
+                       # abbreviated while every page was still read, which is not a coverage
+                       # shortfall. `walk_abandoned` is present for the opposite reason.
+                       coverage_partial=bool(file_cap_hit or unparsed or silenced
+                                             or unreadable or truncated_reads
+                                             or walk_abandoned))
 
 
 # ---------------------------------------------------------------------------

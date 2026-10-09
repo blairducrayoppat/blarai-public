@@ -692,6 +692,41 @@ def _read_run_fleet_logs(run_dir: Path) -> str:
     return "\n".join(out)
 
 
+def bank_plan_into_run_dir(
+    plan_store: "pg.PlanStore | None", run_dir: "str | Path | None"
+) -> str:
+    """Copy the run's plan into its OWN directory. Returns evidence, never raises.
+
+    ``state/fleet-swap/plan.json`` is per-MACHINE, not per-run: the next dispatch
+    overwrites it. The plan is the primary evidence for anything that goes wrong in
+    a run, so without this every post-mortem races the next dispatch -- and a reader
+    who follows a defect report to that path after the next run sees a DIFFERENT
+    plan, which reads as the report being wrong rather than the file having moved
+    (#1481; it happened to #1479's own evidence within the hour).
+
+    Fail-soft by construction: banking evidence must never be able to fail a run.
+    A write that raises returns the reason as evidence instead of propagating -- an
+    unbanked plan costs a later investigation, a raised exception costs the build.
+
+    This is the ONE write the driver makes into ``run_dir``, which is otherwise
+    read-only here (see the ``run_dir`` note in ``__init__``). It is deliberate: the
+    run directory is already the durable per-run home for journal.log,
+    acceptance.json and decompose-diagnostics.json, and the plan is the one primary
+    artifact missing from it."""
+    if plan_store is None or run_dir is None:
+        return "not banked: no plan_store or run_dir"
+    try:
+        src = Path(plan_store.path)
+        if not src.is_file():
+            return f"not banked: {src} is not a file"
+        dest = Path(run_dir) / "plan.json"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(src.read_bytes())
+        return f"banked {dest} ({dest.stat().st_size} bytes)"
+    except Exception as exc:  # noqa: BLE001 -- evidence banking never fails a run
+        return f"not banked: {type(exc).__name__}: {exc}"
+
+
 def _samples_consumed_from_run_dir(run_dir: "str | Path | None") -> int:
     """``samples_consumed`` recovered from the run's per-task logs — the sum of
     every ``"Best-of-N: N candidate(s)"`` line found — or ``-1`` ("not
@@ -861,6 +896,25 @@ def _oracle_execution_validated(run_dir: "str | Path | None") -> bool:
         value = data.get(key)
         if not isinstance(value, str) or value.strip().lower() in _QA_STAMPS_NOT_MEASURED:
             return False
+    # #1410: the two stamps answer "did the probes RUN?". They do not answer "did QA ACCEPT
+    # this exam?", and those are different questions — the second is the one that authorises
+    # deleting the operator's work.
+    #
+    # A `refuse` verdict cannot reach here today, because a refused oracle is never seeded
+    # (`author_and_qa_job_oracle` returns empty code/path) so the pre-check has nothing to
+    # run and never passes. That is a real defence and it held on the 2026-08-14 run. But it
+    # is INCIDENTAL to this function: nothing here would notice if a later change seeded a
+    # refused oracle, and `seed-partial` — QA accepting an exam that still carries soft
+    # findings — reaches this guard TODAY and passes it.
+    #
+    # So the verdict is read here as well, fail-closed, in the same asymmetric direction the
+    # docstring above argues for: being wrong permissively deletes a task the operator asked
+    # for (measured, #1342 — `create-piece-detail-page`), while being wrong strictly costs
+    # one coder candidate and rebuilds something that may already exist. An absent or
+    # unrecognised verdict is NOT evidence of acceptance and refuses.
+    verdict = data.get("verdict")
+    if not isinstance(verdict, str) or verdict.strip().lower() != "seed":
+        return False
     return True
 
 
@@ -1754,6 +1808,11 @@ class SwapDriver:
             waited += self._gpu_settle_poll_s
 
     def run(self) -> SwapDriverResult:
+        # #1481: bank the plan into the run's own directory FIRST -- before the
+        # watchdogs, before any phase that can fail. A run that dies early is
+        # exactly the run whose plan someone will want, and by then the next
+        # dispatch may already have overwritten the shared file.
+        self._progress(bank_plan_into_run_dir(self._plan_store, self._run_dir))
         outcomes: list = []
         raised: BaseException | None = None
         outcome, loaded, cancelled, avail, message = ("error", False, False, 0.0, "swap error")
@@ -2209,6 +2268,31 @@ class SwapDriver:
         ceiling = self._scope_ceiling(ptask)
         if ceiling:
             prompt = f"{prompt}\n\n{ceiling}"
+        # #1357: tell the coder HOW to check a server, because it will try.
+        # Measured across all 932 banked agent logs: 17 issued a server-start command
+        # and six of those BLOCKED — 602 s and 601 s (both killed externally), then
+        # 553, 519, 330 and 276 s — spanning six different cards since 2026-07-12. A
+        # coder building a web application will, sooner or later, try to start the web
+        # application; `node src/server.js` does not exit, and the coder runtime has no
+        # per-command timeout at all (verified against opencode's published config
+        # schema — only provider and MCP timeouts exist).
+        #
+        # The deny-list in agentic-setup `configs/opencode.json` now REFUSES those
+        # commands, and `continue_loop_on_deny` hands the refusal back to the model
+        # rather than killing the task. But a deny with no alternative just costs a
+        # turn: the model tries, is refused, and has to work out what to do instead.
+        # Saying it up front is the half of the fix that saves the turn. Composed at
+        # the same seam as the scope ceiling so no task can skip it.
+        prompt = (
+            f"{prompt}\n\nDO NOT START A SERVER. Commands that run until killed — "
+            "`node server.js`, `npm start`, `npm run dev`, `vite`, `python -m "
+            "http.server` and the like — will be REFUSED, because they block your "
+            "turn until something external stops you. Nothing here is watching a "
+            "browser. To check server-side code, import the module and call it from a "
+            "test, or run a one-shot script that exits; to check a page, assert on the "
+            "HTML you wrote. A test that finishes is worth more here than a server "
+            "that runs."
+        )
         base["prompt"] = prompt
         # #790 sub-task 5: the canonical package rides the task dict to run-fleet.ps1 →
         # new-agent-task.ps1, whose scaffold seeder names the python skeleton's package
@@ -2226,6 +2310,15 @@ class SwapDriver:
                 pass
         return base
 
+    def _is_web_static(self, ptask: "pg.PlanTask") -> bool:
+        """True when this run builds the single self-contained page (``web-static``).
+
+        Read from the ORIGINAL compiled fleet dict, which carries the intake-declared
+        surface; an absent/unknown surface is False, so every other build keeps the
+        full #989 ceiling."""
+        fleet = self._fleet_tasks.get(ptask.id) or {}
+        return str(fleet.get("surface", "")).strip().lower() == "web-static"
+
     def _scope_ceiling(self, ptask: "pg.PlanTask") -> str:
         """The task's OWN scope boundary (#989), derived from the plan's contracts.
 
@@ -2242,7 +2335,16 @@ class SwapDriver:
         * ``''`` when neither this task's nor any sibling's contract names a created
           file — no boundary is derivable, and the plan-time contract-coverage check
           (``context_pack.contract_coverage``) is the surface that flags that plan
-          shape loudly."""
+          shape loudly;
+        * on a ``web-static`` surface the NEGATIVE half is omitted entirely (#1479).
+          That build ships ONE self-contained page every task extends, and the
+          composed prompt orders each task to EDIT it first — so naming it as a
+          sibling's property does not bound the task, it contradicts an explicit
+          instruction, and the honest reading of "do NOT create, stub, or implement
+          `index.html`" is to decline to edit. There are no separable deliverables on
+          this surface to fence off, which is why the omission costs nothing that
+          #989 was protecting. The POSITIVE half still composes: a task that names
+          its own file is still told what it builds."""
         if self._plan is None or len(self._plan.tasks) < 2:
             return ""
         own = [str(c).strip() for c in ptask.contract.creates if str(c).strip()]
@@ -2263,6 +2365,8 @@ class SwapDriver:
                 if _module_forms(path) & own_forms:
                     continue  # shared/ambiguous with this task's own contract
                 others.append(path)
+        if self._is_web_static(ptask):
+            others = []
         if not own and not others:
             return ""
         lines: list[str] = []
@@ -2532,10 +2636,19 @@ class SwapDriver:
             evidence = ""
             if isinstance(seed, dict):
                 evidence = str(seed.get("evidence", "") or "")
-            self._progress(
-                f"Job oracle NOT seeded ({evidence or 'unavailable'}) — the coder "
-                "builds without seeing it; it still grades the final tree."
-            )
+            # #1418: this tail used to read "it still grades the final tree" on EVERY seed
+            # failure. That is true when a seed fails for a mechanical reason — the oracle
+            # exists and grades at the end even though the coder never saw it — and FALSE
+            # when no oracle was authored at all, because `real_run_job_oracle` returns
+            # `not-run` at its first statement and never touches the tree. The sentence cost
+            # real time: it sent an investigation hunting an ecosystem-detection bug, because
+            # it asserted a grade would still happen.
+            no_oracle = "no job oracle was generated" in evidence
+            tail = ("the coder builds without seeing it; it still grades the final tree."
+                    if not no_oracle else
+                    "there is NO oracle, so the final tree will NOT be graded at all — "
+                    "job acceptance for this run is not-run, not a failure.")
+            self._progress(f"Job oracle NOT seeded ({evidence or 'unavailable'}) — {tail}")
         # #790 rec-1: resolve the oracle's first-party import contract ONCE and surface
         # it into every task's prompt (below, in _fleet_task_for). Independent of the
         # seed result above — the import surface is the coder's most actionable signal

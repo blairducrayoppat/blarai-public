@@ -1,0 +1,46 @@
+2026-10-07T15:47:04-0400 run 1 old waiting: input idle 443s < 900s
+2026-10-07T15:52:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T15:57:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T16:02:05-0400 run 1 old waiting: input idle 196s < 900s
+2026-10-07T16:07:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T16:12:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T16:17:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T16:22:05-0400 run 1 old waiting: input idle 53s < 900s
+2026-10-07T16:27:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T16:32:05-0400 run 1 old waiting: input idle 0s < 900s
+2026-10-07T16:37:06-0400 run 1 old waiting: input idle 189s < 900s
+2026-10-07T16:42:05-0400 run 1 old waiting: input idle 62s < 900s
+2026-10-07T16:47:05-0400 run 1 old waiting: input idle 2s < 900s
+2026-10-07T16:52:04-0400 run 1 old waiting: input idle 66s < 900s
+2026-10-07T16:57:04-0400 run 1 old waiting: input idle 366s < 900s
+2026-10-07T17:02:04-0400 run 1 old waiting: input idle 666s < 900s
+2026-10-07T17:18:47-0400 run 1 old -> clean 7 failed, 12049 passed, 30 skipped, 133 deselected, 27 warnings
+2026-10-07T17:49:16-0400 run 2 new -> clean 5 failed, 13148 passed, 26 skipped, 620 deselected, 29 warnings
+2026-10-07T18:03:37-0400 run 3 old -> clean 6 failed, 12050 passed, 30 skipped, 133 deselected, 27 warnings
+2026-10-07T18:35:12-0400 run 4 new -> clean 5 failed, 13148 passed, 26 skipped, 620 deselected, 29 warnings
+2026-10-07T18:36:37-0400 nothing pending
+2026-10-07T18:41:37-0400 nothing pending
+2026-10-07T18:46:37-0400 nothing pending
+2026-10-07T18:51:37-0400 nothing pending
+2026-10-07T18:56:37-0400 nothing pending
+2026-10-07T19:01:45-0400 nothing pending
+2026-10-07T19:06:37-0400 nothing pending
+2026-10-07T19:11:37-0400 nothing pending
+2026-10-07T19:16:38-0400 nothing pending
+2026-10-07T19:21:37-0400 nothing pending
+2026-10-07T19:26:37-0400 nothing pending
+2026-10-07T19:31:37-0400 nothing pending
+2026-10-07T19:36:37-0400 nothing pending
+2026-10-07T19:41:37-0400 nothing pending
+2026-10-07T19:46:37-0400 nothing pending
+2026-10-07T19:52:04-0400 run 1 fixed waiting: cpu 16% >= 15%
+2026-10-07T20:19:56-0400 run 1 fixed -> clean 5 failed, 13219 passed, 26 skipped, 620 deselected, 31 warnings
+2026-10-07T20:46:14-0400 run 2 real -> clean 13250 passed, 620 deselected, 29 warnings
+2026-10-07T21:10:44-0400 run 3 fixed -> clean 6 failed, 13218 passed, 26 skipped, 620 deselected, 29 warnings
+2026-10-07T21:37:03-0400 run 4 real -> clean 1 failed, 13249 passed, 620 deselected, 29 warnings
+2026-10-07T21:41:37-0400 nothing pending
+2026-10-07T21:46:45-0400 nothing pending
+2026-10-07T21:51:38-0400 nothing pending
+2026-10-07T21:56:37-0400 nothing pending
+2026-10-07T22:21:04-0400 run 1 real -> void another test runner started during the run: python.exe:1732 C:\Users\mrbla\BlarAI\.venv\Scripts\python.exe -m pytest tests/test_oracle_eval.
+2026-10-07T22:46:13-0400 run 2 real -> clean 13253 passed, 620 deselected, 29 warnings

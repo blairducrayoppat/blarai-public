@@ -1,0 +1,14 @@
+arm,rep,status,wall_ms,passed,failed,total
+parallel_g4_pre_order_fix,1,clean,730300,13253,0,13253
+parallel_g6_pre_order_fix,1,failed,677550,13252,1,13253
+parallel_g3_pre_order_fix,1,clean,704080,13253,0,13253
+parallel_g3_canary_leak,1,failed,866910,13252,1,13253
+parallel_g3_canary_leak,2,failed,850420,13252,1,13253
+parallel_g3_canary_leak,3,failed,877000,13252,1,13253
+parallel_g3_tail,1,clean,848690,13288,0,13288
+parallel_g3_tail,2,clean,894610,13288,0,13288
+parallel_g3_tail,3,clean,894120,13288,0,13288
+parallel_g5_tail,1,clean,767910,13288,0,13288
+parallel_g6_tail,1,clean,704280,13288,0,13288
+parallel_g6_tail,2,clean,700770,13288,0,13288
+parallel_g6_tail,3,clean,708590,13288,0,13288

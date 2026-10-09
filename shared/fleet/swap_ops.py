@@ -302,20 +302,43 @@ def pending_run_budget_path(config: FleetDispatchConfig) -> Path:
 # CONSUME-ONCE file rather than a live-protocol change or a per-job reboot.
 #: Freshness window: an override older than this is IGNORED (stale-file guard —
 #: a runner that wrote a budget then never dispatched must not silently apply it
-#: to a later job; era-rot class, lesson 195). The runner writes it moments
-#: before each dispatch.
-PENDING_RUN_BUDGET_FRESH_S: float = 300.0
+#: to a later job; era-rot class, lesson 195).
+#:
+#: RAISED 300 -> 1800 (#1359), and the old value's stated rationale was MEASURED FALSE.
+#: It claimed "5 min dwarfs the write->dispatch gap". The gap is not write->dispatch, it
+#: is write->EXECUTE, and EXECUTE is where the file is consumed — on the far side of the
+#: PLAN chain AND of dispatch-asset generation. Measured on run night-20260809-194335:
+#:
+#:     run budget: using the CONFIG DEFAULT 10800s — staged budget REJECTED as STALE:
+#:     28800s written 431s ago, freshness window 300s
+#:
+#: with `dispatch assets: 8/8 written` logged ONE SECOND before that line. Generating the
+#: plan's pictures alone (~303 s for 8 at 37.9 s each) outlasts the entire old window, so
+#: an image-carrying card could never keep its own budget. B9 silently ran on the 10,800 s
+#: default for every night it has ever run, and was killed hours early each time.
+#:
+#: 1800 s covers the measured 431 s with margin and the theoretical worst case (PLAN's
+#: 720 s budget + asset generation) at ~1,023 s. The guard still does its job: the file is
+#: consume-once and deleted on read, and a default-budget card CLEARS it, so a staged-but-
+#: never-dispatched budget cannot reach a later job through this window.
+PENDING_RUN_BUDGET_FRESH_S: float = 1800.0
 #: Hard clamp on any per-card budget the AO will honor (a card cannot request an
 #: unbounded run). 8 h covers the longest measured card (B3 ~6.5 h) with margin.
 CARD_RUN_BUDGET_MAX_S: float = 28800.0
 
 
-def write_pending_run_budget(config: FleetDispatchConfig, seconds: float) -> None:
+def write_pending_run_budget(config: FleetDispatchConfig, seconds: float) -> bool:
     """Runner side: stage a per-card driver budget for the NEXT dispatch.
 
-    Fail-soft: a write failure just means the AO uses its config default. A
-    non-positive value CLEARS any prior override (so a default-budget card after
-    a B3 can never inherit B3's window)."""
+    Returns True on success. **RETURNS A VALUE as of #1359** — it previously returned
+    None and swallowed every ``OSError``, so BOTH ends of this channel failed
+    silently: a stage that never landed and a card that never asked for one produced
+    an identical (absent file, no log) signature at the reader. Callers should log a
+    False; ignoring it restores the old behaviour exactly.
+
+    Fail-soft is still the policy — a write failure means the AO uses its config
+    default, never that the dispatch dies. A non-positive value CLEARS any prior
+    override (so a default-budget card after a B3 can never inherit B3's window)."""
     import json
     import time
 
@@ -332,23 +355,53 @@ def write_pending_run_budget(config: FleetDispatchConfig, seconds: float) -> Non
         else:
             path.unlink(missing_ok=True)
     except OSError:
-        pass
+        return False
+    return True
 
 
-def read_pending_run_budget(config: FleetDispatchConfig) -> float | None:
-    """AO side: CONSUME (read + delete) a fresh per-card budget override, or None.
+def resolve_pending_run_budget(
+    config: FleetDispatchConfig,
+) -> "tuple[float | None, str]":
+    """CONSUME a fresh per-card budget override, and SAY WHY when there isn't one.
 
-    Fail-closed to the config default: absent, unreadable, stale (> the freshness
-    window), or non-positive all return None. Deletes on read so one override can
-    never bleed into a second dispatch. Clamped to CARD_RUN_BUDGET_MAX_S."""
+    Returns ``(seconds_or_None, reason)``. The reason is the whole point of this
+    function existing separately from :func:`read_pending_run_budget`.
+
+    **The incident (#1359, 2026-08-09).** A B9 card staged a 28,800 s envelope and the
+    run was killed at 10,901 s — the 10,800 s config default plus shutdown. Every
+    rejection path here returned a bare ``None``, the caller silently fell back, and
+    nothing anywhere logged which budget was chosen or why the staged one lost. The
+    run's whole record said only *"The overall run budget elapsed"*, which is true of
+    both budgets and therefore useless. Four candidate causes (never written, written
+    late, stale, torn) were indistinguishable after the fact, so the defect could not
+    be diagnosed from a completed run at all — only re-run and hoped at.
+
+    That is the #1241 instrument class: a decision with real consequences and no
+    record. A fallback that cannot say why it fell back is not fail-safe, it is
+    fail-silent.
+
+    Fail-closed to the config default on every path: absent, unreadable, torn,
+    non-positive, or stale (> ``PENDING_RUN_BUDGET_FRESH_S``). Deletes on read so one
+    override can never bleed into a second dispatch. Clamped to
+    ``CARD_RUN_BUDGET_MAX_S``.
+    """
     import json
     import time
 
     try:
         path = pending_run_budget_path(config)
+    except (OSError, AttributeError) as exc:
+        return None, f"no staged budget: cannot resolve its path ({exc})"
+    try:
         raw = path.read_text(encoding="utf-8")
-    except (OSError, AttributeError):
-        return None
+    except FileNotFoundError:
+        # The common, benign case AND the one real failure mode look identical here:
+        # a card with no override never writes the file, and a runner whose write
+        # failed also leaves nothing. Name the path so the two can be told apart by
+        # looking rather than guessing.
+        return None, f"no staged budget: {path} absent (card default, or the stage failed)"
+    except (OSError, AttributeError) as exc:
+        return None, f"no staged budget: {path} unreadable ({exc})"
     # Consume-once: delete immediately, before honoring — a torn/hostile file
     # still cannot survive to a later dispatch.
     try:
@@ -359,13 +412,35 @@ def read_pending_run_budget(config: FleetDispatchConfig) -> float | None:
         data = json.loads(raw)
         seconds = float(data.get("run_budget_s", 0.0))
         written_at = float(data.get("written_at", 0.0))
-    except (ValueError, TypeError, AttributeError):
-        return None
+    except (ValueError, TypeError, AttributeError) as exc:
+        return None, f"staged budget REJECTED: unparseable ({exc}); raw={raw[:120]!r}"
     if seconds <= 0:
-        return None
-    if time.time() - written_at > PENDING_RUN_BUDGET_FRESH_S:
-        return None  # stale: the dispatch it was written for never fired
-    return min(seconds, CARD_RUN_BUDGET_MAX_S)
+        return None, f"staged budget CLEARED: run_budget_s={seconds} (card asked for the default)"
+    age = time.time() - written_at
+    if age > PENDING_RUN_BUDGET_FRESH_S:
+        return None, (
+            f"staged budget REJECTED as STALE: {seconds:.0f}s written {age:.0f}s ago, "
+            f"freshness window {PENDING_RUN_BUDGET_FRESH_S:.0f}s — the dispatch it was "
+            "written for did not fire in time (a slow PLAN/approve widens this gap)"
+        )
+    honored = min(seconds, CARD_RUN_BUDGET_MAX_S)
+    if honored < seconds:
+        return honored, (
+            f"staged budget CLAMPED: card asked {seconds:.0f}s, ceiling "
+            f"{CARD_RUN_BUDGET_MAX_S:.0f}s (staged {age:.0f}s ago)"
+        )
+    return honored, f"staged budget HONORED: {honored:.0f}s (staged {age:.0f}s ago)"
+
+
+def read_pending_run_budget(config: FleetDispatchConfig) -> float | None:
+    """AO side: CONSUME (read + delete) a fresh per-card budget override, or None.
+
+    Thin wrapper over :func:`resolve_pending_run_budget` — kept because callers and
+    tests depend on this exact signature. **Prefer the verbose form at any call site
+    that has a logger**: this one discards the reason, which is precisely the gap
+    #1359 was opened for."""
+    seconds, _reason = resolve_pending_run_budget(config)
+    return seconds
 
 
 def status_path(config: FleetDispatchConfig, run_id: str) -> Path:
@@ -1444,14 +1519,62 @@ def _oracle_qa_seed_gate(
         evidence.setdefault("f2p_baseline", "not-run")
         evidence.setdefault("collectability", "not-run")
     # Persist the merged evidence for #827/#832 (best-effort, never fatal).
-    if evidence:
-        try:
-            out = config.runs_dir / run_id / "oracle-qa.json"
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
-        except OSError:
-            pass
+    _persist_oracle_qa(config, run_id, evidence)
     return refusal
+
+
+def _persist_oracle_qa(config: FleetDispatchConfig, run_id: str, evidence: dict) -> None:
+    """Write ``<run>/oracle-qa.json``. Best-effort by design — a persistence miss must never
+    block a seed, which is the posture every path here already holds.
+
+    Extracted from :func:`_oracle_qa_seed_gate` for #1418: it was the ONLY writer of this
+    file and it sits below three refusal returns in its caller, so every pre-gate refusal
+    banked nothing at all. An empty ``evidence`` still writes nothing — there is a difference
+    between "the run had nothing to say" and "the run refused and said why", and only the
+    second is worth a record."""
+    if not evidence:
+        return
+    try:
+        out = config.runs_dir / run_id / "oracle-qa.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _refused_before_qa(
+    config: FleetDispatchConfig, run_id: str, qa_evidence_json: str, reason: str,
+) -> dict:
+    """Bank what is known when a seed is refused BEFORE the QA gate could run, then return
+    the refusal.
+
+    #1418. Three returns in :func:`real_seed_job_oracle` sit above the QA gate — an
+    ungenerated oracle, an unpinned path, and a pinned path with no designed guard — and the
+    gate is the only writer of ``oracle-qa.json``. So the run banked NOTHING for exactly the
+    outcomes most worth reconstructing: the two containment refusals are what a tampered plan
+    or an undesigned extension look like from the outside.
+
+    The record says the seed was refused BEFORE QA, and the QA stamps read ``not-run``. That
+    distinction is the point: this must not be mistakable for a QA verdict on an oracle that
+    was never examined, which would be the same absence-as-a-confident-value defect one layer
+    over."""
+    evidence = _parse_qa_evidence(qa_evidence_json)
+    evidence.setdefault("f2p_baseline", "not-run")
+    evidence.setdefault("collectability", "not-run")
+    evidence["seed_refused_before_qa"] = reason
+    _persist_oracle_qa(config, run_id, evidence)
+    return {"ok": False, "evidence": reason}
+
+
+def _parse_qa_evidence(qa_evidence_json: str) -> dict:
+    """The plan-time evidence blob, or ``{}``. Never raises on malformed input."""
+    if not qa_evidence_json:
+        return {}
+    try:
+        parsed = json.loads(qa_evidence_json)
+    except (ValueError, TypeError):
+        return {}
+    return dict(parsed) if isinstance(parsed, dict) else {}
 
 
 def real_seed_job_oracle(
@@ -1480,7 +1603,11 @@ def real_seed_job_oracle(
     line-commented instead — see :data:`_SEED_SKIP_GUARD_NODE`). A pinned path
     with no designed guard is refused fail-closed, never seeded unguarded.
     Fail-soft: any refusal/failure returns ``ok=False`` and the run proceeds
-    exactly as before seeding existed (the oracle still grades at the end).
+    exactly as before seeding existed (the oracle still grades at the end — EXCEPT when
+    there is no oracle, where :func:`real_run_job_oracle` returns ``not-run`` at its first
+    statement and never touches the tree; #1418 corrected this sentence and the operator-
+    facing one built from it, which asserted a grade that could not happen and sent an
+    investigation looking for an ecosystem-detection bug that did not exist).
 
     #821 (QUALITY-3) — the oracle-QA SEED GATE: ``qa_evidence_json`` carries the
     plan-time validation evidence (counts / coverage / regeneration) and, when a
@@ -1489,18 +1616,28 @@ def real_seed_job_oracle(
     pre-wave skeleton BEFORE the guarded seed. A CONFIRMED vacuous test (one that
     PASSES with no implementation → can only mint a false GREEN) REFUSES the seed
     (``ok=False`` → the run proceeds oracle-less → honest job-acceptance not-run — a
-    bad oracle is worse than none). The merged evidence is always written to
-    ``<run>/oracle-qa.json`` for #827/#832. Absent ``qa_run`` the execution gate is
+    bad oracle is worse than none). The merged evidence is written to
+    ``<run>/oracle-qa.json`` for #827/#832 on EVERY path, including the three refusals
+    above that return before the gate is reached — those bank the plan-time evidence with
+    ``seed_refused_before_qa`` and ``not-run`` QA stamps, so a refusal is never mistakable
+    for a verdict on an oracle nobody examined. Until #1418 this sentence said "always"
+    while three returns sat above the only writer, which is the defect class the whole
+    instrument-honesty arc exists to close. Absent ``qa_run`` the execution gate is
     skipped (the plan-time HARD gate already refused a hopeless oracle) but the
     evidence is still persisted. Every part is fail-soft: a machinery miss (no
     runner, timeout) never blocks the seed — only a CONFIRMED defect does."""
     from shared.fleet.acceptance import JOB_ORACLE_ALLOWED_PATHS
 
+    # #1418: each of these returns sits ABOVE the QA gate, which is the only writer of
+    # <run>/oracle-qa.json — so every one of them banked nothing, and a refused oracle is the
+    # outcome whose evidence is most worth having.
     if not oracle_code:
-        return {"ok": False, "evidence": "no job oracle was generated at plan time"}
+        return _refused_before_qa(config, run_id, qa_evidence_json,
+                                  "no job oracle was generated at plan time")
     if rel_path not in JOB_ORACLE_ALLOWED_PATHS:
-        return {"ok": False,
-                "evidence": f"refused oracle path {rel_path!r} (not a pinned oracle path)"}
+        return _refused_before_qa(
+            config, run_id, qa_evidence_json,
+            f"refused oracle path {rel_path!r} (not a pinned oracle path)")
     if rel_path.endswith(".py"):
         seeded = _SEED_SKIP_GUARD + oracle_code
     elif rel_path.endswith(".mjs"):
@@ -1509,8 +1646,9 @@ def real_seed_job_oracle(
         # Defense-in-depth: JOB_ORACLE_ALLOWED_PATHS carries only .py/.mjs today,
         # but a future pinned path with an undesigned guard must refuse — an
         # UNGUARDED seed would execute (and fail) in every per-task/wave gate.
-        return {"ok": False,
-                "evidence": f"no seed guard designed for {rel_path!r} — not seeded"}
+        return _refused_before_qa(
+            config, run_id, qa_evidence_json,
+            f"no seed guard designed for {rel_path!r} — not seeded")
 
     # #821 oracle-QA seed gate: run the FAIL-TO-PASS baseline (+ collectability
     # confirmation) against the pre-wave skeleton, merge the plan-time evidence, persist
@@ -2080,6 +2218,28 @@ def real_run_job_oracle_flake_checked(
 #: Registered in shared/timeout_registry.py (the same change, per the SSOT rule).
 EXEC_SMOKE_TIMEOUT_S = 120.0
 
+#: The multi-page capture's own wall-clock bound, INSIDE the one above (#1394). The web
+#: console capture walks every delivered page, and its per-page navigation waits multiply into
+#: a ceiling that ``EXEC_SMOKE_TIMEOUT_S`` has to contain: at the capture's 12-page cap the
+#: worst case reached ~144 s against this 120 s budget. Latent at B9's six pages (~77 s, and
+#: real pages never exhaust their navigation timeout), but "a relatively complex website with
+#: multiple pages" is the operator's stated direction, and past ~10 pages being KILLED
+#: mid-sweep goes from accidental to routine.
+#:
+#: BEING KILLED IS THE FAILURE THIS PREVENTS, not slowness: the caller's timeout takes the
+#: whole capture, so the per-page error text the sweep exists to collect dies with it. On
+#: 2026-08-15 that text was where the real defect lived — a TypeError breaking contact.html,
+#: while the published finding was a favicon 404. So the sweep is given a budget it can stop
+#: WITHIN, and names the pages it never reached.
+#:
+#: THE TWO BOUNDS HAD NO SHARED OWNER, which is what #1394 actually filed: the cap and the
+#: per-page waits live in ``agentic-setup/scripts/capture-web-cdp.mjs`` and were set by a
+#: different change in a different repo, with nothing checking one fits inside the other.
+#: This constant is now that owner — passed down the invocation rather than duplicated — and
+#: ``test_capture_sweep_budget_fits_exec_smoke`` asserts the containment.
+#: 20 s entry wait + 1.2 s settle + 90 s sweep = 111.2 s, inside the 120 s above.
+WEB_CAPTURE_SWEEP_BUDGET_S = 90.0
+
 #: ``_safe_run`` maps a subprocess timeout to ``(False, "", "timed out after Ns")``. The
 #: floor keys on this literal to tell a BOOT-CLASS failure (a fast, real load error) from a
 #: process that merely ran long (a server-start on ``--help``) — the latter is never a
@@ -2406,7 +2566,11 @@ def _with_link_report(result: dict, link: dict) -> dict:
     broken = int(link.get("counts", {}).get("broken", 0) or 0)
     if broken:
         result["evidence"] = f"{result.get('evidence', '')} | {broken} broken link(s)".strip(" |")
-    elif not link.get("checked", False):
+    elif not link_lint.is_measured(link):
+        # The instrument's own predicate, never a re-derivation of `checked` here: a reader
+        # that re-implements the honesty question owns a second copy of it, and the copies
+        # drift. Registered in `shared.instrument_registry`, which fails the standing gate if
+        # this renderer stops asking.
         result["evidence"] = f"{result.get('evidence', '')} | links NOT checked".strip(" |")
     return result
 
@@ -2450,7 +2614,8 @@ def _with_media_report(result: dict, media: dict) -> dict:
     """
     result["image_placement"] = media
     findings = len(media.get("findings", []) or [])
-    if media.get("checked", False):
+    # The instrument's own predicate, for the reason given in `_with_link_report`.
+    if image_placement.is_graded(media):
         if findings:
             result["evidence"] = (
                 f"{result.get('evidence', '')} | {findings} media placement finding(s)".strip(" |")
@@ -2645,7 +2810,12 @@ def real_web_console_capture(
             pass
         command = (
             f"& '{_ps_single_quote(str(script))}' -AppDir '{_ps_single_quote(str(repo))}' "
-            f"-OutPng '{_ps_single_quote(str(out_png))}'"
+            f"-OutPng '{_ps_single_quote(str(out_png))}' "
+            # #1394: the sweep budget travels DOWN from its registered owner rather than
+            # being duplicated in the capture. That is the whole fix — the capture's ceiling
+            # and the timeout containing it were set in two repositories with nothing
+            # reconciling them, and a number with two homes has none.
+            f"-SweepBudgetMs {int(WEB_CAPTURE_SWEEP_BUDGET_S * 1000)}"
         )
         cmd = [_pwsh(), "-NoProfile", "-NonInteractive", "-Command", command]
         log_path = base / "exec-smoke-web.log"

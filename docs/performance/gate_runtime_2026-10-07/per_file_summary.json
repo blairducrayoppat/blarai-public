@@ -1,0 +1,99 @@
+{
+  "arms": {
+    "old": {
+      "summed_test_seconds_per_run": [
+        654.0,
+        648.2
+      ],
+      "pytest_wall_seconds_per_run": [
+        690.57,
+        682.97
+      ],
+      "runs": 2
+    },
+    "new": {
+      "summed_test_seconds_per_run": [
+        1580.0,
+        1629.5
+      ],
+      "pytest_wall_seconds_per_run": [
+        1619.97,
+        1667.64
+      ],
+      "runs": 2
+    }
+  },
+  "files": {
+    "tests/security/test_git_update_consent.py": {
+      "old": 0.0,
+      "new": 274.8,
+      "delta": 274.8
+    },
+    "tests/security/test_git_swap_and_handshake.py": {
+      "old": 0.0,
+      "new": 197.1,
+      "delta": 197.1
+    },
+    "tests/security/test_git_install_hardening.py": {
+      "old": 0.0,
+      "new": 140.7,
+      "delta": 140.7
+    },
+    "tests/security/test_git_rules_guard_differential.py": {
+      "old": 0.0,
+      "new": 53.8,
+      "delta": 53.8
+    },
+    "tests/security/test_git_native_pre_commit.py": {
+      "old": 0.0,
+      "new": 52.3,
+      "delta": 52.3
+    },
+    "tests/security/test_git_hooks_hardening.py": {
+      "old": 0.0,
+      "new": 48.4,
+      "delta": 48.4
+    },
+    "tests/security/test_git_reference_transaction.py": {
+      "old": 0.0,
+      "new": 36.3,
+      "delta": 36.3
+    },
+    "tests/security/test_git_rules_guard.py": {
+      "old": 0.0,
+      "new": 33.3,
+      "delta": 33.3
+    },
+    "tests/security/test_disposition_discipline.py": {
+      "old": 44.3,
+      "new": 68.3,
+      "delta": 24.0
+    },
+    "tests/security/test_containment_evidence_bundle.py": {
+      "old": 0.0,
+      "new": 22.0,
+      "delta": 22.0
+    },
+    "tests/security/test_git_install_recovery.py": {
+      "old": 0.0,
+      "new": 17.6,
+      "delta": 17.6
+    },
+    "tests/security/test_git_rules_guard_failclosed.py": {
+      "old": 0.0,
+      "new": 10.8,
+      "delta": 10.8
+    },
+    "tests/security/test_git_companion_allowlist.py": {
+      "old": 0.0,
+      "new": 10.0,
+      "delta": 10.0
+    },
+    "tests/security/test_git_hooks_chain.py": {
+      "old": 0.0,
+      "new": 9.3,
+      "delta": 9.3
+    }
+  },
+  "net_delta_seconds": 953.7
+}

@@ -1,0 +1,1148 @@
+{
+  "spike": "#1689 confined inference: WFP block keyed to blarai-spike while serving over loopback",
+  "run_id": "testb-20261005-160002",
+  "started": "2026-10-05T16:00:02.319-04:00",
+  "block_max_seconds": 420,
+  "serve_hold_seconds": 60,
+  "env": {
+    "machine_clock": "2026-10-05 16:00:02 -04:00",
+    "uptime_hours": 34.95,
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "ps_version": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "svc_mpssvc": "Running/Automatic",
+    "svc_BFE": "Running/Automatic"
+  },
+  "steps": {
+    "preflight": {
+      "spike_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+      "sd_sddl": "D:(A;;CC;;;S-1-5-21-1000000001-1000000002-1000000003-1010)",
+      "objects_absent_before": true
+    },
+    "operator_baseline": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 60,
+        "error": "",
+        "t": "2026-10-05T16:00:03.8471795-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:00:03.8591037-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 25,
+        "error": "",
+        "t": "2026-10-05T16:00:03.8997955-04:00"
+      }
+    ],
+    "filters_added": {
+      "at": "2026-10-05T16:00:03.985-04:00",
+      "filter_ids": [
+        407253,
+        407254,
+        407255,
+        407256
+      ]
+    },
+    "task_start": {
+      "Started": true,
+      "Detail": "state=Running"
+    },
+    "serve_port": {
+      "run_id": "testb-20261005-160002",
+      "host": "127.0.0.1",
+      "port": 49580,
+      "pid": 21584,
+      "model_loaded": true,
+      "hold_seconds": 60,
+      "t": "2026-10-05T16:01:06.616-04:00"
+    },
+    "operator_request": {
+      "ok": true,
+      "status": 200,
+      "ms": 7670,
+      "model_loaded": true,
+      "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+      "body": "{\"completion\": \"Thinking Process:\\n\\n1.  **Analyze the Request:**\\n    *   Task: Reply with one short sentence.\\n    *  ...[truncated to 100 chars]\", \"model_loaded\": true, \"generated_tokens\": 32, \"wall_ms\": 7214.8, \"ran_as_pid\": 21584, \"t\": \"2026-10-05T16:01:15.740-04:00\"}",
+      "error": "",
+      "t": "2026-10-05T16:01:15.752-04:00"
+    },
+    "watchdog": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-05T16:00:06.4587974-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:00:07.9968911-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-05T16:00:09.5309809-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 25,
+        "error": "",
+        "t": "2026-10-05T16:00:11.0650784-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:00:12.5910261-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:00:14.1187672-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:00:15.6382546-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:00:17.1635912-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:00:18.7029206-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:00:20.2308770-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:00:21.7586293-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:00:23.2880583-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:00:24.8222638-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:00:26.3551907-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:00:27.8762648-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:00:29.4123517-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T16:00:30.9425531-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:00:32.4729972-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:00:34.0050305-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:00:35.5326160-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:00:37.0664713-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:00:38.5952480-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:00:40.1249387-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:00:41.6456994-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:00:43.1738463-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:00:44.7078560-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:00:46.2386051-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:00:47.7674667-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T16:00:49.3064278-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-05T16:00:50.8484203-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:00:52.3805308-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-05T16:00:53.9080175-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 25,
+        "error": "",
+        "t": "2026-10-05T16:00:55.4372504-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 32,
+        "error": "",
+        "t": "2026-10-05T16:00:56.9824512-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:00:58.5142941-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 30,
+        "error": "",
+        "t": "2026-10-05T16:01:00.0567615-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 25,
+        "error": "",
+        "t": "2026-10-05T16:01:01.5884503-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 32,
+        "error": "",
+        "t": "2026-10-05T16:01:03.1401707-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T16:01:04.6828901-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:06.2185512-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:07.7496363-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:15.8034166-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:16.8405460-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T16:01:17.8817142-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:18.9066285-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:01:19.9273352-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:20.9517410-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:01:21.9724256-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:22.9959176-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 25,
+        "error": "",
+        "t": "2026-10-05T16:01:24.0298667-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 29,
+        "error": "",
+        "t": "2026-10-05T16:01:25.0732133-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:26.0994049-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T16:01:27.1260282-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:01:28.1740333-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:29.1978950-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-05T16:01:30.2217804-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T16:01:31.2504253-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:32.2742128-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:33.3009483-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:34.3214522-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:35.3409692-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T16:01:36.3695363-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:37.3977116-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:38.4194705-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:39.4469359-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:40.4742164-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:41.4985710-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:42.5277172-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 18,
+        "error": "",
+        "t": "2026-10-05T16:01:43.5508456-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:44.5829561-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:45.6046430-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 18,
+        "error": "",
+        "t": "2026-10-05T16:01:46.6284882-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:47.6566117-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:48.6854700-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:49.7123351-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:50.7396384-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:51.7636628-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:52.7849591-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 18,
+        "error": "",
+        "t": "2026-10-05T16:01:53.8085155-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:54.8302846-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:55.8548256-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:01:56.8780801-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T16:01:57.9086741-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:01:58.9255599-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T16:01:59.9521132-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 18,
+        "error": "",
+        "t": "2026-10-05T16:02:00.9706567-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:02:01.9991975-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:02:03.0263890-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 30,
+        "error": "",
+        "t": "2026-10-05T16:02:04.0606150-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:02:05.0887736-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-05T16:02:06.1155650-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:02:07.1395227-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 29,
+        "error": "",
+        "t": "2026-10-05T16:02:08.1777497-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T16:02:09.2084770-04:00"
+      }
+    ],
+    "spike_outbound_mid_hold": {
+      "target": "1.1.1.1:443",
+      "connected": false,
+      "ms": 6.9,
+      "error": "PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+      "t": "2026-10-05T16:01:37.079-04:00"
+    },
+    "task_result": {
+      "schema_version": 1,
+      "run_id": "testb-20261005-160002",
+      "mode": "serve",
+      "started": "2026-10-05T16:00:04.586-04:00",
+      "finished": "2026-10-05T16:02:09.244-04:00",
+      "overall": "pass",
+      "hold_seconds": 60,
+      "expected_blocked": true,
+      "host": {
+        "computer": "_MACHINE_",
+        "ps_version": "5.1.26100.9444",
+        "machine_clock": "2026-10-05 16:00:04 -04:00"
+      },
+      "steps": [
+        {
+          "name": "identity",
+          "status": "pass",
+          "started": "2026-10-05T16:00:04.651-04:00",
+          "finished": "2026-10-05T16:00:04.774-04:00",
+          "detail": "ran as the spike SID, not elevated, session 0",
+          "data": {
+            "whoami_user": "\"_MACHINE_\\blarai-spike\",\"S-1-5-21-1000000001-1000000002-1000000003-1010\"",
+            "token_user": "_MACHINE_\\blarai-spike",
+            "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+            "expected_sid": "S-1-5-21-1000000001-1000000002-1000000003-1010",
+            "groups": [
+              "S-1-5-21-1000000001-1000000002-1000000003-513",
+              "S-1-1-0",
+              "S-1-5-32-545",
+              "S-1-5-3",
+              "S-1-2-1",
+              "S-1-5-11",
+              "S-1-5-15",
+              "S-1-5-113",
+              "S-1-2-0",
+              "S-1-5-64-10"
+            ],
+            "mandatory_label": [
+              "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+            ],
+            "is_admin_role": false,
+            "session_id": 0,
+            "user_interactive": false,
+            "auth_type": "NTLM"
+          }
+        },
+        {
+          "name": "memory",
+          "status": "pass",
+          "started": "2026-10-05T16:00:04.774-04:00",
+          "finished": "2026-10-05T16:00:05.056-04:00",
+          "detail": "free 19.55 GB >= 14 GB",
+          "data": {
+            "free_gb": 19.55,
+            "total_gb": 31.32,
+            "in_use_gb": 11.77,
+            "required_free_gb": 14
+          }
+        },
+        {
+          "name": "gpu_feasibility",
+          "status": "pass",
+          "started": "2026-10-05T16:00:05.056-04:00",
+          "finished": "2026-10-05T16:02:08.869-04:00",
+          "detail": "GPU load 33.685 s; run1 ttft 2698.3 ms 6.77 tok/s; run2 ttft 275.62 ms 4.6 tok/s",
+          "data": {
+            "python_exit_code": null,
+            "python_result_file": "C:\\blarai-spike\\results\\python-testb-20261005-160002.json",
+            "python": {
+              "mode": "serve",
+              "started": "2026-10-05T16:00:05.597-04:00",
+              "pid": 21584,
+              "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+              "device_requested": "GPU",
+              "prompt": "Explain in three sentences why the sky is blue.",
+              "versions": {
+                "python": "3.11.9",
+                "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+                "openvino_genai": "2026.4.0.0-3407-7ea2546852a"
+              },
+              "devices": [
+                "CPU",
+                "GPU",
+                "NPU"
+              ],
+              "device_names": {
+                "CPU": "Intel(R) Core(TM) Ultra 7 258V",
+                "GPU": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+                "NPU": "Intel(R) AI Boost"
+              },
+              "runtime_imported": true,
+              "load": {
+                "ok": true,
+                "seconds": 33.685,
+                "error": null,
+                "started": "2026-10-05T16:00:05.597-04:00",
+                "finished": "2026-10-05T16:00:40.572-04:00"
+              },
+              "runs": [
+                {
+                  "started": "2026-10-05T16:00:40.572-04:00",
+                  "ok": true,
+                  "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+                  "wall_ms": 12016.4,
+                  "first_chunk_s": 3.1755,
+                  "generated_tokens": 64,
+                  "ttft_ms": 2698.3,
+                  "tpot_ms": 147.77,
+                  "tok_per_s_wall": 5.33,
+                  "tok_per_s_tpot": 6.77,
+                  "finished": "2026-10-05T16:00:52.593-04:00",
+                  "index": 1
+                },
+                {
+                  "started": "2026-10-05T16:00:52.593-04:00",
+                  "ok": true,
+                  "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+                  "wall_ms": 13991.8,
+                  "first_chunk_s": 0.5642,
+                  "generated_tokens": 64,
+                  "ttft_ms": 275.62,
+                  "tpot_ms": 217.53,
+                  "tok_per_s_wall": 4.57,
+                  "tok_per_s_tpot": 4.6,
+                  "finished": "2026-10-05T16:01:06.588-04:00",
+                  "index": 2
+                }
+              ],
+              "serve": {
+                "bind": "127.0.0.1:49580",
+                "hold_seconds": 60,
+                "started": "2026-10-05T16:01:06.616-04:00",
+                "model_loaded": true,
+                "outbound_probe_mid_hold": {
+                  "target": "1.1.1.1:443",
+                  "connected": false,
+                  "ms": 6.9,
+                  "error": "PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+                  "t": "2026-10-05T16:01:37.079-04:00"
+                },
+                "finished": "2026-10-05T16:02:07.537-04:00",
+                "requests": [
+                  {
+                    "t": "2026-10-05T16:01:08.167-04:00",
+                    "peer": "127.0.0.1",
+                    "path": "/",
+                    "status": 200,
+                    "model": "model",
+                    "wall_ms": 7572.9,
+                    "generated_tokens": 32,
+                    "ttft_ms": 522.71
+                  }
+                ],
+                "requests_served": 1
+              },
+              "finished": "2026-10-05T16:02:07.537-04:00"
+            },
+            "stderr": {}
+          }
+        },
+        {
+          "name": "file_denial",
+          "status": "pass",
+          "started": "2026-10-05T16:02:08.869-04:00",
+          "finished": "2026-10-05T16:02:09.083-04:00",
+          "detail": "all 8 secret reads and 4 outside writes denied; positive controls allowed",
+          "data": {
+            "secret_reads": [
+              {
+                "path": "C:\\Users\\_OPERATOR_\\.ssh",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.ssh' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\.git-credentials",
+                "kind": "read",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.git-credentials' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\AppData\\Local\\BlarAI",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\AppData\\Local\\BlarAI' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\.aws",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.aws' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\.azure",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\.azure' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\BlarAI",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\BlarAI' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\blarai-research-data",
+                "kind": "list",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\blarai-research-data' is denied."
+              }
+            ],
+            "outside_writes": [
+              {
+                "path": "C:\\Windows\\System32\\spike-write-test.tmp",
+                "kind": "write",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Windows\\System32\\spike-write-test.tmp' is denied."
+              },
+              {
+                "path": "C:\\Users\\_OPERATOR_\\spike-write-test.tmp",
+                "kind": "write",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\Users\\_OPERATOR_\\spike-write-test.tmp' is denied."
+              },
+              {
+                "path": "C:\\blarai-spike\\bin\\spike-write-test.tmp",
+                "kind": "write",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\blarai-spike\\bin\\spike-write-test.tmp' is denied."
+              },
+              {
+                "path": "C:\\spike-write-test.tmp",
+                "kind": "write",
+                "outcome": "denied",
+                "exception": "UnauthorizedAccessException",
+                "message": "Access to the path 'C:\\spike-write-test.tmp' is denied."
+              }
+            ],
+            "informational_writes": [
+              {
+                "path": "C:\\Windows\\Temp\\spike-write-test.tmp",
+                "kind": "write",
+                "outcome": "allowed",
+                "exception": null,
+                "message": ""
+              },
+              {
+                "path": "B:\\models\\spike-write-test.tmp",
+                "kind": "write",
+                "outcome": "allowed",
+                "exception": null,
+                "message": ""
+              }
+            ],
+            "positive_controls": [
+              {
+                "path": "C:\\blarai-spike\\work\\write-control-testb-20261005-160002.tmp",
+                "kind": "write",
+                "outcome": "allowed",
+                "exception": null,
+                "message": ""
+              },
+              {
+                "path": "C:\\blarai-spike\\bin\\spike-config.json",
+                "kind": "read",
+                "outcome": "allowed",
+                "exception": null,
+                "message": ""
+              },
+              {
+                "path": "B:\\models\\Qwen3.5-4B-int8-ov\\config.json",
+                "kind": "read",
+                "outcome": "allowed",
+                "exception": null,
+                "message": ""
+              }
+            ]
+          }
+        },
+        {
+          "name": "outbound_probe",
+          "status": "pass",
+          "started": "2026-10-05T16:02:09.083-04:00",
+          "finished": "2026-10-05T16:02:09.189-04:00",
+          "detail": "outbound 1.1.1.1:443: BLOCKED (Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"); expected_blocked=True",
+          "data": {
+            "probe": {
+              "target": "1.1.1.1:443",
+              "connected": false,
+              "ms": 68,
+              "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+              "t": "2026-10-05T16:02:09.172-04:00"
+            },
+            "blocked": true,
+            "expected_blocked": true
+          }
+        },
+        {
+          "name": "serve",
+          "status": "pass",
+          "started": "2026-10-05T16:02:09.189-04:00",
+          "finished": "2026-10-05T16:02:09.242-04:00",
+          "detail": "listener 127.0.0.1:49580 ran 60 s, model_loaded=True, requests served 1",
+          "data": {
+            "bind": "127.0.0.1:49580",
+            "requests_served": 1,
+            "model_loaded": true,
+            "outbound_probe_mid_hold": {
+              "target": "1.1.1.1:443",
+              "connected": false,
+              "ms": 6.9,
+              "error": "PermissionError: [WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+              "t": "2026-10-05T16:01:37.079-04:00"
+            },
+            "requests": [
+              {
+                "t": "2026-10-05T16:01:08.167-04:00",
+                "peer": "127.0.0.1",
+                "path": "/",
+                "status": 200,
+                "model": "model",
+                "wall_ms": 7572.9,
+                "generated_tokens": 32,
+                "ttft_ms": 522.71
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "schema_violations": [],
+    "engine_close_status": "0x00000000",
+    "removal_engine_check": {
+      "sublayer_present": false,
+      "provider_present": false,
+      "filters_present": []
+    },
+    "operator_after_removal": {
+      "target": "1.1.1.1:443",
+      "ok": true,
+      "ms": 30,
+      "error": "",
+      "t": "2026-10-05T16:02:10.6708070-04:00"
+    }
+  },
+  "finished": "2026-10-05T16:02:10.690-04:00",
+  "decision_inputs": {
+    "BaselineOk": true,
+    "TaskStarted": true,
+    "OperatorReachedListener": true,
+    "RemovalVerified": true,
+    "OperatorFailures": 0,
+    "SpikeOutboundBlocked": true,
+    "ModelLoaded": true,
+    "SidIsSpike": true,
+    "ServeStarted": true,
+    "ResultValid": true,
+    "OperatorGotModelCompletion": true,
+    "OperatorAbort": false
+  },
+  "exit_code": 0,
+  "exit_reason": "spike blocked, model completion served over loopback, operator unaffected, removal verified"
+}

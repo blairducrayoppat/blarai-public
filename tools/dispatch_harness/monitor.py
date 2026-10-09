@@ -266,7 +266,7 @@ class RunMonitor:
     # explicitly granted. 240 s survives CPU-quiet gaps between checks while
     # still dooming a truly dead run in minutes (the overall bound backstops).
     # Registered: shared/timeout_registry.py.
-    stall_grace_s: float = 240.0
+    stall_grace_s: float = 900.0
     # 5400 -> 10800 (2026-07-08, #767/#757): this default was still sized to
     # pre-plan-graph runs while every production sibling had moved to the
     # measured 10800 family — the timeout registry's seeding inventory caught

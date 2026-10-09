@@ -482,6 +482,7 @@ batch first. Grep here, then open exactly one volume — never the whole history
 2026-07-17 | A long-context memory guard has to know the model's attention shape, or it lies (#932/#930) | I built a rigorous measurement tool that will chart how the 35B model slows down as you feed it longer and longer prompt | 2026-07.md
 2026-07-17 | The gate that parked good code, and the timeout that starved the job beneath it | two #790 harness fixes — scope the per-candidate test gate to the spec so a coder's buggy self-test can't park working c | 2026-07.md
 2026-07-17 | The per-card budget that fed the multi-wave job without feeding the ceiling | the coder fleet's "overall run budget elapsed" starvation was a too-small per-job timeout; the fix is a per-card budget  | 2026-07.md
+2026-07-17 | #774 sub-task 2: routing the fleet's raw spawns through the blessed helper, honesty over completeness | I moved 10 of the 12 raw process-spawn sites in the fleet code onto the one vetted spawn helper (shared/procsp | 2026-07.md (backfilled 2026-08-09)
 2026-07-18 | A "green" preflight that never checked the signature it blessed | signed and enforced the spec-decode draft manifests (#107 go-live) with the LA present; the ceremony passed, but the ind | 2026-07.md
 2026-07-18 | The gate's verdict depends on the shell that runs it | shipping the LA-decided voice pace (1.5 → 0.90 ≈ 189 WPM) took ten minutes; proving the gate green took three runs, beca | 2026-07.md
 2026-07-18 | First grading of a shadowed agent: the acting layer earned trust, the speaking layer disproved it | the coordinator's sealed shadow journal was opened and graded for the first time — 100% precision on decisions across 3. | 2026-07.md
@@ -492,6 +493,7 @@ batch first. Grep here, then open exactly one volume — never the whole history
 2026-07-19 | The gate that caught the editor: two date errors, a fused CVE, and a program built to catch its own kind | Phase 0 of the publication program ran end to end — author kit, seven parallel novelty/venue surveys, a decision ceremon | 2026-07.md
 2026-07-19 | The obligation nobody owned, and the defect it was hiding | I was handed a confident brief telling me to read last night's A/B battery night; the A/B night had not run yet, and the | 2026-07.md
 2026-07-19 | Before you attribute a verdict, adjudicate the judge | our automated grader kept blaming the coding agent for its own bugs — a grader that checked none of the six things it wa | 2026-07.md
+2026-07-19 | The grader that spent its whole budget on a defect that was never there | the oracle quality-checker was comparing module names against a list of function names, so every time a genera | 2026-07.md (backfilled 2026-08-09)
 2026-07-20 | Documentation is not evidence: three technology evaluations, three README-shaped wrong answers | The Lead Architect asked four technology questions. Every first-pass answer that rested on a vendor's own documentation  | 2026-07.md
 2026-07-20 | The safety gate that never once ran, and the coder punished for being right | reading last night's coding experiment, I found that its result was decided by an earlier step doing too much work — and | 2026-07.md
 2026-07-20 | The fix for a starvation that did not happen last night | I landed the per-card time budgets that stop a long build job being cut off mid-way, and confirmed they work — while not | 2026-07.md
@@ -548,6 +550,8 @@ batch first. Grep here, then open exactly one volume — never the whole history
 2026-07-23 | The well-formed deferral that still rotted, and the half-fix I shipped inside the fix for the lesson about half-fixes | a known defect sat two days behind a perfectly-written ticket until it bit someone live; fixing it, I made the exact mis | 2026-07.md
 2026-07-23 | The corpus that could only agree with me | I measured a guard change as a 73% improvement, published the number, and had to withdraw it two hours later — because I | 2026-07.md
 2026-07-23 | The fix round is where defects enter | across six changes tonight, every single defect found in a round where the author was applying review fixes had been int | 2026-07.md
+2026-07-23 | #1067 v4: the fix was not a better proxy, it was making the fallible half a veto | after three rejected attempts to teach the coordinator's prose guard about negation, the version that held spl | 2026-07.md (backfilled 2026-08-09)
+2026-07-23 | The fifth attempt worked because it stopped asking "is there a negation?" and started asking "is this whole thing a negation?" | four designs tried to spot a negation word next to a success phrase and let the sentence through; English has  | 2026-07.md (backfilled 2026-08-09)
 2026-07-24 | The public mirror was nine days stale and the safety gate that caused it was working perfectly | a fail-closed control that refuses correctly is still a silent failure if nothing carries the refusal to a human — the p | 2026-07.md
 2026-07-27 | The instruction on screen became a lie: durable advertisements over volatile state | BlarAI asked the operator four questions, he relaunched the app, and his long typed answer was both un-consumable and th | 2026-07.md
 2026-07-27 | Don't program the answer into the test: the operator caught me fixing his goal instead of the framework | BlarAI asked the operator four questions, he answered them, he rejected the plan for an unrelated bug, and every require | 2026-07.md
@@ -581,4 +585,119 @@ batch first. Grep here, then open exactly one volume — never the whole history
 2026-07-30 | The lock that grepped for its own fix |  | 2026-07.md
 2026-07-30 | The right answer was already ranked first, and we threw it away | the local documentation was switched on but stayed quiet for the goals the operator actually writes; the retrieval had b | 2026-07.md
 2026-07-30 | A green gate is evidence about the units, and the night is the wiring | I had 10,140 passing tests and a merge I was confident in, and the operator asked one question — "I don't think any mode | 2026-07.md
+2026-07-30 | The probe that could not say it never ran | the check that confirms our exams can actually be run had been quietly answering "I can't tell" on every singl | 2026-07.md (backfilled 2026-08-09)
 2026-07-31 | The comment explaining the fix was the census nobody ran | the scorecard stamp had four checks that reported "nothing found" when they had actually never looked; the fix had been  | 2026-07.md
+
+2026-07-31 | A stale number opened the audit, and it was the least wrong thing on the page | I set out to fix an out-of-date test count on the two pages that introduce this project to the public, and fou | 2026-07.md (backfilled 2026-08-09)
+2026-07-31 | Four surfaces agreed against the record, and the record was right both times | four public pages said our speed-up was about 1.4 times; the internal register said 1.48 to 1.68. That looks l | 2026-07.md (backfilled 2026-08-09)
+2026-08-05 | Monthly retrospective: the month we built the instruments, and the month they failed | July added 5,401 tests and a whole apparatus for measuring whether BlarAI works — an eval harness, oracle machinery, a c | 2026-08.md
+2026-08-05 | He asked for a page, and the system could not hear the word | the dispatch corridor told the operator it was building a command-line tool when he had asked for a web page, because th | 2026-08.md
+2026-08-06 | The harness tells me the date in UTC, and his evening is a different day | I built an entire comprehension gate on the wrong date because the date the tooling hands me is UTC and he was seven hou | 2026-08.md
+2026-08-06 | Two standing authorizations that only existed in my head | he asked whether future sessions know they may spin up subagents and may run the battery on demand. One was authorized b | 2026-08.md
+2026-08-06 | Two locks are defence-in-depth for a read and a trap for a write | the battery's stop date is protected by two independent locks, which is good design — but changing the date needs two ed | 2026-08.md
+2026-08-06 | A hang never takes an error path, so fail-closed never fires | two branches arrived finished and green; independent review found a hang that no error handler could have caught and a f | 2026-08.md
+2026-08-06 | The gates were all green because none of them were reading the page | a website is mostly words, and nothing in the system had ever asked for any of them — so I built the one part of that a  | 2026-08.md
+2026-08-06 | A failure that names the wrong cause costs more than the failure | three times in one evening the system told me why something failed, and three times the reason was wrong — a battery job | 2026-08.md
+2026-08-06 | A handoff card written by a session that kept working is not a handoff, it is a fork | I was handed a landing card and gated on it. While I was presenting the gate, the session that wrote the card merged the | 2026-08.md
+2026-08-06 | The lock enumerated spellings, and the fix had already changed the spelling | a gate built to stop the app destroying typed text could not see the most likely way of reintroducing the bug, because i | 2026-08.md
+2026-08-06 | A self-correction that re-checked the pages and not the figures | a branch built to correct its own overclaim missed a wrong number sitting three lines from the correction, because the c | 2026-08.md
+2026-08-07 | The registry that owns "what is not measured" was about to carry a false claim | a branch added a new measurement, and the file whose whole job is to record what each instrument does not measure would  | 2026-08.md
+2026-08-07 | A floor lowered past its own evidence, and the lock that would have lied about it | the Lead Architect told me to drop the coder's memory safety floor from 20 GiB to 19 GiB because it was blocking work. T | 2026-08.md
+2026-08-07 | Three sessions called them someone else's files, and two of them were evidence | Six stray files had been sitting in the project folder for weeks. Every session that noticed them assumed they belonged  | 2026-08.md
+2026-08-07 | The audit reported better coverage the less of it actually ran | One of our automated quality checks deliberately stops early when it runs out of time. But the tests it never got to wer | 2026-08.md
+2026-08-07 | Supersession is where goals go to disappear |  | 2026-08.md
+2026-08-07 | Five failures, five causes, and two of them printed the same sentence | the multi-page website test had never once run. Tonight it failed five times before it worked, and every failure was in  | 2026-08.md
+2026-08-07 | Ratification by delegation, and the document that got truer by reading worse |  | 2026-08.md
+2026-08-08 | The instrument that blamed a person who was not there | three of our tools reported a confident cause they had no way to know, and the operator caught the worst one by simply s | 2026-08.md
+2026-08-08 | The exam that deleted the work | a test that could never fail did not just mark a broken website as good — it convinced the planner the remaining work wa | 2026-08.md
+2026-08-08 | The exam that could not fail, in the ecosystem he cares about most | the test that decides whether a whole website job succeeded was never itself checked for node projects — so a five-quest | 2026-08.md
+2026-08-08 | The cheapest instrument in the building was a person clicking a link | he looked at a website the system built and found three things wrong in about a minute that four automated gates had pas | 2026-08.md
+2026-08-08 | A zero is not a number until you know who counted it | the record that graded the websites said "0 problems found" when what it meant was "we did not look." I did not change a | 2026-08.md
+2026-08-08 | Seven observations, and the line between what a cheap check can see and what it cannot | he made seven observations about a website in about a minute. I went through them one at a time and asked which could be | 2026-08.md
+2026-08-08 | The instrument that called his photographs a mistake | I built a checker that finds generated pictures no page uses, ran it over everything, and reported that 54 images were w | 2026-08.md
+2026-08-08 | Eighty-one runs, and the check that matters most never ran once | I went looking for why requirement coverage was empty on websites, found a second instrument with the same blind spot, a | 2026-08.md
+2026-08-09 | The monitor I built to detect a quiet tree was watching two corpses | A tool built to answer "is anyone still working here?" checked whether certain processes existed, not whether they were  | 2026-08.md
+2026-08-09 | I fixed the bookkeeping and reported success. He asked why the public repos still hadn't changed. | Realigning a pointer and calling it done is not the same as publishing anything. He caught the gap directly. Actually fi | 2026-08.md
+2026-08-09 | Writing carefully about a guard can trip the guard | A public README had been hand-patched with demo-film links and an update summary that never made it back into the source | 2026-08.md
+2026-08-09 | A deadline is not a fault, and it took me eight tries to notice | four nights of building produced nothing, and the reason was that a security check had three minutes to survive eight mi | 2026-08.md
+2026-08-09 | The fix worked, and my explanation of why was wrong | the builds run again after four lost nights. But when I checked which of my four changes actually did it, only one had — | 2026-08.md
+2026-08-09 | Three inferences, one log file, and a control I nearly broke for no reason | I decided a safety mechanism was faulty and wrote a ticket telling a future session to weaken it. Then I read the log I  | 2026-08.md
+2026-08-09 | An eight-hour window, three hours of run, and no record of the swap | a build was given eight hours and killed after three. The system announced the eight hours in its own log and then used  | 2026-08.md
+2026-08-10 | A control can be present, loaded, matched, and inert | the seven-page site finally got built; the ten-second safety cap that was supposed to stop yesterday's ten-minute hang h | 2026-08.md
+2026-08-10 | A file that exists is not a file that is served | he asked to be handed the website served and running, opened it, and found the gallery empty — the data file was sitting | 2026-08.md
+2026-08-10 | You find an inert control by counting what it did, not by reading what it says | five separate guardrails turned out to have never once changed an outcome, and every one of them was found the same way  | 2026-08.md
+2026-08-11 | The night ran, and every instrument told me it hadn't | a battery night failed three different ways in one evening, and each time the thing that was supposed to notice was itse | 2026-08.md
+2026-08-14 | Five nights of nothing, and the guard that was blocking the only thing that could clear it | the nightly coder had banked no measurement since the 10th. One guard, doing exactly what it was written to do, had wedg | 2026-08.md
+2026-08-14 | The instructions existed, were correct, and were never delivered | both defects he found by opening the site had the same cause, and it was not the one either ticket described. The coder  | 2026-08.md
+2026-08-14 | A test that encodes an implementation is an argument for keeping the bug | I opened every page of the delivered site instead of one, and caught the defect he found by clicking. Three separate tes | 2026-08.md
+2026-08-14 | Six verifiers were red, and one of them was broken | I ran all 63 checking scripts, found six failing, and reported that as six problems. Only one was. Two were correct alar | 2026-08.md
+2026-08-14 | Four rows said a thing could not be measured, and the measurement was already banked | I spent the evening checking the document that defines "done" against the disk, and the same mistake kept appearing — a  | 2026-08.md
+2026-08-14 | Six ways to publish a number that reads cleaner than the truth | I had four reviewers audit every instrument that grades the coder, asking one question each. They found the same defect  | 2026-08.md
+2026-08-15 | I wrote the fix for a dropped caveat, and it dropped the caveat three times | I spent the night making graders admit when they had not looked at everything, and my own fixes kept committing the exac | 2026-08.md
+2026-08-15 | The obvious fix was wrong five times, and measuring first was the only thing that caught it | I spent the second half of the night closing gaps across seven Definition-of-Done rows, and in five of them the fix that | 2026-08.md
+2026-08-15 | A predicate passing is not the same as a defect being fixed, and I proved it on my own lock first | the first battery to finish in six nights gave me four instruments to check, and in every case the honest answer turned  | 2026-08.md
+2026-08-15 | I built a control to catch a defect, and the control had the defect | an independent reviewer found that three of the ten tickets I had just closed were not actually finished, all in the sam | 2026-08.md
+2026-08-15 | "Nine rows need a run" was a sentence I made up, and it excused eleven rows of work | a hook kept telling me the Definition of Done was unfinished, I kept explaining why that was not my fault, and when I fi | 2026-08.md
+2026-08-15 | The code had already written down the bug it was about to have again | the operator answered our interview the way anyone would and got a blank reply; the comment sitting six lines above the  | 2026-08.md
+2026-08-15 | The comment said "we cannot AST-scan JS", and it had been false for weeks | every website exam skipped quality checking entirely, because of one early return whose justification stopped being true | 2026-08.md
+2026-08-15 | "Reject anything bigger than 10 MB" cancelled the whole dispatch | five ordinary English words, typed as an answer to a question the system asked, could destroy the work — and the one tha | 2026-08.md
+2026-08-15 | Every correction today came from a gate; re-reading my own work caught nothing | I spent a day trying to move the coder's scorecard rows to "live", moved none, and found instead that four of the fiftee | 2026-08.md
+2026-08-16 | The grader that could not read the language, and then blamed the coder for it | the check that grades the coder's own tests could only read Python, so for 55 website deliveries in a row it reported th | 2026-08.md
+2026-08-16 | The sentence is the artifact that rots, because nothing executes it | three times today a comment in the code described something the code no longer did. Nobody notices, because a sentence n | 2026-08.md
+2026-08-16 | The check answered honestly about the page it read, and the page was not the site | the website's form checker only ever looked at the front page, so a site with a contact form reported as having no forms | 2026-08.md
+2026-08-17 | The lock that mandated the defect, and the calibration loop that never fired |  | 2026-08.md
+2026-08-17 | The exam-grader and the site-inspector are not the same instrument, and only one of them survives a skipped exam | the report that grades whether the tests covered his requirements goes silent when no tests run; a second, much cheaper  | 2026-08.md
+2026-08-29 | The fix shipped and nobody told the ticket |  | 2026-08.md
+2026-08-30 | The plan card promised what the coder was never told | the operator asked whether he could give a dispatch a photo of himself; the answer was "partly", and the missing part tu | 2026-08.md
+2026-08-31 | The instrument improved when work was deleted, and so did two of the tests I wrote to catch it |  | 2026-08.md
+2026-08-31 | 2026-08-31 (evening) — A ship that was finished two hours before the board knew, and a slowdown a reboot simply deleted |  | 2026-08.md
+2026-08-31 | 2026-08-31 (late evening) — The window we doubled was never open, and the gate that found it was red for a file in another repository |  | 2026-08.md
+2026-08-31 | Monthly retrospective: the month we stopped reading controls and started counting what they did | August turned the instrument-honesty problem from July into a method. Nearly every finding came from dividing something  | 2026-08.md
+2026-09-01 | We set PATH "on the parent so the child inherits", and never asked which children |  | 2026-09.md
+2026-09-01 | The coder was never broken; we had been serving it on a build whose own docs say tool calling is unsupported |  | 2026-09.md
+2026-09-01 | The instrument was reading the other key, and I wrote a retraction of the reasoning that was right |  | 2026-09.md
+2026-09-02 | The check that told me not to worry about the fault it was built to catch |  | 2026-09.md
+2026-09-03 | The heartbeat shape that was wrong twice before it was right |  | 2026-09.md
+2026-09-16 | The adjudicator you would replace is 150 lines, and the proof half was built and never wired | Four research documents comparing CAVA, PCAA, Microsoft Agent Framework and the Agent Governance Toolkit against BlarAI' | 2026-09.md
+2026-09-16 | The headline was written before the count existed, and the count disagreed | One hundred and ten surveyed governance artefacts scored on five questions against BlarAI's trust spine, in one document | 2026-09.md
+2026-09-16 | The claim register almost shipped the exact defect it exists to catch |  | 2026-09.md
+2026-09-17 | Four surfaces agreed the rule existed, and none of them was the enforcement point | the feasibility study for runtime action governance as a Windows product (#1549) probed ten seams on this machine; the f | 2026-09.md
+2026-09-17 | The study recommended a product, and the first thing that product needed was a wall against this one | the #1549 feasibility study's go recommendation was acted on the same day; the runtime action governor now has its own r | 2026-09.md
+2026-09-17 | I built a lock for a door that cannot open |  | 2026-09.md
+2026-09-17 | The check that verified nothing, and the baseline test that caught me building it wrong |  | 2026-09.md
+2026-09-17 | The surface nobody had described turned out to be well guarded, by the wrong door |  | 2026-09.md
+2026-09-17 | The four properties were already written down, in the one place nothing could read them |  | 2026-09.md
+2026-09-17 | Designing the control, and the reason not to build it |  | 2026-09.md
+2026-09-17 | The refusal worked. The evidence of it was filed as an approved answer. |  | 2026-09.md
+2026-09-17 | A lock that cannot fire looks exactly like a lock |  | 2026-09.md
+2026-09-17 | The question was unanswerable; the failure had already answered it |  | 2026-09.md
+2026-09-17 | I answered the wrong suite, twice, and the second time I caught it myself |  | 2026-09.md
+2026-09-17 | The test for whether a tool deserves a dry run turned out to be one word | having accepted simulate-first over my objection that no current tool justified it, the Lead Architect asked which tools | 2026-09.md
+2026-09-17 | He accepted the capability I recommended against, and the useful work was making acceptance cheap | #1548 asked whether BlarAI should gain simulate-first, a fourth route outcome where an action runs as a dry run before t | 2026-09.md
+2026-09-18 | The missing test was the small problem |  | 2026-09.md
+2026-09-18 | Fail-closed is not a licence to pick any blast radius |  | 2026-09.md
+2026-09-18 | The screen has never seen a single byte that actually left this machine |  | 2026-09.md
+2026-09-18 | I wired the new collector to the wrong test |  | 2026-09.md
+2026-09-19 | The research overturned the fix, and then the review overturned the research's fix |  | 2026-09.md
+2026-09-19 | He handed the decision back, and then I got its cost wrong |  | 2026-09.md
+2026-09-19 | Three diagnoses, two fixes, and nobody had read the error message |  | 2026-09.md
+2026-09-20 | Every gate checked the screen against the document, and the document was wrong |  | 2026-09.md
+2026-09-20 | Four claims I inherited, and only one of them was true |  | 2026-09.md
+2026-09-20 | The only way to check the record was to start changing it |  | 2026-09.md
+2026-09-20 | The settings file said five, and nothing read it |  | 2026-09.md
+2026-09-20 | The gate certified a chain cut at its last link |  | 2026-09.md
+2026-09-20 | A door that never loaded is silent, and so is one that works |  | 2026-09.md
+2026-09-20 | A principle the practice deliberately contradicts |  | 2026-09.md
+2026-09-20 | A go became a cancellation, and the register still said go |  | 2026-09.md
+2026-09-20 | The half I could not measure, measured in ten seconds |  | 2026-09.md
+2026-09-20 | The strongest paper's recommendation was already in yesterday's changelog |  | 2026-09.md
+2026-09-20 | Three documents agreed with each other and none of them checked the code |  | 2026-09.md
+2026-09-21 | The relevance check could not work, and neither could the two fixes I wrote for it |  | 2026-09.md
+2026-09-21 | A stamp read after the call is late by exactly the thing being measured |  | 2026-09.md
+2026-09-21 | The instrument that lied was a registry key, and the driver installer keeps writing it |  | 2026-09.md
+2026-09-22 | We told the model to think, then spent two months calling it broken for thinking |  | 2026-09.md
+2026-09-22 | The blocker was ours, the next one is the model's, and only one of them is fixable tonight |  | 2026-09.md
+2026-09-22 | Three defects in one day, all found by the first instrument that could see them | I built the first eval that actually uses a tool instead of just asking for one, and within minutes it found that the as | 2026-09.md
+2026-09-22 | The suite I built to catch injections had removed the defence before measuring | the same day I wrote a lesson about instruments that cannot see, I published three security failures that my own instrum | 2026-09.md
+2026-09-22 | Two reviewers, fifteen defects, and a verdict that reversed twice before the measurement arrived | I reported a serious security finding, an independent reviewer proved my test had manufactured it, and then the correcte | 2026-09.md
+2026-09-30 | Monthly retrospective: the month every record agreed with itself, and the first check that read the executing thing disagreed | September has 47 entries in two bursts, five in the first three days and 42 between 09-16 and 09-22, with nothing writte | 2026-09.md

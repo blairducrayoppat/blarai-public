@@ -545,6 +545,36 @@ public sealed partial class MainWindow : Window
     // new decrypt path and NO new egress — it reuses ResolveImageAsync for pixels
     // and the operator's explicit Save is the sanctioned export (ADR-033).
 
+    // -- The auditability disclosure (#1583) ---------------------------------
+
+    /// <summary>
+    /// Show BlarAI's own disclosure of which of its actions are recorded and
+    /// which are NOT (#1544), read from THE card rather than a re-typed copy.
+    ///
+    /// Loaded on every open rather than cached: the card is a living document,
+    /// and a cached disclosure is a stale disclosure the operator cannot tell
+    /// from a current one.
+    ///
+    /// No backend connection is required. The disclosure is about what the
+    /// system does, and it must be readable when the system is not running -
+    /// which is exactly when someone is most likely to want it.
+    /// </summary>
+    private void OnOpenAuditability(object sender, RoutedEventArgs e)
+    {
+        var card = Services.AuditabilityCard.Load(AppContext.BaseDirectory);
+        AuditabilityContent.Markdown = card.Body;
+        AuditabilitySubtitle.Text = card.Available
+            ? "Including the things it does not record."
+            : "This disclosure could not be loaded - treat nothing here as assurance.";
+        AuditabilityOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void OnCloseAuditability(object sender, RoutedEventArgs e)
+    {
+        AuditabilityOverlay.Visibility = Visibility.Collapsed;
+    }
+
+
     private async void OnOpenGallery(object sender, RoutedEventArgs e)
     {
         if (!_backend.IsConnected)

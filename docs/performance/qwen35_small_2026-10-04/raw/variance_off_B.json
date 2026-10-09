@@ -1,0 +1,88 @@
+{
+ "engine": "cb-mtp-off",
+ "sequence": "pa*6",
+ "rows": [
+  {
+   "wall_ms": 2641.5,
+   "ttft_ms": 815.52,
+   "tpot_ms": 121.36,
+   "gen": 16,
+   "acc": null,
+   "drafted": null,
+   "i": 0,
+   "cell": "pa"
+  },
+  {
+   "wall_ms": 2639.5,
+   "ttft_ms": 733.61,
+   "tpot_ms": 126.93,
+   "gen": 16,
+   "acc": null,
+   "drafted": null,
+   "i": 1,
+   "cell": "pa"
+  },
+  {
+   "wall_ms": 2879.8,
+   "ttft_ms": 798.38,
+   "tpot_ms": 138.47,
+   "gen": 16,
+   "acc": null,
+   "drafted": null,
+   "i": 2,
+   "cell": "pa"
+  },
+  {
+   "wall_ms": 3042.5,
+   "ttft_ms": 908.69,
+   "tpot_ms": 142.06,
+   "gen": 16,
+   "acc": null,
+   "drafted": null,
+   "i": 3,
+   "cell": "pa"
+  },
+  {
+   "wall_ms": 3317.8,
+   "ttft_ms": 910.12,
+   "tpot_ms": 160.23,
+   "gen": 16,
+   "acc": null,
+   "drafted": null,
+   "i": 4,
+   "cell": "pa"
+  },
+  {
+   "wall_ms": 3487.3,
+   "ttft_ms": 1035.05,
+   "tpot_ms": 163.19,
+   "gen": 16,
+   "acc": null,
+   "drafted": null,
+   "i": 5,
+   "cell": "pa"
+  }
+ ],
+ "header": {
+  "engine": "cb-mtp-off",
+  "mtp": false,
+  "prefix_caching": false,
+  "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+  "device": "GPU",
+  "genai_version": "2026.4.0.0-3407-7ea2546852a",
+  "scheduler": {
+   "cache_size_gb": 3,
+   "max_num_seqs": 1
+  },
+  "compile_properties": {
+   "PERFORMANCE_HINT": "LATENCY",
+   "INFERENCE_PRECISION_HINT": "f16",
+   "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+   "CACHE_DIR": "",
+   "KV_CACHE_PRECISION": "f16",
+   "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+  },
+  "num_assistant_tokens": null,
+  "load_seconds": 9.19
+ }
+}

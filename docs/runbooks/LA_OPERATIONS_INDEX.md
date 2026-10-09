@@ -88,6 +88,9 @@ These are the two runbooks you'll use most day-to-day. Fleet Reports is your inb
 | You need to pause the fleet, register scheduled tasks, rotate credentials, or do any install-level work | [../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md](../archive/2026/retired_fleet_runbooks/AUTONOMOUS_FLEET_OPERATIONS.md) *(RETIRED runbook — describes the old scheduled fleet; today ask the Claude session directly)* |
 | ~~You see a stash backlog, orphaned EA worktree, or a merge-gate path-mismatch ESCALATE~~ | ~~`../governance/fleet-hygiene.md`~~ **RETIRED (file absent) — these were autonomous-fleet failure modes; today ask the Claude session, which owns its own git hygiene** |
 | ~~You're about to change `wake_launcher.ps1`, `tools/autonomy_budget/`, or fleet working-tree state~~ | ~~`../governance/fleet-hygiene.md`~~ **RETIRED (file absent) — the autonomous fleet those paths served no longer runs** |
+| You want to know what BlarAI is allowed to do right now - every capability, and where anything outbound goes | [what_blarai_is_allowed_to_do.md](what_blarai_is_allowed_to_do.md) *(one command; reads the live settings, changes nothing)* |
+| You want to check your audit record yourself — is it intact, how much of it is there, over what period | [verify_audit_record.md](verify_audit_record.md) *(read-only; safe to run any time)* |
+| The audit signing key must change, or BlarAI refuses to start with `[key_mismatch]` | [audit_key_rotation.md](audit_key_rotation.md) *(a ceremony — read it before starting)* |
 | You're troubleshooting something that doesn't fit the above | Ask Claude Desktop — describe symptoms, let it diagnose |
 
 ---

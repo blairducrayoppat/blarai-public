@@ -898,7 +898,11 @@ def test_every_cli_exit_carries_the_same_keys(battery_night):
     """The shape the harness parses is stable across the scoped, unscoped, unresolved
     and switched-off exits. A key that appears on only some paths is a key some caller
     will read as absent-meaning-zero."""
-    expected = {"enabled", "hard", "findings", "counts", "files_scanned", "unparsed", "scope"}
+    # #1416 added `languages` and `uncovered`; `measured` was already promised by this
+    # test's own docstring and was missing from the unresolved-scope exit, which is the
+    # single payload whose whole meaning is "nothing was examined".
+    expected = {"enabled", "measured", "hard", "findings", "counts", "files_scanned",
+                "unparsed", "scope", "languages", "uncovered"}
     env_before = os.environ.get("BLARAI_CODER_TEST_QA")
     payloads = [
         _run_cli(battery_night["repo"], "--since", battery_night["baseline_of_task3"]),

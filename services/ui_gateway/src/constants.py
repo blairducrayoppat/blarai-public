@@ -48,8 +48,26 @@ PA_HANDSHAKE_BACKOFF_BASE_S: float = 1.0
 """Base backoff duration (seconds). Doubles each retry (1s, 2s, 4s, 8s)
 until it reaches ``PA_HANDSHAKE_BACKOFF_CAP_S``."""
 
-PA_HANDSHAKE_TIMEOUT_S: float = 5.0
-"""Per-attempt connection timeout (seconds).
+PA_HANDSHAKE_TIMEOUT_S: float = 30.0
+"""Per-attempt socket budget for the Boot-Phase-3 PA handshake.
+
+RAISED 5.0 -> 30.0 (#1353). **This is the constant that fixed four lost battery nights**,
+and it is measured: on the verifying run (20260809-140620-bd) the winning handshake took
+**16.35 s** of TLS negotiation - more than 3x the old 5 s ceiling. No number of
+five-second attempts could ever have completed it; the old config made sixteen and every
+one hit the same wall.
+
+The Policy Agent accept loop is SEQUENTIAL and performs the mTLS handshake INLINE
+(shared/ipc/vsock.py::accept -> wrap_socket(server_side=True)), so one negotiation
+occupies the only accept thread. For roughly the first 90-110 s of a boot the PA is
+effectively unreachable, and five seconds does not complete a negotiation against it in
+that state. Seen on four consecutive nights as `_ssl.c:989 handshake operation timed
+out`, then `WinError 10061` once the backlog filled.
+
+GPU contention EXTENDS that window but does not open it: on the failed
+night-20260809-124052 the handshake had already failed nine times over 110 s BEFORE
+dispatch-asset generation started at 12:43:25. This is the original #808 cold-load class
+with a per-attempt ceiling too tight to clear it - not a new contention class.
 
 Governs the handshake attempt in ALL transport modes (#808): the dev
 loopback ``VsockConfig`` AND the production host-mode / guest-mode socket
@@ -58,16 +76,24 @@ attempt rode ``PROMPT_RESPONSE_TIMEOUT_S`` = 180 s per socket op, so one
 mute-but-accepting server could stall the whole boot on a single attempt.)
 The retry schedule below owns the patience; this bounds one probe."""
 
-PA_HANDSHAKE_BACKOFF_CAP_S: float = 15.0
-"""Ceiling for the exponential backoff between handshake attempts (#808).
+PA_HANDSHAKE_BACKOFF_CAP_S: float = 30.0
+"""RAISED 15 -> 30 (#1353), in lockstep with the budget.
 
-Uncapped doubling would sleep 64+ s between tail attempts, leaving up to a
-minute of blindness to a PA that became ready early in the gap. Capping at
-15 s means a cold-loading PA is caught within at most 15 s of becoming
-ready, anywhere inside the budget. Registered in
+The cap and the budget together decide the ATTEMPT COUNT. Raising the budget to 600 s
+while leaving a 15 s cap produced 44 attempts, and the worst-case wall clock carries
+per-attempt time ON TOP of the sleep budget - 44 x 30 s of hung probes is twenty-two
+minutes of boot. A 30 s cap fills the same 600 s in ~21 attempts and bounds staleness
+after the PA becomes ready to one cap, which is the property this constant exists for.
+The healthy path is unchanged: 1, 2, 4, 8 then capped, so a ready PA is still detected
+in the first second.
+
+Ceiling for the exponential backoff between handshake attempts (#808). Uncapped
+doubling would sleep 64+ s between tail attempts, leaving up to a minute of blindness
+to a PA that became ready early in the gap. The cap means a cold-loading PA is caught
+within at most one cap of becoming ready, anywhere inside the budget. Registered in
 ``shared/timeout_registry.py``."""
 
-PA_HANDSHAKE_BUDGET_S: float = 180.0
+PA_HANDSHAKE_BUDGET_S: float = 600.0
 """Aggregate planned-backoff budget (seconds) for the Boot-Phase-3 PA
 handshake before Fail-Closed (#808, System Qualities Audit Resilience #2).
 
@@ -79,8 +105,19 @@ grants the same physical event — a cold Qwen3-14B load can exceed 2 minutes
 which converted a legitimately cold/slow PA into a hard boot outage needing
 a manual relaunch. The wall-clock worst case additionally carries per-attempt
 time on top of this budget, bounded by ``PA_HANDSHAKE_MAX_RETRIES`` x
-``PA_HANDSHAKE_TIMEOUT_S``-scale probes. Registered in
-``shared/timeout_registry.py``; a registry relation lock binds it to the
+``PA_HANDSHAKE_TIMEOUT_S``-scale probes.
+
+RAISED 180 -> 600 (#1353), and honestly: **this raise is UNPROVEN headroom, not the fix.**
+The verifying run (20260809-140620-bd) completed its handshake 113 s in - comfortably
+inside the OLD 180 s budget. What actually unblocked it was ``PA_HANDSHAKE_TIMEOUT_S``
+(5 -> 30), because the winning attempt needed 16.35 s and could never have fitted a 5 s
+ceiling. This budget was raised alongside it on an arithmetic argument about
+dispatch-asset generation sharing the window; that argument is sound for
+``EXECUTE_RESPONSE_TIMEOUT_S``, which genuinely carries 303 s of generation, but the
+handshake never needed the extra patience. Kept as headroom for a boot slower than any
+yet measured - do not cite it as the remedy for the four lost nights.
+
+Registered in ``shared/timeout_registry.py``; a registry relation lock binds it to the
 ``real_backend_ready`` ceiling."""
 
 
@@ -128,6 +165,43 @@ AO was in fact still producing — surfacing to the user as a spurious validatio
 error. The VLM-eviction memory fix keeps real turns well under this; the larger
 budget is headroom so a legitimate vision turn is never mistaken for a hang."""
 
+EXECUTE_RESPONSE_TIMEOUT_S: float = 900.0
+"""Receive timeout (seconds) for a dispatch EXECUTE specifically (#1353).
+
+EXECUTE is not one message either. Before the model swap it generates the plan's
+dispatch assets on the GPU with the 14B still resident (SEAM A), and only then hands
+off and steps aside.
+
+**The per-asset figure, measured on the dispatch path itself:** run
+`20260809-140620-bd` generated 8 assets between 14:06:22 and 14:11:25 — **303 s total,
+37.9 s each** at 1024x1024 / **18 steps**. Use this figure, not the 59.9 s in
+`docs/performance/uc010_dispatch_asset_gen_2026-06-30.json`: that probe measured the
+30-step interactive `/illustrate` path, and the dispatch path runs 18. Quoting the
+30-step number here overstated this budget's requirement by 58%.
+
+**Why this constant exists at all.** #766 raised the PLAN budget for exactly this
+shape and EXECUTE was left on the 180 s per-prompt default, where it silently
+became a threshold. Measured across three battery nights:
+
+    2 images  ->  98 s  -> fits 180 s -> GREEN     (night-20260807-195325)
+    4 images  -> 142 s  -> plus swap  -> STALLED   (night-20260808-230002)
+    4 images  -> 152 s  -> plus swap  -> STALLED   (night-20260809-124052)
+
+Four consecutive nights were lost to that crossing. Nothing regressed; the asset
+plan grew. The gateway stopped listening while the AO was still generating and
+reported "No response from the Assistant Orchestrator", which reads as a dead
+assistant and is not one.
+
+**The number.** B9 plans 8 assets: 8 x 37.9 s = 303 s of generation, plus the swap
+hand-off — CONFIRMED end-to-end on 20260809-140620-bd, where the approve request stayed
+open the whole time and the dispatch proceeded. The old 180 s default would have hung up
+at ~14:09:22, mid-generation. 900 s carries this with real margin (~3x) and stays well
+under the per-job run budget. It is NOT unbounded — a site whose plan wants materially
+more pictures will cross this too, and that is the honest limit: a request-response
+window is the wrong container for work that scales with the asset plan. Raising this
+un-breaks the pipeline; it does not settle whether generation belongs inside EXECUTE
+at all.
+"""
 PLAN_RESPONSE_TIMEOUT_S: float = 720.0
 """Receive timeout (seconds) for a dispatch PLAN_REQUEST specifically (#766, raised again #1152).
 
@@ -156,6 +230,41 @@ measurement alone cannot rule out. 720 s stays well under the #766-pinned
 900 s test ceiling; a genuinely dead AO still fails fast at the per-job
 mTLS-verified re-ensure — this budget only stretches the wait for an AO that
 is provably alive and working."""
+
+PROMPT_FLOW_PREFLIGHT_BUDGET_S: float = 600.0
+"""Aggregate budget (seconds) for the Step-6b boot prompt-flow preflight (#1355).
+
+The preflight sends one real prompt through ``send_prompt`` -> AO and requires a real
+answer back. It needs a budget because ``send_prompt`` DOES NOT RAISE on a failed
+connect (transport.py: it logs Fail-Closed and returns the request_id anyway), so a
+single attempt cannot tell "the prompt path is broken" from "the box was busy" — both
+produce zero tokens. Retrying separates them: a misroute stays broken, a saturated GPU
+clears.
+
+Sized against the contention that exposed the defect. On run ``20260809-140620-bd`` the
+preflight prompt went out at 14:06:22, the same instant an approved dispatch began
+generating its assets; generation ran to 14:11:25 — **303 s for 8 assets, 37.9 s each**.
+600 s covers that window with margin and leaves room for the cold-14B tail underneath it.
+
+NOT a widening of ``PROMPT_RESPONSE_TIMEOUT_S``. That constant bounds the INTERACTIVE
+path, where 180 s is the right answer and a longer wait would be a hang the operator
+sits through; ``tests/security/test_execute_budget.py`` locks it deliberately. Each
+preflight attempt still rides that 180 s ceiling — this budget only decides how many
+attempts a boot is willing to spend.
+
+CONTENTION TOLERANCE, not a cure, and the same shrink condition as the Boot-Phase-3
+handshake: retire the retry entirely once dispatch-asset generation moves off the
+request thread (#1341 direction 1), after which one attempt suffices. Registered in
+``shared/timeout_registry.py``."""
+
+PROMPT_FLOW_PREFLIGHT_BACKOFF_S: float = 5.0
+"""Sleep between prompt-flow preflight attempts (#1355).
+
+Deliberately short and flat, not exponential. The failure this retries is a GPU busy
+for a bounded, known interval, so there is nothing to back off FROM — the cost of
+probing again is one connect attempt, and the attempt itself already carries the
+180 s ceiling that does the real waiting. Exponential backoff here would only add
+dead time to a boot that is otherwise ready to proceed."""
 
 # ---------------------------------------------------------------------------
 # Streaming

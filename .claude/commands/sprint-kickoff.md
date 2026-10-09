@@ -64,17 +64,17 @@ Then let him react and adjust the cluster with you. Iterate here as long as he w
 
 ## Phase 2 — The comprehension gate (single, then STOP)
 
-When the cluster is settled, present the `CLAUDE.md` comprehension gate in your own words — substantive and substrate-grounded (built from what you read in Phase 0, naming the surfaces; a paraphrase of the kickoff prompt is NOT a gate), mature-not-minimal, sized to the sprint, no point-count cap:
+When the cluster is settled, present the `CLAUDE.md` comprehension gate in your own words — substrate-grounded (built from what you read in Phase 0, naming the surfaces; a paraphrase of the kickoff prompt is NOT a gate), seven points, under ~25 lines:
 
-1. **ROLE & AUTHORITY** — who you are for this sprint; which calls you make yourself vs. which are his.
-2. **CONTEXT** — where the project stands, as relevant to this sprint (proves grounding).
-3. **GOAL** — what the sprint achieves and why he wants it.
-4. **TASK + PLAN** — the ticket cluster, the order you'll work it, the resources (subagents, worktree builders, local scripts) you'll spend, and what a closed sprint looks like.
-5. **SCOPE** — explicitly in, explicitly out.
-6. **INHERITED CONSTRAINTS** — the standing rules that bind this sprint's work (dormant-merge, fleet-pause, LOCALAPPDATA redirect, …) — only the ones that apply.
-7. **RISKS + DECISION POINTS** — what could go wrong; which capability / quality / security-posture flips you expect to escalate to him mid-sprint.
-8. **ASSUMPTIONS & AMBIGUITIES** — your own reads: what you are assuming, what the theme left open, how you resolved each.
-9. **OPEN QUESTIONS** — only ones a non-technical LA can answer.
+1. **GOAL** — what the sprint achieves and why he wants it.
+2. **DELIVERABLE** — what will EXIST when the sprint closes, with rough sizes and where (files, ADRs, tickets, merges). Work described is not work checkable.
+3. **SCOPE** — in, out, and EVERY OTHER repository, board, always-loaded file or running system the sprint will touch.
+4. **YOURS vs MINE** — which calls come back to him, which you make alone, and what you will NOT come back to ask about.
+5. **ASSUMPTIONS** — what you are assuming, what the theme left open, how you resolved each.
+6. **RISKS + STOP CONDITIONS** — what could go wrong, what it would cost him, and what would make you stop and return mid-sprint.
+7. **MONITORING** — what runs unattended and roughly how long; how progress shows him (status file + dated CURRENT STATE ticket comment per phase or hour-scale milestone); how you get woken, event-driven on evidence CONTENT (stall past a stated per-phase bound, error signature, process death, completion), never process presence or a blind poll; the action per wake (stop doomed runs fast). "None: all work is foreground and short" is valid, never omitted.
+
+Open questions only when real ones exist that a non-technical LA can answer; otherwise say "none".
 
 Then **STOP AND WAIT** for his explicit confirmation. Do not combine the gate and any downstream work in one turn. Authorization to do the work is not authorization to skip the gate.
 

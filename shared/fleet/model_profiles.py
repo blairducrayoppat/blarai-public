@@ -26,11 +26,14 @@ at import time, where a raise would refuse-to-start the orchestrator.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+logger = logging.getLogger(__name__)
 
 # The this-host fallback root, mirroring ``shared/fleet/dispatch.py::_AGENTIC_SETUP``
 # (a single-host system; the dispatch target root is the same box's agentic-setup).
@@ -243,3 +246,112 @@ def resolve_hidden_block_re(
     """Convenience: the compiled DOTALL hidden-block regex for *model_id*,
     fail-soft to the byte-identical historical pattern. Never raises."""
     return hidden_block_re(resolve_hidden_block_tags(model_id, path=path))
+
+
+# ---------------------------------------------------------------------------
+# Turn-end ("<|im_end|>") token id — a PER-MODEL fact, resolved from the model
+# ---------------------------------------------------------------------------
+# Why this exists (#930): both services compiled the Qwen3 id 151645 in as a
+# constant and used it as ``stop_token_ids``. It is correct for Qwen3-14B and
+# WRONG for every model with a different vocabulary — the Qwen3.6 family uses
+# 248046 (both measured on the real tokenizers, 2026-09-22). A ``stop_strings``
+# fallback masks the mismatch, so the system does not fail, it DEGRADES, which
+# is the failure class this project keeps paying for. Resolve it from the model
+# that is actually loaded, and say so out loud when it is not the compiled-in
+# default.
+
+TURN_END_TOKEN_TEXT: str = "<|im_end|>"
+
+#: The Qwen3-14B id. Retained ONLY as the last-resort fallback when no
+#: tokenizer can be consulted — never as an assumption about the live model.
+QWEN3_TURN_END_TOKEN_ID: int = 151_645
+
+
+def _single_id_from_tokenizer(tokenizer: Any, text: str) -> "int | None":
+    """Return *text*'s id if it encodes to exactly ONE token, else ``None``.
+
+    Handles both tokenizer flavours this codebase holds: a HuggingFace
+    ``AutoTokenizer`` (the AO loads one for encode/decode) and an
+    ``openvino_genai.Tokenizer`` (what a pipeline hands back). A multi-token
+    encode means the text is not a single special token in this vocabulary,
+    which is exactly the case the caller must NOT paper over.
+    """
+    # HuggingFace: the direct, unambiguous lookup.
+    convert = getattr(tokenizer, "convert_tokens_to_ids", None)
+    if callable(convert):
+        try:
+            tid = convert(text)
+            unk = getattr(tokenizer, "unk_token_id", None)
+            if isinstance(tid, int) and tid >= 0 and (unk is None or tid != unk):
+                return tid
+        except Exception:  # noqa: BLE001 — fall through to the encode path
+            pass
+
+    # OpenVINO GenAI: encode and require a single id.
+    encode = getattr(tokenizer, "encode", None)
+    if callable(encode):
+        try:
+            encoded = encode(text)
+            ids = getattr(encoded, "input_ids", None)
+            if ids is not None:  # ov_genai returns a TokenizedInputs
+                ids = ids.data.flatten().tolist()
+            elif not isinstance(encoded, list):
+                return None
+            else:
+                ids = encoded
+            if len(ids) == 1 and isinstance(ids[0], int):
+                return int(ids[0])
+        except Exception:  # noqa: BLE001 — fail-soft; caller logs and falls back
+            return None
+    return None
+
+
+def resolve_turn_end_token_id(
+    tokenizer: Any,
+    *,
+    default: int = QWEN3_TURN_END_TOKEN_ID,
+    model_label: str = "",
+) -> tuple[int, bool]:
+    """Resolve ``<|im_end|>``'s id from *tokenizer*.
+
+    Returns ``(token_id, resolved)``. ``resolved`` is False when the tokenizer
+    could not be consulted and *default* was used — the caller MUST log that
+    loudly, because a wrong stop id does not crash, it silently lets generation
+    run past the turn boundary until the token cap.
+
+    Never raises: a tokenizer that cannot answer is a degraded-but-running
+    system, and the caller decides how loud to be about it.
+    """
+    if tokenizer is None:
+        return default, False
+    tid = _single_id_from_tokenizer(tokenizer, TURN_END_TOKEN_TEXT)
+    if tid is None:
+        return default, False
+    if tid != default:
+        logger.info(
+            "Turn-end token resolved from the model%s: %d (the compiled-in "
+            "Qwen3 default is %d) — a non-Qwen3 vocabulary is in use.",
+            f" {model_label}" if model_label else "",
+            tid,
+            default,
+        )
+    return tid, True
+
+
+def turn_end_token_id_from_pipeline(
+    pipeline: Any, *, default: int = QWEN3_TURN_END_TOKEN_ID, model_label: str = ""
+) -> tuple[int, bool]:
+    """``resolve_turn_end_token_id`` for a pipeline (or SharedInferencePipeline).
+
+    Reaches the tokenizer through ``get_tokenizer()``, unwrapping the shared
+    wrapper's ``raw`` first. Never raises.
+    """
+    try:
+        target = getattr(pipeline, "raw", pipeline)
+        getter = getattr(target, "get_tokenizer", None)
+        tokenizer = getter() if callable(getter) else None
+    except Exception:  # noqa: BLE001 — fail-soft
+        tokenizer = None
+    return resolve_turn_end_token_id(
+        tokenizer, default=default, model_label=model_label
+    )

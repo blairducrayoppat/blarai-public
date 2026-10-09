@@ -1,0 +1,56 @@
+{
+  "benchmark": "ovms_template_engine_swap",
+  "label": "python_off-Minja -> python_on-Jinja",
+  "timestamp": "2026-09-01T00:44:00-04:00",
+  "purpose": "#1497: OVMS docs state 'using tools is not supported in configuration without Python', and 2026.3 release notes name Qwen3-Coder as a template MINJA cannot render. This measures what actually changed on the swap.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (Xe2)",
+    "gpu_driver": "32.0.101.8826",
+    "ram_total_gib": 31.323
+  },
+  "before": {
+    "ovms": "2026.3.0.6f3df706b",
+    "bazel_flags": "--config=win_mp_on_py_off",
+    "template_engine": "Minja (forced: 'the only option for builds without Python')",
+    "minja_cannot_render_warnings_per_load": 1,
+    "dryrun_template_failures_per_load": 1
+  },
+  "after": {
+    "ovms": "2026.3.1.3a28d490",
+    "bazel_flags": "--config=win_mp_on_py_on",
+    "template_engine": "Jinja (PythonInterpreterModule started)",
+    "minja_cannot_render_warnings_per_load": 0,
+    "dryrun_template_failures_per_load": 0
+  },
+  "measurement": {
+    "methodology": "identical multi-turn chat/completions request replayed against each build: user -> assistant(tool_calls) -> tool result -> user. temperature 0, max_tokens 300, tools=[write_file]. Direct to OVMS :8000, no proxy.",
+    "prompt_tokens_minja": 439,
+    "prompt_tokens_jinja": 380,
+    "prompt_token_delta": -59,
+    "interpretation": "59 fewer tokens for byte-identical history is consistent with Minja dumping the prior tool_calls turn into the prompt as raw JSON while Jinja renders it in the model's native syntax.",
+    "multi_turn_tool_call_correct": {
+      "minja": true,
+      "jinja": true
+    },
+    "streaming_tool_call_deltas": {
+      "jinja": true
+    }
+  },
+  "prefill_throughput_tok_s": {
+    "939_tokens": 253.6,
+    "1854_tokens": 303.3,
+    "3648_tokens": 273.9,
+    "note": "measured on the py_off build; ~275 tok/s steady, cold first request ~33s"
+  },
+  "not_measured": [
+    "whether the corrupted Minja history actually changed CODER BEHAVIOUR end to end - only the prompt encoding and the warning were measured",
+    "prefill throughput was NOT re-measured on the python_on build",
+    "no multi-turn conversation deeper than 2 assistant turns was exercised",
+    "single sample per figure; no variance"
+  ],
+  "artifacts_preserved": [
+    "C:/ovms.py_off.2026.3.0.backup",
+    "C:/ovms.replaced.20260901-003858"
+  ]
+}

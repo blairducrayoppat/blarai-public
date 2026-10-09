@@ -1,0 +1,13 @@
+{"kind": "pa", "label": "ALLOW", "out_sha": "17e404cab49aeb1e", "prompt_len": 3640, "prompt_sha": "0c66235c9f816d94", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "17e404cab49aeb1e", "prompt_len": 3636, "prompt_sha": "dc192adcff833180", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3630, "prompt_sha": "04e3868bb3b78b86", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3613, "prompt_sha": "34807dbb28345b01", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3610, "prompt_sha": "35f527766f779dc4", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "17e404cab49aeb1e", "prompt_len": 3636, "prompt_sha": "926d47a9924425ec", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "17e404cab49aeb1e", "prompt_len": 3622, "prompt_sha": "ea9570482777a019", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "17e404cab49aeb1e", "prompt_len": 3634, "prompt_sha": "1c631d84087c89ed", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3626, "prompt_sha": "98f70ffdff28a3ac", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3649, "prompt_sha": "12a699b1aa864c2f", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3637, "prompt_sha": "98c3663b4a4feff5", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3643, "prompt_sha": "045edf9f44fb8b39", "tag": "9b-off-pa_classification-random-r3"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "17e404cab49aeb1e", "prompt_len": 3621, "prompt_sha": "6a3026ad0f54916f", "tag": "9b-off-pa_classification-random-r3"}

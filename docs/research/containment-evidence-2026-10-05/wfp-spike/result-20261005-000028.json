@@ -1,0 +1,198 @@
+{
+  "spike": "#1671 raw WFP block keyed to the coder account",
+  "started": "2026-10-05T00:00:17.8888847-04:00",
+  "env": {
+    "machine_clock": "2026-10-05 00:00:18 -04:00",
+    "uptime_hours": 18.96,
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "ps_version": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "svc_mpssvc": "Running/Automatic",
+    "svc_BFE": "Running/Automatic"
+  },
+  "hold_seconds": 100,
+  "steps": {
+    "preflight": {
+      "coder_sid": "S-1-5-21-1000000001-1000000002-1000000003-1009",
+      "operator_sid": "S-1-5-21-1000000001-1000000002-1000000003-1001",
+      "sd_sddl": "D:(A;;CC;;;S-1-5-21-1000000001-1000000002-1000000003-1009)",
+      "objects_absent_before": true,
+      "loopback_stub_started": true
+    },
+    "operator_baseline": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 24,
+        "error": "",
+        "t": "2026-10-05T00:00:20.9926127-04:00"
+      },
+      {
+        "target": "8.8.8.8:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T00:00:21.0159646-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-05T00:00:21.0365935-04:00"
+      },
+      {
+        "target": "8.8.8.8:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-05T00:00:21.0635257-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 26,
+        "error": "",
+        "t": "2026-10-05T00:00:21.0793944-04:00"
+      },
+      {
+        "target": "8.8.8.8:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T00:00:21.1130630-04:00"
+      }
+    ],
+    "coder_baseline": {
+      "completed": true,
+      "ran_as_sid": "S-1-5-21-1000000001-1000000002-1000000003-1009",
+      "sid_is_coder": true,
+      "outbound_blocked": false,
+      "outbound_detail": "connected to 1.1.1.1:443 â€” EGRESS IS NOT BLOCKED",
+      "loopback_ok": true,
+      "loopback_detail": "GET http://127.0.0.1:8000/v3/models -> HTTP 200",
+      "secret_reads_denied": true,
+      "t": "2026-10-05T00:00:23.0800546-04:00"
+    },
+    "filters_added": {
+      "at": "2026-10-05T00:00:23.0987812-04:00",
+      "filter_ids": [
+        407221,
+        407222,
+        407223,
+        407224
+      ],
+      "filters": [
+        "BlarAI #1671 spike: permit-loopback-coder-v4 f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+        "BlarAI #1671 spike: permit-loopback-coder-v6 f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+        "BlarAI #1671 spike: block-coder-v4 f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+        "BlarAI #1671 spike: block-coder-v6 f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+      ]
+    },
+    "watchdog": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T00:00:23.1795519-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T00:00:24.7143770-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-05T00:00:26.2488131-04:00"
+      }
+    ],
+    "operator_during": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-05T00:00:26.2774212-04:00"
+      },
+      {
+        "target": "8.8.8.8:443",
+        "ok": true,
+        "ms": 25,
+        "error": "",
+        "t": "2026-10-05T00:00:26.2962288-04:00"
+      }
+    ],
+    "coder_during": {
+      "completed": true,
+      "ran_as_sid": "S-1-5-21-1000000001-1000000002-1000000003-1009",
+      "sid_is_coder": true,
+      "outbound_blocked": true,
+      "outbound_detail": "no connection to 1.1.1.1:443 within 5000ms (blocked)",
+      "loopback_ok": true,
+      "loopback_detail": "GET http://127.0.0.1:8000/v3/models -> HTTP 200",
+      "secret_reads_denied": true,
+      "t": "2026-10-05T00:00:26.2962288-04:00"
+    },
+    "engine_close_status": "0x00000000",
+    "removal_engine_check": {
+      "sublayer_present": false,
+      "provider_present": false,
+      "filters_present": []
+    },
+    "coder_after_removal": {
+      "completed": true,
+      "ran_as_sid": "S-1-5-21-1000000001-1000000002-1000000003-1009",
+      "sid_is_coder": true,
+      "outbound_blocked": false,
+      "outbound_detail": "connected to 1.1.1.1:443 â€” EGRESS IS NOT BLOCKED",
+      "loopback_ok": true,
+      "loopback_detail": "GET http://127.0.0.1:8000/v3/models -> HTTP 200",
+      "secret_reads_denied": true,
+      "t": "2026-10-05T00:00:28.2271927-04:00"
+    }
+  },
+  "finished": "2026-10-05T00:00:28.2801659-04:00",
+  "exit_code": 0,
+  "exit_reason": "coder blocked, loopback ok, operator unaffected, removal verified",
+  "decision_inputs": {
+    "OperatorFailures": 0,
+    "OperatorAbort": false,
+    "BaselineOk": true,
+    "CoderSidIsCoder": true,
+    "CoderOutboundBlocked": true,
+    "RemovalVerified": true,
+    "CoderProbeCompleted": true,
+    "CoderLoopbackOk": true
+  },
+  "answer": "RAW WFP BLOCK ENFORCES for the coder account under Bitdefender (loopback preserved, operator unaffected)."
+}

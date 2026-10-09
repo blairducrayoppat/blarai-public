@@ -1,0 +1,50 @@
+# Disposition — independent audit of all 21 Definition-of-Done rows by OBSERVABLE, 2026-08-15 (evening)
+
+**Why this pass happened, and how it differs from the morning's.** A four-auditor pass that
+morning (`dod-21-row-blocker-audit-disposition-2026-08-15.md`) classified every row by its
+**blocker** and said explicitly what it did not do: *"it did not re-derive every row's
+LIVE/PARTIAL verdict from first principles."* This pass did that — four auditors, one row-group
+each, each required to quote the row's own stated observable and then prove from **artifacts**
+whether that observable had executed end to end. Plus two verifiers on specific claims.
+
+**The headline is not a row that moved. It is that four separate instruments cannot fire on the
+operator's priority surface at all**, which no row said, and which breaks the retirement path for
+a standing operator direction.
+
+**Second headline, and it is about this session's own work:** three of the findings below are
+corrections to claims *I* published earlier the same evening. Two of those had already been
+recorded correctly on the board a day earlier and were contradicted by me anyway.
+
+```disposition
+# finding | status | evidence-or-predicate
+rows 4 and 5 of the DoD described a STRUCTURAL blindness as a scheduling gap: coder_test_qa is Python-only (coder_test_qa.py:930, `if not name.endswith(".py"): continue`, over an ast-based module), so all 55 banked website records return no-tests while Python cards produce 30 clean and the corpus's only findings | FIXED | 4a9f200a — both rows rewritten. Row 5 does NOT move: capability 11 asks whether the observable executed, and it did, on 2026-08-05, on the current instrument. What changed is that LIVE here means live on Python and structurally unreachable on the operator's priority surface
+the same grader's detail line tells the operator "it wrote no exam for its own work" against an archived delivery holding 9 test files and 0 Python files, with measured:true and files_scanned:0 in the same record | DEFERRED | #1416 blocked-by: any state/reports/battery-b9-*.coder-test-qa.json reading status `no-tests` with a detail claiming the task wrote no exam, against an archived delivery containing .test.js files. Separated from the scanner build deliberately — the false accusation is minutes of work and is the half that misleads a human
+three further Python-only instruments found by enumerating all 15 registry entries: green_audit (green_audit.py:673), oracle_mutation (own docstring "PYTHON-only today"), advisory ruff | DEFERRED | #1416 blocked-by: `tools/dispatch_harness/green_audit.py:673` reading `if not lower.endswith(".py"): continue` — observable by that grep. green_audit is the severe one: its whole job is catching a coder gaming the gates, and on a website it publishes gamed:False from a scan that read no delivered code
+fixing coder_test_qa.py:930 alone is a TRAP — every scanner in the module is a Python AST pass, so admitting .js would yield a false "does not compile" and short-circuit every stage, converting "cannot see your tests" into "your tests are broken" | REJECTED | not a defect to fix but a fix to REFUSE. #1416's item 1 is specified to leave the walk untouched and emit a not-measured status instead. Argued rather than asserted: the same shape is already recorded in this project against `_static_findings`, which compiles with check_syntax as Python
+#1414's own campaign side-file asserts rows 12/13/14/15 read partial for one shared reason (a job-level grade). Wrong for all four: 13 and 14 need no run, 15 needs a browser replay over archived sites, 12 needs only the operator's hands | REJECTED | not corrected in place, and the argument is that the artifact is spent. state/campaign-1414-dod-witness-20260815.json is a throwaway diagnostic config, already consumed at launch, read by no later session and banking nothing. Editing a launch argument after the launch would create a record that never governed anything. The correction is carried here and on #1414 c.3150, which a later session does read
+MY row-21 grouping rule (journal.log naming the repo) is BIASED toward the outcome it measures — the reaper renames journal.log on an unclean shutdown, so a full 33-file seven-task attempt was invisible; it under-counted the worst bucket 2 against 9 | FIXED | 06ccd573 — re-keyed on the goal SHA, fates classified, toggle-proved (disabling reaped detection fails 2 tests). Honest rate is now 1 GREEN in 18 attempts at a byte-identical goal, not 1 in 11
+MY claim that the parked artifact is "destroyed between runs" is FALSE — run-battery-night.ps1:1461 is a Move-Item; the branch and commit survive in the archive, misfiled under the next run's stamp and read only by the operator's viewing path | FIXED | 37cb2e14 corrects the roadmap row; #1321 c.3154 and #1381 c.3153 carry the retraction. I took the measurement proving this myself (#1402 c.3145) and drew the opposite conclusion in the next comment. Consequence: #1321 needs a READER, not a rescue, and its hard blocked-by is downgraded
+the operator was asked an ALREADY-ANSWERED question — #1381 item 2 was decided 2026-08-14 (c.3056, "Fresh on the battery, continue on demand"), a session wrote "100% operator-blocked" one comment below it, the roadmap inherited that, and my comprehension gate put it to him again | FIXED | 37cb2e14 clears the needs-operator flag and #1381 c.3153 records the full chain, making c.3056 govern. Nothing was built on the broader reading
+the two recorded answers differ in shape — c.3056 explicitly does NOT authorise changing run-battery-night.ps1, while the 2026-08-15 answer read literally would | DEFERRED | #1381 blocked-by: the operator answering, ON #1381, whether "carry on" still means "fresh on the battery, continue on demand". Asked in chat 2026-08-15 evening; that is NOT the durable queue, which this gate correctly refused — the question is therefore recorded on #1381 itself. Until he answers, c.3056 governs as the narrower and better-specified record and no continuation work touches the nightly path
+my first roadmap rewrite was 6 rows of 14 wrong and passed verify_roadmap.py cleanly, because every ticket it cited was open | FIXED | 37cb2e14 — second revision, recorded in-file rather than overwriting. #1409 closed (finished; its row described capability 2's observable, not its own work); #1407 is one residual not three; #1165 not waiting on him since 29 July; #1374 and #1385 were missing entirely
+row 15's status text is FALSE as of 2026-08-15 03:49 — it says no phone-width, a11y or form checks exist; capture-web-cdp.mjs ships all three, each docstring opening "/** DoD row 15:", and 20260814-230237-bd/exec-smoke-web.png.console.json carries phoneWidth/a11y/forms all measured:true | DEFERRED | #1404 blocked-by: row 15 of docs/design/CODER_DEFINITION_OF_DONE.md still reading "no phone-width layout check exists" — observable against that console.json. Same species as row 5's "never observed" written two days after the event; correction owed regardless of the replay work
+row 13's lock inventory is wrong in the row (5), in my brief (3) and needs stating (10 locked; precisely unlocked: archetype_regression, coder_test_qa, behaviour-smoke contract, plus green_audit's fail-closed half). calibration.py and jury.py carry full locks but are absent from the 15-entry registry | DEFERRED | #1404 blocked-by: row 13's text claiming five reconciliation locks — observable by counting the lock files named in the enumeration on #1414. Adversarial caveat recorded: archetype_regression may have no denominator at all, so budget triage before locking
+row 17's coverage report is confirmed MOVABLE with no run — 32 traceability.json join 32 acceptance.json, spec.criteria present with the operator's verbatim sentences — but on web the matcher reports verified 0 / weak 1 / undecidable 5 of 6, and denominator_excludes silently drops his two visual criteria | DEFERRED | #1374 blocked-by: nothing. It is the cheapest real win on the list (3-5 h) and doubles as the indictment of the web-prose matcher. Observable: traceability.json undecidable reason "no oracle symbol's name is contained in this criterion's wording"
+rows 8, 9, 10 and 11 state NO Observable line at all — `grep "^\*\*Observable"` returns 7 hits, rows 1-7 only — so capability 11's own rule cannot be adjudicated mechanically for four of the rows it governs, including itself | DEFERRED | #1404 blocked-by: rows 8-11 of docs/design/CODER_DEFINITION_OF_DONE.md carrying a DONE clause and no `**Observable:**` line — observable by that grep. Mitigation recorded on #1414: lift the observables VERBATIM from #1321 and #1280, whose predicates predate these runs, or authoring them now narrows the goal invisibly
+row 11's DONE clause names one degradation case (an instrument since repaired makes an observable UNVOUCHED) but not the neighbouring one an audit found: an observable executed on an instrument that CANNOT FIRE on the current target surface — which is exactly row 5's position | DEFERRED | #1404 blocked-by: row 11's DONE clause naming only the repaired-instrument case. Flagged rather than drafted, because amending a ratified row's DONE clause is above an audit's authority and is the operator's ratification (#1325)
+```
+
+## What this pass did NOT cover
+
+It re-derived verdicts against stated observables. **It could not do that for rows 8-11, which
+state none** — those four were argued out of prose, which is the failure row 11 exists to end and
+is now itself a finding above.
+
+It did not re-run any instrument against live data; every claim rests on banked artifacts and
+source. And a live coder run was executing throughout, so no auditor ran the full sweep and none
+read anything under `~/projects/`.
+
+**The honest limit, stated because this document's own subject is over-claiming:** four auditors
+reading in parallel found four Python-only instruments by enumerating a registry. Nothing here
+proves the registry is complete — two graders (`calibration.py`, `jury.py`) were found *outside*
+it during this very pass, and neither was scanned for the same defect.

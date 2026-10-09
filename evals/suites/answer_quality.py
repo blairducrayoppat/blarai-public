@@ -57,8 +57,10 @@ suite is the documented follow-on (see evals/README.md).
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from evals.loader import GoldenDataError, golden_path, load_golden
 from evals.model_target import Capability, ModelTarget
@@ -77,6 +79,7 @@ _VALID_CATEGORIES: frozenset[str] = frozenset(
         "grounding",
         "injection_resistance",
         "uncertainty",
+        "conversation",
     }
 )
 
@@ -92,7 +95,7 @@ _EVAL_MAX_NEW_TOKENS: int = 512
 _TOOL_CALL_TAG: str = "tool_call"
 
 
-def _production_tool_call_pattern() -> "re.Pattern[str]":
+def _production_tool_call_pattern() -> re.Pattern[str]:
     """Production's CLOSED-pair tool-call pattern (imported, never copied —
     SSOT). The AO enters the tool loop only on a closed
     ``<tool_call>…</tool_call>`` block (``tools._TOOL_CALL_TAG_PATTERN``);
@@ -190,6 +193,121 @@ def compose_generation_context(
     return built
 
 
+def compose_conversation(
+    prior_turns: list[dict[str, str]] | None,
+    prompt: str,
+    grounded_context: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, str]], str]:
+    """Build (prior_turns, current_prompt) through the REAL ContextManager.
+
+    Drives the same create_session / add_grounded_context / add_turn /
+    trim_to_budget sequence production runs, then returns the history as REAL
+    turns via ``build_context_messages`` rather than the flattened
+    "role: content" transcript ``build_context`` produces. The flattened form
+    is what #1621 is about: a model cannot reliably tell which line is the live
+    question, and the 35B answers the first one.
+
+    The grounded preamble rides on the FIRST message and never becomes a system
+    message — grounded chunks are untrusted and datamarking is pointless if the
+    text is given system authority.
+
+    DELEGATES to ``compose_with_manager`` + ``structured_prompt_parts``. It
+    used to hold its own copy of the split-at-the-last-turn arithmetic,
+    which made ``structured_prompt_parts``'s "ONE implementation" docstring
+    false the moment it was written - two copies of exactly the decision
+    that had already reverted once inside the tool loop (#1622).
+    """
+    from services.assistant_orchestrator.src.entrypoint import (
+        structured_prompt_parts,
+    )
+
+    manager, session_id = compose_with_manager(
+        prior_turns, prompt, grounded_context
+    )
+    parts = structured_prompt_parts(manager, session_id)
+    if parts is None:
+        raise RuntimeError("context build produced no turns (fail-closed)")
+    return parts
+
+
+def compose_with_manager(
+    prior_turns: list[dict[str, str]] | None,
+    prompt: str,
+    grounded_context: dict[str, Any] | None = None,
+) -> tuple[Any, str]:
+    """Seed a REAL ContextManager and hand it back, LIVE.
+
+    ``compose_conversation`` builds a manager, reads it once and drops it. The
+    tool loop needs the manager itself, because grounding a retrieval result
+    mutates the session and the next prompt must be re-derived from it - which
+    is exactly what production does.
+    """
+    from services.assistant_orchestrator.src.context_manager import (
+        ContextManager,
+        Provenance,
+    )
+
+    manager = ContextManager()
+    manager.create_session(_EVAL_SESSION_ID)
+    if grounded_context is not None:
+        provenance = Provenance(
+            str(grounded_context.get("provenance", "untrusted_external"))
+        )
+        chunks = [str(chunk) for chunk in grounded_context["chunks"]]
+        if not manager.add_grounded_context(
+            _EVAL_SESSION_ID, chunks, provenance=provenance
+        ):
+            raise RuntimeError("grounded-context injection failed (fail-closed)")
+    for turn in prior_turns or []:
+        manager.add_turn(
+            _EVAL_SESSION_ID,
+            str(turn["role"]),
+            str(turn["content"]),
+            token_count=max(1, len(str(turn["content"])) // 4),
+        )
+    manager.add_turn(
+        _EVAL_SESSION_ID, "user", prompt, token_count=max(1, len(prompt) // 4)
+    )
+    manager.trim_to_budget(_EVAL_SESSION_ID)
+    return manager, _EVAL_SESSION_ID
+
+
+def compose_for_brain(
+    manager: Any,
+    session_id: str,
+    *,
+    use_real_turns: bool,
+) -> tuple[list[dict[str, str]] | None, str]:
+    """Return ``(prior_turns, prompt)`` in the shape THIS BRAIN ships.
+
+    Real turns for a multimodal brain; the FLATTENED transcript as the prompt
+    for everything else. The flattened arm is not "no history" - production
+    sends the whole transcript as the single user message, and an eval that
+    dropped it would measure a brain with amnesia rather than the shipped one.
+    """
+    from services.assistant_orchestrator.src.entrypoint import (
+        structured_prompt_parts,
+    )
+
+    if use_real_turns:
+        parts = structured_prompt_parts(manager, session_id)
+        if parts is not None:
+            return parts[0], parts[1]
+    flattened = manager.build_context(session_id)
+    if flattened is None:
+        raise RuntimeError("context build failed (fail-closed)")
+    return None, flattened
+
+
+def brain_uses_real_turns(model_dir: Path | None = None) -> bool:
+    """Mirror the entrypoint's ``_brain_is_multimodal`` gate, imported."""
+    from services.assistant_orchestrator.src.gpu_inference import (
+        _brain_is_multimodal,
+    )
+
+    return bool(_brain_is_multimodal(model_dir or default_model_dir()))
+
+
 def default_model_dir() -> Path:
     """Resolve the production AO model directory (repo-root relative).
 
@@ -279,6 +397,30 @@ def make_real_ao_generator(
         RuntimeError: If the model fails to load or a generation errors
             (fail-closed).
     """
+    # #1663: a continuous-batching engine arm drives the REAL AO class through
+    # its attached-pipeline path; checked first, because it is also multimodal.
+    if target is not None and target.uses_cb_engine:
+        from evals.cb_pipeline import build_ao_inference
+        from services.assistant_orchestrator.src.gpu_inference import GenerationConfig
+
+        engine_inference = build_ao_inference(target.model_dir, target.engine)
+
+        def engine_generate(composed_context: str) -> str:
+            result = engine_inference.generate_text(
+                composed_context,
+                max_new_tokens=_EVAL_MAX_NEW_TOKENS,
+                config=GenerationConfig(
+                    max_new_tokens=_EVAL_MAX_NEW_TOKENS,
+                    do_sample=False,
+                    tool_call_grammar=production_tool_call_grammar_posture(),
+                ),
+            )
+            if result.error:
+                raise RuntimeError(f"generation failed: {result.error}")
+            return result.text
+
+        return engine_generate
+
     # multimodal-vlm capability -> VLMPipeline arm (the 35B-A3B contract).
     if target is not None and target.capability is Capability.MULTIMODAL_VLM:
         from evals.hardware_pipeline import build_vlm_composed_generator
@@ -328,6 +470,35 @@ def make_real_ao_generator(
     return generate
 
 
+#: Every key a golden case may carry. An unknown key is a harness error, not a
+#: silently ignored field: a misspelled `expect_in_prompt` would validate clean
+#: and assert nothing at all.
+_KNOWN_CASE_KEYS: frozenset[str] = frozenset(
+    {
+        "id",
+        "description",
+        "category",
+        "mode",
+        "prompt",
+        "checks",
+        "fixture_response",
+        "scripted",
+        "prior_turns",
+        "grounded_context",
+        "fake_tools",
+        "expect_tools",
+        "forbid_tools",
+        "max_tool_calls",
+        "max_iterations",
+        "expect_failure",
+        "expect_in_prompt",
+        "forbid_in_prompt",
+        "format",
+        "kind",
+    }
+)
+
+
 def _validate_case(case: dict[str, Any]) -> str | None:
     """Return an error string if the golden case is malformed, else None.
 
@@ -345,13 +516,86 @@ def _validate_case(case: dict[str, Any]) -> str | None:
             f"(must be one of {sorted(_VALID_CATEGORIES)})"
         )
     if mode == "offline":
+        # An offline case supplies the model's OUTPUT instead of running a
+        # model. A one-shot suite supplies one string ('fixture_response');
+        # the agentic loop suite supplies the SEQUENCE the scripted model
+        # emits across iterations ('scripted'). Exactly one must be present:
+        # accepting both would leave it ambiguous which one drove the run.
         fixture = case.get("fixture_response")
-        if not isinstance(fixture, str) or not fixture:
-            return "offline case requires a non-empty 'fixture_response' string"
+        scripted = case.get("scripted")
+        has_fixture = isinstance(fixture, str) and bool(fixture)
+        has_scripted = isinstance(scripted, list) and bool(scripted)
+        if has_fixture and has_scripted:
+            return (
+                "offline case has BOTH 'fixture_response' and 'scripted'; "
+                "supply exactly one (which drove the run must be unambiguous)"
+            )
+        if not has_fixture and not has_scripted:
+            return (
+                "offline case requires a non-empty 'fixture_response' string "
+                "or a non-empty 'scripted' list of model outputs"
+            )
+        if has_scripted and not all(
+            isinstance(step, str) and step for step in scripted
+        ):
+            return "'scripted' must contain only non-empty strings"
     else:
         prompt = case.get("prompt")
         if not isinstance(prompt, str) or not prompt:
             return "model case requires a non-empty 'prompt' string"
+
+    # A KEY ALLOWLIST. Without one a typo is a silent no-check: a case
+    # carrying `expect_in_promt` validates clean and asserts nothing, which is
+    # the same failure as a suite that evaluates zero cases, one field down.
+    unknown = sorted(set(case) - _KNOWN_CASE_KEYS)
+    if unknown:
+        return (
+            f"unknown case key(s) {unknown}; a misspelled key is a silent "
+            f"no-check. Known keys: {sorted(_KNOWN_CASE_KEYS)}"
+        )
+
+    for key in ("expect_in_prompt", "forbid_in_prompt"):
+        value = case.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            return (
+                f"'{key}' must be a LIST of strings; a bare string degrades to "
+                f"a per-character membership test and passes vacuously"
+            )
+        if not isinstance(value, list) or not value:
+            return f"'{key}' must be a non-empty list of strings"
+        if not all(isinstance(v, str) and v for v in value):
+            return f"'{key}' must contain only non-empty strings"
+        if case.get("mode") == "model":
+            return (
+                f"'{key}' is only observable for a SCRIPTED case; on a "
+                f"model-mode case it is never evaluated and reads as a live "
+                f"assertion"
+            )
+
+    expect_failure = case.get("expect_failure")
+    if expect_failure is not None:
+        # The case passes or fails on whether the LOCK fired, and the run
+        # deliberately misbehaved, so the answer is meaningless and `checks`
+        # is never evaluated. Five dead assertions shipped reading as live
+        # ones; they are now structurally impossible.
+        if case.get("checks"):
+            return (
+                "a negative control ('expect_failure') must not carry "
+                "'checks': the run misbehaves deliberately, so the answer is "
+                "never scored and the block would be a dead assertion that "
+                "reads as a live one"
+            )
+        # A negative control asserts a lock fires FOR A STATED REASON. A short
+        # or blank needle matches every lock message and discriminates nothing,
+        # which would turn the control back into decoration (#1622, finding 9).
+        if not isinstance(expect_failure, str) or len(expect_failure.strip()) < 6:
+            return (
+                "'expect_failure' must be a distinctive string of at least 6 "
+                "non-blank characters; a short needle matches every lock "
+                "message and proves nothing"
+            )
 
     grounded = case.get("grounded_context")
     if grounded is not None:
@@ -369,9 +613,44 @@ def _validate_case(case: dict[str, Any]) -> str | None:
                 f"(must be one of {sorted(_valid_provenance_values())})"
             )
 
-    checks_problem = validate_checks(case.get("checks"))
-    if checks_problem is not None:
-        return checks_problem
+    prior = case.get("prior_turns")
+    if prior is not None:
+        if not isinstance(prior, list) or not prior:
+            return "'prior_turns' must be a non-empty list of turn objects"
+        for turn in prior:
+            if not isinstance(turn, dict):
+                return "'prior_turns' entries must be JSON objects"
+            role = turn.get("role")
+            if role not in ("user", "assistant"):
+                return f"invalid prior_turns role {role!r} (user|assistant)"
+            content = turn.get("content")
+            if not isinstance(content, str) or not content.strip():
+                return "'prior_turns' entries need a non-empty 'content' string"
+
+    fake = case.get("fake_tools")
+    if fake is not None and (
+        not isinstance(fake, dict)
+        or not all(isinstance(k, str) and isinstance(v, str) for k, v in fake.items())
+    ):
+        return "'fake_tools' must map tool-name strings to result strings"
+    for key in ("expect_tools", "forbid_tools"):
+        val = case.get(key)
+        if val is not None and (
+            not isinstance(val, list)
+            or not all(isinstance(t, str) for t in val)
+        ):
+            return f"'{key}' must be a list of tool-name strings"
+    for key in ("max_tool_calls", "max_iterations"):
+        val = case.get(key)
+        if val is not None and (not isinstance(val, int) or val < 0):
+            return f"'{key}' must be a non-negative integer"
+
+    if expect_failure is None:
+        # A negative control has no checks by design (above); every other case
+        # must have a non-empty block or it scores nothing.
+        checks_problem = validate_checks(case.get("checks"))
+        if checks_problem is not None:
+            return checks_problem
     return None
 
 
@@ -461,6 +740,15 @@ def run_suite(
         description = str(case.get("description", ""))
 
         if case["mode"] == "offline":
+            if case.get("scripted"):
+                # 'scripted' is the LOOP suite's offline form: a sequence of
+                # model outputs across iterations. This suite is one-shot and
+                # would silently score only the first, so refuse it outright.
+                raise GoldenDataError(
+                    f"{path.name} case {case_id}: 'scripted' is not supported "
+                    "by the one-shot answer_quality suite; use "
+                    "'fixture_response', or move the case to the agentic suite"
+                )
             try:
                 fixture = str(case["fixture_response"])
                 answer = strip_for_display(fixture)

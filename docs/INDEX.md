@@ -93,7 +93,7 @@ Ordered roughly by how often you need them. Counts are git-tracked files
 | `upstream/` | 10 | OpenVINO upstream-contribution working sets (e.g. `725_xgrammar_stop_token/`) + GPU-from-source build plan. | External OSS contribution work. |
 | `claude_projects/` | 0 | RETIRED-WORLD manuals — moved to `archive/2026/retired_fleet_instructions/` 2026-07-19 (do not read as current guidance). | Historical only. |
 | `archive/` | ~700 | The archive wing: `journal/` + `lessons/` + `sprints/` + `scheduled/` + `testing/` + `ledger/` + `2026/` clusters + `platform_separation/`, each with an INDEX/README. **Index → volume: any entry in ≤2 reads.** | Recovering any archived entry or superseded doc. |
-| `design/` | 1 | Engineering design docs (swap-driver increment 2). | Design deep-dive. |
+| `design/` | 17 | Engineering design docs (swap-driver increment 2; `CODER_CONTAINMENT_DESIGN_OVERVIEW.md`, the self-contained design of the restricted coder account, #775, ADR-045). | Design deep-dive; the containment overview is the entry point for outside readers. |
 | `battery/` | 1 | Battery-campaign prescope. | Overnight battery-campaign context. |
 | `claude_cowork/` | 0 | RETIRED-WORLD manual — moved to `archive/2026/retired_fleet_instructions/` 2026-07-19. | Historical only. |
 | `demo/` | 0 (gitignored) | Demo capture assets. | Demo prep. |

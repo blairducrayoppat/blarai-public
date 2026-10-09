@@ -69,6 +69,8 @@ CAPABILITY_CHOICES: tuple[str, ...] = tuple(c.value for c in Capability)
 ENV_MODEL_DIR: str = "BLARAI_EVAL_MODEL_DIR"
 ENV_CAPABILITY: str = "BLARAI_EVAL_CAPABILITY"
 ENV_NO_SPECULATIVE: str = "BLARAI_EVAL_NO_SPECULATIVE"
+#: Engine arm for a ``multimodal-vlm`` target (#1663): see ``evals/cb_pipeline.py``.
+ENV_ENGINE: str = "BLARAI_EVAL_ENGINE"
 
 #: The OpenVINO IR filename each capability's directory MUST contain — the
 #: contract check that a declared capability actually matches the directory.
@@ -112,11 +114,21 @@ class ModelTarget:
             ``False`` for ``multimodal-vlm`` (structural); for ``text-llm`` it
             follows the ``--no-speculative`` flag (default ``True`` — the 14B
             contract).
+        engine: Which inference engine serves the target. ``"default"`` is the
+            pipeline class named by ``capability`` (byte-identical to the
+            pre-#1663 behaviour); any other value is a continuous-batching arm
+            from ``evals/cb_pipeline.py`` (MTP off / on / prefix cache).
     """
 
     model_dir: Path
     capability: Capability
     speculative_decode: bool
+    engine: str = "default"
+
+    @property
+    def uses_cb_engine(self) -> bool:
+        """True iff a continuous-batching engine arm serves this target."""
+        return self.engine != "default"
 
     @property
     def uses_vlm_pipeline(self) -> bool:
@@ -148,6 +160,7 @@ def resolve_model_target(
     model_dir: "str | Path | None",
     capability: str | None,
     no_speculative: bool = False,
+    engine: str | None = None,
     env: "Mapping[str, str] | None" = None,
 ) -> "ModelTarget | None":
     """Resolve the hardware model-target override from CLI values (+ env fallback).
@@ -161,6 +174,10 @@ def resolve_model_target(
         capability: Declared capability string (see :class:`Capability`).
         no_speculative: When True, a ``text-llm`` target loads WITHOUT the
             speculative draft (ignored for ``multimodal-vlm``, which has none).
+        engine: Engine arm (``evals.cb_pipeline.ENGINE_CHOICES``). ``None`` or
+            ``"default"`` keeps the declared capability's own pipeline class.
+            A non-default engine requires ``multimodal-vlm`` and, for the MTP
+            arm, an ``openvino_mtp_model.xml`` in the directory.
         env: Environment mapping (defaults to ``os.environ``; injectable for
             tests).
 
@@ -178,12 +195,13 @@ def resolve_model_target(
     resolved_dir = model_dir if model_dir is not None else (environ.get(ENV_MODEL_DIR) or None)
     resolved_cap = capability if capability is not None else (environ.get(ENV_CAPABILITY) or None)
     resolved_nospec = no_speculative or _env_flag(environ.get(ENV_NO_SPECULATIVE))
+    resolved_engine = engine if engine is not None else (environ.get(ENV_ENGINE) or "default")
 
     if resolved_dir is None:
         # A capability contract (or --no-speculative) with no target model is a
         # mistake, not a silent no-op — fail loud rather than quietly running
         # the default 14B while the operator believes an override is in effect.
-        if resolved_cap is not None or resolved_nospec:
+        if resolved_cap is not None or resolved_nospec or resolved_engine != "default":
             raise ModelTargetError(
                 "an eval capability contract (--capability / --no-speculative or "
                 "their BLARAI_EVAL_* env vars) was supplied without --model-dir "
@@ -229,8 +247,29 @@ def resolve_model_target(
     else:
         speculative = not resolved_nospec
 
+    from evals.cb_pipeline import ENGINE_CHOICES, ENGINE_MTP_ON
+
+    if resolved_engine not in ENGINE_CHOICES:
+        raise ModelTargetError(
+            f"unknown eval engine {resolved_engine!r} "
+            f"(must be one of: {', '.join(ENGINE_CHOICES)})"
+        )
+    if resolved_engine != "default":
+        if capability_enum is not Capability.MULTIMODAL_VLM:
+            raise ModelTargetError(
+                f"--engine {resolved_engine} requires --capability multimodal-vlm "
+                "(the continuous-batching arms load the multimodal export layout; "
+                "fail-closed, the engine is never guessed)."
+            )
+        if resolved_engine == ENGINE_MTP_ON and not (path / "openvino_mtp_model.xml").exists():
+            raise ModelTargetError(
+                f"--engine {ENGINE_MTP_ON} needs openvino_mtp_model.xml in {path}; "
+                "the Multi-Token Prediction head is absent (fail-closed)."
+            )
+
     return ModelTarget(
         model_dir=path,
         capability=capability_enum,
         speculative_decode=speculative,
+        engine=resolved_engine,
     )

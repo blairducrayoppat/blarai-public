@@ -127,6 +127,8 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from ipaddress import ip_address
 from typing import Callable, Final, Optional
+import hashlib
+import uuid
 from urllib.parse import urlsplit
 
 import httpx
@@ -373,6 +375,156 @@ _adjudicator: Optional[UrlAdjudicator] = None
 _adjudicator_lock = threading.Lock()
 
 
+ReceiptSink = Callable[..., bool]
+"""A verdict-receipt sink: keyword-only, returns True when recorded."""
+
+_receipt_sink: Optional[ReceiptSink] = None
+
+
+def register_receipt_sink(sink: ReceiptSink) -> None:
+    """Register the sink that records this door's verdicts (#1542 Gap B).
+
+    Registering a sink makes this door's receipts DURABLE. Until one is
+    registered :func:`_record_verdict` falls back to a real in-memory chain, so
+    a verdict is never unrecorded — what registration adds is survival of a
+    restart, not whether a receipt exists. The Assistant Orchestrator registers
+    one in ``start()``; ``tests/security/test_verdict_receipts.py`` locks that
+    it does, because a seam nothing calls is not a seam.
+
+    The sink returns ``True`` when the verdict is recorded. Anything else — a
+    ``False``, a raise — is treated as not recorded and denies.
+    """
+    if not callable(sink):
+        raise TypeError("register_receipt_sink requires a callable")
+    global _receipt_sink
+    _receipt_sink = sink
+
+
+def active_receipt_sink() -> Optional[ReceiptSink]:
+    """The registered durable verdict sink, or None.
+
+    None does NOT mean this door denies: :func:`_record_verdict` falls back to an
+    in-memory chain. Read that function for what absence actually costs.
+    """
+    return _receipt_sink
+
+
+_fallback_chain = None
+_fallback_lock = threading.Lock()
+
+
+def _default_receipt_sink() -> ReceiptSink:
+    """The sink used until a durable one is registered.
+
+    A REAL hash-chained, signed ``AuditLog`` — in memory. The point is that no
+    verdict is ever unrecorded: this door records to RAM until the service
+    registers the persistent chain, rather than denying every fetch because the
+    durable sink is not up yet.
+
+    It is NOT a fail-open. What the registration upgrades is DURABILITY, not
+    whether a receipt exists, and the first use says so at WARNING level so a
+    production process running on this fallback is visible rather than silent.
+    That the Assistant Orchestrator installs a durable sink at all is locked by
+    ``tests/security/test_verdict_receipts.py``, because a warning nobody reads
+    is not a control.
+    """
+    global _fallback_chain
+    # Locked check-then-set. Two concurrent first-uses would otherwise each build
+    # a chain and the loser's records would go to an orphaned object — records
+    # that verify, in a chain nobody holds.
+    with _fallback_lock:
+        if _fallback_chain is None:
+            from shared.security.audit_log import AuditLog, HmacSha256Signer
+
+            logger.warning(
+                "guarded_fetch: recording egress verdicts to an IN-MEMORY chain "
+                "— no durable receipt sink is registered, so these records do "
+                "not survive a restart (#1542)."
+            )
+            _fallback_chain = AuditLog.in_memory(
+                HmacSha256Signer(
+                    key=hashlib.sha256(
+                        b"BlarAI-guarded-fetch-verdict-fallback-v1"
+                    ).digest()
+                )
+            )
+
+    def _sink(**fields: object) -> bool:
+        from shared.security.verdict_receipt import build_receipt
+
+        receipt = build_receipt(
+            intervention_point="pre_tool_call",
+            source_door="guarded_fetch_egress",
+            input_identity=str(fields["action_identity"]),
+            enforced_identity=str(fields["action_identity"]),
+            decision=str(fields["decision"]),
+            reason=str(fields["reason"]),
+            liftable=bool(fields["liftable"]),
+            approval_outcome=str(fields.get("approval_outcome", "")),
+            detail=str(fields.get("detail", "")),
+        )
+        _fallback_chain.append(
+            adjudication_id=f"guarded_fetch_egress:{uuid.uuid4().hex}",
+            decision=str(fields["decision"]).upper(),
+            car_hash=str(fields["action_identity"]),
+            source_agent="guarded_fetch",
+            destination_service="guarded_fetch_egress",
+            verb="ADJUDICATE",
+            resource=str(fields["resource"]),
+            sensitivity="INTERNAL",
+            rule_engine_passed=(fields["decision"] == "allow"),
+            confidence=1.0,
+            receipt=receipt,
+        )
+        return True
+
+    return _sink
+
+
+def _record_verdict(
+    *, decision: str, reason: str, url: str, purpose: str, liftable: bool,
+    approval_outcome: str = "", detail: str = "",
+) -> bool:
+    """Record one egress verdict. Returns False when it was NOT recorded.
+
+    ``resource`` carries the HOST only. The full URL contributes through
+    ``input_identity``, which is a hash — the LA's recorded decision on this
+    ticket, and the reason a receipt cannot become a browsing history.
+
+    That identity is a FETCH identity — a length-prefixed digest over
+    ``(purpose, url)`` — and NOT a Canonical Action Representation hash. The two
+    are the same SHAPE and are not interchangeable: an egress receipt's identity
+    does not reproduce from any CAR, and a reader correlating the two doors must
+    not expect it to. The dispatch door records a real ``canonical_hash()``. This
+    door has no CAR to hash, because ``guarded_fetch`` is a shared module with no
+    access to the session the CAR is built from.
+    """
+    sink = _receipt_sink or _default_receipt_sink()
+    try:
+        host = urlsplit(url).hostname or ""
+        identity = "sha256:" + hashlib.sha256(
+            f"{len(purpose)}:{purpose}:{url}".encode("utf-8")
+        ).hexdigest()
+        return bool(
+            sink(
+                decision=decision,
+                reason=reason,
+                resource=host,
+                action_identity=identity,
+                liftable=liftable,
+                approval_outcome=approval_outcome,
+                # NOT truncated here. build_receipt REFUSES an over-long value,
+                # and truncating first would disable that cap at the only caller
+                # that passes detail — a silently truncated payload is still a
+                # payload, and a control that cannot fire is not a control.
+                detail=detail,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 — FAIL-LOUD, never swallowed
+        logger.error("guarded_fetch: verdict receipt append FAILED: %s", exc)
+        return False
+
+
 def register_url_adjudicator(adjudicator: UrlAdjudicator) -> None:
     """Register the per-URL Policy-Agent adjudicator (the integration seam).
 
@@ -380,9 +532,16 @@ def register_url_adjudicator(adjudicator: UrlAdjudicator) -> None:
     calls this once at its entry point with a ``Callable[[str, str], Verdict]``
     (url, purpose). With an adjudicator registered, :func:`fetch_external` consults
     it on every URL; with none registered (the default), every fetch is DENIED —
-    the fail-closed posture. The slot is SINGULAR and first-wins, so which
-    adjudicator is in force depends on which caller wired it first; the two egress
-    layers agree only while the deterministic one holds it (#977 OPEN).
+    the fail-closed posture. The slot is SINGULAR and this function overwrites it
+    unconditionally — LAST-WRITE-WINS, not first-wins; a caller that wants
+    first-wins guards its own call with ``active_url_adjudicator() is None``, as
+    the Assistant Orchestrator does and the launcher does not.
+
+    **Which adjudicator is in force no longer decides POLICY (#977, closed by
+    #1586).** Both registration sites build the same request-keyed adjudicator,
+    which selects the allowlist policy from the request's own ``purpose``, so the
+    two egress layers agree for every purpose except operator-paste — where the
+    request authorises its own host by design.
 
     TODO (caller wiring — NOT done in this module by design): the registered
     callable is expected to build a
@@ -613,6 +772,45 @@ def _resolution_blocked_reason(target: _ValidatedTarget) -> Optional[str]:
 
 
 def _adjudicate(url: str, purpose: str) -> tuple[Verdict, Optional[str]]:
+    """Adjudicate ``url`` and close the verdict into a signed receipt (#1542).
+
+    Wraps :func:`_adjudicate_uncorded` rather than editing each of its return
+    sites. That is deliberate: a wrapper cannot miss one, and a verdict path
+    added later is recorded without anyone remembering to add the call. The
+    recorded-vs-not distinction is enforced HERE, at the single exit.
+
+    Fail-closed on the ALLOW path: an allow that could not be recorded is
+    downgraded to a DENY, because an egress door whose decision left no
+    tamper-evident record has not proved it. A DENY that could not be recorded
+    stays a DENY — the fetch is not happening either way — and is logged loudly.
+    """
+    verdict, denied_reason = _adjudicate_uncorded(url, purpose)
+
+    if verdict is Verdict.ALLOW:
+        if not _record_verdict(
+            decision="allow", reason="ALLOW_EXTERNAL_FETCH", url=url,
+            purpose=purpose, liftable=False,
+        ):
+            logger.error(
+                "guarded_fetch: ALLOW DOWNGRADED TO DENY — the verdict receipt "
+                "could not be recorded (#1542). An unaudited egress allow is the "
+                "governance hole this door exists to close.",
+            )
+            return Verdict.DENY, "verdict receipt could not be recorded"
+        return verdict, denied_reason
+
+    _record_verdict(
+        decision="deny", reason="DENY_EXTERNAL_FETCH", url=url, purpose=purpose,
+        # An operator could have lifted this only if it reached one at all; the
+        # structural denials above (no adjudicator, malformed verdict) could not
+        # have been, and saying so is what stops an operator waiting for a prompt.
+        liftable=False,
+        detail=denied_reason or "",
+    )
+    return verdict, denied_reason
+
+
+def _adjudicate_uncorded(url: str, purpose: str) -> tuple[Verdict, Optional[str]]:
     """Get the PA verdict for ``url``. Returns (verdict, denied_reason_if_denied).
 
     Fail-closed: no adjudicator registered, an adjudicator that raises, or one that

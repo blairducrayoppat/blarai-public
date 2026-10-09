@@ -1,3 +1,5 @@
+# enforces-rule: decision_boundary.deferral_discipline.any-review-audit-verification
+# enforces-rule: decision_boundary.deferral_discipline.a-deferral-is-a
 """Gate lock for the finding-disposition control (2026-07-20).
 
 WHAT FAILURE THIS EXISTS FOR
@@ -382,3 +384,66 @@ def test_the_verifier_is_wired_and_executable() -> None:
     assert VERIFIER.exists(), f"missing {VERIFIER}"
     out = subprocess.run([sys.executable, str(VERIFIER), "--help"], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
+
+
+# --------------------------------------------------------------------------
+# 5. A row that begins with its ticket number is a ROW, not a comment (2026-08-15)
+# --------------------------------------------------------------------------
+
+
+def test_a_row_beginning_with_a_ticket_number_is_not_swallowed_as_a_comment(tmp_path: Path) -> None:
+    """The verifier used to skip every line starting with `#`, so findings written the way
+    people actually write them — "#1391 item 3 | FIXED | <sha>" — vanished from the block.
+
+    It then printed a self-consistent "3 ok of 3" over a record holding EIGHT rows. That is
+    the #1231 shape inside the control built to retire it: a total derived from what was
+    counted rather than from what was there, arithmetic intact, population quietly shrunk.
+    Caught when a real record under-reported by five.
+    """
+    md = ("```disposition\n"
+          "# finding | status | evidence-or-predicate\n"
+          "#1391 a finding written starting with its ticket | FIXED | f4211acc — must be SEEN\n"
+          "an ordinary finding | FIXED | f4211acc — the normal shape still parses\n"
+          "```")
+    rows = _rows(md)
+    assert len(rows) == 2, (
+        f"expected both rows; the #-prefixed one was dropped. got: {[r.finding for r in rows]}"
+    )
+    assert any(r.finding.startswith("#1391") for r in rows)
+
+
+def test_the_column_header_is_still_treated_as_a_comment(tmp_path: Path) -> None:
+    """Precision half. The header `# finding | status | evidence` also has two pipes, so a
+    naive fix turns it into a row with an unknown status — trading a silent drop for a false
+    failure on every well-formed record in the repo."""
+    md = ("```disposition\n"
+          "# finding | status | evidence-or-predicate\n"
+          "only one real finding | FIXED | f4211acc — one row, not two\n"
+          "```")
+    rows = _rows(md)
+    assert len(rows) == 1 and rows[0].status == "FIXED"
+
+
+def test_a_hash_row_with_a_typod_status_still_FAILS_loudly(tmp_path: Path) -> None:
+    """The fix must not become a tolerance. Skipping `#` lines the parser cannot classify
+    would restore the silence in a politer costume, so a ticket-prefixed row with a bad
+    status has to be convicted like any other."""
+    md = ("```disposition\n"
+          "# finding | status | evidence-or-predicate\n"
+          "#1391 a finding with a bad status | FIXEDD | f4211acc\n"
+          "```")
+    code, report = _run(md, tmp_path)
+    assert code != 0, "a #-prefixed row with an unknown status passed silently"
+    assert "FIXEDD" in report or "unknown status" in report
+
+
+def test_a_genuine_prose_comment_is_still_ignored(tmp_path: Path) -> None:
+    """A `#` line without the two pipes that make a row is still a comment, so records can
+    keep annotating their blocks."""
+    md = ("```disposition\n"
+          "# finding | status | evidence-or-predicate\n"
+          "# this block covers only the security half of the sweep\n"
+          "one real finding | FIXED | f4211acc — the only row here\n"
+          "```")
+    rows = _rows(md)
+    assert len(rows) == 1

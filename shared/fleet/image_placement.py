@@ -190,11 +190,18 @@ _SKIP_DIRS = frozenset({
 #: than no instrument at all. That is the false-positive class this module's own docstring
 #: warns about, committed by this module, and found only by opening the directory.
 _INTAKE_MARKER_NAMES = ("README.txt", "readme.txt")
+#: OLD PHRASES ARE NEVER RETIRED. Every project already on disk carries the README text
+#: that was seeded when it was created, and this marker is the only thing standing
+#: between the operator's own photographs and the unreferenced-asset rule. Dropping a
+#: phrase here would re-commit the 2026-08-08 false positive against every existing
+#: project at once. Add for a new wording; never remove for an old one.
 _INTAKE_MARKER_PHRASES = (
-    "put photos, documents",
-    "material for the build",
+    "put photos, documents",          # scaffold text, 2026-07-29 .. 2026-08-30
+    "put photos, videos, documents",  # scaffold text, 2026-08-30 ..
+    "material for the build",         # in both
     "screenshots to emulate",
     "pictures to emulate",
+    "screenshots to copy the look of",
 )
 
 #: JSON files that are configuration, never a content collection. Excluded by name so a
@@ -873,9 +880,45 @@ def grade_site(site_dir: str | Path, served_root: str | Path | None = None) -> d
 
     items: list[Item] = [item for collection in collections for item in collection.items]
     item_ran = bool(items)
+    # #1391: catalogues that would not parse. `find_collections` already records one LOW
+    # finding each and then `continue`s, so their items never enter `items` above — not as
+    # `items`, not as `items_without_image`, not as `items_with_missing_image`. Ten items all
+    # missing pictures is ten HIGH findings and `hard=True` when the JSON is well-formed, and
+    # a single LOW finding that moves nothing when the same file has a syntax error. Doing
+    # LESS work turned a guaranteed hard-fail into an invisible non-event, which is #1231
+    # exactly, reached by a malformed read instead of a budget clock. No adversary required:
+    # a truncated write or a bad encoding is enough.
+    #
+    # Derived from the findings rather than threaded out of `find_collections` so the
+    # signature every caller depends on is unchanged, and so the count cannot drift from the
+    # findings it describes — they are the same objects.
+    unparsed_catalogs: list[str] = [f.file for f in findings if f.rule == "unreadable"]
     asset_ran = bool(assets)
 
     if not item_ran and not asset_ran:
+        if unparsed_catalogs:
+            # #1391: "no data file listing items with pictures" was FACTUALLY WRONG here — a
+            # file was found, it did not parse. That collapsed "did not look" into "looked and
+            # it broke", which is the STATUS_SENTINEL failure instrument_registry's own
+            # docstring warns about, and it is the more alarming of the two states reported as
+            # the more innocent one.
+            named = ", ".join(sorted(unparsed_catalogs)[:5])
+            reason = (
+                f"{len(unparsed_catalogs)} data file(s) listing items were FOUND but could not "
+                f"be parsed ({named}), and no image files exist under the served root ({root}). "
+                f"This is not a site without media — it is a site whose media data could not "
+                f"be read"
+            )
+            return _absent(
+                reason, str(root), root_reason, findings,
+                [(
+                    f"NOTHING was graded, and NOT because there was nothing to grade: "
+                    f"{len(unparsed_catalogs)} catalogue file(s) failed to parse, so an "
+                    f"unknown number of items went uncounted. Treat this as unmeasured, "
+                    f"never as clean"
+                )],
+                nothing_to_grade=False,
+            )
         reason = (
             "this site declares no media: no image files under the served root "
             f"({root}) and no data file listing items with pictures"
@@ -937,7 +980,21 @@ def grade_site(site_dir: str | Path, served_root: str | Path | None = None) -> d
         }
         checks["item_placement"] = {"checked": True, "reason": ""}
     else:
-        reason = "no data file listing items with pictures was found, so nothing declares what each picture is FOR"
+        # #1391, SECOND REACHABLE PATH. The branch at :891 already refuses to call an
+        # unparseable catalogue an absent one — but that branch only fires when there are no
+        # images EITHER. A delivery with images present and a catalogue that failed to parse
+        # lands here instead, where the text used to assert unconditionally that no data file
+        # "was found". Same false statement, one branch over, and the likelier of the two to
+        # be reached: a site with pictures is the normal case.
+        if unparsed_catalogs:
+            named = ", ".join(sorted(unparsed_catalogs)[:5])
+            reason = (
+                f"{len(unparsed_catalogs)} data file(s) listing items were FOUND but could not "
+                f"be parsed ({named}), so what each picture is FOR could not be read. This is "
+                f"not a delivery without item data — it is one whose item data could not be read"
+            )
+        else:
+            reason = "no data file listing items with pictures was found, so nothing declares what each picture is FOR"
         checks["item_placement"] = {"checked": False, "reason": reason}
         not_measured.insert(0, f"item placement was NOT graded: {reason}")
 
@@ -994,6 +1051,19 @@ def grade_site(site_dir: str | Path, served_root: str | Path | None = None) -> d
         checks["asset_usage"] = {"checked": False, "reason": reason}
         not_measured.insert(0, f"asset usage was NOT graded: {reason}")
 
+    if unparsed_catalogs:
+        # FIRST in the list, ahead of the standing limitations below, because those describe
+        # what this instrument never grades while this one describes what it FAILED to grade
+        # on THIS delivery. The asymmetry that made #1391 findable was that `asset_usage`
+        # confessed its exclusions here and `item_placement` did not; a dimension that
+        # discloses nothing reads as a dimension with nothing to disclose.
+        not_measured.insert(
+            0,
+            f"{len(unparsed_catalogs)} data file(s) could not be parsed "
+            f"({', '.join(sorted(unparsed_catalogs)[:5])}) — an UNKNOWN number of items is "
+            f"excluded from every item count below, so those counts are a lower bound and a "
+            f"clean item result does NOT mean every item was checked",
+        )
     not_measured += [
         (
             "no image is ever opened: every judgement about WHAT a picture shows is inferred "
@@ -1013,6 +1083,13 @@ def grade_site(site_dir: str | Path, served_root: str | Path | None = None) -> d
         "served_root": str(root),
         "served_root_reason": root_reason,
         "data_sources": sorted({collection.source for collection in collections}),
+        # #1391. `data_sources` above lists what WAS read; without this, a reader of the
+        # archive has no way to learn that anything was not. The count is what a sweep
+        # aggregates and the list is what a human opens, so both ship — and the honest
+        # statement is that the number of items lost is UNKNOWN, not zero, because the file
+        # that would have said how many is the file that would not parse.
+        "unparsed_data_sources": sorted(unparsed_catalogs),
+        "unparsed_data_source_count": len(unparsed_catalogs),
         "collections": [
             {
                 "source": collection.source,
@@ -1031,6 +1108,35 @@ def grade_site(site_dir: str | Path, served_root: str | Path | None = None) -> d
         "counts": counts,
         "not_measured": not_measured,
     }
+
+
+def is_graded(report: dict) -> bool:
+    """Whether *report* records a grading pass that ACTUALLY graded something.
+
+    The single predicate every reader consults, so ``findings == []`` from a gallery whose
+    every product has its own photograph can never be confused with ``findings == []``
+    because no picture and no product list was ever found.
+
+    THREE states, not two, and this predicate answers only the first question of the two the
+    reader needs:
+
+    * ``checked`` true — at least one dimension ran and its counts are published. Measured.
+    * ``checked`` false, ``nothing_to_grade`` true — the delivery genuinely carries no media.
+      NOT measured: :func:`grade_site` publishes no counts here, so treating it as a graded
+      pass would put a clean bill of health on an empty result. It is also not a fault, which
+      is why the renderers say "no media to grade" rather than the disclosure.
+    * ``checked`` false, ``nothing_to_grade`` false — the grading could not be performed (a
+      missing tree, an unreadable one, a grader that raised). NOT measured, and the state the
+      registered ``disclosure_marker`` names.
+
+    Registered in :mod:`shared.instrument_registry` as this instrument's ``STATUS_PREDICATE``:
+    the report is a plain dict with no attribute for the registry's guard analysis to trace,
+    so the checkable contract is that every renderer CALLS this. Fail-closed on anything that
+    is not a dict — a caller holding ``None`` because a producer raised has graded nothing.
+    """
+    if not isinstance(report, dict):
+        return False
+    return bool(report.get("checked", False))
 
 
 def has_hard_findings(findings: Iterable[dict | Finding]) -> bool:
@@ -1059,7 +1165,7 @@ def format_operator_summary(report: dict) -> str:
     on 2026-08-08 stated a confident verdict beside an unmeasured field; putting the gap
     first is the fix for that class, not a stylistic choice.
     """
-    if not report.get("checked"):
+    if not is_graded(report):
         if report.get("nothing_to_grade"):
             return (
                 "The picture check found no pictures and no product list, so there was nothing "

@@ -1,0 +1,96 @@
+{
+  "benchmark": "coder_sustained_throughput",
+  "label": "cs4-offload30-bootfresh",
+  "timestamp": "2026-08-31T19:45:26",
+  "ao_resident": false,
+  "session_clock": {
+    "machine_uptime_at_start_s": 1995.9,
+    "harness_wall_s": 265.2,
+    "note": "#1487: the same config decayed 16.55 -> 9.59 tok/s across one hour on this box. Compare records at LIKE machine age, and never A/B two configs back-to-back without interleaving them."
+  },
+  "runs": [
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 48.34,
+      "decode_tps": 16.55,
+      "output_chars": 2623,
+      "produced_markup": true,
+      "index": 0,
+      "elapsed_session_s": 65.6,
+      "machine_uptime_s": 2061.5
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 49.38,
+      "decode_tps": 16.2,
+      "output_chars": 2652,
+      "produced_markup": true,
+      "index": 1,
+      "elapsed_session_s": 114.0,
+      "machine_uptime_s": 2109.8
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 50.27,
+      "decode_tps": 15.91,
+      "output_chars": 2622,
+      "produced_markup": true,
+      "index": 2,
+      "elapsed_session_s": 163.3,
+      "machine_uptime_s": 2159.2
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 51.6,
+      "decode_tps": 15.5,
+      "output_chars": 2637,
+      "produced_markup": true,
+      "index": 3,
+      "elapsed_session_s": 213.6,
+      "machine_uptime_s": 2209.5
+    }
+  ],
+  "errors": 0,
+  "throughput_tps": {
+    "median": 16.05,
+    "mean": 16.04,
+    "min": 15.5,
+    "max": 16.55
+  },
+  "drift": {
+    "first_tps": 16.55,
+    "last_tps": 15.5,
+    "delta_pct": -6.3,
+    "spread_pct": 6.5
+  },
+  "resources_over_the_whole_window": {
+    "ram_avail_gib": {
+      "min": 6.95,
+      "mean": 7.37,
+      "max": 11.86,
+      "n": 23
+    },
+    "ram_in_use_gib": {
+      "min": 19.46,
+      "mean": 23.95,
+      "max": 24.37,
+      "n": 23
+    },
+    "gpu_shared_gib": {
+      "min": 11.15,
+      "mean": 14.77,
+      "max": 15.0,
+      "n": 23
+    },
+    "note": "gpu_shared is carved from system RAM on this iGPU -- do NOT add it to ram_in_use"
+  },
+  "not_measured": [
+    "concurrency -- single stream only",
+    "tool-call round trips, which the real coder interleaves with generation, so real per-task wall time exceeds the sum of these decodes",
+    "thermal soak beyond the duration of this run"
+  ]
+}

@@ -1,0 +1,102 @@
+{"kind": "pa", "label": "ALLOW", "out_sha": "55e8b171aad0d9b8", "prompt_len": 3640, "prompt_sha": "0c66235c9f816d94", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "55e8b171aad0d9b8", "prompt_len": 3636, "prompt_sha": "dc192adcff833180", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3630, "prompt_sha": "04e3868bb3b78b86", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3613, "prompt_sha": "34807dbb28345b01", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3610, "prompt_sha": "35f527766f779dc4", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "55e8b171aad0d9b8", "prompt_len": 3636, "prompt_sha": "926d47a9924425ec", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3622, "prompt_sha": "ea9570482777a019", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "ALLOW", "out_sha": "55e8b171aad0d9b8", "prompt_len": 3634, "prompt_sha": "1c631d84087c89ed", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3626, "prompt_sha": "98f70ffdff28a3ac", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3649, "prompt_sha": "12a699b1aa864c2f", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3637, "prompt_sha": "98c3663b4a4feff5", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3643, "prompt_sha": "045edf9f44fb8b39", "tag": "14b-all-random-r1"}
+{"kind": "pa", "label": "DENY", "out_sha": "3ec99b63609bde97", "prompt_len": 3621, "prompt_sha": "6a3026ad0f54916f", "tag": "14b-all-random-r1"}
+{"json_tool_call": false, "kind": "ao", "out_len": 512, "out_sha": "1440febab49ca2fa", "prompt_len": 9740, "prompt_sha": "7de13bc695d0081c", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 145, "out_sha": "73af23f3ed0af96b", "prompt_len": 9740, "prompt_sha": "30d6ac33b79c0fc0", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 31, "out_sha": "a1b7eb2ee7a6aded", "prompt_len": 9737, "prompt_sha": "aa51abc74e8e346a", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 82, "out_sha": "a05c1de1e1036f41", "prompt_len": 9760, "prompt_sha": "466b85b085f10d3c", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 54, "out_sha": "901c61ab94f16dcf", "prompt_len": 9743, "prompt_sha": "b592932f30717545", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 7, "out_sha": "6ab0e9eb200c2d9f", "prompt_len": 9765, "prompt_sha": "cdacb0963816baff", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 28, "out_sha": "9c2d35e0a39b9ea6", "prompt_len": 9799, "prompt_sha": "2407ca41fd39f268", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 4, "out_sha": "5f9a2b795615ba6a", "prompt_len": 9760, "prompt_sha": "860b9daaec98d18f", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 1685, "out_sha": "5d0445eb94776e55", "prompt_len": 9801, "prompt_sha": "309bbc0093c2764f", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 68, "out_sha": "f24527c66426fada", "prompt_len": 9763, "prompt_sha": "8d4e95867a5d3e2f", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 40, "out_sha": "9017be4e16b5235d", "prompt_len": 10040, "prompt_sha": "b1303e948779199d", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 50, "out_sha": "5e1084d14a0e7d39", "prompt_len": 10144, "prompt_sha": "132b54b21a36bfe8", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 101, "out_sha": "e696f7e7556c35fa", "prompt_len": 10052, "prompt_sha": "073480579f561316", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 210, "out_sha": "aa9f7dffa011046a", "prompt_len": 10094, "prompt_sha": "319b7e8aa3393f4c", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 170, "out_sha": "967df470ba5d606b", "prompt_len": 10085, "prompt_sha": "f738bfd3a48d9a2f", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 82, "out_sha": "4af6579bd1d926a8", "prompt_len": 10068, "prompt_sha": "0009a09ad43b3cf0", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 121, "out_sha": "893556654f9bc1ef", "prompt_len": 10054, "prompt_sha": "96f54f4620880a21", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 347, "out_sha": "a046bf8e6b5701d3", "prompt_len": 9750, "prompt_sha": "e9b1b8c2f2c1b93f", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 97, "out_sha": "0011049261abaacb", "prompt_len": 9750, "prompt_sha": "cc28d1491db8c596", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 36, "out_sha": "51d007ae4c72d8e6", "prompt_len": 10139, "prompt_sha": "2f77606cd3ef646e", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 66, "out_sha": "0a921835bd89aacc", "prompt_len": 10137, "prompt_sha": "f332cba9e4618031", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 14, "out_sha": "99ea526d1e94155e", "prompt_len": 10115, "prompt_sha": "bbfe8056bdf3cc30", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 118, "out_sha": "f95ada3b65531afb", "prompt_len": 10140, "prompt_sha": "848915ad562bb58d", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 144, "out_sha": "d095a735d33c872b", "prompt_len": 9700, "prompt_sha": "10131e39d3578a5a", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 155, "out_sha": "92b394b7a8bc2546", "prompt_len": 10207, "prompt_sha": "0b71b8cc4899e51d", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 175, "out_sha": "7f0f6977a0662e9a", "prompt_len": 9745, "prompt_sha": "3ff315a9a403d909", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 113, "out_sha": "1dbf4f935acf6e7d", "prompt_len": 9734, "prompt_sha": "84c77c8f01b62568", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 3, "out_sha": "b814aabdde112d89", "prompt_len": 9677, "prompt_sha": "490a958e0028d420", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 182, "out_sha": "e72894c19d2f65ce", "prompt_len": 9806, "prompt_sha": "b19477fe60e6ea29", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 4, "out_sha": "5f9a2b795615ba6a", "prompt_len": 9787, "prompt_sha": "e69c48c97ea4358d", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 6, "out_sha": "210631f20ff4463f", "prompt_len": 9784, "prompt_sha": "792172fcad9823cf", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 24, "out_sha": "e77bcee021b79615", "prompt_len": 9806, "prompt_sha": "58539a5300219786", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 39, "out_sha": "5100c24cd27446e0", "prompt_len": 9872, "prompt_sha": "e60547e021cdb9d2", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 67, "out_sha": "4523fd77614cc290", "prompt_len": 9812, "prompt_sha": "5c47c2487a1f00a5", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 4, "out_sha": "5f9a2b795615ba6a", "prompt_len": 9843, "prompt_sha": "ed4d6048156b1e82", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 197, "out_sha": "40a59f1c5620a151", "prompt_len": 9884, "prompt_sha": "cd46340b47aaf976", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 12, "out_sha": "6853a17f9d951dc5", "prompt_len": 9875, "prompt_sha": "56357ec040538ffa", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 88, "out_sha": "7fe10726aafb2ab4", "prompt_len": 9842, "prompt_sha": "17e1bc36797193bc", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 5, "out_sha": "2ae2753e67523092", "prompt_len": 9839, "prompt_sha": "22f1e6869e9892ec", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 29, "out_sha": "1412d6572eae7b09", "prompt_len": 9937, "prompt_sha": "2835910633ea3faa", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 7, "out_sha": "edd7595534b124d7", "prompt_len": 9856, "prompt_sha": "0d7fba74bc7a9163", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 21, "out_sha": "536ea795c4bc8a7d", "prompt_len": 9849, "prompt_sha": "20b83fbc0cf66490", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 53, "out_sha": "322404127b721cc9", "prompt_len": 9883, "prompt_sha": "f0209defa548d83b", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 15, "out_sha": "f55fb6f13ccf77c6", "prompt_len": 9813, "prompt_sha": "9bd38568e7a6dd2a", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 3, "out_sha": "600b4cdf20cc06a7", "prompt_len": 9798, "prompt_sha": "2cb5388475dc8059", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 60, "out_sha": "bcfdc6839f0f079c", "prompt_len": 10123, "prompt_sha": "ed0d7ac12072d894", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 122, "out_sha": "ad2082f4d97e4ba9", "prompt_len": 10111, "prompt_sha": "606111b3be69ecdd", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 6, "out_sha": "68604665ee1fc3bc", "prompt_len": 9908, "prompt_sha": "80ede2a78fa6b9c2", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 121, "out_sha": "2fb1a86f2d5f707c", "prompt_len": 9872, "prompt_sha": "65d44802f048895b", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 15, "out_sha": "e748ca8c3297e0f6", "prompt_len": 9911, "prompt_sha": "cbbadc47d709139c", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 3, "out_sha": "b814aabdde112d89", "prompt_len": 9677, "prompt_sha": "490a958e0028d420", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 82, "out_sha": "a05c1de1e1036f41", "prompt_len": 9788, "prompt_sha": "8742e9929e9dcf99", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 31, "out_sha": "94171329985df268", "prompt_len": 9882, "prompt_sha": "a9c3f1ab80c26826", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 87, "out_sha": "2f0ac798765a2c4b", "prompt_len": 9773, "prompt_sha": "38d65c7191c55a99", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 51, "out_sha": "b997743fc3e3fd2d", "prompt_len": 9871, "prompt_sha": "a66d1dfa735c3dda", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 147, "out_sha": "a341b38d48c85d26", "prompt_len": 9737, "prompt_sha": "39015c729d46120e", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 6, "out_sha": "8471c43144a01028", "prompt_len": 9746, "prompt_sha": "b406c3cca3520889", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 126, "out_sha": "ee96563fa49610f2", "prompt_len": 9775, "prompt_sha": "9834e1faa86789a0", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 49, "out_sha": "d064a79256414bca", "prompt_len": 10261, "prompt_sha": "706884024502fb54", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 111, "out_sha": "b81ccad79610fedf", "prompt_len": 9763, "prompt_sha": "9a34ab2198c19252", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 65, "out_sha": "fb8f723ec40af128", "prompt_len": 10264, "prompt_sha": "2bdff27ed6a5a19e", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 117, "out_sha": "dc8851798e43cd1e", "prompt_len": 9754, "prompt_sha": "15ad9e90aa7dec62", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 34, "out_sha": "ea353072a8bceafc", "prompt_len": 10242, "prompt_sha": "496727626fd45c42", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 114, "out_sha": "82036d53b63b88c2", "prompt_len": 9781, "prompt_sha": "848125f721a1e198", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 200, "out_sha": "819b2b2a1cded85f", "prompt_len": 10217, "prompt_sha": "b6903d7bf99b91a3", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 119, "out_sha": "d4181be2ba65f94d", "prompt_len": 9782, "prompt_sha": "930cbe995f958b7c", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 94, "out_sha": "084517c158fef266", "prompt_len": 10210, "prompt_sha": "c98985fdf9ad7412", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 114, "out_sha": "b9e5d819e3390899", "prompt_len": 9773, "prompt_sha": "74756cc7b90b8828", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 30, "out_sha": "8a01ac7a48a0fcc9", "prompt_len": 10198, "prompt_sha": "826c9f98a935d25e", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 114, "out_sha": "fd4cd9f6daca3569", "prompt_len": 9810, "prompt_sha": "022a4cbe653bcb2e", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 85, "out_sha": "bf9aede733dd2306", "prompt_len": 10255, "prompt_sha": "86d58d32b03a881b", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 112, "out_sha": "6a3ceca3021ee515", "prompt_len": 10350, "prompt_sha": "9e0484f88aa8ff40", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 84, "out_sha": "fad5e277606b3b29", "prompt_len": 9777, "prompt_sha": "9d13d2a116164207", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 48, "out_sha": "b4b1ecaa15baa24b", "prompt_len": 9874, "prompt_sha": "b3367ae0c23ed927", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 114, "out_sha": "48769c18bed63473", "prompt_len": 9758, "prompt_sha": "083b80729167f187", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 30, "out_sha": "8a01ac7a48a0fcc9", "prompt_len": 10183, "prompt_sha": "a75bcbc31333e6f3", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 102, "out_sha": "2b8887d34890f789", "prompt_len": 9810, "prompt_sha": "38968f35998851ab", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 318, "out_sha": "06305e1609f56491", "prompt_len": 9972, "prompt_sha": "691028a61d0d72b1", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 114, "out_sha": "ab43bc25fef49f76", "prompt_len": 9765, "prompt_sha": "55b23729ffd5aa32", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 86, "out_sha": "ad827c1891419678", "prompt_len": 10258, "prompt_sha": "36e3dfdf91832c1a", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 116, "out_sha": "1b769061772b2801", "prompt_len": 9752, "prompt_sha": "daba99e42f92df6a", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 24, "out_sha": "11a4037291a894a5", "prompt_len": 10267, "prompt_sha": "726c0bcab4e2c760", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 122, "out_sha": "471d87b607e131a9", "prompt_len": 9798, "prompt_sha": "0ecd53861d8b85cd", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 64, "out_sha": "a77ba896ccb25199", "prompt_len": 10287, "prompt_sha": "6450031134c5af6d", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 83, "out_sha": "98b6033fba20b6e7", "prompt_len": 9792, "prompt_sha": "21683536ee8ca87e", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 46, "out_sha": "71426e4b6f146e15", "prompt_len": 9888, "prompt_sha": "25f89d76b37bd91a", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 2, "out_sha": "99a1b84b98650fd4", "prompt_len": 9791, "prompt_sha": "9f7c6491432cf814", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": true, "kind": "ao", "out_len": 126, "out_sha": "70986b39202f82ce", "prompt_len": 9763, "prompt_sha": "e4055499feaa5a4c", "tag": "14b-all-random-r1", "xml_tool_call": false}
+{"json_tool_call": false, "kind": "ao", "out_len": 30, "out_sha": "6e1a0420c8ff6122", "prompt_len": 10188, "prompt_sha": "cfe707cd522a239c", "tag": "14b-all-random-r1", "xml_tool_call": false}

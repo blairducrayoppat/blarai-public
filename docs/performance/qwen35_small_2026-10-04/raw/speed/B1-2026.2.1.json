@@ -1,0 +1,1328 @@
+{
+ "meta": {
+  "tag": "B1-2026.2.1",
+  "started": "2026-10-04T05:59:06-04:00",
+  "python": "C:\\Users\\<user>\\BlarAI\\.venv\\Scripts\\python.exe",
+  "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+  "openvino_genai_version": "2026.2.1.0-3123-7dea0459b2a",
+  "gpu_driver": {
+   "intel": [
+    {
+     "Name": "Intel(R) Arc(TM) 140V GPU (16GB)",
+     "DriverVersion": "32.0.101.8831"
+    }
+   ],
+   "all": [
+    {
+     "Name": "Intel(R) Arc(TM) 140V GPU (16GB)",
+     "DriverVersion": "32.0.101.8831"
+    }
+   ]
+  },
+  "uptime_h": 0.94,
+  "baseline_in_use_gb": 8.403,
+  "thermal_at_start": {
+   "temp_c": 72.9,
+   "passive_limit_pct": 100.0,
+   "throttle_reasons": 0.0,
+   "cpu_perf_pct": 138.7
+  },
+  "cache_dir": "",
+  "cache_dir_note": "CACHE_DIR='' (model cache disabled) in every compile-property set",
+  "rounds": 1,
+  "arms": [
+   "14b-ship"
+  ],
+  "arm_order_rotated": true,
+  "cells": [
+   "pa",
+   "ao-long",
+   "multiturn"
+  ],
+  "protocol": "both",
+  "reps": 3,
+  "multiturn_turns": [
+   1,
+   3,
+   6
+  ],
+  "plateau_cells": [
+   "pa",
+   "ao-long",
+   "multiturn:t1",
+   "multiturn:t3",
+   "multiturn:t6"
+  ],
+  "cold_cells": [
+   "pa",
+   "ao-long",
+   "multiturn:t1"
+  ],
+  "cold_temp_c": 72.0,
+  "cold_max_wait_s": 180.0,
+  "plateau_rule": "heat loop on the pa prompt: stop when >=8 generations and the last 4 tpot values are each within 5% of their mean; cap 40",
+  "pa_case_id": "pa-mdl-001",
+  "models": {
+   "model_4b": "B:\\models\\Qwen3.5-4B-int8-ov",
+   "model_14b": "C:\\Users\\<user>\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+   "models_root": "C:\\Users\\<user>\\BlarAI"
+  },
+  "max_new_tokens": {
+   "pa": 16,
+   "ao-long": 128,
+   "multiturn": 48
+  },
+  "warmup": "1 discarded generation per loaded arm on a neutral prompt unrelated to any cell",
+  "multiturn_note": "prior assistant turns are scripted, so prompts are byte-identical across arms/rounds",
+  "prefix_cache_note": "repeated identical prompts (heat loop, reps) hit the prefix cache on prefix-cache-ON arms (4b-prefix-cache, 14b-ship)",
+  "finished": "2026-10-04T06:02:43-04:00"
+ },
+ "arm_rounds": [
+  {
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "order_in_round": 0,
+   "header": {
+    "engine": "14b-ship",
+    "model_dir": "C:\\Users\\<user>\\BlarAI\\models\\qwen3-14b\\openvino-int4-gpu",
+    "draft_dir": "C:\\Users\\<user>\\BlarAI\\models\\qwen3-0.6b-pruned-6l\\openvino-int8-gpu",
+    "prefix_caching": true,
+    "num_assistant_tokens": 3,
+    "scheduler": {
+     "cache_size_gb": 3,
+     "enable_prefix_caching": true
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "MODEL_PRIORITY": "HIGH",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": ""
+    },
+    "draft_compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": ""
+    },
+    "kv_cache_precision": "plugin default (unset, as in production default)",
+    "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+    "load_seconds": 13.97
+   },
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "plateau_reached": true,
+   "heat_generations": 8,
+   "heat_tpot_ms": [
+    39.43,
+    38.99,
+    38.81,
+    39.18,
+    38.66,
+    38.53,
+    38.31,
+    39.07
+   ],
+   "mtp_summary": null,
+   "peak_in_use_gb": 25.899,
+   "return_to_baseline": {
+    "settled": true,
+    "waited_s": 1.0,
+    "in_use_gb": 9.06
+   }
+  }
+ ],
+ "rows": [
+  {
+   "t": "2026-10-04T05:59:51-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "pa",
+   "protocol": "cold",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 72.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 150.0
+   },
+   "thermal_after": {
+    "temp_c": 72.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 149.5
+   },
+   "cold_wait": {
+    "waited_s": 21.4,
+    "temp_c": 70.9,
+    "reached": true,
+    "measured": true
+   },
+   "status": "ok",
+   "ttft_ms": 1784.13,
+   "tpot_ms": 41.29,
+   "decode_tps": 24.219,
+   "decode_tps_wall": 24.202,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 2362.6
+  },
+  {
+   "t": "2026-10-04T06:00:15-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "ao-long",
+   "protocol": "cold",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "d6c34c59df22599b133dd77e3c09794e7d32286db7547cdfdf156c74f9ec0892",
+   "thermal_before": {
+    "temp_c": 71.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.4
+   },
+   "thermal_after": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 143.6
+   },
+   "cold_wait": {
+    "waited_s": 8.0,
+    "temp_c": 71.9,
+    "reached": true,
+    "measured": true
+   },
+   "status": "ok",
+   "ttft_ms": 11315.38,
+   "tpot_ms": 110.9,
+   "decode_tps": 9.017,
+   "decode_tps_wall": 9.014,
+   "generated_tokens": 22,
+   "input_tokens": 6075,
+   "pm_input_tokens": 6075,
+   "output_sha256": "78e756ad5756ba732dc47302936e4addbcb194cb0b59c2b81c45570a62987587",
+   "output_chars": 103,
+   "wall_ms": 13645.01
+  },
+  {
+   "t": "2026-10-04T06:01:10-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t1",
+   "protocol": "cold",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "41b44cd73d7797583a60695dc6fe1557499c1089669f72c23ad33fcf44659cbd",
+   "thermal_before": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.5
+   },
+   "thermal_after": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 164.9
+   },
+   "cold_wait": {
+    "waited_s": 51.1,
+    "temp_c": 71.9,
+    "reached": true,
+    "measured": true
+   },
+   "status": "ok",
+   "ttft_ms": 179.65,
+   "tpot_ms": 45.58,
+   "decode_tps": 21.939,
+   "decode_tps_wall": 21.931,
+   "generated_tokens": 21,
+   "input_tokens": 43,
+   "pm_input_tokens": 43,
+   "output_sha256": "bcf8288e549e125b74f108d92980006438153ea15a496e4ac2a7656c7577be86",
+   "output_chars": 85,
+   "wall_ms": 1091.61
+  },
+  {
+   "t": "2026-10-04T06:01:14-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 73.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.1
+   },
+   "thermal_after": {
+    "temp_c": 72.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 134.6
+   },
+   "heat_index": 0,
+   "status": "heat",
+   "ttft_ms": 733.91,
+   "tpot_ms": 39.43,
+   "decode_tps": 25.361,
+   "decode_tps_wall": 25.34,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 1286.4
+  },
+  {
+   "t": "2026-10-04T06:01:17-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 72.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.4
+   },
+   "thermal_after": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 155.3
+   },
+   "heat_index": 1,
+   "status": "heat",
+   "ttft_ms": 521.47,
+   "tpot_ms": 38.99,
+   "decode_tps": 25.648,
+   "decode_tps_wall": 25.63,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 1067.71
+  },
+  {
+   "t": "2026-10-04T06:01:21-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 78.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 144.1
+   },
+   "thermal_after": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.1
+   },
+   "heat_index": 2,
+   "status": "heat",
+   "ttft_ms": 642.47,
+   "tpot_ms": 38.81,
+   "decode_tps": 25.767,
+   "decode_tps_wall": 25.749,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 1186.18
+  },
+  {
+   "t": "2026-10-04T06:01:25-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 75.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 168.8
+   },
+   "thermal_after": {
+    "temp_c": 73.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.7
+   },
+   "heat_index": 3,
+   "status": "heat",
+   "ttft_ms": 525.54,
+   "tpot_ms": 39.18,
+   "decode_tps": 25.523,
+   "decode_tps_wall": 25.501,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 1074.54
+  },
+  {
+   "t": "2026-10-04T06:01:28-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.8
+   },
+   "thermal_after": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.4
+   },
+   "heat_index": 4,
+   "status": "heat",
+   "ttft_ms": 575.2,
+   "tpot_ms": 38.66,
+   "decode_tps": 25.867,
+   "decode_tps_wall": 25.844,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 1116.92
+  },
+  {
+   "t": "2026-10-04T06:01:31-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 160.5
+   },
+   "thermal_after": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.0
+   },
+   "heat_index": 5,
+   "status": "heat",
+   "ttft_ms": 123.72,
+   "tpot_ms": 38.53,
+   "decode_tps": 25.954,
+   "decode_tps_wall": 25.932,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 663.6
+  },
+  {
+   "t": "2026-10-04T06:01:35-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 75.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 149.2
+   },
+   "thermal_after": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.9
+   },
+   "heat_index": 6,
+   "status": "heat",
+   "ttft_ms": 124.55,
+   "tpot_ms": 38.31,
+   "decode_tps": 26.103,
+   "decode_tps_wall": 26.084,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 661.27
+  },
+  {
+   "t": "2026-10-04T06:01:38-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "heat",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 173.0
+   },
+   "thermal_after": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 147.4
+   },
+   "heat_index": 7,
+   "status": "heat",
+   "ttft_ms": 129.64,
+   "tpot_ms": 39.07,
+   "decode_tps": 25.595,
+   "decode_tps_wall": 25.576,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 677.02
+  },
+  {
+   "t": "2026-10-04T06:01:41-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "pa",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 78.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.0
+   },
+   "thermal_after": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.6
+   },
+   "rep": 0,
+   "status": "ok",
+   "ttft_ms": 176.87,
+   "tpot_ms": 38.48,
+   "decode_tps": 25.988,
+   "decode_tps_wall": 25.965,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 716.05
+  },
+  {
+   "t": "2026-10-04T06:01:45-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "pa",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 166.7
+   },
+   "thermal_after": {
+    "temp_c": 75.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.8
+   },
+   "rep": 1,
+   "status": "ok",
+   "ttft_ms": 123.74,
+   "tpot_ms": 38.71,
+   "decode_tps": 25.833,
+   "decode_tps_wall": 25.801,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 666.35
+  },
+  {
+   "t": "2026-10-04T06:01:48-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "pa",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "0c66235c9f816d94fc63d1423efbdeb80316ae60a572bd15b3aedf66349f0cd6",
+   "thermal_before": {
+    "temp_c": 75.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 156.2
+   },
+   "thermal_after": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 149.1
+   },
+   "rep": 2,
+   "status": "ok",
+   "ttft_ms": 124.04,
+   "tpot_ms": 39.49,
+   "decode_tps": 25.323,
+   "decode_tps_wall": 25.303,
+   "generated_tokens": 15,
+   "input_tokens": 811,
+   "pm_input_tokens": 811,
+   "output_sha256": "abc89583f75d3f409e135a36d59909f3b48e20d234d48fb5ff1aea308d069b31",
+   "output_chars": 32,
+   "wall_ms": 677.34
+  },
+  {
+   "t": "2026-10-04T06:01:52-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "ao-long",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "d6c34c59df22599b133dd77e3c09794e7d32286db7547cdfdf156c74f9ec0892",
+   "thermal_before": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 170.4
+   },
+   "thermal_after": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.0
+   },
+   "rep": 0,
+   "status": "ok",
+   "ttft_ms": 192.43,
+   "tpot_ms": 76.99,
+   "decode_tps": 12.989,
+   "decode_tps_wall": 12.982,
+   "generated_tokens": 22,
+   "input_tokens": 6075,
+   "pm_input_tokens": 6075,
+   "output_sha256": "78e756ad5756ba732dc47302936e4addbcb194cb0b59c2b81c45570a62987587",
+   "output_chars": 103,
+   "wall_ms": 1810.04
+  },
+  {
+   "t": "2026-10-04T06:01:57-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "ao-long",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "d6c34c59df22599b133dd77e3c09794e7d32286db7547cdfdf156c74f9ec0892",
+   "thermal_before": {
+    "temp_c": 82.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 147.8
+   },
+   "thermal_after": {
+    "temp_c": 78.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 150.4
+   },
+   "rep": 1,
+   "status": "ok",
+   "ttft_ms": 191.36,
+   "tpot_ms": 77.62,
+   "decode_tps": 12.883,
+   "decode_tps_wall": 12.878,
+   "generated_tokens": 22,
+   "input_tokens": 6075,
+   "pm_input_tokens": 6075,
+   "output_sha256": "78e756ad5756ba732dc47302936e4addbcb194cb0b59c2b81c45570a62987587",
+   "output_chars": 103,
+   "wall_ms": 1822.03
+  },
+  {
+   "t": "2026-10-04T06:02:02-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "ao-long",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "d6c34c59df22599b133dd77e3c09794e7d32286db7547cdfdf156c74f9ec0892",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 139.9
+   },
+   "thermal_after": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 151.7
+   },
+   "rep": 2,
+   "status": "ok",
+   "ttft_ms": 703.56,
+   "tpot_ms": 76.85,
+   "decode_tps": 13.012,
+   "decode_tps_wall": 13.009,
+   "generated_tokens": 22,
+   "input_tokens": 6075,
+   "pm_input_tokens": 6075,
+   "output_sha256": "78e756ad5756ba732dc47302936e4addbcb194cb0b59c2b81c45570a62987587",
+   "output_chars": 103,
+   "wall_ms": 2317.86
+  },
+  {
+   "t": "2026-10-04T06:02:05-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t1",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "41b44cd73d7797583a60695dc6fe1557499c1089669f72c23ad33fcf44659cbd",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 165.6
+   },
+   "thermal_after": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.4
+   },
+   "rep": 0,
+   "status": "ok",
+   "ttft_ms": 111.82,
+   "tpot_ms": 45.83,
+   "decode_tps": 21.82,
+   "decode_tps_wall": 21.81,
+   "generated_tokens": 21,
+   "input_tokens": 43,
+   "pm_input_tokens": 43,
+   "output_sha256": "bcf8288e549e125b74f108d92980006438153ea15a496e4ac2a7656c7577be86",
+   "output_chars": 85,
+   "wall_ms": 1028.82
+  },
+  {
+   "t": "2026-10-04T06:02:09-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t1",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "41b44cd73d7797583a60695dc6fe1557499c1089669f72c23ad33fcf44659cbd",
+   "thermal_before": {
+    "temp_c": 82.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.0
+   },
+   "thermal_after": {
+    "temp_c": 88.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 164.0
+   },
+   "rep": 1,
+   "status": "ok",
+   "ttft_ms": 617.75,
+   "tpot_ms": 45.12,
+   "decode_tps": 22.163,
+   "decode_tps_wall": 22.155,
+   "generated_tokens": 21,
+   "input_tokens": 43,
+   "pm_input_tokens": 43,
+   "output_sha256": "bcf8288e549e125b74f108d92980006438153ea15a496e4ac2a7656c7577be86",
+   "output_chars": 85,
+   "wall_ms": 1520.5
+  },
+  {
+   "t": "2026-10-04T06:02:13-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t1",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "41b44cd73d7797583a60695dc6fe1557499c1089669f72c23ad33fcf44659cbd",
+   "thermal_before": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 144.7
+   },
+   "thermal_after": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.8
+   },
+   "rep": 2,
+   "status": "ok",
+   "ttft_ms": 180.33,
+   "tpot_ms": 44.9,
+   "decode_tps": 22.272,
+   "decode_tps_wall": 22.26,
+   "generated_tokens": 21,
+   "input_tokens": 43,
+   "pm_input_tokens": 43,
+   "output_sha256": "bcf8288e549e125b74f108d92980006438153ea15a496e4ac2a7656c7577be86",
+   "output_chars": 85,
+   "wall_ms": 1078.81
+  },
+  {
+   "t": "2026-10-04T06:02:17-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t3",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "34997d5d59de03b3ef2a490479c4de430cf3feaf823bd7ca4c358d46fe3a8648",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 151.1
+   },
+   "thermal_after": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 165.4
+   },
+   "rep": 0,
+   "status": "ok",
+   "ttft_ms": 264.7,
+   "tpot_ms": 48.17,
+   "decode_tps": 20.76,
+   "decode_tps_wall": 20.754,
+   "generated_tokens": 28,
+   "input_tokens": 131,
+   "pm_input_tokens": 131,
+   "output_sha256": "a00d6be1e1f7b0bdf7617c7c5ccedfd28cc923a635fab53bc53b9c03daafab34",
+   "output_chars": 145,
+   "wall_ms": 1565.63
+  },
+  {
+   "t": "2026-10-04T06:02:21-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t3",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "34997d5d59de03b3ef2a490479c4de430cf3feaf823bd7ca4c358d46fe3a8648",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 144.9
+   },
+   "thermal_after": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.8
+   },
+   "rep": 1,
+   "status": "ok",
+   "ttft_ms": 96.49,
+   "tpot_ms": 47.42,
+   "decode_tps": 21.088,
+   "decode_tps_wall": 21.082,
+   "generated_tokens": 28,
+   "input_tokens": 131,
+   "pm_input_tokens": 131,
+   "output_sha256": "a00d6be1e1f7b0bdf7617c7c5ccedfd28cc923a635fab53bc53b9c03daafab34",
+   "output_chars": 145,
+   "wall_ms": 1377.23
+  },
+  {
+   "t": "2026-10-04T06:02:26-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t3",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "34997d5d59de03b3ef2a490479c4de430cf3feaf823bd7ca4c358d46fe3a8648",
+   "thermal_before": {
+    "temp_c": 85.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 164.2
+   },
+   "thermal_after": {
+    "temp_c": 86.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 144.9
+   },
+   "rep": 2,
+   "status": "ok",
+   "ttft_ms": 415.85,
+   "tpot_ms": 47.32,
+   "decode_tps": 21.133,
+   "decode_tps_wall": 21.126,
+   "generated_tokens": 28,
+   "input_tokens": 131,
+   "pm_input_tokens": 131,
+   "output_sha256": "a00d6be1e1f7b0bdf7617c7c5ccedfd28cc923a635fab53bc53b9c03daafab34",
+   "output_chars": 145,
+   "wall_ms": 1693.87
+  },
+  {
+   "t": "2026-10-04T06:02:31-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t6",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "5bb8797c005a7e03de9185583f7eaa1940f1262d3ce0d1e4359e28d5ca2a50c0",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 150.6
+   },
+   "thermal_after": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.9
+   },
+   "rep": 0,
+   "status": "ok",
+   "ttft_ms": 565.3,
+   "tpot_ms": 54.41,
+   "decode_tps": 18.379,
+   "decode_tps_wall": 18.376,
+   "generated_tokens": 40,
+   "input_tokens": 265,
+   "pm_input_tokens": 265,
+   "output_sha256": "04cbcc343c458ccb71fa633f6a05400dc65947dcfa0e2745161a0d609478651f",
+   "output_chars": 174,
+   "wall_ms": 2687.64
+  },
+  {
+   "t": "2026-10-04T06:02:36-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t6",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "5bb8797c005a7e03de9185583f7eaa1940f1262d3ce0d1e4359e28d5ca2a50c0",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 150.1
+   },
+   "thermal_after": {
+    "temp_c": 85.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 163.0
+   },
+   "rep": 1,
+   "status": "ok",
+   "ttft_ms": 114.04,
+   "tpot_ms": 59.75,
+   "decode_tps": 16.736,
+   "decode_tps_wall": 16.732,
+   "generated_tokens": 40,
+   "input_tokens": 265,
+   "pm_input_tokens": 265,
+   "output_sha256": "9921d721ebd72717a6486582d405ca7c38bf5840d4a1392683563b96bfbbea7c",
+   "output_chars": 179,
+   "wall_ms": 2444.88
+  },
+  {
+   "t": "2026-10-04T06:02:41-04:00",
+   "arm": "14b-ship",
+   "visit": 0,
+   "round": 0,
+   "cell": "multiturn:t6",
+   "protocol": "plateau",
+   "genai_version": "2026.2.1.0-3123-7dea0459b2a",
+   "openvino_version": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+   "prompt_sha256": "5bb8797c005a7e03de9185583f7eaa1940f1262d3ce0d1e4359e28d5ca2a50c0",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 159.1
+   },
+   "thermal_after": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 147.3
+   },
+   "rep": 2,
+   "status": "ok",
+   "ttft_ms": 113.9,
+   "tpot_ms": 66.22,
+   "decode_tps": 15.101,
+   "decode_tps_wall": 15.097,
+   "generated_tokens": 40,
+   "input_tokens": 265,
+   "pm_input_tokens": 265,
+   "output_sha256": "9921d721ebd72717a6486582d405ca7c38bf5840d4a1392683563b96bfbbea7c",
+   "output_chars": 179,
+   "wall_ms": 2697.28
+  }
+ ],
+ "summary": {
+  "protocols": {
+   "cold": {
+    "per_arm_cell": {
+     "14b-ship": {
+      "ao-long": {
+       "ttft_ms": {
+        "n": 1,
+        "mean": 11315.38,
+        "sd": null,
+        "cv_pct": null
+       },
+       "decode_tps": {
+        "n": 1,
+        "mean": 9.017,
+        "sd": null,
+        "cv_pct": null
+       },
+       "output_identity": {
+        "n": 1,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 9.017
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 11315.38
+       },
+       "visit_cv_pct_ttft_ms": null
+      },
+      "multiturn:t1": {
+       "ttft_ms": {
+        "n": 1,
+        "mean": 179.65,
+        "sd": null,
+        "cv_pct": null
+       },
+       "decode_tps": {
+        "n": 1,
+        "mean": 21.939,
+        "sd": null,
+        "cv_pct": null
+       },
+       "output_identity": {
+        "n": 1,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 21.939
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 179.65
+       },
+       "visit_cv_pct_ttft_ms": null
+      },
+      "pa": {
+       "ttft_ms": {
+        "n": 1,
+        "mean": 1784.13,
+        "sd": null,
+        "cv_pct": null
+       },
+       "decode_tps": {
+        "n": 1,
+        "mean": 24.219,
+        "sd": null,
+        "cv_pct": null
+       },
+       "output_identity": {
+        "n": 1,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 24.219
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 1784.13
+       },
+       "visit_cv_pct_ttft_ms": null
+      }
+     }
+    },
+    "arm_output_identity": {
+     "14b-ship": {
+      "n": 3,
+      "identical": false,
+      "n_distinct": 3
+     }
+    },
+    "mtp_off_vs_on_identity": {},
+    "mde": {
+     "formula": "mde_tps = 2 * pooled_sd / sqrt(n); pooled_sd = sqrt(mean(sd_i^2)) over the per-(arm,cell) decode tok/s standard deviations that have n>=2; n = the smallest per-cell sample count. An effect in decode tok/s below this is not a finding.",
+     "n": 1,
+     "pooled_sd": null,
+     "mde_decode_tps": null
+    },
+    "ratios": {}
+   },
+   "plateau": {
+    "per_arm_cell": {
+     "14b-ship": {
+      "ao-long": {
+       "ttft_ms": {
+        "n": 3,
+        "mean": 362.45,
+        "sd": 295.4104,
+        "cv_pct": 81.5
+       },
+       "decode_tps": {
+        "n": 3,
+        "mean": 12.9613,
+        "sd": 0.0688,
+        "cv_pct": 0.53
+       },
+       "output_identity": {
+        "n": 3,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 12.9613
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 362.45
+       },
+       "visit_cv_pct_ttft_ms": null
+      },
+      "multiturn:t1": {
+       "ttft_ms": {
+        "n": 3,
+        "mean": 303.3,
+        "sd": 274.4677,
+        "cv_pct": 90.49
+       },
+       "decode_tps": {
+        "n": 3,
+        "mean": 22.085,
+        "sd": 0.2359,
+        "cv_pct": 1.07
+       },
+       "output_identity": {
+        "n": 3,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 22.085
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 303.3
+       },
+       "visit_cv_pct_ttft_ms": null
+      },
+      "multiturn:t3": {
+       "ttft_ms": {
+        "n": 3,
+        "mean": 259.0133,
+        "sd": 159.7559,
+        "cv_pct": 61.68
+       },
+       "decode_tps": {
+        "n": 3,
+        "mean": 20.9937,
+        "sd": 0.2036,
+        "cv_pct": 0.97
+       },
+       "output_identity": {
+        "n": 3,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 20.9937
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 259.0133
+       },
+       "visit_cv_pct_ttft_ms": null
+      },
+      "multiturn:t6": {
+       "ttft_ms": {
+        "n": 3,
+        "mean": 264.4133,
+        "sd": 260.5755,
+        "cv_pct": 98.55
+       },
+       "decode_tps": {
+        "n": 3,
+        "mean": 16.7387,
+        "sd": 1.639,
+        "cv_pct": 9.79
+       },
+       "output_identity": {
+        "n": 3,
+        "identical": false,
+        "n_distinct": 2
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 16.7387
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 264.4133
+       },
+       "visit_cv_pct_ttft_ms": null
+      },
+      "pa": {
+       "ttft_ms": {
+        "n": 3,
+        "mean": 141.55,
+        "sd": 30.5884,
+        "cv_pct": 21.61
+       },
+       "decode_tps": {
+        "n": 3,
+        "mean": 25.7147,
+        "sd": 0.3479,
+        "cv_pct": 1.35
+       },
+       "output_identity": {
+        "n": 3,
+        "identical": true,
+        "n_distinct": 1
+       },
+       "per_visit_mean_decode_tps": {
+        "0": 25.7147
+       },
+       "visit_cv_pct_decode_tps": null,
+       "per_visit_mean_ttft_ms": {
+        "0": 141.55
+       },
+       "visit_cv_pct_ttft_ms": null
+      }
+     }
+    },
+    "arm_output_identity": {
+     "14b-ship": {
+      "n": 15,
+      "identical": false,
+      "n_distinct": 6
+     }
+    },
+    "mtp_off_vs_on_identity": {},
+    "mde": {
+     "formula": "mde_tps = 2 * pooled_sd / sqrt(n); pooled_sd = sqrt(mean(sd_i^2)) over the per-(arm,cell) decode tok/s standard deviations that have n>=2; n = the smallest per-cell sample count. An effect in decode tok/s below this is not a finding.",
+     "n": 3,
+     "pooled_sd": 0.7628,
+     "mde_decode_tps": 0.8808
+    },
+    "ratios": {}
+   }
+  },
+  "ratio_rule": "no ratio when either side's CV% > 15.0 or CV is undefined (n<2); computed per protocol",
+  "invalid_rows": 0,
+  "heat_rows_excluded": 8
+ }
+}

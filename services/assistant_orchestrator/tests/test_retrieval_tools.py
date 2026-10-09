@@ -35,6 +35,8 @@ to approve so the loop mechanics are what is under test.
 
 from __future__ import annotations
 
+import dataclasses
+
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -61,12 +63,14 @@ from services.assistant_orchestrator.src.tools import execute
 def _clear_retrieval_runners() -> Any:
     """Every test starts and ends with NO retrieval runners registered —
     the shipped production posture for web_search, and hermetic isolation
-    for search_knowledge."""
+    for search_knowledge and search_reference."""
     tools.clear_search_knowledge_runner()
     tools.clear_web_search_runner()
+    tools.clear_search_reference_runner()
     yield
     tools.clear_search_knowledge_runner()
     tools.clear_web_search_runner()
+    tools.clear_search_reference_runner()
 
 
 def _make_resolved_config() -> Any:
@@ -182,6 +186,11 @@ _SK_CONTENT = (
     "Panels degrade about 0.5 percent per year."
 )
 _WS_ANSWER = "OpenVINO 2026.3 was released in June."
+_SR_CONTENT = (
+    "[From the offline encyclopedia: Wikipedia, 'Water' (last edited 2025-01-01, rev 9; "
+    "archive snapshot 2026-08-25)]" + chr(10) +
+    "Water boils at 100 degrees Celsius at sea level."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +201,9 @@ _WS_ANSWER = "OpenVINO 2026.3 was released in June."
 class TestRetrievalToolRegistration:
     """Both tools registered at every SSOT surface, GUARDED, provenance-declared."""
 
-    @pytest.mark.parametrize("name", ["search_knowledge", "web_search"])
+    @pytest.mark.parametrize(
+        "name", ["search_knowledge", "web_search", "search_reference"]
+    )
     def test_registered_everywhere(self, name: str) -> None:
         from services.assistant_orchestrator.src.pgov import TOOL_CALL_ALLOWLIST
 
@@ -226,8 +237,86 @@ class TestRetrievalToolRegistration:
             "generate_image",
         ):
             assert tools.result_provenance(system_tool) is None
+        # ADR-023 Amendment 5 (#1616): reference-corpus passages are
+        # UNTRUSTED_CORPUS — action-locked + datamarked, Stage-5-leak-exempt.
+        # Omitted from this map when search_reference was first registered,
+        # which spliced corpus text raw; found by an independent session.
+        assert tools.result_provenance("search_reference") == (
+            Provenance.UNTRUSTED_CORPUS.value
+        )
         # The map names only registered tools (no orphan declarations).
         assert set(tools._TOOL_RESULT_PROVENANCE) <= set(tools._REGISTRY)
+
+    def test_every_registered_tool_is_classified(self) -> None:
+        """THE COMPLETENESS LOCK, and the reason it exists.
+
+        The check above is one-directional: it rejects a declaration for a tool
+        that does not exist, and passes a CONTENT-RETURNING TOOL THAT DECLARES
+        NOTHING — which is the dangerous direction, because an undeclared tool
+        splices third-party text into the context unmarked and unlocked. That
+        is exactly how search_reference shipped.
+
+        So the registry is partitioned exhaustively: every registered tool is
+        either provenance-declared or explicitly named system-authored. A new
+        tool fails here until someone classifies it, and the failure names it.
+        """
+        classified = set(tools._TOOL_RESULT_PROVENANCE) | tools._SYSTEM_AUTHORED_TOOLS
+        unclassified = set(tools._REGISTRY) - classified
+        assert not unclassified, (
+            f"registered but unclassified: {sorted(unclassified)}. Declare each "
+            f"in _TOOL_RESULT_PROVENANCE (returns third-party text) or in "
+            f"_SYSTEM_AUTHORED_TOOLS (result is computed here)."
+        )
+        # And no tool claims both.
+        assert not (set(tools._TOOL_RESULT_PROVENANCE) & tools._SYSTEM_AUTHORED_TOOLS)
+        # The system-authored set names only real tools, so a renamed tool
+        # cannot sit in it unnoticed while its replacement goes unclassified.
+        assert tools._SYSTEM_AUTHORED_TOOLS <= set(tools._REGISTRY)
+
+    def test_every_retrieval_tool_notice_is_a_declared_notice(self) -> None:
+        """Every ``*_NOTICE`` constant belonging to a provenance-declared tool
+        is in ``RETRIEVAL_NOTICES``.
+
+        A notice left out is read as retrieved CONTENT, so a turn that found
+        nothing is treated as grounded in the nothing it found. The four
+        search_reference notices were omitted in the same change as the
+        provenance gap.
+        """
+        # Derived from the provenance map, not listed by hand: a hand-kept list
+        # let a fourth declared retrieval tool slip this lock (#1616 pre-merge
+        # review). A declared tool with no notice named by the convention fails
+        # loudly on the `found` assertion below instead of passing unseen.
+        prefixes = {
+            tool: f"{tool.upper()}_" for tool in tools._TOOL_RESULT_PROVENANCE
+        }
+        assert {"search_knowledge", "web_search", "search_reference"} <= set(prefixes)
+        for tool, prefix in prefixes.items():
+            assert tools.result_provenance(tool) is not None, tool
+            found = [
+                name for name in dir(tools)
+                if name.startswith(prefix) and name.endswith("_NOTICE")
+            ]
+            assert found, f"no notice constants found for {tool}"
+            for name in found:
+                assert tools.is_retrieval_notice(getattr(tools, name)), (
+                    f"{name} is not in RETRIEVAL_NOTICES, so it would be "
+                    f"treated as retrieved content"
+                )
+
+    def test_notice_lock_fires_on_a_fourth_declared_tool(self, monkeypatch) -> None:
+        """TOGGLE: plant a declared retrieval tool whose notice is NOT in
+        RETRIEVAL_NOTICES and require the derived-prefix lock to name it. The
+        hand-kept prefix list this replaced passed the same plant."""
+        monkeypatch.setitem(
+            tools._TOOL_RESULT_PROVENANCE,
+            "search_gutenberg",
+            Provenance.UNTRUSTED_CORPUS.value,
+        )
+        monkeypatch.setattr(
+            tools, "SEARCH_GUTENBERG_NO_RESULTS_NOTICE", "no gutenberg hit", raising=False
+        )
+        with pytest.raises(AssertionError, match="SEARCH_GUTENBERG_NO_RESULTS_NOTICE"):
+            self.test_every_retrieval_tool_notice_is_a_declared_notice()
 
     def test_declared_provenance_values_reconstruct_enum(self) -> None:
         for value in tools._TOOL_RESULT_PROVENANCE.values():
@@ -235,6 +324,7 @@ class TestRetrievalToolRegistration:
                 Provenance.UNTRUSTED_KNOWLEDGE,
                 Provenance.UNTRUSTED_EXTERNAL,
                 Provenance.UNTRUSTED_WEB,
+                Provenance.UNTRUSTED_CORPUS,
             )
 
     def test_system_prompt_capabilities_count_is_dynamic(self) -> None:
@@ -243,13 +333,85 @@ class TestRetrievalToolRegistration:
         )
 
         assert (
-            f"You have {len(tools.TOOL_SCHEMAS)} built-in tools"
+            f"You have {len(tools.advertised_tool_names())} built-in tools"
             in _DEFAULT_SYSTEM_PROMPT
         )
         assert "five built-in tools" not in _DEFAULT_SYSTEM_PROMPT
         # Both new tools are advertised via the rendered schemas block.
         assert "search_knowledge" in _DEFAULT_SYSTEM_PROMPT
         assert "web_search" in _DEFAULT_SYSTEM_PROMPT
+
+    def test_switched_off_corpus_tool_is_not_advertised(self) -> None:
+        """#1616 pre-merge review finding 4: the dormant corpus tool was described
+        in EVERY live system prompt ("prefer a passage from here over answering
+        from memory") while no runner existed. With no runner registered the
+        prompt carries neither the schema nor the count for it."""
+        from services.assistant_orchestrator.src.gpu_inference import (
+            _DEFAULT_SYSTEM_PROMPT,
+            render_default_system_prompt,
+        )
+
+        assert tools._SEARCH_REFERENCE_RUNNER is None
+        for prompt in (_DEFAULT_SYSTEM_PROMPT, render_default_system_prompt()):
+            assert "search_reference" not in prompt
+            assert "offline encyclopedia" not in prompt
+            assert f"You have {len(tools.TOOL_SCHEMAS) - 1} built-in tools" in prompt
+        assert "search_reference" not in tools.render_tools_system_block()
+
+    def test_registered_corpus_runner_is_advertised(self) -> None:
+        """TOGGLE (principle 12): the same render with the runner registered
+        describes the tool, so the absence above is the gate working and not a
+        tool the renderer can never emit."""
+        from services.assistant_orchestrator.src.gpu_inference import (
+            render_default_system_prompt,
+        )
+
+        tools.register_search_reference_runner(lambda q, k: "x")
+        prompt = render_default_system_prompt()
+        assert "search_reference" in prompt
+        assert f"You have {len(tools.TOOL_SCHEMAS)} built-in tools" in prompt
+        tools.clear_search_reference_runner()
+        assert "search_reference" not in render_default_system_prompt()
+
+    def test_capabilities_prose_names_the_tool_only_while_advertised(self) -> None:
+        """The CAPABILITIES paragraph lists the retrieval tools; a live prompt
+        that advertised a third tool while naming two was inconsistent. Dormant
+        stays byte-identical to the two-tool wording."""
+        from services.assistant_orchestrator.src.gpu_inference import (
+            render_default_system_prompt,
+        )
+
+        assert "through the search_knowledge and web_search tools." in (
+            render_default_system_prompt()
+        )
+        live = render_default_system_prompt(frozenset({"search_reference"}))
+        assert (
+            "through the search_knowledge, search_reference and web_search tools."
+            in live
+        )
+
+    def test_go_live_prompt_can_be_rendered_without_a_runner(self) -> None:
+        """The accuracy suite measures the go-live prompt with the store closed;
+        it asks for that form explicitly. A name that is not runner-gated is
+        refused rather than silently ignored."""
+        from services.assistant_orchestrator.src.gpu_inference import (
+            render_default_system_prompt,
+        )
+
+        live = render_default_system_prompt(frozenset({"search_reference"}))
+        assert "search_reference" in live
+        with pytest.raises(ValueError, match="not runner-gated"):
+            tools.advertised_tool_names(frozenset({"web_search"}))
+
+    def test_switched_off_corpus_tool_still_dispatches_to_its_notice(self) -> None:
+        """Advertisement is removed, dispatch is not: a call emitted anyway still
+        meets the deterministic unavailable notice (never raw tool_call text)."""
+        from services.assistant_orchestrator.src import pgov
+
+        assert "search_reference" in pgov.TOOL_CALL_ALLOWLIST
+        assert execute("search_reference", '{"query": "water"}') == (
+            tools.SEARCH_REFERENCE_UNAVAILABLE_NOTICE
+        )
 
     def test_grammar_schema_covers_new_tools(self) -> None:
         schema = tools.tool_call_grammar_schema()
@@ -869,6 +1031,94 @@ class TestRetrievalResultGroundingLoop:
         assert runner_calls == ["first", "second"]
         assert service._context_manager.has_untrusted_content("sk-chain")
 
+    @staticmethod
+    def _two_reference_calls() -> list[SimpleNamespace]:
+        return [
+            SimpleNamespace(
+                text=_native_call("search_reference", {"query": "first"}),
+                token_count=8,
+                error=None,
+            ),
+            SimpleNamespace(
+                text=_native_call("search_reference", {"query": "second"}),
+                token_count=8,
+                error=None,
+            ),
+            SimpleNamespace(text="Here is what the encyclopedia says.", token_count=8, error=None),
+        ]
+
+    @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
+    def test_second_search_reference_call_same_turn_executes(
+        self, mock_validate_output: MagicMock
+    ) -> None:
+        """#1616 pre-merge review finding 1 (ADR-023 §A5.8): the corpus tool's
+        own first result grounds as UNTRUSTED_CORPUS, and without the rung-1
+        exemption the SECOND search_reference call in the turn was refused by
+        the Layer-3 lock. Driven through the REAL tool loop: both reads run."""
+        mock_validate_output.side_effect = _pgov_approved
+        runner_calls: list[str] = []
+        tools.register_search_reference_runner(
+            lambda q, k: runner_calls.append(q) or _SR_CONTENT
+        )
+        service = _make_service()
+        captured, service = self._drive(service, "sr-chain", self._two_reference_calls())
+        assert runner_calls == ["first", "second"]
+        assert len(captured) == 3
+        assert service._context_manager.has_untrusted_content("sr-chain")
+
+    @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
+    def test_second_search_reference_call_refused_when_exemption_removed(
+        self, mock_validate_output: MagicMock
+    ) -> None:
+        """TOGGLE (security principle 12): the same drive with search_reference
+        taken OUT of the exempt allowlist refuses the second call, so the test
+        above passes BECAUSE of the exemption and not because the loop cannot
+        reach the lock."""
+        mock_validate_output.side_effect = _pgov_approved
+        runner_calls: list[str] = []
+        tools.register_search_reference_runner(
+            lambda q, k: runner_calls.append(q) or _SR_CONTENT
+        )
+        service = _make_service()
+        with patch.object(
+            tools,
+            "_LOCK_EXEMPT_TOOLS",
+            tools._LOCK_EXEMPT_TOOLS - {"search_reference"},
+        ):
+            _captured, service = self._drive(
+                service, "sr-chain-locked", self._two_reference_calls()
+            )
+        assert runner_calls == ["first"]
+
+    @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
+    def test_search_reference_exempt_under_preexisting_knowledge_content(
+        self, mock_validate_output: MagicMock
+    ) -> None:
+        """The FIRST corpus call in a session that already holds knowledge-bank
+        content runs (the review's second failing shape)."""
+        mock_validate_output.side_effect = _pgov_approved
+        runner_calls: list[str] = []
+        tools.register_search_reference_runner(
+            lambda q, k: runner_calls.append(q) or _SR_CONTENT
+        )
+        service = _make_service()
+        if "sr-mixed" not in service._context_manager.active_sessions:
+            service._context_manager.create_session("sr-mixed")
+        service._context_manager.add_grounded_context(
+            "sr-mixed", ["a curated note"], provenance=Provenance.UNTRUSTED_KNOWLEDGE
+        )
+        assert service._context_manager.has_untrusted_content("sr-mixed")
+        responses = [
+            SimpleNamespace(
+                text=_native_call("search_reference", {"query": "only"}),
+                token_count=8,
+                error=None,
+            ),
+            SimpleNamespace(text="Answer.", token_count=8, error=None),
+        ]
+        self._drive(service, "sr-mixed", responses)
+        assert runner_calls == ["only"]
+
     @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
     def test_disabled_web_search_notice_does_not_lock_session(
         self, mock_validate_output: MagicMock
@@ -1148,13 +1398,30 @@ class TestEgressEnvelopeLoop:
     def test_two_searches_one_turn_share_one_fingerprint_n3(
         self, mock_validate_output: MagicMock, mock_fingerprint: MagicMock
     ) -> None:
-        """N=3 (the default): two web_search calls in the same turn are covered by
-        ONE fingerprint; both execute and both are disclosed."""
+        """N=3, set EXPLICITLY: two web_search calls in one turn are covered by ONE
+        fingerprint; both execute and both are disclosed.
+
+        **This test used to say "N=3 (the default)" and take N from the dataclass
+        default.** #1594 changed that default to 1 — a fingerprint per query — and
+        this test failed on the branch gate asserting `2 == 1`. The adversarial
+        review of that change had concluded "no other consumer assumes 3 in code";
+        it was wrong, and this was the consumer, reading the value through
+        `_make_resolved_config()` rather than by name.
+
+        The window behaviour it covers is NOT retired — N stays configurable and
+        raising it is a posture decision the LA can still take — so the test keeps
+        its subject and pins N itself. A test that inherits a security parameter
+        from a shipped default is silently testing whatever that default happens to
+        be, and reports it under a name that says otherwise.
+        """
         mock_validate_output.side_effect = _pgov_approved
         mock_fingerprint.return_value = True
         ws_calls: list[str] = []
         tools.register_web_search_runner(lambda q: ws_calls.append(q) or _WS_ANSWER)
         service = _make_service()
+        service._resolved_config = dataclasses.replace(
+            service._resolved_config, egress_searches_per_fingerprint=3
+        )
         responses = [
             SimpleNamespace(
                 text=_native_call("web_search", {"query": "price usd"}),
@@ -1293,6 +1560,34 @@ class TestEntrypointRunnerWiring:
         service = _make_service()
         service.stop()
         assert tools._SEARCH_KNOWLEDGE_RUNNER is None
+
+    def test_stop_closes_the_reference_corpus_and_clears_its_runner(self) -> None:
+        """#1616 pre-merge review: stop() deregistered the corpus runner but
+        left the read-only store handle open across a stop()/start() cycle."""
+        tools.register_search_reference_runner(lambda q, k: "content")
+        service = _make_service()
+        corpus = MagicMock()
+        service._reference_corpus = corpus
+        service.stop()
+        corpus.close.assert_called_once_with()
+        assert service._reference_corpus is None
+        assert tools._SEARCH_REFERENCE_RUNNER is None
+
+    def test_reference_runner_with_no_open_corpus_raises_to_the_error_notice(
+        self,
+    ) -> None:
+        """A runner reached with no store open was an empty string, which the
+        tool turned into the NO_RESULTS notice: a missing store read as 'nothing
+        matched'. It now raises, and the tool body owns the ERROR notice."""
+        service = _make_service()
+        service._reference_corpus = None
+        with pytest.raises(RuntimeError, match="not open"):
+            service._run_search_reference_tool("q", 4)
+        tools.register_search_reference_runner(service._run_search_reference_tool)
+        try:
+            assert tools._search_reference("q") == tools.SEARCH_REFERENCE_ERROR_NOTICE
+        finally:
+            tools.clear_search_reference_runner()
 
     def test_knowledge_retrieve_honors_k_override(self) -> None:
         service = _make_service()

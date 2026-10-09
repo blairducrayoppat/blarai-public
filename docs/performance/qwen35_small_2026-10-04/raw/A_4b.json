@@ -1,0 +1,1321 @@
+{
+ "meta": {
+  "started": "2026-10-04T11:00:08-0400",
+  "python": "C:\\Users\\<user>\\BlarAI\\.venv-2026.4\\Scripts\\python.exe",
+  "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+  "genai": "2026.4.0.0-3407-7ea2546852a",
+  "max_new_tokens": 48,
+  "turns": 6,
+  "cold_temp_c": 72.0,
+  "design": "live greedy assistant replies; history assistant messages carry no think block; final header carries the closed empty think block"
+ },
+ "visits": [
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "header": {
+    "engine": "cb-mtp-off",
+    "mtp": false,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": null,
+    "load_seconds": 12.25
+   }
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "header": {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 8.09
+   }
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "header": {
+    "engine": "cb-prefix-cache",
+    "mtp": false,
+    "prefix_caching": true,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": null,
+    "load_seconds": 8.04
+   }
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "header": {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 8.15
+   }
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "header": {
+    "engine": "cb-prefix-cache",
+    "mtp": false,
+    "prefix_caching": true,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": null,
+    "load_seconds": 7.48
+   }
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "header": {
+    "engine": "cb-mtp-off",
+    "mtp": false,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": null,
+    "load_seconds": 7.48
+   }
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "header": {
+    "engine": "cb-prefix-cache",
+    "mtp": false,
+    "prefix_caching": true,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": null,
+    "load_seconds": 7.44
+   }
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "header": {
+    "engine": "cb-mtp-off",
+    "mtp": false,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": null,
+    "load_seconds": 7.37
+   }
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "header": {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 8.63
+   }
+  }
+ ],
+ "rows": [
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 991.43,
+   "tpot_ms": 48.42,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 82.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 162.2
+   },
+   "cold_wait": {
+    "waited_s": 241.6,
+    "temp_c": 80.9,
+    "reached": false,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 474.22,
+   "tpot_ms": 48.4,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 142.4
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 663.53,
+   "tpot_ms": 52.59,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 152.3
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 917.24,
+   "tpot_ms": 70.59,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 137.4
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 1549.28,
+   "tpot_ms": 95.58,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 82.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 149.7
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 0,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 1525.07,
+   "tpot_ms": 134.06,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 85.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.3
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 545.85,
+   "tpot_ms": 33.91,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 152.6
+   },
+   "cold_wait": {
+    "waited_s": 240.7,
+    "temp_c": 72.9,
+    "reached": false,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 529.44,
+   "tpot_ms": 25.55,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 151.4
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 692.47,
+   "tpot_ms": 20.13,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 162.3
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 940.43,
+   "tpot_ms": 20.35,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 150.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 1442.8,
+   "tpot_ms": 22.78,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.0
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 0,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 1445.97,
+   "tpot_ms": 25.68,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 85.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.4
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 710.3,
+   "tpot_ms": 48.01,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 160.6
+   },
+   "cold_wait": {
+    "waited_s": 112.8,
+    "temp_c": 70.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 687.85,
+   "tpot_ms": 49.21,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 134.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 867.15,
+   "tpot_ms": 48.34,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 132.4
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 645.67,
+   "tpot_ms": 49.21,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 166.9
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 919.38,
+   "tpot_ms": 48.88,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.7
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 0,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 763.81,
+   "tpot_ms": 50.46,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 78.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 136.8
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 782.78,
+   "tpot_ms": 38.06,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 172.9
+   },
+   "cold_wait": {
+    "waited_s": 30.7,
+    "temp_c": 71.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 729.32,
+   "tpot_ms": 25.16,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 121.4
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 923.21,
+   "tpot_ms": 20.88,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 123.9
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 1167.37,
+   "tpot_ms": 20.23,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 78.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 162.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 1385.49,
+   "tpot_ms": 22.02,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 129.5
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 1,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 1654.4,
+   "tpot_ms": 24.69,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 82.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 151.5
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 676.01,
+   "tpot_ms": 48.21,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 157.3
+   },
+   "cold_wait": {
+    "waited_s": 43.7,
+    "temp_c": 70.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 686.97,
+   "tpot_ms": 48.6,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 126.0
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 873.91,
+   "tpot_ms": 49.75,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 74.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 128.8
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 647.67,
+   "tpot_ms": 49.18,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 85.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 154.7
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 919.67,
+   "tpot_ms": 48.62,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 128.7
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 1,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 789.71,
+   "tpot_ms": 52.19,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 86.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 161.8
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 679.1,
+   "tpot_ms": 47.95,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 154.2
+   },
+   "cold_wait": {
+    "waited_s": 33.9,
+    "temp_c": 70.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 695.6,
+   "tpot_ms": 48.28,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 76.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 152.3
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 862.42,
+   "tpot_ms": 49.47,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 137.0
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 1078.08,
+   "tpot_ms": 49.16,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 157.5
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 1286.16,
+   "tpot_ms": 48.54,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 162.3
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 1,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 1805.64,
+   "tpot_ms": 69.61,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 80.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 137.8
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 678.83,
+   "tpot_ms": 50.28,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 75.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 125.7
+   },
+   "cold_wait": {
+    "waited_s": 37.3,
+    "temp_c": 70.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 690.48,
+   "tpot_ms": 48.75,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 78.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 125.1
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 871.43,
+   "tpot_ms": 48.28,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 153.1
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 649.62,
+   "tpot_ms": 48.74,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 153.0
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 916.55,
+   "tpot_ms": 48.9,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 142.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-prefix-cache",
+   "visit": 2,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 797.3,
+   "tpot_ms": 53.94,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 83.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 148.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 682.08,
+   "tpot_ms": 47.46,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 135.7
+   },
+   "cold_wait": {
+    "waited_s": 27.4,
+    "temp_c": 71.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 695.96,
+   "tpot_ms": 48.32,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 137.3
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 855.45,
+   "tpot_ms": 50.32,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 85.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 167.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 1082.71,
+   "tpot_ms": 48.27,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 112.0
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 1283.1,
+   "tpot_ms": 55.23,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 81.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 122.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-off",
+   "visit": 2,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 1729.21,
+   "tpot_ms": 69.91,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 87.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 158.5
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "turn": 1,
+   "input_tokens": 402,
+   "ttft_ms": 651.94,
+   "tpot_ms": 32.57,
+   "generated_tokens": 7,
+   "reply_sha256": "f669b4ab4ca307bf2ad16c84787b584a0c3702c5fe955421a078132da82e9784",
+   "prompt_sha256": "c8052034d1e693456e298dc9c931cc22204f67dd157df43e81292e5039d40869",
+   "thermal_before": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 146.8
+   },
+   "cold_wait": {
+    "waited_s": 34.1,
+    "temp_c": 71.9,
+    "reached": true,
+    "measured": true
+   },
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "turn": 2,
+   "input_tokens": 789,
+   "ttft_ms": 721.83,
+   "tpot_ms": 25.34,
+   "generated_tokens": 7,
+   "reply_sha256": "e64d3caba4e99dcc90ca5221acdeac86cedc8822e73a1480f3d539168e755a26",
+   "prompt_sha256": "2e5244468520fbe735fb87c3880601dab14e8c9c0df9859305259e7531311786",
+   "thermal_before": {
+    "temp_c": 84.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 128.0
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "turn": 3,
+   "input_tokens": 1178,
+   "ttft_ms": 925.06,
+   "tpot_ms": 20.11,
+   "generated_tokens": 17,
+   "reply_sha256": "4d357f95ab3a0bd518c54b48504a9103956b1f6197599456ca3416d66687d216",
+   "prompt_sha256": "c5f72909a98a210cd0f9114af2e2df8fea4c1d96ded3bb0e4906e796526cc5cd",
+   "thermal_before": {
+    "temp_c": 75.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 126.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "turn": 4,
+   "input_tokens": 1577,
+   "ttft_ms": 1148.29,
+   "tpot_ms": 20.11,
+   "generated_tokens": 9,
+   "reply_sha256": "0e0148c143e7674d65a19bcda6772ecb6576d39385ada7c7a2685d8b484c7cd5",
+   "prompt_sha256": "7d42105f94188c3ab2c9ac1e87fe0380bebceaaf67b0a2f3c1902898c96c2750",
+   "thermal_before": {
+    "temp_c": 79.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 145.6
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "turn": 5,
+   "input_tokens": 1968,
+   "ttft_ms": 1363.33,
+   "tpot_ms": 21.99,
+   "generated_tokens": 12,
+   "reply_sha256": "ad7cc85d03fed8ba031d3ff572c87f6a94d6fd2764fc918f533d0570170117b5",
+   "prompt_sha256": "8c41d2739f3a940cc5b3f7efb61a79204a125b1d5ee63b7e7df4ae373387ba95",
+   "thermal_before": {
+    "temp_c": 77.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 132.7
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  },
+  {
+   "arm": "4b-mtp-on",
+   "visit": 2,
+   "turn": 6,
+   "input_tokens": 2362,
+   "ttft_ms": 1663.17,
+   "tpot_ms": 29.96,
+   "generated_tokens": 14,
+   "reply_sha256": "7cd75260a0203c016e9c8d2aeb0ca6b0b1d4028a4d63ad4262740b5c53ed469a",
+   "prompt_sha256": "29ddd0e44b9b7a83ea6303a4dbe340f9cfdcac0efda426a595802d43874ece11",
+   "thermal_before": {
+    "temp_c": 82.9,
+    "passive_limit_pct": 100.0,
+    "throttle_reasons": 0.0,
+    "cpu_perf_pct": 166.9
+   },
+   "cold_wait": null,
+   "genai_version": "2026.4.0.0-3407-7ea2546852a"
+  }
+ ]
+}

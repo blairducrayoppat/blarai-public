@@ -39,6 +39,20 @@ external network, consistent with the shared/ posture):
   scan; the port can lag the process on startup/teardown, so both are
   stamped).
 * ``ram_available_gib`` — ``psutil.virtual_memory().available`` in GiB.
+* ``gpu_budget``      — the two Windows registry percentages that decide how
+  much system memory the integrated GPU may commit (#1485, #1501): the DXGK
+  ``SystemPartitionCommitLimitPercentage`` (the budget PERFORMANCE_LOG
+  2026-09-01 identifies as the binding one — a strong candidate, settled by
+  #1485, and the one whose 17.85 GiB predicted the measured cliff) and the Intel
+  GMM ``GpuSystemMemoryPinninglimit`` (the one OpenVINO REPORTS), each with
+  the GiB figure it implies, and whether they agree.  A display-driver
+  package install rewrote the real key while the reported one stayed put
+  (2026-08-26 and 2026-09-14), so a stamp that carries only what OpenVINO
+  reports cannot see the envelope a decode number was taken under.
+* ``machine_uptime_s`` — seconds since boot (``GetTickCount64``).  Throughput
+  on this box decays across a session (#1487: 16.55 → 9.59 tok/s in one
+  hour, one configuration); a number with no clock behind it cannot be
+  compared with another taken later in the same boot.
 * ``captured_utc``    — the stamp instant, ISO-8601 Zulu.
 
 Every probe takes an injectable seam (callable/iterable) so the unit tests
@@ -47,6 +61,7 @@ exercise all paths with no real Hyper-V, sockets, or process table.
 
 from __future__ import annotations
 
+import math
 import socket
 import subprocess
 from datetime import datetime, timezone
@@ -84,7 +99,38 @@ BOX_STATE_KEYS: frozenset[str] = frozenset(
         "ovms_listening",
         "ovms_process",
         "ram_available_gib",
+        "gpu_budget",
+        "machine_uptime_s",
         "captured_utc",
+    }
+)
+
+#: The two registry values behind the integrated GPU's memory budget (HKLM).
+#: Read with ``winreg`` in-process — no subprocess, no elevation needed.
+GPU_BUDGET_REAL_KEY: str = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MemoryManager"
+GPU_BUDGET_REAL_VALUE: str = "SystemPartitionCommitLimitPercentage"
+GPU_BUDGET_REPORTED_KEY: str = (
+    r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0001\GMM"
+)
+GPU_BUDGET_REPORTED_VALUE: str = "GpuSystemMemoryPinninglimit"
+
+#: The formula OpenVINO's GPU plugin applies to the GMM percentage before it
+#: prints a budget (PERFORMANCE_LOG 2026-09-01; reproduces the 2026-08-28 and
+#: 2026-09-01 readings to the byte): ``alignDown(floor(0.94 * P/100 * total)
+#: - 450 MiB, 4096)``.  The 0.94 and the 450 MiB are intel/compute-runtime's
+#: integrated-device constants.
+_GMM_REPORT_FACTOR: float = 0.94
+_GMM_REPORT_RESERVE_BYTES: int = 450 * 1024 * 1024
+_GMM_REPORT_ALIGN: int = 4096
+
+#: The canonical sub-shape of ``gpu_budget`` — always all present.
+GPU_BUDGET_KEYS: frozenset[str] = frozenset(
+    {
+        "real_commit_limit_pct",
+        "reported_pinning_limit_pct",
+        "real_budget_gib",
+        "reported_budget_gib",
+        "keys_agree",
     }
 )
 
@@ -103,6 +149,12 @@ _GET_VM_COMMAND: str = (
 PsRunner = Callable[[str], "tuple[int, str, str]"]
 Connector = Callable[..., Any]
 MemProber = Callable[[], float]
+#: ``(subkey, value_name) -> int`` under HKLM; raises when the value is absent.
+RegReader = Callable[[str, str], int]
+#: Total physical memory in bytes (the base both percentages apply to).
+TotalMemProber = Callable[[], float]
+#: Seconds since boot.
+TickReader = Callable[[], float]
 
 
 def _run_ps(command: str, timeout: float = PS_PROBE_TIMEOUT_S) -> tuple[int, str, str]:
@@ -237,6 +289,101 @@ def probe_ram_available_gib(mem_prober: MemProber | None = None) -> float | str:
         return UNKNOWN
 
 
+def _read_hklm_dword(subkey: str, value_name: str) -> int:
+    """Read one DWORD under HKEY_LOCAL_MACHINE.  Raises on any failure."""
+    import winreg  # Windows-only; the caller degrades to "unknown" elsewhere
+
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, subkey) as key:
+        raw, _kind = winreg.QueryValueEx(key, value_name)
+    return int(raw)
+
+
+def _total_memory_bytes() -> float:
+    if psutil is None:
+        raise RuntimeError("psutil unavailable")
+    return float(psutil.virtual_memory().total)
+
+
+def reported_budget_bytes(pct: int, total_bytes: float) -> int:
+    """What OpenVINO prints for a GMM percentage ``pct`` of ``total_bytes``.
+
+    The intel/compute-runtime integrated-device derivation recorded in
+    PERFORMANCE_LOG 2026-09-01: ``P=87`` → 27,031,388,160 and ``P=57`` →
+    17,547,509,760 on this box's 33,630,777,344 bytes, both to the byte.
+    """
+    raw = math.floor(_GMM_REPORT_FACTOR * (pct / 100.0) * total_bytes) - _GMM_REPORT_RESERVE_BYTES
+    return (raw // _GMM_REPORT_ALIGN) * _GMM_REPORT_ALIGN
+
+
+def probe_gpu_budget(
+    reg_reader: RegReader | None = None,
+    total_mem_prober: TotalMemProber | None = None,
+) -> dict[str, Any]:
+    """The two graphics-memory budget percentages and the GiB each implies.
+
+    Returns exactly :data:`GPU_BUDGET_KEYS`.  Each half degrades to
+    ``"unknown"`` independently — an unreadable key is stamped as such, never
+    as "agrees" — and ``keys_agree`` is ``"unknown"`` unless BOTH percentages
+    were read.  Never raises.
+    """
+    read: RegReader = reg_reader if reg_reader is not None else _read_hklm_dword
+    total_probe: TotalMemProber = (
+        total_mem_prober if total_mem_prober is not None else _total_memory_bytes
+    )
+    out: dict[str, Any] = {k: UNKNOWN for k in GPU_BUDGET_KEYS}
+    real_pct: int | str
+    reported_pct: int | str
+    try:
+        real_pct = int(read(GPU_BUDGET_REAL_KEY, GPU_BUDGET_REAL_VALUE))
+    except Exception:  # noqa: BLE001 — an unreadable key is stamped, never guessed
+        real_pct = UNKNOWN
+    try:
+        reported_pct = int(read(GPU_BUDGET_REPORTED_KEY, GPU_BUDGET_REPORTED_VALUE))
+    except Exception:  # noqa: BLE001
+        reported_pct = UNKNOWN
+    out["real_commit_limit_pct"] = real_pct
+    out["reported_pinning_limit_pct"] = reported_pct
+    total: float | None
+    try:
+        total = float(total_probe())
+        if not math.isfinite(total) or total <= 0:
+            total = None  # a nonsense base is an absence, never a budget
+    except Exception:  # noqa: BLE001 — no base → the GiB figures stay "unknown"
+        total = None
+    gib = 1024.0**3
+    try:
+        if isinstance(real_pct, int) and total is not None:
+            out["real_budget_gib"] = round((real_pct / 100.0) * total / gib, 2)
+        if isinstance(reported_pct, int) and total is not None:
+            out["reported_budget_gib"] = round(
+                reported_budget_bytes(reported_pct, total) / gib, 3
+            )
+    except Exception:  # noqa: BLE001 — the sub-shape must survive any arithmetic surprise
+        out["real_budget_gib"] = UNKNOWN
+        out["reported_budget_gib"] = UNKNOWN
+    if isinstance(real_pct, int) and isinstance(reported_pct, int):
+        out["keys_agree"] = real_pct == reported_pct
+    return out
+
+
+def _tick_count_s() -> float:
+    import ctypes  # Windows-only; the caller degrades to "unknown" elsewhere
+
+    return ctypes.windll.kernel32.GetTickCount64() / 1000.0  # type: ignore[attr-defined]
+
+
+def probe_machine_uptime_s(tick_reader: TickReader | None = None) -> float | str:
+    """Seconds since the machine booted, rounded to 1 place; ``"unknown"`` on failure."""
+    read: TickReader = tick_reader if tick_reader is not None else _tick_count_s
+    try:
+        value = float(read())
+    except Exception:  # noqa: BLE001 — an unreadable clock must never fail a measurement
+        return UNKNOWN
+    if not math.isfinite(value) or value < 0:
+        return UNKNOWN  # NaN/inf/negative is not a clock reading; stamp the absence
+    return round(value, 1)
+
+
 def capture_box_state(
     *,
     ao_port: int = AO_LOOPBACK_PORT,
@@ -245,6 +392,9 @@ def capture_box_state(
     connector: Connector | None = None,
     process_names: Iterable[str] | None = None,
     mem_prober: MemProber | None = None,
+    reg_reader: RegReader | None = None,
+    total_mem_prober: TotalMemProber | None = None,
+    tick_reader: TickReader | None = None,
 ) -> dict[str, Any]:
     """One box-state stamp for a perf-evidence record.  NEVER raises.
 
@@ -272,6 +422,8 @@ def capture_box_state(
         ),
         "ovms_process": _soft(lambda: probe_ovms_process(process_names)),
         "ram_available_gib": _soft(lambda: probe_ram_available_gib(mem_prober)),
+        "gpu_budget": _soft(lambda: probe_gpu_budget(reg_reader, total_mem_prober)),
+        "machine_uptime_s": _soft(lambda: probe_machine_uptime_s(tick_reader)),
         "captured_utc": _soft(
             lambda: datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         ),

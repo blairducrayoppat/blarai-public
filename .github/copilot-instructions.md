@@ -115,8 +115,9 @@ shipped are the bar — match them, never dilute them:
   `pip install .` into the runtime venv.
 - **Build/conversion toolchains** (diffusers, torch, model conversion) live in a SEPARATE venv, never the
   runtime `.venv`. Dev-side installs are pre-approved; runtime dependencies are not.
-- **WinUI 3 desktop app** (`services/ui_winui/BlarAI.Desktop.csproj`) is the primary face and builds ONLY with
-  `-p:Platform=x64 -r win-x64 --self-contained`. A Textual TUI (`services/ui_shell`) predates it and still exists.
+- **WinUI 3 desktop app** (`services/ui_winui/BlarAI.Desktop.csproj`) is the primary face; build it with
+  `-p:Platform=x64` (bare AnyCPU fails). That writes the base-folder exe the launcher and the WinUI harness
+  run; adding `-r win-x64 --self-contained` writes only a `win-x64/` subfolder that neither runs. A Textual TUI (`services/ui_shell`) predates it and still exists.
 - **Shell:** PowerShell 7 is the primary shell on a Windows 11 Pro host. Elevated vs non-elevated matters (2
   symlink tests skip on a non-elevated shell — benign, documented).
 - **Paths:** use forward slashes in tool-call paths (avoids `\u`-style escape pitfalls on Windows). The prior

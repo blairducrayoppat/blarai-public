@@ -337,7 +337,14 @@
       <li>On the standard 40-question answer-quality exam it passed 22 — <em>but about 12 of the 18 failures carry one bug's fingerprints rather than bad answers</em> (see below). The underlying content was frequently right.</li>
     </ul>
 
-    <h3>The blocker — and why it's a governance problem, not a cosmetic one</h3>
+    <div style="border:3px solid #b00;background:#fff4f4;padding:14px 18px;margin:18px 0;border-radius:6px">
+<p style="margin:0 0 8px"><b style="color:#b00;font-size:1.05em">CORRECTION — 22 September 2026: the blocker described below was not real, and the waiting was not the correct state.</b></p>
+<p style="margin:0 0 8px">The section that follows says the runtime ignores the thinking off-switch, and concludes that no decision could be taken until Intel merged a fix. <b>That was our own testing error.</b> The model was never given the off-switch. Its prompt format has no neutral setting: unless you explicitly say "do not think", the format itself opens a thinking block, and our test never said it — so the test opened the block, and then marked the model down for continuing it. The missing markers cited below as the aggravating detail were the giveaway, because a reply that carries a closing marker and no opening one is exactly what happens when the opening one was in the question.</p>
+<p style="margin:0 0 8px">Consequences for this page: the exam score of 22 out of 40 <b>cannot be read as a judgement of the model</b> and must never be used as the figure a corrected re-run has to beat. The upstream pull request is <b>not</b> a dependency — the control we needed already exists in the runtime we ship. And the closing line, "nothing is stalled that could be moving", was wrong: this stalled the brain upgrade for two months.</p>
+<p style="margin:0">What is still genuinely open is unchanged and smaller: quality and security parity, measured through a corrected exam, and the plumbing work of running a multimodal model as the resident brain. Full account in the build journal entry of 22 September 2026; mechanism in lesson 369; harness fix tracked as #1618.</p>
+</div>
+
+<h3>The blocker — and why it's a governance problem, not a cosmetic one</h3>
     <p>Models like this "think out loud" before answering. Normally the thinking is wrapped in markers so BlarAI strips it before you see the reply. On this model, the runtime <b>ignores the thinking off-switch and omits the markers</b> — private reasoning leaks into replies, and, more seriously, BlarAI's Policy Agent (the gate that adjudicates every risky action) <em>relies</em> on that off-switch to get clean, classifiable output. A control surface the trust spine depends on doesn't work on this model today. A fix exists upstream — pull request #4139 to Intel's OpenVINO GenAI runtime, where we've posted supporting test data — but it has not been merged.</p>
 
     <h3>Why no decision today</h3>

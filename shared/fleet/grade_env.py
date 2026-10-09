@@ -74,7 +74,23 @@ def clean_pytest_args(ini_path: "str | Path") -> list[str]:
     """The pytest flags of the clean-env recipe (order-stable, regression-locked).
 
     Prepended to ``-q <oracle>`` by every grader (host, guest, probe, #821 seed-QA)
-    so the four flags + the harness ``-c`` are byte-identical everywhere."""
+    so the flags + the harness ``-c`` are byte-identical everywhere.
+
+    ``--color=no`` IS A CORRECTNESS FLAG, NOT COSMETICS (#1200, 2026-08-15). Every consumer
+    of these runs reads the output as TEXT — ``_passed_tests`` matches ``<file>::<name>
+    PASSED`` per test, ``_run_completed`` looks for pytest's summary. Coloured output puts
+    an escape sequence between the test name and ``PASSED``, so both matchers miss, and the
+    F2P baseline — the check that convicts an oracle passing with NO implementation present
+    — returns ``not-run`` instead of ``vacuous:<test>``. Measured, not reasoned: with
+    ``FORCE_COLOR=3`` in the parent environment the identical call stamped ``not-run``; with
+    it cleared, ``vacuous:test_always_green`` with a hard finding.
+
+    pytest colours on a TTY *or* when the environment forces it, and any agent harness, CI
+    runner or terminal multiplexer may set ``FORCE_COLOR``. The nightly battery does not,
+    which is why this never showed up there — a latent blind spot that fires only where the
+    parent happens to be colourful, and fails toward the innocent-looking stamp. Pinning the
+    flag is deterministic; scrubbing the environment alone would leave the next colour
+    variable to rediscover this."""
     return [
         "--noconftest",
         "-c",
@@ -82,6 +98,7 @@ def clean_pytest_args(ini_path: "str | Path") -> list[str]:
         "-o",
         "addopts=",
         "--import-mode=importlib",
+        "--color=no",
     ]
 
 

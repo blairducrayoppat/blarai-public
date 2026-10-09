@@ -1,0 +1,11 @@
+# Disposition - ADR-049 (the Governator venture reopened): independent pre-merge review, findings A1-A5
+
+**Review:** `docs/reviews/code-review-containment-evidence-adr049-2026-10-05.md` (Branch 2; independent reviewer on Opus, who wrote no fix; committed with the evidence branch). **Author of the work and of this disposition:** the session on #1693. The reviewer did not write fixes. Tested at `96e985f0`; fixes at `f9238e0d`.
+
+```disposition
+A1 journal fragment plain-summary line says the agent cannot talk its way past the limit, and line 7 says nothing the agent does changes it | FIXED | f9238e0d - the summary now states what was observed (an outbound connect from the account failed while the filters stood, enforced by Windows with the stated limits); line 7 now says the filter did not depend on the agent's cooperation in these runs and is fail-open when the installer process exits
+A2 the LA's verbatim quote carried a bracketed gloss he did not say | FIXED | f9238e0d - the quote is now exactly "between this and the BitDefender study results, The Governator is reopened", with the context sentence outside it saying "this" is the session's reading which the LA may correct; applied in ADR-049, the register row and the fragment
+A3 ADR-049 said it supersedes Decision 1 only while its Decision 2 changed Decision 6 and re-affirmed Decision 3 | FIXED | f9238e0d - ADR-049 status and Decision 2 now state that Decision 1 and the repository disposition in Decision 6 are superseded, Decision 3's ground is flagged for re-examination and not re-affirmed, and Decisions 2, 4, 5 stand; the ADR-042 banner and the 2026-09-20 and 2026-10-05 register rows match
+A4 the limits omit the negative results that bear on the candidate claim | FIXED | f9238e0d - ADR-049 limits now list B:\models and C:\Windows\Temp writable, projects Modify (#1678), C:\blarai-fleet writable (#1686), coder egress open today, the loopback permit shown only against a stub, the Test A classifier failure, and the allowed informational writes behind the 8 of 8 and 4 of 4 figures
+A5 session judgements not labelled; the 3-5 second figure is an upper bound of 5.1-5.35 s | FIXED | f9238e0d - the narrower-claim reading, the sample-size observation and the re-visit triggers are labelled as the session's; the duration cites #1671 comment 3891 with the raw upper bound
+```

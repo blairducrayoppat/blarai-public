@@ -1,0 +1,62 @@
+{
+  "benchmark": "ovms_cache_size_decode_cliff",
+  "config_stamp": {
+    "timestamp": "2026-08-31T10:30:00-04:00",
+    "model_name": "Qwen3-Coder-30B-A3B",
+    "model_precision": "int4 (openvino_model.bin 16,314,043,317 B, mtime 2026-06-10 — unchanged since before the June baseline)",
+    "served_model_id": "coder-30b",
+    "endpoint": "http://127.0.0.1:8000/v3/chat/completions",
+    "device": "GPU",
+    "ovms_version": "2026.2.5e9dcfc46 (OpenVINO backend 2026.2.0)",
+    "driver_version": "32.0.101.8826",
+    "gpu": "Intel Arc 140V (Xe2 iGPU), GPU_DEVICE_TOTAL_MEM_SIZE 27,031,388,160 B = 25.17 GiB (re-queried 2026-08-31, IDENTICAL to the 2026-08-28 record)",
+    "hardware": "Intel Core Ultra 7 258V (Lunar Lake), 31.32 GiB RAM, Windows 11 Pro 26200",
+    "power_plan": "High performance (corrected this session; measured to have NO effect on throughput)",
+    "methodology": "1 warmup + 2 measured generations per arm, max_tokens=128, temperature=0, fixed prompt, fresh OVMS process per arm, box otherwise idle"
+  },
+  "headline": "OVMS --cache_size is a decode cliff on this box: 1 GB gives 36.5-39.3 tok/s, 4 GB gives 2.9-3.0 tok/s — a ~13x collapse — while GPU-shared memory moves only 16.65 -> 17.84 GiB.",
+  "bisect": {
+    "note": "Each arm is the MINIMAL config (model + device) plus exactly one production flag, so each result is attributable.",
+    "minimal_no_flags": [38.96, 40.03, 39.92],
+    "kv_cache_precision_u8": [36.57, 39.17],
+    "enable_prefix_caching_true": [36.41, 39.29],
+    "tool_parser_plus_guided_generation": "exonerated — full production set MINUS tool-guided measured 3.01/2.94/2.88, i.e. still slow, so the flag is not the cause",
+    "cache_size_1": [36.45, 39.30],
+    "cache_size_2": [13.43, 19.06],
+    "cache_size_3": [3.71, 3.32],
+    "cache_size_4": [2.97, 2.88]
+  },
+  "gpu_shared_gib_by_cache_size": {"1": 16.65, "2": 17.36, "3": 17.84},
+  "full_production_config_verified_at_cache_size_1": {
+    "flags": "target_device GPU | cache_size 1 | cache_dir <state/ovms-model-cache> | tool_parser qwen3coder | enable_tool_guided_generation true | kv_cache_precision u8 | enable_prefix_caching true",
+    "short_prompt_tps": [36.56, 39.75],
+    "long_prompt": {
+      "prompt_tokens": 5309,
+      "completion_tokens": 900,
+      "seconds": 70.9,
+      "tps": 12.69,
+      "note": "This is the shape the coder actually sends — the operator's four content files plus an instruction. It completes without error at a 1 GB KV pool."
+    }
+  },
+  "why_this_matters_beyond_speed": "At ~3 tok/s a 3000-token page needs ~17 minutes of unbroken generation. A single long file write emits no intermediate step, so the ACP idle breaker (acp.idle_sec = 600) killed every candidate as 'genuinely stuck'. That is what emptied dispatch 20260831-003919-bd: the coder read the operator's content files correctly, began writing, and was killed mid-write — 3 candidates, 52 minutes, zero changes. At cache_size 1 the same workload measures 12.69 tok/s, finishing well inside the window.",
+  "mechanism_partially_understood": "Not simple pool exhaustion. GPU-shared memory rises only 16.65 -> 17.84 GiB across cache_size 1..3 while throughput falls 13x. Prefill degrades only ~1.75x (475 -> 271 tok/s) while decode degrades 12.9x — decode is memory-bandwidth-bound and prefill is not, and that asymmetry is what identified the KV pool as the suspect. Crossing roughly 2 GB appears to flip the allocator into a path that starves decode bandwidth.",
+  "NOT_established": "Why 4 GB used to work. The 2026-06-29 benchmark measured 38.58 tok/s with cache_size 4 present in its own recorded flag stamp, on the same model file (unchanged since 2026-06-10), the same driver, and the same GPU pool size (re-queried today, byte-identical). Something changed between 2026-06-29 and 2026-08-31 that made a 4 GB KV pool unaffordable. Candidates NOT tested: a Windows update altering iGPU shared-memory behaviour, a change in baseline resident memory, a firmware/BIOS change. This is open on #1477.",
+  "ruled_out_during_diagnosis": [
+    "Contention — clean-box runs reproduce it",
+    "Memory pressure / paging — hard faults 0.0/sec, committed 28 of 55 GiB",
+    "CPU fallback — GPU matrix engine pegged ~100% during generation",
+    "Kernel-cache recompilation — zero cache writes over 15 minutes",
+    "Thermal — the only readable ACPI zone reports a constant 91.1 C idle and loaded, i.e. a fixed trip point, not a live sensor; withdrawn as evidence",
+    "Power plan — corrected Balanced -> High performance, throughput unchanged (2.97 vs 3.3)",
+    "Model file — openvino_model.bin unchanged since 2026-06-10, before the good baseline",
+    "OVMS version — 2026.2 confirmed, the same build as the baseline"
+  ],
+  "session_caveat": "An OVMS version round-trip earlier in this session (2026.2 -> 2026.3 -> 2026.2, with OFFLOAD_RATIO exercised and 33 kernel-cache entries quarantined) degraded throughput a further ~4x on top of this defect (0.8 tok/s). A reboot cleared that. The cache_size cliff documented here is the residue that survived the reboot and is independent of it.",
+  "not_measured": [
+    "The KV capacity ceiling at cache_size 1 — the 5309+900 token case passes; the failure point was not probed.",
+    "cache_size between 1 and 2 (fractional values not tested).",
+    "Whether the cliff reproduces on the 14B or on a dense model.",
+    "Prefill/TTFT at each cache_size — only the full-harness pair (475/184 baseline vs 271/1203 broken) exists.",
+    "Concurrency — all measurements single-stream."
+  ]
+}

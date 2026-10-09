@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/git_rules_guard.py\"; ov=\"${BLARAI_GIT_RULES_OVERRIDE// /}\"; if [ ! -f \"$f\" ]; then [ -n \"$ov\" ] && exit 0; echo \"BLOCKED: git-rules guard script missing ($f). Restore it with git checkout, or set BLARAI_GIT_RULES_OVERRIDE.\" >&2; exit 2; fi; python -I -S \"$f\"; rc=$?; if [ \"$rc\" -eq 0 ] || [ \"$rc\" -eq 2 ]; then exit \"$rc\"; fi; [ -n \"$ov\" ] && exit 0; echo \"BLOCKED: git-rules guard failed to run (exit $rc). Fix the guard or python, or set BLARAI_GIT_RULES_OVERRIDE.\" >&2; exit 2",
+            "shell": "bash",
+            "timeout": 20,
+            "statusMessage": "git-rules guard"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell|WebFetch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/rules_inject.py\"; if [ -f \"$f\" ] && python -I -S \"$f\"; then exit 0; fi; printf '%s' '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"DOCTRINE DELIVERY FAILED: scripts/hooks/rules_inject.py is missing or python could not run it. The topic rules in .claude/rules/ were NOT delivered; read the relevant .claude/rules/*.md file directly before acting on its subject.\"}}'; exit 0",
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "doctrine delivery"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/rules_inject.py\"; if [ -f \"$f\" ] && python -I -S \"$f\"; then exit 0; fi; printf '%s' '{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"DOCTRINE DELIVERY FAILED: scripts/hooks/rules_inject.py is missing or python could not run it. The topic rules in .claude/rules/ were NOT delivered; read the relevant .claude/rules/*.md file directly before acting on its subject.\"}}'; exit 0",
+            "shell": "bash",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

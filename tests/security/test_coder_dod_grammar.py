@@ -35,6 +35,27 @@ TOP_CAPABILITY = 21
 _HEADING_RE = re.compile(r"^### (\d+)\.", re.MULTILINE)
 _LEGEND_RE = re.compile("|".join(re.escape(w) for w in LEGEND))
 _LIVE_CITE_RE = re.compile(r"as of \d{4}-\d{2}-\d{2}")
+
+#: Absolute NEGATIVE claims. These are the sentences that went stale silently on 2026-08-14:
+#: row 5 said the withdrawal event had "never been observed" two days AFTER it happened; row 19
+#: said a correlation "cannot be computed from banked state at all" while 580 log lines and 694
+#: draw records already carried it; row 14's table said an instrument had fired 0 times when it
+#: had fired 11.
+#:
+#: The asymmetry is the point, and it is invisible in the writing: "this happened" needs ONE
+#: witness, while "this has never happened" is a claim about the ENTIRE search space and needs
+#: to have looked everywhere. Both sentences are the same length and sound equally measured.
+#: Every one of those three was written by someone reading a real surface and reporting honestly
+#: what was on it — from one corner of the space.
+#:
+#: So a negative claim earns the same burden `LIVE` already carries: name WHEN you looked. A
+#: date or a run id does not prove the search was exhaustive, but it stops a claim from
+#: outliving the evidence in silence, which is how all three survived.
+_NEGATIVE_CLAIM_RE = re.compile(
+    r"\bnever\b|\bcannot\b|\bno run\b|\bnot once\b|\b0 of\b|\bzero\b|\bhas not\b", re.IGNORECASE
+)
+#: Any dated evidence: an ISO date, or a run id like `20260805-000122-bd`.
+_ANY_CITE_RE = re.compile(r"\d{4}-\d{2}-\d{2}|\d{8}-\d{6}-bd")
 _EXECUTED_RE = re.compile(r"\*\*Executed: (NEVER|\d{4}-\d{2}-\d{2})")
 
 
@@ -79,6 +100,13 @@ def _status_violations(section: str, n: int | str = "?") -> list[str]:
             f"capability {n}: status speaks no legend word {LEGEND}: {window[:80]!r}"
         )
         return violations
+    neg = _NEGATIVE_CLAIM_RE.search(window)
+    if neg is not None and not _ANY_CITE_RE.search(window):
+        violations.append(
+            f"capability {n}: absolute negative claim {neg.group(0)!r} with no dated citation "
+            f"— 'never' is a claim about the whole search space and must say WHEN it was "
+            f"checked (a date or a run id): {window[:80]!r}"
+        )
     if first.group(0) == "LIVE" and not _LIVE_CITE_RE.search(window):
         violations.append(
             f"capability {n}: LIVE claim without a dated citation "
@@ -185,3 +213,24 @@ def test_checker_passes_a_conforming_row() -> None:
 def test_checker_flags_a_row_beyond_the_range() -> None:
     text = "### 21. X\n\n**Status: UNKNOWN.**\n\n### 22. Smuggled\n\n**Status: UNKNOWN.**\n"
     assert _beyond_range(_capability_sections(text)) == [22]
+
+
+def test_checker_flags_an_uncited_negative_claim() -> None:
+    """'Never' without a date is the sentence that went stale three times on 2026-08-14."""
+    bad = "### 9. Row\n**Status: ARMED — the observable has never fired.**\n"
+    v = _status_violations(bad, 9)
+    assert any("absolute negative claim" in x for x in v), v
+
+
+def test_checker_accepts_a_negative_claim_that_says_when_it_looked() -> None:
+    """The toggle. A rule that rejects every negative claim would just be noise."""
+    ok_date = "### 9. Row\n**Status: ARMED — never fired, re-measured 2026-08-14.**\n"
+    assert not any("absolute negative claim" in x for x in _status_violations(ok_date, 9))
+    ok_run = "### 9. Row\n**Status: ARMED — never fired; swept to 20260811-232102-bd.**\n"
+    assert not any("absolute negative claim" in x for x in _status_violations(ok_run, 9))
+
+
+def test_a_positive_claim_needs_no_such_citation() -> None:
+    """The asymmetry this rule exists for: one witness settles a positive claim."""
+    pos = "### 9. Row\n**Status: PARTIAL — the mechanism is wired and the artifact is banked.**\n"
+    assert not any("absolute negative claim" in x for x in _status_violations(pos, 9))

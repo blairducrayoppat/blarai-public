@@ -1,0 +1,6 @@
+Written 2026-10-07 before any control run. Both arms are WORKTREES (no models/, gitignored assets absent), elevated, LOCALAPPDATA redirected per run.
+new = ca4fab46 (main before #1703): 13179 selected / 620 deselected. Predicted 13148 passed / 5 failed / 26 skipped
+   (3 missing-14B-model failures + 2 ADR-013 relative-link failures + 26 asset skips, as read on the #1703 branch gate).
+old = 3be0e22e (09-22 tree): 12086 selected / 133 deselected. Predicted: failed 3..5 (same environmental classes), skipped about 26, passed = 12086 - failed - skipped (about 12055).
+A mismatch of more than 5 tests in any column stops the arc for diagnosis. Wall-clock is not predicted: that is the measurement.
+Deselected: old 133 vs new 620 (the slow marker grew by 487 tests that the standing gate never runs).

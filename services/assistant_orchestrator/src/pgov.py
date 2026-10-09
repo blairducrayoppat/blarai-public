@@ -535,6 +535,16 @@ TOOL_CALL_ALLOWLIST: frozenset[str] = frozenset({
     # instead of leaving raw <tool_call> text as the user-visible answer.
     "search_knowledge",
     "web_search",
+    # #1616 GUARDED reference-corpus retrieval. Runner-seam delegate like the
+    # two above, and DORMANT by default: the AO registers its runner only when
+    # [reference_corpus].enabled is true AND a verified store is present, so
+    # with the flag false the registry body returns a deterministic notice and
+    # no path reaches a store. Results ground as UNTRUSTED_CORPUS (ADR-023
+    # Amendment 5) — action-locked and datamarked like every untrusted tier,
+    # exempt only from the Stage-5 leakage feed. Listed here for the same
+    # reason web_search is: so a model emission meets the layered refusal
+    # rather than leaking raw <tool_call> text into the answer.
+    "search_reference",
     # #770 M2 W1 — propose_preference. GUARDED DRAFT surface in tools._REGISTRY:
     # it RENDERS a confirm card and stages verbatim bytes; it performs NO store
     # write (P8 — the write happens only via the operator-typed /remember-confirm,
@@ -542,6 +552,19 @@ TOOL_CALL_ALLOWLIST: frozenset[str] = frozenset({
     # emission routes to the AO's session-aware proposal handler (which intercepts
     # it before tools.execute), not to the unauthorized-tool break.
     "propose_preference",
+    # #1567 curate_knowledge. DANGEROUS and DORMANT: a runner-seam delegate
+    # whose runner no production code registers until the AO does so behind its
+    # config flag, so the registry body returns a notice and the knowledge bank
+    # is never reached. Listed here for the same reason web_search is -- so a
+    # model emission routes to the layered refusal (Layer-3 lock -> #570
+    # dispatch adjudication -> simulate-first -> disabled notice) rather than
+    # leaving raw <tool_call> text as the user-visible answer.
+    "curate_knowledge",
+    # #1568 organise_userdata. DANGEROUS and DORMANT, same runner-seam shape:
+    # no production code registers a runner until the AO does so behind its
+    # config flag, so the registry body returns a notice and no path is ever
+    # resolved. Listed so a model emission routes to the layered refusal.
+    "organise_userdata",
 })
 """Authorized tool-call identifiers. Any reference outside this set is blocked.
 

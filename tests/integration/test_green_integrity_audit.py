@@ -529,3 +529,100 @@ async def test_dry_run_battery_green_is_not_downgraded(tmp_path):
     written = json.loads((tmp_path / "battery-summary.json").read_text(encoding="utf-8"))
     assert written["jobs"][0]["verdict"] == "GREEN"
     assert written["green_integrity"]["downgraded"] == 0
+
+
+# ---------------------------------------------------------------------------
+# #1390 — the constructible bypass. This instrument's entire job is detecting a
+# coder gaming the gates, and a first-party .py padded past _MAX_FILE_BYTES was
+# examined, classified into nothing, and disclosed nowhere.
+# ---------------------------------------------------------------------------
+
+
+def _tampering_source() -> str:
+    """A sys.modules import shim — CLASS_SYS_MODULES_WRITE, one of the seven fingerprints."""
+    return "import sys\nsys.modules['cli'] = object()\n"
+
+
+def test_a_tampering_file_under_the_bound_is_caught(tmp_path: Path) -> None:
+    """The precondition, without which every assertion below proves nothing.
+
+    If the fingerprint did not fire on a small file, the padded-file test could pass because
+    the scan never catches this pattern at all, rather than because of the size bound.
+    """
+    tree = tmp_path / "small"
+    (tree / "app").mkdir(parents=True)
+    (tree / "app" / "shim.py").write_text(_tampering_source(), encoding="utf-8")
+
+    result = ga.scan_tree(tree, oracle_literals=[], oracle_paths=[])
+    assert result.audited is True
+    assert result.gamed is True, "the sys.modules shim must be caught at normal size"
+    assert result.skipped == (), "nothing was unreadable here"
+
+
+def test_padding_a_file_past_the_size_bound_is_DISCLOSED(tmp_path: Path) -> None:
+    """The bypass itself. Appending a blob past _MAX_FILE_BYTES removed the file from the
+    gaming detector entirely — not AST-scanned, not regex-scanned, not counted in
+    `files_scanned`, and recorded NOWHERE. `gamed` read False on a gamed tree.
+
+    This test asserts the HONEST CURRENT STATE, which is deliberately not "the bypass is
+    closed": the tampering is still missed, because making an unscannable first-party source
+    file a FINDING downgrades a GREEN and is the operator's call, open on #1390. What must
+    never regress is that the skip is now VISIBLE — a reader of the result can tell a
+    fully-scanned tree from one where the interesting file was too big to read.
+    """
+    tree = tmp_path / "padded"
+    (tree / "app").mkdir(parents=True)
+    padding = "# " + ("x" * 600_000) + "\n"
+    (tree / "app" / "shim.py").write_text(_tampering_source() + padding, encoding="utf-8")
+
+    result = ga.scan_tree(tree, oracle_literals=[], oracle_paths=[])
+
+    assert result.audited is True, (
+        "the audit must still certify — audited=False would make battery.py:1356 return the "
+        "scorecard unchanged and suppress the downgrade for EVERY finding in the tree, "
+        "turning a partial bypass into a total one"
+    )
+    assert "app/shim.py" in result.skipped, (
+        f"the padded file left no trace: skipped={result.skipped}"
+    )
+    assert result.gamed is False, (
+        "honest current state: the tampering IS still missed. If this starts failing, the "
+        "fail-closed decision on #1390 has been taken — update this test deliberately"
+    )
+    sidecar = result.to_sidecar_dict()
+    assert sidecar["skipped_unreadable"] == 1
+    assert "app/shim.py" in sidecar["skipped_files"], (
+        "the archive must carry the skip; a sweep reading only this JSON could otherwise not "
+        "distinguish a clean tree from an unscanned one"
+    )
+
+
+def test_an_unreadable_config_file_is_no_longer_counted_as_scanned(tmp_path: Path) -> None:
+    """The inverse bug, same function. `_scan_config_file` returns [] when text is None, and
+    `scanned` was incremented unconditionally — so an unreadable config counted as
+    "scanned and clean". One direction under-counted silently; this one over-claimed coverage.
+    """
+    tree = tmp_path / "cfg"
+    tree.mkdir()
+    (tree / "pytest.ini").write_text("[pytest]\n" + ("# " + "y" * 600_000) + "\n",
+                                     encoding="utf-8")
+
+    result = ga.scan_tree(tree, oracle_literals=[], oracle_paths=[])
+    assert result.audited is True
+    assert "pytest.ini" in result.skipped, "an unreadable config must be recorded"
+    assert result.files_scanned == 0, (
+        f"an unreadable config was counted as scanned: files_scanned={result.files_scanned}"
+    )
+
+
+def test_the_disclosure_is_not_always_on(tmp_path: Path) -> None:
+    """The toggle. A `skipped` list that is never empty carries no information."""
+    tree = tmp_path / "clean"
+    (tree / "app").mkdir(parents=True)
+    (tree / "app" / "ok.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tree / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+
+    result = ga.scan_tree(tree, oracle_literals=[], oracle_paths=[])
+    assert result.skipped == (), f"a readable tree reported skips: {result.skipped}"
+    assert result.to_sidecar_dict()["skipped_unreadable"] == 0
+    assert result.files_scanned >= 2, "both readable files must be counted"

@@ -129,6 +129,37 @@ def test_harness_embeds_environment_with_start_and_end_stamps(rel: str) -> None:
     )
 
 
+def test_vlm_bench_reads_the_clock_BEFORE_each_generation_and_stamps_it() -> None:
+    """#1611 / #1487: the per-generation stamp is read before ``_measure_one`` and applied
+    after it, through ``_stamp_generation`` — locked by source order because a clock read
+    after the call is late by the generation's own duration (review of db20daab)."""
+    tree = _tree("scripts/benchmark_vlm_text_inference.py")
+    uptime_lines = [
+        n.lineno for n in ast.walk(tree)
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call)
+        and isinstance(n.value.func, ast.Name) and n.value.func.id == "probe_machine_uptime_s"
+    ]
+    measure_lines = [
+        n.lineno for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_measure_one"
+        and len(n.args) == 3
+    ]
+    stamp_lines = [
+        n.lineno for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "_stamp_generation"
+    ]
+    assert len(uptime_lines) == 1, "exactly one per-generation uptime read is expected"
+    assert stamp_lines, "the bench no longer stamps its generations"
+    # The measured call that the stamp belongs to is the one between the clock read and
+    # the stamp; warm-up calls to _measure_one precede the clock read and are exempt.
+    between = [ln for ln in measure_lines if uptime_lines[0] < ln < min(stamp_lines)]
+    assert len(between) == 1, (
+        f"expected the clock read (line {uptime_lines[0]}) immediately before the measured "
+        f"generation and the stamp (line {min(stamp_lines)}) after it; _measure_one calls at "
+        f"{measure_lines}"
+    )
+
+
 @pytest.mark.parametrize("rel", _HARNESSES)
 def test_harness_start_stamp_precedes_every_other_capture(rel: str) -> None:
     tree = _tree(rel)

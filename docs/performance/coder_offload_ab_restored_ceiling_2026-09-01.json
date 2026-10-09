@@ -1,0 +1,195 @@
+{
+  "benchmark": "coder_offload_ab",
+  "label": "offload30-vs-none-cs4-RESTORED-CEILING",
+  "timestamp": "2026-09-01T16:15:16-04:00",
+  "ticket": "#1501",
+  "status": "FINAL",
+  "question": "At the RESTORED 25.175 GiB ceiling, what does MoE expert offload cost and return?",
+  "supersedes": "coder_offload_ab_2026-09-01.json, which was measured at the constrained 16.342 GiB ceiling and is marked COMPLETE BUT SUPERSEDED",
+  "machine_state": {
+    "dxgk_pinning_limit_pct": 87,
+    "gmm_pinning_limit_pct": 87,
+    "keys_agree": true,
+    "gpu_device_total_mem_size_bytes": 27031388160,
+    "gpu_device_total_mem_size_gib": 25.175,
+    "dxgk_granted_budget_gib": 27.249,
+    "TWO_DIFFERENT_QUANTITIES": "27.249 GiB is what the graphics kernel GRANTS (0.87 x 31.321 GiB). 25.175 GiB is what OpenVINO REPORTS, after the driver's own 0.94 factor and a flat 450 MiB reserve. They are not interchangeable and were conflated repeatedly earlier in this investigation. The ceiling that binds OpenVINO is 25.175.",
+    "derivation": "alignDown(floor(0.94*(P/100*33630777344))-450MiB,4096); P=57 gives 17547509760 and P=87 gives 27031388160, both matching measurements on this machine to the byte",
+    "last_boot": "2026-09-01T14:58:51"
+  },
+  "versions": {
+    "ovms_version": "2026.3.1 python_on",
+    "openvino_version": "2026.2.1-21919-ede283a88e3 (venv; OVMS ships its own runtime)",
+    "genai_version": "unavailable: no version resource in the C:/ovms binaries",
+    "graphics_driver_version": "32.0.101.8991 (oem106.inf)",
+    "windows_build": "26200"
+  },
+  "envelope": {
+    "gpu_shared_budget_gib": 25.175,
+    "system_ram_gib": 31.321,
+    "free_disk_gib": {
+      "B:": 696.25,
+      "C:": 30.73
+    }
+  },
+  "methodology": {
+    "prompt_tokens": 14094,
+    "max_new_tokens": 1500,
+    "temperature": 0,
+    "prompt": "the real captured coder request, 9 tools, replayed byte-for-byte",
+    "interleaving": "A,B,A,B, then two further offload blocks to replace the contaminated one. Interleaved because #1487 measured ~40%/hour drift on this box, which exceeds many of the effects this project has tried to read."
+  },
+  "prefix_cache": {
+    "enabled": true,
+    "unique_prompt_per_run": true,
+    "note": "turn 2 deliberately REUSES turn 1's prefix, because that is the real multi-turn shape. Turn 1 always carries a unique nonce at the head of the first message."
+  },
+  "blocks": [
+    {
+      "block": "A1",
+      "config": "OFFLOAD_RATIO 30",
+      "config_fingerprint": "d168abd1ebb0645f",
+      "load_s": 12.02,
+      "turn1_cold_ttft_s": 363.744,
+      "turn2_warm_ttft_s": 2.318,
+      "turn1_decode_tps": 8.98,
+      "turn2_decode_tps": 13.62,
+      "gpu_shared_counter": "adapter",
+      "gpu_shared_peak_gib": 15.598,
+      "gpu_shared_mean_gib": 14.94,
+      "gpu_shared_peak_gib_process_counter": 15.94,
+      "gpu_shared_mean_gib_process_counter": 15.218,
+      "ram_available_min_gib": 3.52,
+      "sample_count": 54,
+      "EXCLUDED": true,
+      "excluded_reason": "CONTAMINATED. Six max_tokens=8 health probes were sent to this server during its turn-1 prefill, to answer an unrelated watchdog question. They queued behind the prefill and inflated the figure. Kept visible rather than deleted; excluded from every aggregate below."
+    },
+    {
+      "block": "B1",
+      "config": "no offload",
+      "config_fingerprint": "c98385afcd966d9d",
+      "load_s": 54.13,
+      "turn1_cold_ttft_s": 46.077,
+      "turn2_warm_ttft_s": 0.696,
+      "turn1_decode_tps": 22.49,
+      "turn2_decode_tps": 19.56,
+      "gpu_shared_counter": "adapter",
+      "gpu_shared_peak_gib": 19.826,
+      "gpu_shared_mean_gib": 15.568,
+      "gpu_shared_peak_gib_process_counter": 20.052,
+      "gpu_shared_mean_gib_process_counter": 15.939,
+      "ram_available_min_gib": 0.72,
+      "sample_count": 17
+    },
+    {
+      "block": "A2",
+      "config": "OFFLOAD_RATIO 30",
+      "config_fingerprint": "d168abd1ebb0645f",
+      "load_s": 9.06,
+      "turn1_cold_ttft_s": 284.521,
+      "turn2_warm_ttft_s": 1.548,
+      "turn1_decode_tps": 12.85,
+      "turn2_decode_tps": 17.44,
+      "gpu_shared_counter": "adapter",
+      "gpu_shared_peak_gib": 15.323,
+      "gpu_shared_mean_gib": 14.765,
+      "gpu_shared_peak_gib_process_counter": 15.562,
+      "gpu_shared_mean_gib_process_counter": 15.013,
+      "ram_available_min_gib": 3.65,
+      "sample_count": 42
+    },
+    {
+      "block": "B2",
+      "config": "no offload",
+      "config_fingerprint": "c98385afcd966d9d",
+      "load_s": 39.29,
+      "turn1_cold_ttft_s": 44.364,
+      "turn2_warm_ttft_s": 0.752,
+      "turn1_decode_tps": 19.42,
+      "turn2_decode_tps": 19.06,
+      "gpu_shared_counter": "adapter",
+      "gpu_shared_peak_gib": 19.72,
+      "gpu_shared_mean_gib": 15.522,
+      "gpu_shared_peak_gib_process_counter": 19.95,
+      "gpu_shared_mean_gib_process_counter": 16.008,
+      "ram_available_min_gib": 0.72,
+      "sample_count": 14
+    },
+    {
+      "block": "A3",
+      "config": "OFFLOAD_RATIO 30",
+      "config_fingerprint": "d168abd1ebb0645f",
+      "load_s": 9.05,
+      "turn1_cold_ttft_s": 341.87,
+      "turn2_warm_ttft_s": 1.937,
+      "turn1_decode_tps": 11.3,
+      "turn2_decode_tps": 14.99,
+      "gpu_shared_counter": "adapter",
+      "gpu_shared_peak_gib": 15.39,
+      "gpu_shared_mean_gib": 14.92,
+      "gpu_shared_peak_gib_process_counter": 15.653,
+      "gpu_shared_mean_gib_process_counter": 15.182,
+      "ram_available_min_gib": 3.98,
+      "sample_count": 51
+    },
+    {
+      "block": "A4",
+      "config": "OFFLOAD_RATIO 30",
+      "config_fingerprint": "d168abd1ebb0645f",
+      "load_s": 12.07,
+      "turn1_cold_ttft_s": 288.355,
+      "turn2_warm_ttft_s": 2.076,
+      "turn1_decode_tps": 11.6,
+      "turn2_decode_tps": 17.54,
+      "gpu_shared_counter": "adapter",
+      "gpu_shared_peak_gib": 15.354,
+      "gpu_shared_mean_gib": 14.764,
+      "gpu_shared_peak_gib_process_counter": 15.596,
+      "gpu_shared_mean_gib_process_counter": 14.997,
+      "ram_available_min_gib": 3.82,
+      "sample_count": 43
+    }
+  ],
+  "findings": {
+    "clean_blocks": {
+      "offload": 3,
+      "no_offload": 2
+    },
+    "first_turn_ttft_s": {
+      "offload": [
+        284.521,
+        288.355,
+        341.87
+      ],
+      "no_offload": [
+        44.364,
+        46.077
+      ],
+      "median_offload": 288.355,
+      "median_no_offload": 46.077
+    },
+    "memory_returned_by_offload_gib": 4.417,
+    "free_ram_floor_gib": {
+      "offload": [
+        3.65,
+        3.82,
+        3.98
+      ],
+      "no_offload": [
+        0.72,
+        0.72
+      ],
+      "why_it_matters": "0.72 GiB reproduced EXACTLY in both no-offload blocks. That is a machine which cannot run anything else, and it is the operator's stated reason for wanting offload. A usability fact, not a benchmark, and it survives the ceiling change."
+    },
+    "BOTH_CONFIGS_NOW_FIT": "no-offload peaks at 19.72-19.83 GiB against a 25.175 GiB ceiling, over 5 GiB spare. Nothing is made POSSIBLE by offload any more. This is a memory-versus-latency trade rather than a forced choice, and start-llm.ps1's claim that offloading is what lets a 4 GB pool fit at all was true of the machine as it then was and is not true now.",
+    "the_first_turn_is_paid_once": "turn 2: 1.55-2.08 s with offload, 0.70-0.75 s without",
+    "offload_loads_faster": "9.05-12.07 s with offload against 39.29-54.13 s without"
+  },
+  "not_measured": [
+    "ambient_load cpu_pct and process_count. The harness sampled memory continuously but never sampled CPU or process count. Rather than back-fill from launch-time readings -- which would have passed the performance-policy gate as fabricated data -- these are declared absent. The first record carrying them will come from the new instrument.",
+    "SUSTAINED decode. Every decode figure here came from a generation truncated at 75-289 tokens by a tool call, so all are bursts dominated by ramp-up. None is a sustained rate and none should be quoted as one.",
+    "answer QUALITY or long-prompt degradation under offload. No instrument exists for the coder; the seven suites in evals/ target the assistant's 14B.",
+    "offload ratios other than 30, cache sizes other than 4, concurrency",
+    "a deliberate quiet-versus-loaded pair. The load-sensitivity finding in the superseded record rests on accidental load and still deserves a designed repeat."
+  ]
+}

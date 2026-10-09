@@ -1,0 +1,46 @@
+---
+title: "#1595 provenance-constrained egress — research disposition"
+status: final
+area: security
+---
+
+# Disposition — #1595 (research: constrain the outbound query by provenance)
+
+**A research pass, not a code review, so the "findings" are what the research established and
+what it could not.** The ticket asked for a pass of the same standard as the #1592 design —
+primary artifacts read, not vendor prose — ending in a recommendation.
+
+**The recommendation is DO NOT BUILD, and the reason is not "too hard".** The published
+treatment for this exact shape is user confirmation, and #1594 shipped user confirmation on
+every outbound query the day before this pass ran.
+
+The research also surfaced one live defect in a governance surface, which is fixed here
+rather than ticketed.
+
+```disposition
+# finding | status | evidence-or-predicate
+THE RECOMMENDATION: DO NOT BUILD a turn- or session-scoped provenance constraint on the outbound search query. The mechanism is real and readable (CaMeL, `github.com/google-research/camel-prompt-injection`, Apache-2.0), but it is per-VALUE, not per-turn, and its cost splits on whether the action plan can be fixed BEFORE untrusted content is read. Where it can, the cost is near zero. Our shape — read the web, then act — is the other side of that split, and three independent teams measured a collapse on the same AgentDojo suite for the same stated reason: CaMeL denies 60-80% of BENIGN tasks there with no attack present, FIDES drops it 95.24 to 20.95, RTBAS to 33%/22%. RTBAS's own conclusion for that shape: "We consider such tasks inherently unsafe, necessitating user confirmation" | REJECTED | Argued, not asserted, in docs/design/1595-provenance-constrained-egress-design-2026-09-20.md with the artifact read for each figure. The decisive local fact is that RTBAS's prescription is what BlarAI already ships: #1594 moved `searches_per_fingerprint` to 1 on 2026-09-19, so every outbound query already raises its own Hello prompt showing the exact bytes. A provenance signal cannot make that approval more binding; it can only convert approvals into refusals, and refusal is where the entire measured cost lives
+IT WOULD RE-LITIGATE A DECISION WITH REASONS ALREADY ON THE RECORD. The Layer-3 lock already refuses non-SAFE tools on untrusted content, and EGRESS tools are carved out of it deliberately (ADR-023 Am.4 rung 3). The code comment gives two reasons: a search's own UNTRUSTED_WEB result would otherwise lock the next search, and the refusal text itself was poisoning the conversation because the model imitated its own refusal lines (#726) | REJECTED | Named with the tests and goldens that would regress: `test_egress_tool_not_layer3_locked_under_untrusted_content` (whose own docstring calls it "THE MARQUEE FIX (#723 rung 3)"), `test_two_searches_one_turn_share_one_fingerprint_n3`, and eval goldens gov-l3-010 / gov-l3-011 whose descriptions record that their verdict was deliberately changed at Am.4. Re-introducing the condition would re-introduce exactly what the exemption was written to remove
+OUR CODEBASE IS A WORSE CASE THAN THE LITERATURE'S, AND THIS WAS MEASURED ON DISK RATHER THAN ASSUMED. Grounded provenance is stored per SESSION; `clear_grounded_context` has exactly one production caller, reached only by an explicit unload or a fresh document attachment on a LATER turn. Nothing clears taint at turn end. So "constrain the tainted turn" would in practice mean constraining every search for the remainder of the session after any web result, knowledge recall or pasted text — label creep as the terminal state rather than a tuning problem | REJECTED | If it is ever reconsidered, the stated precondition is a DECLASSIFICATION OPERATOR — some way for taint to be cleared or bounded. CaMeL's `get_all_sources` is a pure union with none, and a position paper names the endpoint: "every piece of data is labeled as 'everything' and thus defeats the purpose of tracking labels"
+CLAIM-REGISTER ROW 22 OVERSTATED A LIVE CONTROL IN FOUR WAYS, ALL REASSURING, AND NOTHING CONNECTED THE ROW TO THE GATE. It said the trigger is "any document loaded" (it is untrusted PROVENANCE — a TRUSTED_LOCAL document locks nothing); "every tool call is refused" (SAFE tools, lock-exempt tools and EGRESS tools are all carved out, the last deliberately); "three-condition gate" (six); and "per-turn only that the document is present" (per SESSION). Two ADR-023 amendments added conditions without the row being touched | FIXED | fix/1595-claim22-and-provenance — row 22 rewritten with the four corrections, its superseded text kept inside it, and `tests/security/test_claim_register_row22_layer3_gate.py` added as the row's lock in the same spirit as row 12's. It does NOT re-test the gate; it tests that the ROW and the GATE describe the same thing: the stated condition count must equal the AST count, every carve-out present in the code must be NAMED in the row, and the trigger must not revert to "document". The gate is located structurally, never by line number — a line citation is what broke in #1592. Mutation-verified: count back to THREE, egress carve-out unnamed, and trigger back to DOCUMENT each kill a test
+THE EVIDENCE BASE IS WEAKER THAN ITS VOLUME SUGGESTS, and saying so is part of the deliverable | REJECTED | Not a defect; recorded because a recommendation resting on unexamined evidence is the failure this project keeps finding. Three limits, each from the primary artifact. (a) The benchmark nearly everything rests on cannot show the cost that matters: AgentDyn, verbatim — "only 6 of 97 tasks require dynamic planning. This allows defenses to exploit a shortcut: they can appear secure by forcing the agent to strictly follow the initial plan". (b) AgentDojo does not model user confirmation — RTBAS: "we do not model user confirmations… any apparent unauthorized calls are skipped and unperformed" — so a defence that ASKS is scored as though it DENIED, which systematically understates the category BlarAI is already in. (c) No defence in this class has faced an adaptive attacker. I am recommending against on consistent directional evidence, not on a measured figure for this design
+NOBODY HAS MEASURED OUR EXACT RULE, and the closest published measurements bound it from above rather than estimating it | DEFERRED | #1595 — recorded in the design's section 5 rather than smoothed over. Every figure cited is per-value, per-argument or per-tool-call; a turn-scoped binary on a SEARCH QUERY is measured nowhere. ContainmentBench's taint-only arm (62% false-block) and PACT's per-argument USER threshold (14.4% utility) are both STRICTER in form than the proposal. blocked-by: `docs/design/1595-provenance-constrained-egress-design-2026-09-20.md` section 6 option C — revisit when Chrome ships the read-set half of Agent Origin Sets, which Google states was not in the first iteration, or when a reference implementation appears that is not a self-described research artifact. Both are observable events
+WHAT THE RESEARCH COULD NOT ESTABLISH, named rather than left as silence | REJECTED | Not a defect. Genuinely unexamined after three parallel reads: LangChain/LangGraph, LlamaIndex, AutoGen, Semantic Kernel; and Microsoft's "tool chain analysis", which is one undocumented sentence in the Copilot defence-in-depth page and the single most likely place a shipped taint-like mechanism could be hiding. One sweep listed Microsoft and OpenAI as unchecked when sibling reads had covered them; that is corrected in the design's coverage note. Absence of evidence is not recorded as evidence of absence
+WHAT TO BUILD INSTEAD, IF ANYTHING | DEFERRED | #1599 — provenance-aware DISCLOSURE rather than constraint: when the turn has ingested untrusted content, say so IN the approval prompt ("this search was composed after reading a web page"). No refusals, no false positives, no capability cost; it makes an approval the operator is already giving better informed. This is PACT's insight applied honestly — the question is whether untrusted content determines an authority-bearing argument, and the operator is the one deciding, so give them the fact. blocked-by: #1599 — the data is one call away (`context_manager.untrusted_provenance_tiers(session_id)` already returns the distinct tiers) and `_egress_query` and `session_id` are both live locals at the same point in the tool loop, so the predicate is "the disclosure names the tier"
+```
+
+## Verification
+
+No runtime behaviour changed by this ticket. The one code artifact is a test.
+
+`tests/security/test_claim_register_row22_layer3_gate.py`: **8 passed**, elevated.
+Mutation-verified against three drift shapes, all killed.
+
+## The honest note
+
+The ticket called this "the strongest published direction and the least mature". Both halves
+held up, and the second half decided it. What I did not expect was that the local answer would
+come from our own change log rather than the literature: the treatment the strongest paper
+prescribes for exactly our shape — user confirmation on the outbound action — was merged the
+previous day for unrelated reasons. The research was still worth doing, because "we already do
+the recommended thing" is only a defence if you have read what the recommendation is.

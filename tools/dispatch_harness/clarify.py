@@ -11,7 +11,7 @@ question with numbered options, e.g.::
       2. In a web browser
       3. On a phone
 
-    Reply with the number (e.g. `2`), or `/dispatch reject` to cancel.
+    Reply with the number of the option you want as `/dispatch 2`, or `/dispatch reject` to cancel.
 
 The operator (here, the harness) answers with the option NUMBER (``/dispatch 2``). A job's
 ``clarify_answer`` may be given as that number ("2"), or — more readably — as label text

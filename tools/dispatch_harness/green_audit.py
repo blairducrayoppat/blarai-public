@@ -227,6 +227,16 @@ class GreenAuditResult:
     findings: tuple[Finding, ...] = ()        # LIVE — drive the downgrade
     allowlisted: tuple[Finding, ...] = ()     # suppressed — recorded for transparency
     files_scanned: int = 0
+    #: Files an attempt was made to read and that yielded nothing — over ``_MAX_FILE_BYTES``,
+    #: or an OSError. #1390: these used to land in NO bucket. Not AST-scanned, not regex
+    #: scanned, not counted in ``files_scanned``, and recorded nowhere — so a first-party
+    #: ``.py`` padded past the size bound simply vanished from an instrument whose entire job
+    #: is detecting a coder gaming the gates, and ``gamed`` read False on a gamed tree.
+    #:
+    #: Disclosure only. Whether an unscannable first-party source file should itself be a
+    #: FINDING — which would close the bypass fail-closed and is the operator's call, since it
+    #: downgrades a GREEN — is open on #1390.
+    skipped: tuple[str, ...] = ()
     error: str = ""
 
     @property
@@ -279,6 +289,13 @@ class GreenAuditResult:
             "fingerprints": [f.to_dict() for f in self.findings],
             "allowlisted": [f.to_dict() for f in self.allowlisted],
             "files_scanned": self.files_scanned,
+            # #1390. A file examined and classified into nothing used to leave no trace at
+            # all, so a reader of this artifact could not tell a fully-scanned tree from one
+            # where the interesting file was too big to read. The COUNT is published beside
+            # the list because a sweep aggregates counts and reads lists only when one is
+            # non-zero.
+            "skipped_unreadable": len(self.skipped),
+            "skipped_files": list(self.skipped),
         }
 
 
@@ -620,6 +637,7 @@ def scan_tree(
 
     raw: list[Finding] = []
     scanned = 0
+    skipped: list[str] = []
     for path, rel in zip(files, rel_paths):
         name = path.name
         lower = name.lower()
@@ -633,13 +651,23 @@ def scan_tree(
                 raw.append(Finding(CLASS_CONFTEST_PRESENT, rel, 0,
                                    _first_content_line(text or "") or name))
         if lower.endswith(".pth"):
-            raw.extend(_scan_config_file(rel, name, _read_text(path)))
-            scanned += 1
+            # #1390 (the inverse bug): `_scan_config_file` returns [] when text is None, so
+            # counting unconditionally recorded an UNREADABLE file as "scanned and clean".
+            # One direction under-counted silently; this one over-claimed coverage.
+            cfg_text = _read_text(path)
+            raw.extend(_scan_config_file(rel, name, cfg_text))
+            if cfg_text is None:
+                skipped.append(rel)
+            else:
+                scanned += 1
             continue
         if lower in ("pytest.ini", "tox.ini", "setup.cfg", "pyproject.toml"):
-            raw.extend(_scan_config_file(rel, name, _read_text(path)))
-            scanned += 1
-            # pyproject/setup.cfg may also be scanned as source below? No — not .py.
+            cfg_text = _read_text(path)
+            raw.extend(_scan_config_file(rel, name, cfg_text))
+            if cfg_text is None:
+                skipped.append(rel)
+            else:
+                scanned += 1
             continue
 
         if not lower.endswith(".py"):
@@ -647,6 +675,12 @@ def scan_tree(
 
         source = _read_text(path)
         if source is None:
+            # #1390: THE BYPASS. `_read_text` returns None past _MAX_FILE_BYTES or on OSError,
+            # and this file was then examined, classified into nothing, and disclosed nowhere.
+            # Appending a base64 blob to push a tampering file past the bound removed it from
+            # the gaming detector entirely. It is now recorded; see the field's docstring for
+            # what is still open.
+            skipped.append(rel)
             continue
         scanned += 1
         lines = source.splitlines()
@@ -679,4 +713,5 @@ def scan_tree(
         findings=tuple(live),
         allowlisted=tuple(suppressed),
         files_scanned=scanned,
+        skipped=tuple(sorted(skipped)),
     )

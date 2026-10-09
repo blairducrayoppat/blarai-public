@@ -1812,3 +1812,84 @@ def test_battery_close_banks_the_honest_reason_when_it_cannot_read_the_ecosystem
     assert "no seeded job oracle" not in banked["reason"]
     assert banked["reason"].startswith("unsupported oracle ecosystem")
     assert sc.evidence["green_class"] == ftax.CLASS_GREEN_UNVERIFIED
+
+
+# ---------------------------------------------------------------------------
+# RECONCILIATION — the grader's arithmetic checked by something that is NOT the grader
+# ---------------------------------------------------------------------------
+# DoD capability 13, third instrument. #1231 found `oracle_mutation`'s score and coverage
+# band RISING as the audit ran LESS, because budget-expired and machinery-missed mutants fell
+# out of the DENOMINATOR. #1324 was the same shape in the failure classifier. #1389 is the
+# same shape latent in `link_lint`, whose published `references` figure is literally the sum
+# of its own buckets.
+#
+# This instrument is built correctly — `denominator` is `len(self.criteria)`, the population
+# itself, not a sum of the counters. These locks exist so that stays true, and so the
+# PARTITION stays true beside it:
+#
+#   verified + weak + gap + undecidable == denominator
+#
+# A criterion that no bucket claims is the failure mode. Here it would under-report coverage
+# rather than inflate it — the safe direction — but "safe direction" is not a property anyone
+# checked, and the denominator half is exactly #1231 with the sign flipped.
+
+
+def _crit(cid: str, level: str) -> "tr.CriterionCoverage":
+    return tr.CriterionCoverage(criterion_id=cid, tier="behavior", level=level)
+
+
+def _result_with(levels: "list[str]") -> "tr.TraceabilityResult":
+    return tr.TraceabilityResult(
+        available=True,
+        criteria=[_crit(f"c{i}", lv) for i, lv in enumerate(levels)],
+    )
+
+
+def test_the_buckets_partition_the_criteria_at_every_level() -> None:
+    """Every declared level lands in exactly one bucket, and they sum to the denominator."""
+    res = _result_with(list(tr.LEVELS))
+    total = res.verified + res.weak + res.gap + res.undecidable
+    assert res.denominator == len(tr.LEVELS)
+    assert total == res.denominator, (
+        f"the level buckets do not partition the criteria: "
+        f"verified={res.verified} weak={res.weak} gap={res.gap} "
+        f"undecidable={res.undecidable} != denominator={res.denominator}"
+    )
+
+
+def test_the_denominator_is_the_POPULATION_not_the_sum_of_the_buckets() -> None:
+    """#1231's exact shape, and the one that must never regress.
+
+    A criterion carrying a level no bucket recognises must STILL be counted in the
+    denominator. If the denominator were derived from the counters — as `link_lint`'s
+    `references` is (#1389) — such a criterion would leave numerator and denominator
+    together, and coverage would stay flat or RISE while classification degraded.
+    """
+    res = _result_with([tr.LEVEL_ASSERTED, "L9-INVENTED-LATER"])
+    assert res.denominator == 2, "an unclassifiable criterion must not vanish from the denominator"
+    assert res.verified == 1
+    assert res.verified + res.weak + res.gap + res.undecidable == 1, (
+        "sanity: the invented level is in NO bucket — that is what the next assert is about"
+    )
+    # And the partition invariant must NOTICE, rather than reporting a clean 1-of-1.
+    assert res.verified + res.weak + res.gap + res.undecidable != res.denominator
+
+
+def test_the_partition_lock_is_not_vacuous() -> None:
+    """The toggle. A partition assertion that cannot fail proves nothing (principle 12)."""
+    good = _result_with([tr.LEVEL_ASSERTED, tr.LEVEL_GAP])
+    assert good.verified + good.weak + good.gap + good.undecidable == good.denominator
+    bad = _result_with([tr.LEVEL_ASSERTED, "NOT-A-LEVEL"])
+    assert bad.verified + bad.weak + bad.gap + bad.undecidable != bad.denominator
+
+
+def test_coverage_cannot_rise_by_losing_criteria() -> None:
+    """The property #1231 violated, stated directly: dropping classification never helps.
+
+    Degrading a criterion from ASSERTED to an unrecognised level must LOWER the covered
+    count and must NOT lower the denominator — so the ratio can only fall.
+    """
+    before = _result_with([tr.LEVEL_ASSERTED, tr.LEVEL_ASSERTED])
+    after = _result_with([tr.LEVEL_ASSERTED, "L9-INVENTED-LATER"])
+    assert before.denominator == after.denominator == 2
+    assert after.verified < before.verified

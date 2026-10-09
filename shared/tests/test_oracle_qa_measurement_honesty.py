@@ -22,6 +22,8 @@ explicitly asked for. The count being un-interpretable was not cosmetic.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from shared.fleet import oracle_qa as q
@@ -209,3 +211,157 @@ def test_toggle_proof_the_probe_fails_when_stage_mapping_is_disengaged(
         "result was not produced by the control under test"
     )
     assert disengaged["not_measured"] == []
+
+
+# ---------------------------------------------------------------------------
+# #1350 — a `not-run` that says WHY
+# ---------------------------------------------------------------------------
+#
+# All 81 banked oracle-qa.json records carry `f2p_baseline: "not-run"`, across both
+# ecosystems since 2026-07-12, and none of them says whether the runner was missing, timed
+# out, or died on its way up. The single most load-bearing check in the QA system reported
+# the same word for a month and nobody could act on it.
+
+
+def test_the_stamp_is_EXACTLY_not_run_so_the_gates_still_bite() -> None:
+    """The load-bearing constraint. Decorating the stamp would re-open the amputation.
+
+    `swap_driver._oracle_execution_validated` decides whether an oracle may DELETE work by
+    membership test against `STAMPS_NOT_MEASURED`. A stamp like `not-run:timeout` fails that
+    test, which would turn an unvalidated oracle back into evidence — #1342, reintroduced by
+    a diagnostic. The cause must ride in a separate dict, never in the stamp.
+    """
+    diag: dict = {}
+    stamp, _ = q.fail_to_pass_baseline("x", "C:/no/such/skeleton", diagnostics=diag)
+
+    assert stamp == "not-run"
+    assert stamp in q.STAMPS_NOT_MEASURED
+    assert diag["cause"] == "skeleton-absent"
+
+
+def test_a_runner_that_dies_before_pytest_speaks_names_itself(tmp_path: Path) -> None:
+    """The production symptom: 81 records' worth of silence, now with a cause attached."""
+    skeleton = tmp_path / "skeleton"
+    skeleton.mkdir()
+    (skeleton / "README.md").write_text("x", encoding="utf-8")
+
+    def dead_runner(cmd, cwd, timeout, env=None):  # noqa: ANN001, ARG001
+        return (False, "", "")
+
+    diag: dict = {}
+    stamp, _ = q.fail_to_pass_baseline(
+        "def test_x(): assert False", str(skeleton), run=dead_runner, diagnostics=diag
+    )
+
+    assert stamp == "not-run"
+    assert diag["cause"] == "runner-produced-nothing"
+    assert diag["elapsed_s"] is not None, "a reader needs to know if it timed out or died fast"
+    assert diag["cmd"], "the exact invocation is the first thing anyone would ask for"
+
+
+def test_the_diagnostic_is_readable_on_a_windows_console(tmp_path: Path) -> None:
+    """It is read in a console whose code page mangles non-ASCII punctuation."""
+    diag: dict = {}
+    q.fail_to_pass_baseline("x", "C:/no/such/skeleton", diagnostics=diag)
+    assert diag["detail"].isascii()
+
+
+def test_the_detail_reaches_the_banked_record() -> None:
+    """A cause nothing publishes is the defect wearing the fix's uniform."""
+    result = _result(f2p_baseline="not-run")
+    result.f2p_diagnostics = {"cause": "runner-produced-nothing", "detail": "d"}
+    evidence = result.to_evidence()
+
+    assert evidence["not_measured_detail"]["cause"] == "runner-produced-nothing"
+    assert evidence["findings_conclusive"] is False
+
+
+def test_a_probe_that_RAN_publishes_no_cause() -> None:
+    """An empty detail is how a reader tells `it ran` from `it did not`."""
+    assert _a_measured_record().to_evidence()["not_measured_detail"] == {}
+
+
+def test_toggle_proof_removing_the_capture_restores_the_silence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Disengage the capture and `not-run` goes back to saying nothing."""
+    diag: dict = {}
+    q.fail_to_pass_baseline("x", "C:/no/such/skeleton", diagnostics=diag)
+    assert diag.get("cause"), "engaged: the cause must be captured"
+
+    monkeypatch.setattr(
+        q, "_not_run", lambda *a, **k: ("not-run", [])  # noqa: ARG005
+    )
+    blind: dict = {}
+    stamp, _ = q.fail_to_pass_baseline("x", "C:/no/such/skeleton", diagnostics=blind)
+    assert stamp == "not-run"
+    assert blind == {}, "disengaged: the silence must return, or the capture proved nothing"
+
+
+# ---------------------------------------------------------------------------
+# #1351 — the generation collapsed instead of finishing
+# ---------------------------------------------------------------------------
+
+_TRUNCATED_ORACLE = Path(
+    "C:/Users/mrbla/agentic-setup/state/fleet-runs/20260806-094526-bd/"
+    "job-oracle-acceptance.job.test.mjs"
+)
+
+
+@pytest.mark.skipif(not _TRUNCATED_ORACLE.is_file(), reason="run archive not in this checkout")
+def test_the_real_collapsed_oracle_is_caught() -> None:
+    """The artifact: `habits2`..`habits55`, ending mid-token at `const habits55 = await get`.
+
+    Two runs produced it BYTE-IDENTICALLY, because generation here is deterministic — so a
+    retry reproduces the same corrupt exam forever. That is worse than a flaky truncation:
+    re-running is not a remedy.
+    """
+    code = _TRUNCATED_ORACLE.read_text(encoding="utf-8", errors="replace")
+    finding = q.generation_degeneracy(code)
+
+    assert finding is not None, "the real collapsed oracle must be caught"
+    assert finding.cls == q.CLASS_ADEQUACY_FLOOR
+    assert "habits" in finding.message
+    assert "retry" in finding.message.lower(), (
+        "the message must say a retry cannot cure it — that is the actionable half"
+    )
+
+
+def test_it_runs_WITHOUT_parsing_because_the_artifact_does_not_parse() -> None:
+    """The detector must work on raw text, and must fire before the syntax short-circuit.
+
+    A collapsed generation typically stops mid-token, so it is unparseable — exactly when
+    this finding is most useful. Placed after the syntax return it would never fire on the
+    case it exists for.
+    """
+    # A two-character stem at minimum: single letters (`x1`, `y2`) read as coordinates and are
+    # deliberately excluded — which this test tripped over on its own first run, using `a1`.
+    collapsed = (
+        "".join(f"const habit{i} = await get();\n" for i in range(1, 10))
+        + "const habit10 = await get"
+    )
+    assert q.generation_degeneracy(collapsed) is not None
+
+
+def test_a_healthy_oracle_is_not_convicted() -> None:
+    """Precision: a handful of numbered fixtures is ordinary test-writing, not a collapse."""
+    ordinary = (
+        "const item1 = mk(); const item2 = mk(); const item3 = mk();\n"
+        "assert.equal(total([item1, item2, item3]), 3);\n"
+    )
+    assert q.generation_degeneracy(ordinary) is None
+
+
+def test_a_scattered_set_of_numbers_is_not_a_run() -> None:
+    """Error codes and years are numbered identifiers too, and they are not a loop."""
+    scattered = "code200 code301 code404 code418 code500 code502 code503 code504 code511"
+    assert q.generation_degeneracy(scattered) is None
+
+
+def test_toggle_proof_raising_the_threshold_blinds_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The threshold is load-bearing, not a number that happens to sit in the file."""
+    collapsed = " ".join(f"habits{i}" for i in range(1, 20))
+    assert q.generation_degeneracy(collapsed) is not None
+
+    monkeypatch.setattr(q, "_DEGENERACY_RUN_THRESHOLD", 99)
+    assert q.generation_degeneracy(collapsed) is None

@@ -1,0 +1,83 @@
+{
+  "benchmark": "coder_sustained_throughput",
+  "label": "cs2-nooffload-SHIPPED",
+  "timestamp": "2026-08-31T14:51:29",
+  "ao_resident": false,
+  "runs": [
+    {
+      "prompt_tokens": 6933,
+      "completion_tokens": 800,
+      "wall_s": 64.24,
+      "decode_tps": 12.45,
+      "output_chars": 2627,
+      "produced_markup": true,
+      "index": 0
+    },
+    {
+      "prompt_tokens": 6933,
+      "completion_tokens": 800,
+      "wall_s": 69.63,
+      "decode_tps": 11.49,
+      "output_chars": 2627,
+      "produced_markup": true,
+      "index": 1
+    },
+    {
+      "prompt_tokens": 6933,
+      "completion_tokens": 800,
+      "wall_s": 71.73,
+      "decode_tps": 11.15,
+      "output_chars": 2627,
+      "produced_markup": true,
+      "index": 2
+    },
+    {
+      "prompt_tokens": 6933,
+      "completion_tokens": 800,
+      "wall_s": 71.18,
+      "decode_tps": 11.24,
+      "output_chars": 2627,
+      "produced_markup": true,
+      "index": 3
+    }
+  ],
+  "errors": 0,
+  "throughput_tps": {
+    "median": 11.37,
+    "mean": 11.58,
+    "min": 11.15,
+    "max": 12.45
+  },
+  "drift": {
+    "first_tps": 12.45,
+    "last_tps": 11.24,
+    "delta_pct": -9.7,
+    "spread_pct": 11.4
+  },
+  "resources_over_the_whole_window": {
+    "ram_avail_gib": {
+      "min": 8.07,
+      "mean": 8.24,
+      "max": 10.15,
+      "n": 25
+    },
+    "ram_in_use_gib": {
+      "min": 21.17,
+      "mean": 23.09,
+      "max": 23.25,
+      "n": 25
+    },
+    "gpu_shared_gib": {
+      "min": 17.76,
+      "mean": 18.04,
+      "max": 18.14,
+      "n": 25
+    },
+    "note": "gpu_shared is carved from system RAM on this iGPU -- do NOT add it to ram_in_use"
+  },
+  "not_measured": [
+    "concurrency -- single stream only",
+    "tool-call round trips, which the real coder interleaves with generation, so real per-task wall time exceeds the sum of these decodes",
+    "thermal soak beyond the duration of this run"
+  ]
+}

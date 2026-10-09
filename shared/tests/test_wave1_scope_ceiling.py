@@ -571,3 +571,221 @@ def test_coverage_crash_is_logged_not_silent(monkeypatch, caplog):
     assert "UNMEASURED" in records[0].message
     assert "not a clean bill" in records[0].message
     assert "RuntimeError" in records[0].message
+
+
+# ---------------------------------------------------------------------------
+# (d) The SERVER-VERIFICATION guidance (#1357) — every brief, no exceptions
+# ---------------------------------------------------------------------------
+
+
+def test_every_task_brief_says_how_to_check_a_server_without_starting_one(tmp_path):
+    """REACHABILITY lock for #1357, which is the half of that fix that saves a turn.
+
+    Measured across all 932 banked agent logs: 17 issued a server-start command and
+    six BLOCKED — 602 s and 601 s (both killed externally), then 553, 519, 330 and
+    276 s, across six different cards since 2026-07-12. `node src/server.js` does not
+    exit and the coder runtime has NO per-command timeout, so the hang ends only when
+    something outside kills it. On run 20260809-140620-bd that cost the task, three of
+    its four remaining dispatches, and both tasks that depended on it.
+
+    The deny-list in `agentic-setup/configs/opencode.json` refuses those commands. But
+    a refusal with no alternative just moves the cost: the model tries, is denied, and
+    spends a turn working out what to do instead. This asserts the ALTERNATIVE reaches
+    the brief — the built-but-wired-into-nothing shape is exactly how a guidance line
+    that nobody reads gets called done.
+    """
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()
+    # A ROOT task and a DEPENDENT one — the two composition paths. A root never gets a
+    # context pack, so a guidance line attached to the pack would reach only the second.
+    for task_id in ("tokenize", "report"):
+        prompt = _ran_prompt(calls, task_id)
+        assert "DO NOT START A SERVER" in prompt, f"{task_id} was never told"
+        # The refusal is worthless without the alternative — that is the whole point.
+        assert "import the module and call it from a test" in prompt, (
+            f"{task_id} was told what NOT to do and not what to do instead"
+        )
+        assert "npm run dev" in prompt, f"{task_id} was not given the shapes by name"
+
+
+def test_the_server_guidance_survives_a_plan_that_gets_no_scope_ceiling(tmp_path):
+    """PRECISION: the guidance is composed OUTSIDE the ceiling block, deliberately.
+
+    `_scope_ceiling` returns '' for a plan of fewer than two tasks — its one task
+    legitimately owns everything, so a boundary would be nonsense. A single-task plan
+    is also the likeliest shape to be handed a whole small web app, i.e. the case most
+    likely to reach for `npm start`. Nesting this guidance inside `if ceiling:` would
+    have deleted it from exactly the task that needs it most, and every multi-task test
+    above would still have passed.
+    """
+    repo = _mk_repo(tmp_path)
+    solo = [{
+        "repo": str(repo), "task": "build-site", "prompt": "build a small site",
+        "depends_on": [],
+        "contract": {"creates": ["app/__init__.py", "app/site.py"],
+                     "exports": ["render()"], "notes": "one page"},
+    }]
+    plan = _build_plan(tmp_path, solo)
+    calls = []
+    _driver(tmp_path, _ops(calls), solo, plan).run()
+    prompt = _ran_prompt(calls, "build-site")
+    assert "SCOPE — this task builds ONLY" not in prompt, (
+        "a one-task plan should get NO ceiling — if it does, this test's premise moved"
+    )
+    assert "DO NOT START A SERVER" in prompt, (
+        "the server guidance vanished on the plan shape most likely to need it"
+    )
+
+
+# ---------------------------------------------------------------------------
+# (e) A prohibition with no matching permission is a dead end, not a boundary
+# ---------------------------------------------------------------------------
+
+
+def _single_page_tasks(repo: Path) -> list[dict]:
+    """The shape a static one-page website decomposes into: every task extends the
+    SAME `index.html`, and only one task's contract happens to name it.
+
+    This is not a hypothetical. Website dispatch 20260831-115814-bd planned exactly
+    this — 8 tasks, 7 with an empty `creates`, `add-error-handling` alone naming
+    ['index.html', 'styles.css'] — and produced zero files.
+    """
+    def _t(name: str, creates: list[str]) -> dict:
+        return {"repo": str(repo), "task": name, "prompt": f"build {name}",
+                "depends_on": [], "surface": "web-static",
+                "contract": {"creates": creates, "exports": [], "notes": ""}}
+    return [
+        _t("photo-bio-section", []),
+        _t("certification-section", []),
+        _t("add-error-handling", ["index.html", "styles.css"]),
+    ]
+
+
+def test_a_task_with_no_contract_is_never_handed_a_bare_prohibition(tmp_path):
+    """THE defect lock (#1479). On a web-static build no task is told that the one
+    page it must extend belongs to somebody else.
+
+    The composed prompt already orders it to EDIT `index.html` first (the static-web
+    hint). Adding "do NOT create, stub, or implement `index.html`" makes the brief
+    self-contradicting, and the honest resolution is the one the coder took three
+    times in a row: read the file, decline to edit, report no changes.
+    """
+    repo = _mk_repo(tmp_path)
+    tasks = _single_page_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()
+
+    prompt = _ran_prompt(calls, "photo-bio-section")
+    assert "NOT yours to create" not in prompt, (
+        "a task with an empty contract was told what it may not touch and never "
+        "told what it may — that is a dead end, not a boundary"
+    )
+    assert "`index.html`" not in prompt.split("--- TASK COMPLEXITY")[0], (
+        "the only file this build ships was named as forbidden"
+    )
+
+
+def test_the_contracted_task_still_gets_its_own_ceiling(tmp_path):
+    """CONTROL TESTED OFF: only the NEGATIVE half is dropped. The one task that DOES
+    declare a contract still receives its positive SCOPE line — otherwise a green
+    here would prove only that the ceiling stopped working entirely."""
+    repo = _mk_repo(tmp_path)
+    tasks = _single_page_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()
+
+    prompt = _ran_prompt(calls, "add-error-handling")
+    assert "SCOPE — this task builds ONLY its own contracted deliverable(s)" in prompt
+    assert "`index.html`" in prompt
+
+
+def test_mutual_prohibition_survives_on_every_other_surface(tmp_path):
+    """#989 is untouched off web-static: a multi-file plan still fences each task off
+    from its siblings' deliverables. Keying the fix to the surface — rather than to
+    the empty contract, which was the tempting and wrong generalisation — is what
+    keeps `test_empty_own_contract_still_gets_negative_ceiling` true as written."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()
+
+    prompt = _ran_prompt(calls, "tokenize")
+    assert "NOT yours to create" in prompt
+    assert "`app/report.py`" in prompt
+
+
+# ---------------------------------------------------------------------------
+# (f) #1481 — the run's plan is banked where the run's evidence lives
+# ---------------------------------------------------------------------------
+
+
+def test_the_plan_is_banked_into_the_run_directory(tmp_path):
+    """THE defect lock. `state/fleet-swap/plan.json` is per-MACHINE: the next
+    dispatch overwrites it, so a post-mortem races the next run. #1479's own
+    evidence was destroyed this way within the hour."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    run_dir = tmp_path / "runs" / "R1"
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan, run_dir=run_dir).run()
+
+    banked = run_dir / "plan.json"
+    assert banked.is_file(), "the run directory holds no copy of its own plan"
+    assert json.loads(banked.read_text(encoding="utf-8"))["tasks"], "banked plan is empty"
+
+
+def test_the_banked_plan_survives_the_shared_file_being_overwritten(tmp_path):
+    """The whole point: the banked copy must be independent of the shared file,
+    not a pointer to it."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    run_dir = tmp_path / "runs" / "R1"
+    _driver(tmp_path, _ops([]), tasks, plan, run_dir=run_dir).run()
+
+    shared = tmp_path / "plan.json"
+    shared.write_text('{"tasks": [], "plan_id": "a-later-run"}', encoding="utf-8")
+
+    banked = json.loads((run_dir / "plan.json").read_text(encoding="utf-8"))
+    assert banked["plan_id"] != "a-later-run"
+    assert [t["id"] for t in banked["tasks"]] == ["tokenize", "word-frequencies", "report"]
+
+
+def test_banking_never_fails_a_run(tmp_path):
+    """CONTROL: evidence banking is fail-soft. An unwritable run_dir costs a later
+    investigation; a raised exception would cost the build itself."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    blocker = tmp_path / "blocked"
+    blocker.write_text("I am a file, not a directory", encoding="utf-8")
+
+    calls = []
+    result = _driver(tmp_path, _ops(calls), tasks, plan, run_dir=blocker / "R1").run()
+
+    assert result is not None
+    assert _ran_prompt(calls, "tokenize")  # the run still dispatched its tasks
+
+
+def test_no_run_dir_is_not_an_error(tmp_path):
+    """run_dir is optional (#790). Absent ⇒ no banking, no failure."""
+    repo = _mk_repo(tmp_path)
+    tasks = _diamond_tasks(repo)
+    plan = _build_plan(tmp_path, tasks)
+    calls = []
+    _driver(tmp_path, _ops(calls), tasks, plan).run()
+    assert _ran_prompt(calls, "tokenize")
+
+
+def test_bank_plan_reports_why_it_did_not_bank(tmp_path):
+    """The evidence string must say WHY, not go quiet — a silent skip and a
+    successful bank must never look the same in the progress trail."""
+    assert "no plan_store or run_dir" in sd.bank_plan_into_run_dir(None, tmp_path)
+    assert "no plan_store or run_dir" in sd.bank_plan_into_run_dir(None, None)

@@ -1,3 +1,5 @@
+# enforces-rule: decision_boundary.deferral_discipline.any-review-audit-verification
+# enforces-rule: decision_boundary.deferral_discipline.a-deferral-is-a
 """
 BlarAI finding-disposition verifier
 ===================================
@@ -305,8 +307,28 @@ def extract_block(text: str) -> tuple[list[Row] | None, str | None]:
     rows: list[Row] = []
     for i, line in enumerate(blocks[0].splitlines(), 1):
         stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
+        if not stripped:
             continue
+        if stripped.startswith("#"):
+            # A COMMENT ONLY IF IT IS NOT A ROW. Findings are routinely written starting with
+            # the ticket they belong to — "#1391 item 3 | FIXED | <sha>" — and those were
+            # silently dropped here, after which this verifier printed a self-consistent
+            # "N ok of N" over a population it had quietly shrunk. That is the exact defect
+            # class this gate exists to catch, committed by the gate: a denominator derived
+            # from what was counted rather than from what was there. Caught 2026-08-15 when a
+            # record with eight rows was reported as three.
+            #
+            # A comment cannot be mistaken for a row and vice versa: a row has the two pipes
+            # that make it parseable as one. Anything else beginning with # stays a comment.
+            #
+            # The one # line that HAS two pipes and is not a row is the block's own column
+            # header, recognised by its literal middle field. Deliberately not "skip any #
+            # line I fail to parse" — that is the silent-drop being fixed, wearing a
+            # tolerance. A #-row with a typo'd status must still fail loudly.
+            fields = [p.strip().lower() for p in stripped.lstrip("#").split("|")]
+            is_header = len(fields) >= 2 and fields[1] == "status"
+            if stripped.count("|") < 2 or is_header:
+                continue
         parts = [p.strip() for p in stripped.split("|")]
         if len(parts) < 3:
             return None, f"line {i}: expected '<finding> | <status> | <evidence>', got: {stripped!r}"

@@ -1,0 +1,51 @@
+{
+  "measurement": "knowledge_bank.retrieve() latency vs store size",
+  "ticket": "#1617",
+  "date": "2026-09-21",
+  "purpose": "Derive CACHE_SIZE_WARN_CHUNKS from data instead of inheriting it from a deleted design.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) — not used by this measurement",
+    "ram_gb_effective": 31.323,
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "software": {
+    "python": "3.11.9",
+    "sqlite_fts5": "in-memory, tokenize='porter unicode61'",
+    "code_under_test": "services/assistant_orchestrator/src/knowledge_bank.py::EncryptedKnowledgeBank.retrieve"
+  },
+  "methodology": {
+    "what_is_measured": "wall-clock of a single retrieve(query, k=4) call",
+    "cache_population": "retrieval caches (_chunk_vecs, _chunk_texts, _fts) written directly rather than via approve(), because per-chunk AES cost is not under test and would cap reachable N",
+    "embeddings": "random unit vectors, 384-dim, seed 7",
+    "queries": "8 fixed queries cycled; 2 warm-up calls discarded",
+    "reps_per_size": "40 up to 25k chunks, 12 above",
+    "statistic": "median, p95, max",
+    "box_state": "quiet — no model loaded, assistant down, archive download PAUSED for the duration"
+  },
+  "results": [
+    {"chunks": 100,     "median_ms": 0.23,   "p95_ms": 0.26,   "max_ms": 0.27,   "reps": 40},
+    {"chunks": 1000,    "median_ms": 2.32,   "p95_ms": 2.56,   "max_ms": 2.61,   "reps": 40},
+    {"chunks": 5000,    "median_ms": 13.42,  "p95_ms": 14.64,  "max_ms": 14.83,  "reps": 40},
+    {"chunks": 10000,   "median_ms": 29.69,  "p95_ms": 30.79,  "max_ms": 31.05,  "reps": 40},
+    {"chunks": 25000,   "median_ms": 79.47,  "p95_ms": 84.51,  "max_ms": 85.12,  "reps": 40},
+    {"chunks": 50000,   "median_ms": 177.37, "p95_ms": 180.14, "max_ms": 183.88, "reps": 12},
+    {"chunks": 100000,  "median_ms": 356.05, "p95_ms": 365.30, "max_ms": 367.06, "reps": 12},
+    {"chunks": 200000,  "median_ms": 775.42, "p95_ms": 776.93, "max_ms": 784.93, "reps": 12}
+  ],
+  "derived": {
+    "scaling": "linear in store size",
+    "crossing_100ms_chunks": 30242,
+    "threshold_set": 25000,
+    "threshold_rationale": "the measured row below the 100 ms crossing (79 ms), leaving headroom to act before the cost is felt",
+    "live_store_chunks_at_measurement": 15,
+    "live_store_latency_ms": "~0.05 (below the smallest measured size)"
+  },
+  "not_measured": [
+    "cost with REAL embeddings and real text lengths (random vectors and 24-word texts were used)",
+    "cost under concurrent load or with the model resident on the same box",
+    "the encrypt/decrypt cost of growing the store to these sizes via approve()",
+    "memory footprint at each size — only latency was timed",
+    "whether SQLite FTS5 BM25 cost scales differently with realistic term-frequency distributions than with the uniform random vocabulary used here"
+  ]
+}

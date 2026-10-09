@@ -1,3 +1,5 @@
+# enforces-rule: security_by_design.principles.born-encrypted -- session store keystore only
+# enforces-rule: security_by_design.principles.hardware-rooted-integrity -- signed-manifest posture pin only
 """Production-posture RUNTIME guard (GAP-12 / #600) — Sprint 17 SDV C5.
 
 WHY THIS FILE EXISTS — the dynamic complement to the static locks

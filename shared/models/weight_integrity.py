@@ -297,6 +297,8 @@ class ManifestSweepResult:
 def verify_all_manifest_entries(
     model_dir: str | Path,
     manifest_path: str | Path,
+    *,
+    require_signed: bool = False,
 ) -> ManifestSweepResult:
     """Verify every .bin file listed in the manifest AND reject extra .bin files.
 
@@ -324,6 +326,17 @@ def verify_all_manifest_entries(
     Args:
         model_dir: Directory containing .bin weight files.
         manifest_path: Path to the JSON manifest containing expected digests.
+        require_signed: When True the manifest MUST carry a valid TPM signature
+            (``.sig``) — the load routes through :func:`load_manifest_verified`
+            and a missing/invalid signature fails closed
+            (``all_verified=False``). Default False keeps every existing flat
+            caller byte-identical. **Pass True for any MULTI-FILE model whose
+            integrity rests on this sweep alone** (#930): the single-file
+            :func:`verify_weight_integrity` path already takes a
+            ``require_signed`` argument, and a multi-file model routed here
+            without it would be digest-checked but NOT signature-checked —
+            quietly weaker than the model beside it, which is exactly the kind
+            of asymmetry a reader would never notice.
 
     Returns:
         ``ManifestSweepResult``.  ``all_verified=False`` on any failure
@@ -332,13 +345,21 @@ def verify_all_manifest_entries(
     model_dir = Path(model_dir)
     results: list[IntegrityCheckResult] = []
 
-    # Step 1: Load the manifest.
-    digests = load_manifest(manifest_path)
+    # Step 1: Load the manifest — through the signature-checking loader when
+    # the caller requires it, mirroring the nested sibling exactly.
+    digests = (
+        load_manifest_verified(manifest_path, require_signed=require_signed)
+        if require_signed
+        else load_manifest(manifest_path)
+    )
     if digests is None:
         return ManifestSweepResult(
             all_verified=False,
             per_file=[],
-            error=f"Failed to load manifest: {manifest_path}",
+            error=(
+                f"Failed to load manifest: {manifest_path}"
+                + (" (signature required)" if require_signed else "")
+            ),
         )
 
     # Step 2: Verify every entry listed in the manifest.

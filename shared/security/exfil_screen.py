@@ -348,6 +348,18 @@ def screen_and_enforce(payload: Any) -> Detection:
     return detection
 
 
+def _register_screen_on_arm() -> None:
+    """Arm-hook: register :func:`screen` with the egress guard at ``arm()`` time.
+
+    Module-level and named ON PURPOSE. A lambda is a distinct object on every
+    call, which defeats ``register_arm_hook``'s identity de-duplication and stacks
+    one hook per call.
+    """
+    from shared.security import egress_guard
+
+    egress_guard.register_screener(screen)
+
+
 def wire_into_egress_guard() -> None:
     """Register :func:`screen` as the egress-guard outbound screener at arm time.
 
@@ -367,9 +379,11 @@ def wire_into_egress_guard() -> None:
 
     ``egress_guard`` is imported lazily (inside the function) so this module stays
     importable and unit-testable without pulling ``egress_guard`` at module load —
-    matching :func:`screen_and_enforce`. Idempotent: ``register_arm_hook`` and
-    ``register_screener`` both de-duplicate, so a second call (or a re-import) does
-    not stack a second screener.
+    matching :func:`screen_and_enforce`. Idempotent in BOTH halves: the arm-hook
+    is a module-level function, so ``register_arm_hook``'s identity de-duplication
+    can actually see it, and ``register_screener`` de-duplicates the screener — a
+    second call (or a re-import) stacks neither a second hook nor a second
+    screener.
 
     SAFETY: registering the screener does NOT enable any external egress and does
     NOT screen internal traffic. The egress guard only invokes the screener for
@@ -380,9 +394,13 @@ def wire_into_egress_guard() -> None:
     """
     from shared.security import egress_guard
 
-    egress_guard.register_arm_hook(
-        lambda: egress_guard.register_screener(screen)
-    )
+    # A NAMED module-level hook, not a lambda. `register_arm_hook` de-duplicates
+    # with `hook not in _arm_hooks`, and a fresh lambda is never equal to the
+    # previous one — so the idempotency this docstring promised did not hold for
+    # the arm-hook half, and three calls stacked three hooks. The screener count
+    # stayed 1 only because `register_screener` de-duplicates separately, which
+    # is what kept the miss invisible.
+    egress_guard.register_arm_hook(_register_screen_on_arm)
     logger.info(
         "exfil screen: outbound screener wired into egress_guard via arm-hook "
         "(ADR-027 rule 4; registers at arm() time; dormant until an external "

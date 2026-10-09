@@ -1,3 +1,4 @@
+# enforces-rule: journal_discipline.entry-form -- chronology and duplicates only, not the entry form
 """Gate: BUILD_JOURNAL.md chronology and entry uniqueness (#1021's lock).
 
 Drives the real checker (``tools/doc_hygiene/check_journal_order.py``) over the

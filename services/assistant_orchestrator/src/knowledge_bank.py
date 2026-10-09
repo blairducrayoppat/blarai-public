@@ -115,6 +115,7 @@ import re
 import sqlite3
 import threading
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, NamedTuple
 
@@ -142,6 +143,43 @@ RRF_K: int = 60
 
 # Default hybrid-retrieval budget (overridden by [knowledge].retrieve_k).
 DEFAULT_RETRIEVE_K: int = 4
+
+# Loud-warning threshold for the retrieval caches (#1617).
+#
+# DERIVED FROM MEASUREMENT, not chosen. `retrieve()` is O(corpus) per query by
+# design (see the long note in `retrieve`), so the only honest guard is one
+# placed where that cost becomes perceptible. Measured on the Arc 140V box,
+# quiet, k=4, median of 40 reps per size (PERFORMANCE_LOG.md 2026-09-21):
+#
+#     chunks      100    1,000    5,000   10,000   25,000   50,000  100,000
+#     median ms  0.23     2.32    13.42    29.69    79.47   177.37   356.05
+#
+# Scaling is linear and crosses 100 ms at ~30,200 chunks. 25,000 is the
+# measured row below that crossing (79 ms), leaving headroom to act before
+# the cost is felt. This matters more than it looks: a per-prompt auto-recall
+# runs on EVERY user turn (entrypoint.py), so this cost is paid per message,
+# not per explicit search. An earlier revision of this change carried 50,000,
+# inherited from a truncation design that was removed — at 50,000 every turn
+# would already pay 177 ms. Independent review caught the stale constant.
+#
+# For scale: the live bank measured 15 chunks, about 0.05 ms. It would have
+# to grow roughly 1,600x before this fires.
+#
+# It WARNS rather than refuses: the rows are the operator's own approved
+# knowledge, and refusing to load it is a capability decision that belongs to
+# the operator, not to this module. The warning names the cost so the choice
+# is informed rather than silent.
+CACHE_SIZE_WARN_CHUNKS: int = 25_000
+
+# Bounded sample for the L2-normalisation soundness check at cache-build time
+# (#1617).  A sample, not a sweep: the embed_fn either honours its contract or
+# does not, and checking every vector would make a boot cost scale with the
+# corpus for a property that does not vary row by row.
+_NORM_CHECK_SAMPLE: int = 64
+
+# float32 embeddings round-trip through encrypt/decrypt, so an exactly-1.0
+# norm is not expected; this admits that noise and nothing larger.
+_NORM_TOLERANCE: float = 0.01
 
 _SOURCE_TYPES: frozenset[str] = frozenset({"url", "file", "paste"})
 _DECISION_STATES: frozenset[str] = frozenset({"pending", "approved", "rejected"})
@@ -299,6 +337,28 @@ class KnowledgeDoc(NamedTuple):
     decided_at: str | None
 
 
+class CurationCandidate(NamedTuple):
+    """One document a curation request matches (#1567) — metadata plus title.
+
+    Deliberately NOT a :class:`KnowledgeDoc`. A rehearsal must show the
+    operator enough to recognise what he is about to lose and no more, so
+    ``content`` is never decrypted to build one (``security_by_design`` 8,
+    least data). ``title`` is, because a list of identifiers is not something a
+    person can approve.
+
+    ``title`` reads ``"(title unreadable)"`` when the row's title cannot be
+    decrypted. The row is still a match — the selector's predicates never
+    touched that column — and dropping it would undercount a destructive set.
+    """
+
+    doc_uuid: str
+    source_type: str
+    title: str
+    published_date: str
+    created_at: str
+    word_count: int
+
+
 class KnowledgeImage(NamedTuple):
     """A decrypted display-only image record (UC-003 Workstream B).
 
@@ -402,14 +462,63 @@ def _pref_similarity_tokens(text: str) -> frozenset[str]:
 
 
 class KnowledgeHit(NamedTuple):
-    """A single hybrid-retrieval hit."""
+    """A single hybrid-retrieval hit.
+
+    ``score`` ORDERS hits; ``vector_score`` MEASURES them.  Keeping the two
+    apart is the point of #1617 — see the field notes below before writing any
+    code that thresholds on a hit.
+    """
 
     doc_uuid: str
     chunk_index: int
     title: str
     source_type: str
     text: str
-    score: float  # reciprocal-rank-fusion score (higher = better)
+    score: float
+    """Reciprocal-rank-fusion score (higher = better).
+
+    **Rank-derived. NOT a relevance measure, and NOT thresholdable.** It is a
+    sum of ``1/(60 + rank + 1)`` terms, so the top hit of every query scores
+    the same value whether the match is perfect or worthless: a query whose
+    best chunk is irrelevant still produces ``0.0164``.  A minimum-relevance
+    gate built on this number would admit everything while reading like a
+    control.  Threshold on :attr:`vector_score` instead (#1617).
+    """
+
+    vector_score: float | None = None
+    """Cosine similarity of the chunk to the query, in ``[-1, 1]``.
+
+    **This is the calibrated signal** — comparable across queries, and the
+    only field here suitable for a relevance floor.  Cosine because the
+    ``embed_fn`` contract is L2-normalised (see :class:`KnowledgeBank`); a
+    violation of that contract is caught loudly at cache-build time rather
+    than silently rescaling this number.
+
+    ``None`` only when the vector limb is disabled by the embedding-model
+    identity guard (#794), in which case NO hit carries a calibrated score and
+    a caller that needs one must treat the whole result as unmeasured.
+    Reported for every returned hit otherwise, including chunks the lexical
+    limb surfaced alone.
+    """
+
+    lexical_score: float | None = None
+    """Raw SQLite ``bm25()`` value for the lexical limb. LOWER is better.
+
+    Diagnostic only, and non-discriminating in BOTH directions.  Across
+    queries it varies with term rarity and query length.  *Within* one query
+    it can be degenerate too: for a term present in every row the inverse
+    document frequency collapses and SQLite returns the same ``-1e-06`` for
+    every match — exactly the common-word case where a floor would be most
+    wanted.  Never use it as a threshold; that is what ``vector_score`` is
+    for.  Carried because a future calibration will want both limbs visible.
+    ``None`` when the chunk was not a lexical match.
+    """
+
+    lexical_rank: int | None = None
+    """0-based rank within the lexical limb, or ``None`` if not a lexical hit.
+
+    Diagnostic: answers "why did this surface?" without re-running the query.
+    """
 
 
 def _doc_aad_id(doc_uuid: str) -> str:
@@ -725,6 +834,8 @@ class EncryptedKnowledgeBank:
         # makes the cache safe if that ever changes).
         self._lock = threading.RLock()
         self._chunk_vecs: dict[tuple[str, int], Any] = {}
+        #: One-shot latch for the cache-size warning (#1617).
+        self._cache_size_warned: bool = False
         self._chunk_texts: dict[tuple[str, int], str] = {}
         self._doc_titles: dict[str, str] = {}
         self._doc_source_types: dict[str, str] = {}
@@ -1231,6 +1342,10 @@ class EncryptedKnowledgeBank:
                     (chunk, doc_uuid, i),
                 )
             self._fts.commit()
+            # The cache also grows here, not only at construction (#1617).
+            # Pass the vectors JUST written: sampling the cache would re-check
+            # the oldest rows and never see these at all.
+            self._warn_if_cache_unsound(checked=[embeddings[i] for i in range(len(chunks))])
 
         logger.info(
             "Knowledge approve: doc %s approved (%d chunks indexed)",
@@ -2306,6 +2421,158 @@ class EncryptedKnowledgeBank:
                 )
         return docs
 
+    def select_docs_for_curation(
+        self,
+        *,
+        source_ref: str = "",
+        source_type: str = "",
+        created_before: str = "",
+        created_after: str = "",
+        state: str = "approved",
+    ) -> list[CurationCandidate]:
+        """The DETERMINISTIC match set for a curation request (#1567).
+
+        Every predicate reads a column that is plaintext or a keyed hash on
+        disk, and the result is ordered by ``doc_uuid``. That is what makes the
+        same arguments yield the same set in the rehearsal and in the execution
+        that follows it -- the property a dry run of a destructive action rests
+        on (#1541's identity binding).
+
+        NOT :meth:`retrieve`, and the distinction is the whole reason this
+        method exists. ``retrieve`` is a RANKED TOP-K over an in-memory FTS
+        index rebuilt per process from decrypted content. Its result set is
+        defined by ``k`` and by what happens to be loaded, not by the query, so
+        "delete what this query matches" over it would mean "delete whichever k
+        rows ranked highest in this process" -- a different set for the same
+        arguments, which is exactly the divergence a rehearsal must not have.
+
+        LEAST DATA (``security_by_design`` 8): ``content`` is NEVER decrypted
+        here. Only ``title`` is, because the operator needs it to recognise what
+        he is about to lose, and it stays inside the application.
+
+        Args:
+            source_ref: Exact source reference. Matched through the KEYED hash
+                (``source_hash``, indexed) -- the encrypted column is never
+                compared and no wildcard is possible, so a selector cannot
+                widen itself.
+            source_type: One of ``url`` / ``file`` / ``paste``.
+            created_before: ISO timestamp; rows created strictly before it.
+            created_after: ISO timestamp; rows created strictly after it.
+            state: Approval state. Defaults to ``approved``.
+
+        Returns:
+            Matching candidates, ordered by ``doc_uuid``. EMPTY when no
+            predicate is supplied -- an unconstrained curation request selects
+            NOTHING rather than everything (``security_by_design`` 2 applied to
+            a selector; the caller refuses before reaching here, and this is the
+            second, independent refusal).
+        """
+        from shared.security.field_cipher import FieldCipherError
+
+        clauses: list[str] = ["approval_state = ?"]
+        params: list[object] = [state]
+        constrained = False
+
+        if source_ref.strip():
+            clauses.append("source_hash = ?")
+            params.append(self.source_hash_for(source_ref))
+            constrained = True
+        if source_type.strip():
+            clauses.append("source_type = ?")
+            params.append(source_type)
+            constrained = True
+        if created_before.strip():
+            clauses.append("created_at < ?")
+            params.append(created_before)
+            constrained = True
+        if created_after.strip():
+            clauses.append("created_at > ?")
+            params.append(created_after)
+            constrained = True
+
+        if not constrained:
+            logger.warning(
+                "KNOWLEDGE_CURATION_UNCONSTRAINED "
+                "event=KNOWLEDGE_CURATION_UNCONSTRAINED -- selecting nothing; an "
+                "unconstrained curation request is a refusal, never 'everything'"
+            )
+            return []
+
+        rows = self._conn.execute(
+            "SELECT doc_uuid, source_type, title, published_date, created_at, "
+            "word_count FROM knowledge_docs WHERE "
+            + " AND ".join(clauses)
+            + " ORDER BY doc_uuid",
+            tuple(params),
+        ).fetchall()
+
+        candidates: list[CurationCandidate] = []
+        for doc_uuid, row_type, title_blob, published, created, words in rows:
+            try:
+                title = (
+                    self._dec_doc_field("title", str(doc_uuid), title_blob)
+                    if title_blob
+                    else ""
+                )
+            except FieldCipherError as exc:
+                # Counted, NOT skipped. The predicates never touched this
+                # column, so the row matches whether or not its title reads;
+                # dropping it here would undercount a destructive set and leave
+                # the operator approving 23 deletions that are in fact 24.
+                logger.warning(
+                    "KNOWLEDGE_ROW_DECRYPT_QUARANTINE "
+                    "event=KNOWLEDGE_ROW_DECRYPT_QUARANTINE doc_uuid=%r reason=%r "
+                    "-- title unreadable; row still counted for curation",
+                    str(doc_uuid),
+                    str(exc),
+                )
+                title = "(title unreadable)"
+            candidates.append(
+                CurationCandidate(
+                    doc_uuid=str(doc_uuid),
+                    source_type=str(row_type),
+                    title=title,
+                    published_date=str(published or ""),
+                    created_at=str(created),
+                    word_count=int(words or 0),
+                )
+            )
+        return candidates
+
+    def delete_docs(self, doc_uuids: Sequence[str]) -> int:
+        """Securely delete EXACTLY the given documents; return how many went.
+
+        Takes the SET, never a query. A destructive execution that re-ran its
+        own selector could act on a different set than the one rehearsed and
+        approved; taking the identifiers means the approved set and the deleted
+        set are the same object (#1567 design point 6).
+
+        ``secure_delete=ON`` zeroes the freed pages, and ``ON DELETE CASCADE``
+        reaps each document's chunks and images in the same transaction. There
+        is no undo.
+
+        Idempotent: an absent identifier contributes nothing and is not an
+        error, so a partially-completed prior run can be repeated safely.
+        """
+        wanted = [u for u in dict.fromkeys(doc_uuids) if u and u.strip()]
+        if not wanted:
+            return 0
+        placeholders = ",".join("?" for _ in wanted)
+        with self._conn:
+            cur = self._conn.execute(
+                f"DELETE FROM knowledge_docs WHERE doc_uuid IN ({placeholders})",
+                tuple(wanted),
+            )
+        removed = int(cur.rowcount or 0)
+        logger.info(
+            "KNOWLEDGE_CURATION_DELETE "
+            "event=KNOWLEDGE_CURATION_DELETE requested=%d removed=%d "
+            "-- secure_delete=ON, chunks and images reaped by CASCADE",
+            len(wanted),
+            removed,
+        )
+        return removed
+
     def count(self, state: str | None = None) -> int:
         """Count documents, optionally filtered by approval state."""
         if state is not None:
@@ -2365,6 +2632,21 @@ class EncryptedKnowledgeBank:
         rankings are merged by reciprocal-rank fusion with the canonical
         constant ``k=60``: ``score(c) = sum(1 / (60 + rank_i(c)))``.
 
+        Both limbs rank the ENTIRE store — O(corpus) per query, deliberately
+        (#1617).  Bounding either limb perturbs the result rather than merely
+        trimming it; the long note in the body records what was measured and
+        why exact wins at curation scale.  ``CACHE_SIZE_WARN_CHUNKS`` says
+        loudly when the store outgrows that choice.
+
+        **The returned ``score`` orders hits but does not measure them.** It is
+        rank-derived, so the top hit of every query carries the same value
+        whether the match is excellent or worthless — do not build a relevance
+        floor on it.  Each hit also carries ``vector_score``, the cosine
+        similarity in ``[-1, 1]``, which IS comparable across queries and is
+        the field a floor belongs on.  This method deliberately applies no
+        such floor: the threshold has not been measured, and an invented one
+        is the same mistake in a new place (#1617, #1616 C2).
+
         Pending and rejected documents are never candidates — their chunks do
         not exist (pending/rejected rows hold content only).
 
@@ -2399,6 +2681,31 @@ class EncryptedKnowledgeBank:
         with self._lock:
             # Vector limb — skipped when the embedding-model identity is
             # mismatched (#794); the lexical limb below still runs.
+            # BOTH LIMBS RANK EVERYTHING. That is O(corpus) per query and it
+            # is deliberate (#1617). An earlier revision of this change bounded
+            # each limb to a candidate pool; independent review measured what
+            # that actually costs, and it is not what the bounding argument
+            # assumed. The argument asked whether a discarded TAIL chunk could
+            # climb into the budget (it cannot). The real failure is the
+            # reverse: a chunk already IN the budget that falls outside ONE
+            # limb's pool loses that limb's whole contribution at the boundary
+            # — a discontinuous drop of 1/261, which is 23% of the most any
+            # single limb can contribute. Measured: a chunk at lexical rank 8
+            # of 3000 was evicted from the top 4 because its vector rank was
+            # 251 rather than 199. Truncation also MANUFACTURES exact ties,
+            # which `sorted` then resolves by insertion order — i.e. by the
+            # order documents happened to be approved — and that begins at
+            # N=300 with near-duplicate chunks.
+            #
+            # The two limbs cannot both be bounded without perturbing the
+            # result, because the vector limb ranks every chunk and so the
+            # fused set is the entire store. "Fast" and "exact" is therefore a
+            # genuine fork, and the right side of it differs by tier: this is
+            # an operator-CURATED bank (measured at 8 docs / 15 chunks) where
+            # exact costs nothing, so exact wins. A bulk reference corpus is
+            # millions of chunks where exact is impossible — it needs
+            # purpose-built candidate generation and MUST NOT inherit this
+            # code path (#1616).
             vector_ranked: list[tuple[str, int]] = []
             if not vector_disabled and self._chunk_vecs:
                 keys = list(self._chunk_vecs.keys())
@@ -2407,14 +2714,23 @@ class EncryptedKnowledgeBank:
                 vector_ranked = [keys[int(i)] for i in np.argsort(scores)[::-1]]
 
             lexical_ranked: list[tuple[str, int]] = []
+            lexical_bm25: dict[tuple[str, int], float] = {}
             match_expr = _fts_match_expr(query)
             if match_expr:
+                # bm25() added to the SELECT list only — same predicate, same
+                # ORDER BY, no LIMIT. Verified behaviour-identical against the
+                # prior statement: identical row order across 500 randomised
+                # stores (n=8..1200) and an identical EXPLAIN QUERY PLAN.
                 rows = self._fts.execute(
-                    "SELECT doc_uuid, chunk_index FROM knowledge_fts "
-                    "WHERE knowledge_fts MATCH ? ORDER BY bm25(knowledge_fts)",
+                    "SELECT doc_uuid, chunk_index, bm25(knowledge_fts) "
+                    "FROM knowledge_fts WHERE knowledge_fts MATCH ? "
+                    "ORDER BY bm25(knowledge_fts)",
                     (match_expr,),
                 ).fetchall()
-                lexical_ranked = [(str(r[0]), int(r[1])) for r in rows]
+                for row in rows:
+                    lex_key = (str(row[0]), int(row[1]))
+                    lexical_ranked.append(lex_key)
+                    lexical_bm25[lex_key] = float(row[2])
 
             # Both limbs empty ⇒ nothing to return.  Covers a store with no
             # approved chunks AND a disabled vector limb whose lexical query
@@ -2428,11 +2744,23 @@ class EncryptedKnowledgeBank:
                     fused[key] = fused.get(key, 0.0) + 1.0 / (RRF_K + rank + 1)
 
             top = sorted(fused.items(), key=lambda kv: kv[1], reverse=True)[:k]
+            # Rank lookup over the POOL, not the corpus.
+            lexical_rank_of = {key: i for i, key in enumerate(lexical_ranked)}
             hits: list[KnowledgeHit] = []
             for (doc_uuid, chunk_index), score in top:
-                text = self._chunk_texts.get((doc_uuid, chunk_index))
+                key = (doc_uuid, chunk_index)
+                text = self._chunk_texts.get(key)
                 if text is None:
                     continue  # quarantined at cache build — never scored from disk
+                # The calibrated number the fused score cannot carry (#1617).
+                # Computed per RETURNED hit — k dot products, not a corpus-wide
+                # map — so a chunk the lexical limb surfaced alone still reports
+                # how similar it actually is.
+                vector_score: float | None = None
+                if q_vec is not None:
+                    cached_vec = self._chunk_vecs.get(key)
+                    if cached_vec is not None:
+                        vector_score = float(cached_vec @ q_vec)
                 hits.append(
                     KnowledgeHit(
                         doc_uuid=doc_uuid,
@@ -2441,6 +2769,9 @@ class EncryptedKnowledgeBank:
                         source_type=self._doc_source_types.get(doc_uuid, ""),
                         text=text,
                         score=float(score),
+                        vector_score=vector_score,
+                        lexical_score=lexical_bm25.get(key),
+                        lexical_rank=lexical_rank_of.get(key),
                     )
                 )
             return hits
@@ -2525,4 +2856,76 @@ class EncryptedKnowledgeBank:
                 "while building the knowledge retrieval caches -- check key "
                 "rotation / dev->prod key transition",
                 quarantined,
+            )
+        self._warn_if_cache_unsound()
+
+    def _warn_if_cache_unsound(self, checked: list[Any] | None = None) -> None:
+        """Fail LOUDLY on the two things that would silently corrupt a score.
+
+        Warnings, not refusals: this cache holds the operator's own approved
+        knowledge, and refusing to load it is a capability decision that does
+        not belong to this module (#1617).  Silence is what is being removed.
+
+        Args:
+            checked: The vectors to examine for the L2-normalisation contract.
+                ``approve()`` passes the rows it JUST wrote.  Passing ``None``
+                samples the cache instead, which is correct only at load time
+                when every row is equally new.  **Sampling the cache after the
+                fact cannot see a late arrival** — dict order is insertion
+                order, so a fixed sample is frozen on the oldest rows forever.
+                An earlier revision sampled unconditionally and was therefore
+                blind to every vector after the 64th; independent review
+                reproduced it. The caller now supplies what it wants checked.
+        """
+        import numpy as np
+
+        count = len(self._chunk_vecs)
+        if count > CACHE_SIZE_WARN_CHUNKS and not self._cache_size_warned:
+            # Once per instance. A control that re-fires on every approve
+            # becomes noise people filter, which is how a loud warning turns
+            # quiet without anyone deciding to silence it.
+            self._cache_size_warned = True
+            logger.warning(
+                "KNOWLEDGE_CACHE_SIZE_EXCEEDED event=KNOWLEDGE_CACHE_SIZE_EXCEEDED "
+                "chunks=%d threshold=%d -- every approved chunk's text AND "
+                "embedding is decrypted into RAM at construction, and each query "
+                "ranks the whole store. Measured cost at this size is in "
+                "PERFORMANCE_LOG.md (2026-09-21); retrieval runs on EVERY turn, "
+                "so it is paid per message. This bank is an operator-curated "
+                "store, not a corpus tier; a bulk reference corpus belongs in "
+                "its own on-disk tier (#1616). Logged once per process.",
+                count,
+                CACHE_SIZE_WARN_CHUNKS,
+            )
+
+        # vector_score is documented as cosine, which holds only while the
+        # embed_fn contract (L2-normalised) does.
+        if checked is None:
+            if not self._chunk_vecs:
+                return
+            checked = [
+                v for _, v in zip(range(_NORM_CHECK_SAMPLE), self._chunk_vecs.values())
+            ]
+        if len(checked) == 0:
+            return
+        norms = np.linalg.norm(np.vstack(checked), axis=1)
+        # NOT `worst > tol`: a NaN norm makes every comparison False, so a NaN
+        # embedding would pass the check that exists to catch it, and then make
+        # every vector_score NaN — silently rejecting everything under any
+        # later floor. Non-finite is unsound by definition, so test for it.
+        nonfinite = int(np.count_nonzero(~np.isfinite(norms)))
+        worst = float(np.max(np.abs(norms - 1.0))) if nonfinite == 0 else float("nan")
+        if nonfinite or worst > _NORM_TOLERANCE:
+            logger.warning(
+                "KNOWLEDGE_EMBEDDING_NOT_NORMALISED "
+                "event=KNOWLEDGE_EMBEDDING_NOT_NORMALISED checked=%d "
+                "nonfinite=%d max_deviation=%s tolerance=%.4f -- the embed_fn "
+                "contract is L2-normalised vectors; KnowledgeHit.vector_score "
+                "is documented as cosine similarity and is NOT cosine while "
+                "this holds. Treat vector_score as an uncalibrated dot product "
+                "until fixed.",
+                len(checked),
+                nonfinite,
+                f"{worst:.4f}" if nonfinite == 0 else "non-finite",
+                _NORM_TOLERANCE,
             )

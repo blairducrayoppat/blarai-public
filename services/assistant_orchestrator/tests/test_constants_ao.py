@@ -30,13 +30,28 @@ class TestAOConstantsWiring:
     def test_output_token_cap_value_locked(self) -> None:
         assert ao_constants.OUTPUT_TOKEN_CAP == 4_096
 
-    def test_tool_call_depth_cap_matches_shared(self) -> None:
-        assert (
-            ao_constants.TOOL_CALL_DEPTH_CAP == shared_constants.MAX_TOOL_CALL_DEPTH
+    def test_the_tool_call_depth_ALIAS_is_gone(self) -> None:
+        """#1596: `TOOL_CALL_DEPTH_CAP` aliased a constant nothing enforced.
+
+        It existed for exactly one consumer — `CircuitBreaker`, imported by
+        nothing but its own test — so the alias outlived its only reader. The
+        tool loop reads `shared.constants.MAX_TOOL_CALL_DEPTH` directly now, and
+        an alias re-introduced here would be a second name for the live bound.
+        """
+        assert not hasattr(ao_constants, "TOOL_CALL_DEPTH_CAP"), (
+            "TOOL_CALL_DEPTH_CAP is back. The tool-call bound must have exactly "
+            "one name, or the two can disagree — which is what #1596 fixed, "
+            "where the registered constant said 5 and the loop enforced 3"
         )
 
-    def test_tool_call_depth_cap_value_locked(self) -> None:
-        assert ao_constants.TOOL_CALL_DEPTH_CAP == 5
+    def test_the_tool_call_depth_value_is_what_the_LOOP_enforces(self) -> None:
+        """The value is 3 because that is what has always run.
+
+        It said 5 for months, in the constant a reader would find, while a
+        function-local literal seven thousand lines into entrypoint.py enforced
+        3. Claim-register row 24 inherited the 5.
+        """
+        assert shared_constants.MAX_TOOL_CALL_DEPTH == 3
 
     def test_security_posture_fail_closed_matches_shared(self) -> None:
         assert (

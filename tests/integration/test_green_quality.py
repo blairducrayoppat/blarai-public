@@ -1480,3 +1480,387 @@ def test_audit_failed_defaults_to_zero_so_existing_callers_are_unchanged() -> No
     pass it gets today's behaviour exactly, and the KPI stays quiet."""
     block = _gq.corpus_block([], _gq.MODE_DET_ONLY)
     assert block["audit_failed"] == 0 and block["audit_failed_jobs"] == []
+
+
+# ---------------------------------------------------------------------------
+# RECONCILIATION — the night's rollup checked by something that is not the rollup
+# ---------------------------------------------------------------------------
+# DoD capability 13. `corpus_block` is the shared aggregator behind several registered
+# instruments (the three craft lints, the archetype regression probe), so locking it once holds
+# more than one of them. #1270 already fixed the loss it had — a card that RAISED vanished from
+# `results` and was counted nowhere, so `audited` described a smaller night as a complete one.
+#
+# These lock the arithmetic that fix depends on, which nothing asserted:
+#   * the bands PARTITION the audited population (they sum to `audited`);
+#   * `audited` is the POPULATION, not a sum of the bands — the #1231 property, which is what
+#     stops coverage looking clean while classification degrades;
+#   * the night's true size stays recoverable as `audited + audit_failed`.
+
+
+def _clean_result():
+    clean_seed = l1.SeedDivergenceFinding(False, "diverged", status=l1.SEED_STATUS_DIVERGED)
+    return _audit_result(_l1(seed=clean_seed))
+
+
+def test_the_bands_partition_the_audited_population() -> None:
+    from dataclasses import replace
+
+    base = _clean_result()
+    results = [replace(base, band=b) for b in (BAND_A, BAND_B, BAND_C)]
+    block = _gq.corpus_block(results, _gq.MODE_DET_ONLY)
+
+    assert block["audited"] == 3
+    assert sum(block["bands"].values()) == block["audited"], (
+        f"bands do not partition the audited population: "
+        f"{block['bands']} sums to {sum(block['bands'].values())}, audited={block['audited']}"
+    )
+
+
+def test_audited_is_the_POPULATION_not_a_sum_of_the_bands() -> None:
+    """#1231's exact shape, and the reason this rollup can be trusted.
+
+    A card carrying a band no bucket recognises must STILL count in `audited`. If `audited`
+    were derived from the band counters — as `link_lint`'s `references` is (#1389) — that card
+    would leave numerator and denominator together, the arithmetic would stay perfectly
+    self-consistent, and a night that classified less would look identical to a smaller one.
+    """
+    from dataclasses import replace
+
+    base = _clean_result()
+    rogue = replace(base, band="Z-INVENTED-LATER")
+    block = _gq.corpus_block([base, rogue], _gq.MODE_DET_ONLY)
+
+    assert block["audited"] == 2, "an unclassifiable card must not vanish from the population"
+    assert sum(block["bands"].values()) == 1, "sanity: the rogue band is in no bucket"
+    # And the divergence must be VISIBLE — audited does not shrink to match the buckets.
+    assert sum(block["bands"].values()) != block["audited"]
+
+
+def test_the_partition_lock_is_not_vacuous() -> None:
+    """The toggle. A partition assertion that cannot fail proves nothing (principle 12)."""
+    from dataclasses import replace
+
+    base = _clean_result()
+    good = _gq.corpus_block([replace(base, band=BAND_A)], _gq.MODE_DET_ONLY)
+    assert sum(good["bands"].values()) == good["audited"]
+
+    bad = _gq.corpus_block([replace(base, band="NOT-A-BAND")], _gq.MODE_DET_ONLY)
+    assert sum(bad["bands"].values()) != bad["audited"]
+
+
+def test_the_nights_true_size_survives_a_card_that_raised() -> None:
+    """#1270's property stated as arithmetic: nothing observed leaves every counter.
+
+    A card whose audit RAISED never reaches `results`, so `audited` alone under-describes the
+    night. The pair must reconstitute it — otherwise the rollup reports a partial night as a
+    whole one, which is this row's entire subject.
+    """
+    block = _gq.corpus_block([_clean_result()], _gq.MODE_DET_ONLY, audit_failed=("B4", "B7"))
+    assert block["audited"] == 1
+    assert block["audit_failed"] == 2
+    assert block["audited"] + block["audit_failed"] == 3
+    assert list(block["audit_failed_jobs"]) == ["B4", "B7"], "the lost cards are NAMED, not counted"
+
+
+# ---------------------------------------------------------------------------
+# #1397 — the craft walks are BOUNDED, and the bound was neither counted nor
+# disclosed. `lint_dead_scaffold` had been computing its shortfall since it was
+# built and writing it into `detail`; `Layer1Result.findings()` printed a craft
+# detail only when `measured and flagged` or `not measured`, so a bounded-clean
+# lint was neither and the sentence reached nobody.
+# ---------------------------------------------------------------------------
+
+
+def _many_py(root: Path, n: int, *, marker: bool = False) -> Path:
+    (root / "app").mkdir(parents=True, exist_ok=True)
+    for i in range(n):
+        (root / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+    if marker:
+        # Must be a string from `_SCAFFOLD_MARKERS`, not a plausible-looking invention.
+        (root / "app" / "zzz_scaffold.py").write_text("X = 'PLACEHOLDER'\n", encoding="utf-8")
+    return root
+
+
+def test_a_bounded_scaffold_walk_says_its_coverage_was_partial(tmp_path):
+    """A tree past the 400-file bound reported an unqualified "no seed scaffold placeholder
+    found" having examined an arbitrary prefix of it."""
+    repo = _many_py(tmp_path / "big", 450)
+    finding = l1.lint_dead_scaffold(repo)
+
+    assert finding.measured, "the lint ran"
+    assert finding.flagged is False, "precondition: nothing found in the part it read"
+    assert finding.coverage_partial, "a bounded walk claimed complete coverage"
+    assert "bound" in finding.detail, f"the reader must be told which bound was hit: {finding.detail!r}"
+
+
+def test_a_small_tree_is_walked_WHOLE_and_says_so(tmp_path):
+    """The toggle. A `coverage_partial` that is always true carries no information."""
+    repo = _many_py(tmp_path / "small", 5)
+    finding = l1.lint_dead_scaffold(repo)
+
+    assert finding.measured and finding.flagged is False
+    assert not finding.coverage_partial, "a complete walk claimed partial coverage"
+    assert "partial" not in finding.detail
+
+
+def test_vendored_trees_do_not_consume_the_bound(tmp_path):
+    """The skip-list. Before it, a delivery shipping a `.venv` could spend all 400 slots
+    inside site-packages and never reach the coder's own code — reporting a clean result
+    about a tree it had not looked at.
+    """
+    repo = tmp_path / "vendored"
+    (repo / ".venv" / "lib" / "site-packages" / "dep").mkdir(parents=True)
+    for i in range(500):
+        (repo / ".venv" / "lib" / "site-packages" / "dep" / f"v{i}.py").write_text(
+            "VALUE = 1\n", encoding="utf-8")
+    (repo / "app").mkdir(parents=True)
+    # The real marker, read off `_SCAFFOLD_MARKERS`. My first draft invented one
+    # ("TODO: replace this scaffold") and the test failed for that reason rather than the
+    # one it names — a fixture asserting against a string the lint has never looked for.
+    (repo / "app" / "real.py").write_text("X = 'PLACEHOLDER'\n", encoding="utf-8")
+
+    finding = l1.lint_dead_scaffold(repo)
+    assert finding.flagged is True, (
+        "the coder's own scaffold marker was hidden behind a vendored tree — the walk never "
+        "reached it"
+    )
+    assert not finding.coverage_partial, "the real tree is tiny once the vendored one is skipped"
+
+
+def test_a_truncated_entry_point_walk_does_NOT_accuse(tmp_path):
+    """`no_entry_point.flagged` is a band-B trigger, so a false flag costs the operator a
+    worse verdict on a build that may be fine.
+
+    The module already refuses to accuse when a packaging manifest could not be read — "the
+    flag would be an accusation the evidence does not carry". A walk that stopped at the
+    bound is the same shape: the entry point may simply be past it.
+    """
+    repo = _many_py(tmp_path / "huge", 850)   # no demo.py / __main__.py / bin / console-script
+    finding = l1.lint_no_entry_point(repo, "python-lib")
+
+    assert finding.measured
+    assert finding.flagged is False, (
+        "a truncated walk produced an ACCUSATION the evidence does not carry, and that "
+        "accusation bands B"
+    )
+    assert finding.coverage_partial
+    assert "bound" in finding.detail
+
+
+def test_the_partial_coverage_sentence_REACHES_the_shipping_surface(tmp_path):
+    """The whole point of #1397's second half, and the reason a lock on `detail` alone would
+    have been worthless: the sentence existed and `findings()` dropped it.
+    """
+    repo = _many_py(tmp_path / "big2", 450)
+    result = l1.Layer1Result(
+        regression=l1.RegressionFinding(False, False, "no behaviour change", measured=True),
+        dead_scaffold=l1.lint_dead_scaffold(repo),
+        stale_readme=l1.CraftFinding(False, "", measured=True),
+        no_entry_point=l1.CraftFinding(False, "", measured=True),
+        ruff_findings=None, surface="python-lib")
+
+    lines = " ".join(result.findings())
+    assert "PARTIAL" in lines, (
+        f"the shipped report dropped the partial-coverage caveat the object was carrying: {lines!r}"
+    )
+    assert "lower bound" in lines
+
+
+def test_a_clean_complete_lint_adds_NOTHING_to_the_report(tmp_path):
+    """The toggle for the shipping surface. Without it, a `findings()` hard-wired to always
+    append would pass the test above and fill every clean report with noise.
+    """
+    repo = _many_py(tmp_path / "small2", 5)
+    result = l1.Layer1Result(
+        regression=l1.RegressionFinding(False, False, "no behaviour change", measured=True),
+        dead_scaffold=l1.lint_dead_scaffold(repo),
+        stale_readme=l1.CraftFinding(False, "", measured=True),
+        no_entry_point=l1.CraftFinding(False, "", measured=True),
+        ruff_findings=None, surface="python-lib")
+
+    lines = " ".join(result.findings())
+    assert "PARTIAL" not in lines, f"a complete lint claimed partial coverage: {lines!r}"
+
+
+# ---------------------------------------------------------------------------
+# #1231 / DoD row 13 — seed divergence's reconciliation lock.
+#
+# Row 13's audit verdicted this grader SOUND but it carried no external check of
+# its own arithmetic, which is the row's first clause verbatim: "a grader's own
+# arithmetic is verified by something that is not that grader". Its three
+# buckets — identical / diverged / unknown — are drawn over SEED_FILES, and the
+# docstring already promises the third is "always NAMED, never folded silently
+# into clean". Nothing asserted that promise from outside.
+# ---------------------------------------------------------------------------
+
+
+def _seed_and_delivery(tmp_path: Path, *, changed: set[str] | None = None):
+    """A real seed tree and a delivery copied from it, honouring each spec's COMPARE MODE.
+
+    Written against `SeedFileSpec` as it actually is — `rel_path`, and a `mode` that is either
+    whole-file or toml-fields. My first draft guessed `spec.path` and fell back to `str(spec)`,
+    which produced a filename out of the dataclass repr and failed with an OSError that said
+    nothing about the real mistake. Read the surface, then write the fixture.
+    """
+    changed = changed or set()
+    seed = tmp_path / "seed"
+    repo = tmp_path / "delivery"
+    for spec in l1.SEED_FILES:
+        rel = spec.rel_path
+        rewritten = rel in changed
+        if spec.mode == l1.SEED_COMPARE_TOML_FIELDS:
+            desc = "a real description of the pottery site" if rewritten else "PLACEHOLDER"
+            seed_body = '[project]\ndescription = "PLACEHOLDER"\n'
+            repo_body = f'[project]\ndescription = "{desc}"\n'
+        else:
+            seed_body = f"SEED CONTENT for {rel}\n"
+            repo_body = (f"the coder rewrote {rel}\n" if rewritten else seed_body)
+        for root, body in ((seed, seed_body), (repo, repo_body)):
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(body, encoding="utf-8")
+    return seed, repo
+
+
+def test_the_seed_buckets_account_for_every_file_examined(tmp_path):
+    """The #1231 property stated for this instrument: every seed file the check looked at
+    lands in EXACTLY ONE of identical / diverged / unknown.
+
+    A file in none of them is a comparison that happened and was reported nowhere — the
+    numerator and the denominator lost together, which is the shape row 13 exists to forbid.
+    """
+    seed, repo = _seed_and_delivery(tmp_path)
+    finding = l1.lint_seed_divergence(repo, seed_root=seed)
+
+    buckets = list(finding.identical) + list(finding.diverged) + list(finding.unknown)
+    assert buckets, "precondition: the check examined something"
+    assert len(buckets) == len(set(buckets)), (
+        f"a file appears in more than one bucket, so the three do not partition: {buckets}"
+    )
+    assert finding.measured, "a comparison succeeded, so this is a measured result"
+
+
+def test_a_file_that_could_not_be_compared_is_NAMED_not_dropped(tmp_path):
+    """The docstring's own promise, asserted from outside it.
+
+    An unreadable seed file must appear in `unknown`. Folding it into silence would let the
+    check report a clean divergence result about a file it never read — the fail-open this
+    instrument's tri-state exists to prevent.
+    """
+    seed, repo = _seed_and_delivery(tmp_path)
+    real_read = Path.read_text
+    victim = sorted(p.name for p in seed.rglob("*") if p.is_file())[0]
+
+    def _blind(self, *a, **k):
+        if self.name == victim and "seed" in str(self):
+            raise OSError("permission denied")
+        return real_read(self, *a, **k)
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(Path, "read_text", _blind)
+        finding = l1.lint_seed_divergence(repo, seed_root=seed)
+    finally:
+        monkeypatch.undo()
+
+    named = list(finding.identical) + list(finding.diverged) + list(finding.unknown)
+    assert any(victim in n for n in named), (
+        f"a file that could not be compared vanished from every bucket: {named}"
+    )
+
+
+def test_the_partition_lock_is_not_vacuous(tmp_path):
+    """The toggle. If the buckets were always empty the assertion above would pass on a
+    grader that examined nothing, which is the vacuous shape row 13 is about.
+    """
+    seed, repo = _seed_and_delivery(tmp_path,
+                                    changed={s.rel_path for s in l1.SEED_FILES})
+    finding = l1.lint_seed_divergence(repo, seed_root=seed)
+    total = len(finding.identical) + len(finding.diverged) + len(finding.unknown)
+    assert total > 0, "the check reported no files at all — the partition proves nothing"
+    assert finding.diverged, "a rewritten file must land in `diverged`, or the buckets are inert"
+
+
+# ---------------------------------------------------------------------------
+# #1385 item 1 — the craft seed sweep must not be Python-only
+# ---------------------------------------------------------------------------
+
+
+def _seed_copy(tmp_path, seed_name: str, *, rewrite_readme: bool):
+    """A delivery that is a COPY of one seed tree, optionally with a written README."""
+    src = Path("C:/Users/mrbla/agentic-setup/build-infra") / seed_name / "reference"
+    if not src.is_dir():
+        pytest.skip(f"seed tree {seed_name} not present on this box")
+    repo = tmp_path / f"delivery-{seed_name}"
+    repo.mkdir()
+    readme = src / "README.md"
+    if not readme.is_file():
+        pytest.skip(f"seed {seed_name} has no README.md to copy")
+    (repo / "README.md").write_text(
+        "# Pottery studio\n\nA site for a small pottery studio.\n" if rewrite_readme
+        else readme.read_text(encoding="utf-8", errors="replace"),
+        encoding="utf-8",
+    )
+    return repo
+
+
+def test_a_delivery_shipping_the_WEB_seed_readme_is_flagged(tmp_path):
+    """#1385 item 1, measured on the 2026-08-14 B9 run before it was fixed.
+
+    `build-infra/` holds a reference tree per surface, and this lint compared every delivery
+    against `python` alone. The web seed README is 1,461 normalised characters; the Python
+    one is 68. So a web delivery shipping its seed README untouched differed from the text it
+    was compared against and was reported CLEAN — the exact false-clean this lint exists to
+    retire, on the operator's stated priority surface.
+
+    Last night's delivery normalised character-for-character identical to
+    `web/reference/README.md`, still titled "Web project skeleton (BlarAI dispatch fleet)",
+    mentioning the pottery studio zero times. Nothing flagged it."""
+    repo = _seed_copy(tmp_path, "web", rewrite_readme=False)
+    finding = l1.lint_seed_divergence(repo)
+    assert finding.flagged, (
+        f"a delivery shipping the untouched WEB seed README was not flagged: {finding.detail}"
+    )
+    assert "README.md" in finding.detail
+    assert Path(finding.seed_root).parent.name == "web", (
+        f"the finding should name the seed it actually matched, got {finding.seed_root}"
+    )
+
+
+def test_the_PYTHON_ONLY_root_still_misses_it_which_is_why_the_sweep_exists(tmp_path):
+    """The toggle, and the proof this is not a vacuous test. Pinning the comparison back to the
+    single Python tree reproduces the false clean exactly."""
+    repo = _seed_copy(tmp_path, "web", rewrite_readme=False)
+    finding = l1.lint_seed_divergence(repo, seed_root=l1.default_seed_root())
+    assert not finding.flagged, (
+        "the python-only comparison should MISS a web seed README — if this now catches it, "
+        "the sweep is not what fixed the defect and the claim above is wrong"
+    )
+
+
+def test_a_delivery_whose_readme_was_actually_written_is_NOT_flagged(tmp_path):
+    """Precision. Sweeping nine seed trees must not turn every delivery into a finding — a
+    README the coder wrote byte-matches no reference tree."""
+    repo = _seed_copy(tmp_path, "web", rewrite_readme=True)
+    finding = l1.lint_seed_divergence(repo)
+    assert not finding.flagged, (
+        f"a written README was flagged as unchanged from a seed: {finding.detail}"
+    )
+
+
+def test_the_python_seed_is_still_caught_by_the_sweep(tmp_path):
+    """The behaviour that already worked must keep working — widening the search must not
+    trade one surface's coverage for another's."""
+    repo = _seed_copy(tmp_path, "python", rewrite_readme=False)
+    finding = l1.lint_seed_divergence(repo)
+    assert finding.flagged, f"the python seed README stopped being caught: {finding.detail}"
+
+
+def test_all_seed_roots_finds_every_surface_not_just_python():
+    """The sweep's input. If this ever returns one tree again, the fix has silently reverted."""
+    roots = l1.all_seed_roots()
+    if not roots:
+        pytest.skip("build-infra/ not present on this box")
+    names = {r.parent.name for r in roots}
+    assert "python" in names and "web" in names, f"expected python AND web seeds, got {names}"
+    assert len(roots) > 1, "the sweep found a single tree — that is the defect, restored"
+    assert all(r.name == "reference" for r in roots)

@@ -151,8 +151,7 @@ deterministically (the coding fleet's dispatch gate is by repository name). It
 uses a hybrid model:
 
 1. Each action is reduced to a **Canonical Action Representation (CAR)** and
-   evaluated by a deterministic checker (allowlist + schema
-   constraints).
+   evaluated by a deterministic checker (allowlist + schema constraints).
 2. Only actions the deterministic layer admits proceed; a probabilistic
    classifier backstops semantic intent.
 

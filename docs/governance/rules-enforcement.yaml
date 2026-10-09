@@ -1,0 +1,11 @@
+# CURATED enforcement entries for things that cannot carry an `enforces-rule:` marker (the
+# user-level hook outside the repo, reviewer agents). One `- {json}` entry per line:
+#   {"rule": <rule id>, "kind": test|hook|verifier|reviewer|gate, "ref": <repo path | external:...>, "note": <optional>}
+# Validated by scripts/extract_rules_corpus.py: rule id must exist in CLAUDE.md, a repo ref must
+# exist on disk. Everything else in the enforcement column comes from markers in the enforcing file.
+- {"rule": "critical_rules.git-has-no-human-safety-net", "kind": "hook", "ref": "external:~/.claude/hooks/block_destructive_git.py", "note": "destructive verbs only; fails open on parse errors"}
+- {"rule": "git_discipline.absolute_rules.no-destructive-git-operations-ever", "kind": "hook", "ref": "external:~/.claude/hooks/block_destructive_git.py", "note": "fails open on parse errors"}
+- {"rule": "security_by_design.principles.every-control-is-tested-off", "kind": "reviewer", "ref": ".claude/agents/adversarial-reviewer.md", "note": "attack #3: locks that certify more than they test"}
+- {"rule": "security_by_design.application.at-review-time", "kind": "reviewer", "ref": ".claude/agents/adversarial-reviewer.md"}
+- {"rule": "testing.seams.author-verifier", "kind": "reviewer", "ref": ".claude/agents/adversarial-reviewer.md", "note": "independence is the agent's contract"}
+- {"rule": "git_discipline.merge_guards.author-verifier", "kind": "reviewer", "ref": ".claude/agents/adversarial-reviewer.md", "note": "independence is the agent's contract"}

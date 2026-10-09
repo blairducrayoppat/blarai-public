@@ -1,0 +1,119 @@
+{
+  "benchmark": "coder_sustained_throughput",
+  "label": "cs4-offload30-CONFIRM",
+  "timestamp": "2026-08-31T16:13:34",
+  "ao_resident": false,
+  "runs": [
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 64.51,
+      "decode_tps": 12.4,
+      "output_chars": 2622,
+      "produced_markup": true,
+      "index": 0
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 65.61,
+      "decode_tps": 12.19,
+      "output_chars": 2579,
+      "produced_markup": true,
+      "index": 1
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 62.91,
+      "decode_tps": 12.72,
+      "output_chars": 2585,
+      "produced_markup": true,
+      "index": 2
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 63.62,
+      "decode_tps": 12.57,
+      "output_chars": 2652,
+      "produced_markup": true,
+      "index": 3
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 71.0,
+      "decode_tps": 11.27,
+      "output_chars": 2583,
+      "produced_markup": true,
+      "index": 4
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 82.02,
+      "decode_tps": 9.75,
+      "output_chars": 2622,
+      "produced_markup": true,
+      "index": 5
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 71.4,
+      "decode_tps": 11.21,
+      "output_chars": 2583,
+      "produced_markup": true,
+      "index": 6
+    },
+    {
+      "prompt_tokens": 6761,
+      "completion_tokens": 800,
+      "wall_s": 69.79,
+      "decode_tps": 11.46,
+      "output_chars": 2589,
+      "produced_markup": true,
+      "index": 7
+    }
+  ],
+  "errors": 0,
+  "throughput_tps": {
+    "median": 11.82,
+    "mean": 11.7,
+    "min": 9.75,
+    "max": 12.72
+  },
+  "drift": {
+    "first_tps": 12.4,
+    "last_tps": 11.46,
+    "delta_pct": -7.6,
+    "spread_pct": 25.1
+  },
+  "resources_over_the_whole_window": {
+    "ram_avail_gib": {
+      "min": 7.51,
+      "mean": 7.98,
+      "max": 13.2,
+      "n": 52
+    },
+    "ram_in_use_gib": {
+      "min": 18.12,
+      "mean": 23.34,
+      "max": 23.82,
+      "n": 52
+    },
+    "gpu_shared_gib": {
+      "min": 11.96,
+      "mean": 15.73,
+      "max": 15.93,
+      "n": 52
+    },
+    "note": "gpu_shared is carved from system RAM on this iGPU -- do NOT add it to ram_in_use"
+  },
+  "not_measured": [
+    "concurrency -- single stream only",
+    "tool-call round trips, which the real coder interleaves with generation, so real per-task wall time exceeds the sum of these decodes",
+    "thermal soak beyond the duration of this run"
+  ]
+}

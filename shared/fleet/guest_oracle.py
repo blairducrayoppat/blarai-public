@@ -470,8 +470,13 @@ _CLEAN_GRADE_INI_CONTENT = (
 
 def _clean_pytest_args(ini_path: str) -> list[str]:
     """The clean-env pytest flags (guest redeclaration of grade_env.clean_pytest_args;
-    host-locked equal)."""
-    return ["--noconftest", "-c", str(ini_path), "-o", "addopts=", "--import-mode=importlib"]
+    host-locked equal).
+
+    ``--color=no`` is a correctness flag here too (#1200): the guest's verdict is read out
+    of this output as text, so an escape sequence between the test name and ``PASSED`` blinds
+    the same matchers it blinds on the host. The host docstring carries the measurement."""
+    return ["--noconftest", "-c", str(ini_path), "-o", "addopts=",
+            "--import-mode=importlib", "--color=no"]
 
 
 def _clean_grade_env_overlay(root: str) -> dict:

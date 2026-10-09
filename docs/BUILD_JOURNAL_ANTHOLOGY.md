@@ -2949,6 +2949,26 @@ Vikunja #768 carries the verdict; Stage 2 not triggered. Lesson 151 tallied at f
 a first-principles estimate is itself a measurement of the WRONG scenario (mature kernels)
 until the immature-kernel alternative is named.)*
 
+> **CORRECTED 2026-09-22, and the correction is why this entry stays on the shelf.** The last
+> paragraph's triumphant finish — that the hardest blocker was not the speed but a chat-template
+> defect, "now reproduced on the 27B on release wheels" — is **wrong**, and it was wrong in a way
+> that cost two months. The ten-minute probe did not find a defect. **It caused one.** The
+> export's chat template has no neutral setting: it emits a closed empty `<think></think>` pair
+> only when `enable_thinking` is defined and false, and a bare *opening* tag in every other case.
+> The probe never set it, and passed `enable_thinking=False` as a generation argument where it is
+> a template variable and is silently discarded. So all three conditions ran with a reasoning
+> block already opened for them, and the probe scored the model for continuing it. The detail
+> flagged above as *aggravating* — that the reasoning came out untagged — was the tell: output
+> carrying a closing tag and no opening one is exactly what a prompt-side opener produces.
+>
+> The same flaw voided the 35B's 22/40 answer-quality verdict nine days later and blocked the
+> brain swap until 2026-09-22. A one-minute tokenizer-only render would have caught it on the
+> day. The entry is preserved unedited because the failure is the instructive part: a probe run
+> in the last hour of a long day, answering exactly the question the operator asked, producing a
+> clean and quotable result, and never once asked what it had sent. See lesson 369, lesson 222's
+> eleventh recurrence, and the 2026-09-22 entry "We told the model to think, then spent two
+> months calling it broken for thinking".*
+
 
 ### 2026-07-08 — The clean room takes its first exam
 

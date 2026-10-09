@@ -1,0 +1,97 @@
+{
+  "measurement": "audit_chain_verify_cost",
+  "ticket": "#1543",
+  "date_local": "2026-09-17T22:50:00-04:00",
+  "purpose": "Choose fast-versus-full audit-chain verification at boot from a measurement rather than a guess, per the #1543 description. Also the ticket's stop-condition check: do the real audit chains on this machine verify today?",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) iGPU",
+    "gpu_driver": "32.0.101.8831",
+    "ram_total_gb": 31.323,
+    "os": "Windows 11 Pro 10.0.26200",
+    "tpm": "Windows CNG TPM 2.0 provider, key BlarAI-Audit-Signing-Key-v1 (ECDSA P-256, non-exportable)"
+  },
+  "software": {
+    "python": "3.11.9 (.venv) -- MEASURED via .venv/Scripts/python.exe --version. An earlier version of this record said 3.12, copied from CLAUDE.md rather than measured; documentation is not evidence applies to a performance record about its own conditions.",
+    "openvino": "2026.2.1-21919-ede283a88e3-releases/2026/2",
+    "note": "OpenVINO is irrelevant to this measurement; recorded for run provenance only. No model was loaded."
+  },
+  "conditions": {
+    "ram_in_use_gb_at_start": 21.61,
+    "cpu_load_percent_at_start": 9,
+    "battery_campaign": "all BlarAI-Battery-* scheduled tasks Disabled; nothing contending",
+    "assistant_running": false,
+    "concurrent_note": "Interactive Claude session with MCP servers resident. No dispatch, no gate run, no battery."
+  },
+  "subject": {
+    "chain": "Assistant Orchestrator ingest audit chain",
+    "live_path": "%LOCALAPPDATA%/BlarAI/audit/ingest_audit.jsonl",
+    "measured_on": "a byte-identical COPY in the session scratchpad; the live file was never opened for write",
+    "records": 33,
+    "seq_range": "0..32",
+    "first_record_utc": "2026-06-11T07:07:00.715180+00:00",
+    "last_record_utc": "2026-07-13T00:52:44.470984+00:00",
+    "signer_id": "ECDSA-P256-TPM:BlarAI-Audit-Signing-Key-v1",
+    "sealed_segments": 0,
+    "verbs": [
+      "INGEST_APPROVE",
+      "INGEST_REJECT",
+      "INGEST_SUBMIT"
+    ],
+    "decisions": [
+      "ALLOW",
+      "DENY",
+      "ESCALATE"
+    ]
+  },
+  "methodology": {
+    "warmup": "one verify run executed and discarded (the first TPM call pays provider-open cost)",
+    "repetitions_per_arm": 10,
+    "isolated_signature_calls": 100,
+    "timer": "time.perf_counter",
+    "statistic_reported": "min / median / max / stdev, plus spread as a percentage of the median",
+    "why_variance_first": "The single-shot run that preceded this reported FULL as FASTER than FAST (298 ms vs 334 ms), which cannot be true as an ordering. Variance was therefore measured before any comparison was drawn."
+  },
+  "results": {
+    "stop_condition": "DID NOT FIRE — the real chain verifies today, in both modes.",
+    "fast_verify_ms": {
+      "min": 251.31,
+      "median": 286.68,
+      "max": 443.16,
+      "stdev": 70.66,
+      "spread_pct_of_median": 66.9,
+      "per_record_ms": 8.687
+    },
+    "full_verify_ms": {
+      "min": 247.58,
+      "median": 298.41,
+      "max": 367.16,
+      "stdev": 37.43,
+      "spread_pct_of_median": 40.1,
+      "per_record_ms": 9.043
+    },
+    "isolated_tpm_verify_ms": {
+      "min": 6.78,
+      "median": 12.63,
+      "max": 63.3,
+      "stdev": 10.23,
+      "spread_pct_of_median": 447.3,
+      "calls": 100
+    }
+  },
+  "findings": [
+    "The real chain VERIFIES today, fast and full. The #1543 stop condition did not fire.",
+    "FAST and FULL are INDISTINGUISHABLE on this chain, and the reason is structural rather than statistical: there are zero sealed segments, so `full=True` has nothing extra to walk. The 4% difference between their medians sits inside a 40-67% spread and is not a finding.",
+    "The cost is dominated by TPM signature verification, not by hashing. The isolated per-signature figure has a 447% spread; its MIN (6.78 ms) is the more trustworthy floor, because 33 records x 6.78 ms = 224 ms sits just under the measured FAST min of 251 ms, whereas 33 x the 12.63 ms median = 417 ms exceeds the measured median. Per-signature cost is therefore best stated as a RANGE of roughly 7-13 ms, not as a point estimate.",
+    "EXTRAPOLATION, stated as such: at the DEFAULT_MAX_ACTIVE_RECORDS ceiling of 100,000 records, signature verification alone would cost roughly 11-21 minutes at boot. Verifying a FULL active segment at its ceiling is not viable on this machine. This is a 3000x extrapolation from 33 records and is presented as an upper-bound argument, not as a measurement.",
+    "The real chain holds 33 records after thirteen months of calendar time, so the ceiling is theoretical rather than imminent. The design must nonetheless bound the boot cost, because a control whose cost scales to 21 minutes will eventually be switched off by whoever is waiting for boot."
+  ],
+  "not_measured": [
+    "A real active segment at or near the 100,000-record ceiling. None exists on this machine; the ceiling figure is extrapolated from the per-signature cost.",
+    "Sealed-segment behaviour, anchor-chain verification, and the gunzip path: this chain has zero sealed segments, so `full=True` never exercised them.",
+    "The Policy Agent adjudication chain. Its default path services/policy_agent/data/audit/ is EMPTY on this machine — no adjudication_audit.jsonl has ever been written. Only one real audit chain exists here.",
+    "Dev-mode HmacSha256Signer cost. Only the production TPM path was measured, because the real chain is TPM-signed.",
+    "Cost under contention (a live battery run, a gate run, or a loaded 14B resident). Measured on an idle machine at 9% CPU.",
+    "Whether TPM verify cost varies with payload size. A fixed 256-byte payload was used for the isolated calls."
+  ]
+}

@@ -1,0 +1,32 @@
+#!/bin/sh
+# Git-native pre-commit shim (git for Windows runs hooks through its bundled sh). Installed copy.
+# On main/master: _lib.sh is checked against the install record BEFORE it is sourced (the shim
+# itself is the one file it cannot verify), then every installed file is verified by _lib.sh.
+# Exported shell functions in the caller's environment could replace any builtin or command used below; unset is a
+# special builtin (found before functions in the POSIX mode sh runs in), so it runs first.
+unset -f '[' test echo printf read cd pwd command type git sed tr cat sha256sum true false exec 2>/dev/null
+case "$(git symbolic-ref -q --short HEAD 2>/dev/null)" in
+    main|master)
+        _rec="${0%/*}/../../blarai-install.json"
+        _lh=$(git hash-object --no-filters -- "${0%/*}/_lib.sh" 2>/dev/null)
+        _want=
+        _pat='"githooks/_lib.sh": "'
+        if [ -f "$_rec" ]; then
+            while IFS= read -r _rl || [ -n "$_rl" ]; do
+                case "$_rl" in
+                    *"$_pat"*) _want=${_rl#*"$_pat"}; _want=${_want%%\"*}; break ;;
+                esac
+            done < "$_rec"
+        fi
+        if [ -z "$_want" ] || [ "$_want" != "$_lh" ]; then
+            echo "BLOCKED: the installed _lib.sh differs from the install record or the record is missing; run: python scripts/install_git_hooks.py --check, then --update (the lead)" >&2
+            exit 1
+        fi ;;
+esac
+. "${0%/*}/_lib.sh"
+case "$(git symbolic-ref -q --short HEAD 2>/dev/null)" in
+    main|master) verify_install || exit 1 ;;
+esac
+run_guard git_native_pre_commit.py "$@" || exit 1
+chain_previous "$@"
+exit $?

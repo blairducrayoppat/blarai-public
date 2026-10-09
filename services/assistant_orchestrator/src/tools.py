@@ -233,6 +233,22 @@ SEARCH_KNOWLEDGE_UNAVAILABLE_NOTICE: str = (
     "this system."
 )
 SEARCH_KNOWLEDGE_EMPTY_QUERY_NOTICE: str = "search_knowledge: no query provided."
+
+# #1616 search_reference notices. Same deterministic-notice contract as the
+# knowledge tool: a dormant, absent or erroring corpus yields a fixed system
+# string, never an exception into the loop and never a silent empty result
+# the model would read as "the encyclopedia has nothing on this".
+SEARCH_REFERENCE_UNAVAILABLE_NOTICE: str = (
+    "Reference search is unavailable — the offline reference corpus is not "
+    "enabled on this system."
+)
+SEARCH_REFERENCE_EMPTY_QUERY_NOTICE: str = "search_reference: no query provided."
+SEARCH_REFERENCE_NO_RESULTS_NOTICE: str = (
+    "search_reference: the reference corpus has no passage matching that query."
+)
+SEARCH_REFERENCE_ERROR_NOTICE: str = (
+    "search_reference: the reference corpus could not be read."
+)
 SEARCH_KNOWLEDGE_NO_RESULTS_NOTICE: str = (
     "No matching content found in the knowledge bank for that query."
 )
@@ -257,6 +273,12 @@ RETRIEVAL_NOTICES: frozenset[str] = frozenset({
     WEB_SEARCH_DISABLED_NOTICE,
     WEB_SEARCH_EMPTY_QUERY_NOTICE,
     WEB_SEARCH_ERROR_NOTICE,
+    # #1616. Omitting these made a notice look like retrieved CONTENT, which
+    # put the turn on the grounded path while reporting that nothing was found.
+    SEARCH_REFERENCE_UNAVAILABLE_NOTICE,
+    SEARCH_REFERENCE_EMPTY_QUERY_NOTICE,
+    SEARCH_REFERENCE_NO_RESULTS_NOTICE,
+    SEARCH_REFERENCE_ERROR_NOTICE,
 })
 
 
@@ -286,6 +308,10 @@ def _cap_retrieval_result(result: str) -> str:
 # registry pattern): the host service registers/clears; the tool bodies only
 # read. Registration is an explicit code-reviewed act, never config-driven.
 _SEARCH_KNOWLEDGE_RUNNER: Callable[[str, int], str] | None = None
+#: #1616 reference-corpus runner. None until the AO registers one,
+#: which it does only when the capability is enabled AND its store
+#: verified — so None is the shipped default.
+_SEARCH_REFERENCE_RUNNER: Callable[[str, int], str] | None = None
 _WEB_SEARCH_RUNNER: Callable[[str], str] | None = None
 
 
@@ -308,6 +334,28 @@ def clear_search_knowledge_runner() -> None:
     """Deregister the knowledge-search runner (AO stop(); tests)."""
     global _SEARCH_KNOWLEDGE_RUNNER
     _SEARCH_KNOWLEDGE_RUNNER = None
+
+
+def register_search_reference_runner(runner: Callable[[str, int], str]) -> None:
+    """Register the live reference-corpus runner (AO entrypoint, at start()).
+
+    Contract: ``runner(query, max_results) -> str`` — joined, labelled passage
+    text with its citation ("" when nothing matched). Registration is the
+    STRUCTURAL dormancy switch for this capability: with the config flag false
+    the AO never calls this, so no store path exists to reach. That is
+    stronger than a runtime check on a flag, which is why it is done this way
+    (security principle 4 — structural absence over configuration).
+    """
+    global _SEARCH_REFERENCE_RUNNER
+    if _SEARCH_REFERENCE_RUNNER is not None:
+        logger.info("search_reference runner replaced (re-registration).")
+    _SEARCH_REFERENCE_RUNNER = runner
+
+
+def clear_search_reference_runner() -> None:
+    """Deregister the reference-corpus runner (AO stop(); tests)."""
+    global _SEARCH_REFERENCE_RUNNER
+    _SEARCH_REFERENCE_RUNNER = None
 
 
 def register_web_search_runner(runner: Callable[[str], str]) -> None:
@@ -406,6 +454,39 @@ def _search_knowledge(args: str) -> str:
     return _cap_retrieval_result(result)
 
 
+def _search_reference(args: str) -> str:
+    """#1616 GUARDED offline reference-corpus retrieval — never-raising.
+
+    Same decision chain as ``search_knowledge`` before this body runs:
+    allowlist membership, the Layer-3 untrusted-content lock, then the #570 PA
+    deterministic adjudication over the dispatch CAR. This body delegates to
+    the registered runner; the AO loop grounds any non-notice result as
+    UNTRUSTED_CORPUS (ADR-023 Amendment 5) — action-locked and datamarked, so
+    an injection hidden in a vandalised encyclopedia article still cannot fire
+    a tool, and exempt only from the Stage-5 leakage feed.
+
+    Fail-closed and never-raising: no runner (capability dormant or the store
+    absent/unverified), an erroring runner, or an empty query each return a
+    deterministic notice rather than an empty string, because an empty string
+    reads to the model as "the corpus covers nothing here" — a silent,
+    confident falsehood about coverage.
+    """
+    query, max_results = _parse_search_knowledge_args(args)
+    if not query:
+        return SEARCH_REFERENCE_EMPTY_QUERY_NOTICE
+    runner = _SEARCH_REFERENCE_RUNNER
+    if runner is None:
+        return SEARCH_REFERENCE_UNAVAILABLE_NOTICE
+    try:
+        result = runner(query, max_results)
+    except Exception as exc:  # noqa: BLE001 — never an exception into the loop
+        logger.error("search_reference runner failed: %s", exc)
+        return SEARCH_REFERENCE_ERROR_NOTICE
+    if not isinstance(result, str) or not result.strip():
+        return SEARCH_REFERENCE_NO_RESULTS_NOTICE
+    return _cap_retrieval_result(result)
+
+
 def _web_search(query: str) -> str:
     """#719 GUARDED web retrieval delegate — never-raising, dormant today.
 
@@ -495,6 +576,289 @@ def _propose_preference(args: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# curate_knowledge (#1567) — the first tool to declare a dry run. DORMANT.
+# ---------------------------------------------------------------------------
+# The only action in BlarAI whose effect is BOTH irreversible AND not already
+# described by its arguments at the approval prompt. `secure_delete=ON` zeroes
+# the freed pages; there is no undo. The argument is a SELECTOR and the effect
+# is a SET, and nobody can compute the set from the selector — which is the
+# condition that makes a rehearsal worth having rather than ceremony.
+#
+# DORMANT by the RUNNER SEAM, not only by a flag. With no runner registered the
+# body returns a deterministic notice and the knowledge bank is never reached:
+# there is no code path from this tool to a delete until the AO registers one at
+# startup, behind its config flag (`security_by_design` 4 — the strongest
+# dormancy is the path that is not there).
+
+CURATE_KNOWLEDGE_MAX_MATCHES: int = 200
+"""Refuse a match set larger than this — never truncate it.
+
+Truncating a destructive set would delete a different set than the one the
+operator was shown, silently, and the part it kept would be whichever rows
+sorted first. A set too large to show is a request to reformulate."""
+
+CURATE_ACTIONS: frozenset[str] = frozenset({"delete", "mark_saved"})
+"""The verbs, reusing the bank's existing vocabulary. No new ones."""
+
+_CURATE_SOURCE_TYPES: frozenset[str] = frozenset({"url", "file", "paste"})
+
+#: EXTENDED ISO only, anchored. Shape FIRST, then calendar validity -- neither
+#: alone is enough, and each was tried alone and failed.
+#:
+#: The regex alone accepted ``9999-99-99``, which is not a date and sorts above
+#: every stored timestamp, so ``created_before`` with it selected the entire
+#: approved bank.
+#:
+#: ``fromisoformat`` alone accepts ISO BASIC format and week dates --
+#: ``20260101T000000`` and ``2026-W01-1`` -- and on the stored
+#: ``2026-09-21T03:16:23.000982+00:00`` under a binary collation ``'0'`` and
+#: ``'W'`` both sort ABOVE ``'-'``, so those select the whole bank too. Worse,
+#: ``20260101T000000`` and ``2026-01-01`` are the SAME INSTANT and gave opposite
+#: destructive sets, which is the property this was supposed to eliminate.
+_ISO_EXTENDED: re.Pattern[str] = re.compile(
+    r"^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2})?)?$"
+)
+
+
+def _is_iso_timestamp(value: str) -> bool:
+    """True iff ``value`` is a REAL date in the one spelling this accepts.
+
+    One spelling, one meaning: the stored form is extended ISO, so a selector
+    must be too. A space separator, basic format, a week date, a trailing ``Z``
+    and an offset are all refused -- not because they are malformed, but because
+    each sorts differently against the stored column and would select a
+    different set for the same instant.
+    """
+    if not _ISO_EXTENDED.match(value):
+        return False
+    try:
+        datetime.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+CURATE_KNOWLEDGE_UNAVAILABLE_NOTICE: str = (
+    "curate_knowledge: knowledge curation is not enabled on this system."
+)
+CURATE_KNOWLEDGE_NO_SELECTOR_NOTICE: str = (
+    "curate_knowledge: no selector given. Name a source, a type or a date range "
+    "— a curation request with no selector matches nothing, never everything."
+)
+CURATE_KNOWLEDGE_BAD_ACTION_NOTICE: str = (
+    "curate_knowledge: unknown action. Use 'delete' or 'mark_saved'."
+)
+CURATE_KNOWLEDGE_BAD_ARGS_NOTICE: str = (
+    "curate_knowledge: arguments could not be read. Nothing was changed."
+)
+
+_CURATE_KNOWLEDGE_RUNNER: Callable[[str], str] | None = None
+
+
+def register_curate_knowledge_runner(runner: Callable[[str], str]) -> None:
+    """Wire the tool to a real knowledge bank — a GO-LIVE step (#1567).
+
+    Not called at import. Until the AO calls this behind its config flag, the
+    tool body below returns a notice and no delete path exists.
+    """
+    global _CURATE_KNOWLEDGE_RUNNER
+    if not callable(runner):
+        raise TypeError("curate_knowledge runner must be callable")
+    _CURATE_KNOWLEDGE_RUNNER = runner
+
+
+def clear_curate_knowledge_runner() -> None:
+    """Unregister the runner, restoring the dormant default."""
+    global _CURATE_KNOWLEDGE_RUNNER
+    _CURATE_KNOWLEDGE_RUNNER = None
+
+
+def parse_curate_args(args: str) -> dict[str, str]:
+    """Validate curation arguments BEFORE any store is consulted (#1567).
+
+    Anchored validation at the boundary: a forged or malformed request dies
+    here, not at the bank (`security_by_design` 7).
+
+    Returns:
+        The normalised selector, or ``{}`` when the request must be refused.
+        An empty result is always a refusal — never "match everything".
+    """
+    try:
+        parsed = json.loads(args) if args.strip() else {}
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+
+    action = str(parsed.get("action", "")).strip()
+    if action not in CURATE_ACTIONS:
+        return {}
+
+    selector: dict[str, str] = {"action": action}
+    source_ref = str(parsed.get("source_ref", "") or "").strip()
+    source_type = str(parsed.get("source_type", "") or "").strip()
+    before = str(parsed.get("created_before", "") or "").strip()
+    after = str(parsed.get("created_after", "") or "").strip()
+
+    if source_type and source_type not in _CURATE_SOURCE_TYPES:
+        return {}
+    for stamp in (before, after):
+        if stamp and not _is_iso_timestamp(stamp):
+            return {}
+
+    if not (source_ref or source_type or before or after):
+        return {}
+
+    if source_ref:
+        selector["source_ref"] = source_ref
+    if source_type:
+        selector["source_type"] = source_type
+    if before:
+        selector["created_before"] = before
+    if after:
+        selector["created_after"] = after
+    return selector
+
+
+def curate_action_needs_rehearsal(args: str) -> bool:
+    """True iff these arguments name the irreversible action (#1567 design 2/3).
+
+    ``delete`` always rehearses; ``mark_saved`` is reversible and routes
+    normally. Fail-closed on anything unreadable: arguments that cannot be
+    parsed are treated as needing a rehearsal, because the alternative is
+    executing something nobody could describe.
+    """
+    try:
+        parsed = json.loads(args) if args.strip() else {}
+        if not isinstance(parsed, dict):
+            return True
+        return str(parsed.get("action", "")).strip() != "mark_saved"
+    except (ValueError, TypeError):
+        return True
+
+
+def _curate_knowledge(args: str) -> str:
+    """Registry body — delegates to the registered runner, or refuses."""
+    if _CURATE_KNOWLEDGE_RUNNER is None:
+        return CURATE_KNOWLEDGE_UNAVAILABLE_NOTICE
+    selector = parse_curate_args(args)
+    if not selector:
+        return CURATE_KNOWLEDGE_NO_SELECTOR_NOTICE
+    try:
+        return _CURATE_KNOWLEDGE_RUNNER(json.dumps(selector, sort_keys=True))
+    except Exception:
+        logger.exception("curate_knowledge runner failed")
+        return CURATE_KNOWLEDGE_BAD_ARGS_NOTICE
+
+
+# ---------------------------------------------------------------------------
+# organise_userdata (#1568) — the assistant's FIRST file surface. DORMANT.
+# ---------------------------------------------------------------------------
+# The honest cost, stated first: this is the larger of the two approved tools
+# because it adds a whole capability class rather than extending one. Every
+# argument for it being useful is an argument for it being the most dangerous
+# tool in the set.
+#
+# It ALWAYS rehearses — unlike curate_knowledge there is no reversible action
+# here to route normally. The argument is a PATTERN and the effect is a SET OF
+# MOVES; "these 23 files would move there" is not answerable from the arguments
+# and is tedious to unwind afterwards.
+#
+# Moves only. No delete, no overwrite, no copy — and `shared.governance.
+# userdata_move` contains no code that removes or overwrites a file, so this is
+# structural rather than a promise (`security_by_design` 4).
+
+ORGANISE_USERDATA_UNAVAILABLE_NOTICE: str = (
+    "organise_userdata: file organising is not enabled on this system."
+)
+ORGANISE_USERDATA_BAD_ARGS_NOTICE: str = (
+    "organise_userdata: a pattern and a destination are both required, and "
+    "both must stay inside your data folder. Nothing was moved."
+)
+
+#: Windows' classic MAX_PATH. A pattern or destination longer than this cannot
+#: name a movable file, so it is refused at the boundary rather than planned and
+#: failed at the move.
+_ORGANISE_PATH_MAX_CHARS: int = 260
+
+_ORGANISE_USERDATA_RUNNER: Callable[[str], str] | None = None
+
+
+def register_organise_userdata_runner(runner: Callable[[str], str]) -> None:
+    """Wire the tool to a real data directory — a GO-LIVE step (#1568).
+
+    Not called at import. Until the AO calls this behind its config flag, the
+    tool body returns a notice and no file path is ever resolved.
+    """
+    global _ORGANISE_USERDATA_RUNNER
+    if not callable(runner):
+        raise TypeError("organise_userdata runner must be callable")
+    _ORGANISE_USERDATA_RUNNER = runner
+
+
+def clear_organise_userdata_runner() -> None:
+    """Unregister the runner, restoring the dormant default."""
+    global _ORGANISE_USERDATA_RUNNER
+    _ORGANISE_USERDATA_RUNNER = None
+
+
+def parse_organise_args(args: str) -> dict[str, str]:
+    """Validate move arguments BEFORE any path is resolved (#1568).
+
+    Returns:
+        ``{"pattern": ..., "destination": ...}``, or ``{}`` when the request
+        must be refused. An empty result is always a refusal.
+
+    The containment check itself lives in ``shared.governance.userdata_move``
+    and runs on the resolved paths; this is the cheaper boundary in front of
+    it, refusing a malformed request before anything touches the file system.
+    """
+    try:
+        parsed = json.loads(args) if args.strip() else {}
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    raw_pattern = parsed.get("pattern", "")
+    raw_destination = parsed.get("destination", "")
+    # VALIDATED, not coerced. `str(...)` turned any JSON type into a Python
+    # repr and handed it to glob(): a list became "['a', 'b']", a dict became
+    # "{'k': 1}", True became "True". `security_by_design` 7 asks for anchored
+    # validation, and coercion is the opposite of it.
+    if not isinstance(raw_pattern, str) or not isinstance(raw_destination, str):
+        return {}
+    pattern = raw_pattern.strip()
+    destination = raw_destination.strip()
+    if not pattern or not destination:
+        return {}
+    # A path longer than the platform allows cannot be moved, but it CAN be
+    # planned -- so the operator was asked to approve a move that could never
+    # happen, and the failure then surfaced as a wrong message.
+    if len(pattern) > _ORGANISE_PATH_MAX_CHARS or len(destination) > _ORGANISE_PATH_MAX_CHARS:
+        return {}
+    # A NUL truncates a path in some syscalls, so it is refused at the boundary
+    # rather than trusted to be noticed by every layer below.
+    nul = chr(0)
+    if nul in pattern or nul in destination:
+        return {}
+    return {"pattern": pattern, "destination": destination}
+
+
+def _organise_userdata(args: str) -> str:
+    """Registry body — delegates to the registered runner, or refuses."""
+    if _ORGANISE_USERDATA_RUNNER is None:
+        return ORGANISE_USERDATA_UNAVAILABLE_NOTICE
+    request = parse_organise_args(args)
+    if not request:
+        return ORGANISE_USERDATA_BAD_ARGS_NOTICE
+    try:
+        return _ORGANISE_USERDATA_RUNNER(json.dumps(request, sort_keys=True))
+    except Exception:
+        logger.exception("organise_userdata runner failed")
+        return ORGANISE_USERDATA_BAD_ARGS_NOTICE
+
+
+# ---------------------------------------------------------------------------
 # Registry — each tool takes a single string arg ("" if none provided)
 # ---------------------------------------------------------------------------
 
@@ -513,10 +877,21 @@ _REGISTRY: dict[str, Callable[[str], str]] = {
     # single 'query' string. Neither ever raises into the loop.
     "search_knowledge": _search_knowledge,
     "web_search": _web_search,
+    # #1616 GUARDED + DORMANT. Registry body returns its notice until the AO
+    # registers a runner, which it does only behind the config flag.
+    "search_reference": _search_reference,
     # #770 M2 W1 — a DRAFT surface (renders a confirm card, never a store write).
     # The registry body is a fail-closed notice; the real session-aware handling
     # is the AO tool loop (see the section note above _propose_preference).
     "propose_preference": _propose_preference,
+    # #1567 DANGEROUS + DORMANT. Irreversible (secure_delete=ON, no undo) and
+    # selector-shaped, so its `delete` always routes to simulate-first. The
+    # registry body reaches no store until a runner is registered.
+    "curate_knowledge": _curate_knowledge,
+    # #1568 DANGEROUS + DORMANT. The assistant's first file surface; moves
+    # only, always rehearsed, and the registry body resolves no path until a
+    # runner is registered.
+    "organise_userdata": _organise_userdata,
 }
 """Maps tool name -> callable taking a single string arg ('' if none)."""
 
@@ -648,6 +1023,124 @@ TOOL_SCHEMAS: dict[str, dict[str, object]] = {
             },
         },
     },
+    "search_reference": {
+        "type": "function",
+        "function": {
+            "name": "search_reference",
+            "description": (
+                "Search the offline encyclopedia stored on this machine and "
+                "return the most relevant passages, each with the article it "
+                "came from. Use this for general factual questions about the "
+                "world - people, places, events, science, history - especially "
+                "when you are not certain of the answer. Prefer a passage from "
+                "here over answering from memory. This is a dated snapshot, "
+                "not live, so it will not know about very recent events."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "What to look up in the encyclopedia.",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": (
+                            "Maximum passages to return, between 1 and 8 "
+                            "(default 4; out-of-range values are clamped)."
+                        ),
+                    },
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "curate_knowledge": {
+        "type": "function",
+        "function": {
+            "name": "curate_knowledge",
+            "description": (
+                "Curate the user's local knowledge bank: permanently erase, or "
+                "mark as saved, the documents matching a selector. Erasing "
+                "CANNOT BE UNDONE. Name what to match by source, by type, or by "
+                "when it was taken in — a request with no selector matches "
+                "nothing. Use only when the user asks to clear out or tidy "
+                "saved material."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["delete", "mark_saved"],
+                        "description": (
+                            "'delete' erases permanently; 'mark_saved' is "
+                            "reversible."
+                        ),
+                    },
+                    "source_ref": {
+                        "type": "string",
+                        "description": (
+                            "Exact source this came from. Matched exactly — "
+                            "there is no wildcard."
+                        ),
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "enum": ["url", "file", "paste"],
+                        "description": "How it was taken in.",
+                    },
+                    "created_before": {
+                        "type": "string",
+                        "description": "Only items taken in before this date (YYYY-MM-DD).",
+                    },
+                    "created_after": {
+                        "type": "string",
+                        "description": "Only items taken in after this date (YYYY-MM-DD).",
+                    },
+                },
+                "required": ["action"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "organise_userdata": {
+        "type": "function",
+        "function": {
+            "name": "organise_userdata",
+            "description": (
+                "Move files into a folder inside the user's own data folder. "
+                "Moves only — it never deletes, copies or overwrites, and it "
+                "refuses if something with the same name is already there. "
+                "Everything stays inside the data folder. It always shows how "
+                "many files would move and asks before moving anything."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": (
+                            "Which files to move, e.g. '*.pdf' or "
+                            "'receipts/*.png'. Relative to the data folder."
+                        ),
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": (
+                            "An EXISTING folder to move them into, relative to "
+                            "the data folder. This tool moves files; it does "
+                            "not create folders, and a destination that does "
+                            "not exist is refused."
+                        ),
+                    },
+                },
+                "required": ["pattern", "destination"],
+                "additionalProperties": False,
+            },
+        },
+    },
     "web_search": {
         "type": "function",
         "function": {
@@ -749,7 +1242,10 @@ _PRIMARY_STRING_PARAM: dict[str, str] = {
 # notice body the whole args object (harmless — it never touches the store); the
 # production path is the AO loop's session-aware handler, not execute().
 _JSON_ARGS_TOOLS: frozenset[str] = frozenset(
-    {"search_knowledge", "propose_preference"}
+    {
+        "search_knowledge", "search_reference", "propose_preference",
+        "curate_knowledge", "organise_userdata",
+    }
 )
 
 
@@ -792,7 +1288,46 @@ def tool_call_grammar_schema() -> dict[str, object]:
     }
 
 
-def render_tools_system_block() -> str:
+#: Tools advertised to the model ONLY while their runner is registered. A tool
+#: whose capability is switched off by configuration must not be described to
+#: the model as something to prefer: the model would call it, receive the
+#: unavailable notice, and the switched-off capability would still have
+#: changed every conversation's prompt. Structural absence from the prompt,
+#: not a notice after the fact (#1616 pre-merge review). Dispatch is unchanged:
+#: the tool stays in ``_REGISTRY`` / ``TOOL_CALL_ALLOWLIST`` / the call grammar,
+#: so a call emitted anyway still meets its deterministic notice.
+_ADVERTISED_ONLY_WHEN_RUNNER_REGISTERED: dict[str, Callable[[], bool]] = {
+    "search_reference": lambda: _SEARCH_REFERENCE_RUNNER is not None,
+}
+
+
+def advertised_tool_names(
+    also_advertise: frozenset[str] | None = None,
+) -> tuple[str, ...]:
+    """The tools the system prompt describes, in ``TOOL_SCHEMAS`` order.
+
+    Every schema'd tool, except a runner-gated one whose runner is not
+    registered. ``also_advertise`` names runner-gated tools to describe
+    regardless, for rendering the prompt a configuration WOULD produce (the
+    corpus-accuracy suite measures the go-live prompt with the store closed).
+    Unknown names in it are refused rather than ignored.
+    """
+    extra = frozenset(also_advertise or ())
+    unknown = extra - set(_ADVERTISED_ONLY_WHEN_RUNNER_REGISTERED)
+    if unknown:
+        raise ValueError(
+            f"also_advertise names tools that are not runner-gated: {sorted(unknown)}"
+        )
+    return tuple(
+        name
+        for name in TOOL_SCHEMAS
+        if name not in _ADVERTISED_ONLY_WHEN_RUNNER_REGISTERED
+        or name in extra
+        or _ADVERTISED_ONLY_WHEN_RUNNER_REGISTERED[name]()
+    )
+
+
+def render_tools_system_block(names: tuple[str, ...] | None = None) -> str:
     """Render the Qwen3/Hermes-style tools block for the system prompt.
 
     Emits the ``<tools>`` block (one compact JSON function spec per line) plus
@@ -800,12 +1335,14 @@ def render_tools_system_block() -> str:
 
         <tool_call>{"name": <function-name>, "arguments": <args-json-object>}</tool_call>
 
-    Deterministic: key order is the literal ``TOOL_SCHEMAS`` insertion order and
-    JSON is rendered compactly, so the rendered prompt is byte-stable per build.
+    ``names`` defaults to :func:`advertised_tool_names`. Deterministic: key
+    order is the literal ``TOOL_SCHEMAS`` insertion order and JSON is rendered
+    compactly, so the rendered prompt is byte-stable for a given tool set.
     """
+    selected = advertised_tool_names() if names is None else names
     lines = [
-        json.dumps(spec, separators=(", ", ": "), ensure_ascii=False)
-        for spec in TOOL_SCHEMAS.values()
+        json.dumps(TOOL_SCHEMAS[name], separators=(", ", ": "), ensure_ascii=False)
+        for name in selected
     ]
     tools_block = "\n".join(lines)
     return (
@@ -864,6 +1401,21 @@ _TOOL_RISK_TIER: dict[str, RiskTier] = {
     # not); not DANGEROUS (no egress / irreversible external dispatch — the
     # output is a deletable on-box artifact).
     "generate_image": RiskTier.GUARDED,
+    # DANGEROUS (#1567), DECLARED rather than left to risk_tier's fallback. The
+    # fallback would reach the same answer, and a control that is right by
+    # accident is the defect class this sprint spent itself on: an explicit
+    # declaration fails loudly if someone reclassifies it, a fallback does not.
+    # Irreversible by construction (secure_delete=ON zeroes the freed pages),
+    # mutating, and selector-shaped, so its match set is not knowable from its
+    # arguments. NOT Layer-3-exempt: unlike search_knowledge this is a WRITE,
+    # so untrusted content in a session must lock it.
+    "curate_knowledge": RiskTier.DANGEROUS,
+    # DANGEROUS (#1568), declared rather than inherited from the fallback. The
+    # first tool that touches the file system: a redirectable PATTERN whose
+    # effect is a set of moves. Not Layer-3-exempt — a session holding
+    # untrusted content must lock it, because an injection that can steer a
+    # pattern can steer where the operator's files end up.
+    "organise_userdata": RiskTier.DANGEROUS,
     # GUARDED (#719): local knowledge retrieval with a redirectable query
     # parameter — an injection can steer WHAT is retrieved (and retrieved bank
     # content is itself untrusted, ADR-023 Am.2), so it is locked under
@@ -880,6 +1432,16 @@ _TOOL_RISK_TIER: dict[str, RiskTier] = {
     # door (RULE 3 + empty allowlist) and by the runner's absence. Under
     # untrusted content it locks exactly like the other GUARDED tools.
     "web_search": RiskTier.GUARDED,
+    # GUARDED (#1616): a redirectable READ over an on-box, read-only store —
+    # no egress, no mutation — so it sits with search_knowledge rather than
+    # with the DANGEROUS writes. Declared explicitly rather than left to
+    # risk_tier()'s DANGEROUS fallback: the fallback is the right failure mode
+    # for a tool nobody classified, not a substitute for classifying one.
+    # Lock-exempt too (`_LOCK_EXEMPT_TOOLS`, ADR-023 Amendment 5 addendum) —
+    # the bounded-danger property that earns the exemption IS this tier
+    # classification, so a tool that "sits with search_knowledge" here and is
+    # not also exempt is a drift, not a variant.
+    "search_reference": RiskTier.GUARDED,
     # GUARDED (#770 M2 W1): propose_preference RENDERS a confirm card and stages
     # verbatim bytes — it performs NO store write (P8: the write door is the AO
     # operator preference write handler, reached only by an operator-typed confirm) and NO
@@ -928,7 +1490,34 @@ _TOOL_RESULT_PROVENANCE: dict[str, str] = {
     # from untrusted_knowledge (web results are not the curated bank) and from
     # untrusted_external (/external pasted content stays screened).
     "web_search": "untrusted_web",
+    # ADR-023 Amendment 5 (#1616): reference-corpus passages are untrusted
+    # content — a bulk archive import is not operator curation, so the
+    # knowledge-bank rationale does not carry. Action-locked + datamarked in
+    # full; EXEMPT from the Stage-5 cosine leakage feed on the UNTRUSTED_WEB
+    # precedent, because relaying the public encyclopedia text the operator
+    # asked for is the intended behaviour, not exfiltration.
+    "search_reference": "untrusted_corpus",
 }
+
+#: Registered tools whose results are SYSTEM-AUTHORED — computed or templated
+#: here, never carrying third-party text. Maintained as an explicit set so that
+#: `_REGISTRY` is exhaustively partitioned between this and
+#: `_TOOL_RESULT_PROVENANCE`: a newly registered tool belongs to one or the
+#: other, and the completeness lock in the retrieval-tool tests fails until it
+#: is classified. The previous lock only rejected declarations for tools that
+#: do not exist, so a retrieval tool MISSING from the provenance map passed it.
+_SYSTEM_AUTHORED_TOOLS: frozenset[str] = frozenset(
+    {
+        "get_current_time",
+        "get_current_date",
+        "get_day_of_week",
+        "calculate",
+        "generate_image",
+        "propose_preference",
+        "curate_knowledge",
+        "organise_userdata",
+    }
+)
 
 
 def result_provenance(tool_name: str) -> str | None:
@@ -985,22 +1574,37 @@ def risk_tier(tool_name: str) -> RiskTier:
 # entrypoint.py `_adjudicate_tool_dispatch`, which is downstream of the gate);
 # an exempt tool is never a governance bypass, only a friction removal.
 #
+# `search_reference` qualifies for the SAME rung-1 reason as `search_knowledge`
+# (ADR-023 Amendment 5 addendum, #1616 pre-merge review finding 1): it is a
+# redirectable READ over an on-box, read-only encyclopedia store. A
+# prompt-injection can at most steer WHICH passage is read; the result grounds
+# as `untrusted_corpus` (still action-locked + datamarked), performs NO egress
+# and NO mutation, so it cannot exfiltrate or fire a subsequent action no
+# matter what untrusted content shares the session — the identical bounded-
+# danger shape `search_knowledge` was exempted on. Without this exemption the
+# tool locks itself after its own first result (and locks on the first call of
+# any session already holding knowledge/web/pasted content), making the
+# capability single-shot per clean session absent `/trust` — a friction with no
+# matching danger, exactly what rung 1 removed for search_knowledge.
+#
 # Fail-closed: membership is an explicit allowlist. A tool NOT listed here is
 # never exempt (the gate locks it exactly as before). Every entry MUST be a
 # GUARDED (never a DANGEROUS) tool with the bounded-danger property above; the
 # `test_lock_exempt_tools_are_all_guarded` lock enforces that invariant.
 _LOCK_EXEMPT_TOOLS: frozenset[str] = frozenset(
-    {"search_knowledge", "generate_image", "propose_preference"}
+    {"search_knowledge", "generate_image", "propose_preference", "search_reference"}
 )
 """Tools whose Layer-3 action-lock is lifted on bounded-danger grounds
-(ADR-023 Amendment 4, rungs 1 + 2; #770 M2 W1). A per-tool allowlist, not a
-provenance rule. `search_knowledge` (non-exfiltratable local read) +
-`generate_image` (a no-side-effect directive shim) + `propose_preference` (#770
-M2 W1 — renders a confirm card and stages verbatim bytes; NO store write and NO
-egress, so an injection can at most induce a proposal the operator sees, flagged
-untrusted-context, and must confirm; D-1(a) requires it to fire under untrusted
-content BECAUSE the card flag — not a lock — is the weak-signal defense). The
-#570 PA adjudication still runs on every dispatch."""
+(ADR-023 Amendment 4, rungs 1 + 2; #770 M2 W1; Amendment 5 addendum, #1616). A
+per-tool allowlist, not a provenance rule. `search_knowledge` (non-exfiltratable
+local read) + `generate_image` (a no-side-effect directive shim) +
+`propose_preference` (#770 M2 W1 — renders a confirm card and stages verbatim
+bytes; NO store write and NO egress, so an injection can at most induce a
+proposal the operator sees, flagged untrusted-context, and must confirm; D-1(a)
+requires it to fire under untrusted content BECAUSE the card flag — not a lock —
+is the weak-signal defense) + `search_reference` (#1616 — a non-exfiltratable
+read of an on-box, read-only encyclopedia store; same shape as
+search_knowledge). The #570 PA adjudication still runs on every dispatch."""
 
 
 def is_lock_exempt(tool_name: str) -> bool:
@@ -1355,3 +1959,106 @@ def execute(tool_name: str, args: str = "") -> str:
     if tool_name not in _REGISTRY:
         raise KeyError(f"Unknown tool: {tool_name!r}. Available: {sorted(_REGISTRY)}")
     return _REGISTRY[tool_name](_coerce_args_string(tool_name, args))
+
+
+# ---------------------------------------------------------------------------
+# Simulate-first capability declaration (#1548) — DENY-BY-DEFAULT
+# ---------------------------------------------------------------------------
+
+#: Tools that declare a dry run, and therefore MAY be routed to the
+#: simulate-first outcome. **Empty at merge, deliberately** — the outcome ships
+#: reachable and unused, which is the correct starting state under
+#: security_by_design principle 2 (new capability starts denied, granted
+#: explicitly). A tool absent from this set can NEVER be routed to
+#: simulate-first: the checker refuses the route rather than falling back to
+#: execute.
+#:
+#: The rule a tool must satisfy before being added: its argument is a SELECTOR
+#: rather than a TARGET. `delete_image(id)` needs no simulation because the
+#: argument IS the effect; `forget(query)` does, because nobody can compute the
+#: match set in their head.
+#:
+#: RETIRED as a source of truth (#1548 executor). Declaring is now registering a
+#: rehearsal with :mod:`shared.governance.dry_run`, because a declaration this
+#: module could not honour was a name with nothing behind it. Kept, empty, only
+#: so the gate test that pinned it fails loudly if anything writes to it again
+#: instead of registering — a second list is what this retired.
+_SIMULATE_FIRST_TOOLS: frozenset[str] = frozenset()
+
+#: Tools BARRED from simulate-first no matter what they declare (#1548).
+#:
+#: `web_search` is barred because it is the only tool that leaves the machine. A
+#: dry run of a search is either the query and host shown before sending — which
+#: the escalation prompt already does — or the search actually performed and its
+#: results shown before approval, **which commits the exact egress the gate
+#: exists to control**. That second shape is the trap this bar exists to prevent,
+#: and it is enforced here rather than by a comment.
+#:
+#: This set wins over `_SIMULATE_FIRST_TOOLS`: a tool in both is barred.
+_SIMULATE_FIRST_BARRED: frozenset[str] = frozenset({"web_search"})
+
+
+def declares_dry_run(tool_name: str, tool_args: str = "") -> bool:
+    """True iff ``tool_name`` may be routed to the simulate-first outcome (#1548).
+
+    Deny-by-default and bar-wins:
+
+      * no rehearsal registered    -> False (the default for every tool)
+      * present in the barred set  -> False, even with one registered
+      * registered and not barred  -> True
+
+    Returns False for an unknown tool, so a tool added later is not routable
+    until someone registers its rehearsal deliberately.
+
+    THE DECLARATION IS THE REGISTRATION (#1548 executor). This used to read a
+    hand-maintained ``_SIMULATE_FIRST_TOOLS`` frozenset that lived separately
+    from any implementation, so a name could sit in it with no dry run behind
+    it and the only thing between that and a real execution was the tool loop
+    noticing. Two lists that must agree will eventually disagree; there is one
+    now, and it is the one that can actually rehearse
+    (:func:`shared.governance.dry_run.declares_dry_run`).
+    """
+    if tool_name in _SIMULATE_FIRST_BARRED:
+        return False
+    from shared.governance import dry_run as _dry_run
+
+    return _dry_run.declares_dry_run(tool_name, tool_args)
+
+
+#: The fourth route outcome's name (#1548). ALLOW / DENY / ESCALATE are the three
+#: that exist today; this is the fourth, and it is a distinct string so a consumer
+#: that does not know it cannot silently treat it as one of the others.
+SIMULATE_FIRST: str = "SIMULATE_FIRST"
+
+
+def route_simulate_first(
+    tool_name: str,
+    *,
+    enabled: bool,
+    tool_args: str = "",
+) -> str | None:
+    """Decide whether a dispatch routes to simulate-first (#1548). DORMANT by default.
+
+    Returns :data:`SIMULATE_FIRST` only when ALL of:
+      * ``enabled`` is True — the config flag, off in the shipped default, flipped
+        only at an LA-present go-live ceremony;
+      * the tool declares a dry run FOR THESE ARGUMENTS
+        (:func:`declares_dry_run`), which no tool does at merge. Applicability
+        is per-argument because one tool can carry actions of different kinds:
+        ``curate_knowledge``'s ``delete`` is irreversible and always rehearses,
+        its ``mark_saved`` is reversible and routes normally;
+      * the tool is not barred.
+
+    Returns ``None`` otherwise, meaning "this outcome does not apply" — the caller
+    proceeds with the verdict it already has. It NEVER returns a permissive value
+    of its own: a tool that does not declare is not routed here and is not
+    thereby allowed, which is the refusal the ticket specifies rather than a
+    fallback to execute.
+
+    Reversal is the flag plus a restart, restoring byte-identical prior behaviour.
+    """
+    if not enabled:
+        return None
+    if not declares_dry_run(tool_name, tool_args):
+        return None
+    return SIMULATE_FIRST

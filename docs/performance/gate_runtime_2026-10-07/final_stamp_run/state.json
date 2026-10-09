@@ -1,0 +1,43 @@
+{
+  "python": "C:/Users/mrbla/BlarAI/.venv/Scripts/python.exe",
+  "arms": {
+    "real": "C:/Users/mrbla/BlarAI"
+  },
+  "runs": [
+    {
+      "n": 1,
+      "arm": "real",
+      "status": "void",
+      "tick_pid": 20648,
+      "tick_ctime": 1791425497.4175134,
+      "started": "2026-10-07 22:12:04 -0400",
+      "power_at_start": "AC",
+      "idle_at_start_s": 19293,
+      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run01-real.log",
+      "gate_pid": 11508,
+      "gate_ctime": 1791425524.8002412,
+      "ended": "2026-10-07 22:21:04 -0400",
+      "wall_s": 539.5,
+      "reason": "another test runner started during the run: python.exe:1732 C:\\Users\\mrbla\\BlarAI\\.venv\\Scripts\\python.exe -m pytest tests/test_oracle_eval."
+    },
+    {
+      "n": 2,
+      "arm": "real",
+      "status": "clean",
+      "tick_pid": 15688,
+      "tick_ctime": 1791426097.4312217,
+      "started": "2026-10-07 22:22:05 -0400",
+      "power_at_start": "AC",
+      "idle_at_start_s": 19893,
+      "log": "C:\\Users\\mrbla\\BlarAI-worktrees\\_gatelogs\\timing\\state\\run02-real.log",
+      "gate_pid": 21716,
+      "gate_ctime": 1791426125.0695884,
+      "ended": "2026-10-07 22:46:13 -0400",
+      "wall_s": 1448.0,
+      "summary": "13253 passed, 620 deselected, 29 warnings",
+      "pytest_s": 1436.45,
+      "passed": 13253,
+      "deselected": 620
+    }
+  ]
+}

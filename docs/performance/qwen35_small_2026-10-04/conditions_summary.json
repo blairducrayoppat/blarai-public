@@ -1,0 +1,37 @@
+{
+  "samples": 2676,
+  "first": "2026-10-04T05:29:36-0400",
+  "last": "2026-10-04T11:03:54-0400",
+  "cpu_pct": {
+    "min": 1.7,
+    "mean": 16.995,
+    "max": 81.0
+  },
+  "in_use_gb": {
+    "min": 8.069,
+    "mean": 16.794,
+    "max": 27.938
+  },
+  "processes": {
+    "min": 242,
+    "mean": 259.309,
+    "max": 273
+  },
+  "threads": {
+    "min": 2968,
+    "mean": 3154.676,
+    "max": 3413
+  },
+  "bitdefender_cpu": {
+    "min": 0.0,
+    "mean": 2.495,
+    "max": 76.0
+  },
+  "onedrive_cpu": {
+    "min": 0.0,
+    "mean": 0.0,
+    "max": 0.0
+  },
+  "bitdefender_present_samples": 2676,
+  "onedrive_present_samples": 0
+}

@@ -292,9 +292,15 @@ class TestToolCallStreamerSuppression:
             received.append(chunk)
             return True
 
+        # Parameter NAMES mirror the real pipeline API; production calls them
+        # by keyword so a multimodal brain can attach (#930). A fake whose
+        # names diverge only works positionally and stops binding silently.
         def fake_generate(
-            prompt: str, gen_config: object, streamer_fn: object = None
+            prompt: str,
+            generation_config: object = None,
+            streamer: object = None,
         ) -> str:
+            streamer_fn = streamer
             if callable(streamer_fn):
                 streamer_fn("<tool_call>")
                 streamer_fn("get_current_time")
@@ -980,9 +986,21 @@ class TestToolCallLoop:
 
         # Loop must stop after one call (no second generate for unauthorized tool).
         assert service._inference.generate_text.call_count == 1
-        # The unauthorized tool generation is what PGOV received.
+        # #1575: PGOV receives a NOTICE, not the model's raw tool call.
+        #
+        # This asserted "unauthorized_tool_xyz" in pgov_texts[0] — i.e. that the
+        # raw generation reached the validator and therefore the session store.
+        # That is the defect #1575 closes, and on THIS path the name is
+        # model-chosen and unbounded (`\w+`, no length cap), so echoing it put a
+        # model-controlled string into an approved turn that is replayed into
+        # later prompts and written to long-term memory.
+        #
+        # The loop-stopping behaviour this test is really about is unchanged and
+        # still asserted above.
         assert len(pgov_texts) == 1
-        assert "unauthorized_tool_xyz" in pgov_texts[0]
+        assert "<tool_call>" not in pgov_texts[0]
+        assert "unauthorized_tool_xyz" not in pgov_texts[0]
+        assert "does not provide" in pgov_texts[0]
 
 
 class TestLayer3LoadedVsRetrieved:
@@ -1455,6 +1473,137 @@ class TestEscalateConsumerAtAOLoop:
         assert service._inference.generate_text.call_count == 2
         mock_adjudicate.assert_called_once()
 
+    @patch("services.assistant_orchestrator.src.entrypoint._action_identity")
+    @patch("services.assistant_orchestrator.src.entrypoint._adjudicate_tool_dispatch")
+    @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
+    def test_approved_dispatch_REFUSES_when_the_identity_drifts(
+        self,
+        mock_validate_output: MagicMock,
+        mock_adjudicate: MagicMock,
+        mock_identity: MagicMock,
+    ) -> None:
+        """#1541 Gap A, THE LOCK for the pre-execute binding — and the reason it is
+        written this way.
+
+        Adversarial review found that neutering the binding block failed NOTHING in
+        the entire suite: 120 passed with the control removed. There was no direct
+        test and no indirect one either. This is that test, and it drives the REAL
+        `_handle_prompt_request` rather than a helper.
+
+        It mocks two things and no more. `_adjudicate_tool_dispatch` because ESCALATE
+        is unreachable for every live tool (#1573) — the verdict cannot be produced
+        naturally, so a test that waits for one tests nothing. `_action_identity`
+        because within a single loop iteration `tool_name`/`tool_args` are assigned
+        once, so the production comparison is `f(x)` against `f(x)` and cannot drift
+        on its own. Making it drift is the only way to exercise the branch, and the
+        branch is what refuses.
+        """
+        from shared.security.escalation_consent import ApprovalResult, register_verifier
+
+        class _Approve:
+            def verify(self, context: Any) -> ApprovalResult:
+                return ApprovalResult.allow(verifier_identity="mock-approve")
+
+        register_verifier(_Approve())
+
+        service = _make_service()
+        service._inference = MagicMock()
+        mock_validate_output.side_effect = self._pgov_approved
+        mock_adjudicate.return_value = ("ESCALATE", "ESCALATE_CRYPTO_MATERIAL")
+        # Approved under one identity; a different one is what would execute.
+        mock_identity.side_effect = ["sha256:" + "a" * 64, "sha256:" + "b" * 64]
+        responses = [
+            SimpleNamespace(text=_TIME_CALL, token_count=5, error=None),
+            SimpleNamespace(text="It's 3pm.", token_count=4, error=None),
+        ]
+        service._inference.generate_text.side_effect = lambda *_a, **_k: responses.pop(0)
+
+        service._handle_connection(_FakeTransport(MessageFramer().encode_prompt_request(
+            session_id="esc-drift", prompt="do the thing", request_id="r-esc-drift",
+        )))
+
+        # REFUSED → the tool never ran → only the first generate happened.
+        assert service._inference.generate_text.call_count == 1, (
+            "the approved dispatch executed under a DIFFERENT action identity than "
+            "the operator approved — Gap A is open"
+        )
+
+    @patch("services.assistant_orchestrator.src.entrypoint._action_identity")
+    @patch("services.assistant_orchestrator.src.entrypoint._adjudicate_tool_dispatch")
+    @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
+    def test_approved_dispatch_EXECUTES_when_the_identity_holds(
+        self,
+        mock_validate_output: MagicMock,
+        mock_adjudicate: MagicMock,
+        mock_identity: MagicMock,
+    ) -> None:
+        """THE BASELINE for the lock above.
+
+        Without it, a binding block that refused unconditionally would pass the drift
+        test while breaking every approved dispatch — a control indistinguishable
+        from a permanently shut door.
+        """
+        from shared.security.escalation_consent import ApprovalResult, register_verifier
+
+        class _Approve:
+            def verify(self, context: Any) -> ApprovalResult:
+                return ApprovalResult.allow(verifier_identity="mock-approve")
+
+        register_verifier(_Approve())
+
+        service = _make_service()
+        service._inference = MagicMock()
+        mock_validate_output.side_effect = self._pgov_approved
+        mock_adjudicate.return_value = ("ESCALATE", "ESCALATE_CRYPTO_MATERIAL")
+        mock_identity.return_value = "sha256:" + "a" * 64  # stable across both calls
+        responses = [
+            SimpleNamespace(text=_TIME_CALL, token_count=5, error=None),
+            SimpleNamespace(text="It's 3pm.", token_count=4, error=None),
+        ]
+        service._inference.generate_text.side_effect = lambda *_a, **_k: responses.pop(0)
+
+        service._handle_connection(_FakeTransport(MessageFramer().encode_prompt_request(
+            session_id="esc-hold", prompt="do the thing", request_id="r-esc-hold",
+        )))
+
+        assert service._inference.generate_text.call_count == 2
+
+    @patch("services.assistant_orchestrator.src.entrypoint._action_identity")
+    @patch("services.assistant_orchestrator.src.entrypoint._adjudicate_tool_dispatch")
+    @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
+    def test_approved_dispatch_REFUSES_when_the_identity_cannot_be_derived(
+        self,
+        mock_validate_output: MagicMock,
+        mock_adjudicate: MagicMock,
+        mock_identity: MagicMock,
+    ) -> None:
+        """An identity that could not be derived must never compare equal to one that
+        could, or the binding is bypassable by making derivation fail."""
+        from shared.security.escalation_consent import ApprovalResult, register_verifier
+
+        class _Approve:
+            def verify(self, context: Any) -> ApprovalResult:
+                return ApprovalResult.allow(verifier_identity="mock-approve")
+
+        register_verifier(_Approve())
+
+        service = _make_service()
+        service._inference = MagicMock()
+        mock_validate_output.side_effect = self._pgov_approved
+        mock_adjudicate.return_value = ("ESCALATE", "ESCALATE_CRYPTO_MATERIAL")
+        mock_identity.return_value = ""  # derivation failed at both moments
+        responses = [
+            SimpleNamespace(text=_TIME_CALL, token_count=5, error=None),
+            SimpleNamespace(text="It's 3pm.", token_count=4, error=None),
+        ]
+        service._inference.generate_text.side_effect = lambda *_a, **_k: responses.pop(0)
+
+        service._handle_connection(_FakeTransport(MessageFramer().encode_prompt_request(
+            session_id="esc-empty", prompt="do the thing", request_id="r-esc-empty",
+        )))
+
+        assert service._inference.generate_text.call_count == 1
+
     @patch("services.assistant_orchestrator.src.entrypoint._adjudicate_tool_dispatch")
     @patch("services.assistant_orchestrator.src.entrypoint.validate_output")
     def test_escalate_with_denying_verifier_refuses_tool(
@@ -1877,6 +2026,18 @@ class TestRiskTiers:
         assert tools.is_lock_exempt("generate_image") is True
         for name in ("web_search", "get_current_time", "calculate", "send_email", ""):
             assert tools.is_lock_exempt(name) is False, name
+
+    def test_lock_exempt_set_is_exactly_the_four_bounded_danger_tools(self) -> None:
+        """The exempt allowlist is pinned EXACTLY (ADR-023 Am.4 rungs 1 + 2, #770
+        M2 W1, and the #1616 corpus addendum §A5.8). An addition or a removal is a
+        trust-model change and must fail here until the ADR and this pin move
+        together. search_reference joined on the same rung-1 grounds as
+        search_knowledge: a read of an on-box, read-only store, no egress, no
+        mutation."""
+        assert tools._LOCK_EXEMPT_TOOLS == frozenset(
+            {"search_knowledge", "generate_image", "propose_preference", "search_reference"}
+        )
+        assert tools.is_lock_exempt("search_reference") is True
 
     def test_lock_exempt_tools_are_all_guarded(self) -> None:
         """INVARIANT (fail-closed): every lock-exempt tool MUST be GUARDED — a

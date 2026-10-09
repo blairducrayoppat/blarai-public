@@ -13,7 +13,9 @@ comparable to the in-process 14B / 8B numbers in PERFORMANCE_LOG.md:
 The 30B is served by the operator's coding fleet via ``start-llm.ps1 -Model
 coder-30b -Force`` on the OpenAI-compatible endpoint http://127.0.0.1:8000/v3.
 Bring it up FIRST (the 30B and the 14B cannot co-reside in 31.3 GB), then run
-this. The endpoint is LOOPBACK ONLY (127.0.0.1) — no network egress; this is a
+this. That co-residency limit is ENFORCED here, not merely documented: the
+harness refuses to measure while the AO holds :5001, because a contended read
+is indistinguishable by eye from a genuine throughput defect (#1477). The endpoint is LOOPBACK ONLY (127.0.0.1) — no network egress; this is a
 dev/benchmark tool (in ``scripts/``), NOT BlarAI runtime code, so the urllib HTTP
 client the runtime air-gap forbids is fine here against a local socket.
 
@@ -31,10 +33,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import socket
 import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -401,6 +405,59 @@ def measure_prefill(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Refuse-to-start guard (#1477) -- the AO and the 30B cannot both be resident
+# ---------------------------------------------------------------------------
+# On this iGPU "GPU shared memory" IS system RAM, so a resident 14B does not
+# merely compete with the 30B for a pool: the coder's weights spill and decode
+# collapses ~13x. That collapse is BYTE-IDENTICAL in shape to the cache_size
+# defect #1477 fixed, so a number taken under contention reads as a server
+# regression and sends the reader after the wrong cause. A benchmark that
+# cannot state the condition it was taken under is not evidence, so this
+# refuses rather than annotating (fail-closed; security_by_design 1 + 11).
+#
+# Polarity note: a LIVE OVMS is required here, unlike the in-process harnesses
+# whose guards refuse on it -- this bench measures the server, it does not
+# build a pipeline. Only the AO is contention.
+AO_LOOPBACK_PORT: int = 5001
+
+
+def port_held(port: int, host: str = "127.0.0.1") -> bool:
+    """True iff ``port`` on ``host`` has a listener (non-blocking bind probe --
+    bind succeeds only when nothing holds the port; mirrors the root
+    conftest.py ``_port_held`` and benchmark_prefix_caching_ab.port_held)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+        sock.bind((host, port))
+        return False
+    except OSError:
+        return True
+    finally:
+        sock.close()
+
+
+def ao_contention_reasons(
+    ao_port: int = AO_LOOPBACK_PORT,
+    port_probe: "Callable[[int], bool] | None" = None,
+) -> list[str]:
+    """Why this measurement would be invalid. Empty list = clear to measure.
+
+    ``port_probe`` is injectable so the guard is testable without a live AO."""
+    probe = port_probe if port_probe is not None else port_held
+    reasons: list[str] = []
+    if probe(ao_port):
+        reasons.append(
+            f"port {ao_port} (AO loopback) has a listener -- the BlarAI launcher "
+            "is UP. This checks the PORT, not whether its model is loaded: the AO "
+            "loads lazily, so an idle app holds the port at ~0 GB working set. "
+            "Refusing anyway, because first use can be a heartbeat -- a 14B "
+            "arriving mid-run spills the 30B out of GPU memory and collapses "
+            "decode ~13x. This is a PREDICTOR of contention, not a detector of it."
+        )
+    return reasons
+
+
 def served_model_ids(models_url: str, timeout: float = 5.0) -> list[str]:
     """GET /v3/models -> the list of served model ids ([] on any error)."""
     try:
@@ -498,6 +555,10 @@ def main() -> int:
                         help="Seconds idle between measured runs (thermal). Default 0.")
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--prefill", default="on", choices=["on", "off"])
+    parser.add_argument("--allow-ao-resident", action="store_true",
+                        help="measure even though the AO holds :5001. The result is "
+                             "contended and is stamped ao_resident=true so the record "
+                             "says so; never bank it as a clean baseline.")
     parser.add_argument("--ovms-version", default="")
     parser.add_argument("--ovms-flags", default="")
     parser.add_argument("--driver-version", default="")
@@ -529,6 +590,25 @@ def main() -> int:
               f"Run start-llm.ps1 -Model coder-30b -Force.")
         return 1
     print(f"  [OK] OVMS serving: {ids}")
+
+    # Contention pre-flight (#1477) -- refuse before the warmup burns minutes.
+    ao_reasons = ao_contention_reasons()
+    if ao_reasons and not args.allow_ao_resident:
+        print()
+        print("FATAL: the box is not in a measurable state:")
+        for reason in ao_reasons:
+            print(f"  - {reason}")
+        print()
+        print("A number taken now looks exactly like an OVMS regression and is not")
+        print("one. Close the BlarAI app (or stop the launcher), re-run, and restart")
+        print("it afterwards. To measure anyway -- contended, stamped, never a")
+        print("baseline -- pass --allow-ao-resident.")
+        return 2
+    if ao_reasons:
+        print("  [WARN] --allow-ao-resident: measuring UNDER CONTENTION. "
+              "This is not a baseline.")
+    else:
+        print(f"  [OK] AO not resident (:{AO_LOOPBACK_PORT} free) -- clear to measure")
 
     # Warmup — discarded
     if args.warmup > 0:
@@ -571,12 +651,54 @@ def main() -> int:
           f"P95={stats.p95_total_ms:.0f}")
     print(f"  Runs (ok/err)      : {stats.total_runs - stats.error_runs}/{stats.error_runs}")
 
+    # #1477 (review): the pre-flight sample is a point-in-time reading and a run
+    # lasts minutes. A launcher that comes up AFTER pre-flight would otherwise be
+    # stamped ao_resident=false -- a clean-looking contended number, which is the
+    # exact failure this guard exists to prevent, displaced one step. Re-sample and
+    # OR the two, so the stamp describes the WHOLE measurement window.
+    ao_reasons_end = ao_contention_reasons()
+    ao_resident = bool(ao_reasons or ao_reasons_end)
+    if ao_reasons_end and not ao_reasons:
+        print("  [WARN] the AO came up DURING the run -- this measurement is "
+              "contended and is stamped ao_resident=true. Not a baseline.")
+    # Same hole, same fix site: a server that died mid-run leaves partial numbers
+    # that read as complete ones.
+    ovms_alive_at_end = bool(served_model_ids(args.models_url))
+    if not ovms_alive_at_end:
+        print("  [WARN] OVMS is NOT serving at the end of the run -- the numbers "
+              "above may be partial.")
+
     config_stamp = {
         "timestamp": timestamp,
         "model_name": args.model_name,
         "served_model_id": args.model_id,
         "endpoint": args.endpoint,
         "device": "GPU",
+        # #1477: every record states the condition it was taken under, so a
+        # future reader never has to reconstruct it from process archaeology.
+        # ao_resident is the OR of both samples -- true if the AO held the port at
+        # ANY point that was checked. The two endpoint fields are kept separately
+        # because "resident throughout" and "appeared mid-run" are different
+        # stories about the same number.
+        "ao_resident": ao_resident,
+        "ao_resident_override": bool(ao_resident and args.allow_ao_resident),
+        "ao_resident_at_start": bool(ao_reasons),
+        "ao_resident_at_end": bool(ao_reasons_end),
+        # AUTHORITY-FIRST: say what these mean, so nothing is inferred from a name.
+        # condition_samples is 2 -- the ENDPOINTS. The interval between them is
+        # NOT sampled, so both flags false means "clean at both ends", NOT "clean
+        # throughout". A launcher that appears and exits inside the window is
+        # invisible here AND leaves a persistent throughput depression (a 14B
+        # evicts the 30B's weights from shared memory; the eviction does not
+        # reverse when the launcher does). That residual is named on its own
+        # ticket rather than hidden behind a confident-looking pair of booleans.
+        "condition_samples": 2,
+        "condition_sampling": "endpoints only; the measurement interval is unsampled",
+        # ao_resident_override means THE START GATE WAS OVERRIDDEN -- it does NOT
+        # mean the record is trustworthy. A run clean at start and contended at
+        # end is ao_resident=true / ao_resident_override=false. To select clean
+        # baselines filter on ao_resident == false, NEVER on the override field.
+        "ovms_alive_at_end": ovms_alive_at_end,
         "ovms_version": args.ovms_version,
         "ovms_flags": args.ovms_flags,
         "driver_version": args.driver_version,

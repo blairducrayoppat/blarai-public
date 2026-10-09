@@ -1,0 +1,281 @@
+{
+  "conditions": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake), 8 cores / 8 threads",
+    "memory_gb": 31.32,
+    "os": "Windows 11 Pro 10.0.26200",
+    "python": "3.11.9",
+    "pytest": "8.4.2",
+    "git": "2.55.0.windows.1",
+    "selection": "shared/ services/ launcher/ tests/integration/ tests/security/ -m not hardware and not winui and not slow",
+    "flags": "-p no:cacheprovider --durations=0 -rfs; LOCALAPPDATA redirected per run; elevated; AC power",
+    "start_rule": "input idle >= 900 s, AC, CPU < 15 %, no other pytest; void on any input, non-AC, intruder, 300 s silent log",
+    "voided_runs": 0
+  },
+  "arms": {
+    "old_3be0e22e_wt": {
+      "runs": 2,
+      "wall_s": [
+        703.0,
+        693.0
+      ],
+      "mean_s": 698.0,
+      "spread_pct": 1.4,
+      "skipped": 30,
+      "deselected": 133
+    },
+    "new_ca4fab46_wt": {
+      "runs": 2,
+      "wall_s": [
+        1631.7,
+        1687.2
+      ],
+      "mean_s": 1659.5,
+      "spread_pct": 3.4,
+      "skipped": 26,
+      "deselected": 620
+    },
+    "fixed_f407d2af_wt": {
+      "runs": 2,
+      "wall_s": [
+        1371.5,
+        1419.9
+      ],
+      "mean_s": 1395.7,
+      "spread_pct": 3.5,
+      "skipped": 26,
+      "deselected": 620
+    },
+    "fixed_f407d2af_real": {
+      "runs": 2,
+      "wall_s": [
+        1449.8,
+        1498.8
+      ],
+      "mean_s": 1474.3,
+      "spread_pct": 3.4,
+      "skipped": null,
+      "deselected": 620
+    }
+  },
+  "parallel": {
+    "parallel_g4_pre_order_fix": {
+      "runs": [
+        730.3
+      ],
+      "failed": [
+        0
+      ]
+    },
+    "parallel_g6_pre_order_fix": {
+      "runs": [
+        677.55
+      ],
+      "failed": [
+        1
+      ]
+    },
+    "parallel_g3_pre_order_fix": {
+      "runs": [
+        704.08
+      ],
+      "failed": [
+        0
+      ]
+    },
+    "parallel_g3_canary_leak": {
+      "runs": [
+        866.91,
+        850.42,
+        877.0
+      ],
+      "failed": [
+        1,
+        1,
+        1
+      ]
+    },
+    "parallel_g3_tail": {
+      "runs": [
+        848.69,
+        894.61,
+        894.12
+      ],
+      "failed": [
+        0,
+        0,
+        0
+      ]
+    },
+    "parallel_g5_tail": {
+      "runs": [
+        767.91
+      ],
+      "failed": [
+        0
+      ]
+    },
+    "parallel_g6_tail": {
+      "runs": [
+        704.28,
+        700.77,
+        708.59
+      ],
+      "failed": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "difference": {
+    "from": "old_3be0e22e_wt",
+    "to": "new_ca4fab46_wt",
+    "summed_test_s_old": 651.1,
+    "summed_test_s_new": 1604.8,
+    "net_s": 953.7,
+    "test_git_files_s": 884.4,
+    "test_git_files": 12,
+    "largest": [
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_update_consent",
+        "old_s": 0.0,
+        "new_s": 274.8
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_swap_and_handshake",
+        "old_s": 0.0,
+        "new_s": 197.1
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_install_hardening",
+        "old_s": 0.0,
+        "new_s": 140.7
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_rules_guard_differential",
+        "old_s": 0.0,
+        "new_s": 53.8
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_native_pre_commit",
+        "old_s": 0.0,
+        "new_s": 52.3
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_hooks_hardening",
+        "old_s": 0.0,
+        "new_s": 48.4
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_reference_transaction",
+        "old_s": 0.0,
+        "new_s": 36.3
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_rules_guard",
+        "old_s": 0.0,
+        "new_s": 33.3
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_disposition_discipline",
+        "old_s": 44.3,
+        "new_s": 68.3
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_containment_evidence_bundle",
+        "old_s": 0.0,
+        "new_s": 22.0
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_install_recovery",
+        "old_s": 0.0,
+        "new_s": 17.6
+      },
+      {
+        "suite": "tests/security",
+        "case_id": "test_git_rules_guard_failclosed",
+        "old_s": 0.0,
+        "new_s": 10.8
+      }
+    ]
+  },
+  "sampler": {
+    "old_3be0e22e_wt#1": {
+      "idle_at_start_s": 993,
+      "samples": 63,
+      "all_ac": true,
+      "max_cpu_pct": 30,
+      "idle_never_below_start_idle": true
+    },
+    "old_3be0e22e_wt#2": {
+      "idle_at_start_s": 3693,
+      "samples": 62,
+      "all_ac": true,
+      "max_cpu_pct": 23,
+      "idle_never_below_start_idle": true
+    },
+    "new_ca4fab46_wt#1": {
+      "idle_at_start_s": 1894,
+      "samples": 145,
+      "all_ac": true,
+      "max_cpu_pct": 99,
+      "idle_never_below_start_idle": true
+    },
+    "new_ca4fab46_wt#2": {
+      "idle_at_start_s": 4593,
+      "samples": 150,
+      "all_ac": true,
+      "max_cpu_pct": 95,
+      "idle_never_below_start_idle": true
+    },
+    "fixed_f407d2af_wt#1": {
+      "idle_at_start_s": 11193,
+      "samples": 122,
+      "all_ac": true,
+      "max_cpu_pct": 95,
+      "idle_never_below_start_idle": true
+    },
+    "fixed_f407d2af_wt#2": {
+      "idle_at_start_s": 14193,
+      "samples": 126,
+      "all_ac": true,
+      "max_cpu_pct": 97,
+      "idle_never_below_start_idle": true
+    },
+    "fixed_f407d2af_real#1": {
+      "idle_at_start_s": 12693,
+      "samples": 129,
+      "all_ac": true,
+      "max_cpu_pct": 99,
+      "idle_never_below_start_idle": true
+    },
+    "fixed_f407d2af_real#2": {
+      "idle_at_start_s": 15693,
+      "samples": 133,
+      "all_ac": true,
+      "max_cpu_pct": 90,
+      "idle_never_below_start_idle": true
+    }
+  },
+  "notes": {
+    "what_this_is": "Wall clock of a software test suite on a laptop; it is CPU and process-spawn bound, not an inference measurement.",
+    "controlled": "old_3be0e22e_wt and new_ca4fab46_wt alternated on one idle box; fixed_* ran later the same evening.",
+    "worktrees": "Worktree arms have no model weights, so 5-6 tests fail and 26 skip for environmental reasons in each.",
+    "real_vs_worktree": "The real-checkout arm runs 26 more tests (models present); its wall clock is not comparable to the worktree arms.",
+    "not_measured": "Variance across days, thermal and scanner state, the slow tier, a real-checkout run before the fix under the instrument.",
+    "per_file_ms": "Sum of setup, call and teardown from pytest --durations=0; tests under 5 ms are omitted, so sums sit 2 to 5 % under wall clock.",
+    "parallel": "parallel_runs.csv rows come from scripts/run_standing_gate.py output; the _tail arms run the fixed-port files alone afterwards; canary_leak rows are the runs that failed on a test-order leak, kept as evidence.",
+    "ids": "case_id is the test file name without .py; suite is its directory with assistant_orchestrator abbreviated to ao."
+  }
+}

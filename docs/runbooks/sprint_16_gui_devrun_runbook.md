@@ -23,10 +23,11 @@
 > > current, deliberately deselected-by-default test tier — see
 > > `docs/TEST_GOVERNANCE.md` §1 and its tier table — not a retired one.
 > >
-> > One command below was **not** correct and has been fixed: the "if the exe is
-> > not built" recovery step omitted `-r win-x64 --self-contained`, which this
-> > project's WinUI build requires. That is the step you reach for exactly when
-> > the exe is missing, so it mattered most where it was wrong.
+> > Correction 2026-10-07 (#1700): the "if the exe is not built" step had been
+> > changed to add `-r win-x64 --self-contained`. That writes only the `win-x64/`
+> > subfolder exe; the `Test-Path` check, the launcher and the harness all use the
+> > base-folder exe, which only `-p:Platform=x64` without a RID rebuilds (measured:
+> > the base exe kept its timestamp through a RID build). The step is reverted.
 > >
 > > **Two things to know before you run it:** these tests drive the **real BlarAI
 > > window** via UI Automation, so they take over the screen and will fight a
@@ -176,7 +177,7 @@ If `Test-Path` in the "Before you start" section returned `False`:
 
 ```
 cd C:\Users\mrbla\blarai
-dotnet build "services\ui_winui\BlarAI.Desktop.csproj" -c Debug -p:Platform=x64 -r win-x64 --self-contained
+dotnet build "services\ui_winui\BlarAI.Desktop.csproj" -c Debug -p:Platform=x64
 ```
 
 When it says `Build succeeded`, re-run the `Test-Path` check above, then start at Tier 1.

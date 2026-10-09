@@ -138,6 +138,17 @@ public sealed class MarkdownBlock : ContentControl
                 else
                     root.Children.Add(BuildProse(body));
             }
+            else if (Services.MarkdownTable.TryParse(lines, i) is { } table)
+            {
+                // #1583 - a pipe table, recognised ONLY on a header row
+                // followed immediately by a separator row. Anything else
+                // containing a bar stays prose: this parser runs over every
+                // assistant reply too, and a greedy one would start eating
+                // ordinary sentences.
+                FlushProse();
+                root.Children.Add(BuildTable(table));
+                i += table.LinesConsumed;
+            }
             else
             {
                 prose.Append(line).Append('\n');
@@ -466,6 +477,82 @@ public sealed class MarkdownBlock : ContentControl
     /// the token crosses). Both buttons disable after one click (a proposal is
     /// single-use; the AO's token pop is the authoritative one-shot).
     /// </summary>
+    // -- Tables (#1583) ------------------------------------------------------
+
+    /// <summary>
+    /// Render a parsed pipe table as a Grid, header row emphasised.
+    ///
+    /// Cell text goes through the same inline pass as prose, so the code spans
+    /// and bold runs the governance tables use render as they do everywhere
+    /// else. Cells WRAP rather than clip: a truncated cell in a disclosure
+    /// table would hide exactly the qualification that makes a row honest.
+    /// </summary>
+    private static UIElement BuildTable(Services.MarkdownTable.Parsed table)
+    {
+        var stroke = (Microsoft.UI.Xaml.Media.Brush)
+            Application.Current.Resources["CardStrokeColorDefaultBrush"];
+
+        var grid = new Grid
+        {
+            BorderBrush = stroke,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+        };
+
+        // The WIDEST row, not the header's width. Taking the header's count
+        // silently dropped every cell past it, which contradicts the parser's
+        // own contract -- MarkdownTable keeps a long row precisely because a
+        // malformed row in a disclosure must still be SHOWN. Review found 3
+        // real rows in this repo with more cells than their header (pasted
+        // exception text containing unescaped pipes), where the truncated tail
+        // was the failure reason itself.
+        int columns = Math.Max(
+            table.Header.Count,
+            table.Rows.Count == 0 ? 0 : table.Rows.Max(r => r.Count));
+        for (int c = 0; c < columns; c++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (int r = 0; r <= table.Rows.Count; r++)
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        void Cell(string text, int row, int column, bool header)
+        {
+            var rtb = new RichTextBlock
+            {
+                IsTextSelectionEnabled = true,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(10, 6, 10, 6),
+            };
+            var para = new Paragraph();
+            if (header) para.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+            AppendInlines(para, text);
+            rtb.Blocks.Add(para);
+
+            var border = new Border
+            {
+                Child = rtb,
+                BorderBrush = stroke,
+                // Inner rules only; the outer Grid already draws the frame.
+                BorderThickness = new Thickness(0, header ? 0 : 1, column == columns - 1 ? 0 : 1, 0),
+            };
+            Grid.SetRow(border, row);
+            Grid.SetColumn(border, column);
+            grid.Children.Add(border);
+        }
+
+        for (int c = 0; c < columns; c++)
+            Cell(c < table.Header.Count ? table.Header[c] : string.Empty, 0, c, header: true);
+
+        for (int r = 0; r < table.Rows.Count; r++)
+        {
+            var cells = table.Rows[r];
+            for (int c = 0; c < columns; c++)
+                Cell(c < cells.Count ? cells[c] : string.Empty, r + 1, c, header: false);
+        }
+
+        return grid;
+    }
+
+
     private static UIElement BuildProposalCard(string token, string body)
     {
         var border = new Border

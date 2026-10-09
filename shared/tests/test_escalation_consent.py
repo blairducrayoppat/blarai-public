@@ -220,9 +220,57 @@ class TestEscalationContextSafety:
         params = set(inspect.signature(EscalationContext.from_pa_verdict).parameters)
         # Only safe, descriptor-shaped parameters are accepted (classmethod, so
         # 'cls' is already bound and not in the signature).
-        assert params == {"rule_label", "tool_name", "action_summary", "source"}
+        # EXACT allowlist, deliberately: a new parameter here must be a conscious
+        # decision about whether it can carry payload, not an accident.
+        #
+        # `action_identity` (#1541) was added and is safe for a STRUCTURAL reason,
+        # not a promise: `from_pa_verdict` discards anything that is not exactly
+        # `sha256:` + 64 lowercase hex digits, and raw tool arguments cannot take
+        # that shape. See test_action_identity_cannot_smuggle_payload below, which
+        # is what actually holds that property.
+        assert params == {
+            "rule_label",
+            "tool_name",
+            "action_summary",
+            "source",
+            "action_identity",
+        }
         for forbidden in ("tool_args", "args", "payload", "parameters", "raw"):
             assert forbidden not in params
+
+    def test_action_identity_cannot_smuggle_payload(self) -> None:
+        """The structural guard behind the allowlist entry above (#1541).
+
+        If `action_identity` accepted arbitrary text it would be a hole straight
+        through the no-raw-arguments rule the rest of this class enforces. It does
+        not: a malformed value is DISCARDED, and an empty identity is treated as a
+        mismatch by the dispatcher, so the failure mode is refusal.
+        """
+        secret = "my-passphrase-hunter2"
+        ctx = EscalationContext.from_pa_verdict(
+            "ESCALATE_TEST", tool_name="web_search", action_identity=secret
+        )
+        assert ctx.action_identity == "", "raw text survived into action_identity"
+        assert secret not in ctx.describe()
+
+        # Near-misses are rejected too — a prefix alone is not a descriptor.
+        for bad in ("sha256:", "sha256:zz", "sha256:" + "A" * 64, "deadbeef" * 8):
+            assert (
+                EscalationContext.from_pa_verdict(
+                    "R", tool_name="t", action_identity=bad
+                ).action_identity
+                == ""
+            ), f"malformed identity {bad!r} was accepted"
+
+        # The toggle: a WELL-FORMED descriptor must survive, or the field is inert
+        # and every approval would be refused.
+        good = "sha256:" + "a" * 64
+        assert (
+            EscalationContext.from_pa_verdict(
+                "R", tool_name="t", action_identity=good
+            ).action_identity
+            == good
+        )
 
     def test_secret_does_not_leak_through_provided_summary_path(self) -> None:
         """The supported builder takes a *summary*, not raw args. If a caller passes

@@ -1,5 +1,47 @@
 # Circuit Breaker Governance
 
+> ## ⚠ CORRECTED 2026-09-20 (#1596) — READ THIS BEFORE THE REST
+>
+> **The two caps this document governs are real and enforced. The module it
+> describes was not.** `services/assistant_orchestrator/src/circuit_breaker.py`
+> was imported by nothing but its own test; its only in-source construction was
+> inside a docstring; `record_tokens` and `record_tool_call` were called by
+> nothing. It has been DELETED.
+>
+> **Where the caps are actually enforced:**
+>
+> | cap | value | enforced by |
+> |---|---|---|
+> | output tokens | 4096 | `MAX_OUTPUT_TOKENS` as the `max_new_tokens` default in `services/assistant_orchestrator/src/gpu_inference.py` |
+> | chained tool calls | **3** (not 5) | `MAX_TOOL_CALL_DEPTH` bounding the AO tool loop in `entrypoint.py` — `for _tool_iter in range(_TOOL_LOOP_MAX)` |
+>
+> **The depth number was wrong as well as the mechanism.** `MAX_TOOL_CALL_DEPTH`
+> said 5; the loop has always enforced 3, via a function-local literal invisible
+> to anything auditing limits. The constant now says 3 and the loop reads it, so
+> there is one name for the bound.
+>
+> **The class was deleted rather than wired.** Wiring it would have added a
+> second mechanism for a limit already enforced — two counters for one cap, which
+> is the drift this correction exists to end (`security_by_design` 4: structural
+> absence over vigilance).
+>
+> **Everything below that describes `CircuitBreaker`, `BreakerState`,
+> `record_tokens`, `record_tool_call` or `safe_truncation_message` is SUPERSEDED**
+> and is kept because the wrong version is the useful one: it shows how a
+> 306-line governance document, a claim-register row marked LIVE, and a set of
+> unit tests can all describe a control that never ran. Sections 1–6 are fiction
+> in their mechanism; their *intent* — hard caps, no escalation path, per-request
+> reset — survives and is implemented by the two enforcement points above.
+>
+> **What is NOT superseded:** §7 (threshold-tuning governance), §8 (monitoring),
+> §9–11 (PGOV / streaming / KV-cache interaction) and the no-runtime-override
+> posture. Those describe the caps, not the class.
+>
+> Locked by `tests/security/test_claim_register_row24_tool_call_cap.py`, which
+> ties claim-register row 24's number to the loop's actual bound and fails if the
+> deleted class returns to the runtime.
+
+
 ## Audience
 
 **Primary**: developer — maintains the Orchestrator circuit-breaker
@@ -47,15 +89,19 @@ Canonical implementation and its load-bearing constants.
 | Token breaker `record_tokens` | `services/assistant_orchestrator/src/circuit_breaker.py` | lines 70-83 |
 | Depth breaker `record_tool_call` | `services/assistant_orchestrator/src/circuit_breaker.py` | lines 85-97 |
 | `safe_truncation_message` | `services/assistant_orchestrator/src/circuit_breaker.py` | lines 99-117 |
-| AO-local constant aliases | `services/assistant_orchestrator/src/constants.py` | lines 46-47 |
+| AO-local constant alias (`OUTPUT_TOKEN_CAP` only) | `services/assistant_orchestrator/src/constants.py` | SUPERSEDED - `TOOL_CALL_DEPTH_CAP` was deleted with the class in #1596; the loop reads `MAX_TOOL_CALL_DEPTH` directly |
 | `MAX_OUTPUT_TOKENS = 4_096` | `shared/constants.py` | line 135 |
-| `MAX_TOOL_CALL_DEPTH = 5` | `shared/constants.py` | line 138 |
-| Breaker unit tests | `services/assistant_orchestrator/tests/test_circuit_breaker.py` | full file |
+| `MAX_TOOL_CALL_DEPTH` | `shared/constants.py` | SUPERSEDED - the value is **3**, not 5 (#1596). Read the constant; this row is kept only so the wrong number stays visible where it was asserted |
+| Breaker unit tests | SUPERSEDED - deleted with the class in #1596. The caps are locked by `tests/security/test_claim_register_row24_tool_call_cap.py` | - |
 | PGOV `FALLBACK_MESSAGE` (distinct string) | `services/assistant_orchestrator/src/pgov.py` | lines 93-97 |
 
 ## Governance Content
 
 ### 1. Two Independent Breakers
+
+> **SUPERSEDED (#1596)** — describes the deleted `CircuitBreaker`
+> module, which had no production caller. See the banner at the top for
+> where these caps are actually enforced.
 
 The module defines **two** breakers that run in parallel inside a single
 `BreakerState`:
@@ -63,9 +109,14 @@ The module defines **two** breakers that run in parallel inside a single
 1. **Token Breaker** — caps decoder output at
    `MAX_OUTPUT_TOKENS = 4096` (`shared/constants.py` line 135, aliased
    into the AO package as `OUTPUT_TOKEN_CAP` at `constants.py` line 46).
-2. **Depth Breaker** — caps tool-call recursion at
-   `MAX_TOOL_CALL_DEPTH = 5` (`shared/constants.py` line 138, aliased
-   as `TOOL_CALL_DEPTH_CAP` at `constants.py` line 47).
+2. **Depth Breaker** — SUPERSEDED (#1596). The class never ran. The cap is
+   real and is enforced by the AO tool loop, which reads
+   `MAX_TOOL_CALL_DEPTH` from `shared/constants.py`. **Its value is 3.** This
+   document said 5, the registered constant said 5, and the loop enforced 3;
+   the alias `TOOL_CALL_DEPTH_CAP` named here was deleted with the class.
+   #1582 then found the same 5 surviving a fourth time, in
+   `[circuit_breaker].max_tool_call_depth` in both Assistant Orchestrator
+   config files, where nothing read it.
 
 Either breaker tripping sets `BreakerState.tripped = True`
 (`circuit_breaker.py` lines 40-43). Callers check the aggregate
@@ -74,6 +125,10 @@ generation or tool-dispatch loop. Trips are non-negotiable: there is
 no escalation path that raises the caps mid-request.
 
 ### 2. Token Counter Semantics
+
+> **SUPERSEDED (#1596)** — describes the deleted `CircuitBreaker`
+> module, which had no production caller. See the banner at the top for
+> where these caps are actually enforced.
 
 `record_tokens(state, count)` accumulates into
 `state.tokens_generated` and trips when
@@ -96,6 +151,10 @@ purpose.
 
 ### 3. Tool-Call Depth Counter Semantics
 
+> **SUPERSEDED (#1596)** — describes the deleted `CircuitBreaker`
+> module, which had no production caller. See the banner at the top for
+> where these caps are actually enforced.
+
 `record_tool_call(state)` increments `state.tool_call_depth` by 1 per
 hop and trips when `tool_call_depth >= max_depth`
 (`circuit_breaker.py` lines 94-96). A "hop" is a complete tool
@@ -104,6 +163,10 @@ conversation. The counter resets only at the start of a new request
 (see §6 below).
 
 ### 4. Trip Behavior
+
+> **SUPERSEDED (#1596)** — describes the deleted `CircuitBreaker`
+> module, which had no production caller. See the banner at the top for
+> where these caps are actually enforced.
 
 When either breaker trips, the caller MUST:
 
@@ -123,6 +186,10 @@ evaluation errors trip the breaker"). There is no "breaker is broken,
 continue anyway" path.
 
 ### 5. Exact Fallback Message Text
+
+> **SUPERSEDED (#1596)** — describes the deleted `CircuitBreaker`
+> module, which had no production caller. See the banner at the top for
+> where these caps are actually enforced.
 
 `safe_truncation_message` composes one or both of these exact strings
 (`circuit_breaker.py` lines 108-117):
@@ -145,6 +212,10 @@ generated — the user sees the truncated answer plus the notice.
 Mixing the two breaks the "why was my response stopped?" signal.
 
 ### 6. Per-Session vs. Cross-Session Reset
+
+> **SUPERSEDED (#1596)** — describes the deleted `CircuitBreaker`
+> module, which had no production caller. See the banner at the top for
+> where these caps are actually enforced.
 
 Breaker state is **per-request** — the module docstring
 (`circuit_breaker.py` line 16) states "Breaker state is per-request

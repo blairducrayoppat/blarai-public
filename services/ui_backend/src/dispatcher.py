@@ -732,6 +732,67 @@ class RpcDispatcher:
                 }))
                 return
 
+        # ── Unanswered-question fallback (#1406) ──────────────────────────
+        # LAST, and that position is the whole precision guarantee. Every command
+        # family above has already declined this message, so what remains is
+        # ordinary text — and ordinary text that vanishes while a /dispatch
+        # question sits on screen waiting is the defect the operator found on
+        # 2026-08-15: he answered the intake interview without the prefix and got
+        # an EMPTY bubble (the model called generate_image three times and said
+        # nothing). Hooking this into the dispatch interception at :512 instead
+        # would have been shorter and wrong — that runs BEFORE coord (:573),
+        # imagine (:625) and preferences (:688), so it would swallow /coord and
+        # /remember for as long as a question was parked. Here it cannot swallow
+        # any family, and a family added later sits above it without anyone
+        # having to remember this exists. getattr-guarded like every sibling;
+        # DORMANT-safe (dispatch off -> None, no frame, no behaviour).
+        unanswered_handler = getattr(
+            self._gateway, "handle_unanswered_question", None
+        )
+        if unanswered_handler is not None:
+            try:
+                unanswered_text = await asyncio.wait_for(
+                    unanswered_handler(session_id, prompt),
+                    timeout=self._imagine_failsafe_s,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "_m_prompt: unanswered-question interception timed out after "
+                    "%.0fs (session=%s) — emitting failsafe terminal frame",
+                    self._imagine_failsafe_s, session_id,
+                )
+                await send(stream_frame(rid, "token", {
+                    "token": (
+                        "The backend didn't reply in time (Fail-Closed). "
+                        "Send that again."
+                    ),
+                    "token_index": 0,
+                    "is_final": True,
+                    "is_tool_call": False,
+                    "session_id": session_id,
+                    "is_thinking": False,
+                }))
+                await send(stream_frame(rid, "end", {
+                    "request_id": "",
+                    "informational": True,
+                    "failsafe": True,
+                }))
+                return
+            if unanswered_text is not None:
+                await send(stream_frame(rid, "token", {
+                    "token": unanswered_text,
+                    "token_index": 0,
+                    "is_final": True,
+                    "is_tool_call": False,
+                    "session_id": session_id,
+                    "is_thinking": False,
+                }))
+                await send(stream_frame(rid, "end", {
+                    "request_id": "",
+                    "informational": True,
+                }))
+                return
+
         speak = (
             bool(params.get("speak"))
             and self._voice is not None

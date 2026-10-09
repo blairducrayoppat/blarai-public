@@ -1,5 +1,19 @@
 # POSTED 2026-07-16 (LA-directed) → https://github.com/openvinotoolkit/openvino/issues/36270#issuecomment-4998835192
 
+> **CORRECTION 2026-09-22 — THE #3937 THINKING CLAIM IN THIS FILE IS WRONG. DO NOT REUSE IT.**
+> The claim that these models have "no working thinking-disable" on the OpenVINO substrate rests
+> on probes that never set `enable_thinking` where the runtime reads it. The exports' chat
+> template emits the closed empty block ONLY when `enable_thinking` is defined AND false, and a
+> bare opening `<think>` otherwise; `probe_qwen36_thinking_toggle.py:77` passed it as a
+> `generate()` kwarg, where it is silently dropped. The "untagged visible thinking" noted here as
+> corroboration is the SYMPTOM of a prompt-side opener, not a model property. Whether these models
+> honour a correctly built prompt is UNMEASURED as of this correction (#1611 S0c). The comment
+> this file records is already public and its retraction belongs to the session that owns upstream
+> work — this banner exists so the claim is not recycled into a NEW post. See
+> `docs/MODEL_EVALUATION_QWEN36_27B.md` (partial retraction), PERFORMANCE_LOG 2026-07-17
+> CORRECTION block, lesson 369, Vikunja #1618.
+
+
 > Supersedes the v1 caveated table (v1 carried the unofficial-IR OV-MoE cell and the
 > "architecture-dependent inversion" headline — both now known wrong; v1 was never posted).
 > Post from the operator's account (blairducrayoppat) after his review.

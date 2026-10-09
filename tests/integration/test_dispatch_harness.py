@@ -119,7 +119,8 @@ _QUESTION = (
     "  2. In a web browser\n"
     "  3. On a phone\n"
     "\n"
-    "Reply with the number (e.g. `2`), or `/dispatch reject` to cancel."
+    "Reply with the number of the option you want as `/dispatch 2`, or "
+    "`/dispatch reject` to cancel."
 )
 
 
@@ -331,19 +332,46 @@ def test_doom_still_fires_past_the_production_grace():
     assert classify_run_health(prev, cur, stall_grace_s=240) is DoomVerdict.DOOMED
 
 
-def test_doom_production_grace_default_is_the_registered_240():
-    # The dataclass default, the harness defaults, and the registry row must agree (the
-    # lesson-217 family-drift class; the registry gate cross-checks the row, this locks the
-    # siblings to each other).
+def test_doom_production_grace_defaults_agree_with_the_registry():
+    """The dataclass default, the harness defaults, and the registry row must agree —
+    the lesson-217 family-drift class. The registry gate cross-checks the row; this
+    locks the siblings to each other.
+
+    **Renamed and de-pinned (#1366).** This was
+    ``test_doom_production_grace_default_is_the_registered_240`` and asserted the literal
+    ``240.0`` three times — the value was in the FUNCTION NAME. Its intent was always the
+    invariant (the siblings agree), and a literal is a strictly weaker way to express it:
+    it passes when all four are wrong together, and fails when they are all correctly
+    tuned. Raising the grace 240 -> 900 for #1366 turned this red, which reads as "you
+    broke production" rather than "this test names a number".
+
+    That is not a harmless style point. A test pinned to a magic number ARGUES AGAINST
+    tuning the constant — change it, watch the suite go red, put it back. This window sat
+    at 240 for a month while the registry's own rationale required it to exceed the
+    coder's 600 s idle classifier, and this test is part of why moving it looked wrong.
+    Now it compares the siblings to each other and to the registry, so a correct tune is
+    green and a genuine drift is red.
+    """
     import inspect
 
+    from shared.timeout_registry import REGISTRY
     from tools.dispatch_harness.harness import DispatchHarness
     from tools.dispatch_harness.monitor import RunMonitor
 
-    assert RunMonitor.__dataclass_fields__["stall_grace_s"].default == 240.0
-    assert DispatchHarness.__dataclass_fields__["stall_grace_s"].default == 240.0
-    sig = inspect.signature(DispatchHarness.for_live)
-    assert sig.parameters["stall_grace_s"].default == 240.0
+    registered = next(
+        e.seconds for e in REGISTRY if e.attribute == "RunMonitor.stall_grace_s"
+    )
+    monitor_default = RunMonitor.__dataclass_fields__["stall_grace_s"].default
+    harness_default = DispatchHarness.__dataclass_fields__["stall_grace_s"].default
+    for_live_default = inspect.signature(DispatchHarness.for_live).parameters[
+        "stall_grace_s"
+    ].default
+
+    assert monitor_default == harness_default == for_live_default == registered, (
+        "the doom-grace siblings have drifted: "
+        f"RunMonitor={monitor_default}, DispatchHarness={harness_default}, "
+        f"for_live={for_live_default}, registry={registered}"
+    )
 
 
 def test_doom_not_declared_within_grace():

@@ -531,3 +531,98 @@ def test_live_gate_seeds_a_legitimate_oracle(tmp_path):
     assert result.verdict == "seed" and result.seedable
     assert result.collectability == "confirmed"
     assert result.f2p_baseline == "all-fail"
+
+
+# ---------------------------------------------------------------------------
+# #1350 — the node not-run stamp must say WHY
+#
+# The python path has used `_not_run(diagnostics, cause, detail)` since that helper landed —
+# a helper written FOR this ticket. Its node sibling returned a bare `("not-run", [])` at all
+# five exits, so the ecosystem the operator actually cares about (websites are node jobs) had
+# the undiagnosable stamp. Lesson 342's predicate: the honest treatment was applied at one
+# site and not run over its sibling.
+# ---------------------------------------------------------------------------
+
+
+def _trivial_oracle() -> str:
+    return "import {test} from 'node:test';\ntest('x', () => {});\n"
+
+
+def test_node_f2p_names_an_absent_skeleton(tmp_path):
+    diag: dict = {}
+    stamp, findings = oq.node_fail_to_pass_baseline(
+        _trivial_oracle(), str(tmp_path / "does-not-exist"), diagnostics=diag)
+    assert stamp == "not-run"
+    assert findings == []          # a machinery miss is fail-soft, never a finding
+    assert diag["cause"] == "skeleton-absent"
+    assert "not a directory" in diag["detail"]
+
+
+def test_node_f2p_banks_the_runners_last_words_when_tap_says_nothing(tmp_path):
+    """The exit that fired on every pre-2026-08-09 node record. On a node oracle this is
+    almost always ESM resolution against the pre-implementation skeleton, and that is
+    unreadable from the stamp alone — so the command and both streams are banked."""
+    diag: dict = {}
+    stamp, _ = oq.node_fail_to_pass_baseline(
+        _trivial_oracle(), str(tmp_path),
+        run=lambda *a, **k: (False, "", "ERR_MODULE_NOT_FOUND: '../src/pieces/data.js'"),
+        diagnostics=diag)
+    assert stamp == "not-run"
+    assert diag["cause"] == "runner-produced-nothing"
+    assert "ERR_MODULE_NOT_FOUND" in diag["stderr_tail"]
+    assert "--test" in diag["cmd"]
+    assert diag["elapsed_s"] is not None
+
+
+def test_node_f2p_names_the_exception_instead_of_swallowing_it(tmp_path):
+    """`except Exception: return ("not-run", [])` collapsed every machinery failure into one
+    silent word. Fail-soft is correct here; fail-SILENT never was."""
+    def boom(*a, **k):
+        raise RuntimeError("subprocess exploded")
+
+    diag: dict = {}
+    stamp, _ = oq.node_fail_to_pass_baseline(
+        _trivial_oracle(), str(tmp_path), run=boom, diagnostics=diag)
+    assert stamp == "not-run"
+    assert diag["cause"] == "raised"
+    assert "RuntimeError" in diag["detail"]
+    assert "subprocess exploded" in diag["detail"]
+
+
+def test_the_node_stamp_is_never_decorated(tmp_path):
+    """[kill] Several gates decide whether an oracle may DELETE work by membership test
+    against STAMPS_NOT_MEASURED. A decorated stamp like `not-run:timeout` would fail that
+    test and turn an unvalidated oracle back into evidence — the #1342 amputation. The cause
+    goes in the diagnostics dict; the stamp string stays exactly `not-run`."""
+    for runner in (None, (lambda *a, **k: (False, "", "x"))):
+        diag: dict = {}
+        kw = {"diagnostics": diag}
+        if runner is not None:
+            kw["run"] = runner
+        stamp, _ = oq.node_fail_to_pass_baseline(
+            _trivial_oracle(), str(tmp_path / "nope"), **kw)
+        assert stamp == "not-run"
+        assert stamp in oq.STAMPS_NOT_MEASURED
+
+
+def test_node_diagnostics_reach_the_banked_evidence(tmp_path):
+    """[kill] Wiring: without _node_seed_gate threading the dict through, the diagnostics are
+    collected and dropped — the built-but-wired-into-nothing shape this repo keeps paying for."""
+    result = oq.f2p_seed_gate(
+        _trivial_oracle(), JOB_ORACLE_PATH_NODE, str(tmp_path / "absent"))
+    evidence = result.to_evidence()
+    assert evidence["language"] == "node"
+    assert evidence["f2p_baseline"] == "not-run"
+    assert evidence["not_measured_detail"]["cause"] == "skeleton-absent"
+
+
+def test_a_measured_node_run_carries_no_not_run_diagnostics(tmp_path):
+    """[quiet] The other direction: a baseline that RAN must not leave a cause behind. A
+    diagnostics dict that is populated on success would make every record look like a failure."""
+    diag: dict = {}
+    stamp, _ = oq.node_fail_to_pass_baseline(
+        _trivial_oracle(), str(tmp_path),
+        run=lambda *a, **k: (False, "TAP version 13\n1..1\nnot ok 1 - x\n# fail 1\n", ""),
+        diagnostics=diag)
+    assert stamp == "all-fail"
+    assert diag == {}

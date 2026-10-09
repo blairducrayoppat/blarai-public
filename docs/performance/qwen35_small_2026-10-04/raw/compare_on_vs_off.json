@@ -1,0 +1,46 @@
+{
+ "a": "4b-on",
+ "b": "4b-off",
+ "agentic": {
+  "verdict_differences": {},
+  "prompt_identity": {
+   "repeats": 2,
+   "calls_per_repeat": [
+    40
+   ],
+   "same_call_count": true,
+   "identical": true,
+   "mismatched_calls": 0
+  },
+  "output_identity": {
+   "repeats": 2,
+   "calls_per_repeat": [
+    40
+   ],
+   "same_call_count": true,
+   "identical": true,
+   "mismatched_calls": 0
+  }
+ },
+ "conversation": {
+  "verdict_differences": {},
+  "prompt_identity": {
+   "repeats": 2,
+   "calls_per_repeat": [
+    23
+   ],
+   "same_call_count": true,
+   "identical": true,
+   "mismatched_calls": 0
+  },
+  "output_identity": {
+   "repeats": 2,
+   "calls_per_repeat": [
+    23
+   ],
+   "same_call_count": true,
+   "identical": true,
+   "mismatched_calls": 0
+  }
+ }
+}

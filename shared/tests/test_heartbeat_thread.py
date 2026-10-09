@@ -445,6 +445,41 @@ def test_shadow_to_live_edge_resets_seen_set(tmp_path: Path) -> None:
     assert read_seen_state(seen_path).fingerprints == frozenset()  # reset once
 
 
+def _poll_for_graduated_stamp(
+    stamp_path: Path,
+    *,
+    timeout_s: float = 30.0,
+    read: Any = None,
+) -> dict[str, Any] | None:
+    """Wait for the heartbeat thread to stamp GRADUATED, tolerating a locked file.
+
+    A transient read failure is EXPECTED here and is not what the caller is
+    testing: the thread rewrites this file atomically, and on Windows the target
+    is briefly unopenable during the replace (#1597 — measured `PermissionError`
+    on the 2026-09-19 gate, after two earlier hits were misdiagnosed as thread
+    starvation and "fixed" by widening this deadline twice).
+
+    The deadline still bounds a genuine hang; it just no longer has to bound a
+    race it never could catch.
+
+    Args:
+        read: injected for the off-test, which needs the failure to happen on
+            demand. Production callers leave it alone.
+    """
+    _read = read or (lambda: stamp_path.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            raw = json.loads(_read())
+        except (PermissionError, OSError, json.JSONDecodeError):
+            time.sleep(0.01)
+            continue
+        if raw.get("mode") == "GRADUATED":
+            return raw
+        time.sleep(0.01)
+    return None
+
+
 def test_graduation_reset_stamps_current_mode_immediately(tmp_path: Path) -> None:
     """Review 8c18ed43 MINOR-3: the reset and the current-mode recording are
     one motion — a crash between the reset and the first cycle's stamp can no
@@ -461,21 +496,89 @@ def test_graduation_reset_stamps_current_mode_immediately(tmp_path: Path) -> Non
         StallSeenState(fingerprints=frozenset({"Standard:42"})), path=seen_path
     )
     beat.start()
-    # #1163: this deadline bounds only the FAILURE path (a green run exits the
-    # poll in well under a second) — 5 s proved thread-starvable under a
-    # model-load storm (two dated gate hits, 2026-07-28/29); 30 s is not.
-    deadline = time.monotonic() + 30.0
-    stamp = None
-    while time.monotonic() < deadline:
-        raw = json.loads(stamp_path.read_text(encoding="utf-8"))
-        if raw.get("mode") == "GRADUATED":
-            stamp = raw
-            break
-        time.sleep(0.01)
+    # #1597: THE DEADLINE WAS NEVER THE PROBLEM, AND THE 5 -> 30 s WIDENING IN
+    # #1163 FIXED A MECHANISM THAT WAS NOT THE CAUSE. The failure was measured on
+    # 2026-09-19 with full output captured: `PermissionError: [Errno 13]` raised
+    # by `read_text` on this very line. The heartbeat thread rewrites the stamp
+    # atomically, and on Windows the target is briefly unopenable during the
+    # replace — so a tight poll reading it eventually lands inside that window.
+    #
+    # The exception ESCAPES the loop rather than exhausting the deadline, which
+    # is why a third widening could not have helped and why the correlation with
+    # machine load was real but misleading: load widens the window, it does not
+    # starve the thread. Two dated gate hits in 2026 were diagnosed as starvation
+    # from that correlation alone, with the traceback discarded by a `tail`.
+    #
+    # A transient read failure is expected here and is NOT what this test is
+    # about; it retries, and the deadline still bounds a genuine hang.
+    stamp = _poll_for_graduated_stamp(stamp_path)
     beat.stop()
     assert stamp is not None, "the graduation stamp never landed pre-cycle"
     assert stamp["shadow_mode"] is False  # the edge is closed atomically
     assert read_seen_state(seen_path).fingerprints == frozenset()
+
+
+def test_the_graduation_poll_SURVIVES_a_locked_stamp_file(tmp_path: Path) -> None:
+    """#1597: the retry the test above depends on, proved rather than assumed.
+
+    The graduation poll reads a file the heartbeat thread rewrites atomically. On
+    Windows the target is briefly unopenable during the replace, so the poll
+    eventually raises `PermissionError` instead of timing out — measured on the
+    2026-09-19 gate with full output captured, after two earlier occurrences were
+    diagnosed as thread starvation from a load correlation alone and "fixed" by
+    widening a deadline from 5 s to 30 s. A deadline cannot catch an exception.
+
+    This drives the SAME `_poll_for_graduated_stamp` the real test uses — not a
+    copy of its loop — with a reader that fails the way the race fails. An
+    off-test that reimplements the thing it certifies proves only that the
+    reimplementation works.
+    """
+    stamp_path = tmp_path / "heartbeat-liveness.json"
+    stamp_path.write_text(json.dumps({"mode": "GRADUATED", "shadow_mode": False}),
+                          encoding="utf-8")
+
+    attempts: list[str] = []
+
+    def _flaky_read() -> str:
+        attempts.append("read")
+        if len(attempts) <= 3:
+            raise PermissionError(13, "Permission denied (simulated mid-replace)")
+        return stamp_path.read_text(encoding="utf-8")
+
+    stamp = _poll_for_graduated_stamp(stamp_path, read=_flaky_read)
+
+    assert len(attempts) > 3, (
+        "the simulated lock never fired, so this test did not exercise the retry "
+        "path it exists to cover"
+    )
+    assert stamp is not None, (
+        "the poll did not survive a transient PermissionError on the stamp file — "
+        "the retry is the whole fix for #1597 and it is not working"
+    )
+    assert stamp["shadow_mode"] is False
+
+
+def test_the_graduation_poll_STILL_GIVES_UP_on_a_stamp_that_never_lands(
+    tmp_path: Path,
+) -> None:
+    """The other half: retrying must not turn a real hang into an infinite wait.
+
+    If the retry swallowed everything, a stamp that never graduates would spin
+    until the suite timed out and the failure would name nothing. The deadline
+    still bounds it and the helper returns None.
+    """
+    stamp_path = tmp_path / "heartbeat-liveness.json"
+    stamp_path.write_text(json.dumps({"mode": "SHADOW"}), encoding="utf-8")
+
+    started = time.monotonic()
+    stamp = _poll_for_graduated_stamp(stamp_path, timeout_s=0.5)
+    elapsed = time.monotonic() - started
+
+    assert stamp is None, "a non-graduated stamp was reported as graduated"
+    assert elapsed < 5.0, (
+        f"the poll took {elapsed:.1f}s to give up on a 0.5s budget — the deadline "
+        "no longer bounds the failure path"
+    )
 
 
 def test_proposal_copy_enriched_from_store(tmp_path: Path) -> None:

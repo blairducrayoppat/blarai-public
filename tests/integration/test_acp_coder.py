@@ -34,6 +34,8 @@ from tools.dispatch_harness.acp_coder import (
     AcpEventTracker,
     AcpRunResult,
     CancelState,
+    GIT_SAFETY_ENV_VARS,
+    build_env,
     classify_result,
     evaluate_step_cap,
     idle_exceeded,
@@ -432,3 +434,65 @@ def test_progress_write_is_fail_soft(tmp_path: Path):
     t = AcpEventTracker(run_id="R", progress_path=blocker / "sub" / "acp-progress.json")
     t.on_session_update(agent_chunk())  # must NOT raise despite the write failing
     assert t.event_count == 1           # the event still folded
+
+
+# ---------------------------------------------------------------------------
+# build_env — the coder-leg git-safety variables reach opencode's shell (#1694)
+# ---------------------------------------------------------------------------
+
+# The seven names + values Get-CoderLegGitEnv (agentic-setup coder-leg-queue.ps1) sets.
+_CODER_LEG_GIT_ENV = {
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_CONFIG_COUNT": "2",
+    "GIT_CONFIG_KEY_0": "safe.directory",
+    "GIT_CONFIG_VALUE_0": "C:/blarai-fleet/worktrees/w1",
+    "GIT_CONFIG_KEY_1": "core.fsmonitor",
+    "GIT_CONFIG_VALUE_1": "false",
+}
+
+
+def _clear_git_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    import os
+    for k in [k for k in os.environ if k.startswith("GIT_")]:
+        monkeypatch.delenv(k, raising=False)
+
+
+def test_1694_all_seven_coder_leg_git_vars_survive_build_env(monkeypatch):
+    _clear_git_env(monkeypatch)
+    for k, v in _CODER_LEG_GIT_ENV.items():
+        monkeypatch.setenv(k, v)
+    env = build_env("C:/blarai-fleet/worktrees/w1")
+    assert {k: env.get(k) for k in _CODER_LEG_GIT_ENV} == _CODER_LEG_GIT_ENV
+    assert set(GIT_SAFETY_ENV_VARS) == set(_CODER_LEG_GIT_ENV)
+
+
+def test_1694_operator_mode_env_is_unchanged_when_no_git_vars_are_set(monkeypatch):
+    _clear_git_env(monkeypatch)
+    env = build_env("C:/work/w1")
+    assert not [k for k in env if k.startswith("GIT_")]
+    assert set(env) <= {
+        "OPENCODE_GIT_BASH_PATH", "SHELL", "PYTHONPATH", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
+        "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP", "HOMEDRIVE", "HOMEPATH",
+        "USERNAME", "PROCESSOR_ARCHITECTURE",
+    }
+
+
+def test_1694_other_git_vars_are_not_passed_through(monkeypatch):
+    _clear_git_env(monkeypatch)
+    monkeypatch.setenv("GIT_DIR", "C:/elsewhere/.git")
+    monkeypatch.setenv("GIT_OPTIONAL_LOCKS", "0")
+    env = build_env("C:/work/w1")
+    assert "GIT_DIR" not in env and env["GIT_OPTIONAL_LOCKS"] == "0"
+
+
+def test_1694_toggle_probe_fails_when_the_allowlist_entry_is_removed(monkeypatch):
+    # Without the allowlist the variables must NOT reach the env: proves the survival
+    # test above can fail (a probe that cannot fail certifies nothing).
+    import tools.dispatch_harness.acp_coder as mod
+    _clear_git_env(monkeypatch)
+    for k, v in _CODER_LEG_GIT_ENV.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(mod, "GIT_SAFETY_ENV_VARS", ())
+    env = mod.build_env("C:/work/w1")
+    assert not [k for k in env if k.startswith("GIT_")]

@@ -1,3 +1,6 @@
+# enforces-rule: critical_rules.watch-the-context-gauge -- landing card form, not the gauge timing
+# enforces-rule: context_handoff.the-landing-card-template
+# enforces-rule: context_handoff.location
 """Handoff-discipline gate (#1144, LA-ratified 2026-07-28).
 
 The 2026-07-28 audit measured the world-report brief era: 137 briefs /
@@ -27,6 +30,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -94,10 +98,85 @@ def test_claude_md_wires_the_discipline() -> None:
     """Doctrine names the banking section, the tools, and the new verbs."""
     text = CLAUDE_MD.read_text(encoding="utf-8")
     assert "<event_time_banking" in text
-    assert "author_landing_card.py" in text and "verify_handoff_brief.py" in text
+    # The landing-card mechanics live in the path-scoped handoff rules (#1700), delivered
+    # when a session reads or writes the card, its template or these scripts.
+    rules = (REPO_ROOT / ".claude" / "rules" / "handoff.md").read_text(encoding="utf-8")
+    assert "author_landing_card.py" in rules and "verify_handoff_brief.py" in rules
+    assert "handoff.md" in text, "CLAUDE.md <rules_index> lost the handoff rules entry"
     assert "UNBLOCKS" in text, "critical rule 5 lost the unblock-sweep verb"
     assert "DELTA-GATE" in text, "comprehension_gate lost the continuation tier"
 
+
+# The gate point itself (MONITORING) is pinned on all four gate surfaces, in list
+# position, by test_doctrine_freshness.GATE_SURFACES. This pins the SECOND requirement
+# a list lock cannot see: the continuation tier must carry its own monitoring line,
+# or a delta-gate of a long program plans no watch (#1668).
+_DELTA_GATE_SURFACES = (
+    (CLAUDE_MD, "DELTA-GATE (#1144)"),
+    (TEMPLATE, "**delta-gate**"),
+)
+
+
+def _delta_gate_clause(text: str, needle: str) -> str:
+    """The SENTENCE that states the delta-gate, whatever its word order.
+
+    Scoped to the sentence on purpose. The full gate on the same surface names
+    MONITORING too, so a whole-file search passes with the delta-gate's line deleted;
+    and a window that stops at a fixed phrase misses the line in a legitimate reorder.
+    """
+    text = text.replace("\r\n", "\n")
+    at = text.find(needle)
+    if at < 0:
+        return ""
+    before = list(re.finditer(r"\.\s", text[:at]))
+    start = before[-1].end() if before else 0
+    end = re.search(r"\.(?=\s|$)", text[at:])
+    stop = at + end.end() if end else len(text)
+    return text[start:stop]
+
+
+def _delta_gate_names_monitoring(text: str, needle: str) -> bool:
+    return "MONITORING" in _delta_gate_clause(text, needle).upper()
+
+
+def test_delta_gate_carries_a_monitoring_line_on_both_surfaces() -> None:
+    for path, needle in _DELTA_GATE_SURFACES:
+        text = path.read_text(encoding="utf-8")
+        assert _delta_gate_clause(text, needle), f"{path.name}: the delta-gate clause moved or vanished"
+        assert _delta_gate_names_monitoring(text, needle), (
+            f"{path.name}: the delta-gate lost its MONITORING line (#1668)"
+        )
+
+
+def test_delta_gate_monitoring_probe_fails_when_the_line_is_removed() -> None:
+    """Principle 12: the probe must be able to FAIL, including when MONITORING is
+    still present elsewhere on the surface (the full gate's point 7)."""
+    for path, needle in _DELTA_GATE_SURFACES:
+        text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        clause = _delta_gate_clause(text, needle)
+        assert "MONITORING" in clause.upper(), f"{path.name}: nothing to remove"
+        stripped = re.sub("MONITORING", "", clause, flags=re.IGNORECASE)
+        mutated = text.replace(clause, stripped)
+        assert "MONITORING" in mutated.upper(), "mutation must leave MONITORING elsewhere"
+        assert not _delta_gate_names_monitoring(mutated, needle), (
+            f"{path.name}: probe passed with the delta-gate's monitoring line removed"
+        )
+
+
+def test_delta_gate_lock_accepts_the_line_in_any_word_order() -> None:
+    """A legitimate reorder must not trip the lock: the line moved to the end of the
+    sentence, past 'before substantive action', still counts; the same sentence with
+    the line gone does not."""
+    for path, needle in _DELTA_GATE_SURFACES:
+        text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        clause = _delta_gate_clause(text, needle)
+        assert clause.endswith("."), f"{path.name}: unexpected clause shape {clause[-20:]!r}"
+        body = re.sub("MONITORING", "watch", clause[:-1], flags=re.IGNORECASE)
+        reordered = text.replace(clause, body + ", with a MONITORING line.")
+        assert _delta_gate_names_monitoring(reordered, needle), (
+            f"{path.name}: a reordered delta-gate line tripped the lock"
+        )
+        assert not _delta_gate_names_monitoring(text.replace(clause, body + "."), needle)
 
 # ---------------------------------------------------------------------------
 # 2. Verifier landing-card gates (drive verify_brief through real tmp files)

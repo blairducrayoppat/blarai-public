@@ -220,7 +220,7 @@ been **verified against the shipped code** (precondition 2) — not just the #57
 operator-directed URL egress path is `services/ui_gateway/src/ingest_coordinator.py` (`/ingest <url>`)
 → `shared/security/guarded_fetch.fetch_external` (the one door, `8703dae`) → the NIC-less guest parser
 over vsock → host §5 compose → preview (host glue `75ba1c7`), with PA adjudication via
-`services/ui_gateway/src/url_adjudicator.make_deterministic_url_adjudicate` (`be603db`). Verified faithful
+`services/ui_gateway/src/url_adjudicator.make_deterministic_url_adjudicate` (`be603db`) — **that symbol was removed 2026-09-20 (#1586); the live wiring is `make_request_keyed_url_adjudicate`, which selects the allowlist policy from the request's `purpose`. This line records what was verified in 2026-06 and is kept as history; a reader chasing the live door from here should follow the new name.** Verified faithful
 to Amendment 1: **one door** (httpx imported by exactly that module, import-scan-enforced);
 **GET-only, no user-content echo** (`client.stream("GET", url)`, no request body — only the URL + protocol
 headers cross the wire); the **ordered fail-closed pipeline** (SSRF guard → PA adjudication → per-fetch

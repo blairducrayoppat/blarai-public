@@ -1,3 +1,5 @@
+# enforces-rule: critical_rules.redirect-localappdata-before-running-pytest
+# enforces-rule: testing.protect_the_gate.always-redirect-localappdata-for-pytest
 """Root conftest isolation regression guard.
 
 This test proves that the root ``conftest.py`` fired at process startup and

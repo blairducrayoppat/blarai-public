@@ -55,7 +55,7 @@ URL_INGEST_DESTINATION: str = "external_web"
 #: the only producer (``ingest_coordinator._IMAGE_FETCH_PURPOSE``); kept here as a
 #: literal to avoid importing a sibling-module private.  This is the image-SPECIFIC
 #: weld lock that SURVIVES text URL-ingest go-live: registering this (shared)
-#: adjudicator + the operator factory's per-URL allowlist self-population release
+#: adjudicator + the per-URL allowlist the paste-is-consent branch builds release
 #: the "adjudicator-not-registered" and "empty-allowlist" locks for the TEXT door,
 #: but the image purpose stays denied here.  So the image path remains welded by
 #: purpose-deny + ``[knowledge].images_enabled``, independent of text go-live.
@@ -63,10 +63,28 @@ URL_INGEST_DESTINATION: str = "external_web"
 #: silent.
 IMAGE_INGEST_DENY_PURPOSES: frozenset[str] = frozenset({"uc003-image-ingest"})
 
+#: Fetch purposes that carry ADR-027 Amendment 1 semantics — *the paste IS the
+#: consent for that ONE URL* — and therefore have their egress allowlist rebuilt
+#: PER REQUEST from the request's own URL.  Every other purpose is adjudicated
+#: against the STANDING allowlist instead (#1586/#977).
+#:
+#: **ALLOWLIST, NEVER A BLOCKLIST, and the asymmetry is the whole safety
+#: argument.** An unrecognised purpose gets the standing allowlist, which is the
+#: restrictive branch; paste-is-consent is reachable only by being named here.
+#: Getting that backwards would mean any purpose nobody thought about authorises
+#: its own destination — "the model said the operator pasted this".
+#:
+#: **This is safe only because `purpose` is unforgeable from the model side**, and
+#: that is not an assumption: `tests/security/test_purpose_unforgeable.py` proves
+#: every runtime path into the door pins a module-level literal, fails CLOSED on
+#: any indirection it cannot resolve, and is off-tested against five synthetic
+#: forgeries.  If that lock is ever weakened, THIS set is what it was protecting.
+PASTE_IS_CONSENT_PURPOSES: frozenset[str] = frozenset({"uc003-url-ingest"})
+
 #: A PA call: given a CAR, return the adjudication decision.  Injected so this
 #: module never imports the Policy Agent package at module load (leaf-level +
 #: testable).  The production implementation is
-#: :func:`make_deterministic_url_adjudicate` — the in-process
+#: :func:`make_request_keyed_url_adjudicate` — the in-process
 #: ``DeterministicPolicyChecker`` the AO already runs for every tool dispatch
 #: (verified pathway; NOT a vsock round-trip — there is no per-CAR client path
 #: in the live runtime — and NOT a second in-process ``HybridAdjudicator``,
@@ -159,35 +177,63 @@ def make_url_adjudicator(
     return _adjudicator
 
 
-def make_deterministic_url_adjudicate(
+#: **Superseded and REMOVED (#1586/#977):** ``make_deterministic_url_adjudicate``
+#: (standing allowlist) and ``make_operator_url_adjudicate`` (paste-is-consent)
+#: were two factories competing for ONE first-wins registration slot, so process
+#: startup ORDER decided which policy both postures got.
+#: :func:`make_request_keyed_url_adjudicate` replaces both by choosing the policy
+#: from the request. They are deleted rather than deprecated because a factory
+#: with no caller is the shape this project keeps having to re-find, and one of
+#: them carried a fail-closed claim its code did not implement (see the
+#: no-extractable-host branch below). ADR-027 and the journal record them by name;
+#: that history stays accurate about what WAS.
+
+
+def make_request_keyed_url_adjudicate(
     egress_allowlist: frozenset[str] | None = None,
 ) -> PolicyAdjudicateFn:
-    """The production PA adjudicate function for URL fetches — in-process.
+    """The ONE adjudicate fn: the allowlist policy is chosen by the REQUEST (#977).
 
-    Runs the CAR through ``services.policy_agent.src.gpu_inference.
-    DeterministicPolicyChecker.check`` — the SAME deterministic rule engine the
-    AO already runs for every tool dispatch
-    (``assistant_orchestrator.src.entrypoint._adjudicate_tool_dispatch``).  This
-    is the verified-correct pathway: NOT a vsock round-trip to the PA service
-    (the live runtime has no per-CAR client path) and NOT a second in-process
-    ``HybridAdjudicator`` (which would load the GPU policy model a second time —
-    untenable against the 31 GB memory ceiling).
+    **The problem this retires.** There are two correct egress postures, and until
+    now which one was live depended on PROCESS STARTUP ORDER.
+    :func:`register_url_adjudicator` fills a module-global slot first-wins, and two
+    different runtime components fill it: the launcher registered the operator
+    "paste is consent" policy, the Assistant Orchestrator registered the standing
+    allowlist. Whichever booted first decided the policy for BOTH — so a URL the
+    operator pasted could be adjudicated against the web-search host, and a
+    web-search fetch could be adjudicated as though the operator had pasted it.
+    The runbook recorded that as a governance question about "which adjudicator
+    wins". It is not one. It was a wiring accident wearing a policy costume
+    (#1586), and the answer a request needs is already IN the request.
 
-    THE DOOR-OPENING KNOB is *egress_allowlist* — the ADR-027 §2 egress
-    carve-out, already built and STAGED/DORMANT in the checker.  RULE 3
-    (``DENY_EXTERNAL_NETWORK``) denies every external URL UNLESS its host is in
-    this allowlist, in which case the checker auto-approves (``check`` returns
-    ``None`` → ALLOW).  The live default ``None`` resolves to the checker's
-    EMPTY class allowlist → **every URL denied** (the air-gap stays welded).
-    Populating the allowlist for an operator-directed fetch is the governance
-    act of opening the door — owned by the LA via ADR-027 Amendment 1, NOT
-    decided here.  This function only adapts whatever policy the allowlist
-    expresses onto the door's :class:`Verdict`.
+    **The discriminator.** ``purpose`` is recorded in the CAR's parameters schema
+    by :func:`build_url_car`, and it already gates the image weld a few lines
+    above, so keying on it here is precedent rather than novelty.
 
-    Decision mapping (fail-closed): ``None`` (no deny/escalate rule fired —
-    allowlisted host) → ALLOW; ``("ESCALATE", rule)`` → ESCALATE; anything else
-    (``("DENY", rule)``) → DENY.  Synchronous + performs no egress (the door's
-    contract), so it is safe to call from inside ``guarded_fetch.fetch_external``.
+    * ``purpose`` in :data:`PASTE_IS_CONSENT_PURPOSES` → the allowlist is rebuilt
+      from THIS request's own URL using the checker's own host normalisation, so
+      an operator paste authorises its own host and nothing else, per adjudication.
+    * anything else → the STANDING *egress_allowlist* (``None`` resolves to the
+      checker's class default, which ships EMPTY = every URL denied).
+
+    **Deny-by-default, and the direction matters.** The paste-is-consent branch is
+    an allowlist of purposes; an unrecognised purpose falls to the STANDING
+    allowlist, which is the restrictive side. A missing, non-string or malformed
+    purpose does the same. The failure mode of a mistake here is a refused fetch,
+    never a widened one.
+
+    **What this rests on.** Paste-is-consent for an arbitrary host is only safe if
+    the model cannot choose the purpose that selects it — otherwise the model can
+    claim the operator pasted something. That is proved, not assumed:
+    ``tests/security/test_purpose_unforgeable.py`` resolves every runtime path into
+    the door and requires a pinned module-level literal at each, failing CLOSED on
+    any indirection it cannot account for.
+
+    Every other guard is unchanged and still applies in series: the door's SSRF
+    validation, GET-only, the per-fetch widen/revoke, the armed egress guard, the
+    resolution pin, the injection scan on the body, and the checker's non-egress
+    deny/escalate rules. Synchronous and performs no egress, per the door's
+    contract.
     """
 
     def _adjudicate(car: CanonicalActionRepresentation) -> AdjudicationDecision:
@@ -197,72 +243,40 @@ def make_deterministic_url_adjudicate(
             DeterministicPolicyChecker,
         )
 
-        result = DeterministicPolicyChecker.check(
-            car, egress_allowlist=egress_allowlist
-        )
-        if result is None:
-            return AdjudicationDecision.ALLOW
-        decision, _rule = result
-        if decision == "ESCALATE":
-            return AdjudicationDecision.ESCALATE
-        return AdjudicationDecision.DENY
+        schema = car.parameters_schema or {}
+        purpose = schema.get("purpose") if isinstance(schema, dict) else None
 
-    return _adjudicate
-
-
-def make_operator_url_adjudicate() -> PolicyAdjudicateFn:
-    """The LIVE operator "URL = authorization" adjudicate fn (ADR-027 Amendment 1).
-
-    This is ADR-027 Amendment 1 — "the paste IS the consent for that ONE URL" —
-    made literal for the live runtime.  There is NO autonomous caller of the
-    egress door: a URL fetch happens ONLY because the operator pasted a URL into
-    ``/ingest <url>``.  So each operator-pasted URL authorizes ONLY its own host,
-    and ONLY for that one adjudication — the allowlist is rebuilt per-CAR from the
-    CAR's own URL, never a fixed standing host.  A second URL on a different host,
-    adjudicated by the SAME registered adjudicator, authorizes ITS host and not the
-    first one's (proven per-CAR, not a stuck allowlist).
-
-    Mechanics (zero normalization drift): the host is extracted from the CAR's URL
-    using the checker's OWN normalization
-    (``DeterministicPolicyChecker._egress_host``), so the host this function puts
-    in the one-entry allowlist matches byte-for-byte the host the checker compares
-    against inside ``check`` (no divergence between "what we allowed" and "what the
-    rule engine sees").  A non-web / unparseable resource yields ``None`` →
-    ``frozenset()`` (empty) → RULE 3 (``DENY_EXTERNAL_NETWORK``) denies it
-    (fail-closed: an operator paste that is not a fetchable https/http URL is
-    refused, never silently allowed).
-
-    Every OTHER guard is UNCHANGED and still applies in series:
-      * the door's SSRF guard (https-only, no userinfo, no raw-IP host, no
-        internal-resolving host) in :func:`shared.security.guarded_fetch._validate_url`
-        + :func:`...._resolution_blocked_reason`;
-      * GET-only + the per-fetch widen/revoke + the armed egress guard + the W4
-        resolution pin in ``_fetch_body``;
-      * the ADR-013 injection scan on the returned body;
-      * and the checker's NON-egress deny/escalate rules (restricted paths,
-        exfiltration, authority claims, cross-agent ownership, etc.) — those fire
-        on the CAR exactly as for any other action, regardless of the one-host
-        egress allowlist.
-
-    Synchronous + performs NO egress (the door's contract — safe to call from
-    inside ``guarded_fetch.fetch_external``).  Returns the PA decision
-    (ALLOW/DENY/ESCALATE) for :func:`make_url_adjudicator` to map onto a Verdict.
-    """
-
-    def _adjudicate(car: CanonicalActionRepresentation) -> AdjudicationDecision:
-        # Lazy import: keep this leaf module free of the Policy Agent package at
-        # import time (the checker lives in the PA's gpu_inference module).
-        from services.policy_agent.src.gpu_inference import (
-            DeterministicPolicyChecker,
-        )
-
-        # The paste IS the consent for THIS one host: build a one-entry allowlist
-        # from the CAR's own URL, using the checker's OWN host normalization so the
-        # allowlist entry matches the host the rule engine compares against inside
-        # check() (zero normalization drift).  A non-web / unparseable resource ->
-        # None -> empty allowlist -> RULE 3 DENY (fail-closed).
+        # ONE host extraction, ONE refusal, BOTH branches. The first version of
+        # this function refused a hostless resource on the paste branch only —
+        # while its own comment explained, at length, why relying on RULE 3 to
+        # catch it was wrong. The review found the else branch still doing
+        # exactly that (#1586 review, finding 2): measured,
+        # `purpose="web_search", resource="not-a-url-at-all"` returned ALLOW.
+        #
+        # RULE 3 only fires on a resource that STARTS WITH an external-network
+        # scheme, so a resource with no scheme skips it entirely and falls
+        # through the remaining rules to ALLOW. Nothing is exploitable either way
+        # — the door's https-only validation refuses such a resource
+        # independently — but writing the argument down and then applying it to
+        # half the code is worse than not making it, because the comment now
+        # certifies the branch it does not cover.
         host = DeterministicPolicyChecker._egress_host(car.resource)
-        allowlist = frozenset({host}) if host else frozenset()
+        if not host:
+            logger.warning(
+                "url adjudicator: purpose %r on a resource with no extractable "
+                "host — DENY (fail-closed; this is the EGRESS door and every "
+                "resource reaching it is meant to be a fetchable URL)",
+                purpose,
+            )
+            return AdjudicationDecision.DENY
+
+        if isinstance(purpose, str) and purpose in PASTE_IS_CONSENT_PURPOSES:
+            # ADR-027 Am.1: this ONE host, for this ONE adjudication. The
+            # checker's own normalisation, so the entry matches byte-for-byte
+            # what `check` compares against.
+            allowlist = frozenset({host})
+        else:
+            allowlist = egress_allowlist
 
         result = DeterministicPolicyChecker.check(car, egress_allowlist=allowlist)
         if result is None:

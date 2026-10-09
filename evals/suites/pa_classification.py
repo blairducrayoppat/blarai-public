@@ -125,6 +125,7 @@ def make_real_gpu_classifier(
     model_dir: Path,
     *,
     speculative_decoding_enabled: bool | None = None,
+    engine: str = "default",
 ) -> Callable[[dict[str, Any]], tuple[str, str | None]]:
     """Build the model-in-the-loop classifier (Arc 140V required).
 
@@ -155,15 +156,22 @@ def make_real_gpu_classifier(
 
     if not model_dir.exists():
         raise FileNotFoundError(f"PA model directory not found: {model_dir}")
-    if speculative_decoding_enabled is None:
-        gpu = PolicyGPUInference(str(model_dir))
+    if engine != "default":
+        # #1663: the REAL PolicyGPUInference attached to a continuous-batching
+        # engine arm - the production classify_car path, not a re-implementation.
+        from evals.cb_pipeline import build_pa_inference
+
+        gpu = build_pa_inference(model_dir, engine)
     else:
-        gpu = PolicyGPUInference(
-            str(model_dir),
-            speculative_decoding_enabled=speculative_decoding_enabled,
-        )
-    if not gpu.load_model():
-        raise RuntimeError(f"PA model failed to load from {model_dir}")
+        if speculative_decoding_enabled is None:
+            gpu = PolicyGPUInference(str(model_dir))
+        else:
+            gpu = PolicyGPUInference(
+                str(model_dir),
+                speculative_decoding_enabled=speculative_decoding_enabled,
+            )
+        if not gpu.load_model():
+            raise RuntimeError(f"PA model failed to load from {model_dir}")
 
     def classify(car_dict: dict[str, Any]) -> tuple[str, str | None]:
         car = _build_car(car_dict)
@@ -316,6 +324,7 @@ def run_suite(
     vlm_target = (
         model_target is not None
         and model_target.capability is Capability.MULTIMODAL_VLM
+        and not model_target.uses_cb_engine
     )
 
     for case in cases:
@@ -354,6 +363,7 @@ def run_suite(
                         if model_target is not None
                         else None
                     ),
+                    engine=model_target.engine if model_target is not None else "default",
                 )
             report.results.append(_evaluate_case(case, model_classify))
         else:

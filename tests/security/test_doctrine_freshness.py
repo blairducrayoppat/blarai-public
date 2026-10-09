@@ -1,3 +1,5 @@
+# enforces-rule: coding_standards.docstrings-comments-state-defaults-contracts-and-conditionals -- phrasing class only, not truth
+# enforces-rule: maintenance.doctrine-freshness-is-gate-enforced
 """Doctrine-freshness gate (#945 D8, LA-approved 2026-07-19).
 
 The 2026-07-18 documentation audit found every frozen doctrine surface shared one root
@@ -43,6 +45,7 @@ import datetime as _dt
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -55,6 +58,10 @@ COPILOT = REPO_ROOT / ".github" / "copilot-instructions.md"
 ACTIVE_SPRINT = REPO_ROOT / "docs" / "sprints" / "ACTIVE_SPRINT.md"
 LESSONS = REPO_ROOT / "LESSONS.md"
 COMMANDS = sorted((REPO_ROOT / ".claude" / "commands").glob("sprint-*.md"))
+# Path-scoped doctrine (#1700): loaded on demand, not every session, but it is doctrine all
+# the same, so it carries a budget and the lexicon scan like the always-loaded surfaces.
+RULES_FILES = sorted((REPO_ROOT / ".claude" / "rules").glob("*.md"))
+RULES_FILE_BUDGET = 4_000
 
 SNAPSHOT_RE = re.compile(r"Standing gate:\s*([\d,]+)\s*/")
 LIVE_LINE_RE = re.compile(r"LIVE_GATE_BASELINE:\s*([\d,]+)\s+passed")
@@ -77,7 +84,9 @@ LEXICON_ALLOWLIST: frozenset[tuple[str, str]] = frozenset()
 
 # Hot-file size budgets in bytes (#945 D8). Breach = consolidate, never wave through.
 SIZE_BUDGETS = {
-    CLAUDE_MD: 48_000,
+    # #1700 moved the topic sections into .claude/rules/ (47,852 -> 38,6xx bytes). The
+    # budget follows the file down so the room cannot silently refill.
+    CLAUDE_MD: 40_000,
     TEST_GOVERNANCE: 40_000,
     ACTIVE_SPRINT: 4_000,
     COPILOT: 14_000,
@@ -90,6 +99,7 @@ SIZE_BUDGETS = {
     # If this ever needs raising, raise Rule 7 first and say why there - the constant
     # follows the doctrine, never the other way round.
     LESSONS: 122_880,
+    **{path: RULES_FILE_BUDGET for path in RULES_FILES},
 }
 
 
@@ -151,8 +161,16 @@ def test_hot_doctrine_files_respect_size_budgets() -> None:
     """Bloat regrows unless bounded: each always-loaded surface has a byte budget."""
     over = []
     for path, budget in SIZE_BUDGETS.items():
-        size = path.stat().st_size if path.exists() else 0
         assert path.exists(), f"budgeted doctrine surface missing: {path}"
+        # LINE-ENDING-NORMALISED, not ``st_size`` (2026-08-30). The repo stores LF and a
+        # worktree may hold CRLF, so raw size carries one byte per line of pure checkout
+        # convention -- CLAUDE.md measures 47,919 as LF and 48,252 as CRLF against a
+        # 48,000 budget. Raw ``st_size`` therefore made the SAME COMMIT pass on one
+        # machine and fail on another, and would have failed first in a fresh clone or an
+        # agent worktree where nobody was editing doctrine at all. This measures what the
+        # budget is actually about -- how much a session must read. The control is
+        # unchanged in strength: no content is exempted, only invisible carriage returns.
+        size = len(path.read_bytes().replace(b"\r\n", b"\n"))
         if size > budget:
             over.append(f"{path.name}: {size:,} > {budget:,} bytes")
     assert not over, (
@@ -163,7 +181,7 @@ def test_hot_doctrine_files_respect_size_budgets() -> None:
 
 def test_no_retired_lexicon_in_always_loaded_surfaces() -> None:
     """Retired-world vocabulary must not re-enter the surfaces every session loads."""
-    surfaces = [CLAUDE_MD, COPILOT, ACTIVE_SPRINT, *COMMANDS]
+    surfaces = [CLAUDE_MD, COPILOT, ACTIVE_SPRINT, *COMMANDS, *RULES_FILES]
     hits: list[str] = []
     for path in surfaces:
         text = _read(path)
@@ -220,49 +238,177 @@ def test_rotate_log_tool_is_byte_preserving(tmp_path: Path) -> None:
 # No count or vocabulary probe can see a dropped section, so the section names
 # themselves are pinned: every surface that states the gate list must name all
 # of them. Case-insensitive — the mirrors legitimately differ in casing.
+# Cut from nine to six on 2026-09-17 at the LA's approval: ROLE, CONTEXT and
+# INHERITED CONSTRAINTS were addressed to the session rather than to him and he
+# had no way to evaluate any of them, so they were length rather than checkpoint.
+# SCOPE gained "every other surface touched" and DECISIONS gained "what will not
+# come back to him". MONITORING joined on 2026-10-04 (#1668, LA-directed): the gate
+# states how unattended work is watched, or states that none is needed. Changing this
+# tuple is a deliberate gate-spec change and lands with every GATE_SURFACE in the same
+# commit.
 GATE_SECTIONS = (
-    "ROLE & AUTHORITY",
-    "CONTEXT",
     "GOAL",
-    "TASK + PLAN",
+    "DELIVERABLE",
     "SCOPE",
-    "INHERITED CONSTRAINTS",
-    "RISKS + DECISION POINTS",
-    "ASSUMPTIONS & AMBIGUITIES",
-    "OPEN QUESTIONS",
+    "YOURS VS MINE",
+    "ASSUMPTIONS",
+    "RISKS + STOP CONDITIONS",
+    "MONITORING",
 )
+@dataclass(frozen=True)
+class GateSurface:
+    """One surface that states the gate's point list, and where on it the list lives.
+
+    The list is LOCATED by markers and READ by list position, never found by searching
+    the whole file: a section word that merely appears elsewhere on the surface (the
+    delta-gate's own line, a sentence about a point) must not be able to stand in for a
+    deleted point. ``numbered`` surfaces carry one numbered item per point; the others
+    carry the points as a "/"-separated run of prose.
+    """
+
+    path: Path
+    start: str  # regex; the list begins where this match ends
+    end: str  # regex; the list ends where the next match (after ``start``) begins
+    numbered: bool
+
+
 GATE_SURFACES = (
-    CLAUDE_MD,
-    REPO_ROOT / ".claude" / "commands" / "sprint-kickoff.md",
-    REPO_ROOT / "docs" / "governance" / "handoff-brief-template.md",
-    REPO_ROOT / "docs" / "runbooks" / "LA_SPRINT_KICKOFF_HOWTO.md",
+    GateSurface(CLAUDE_MD, r"<comprehension_gate\b[^>]*>", r"</comprehension_gate>", True),
+    GateSurface(
+        REPO_ROOT / ".claude" / "commands" / "sprint-kickoff.md",
+        r"^## Phase 2\b",
+        r"^## Phase 3\b",
+        True,
+    ),
+    GateSurface(
+        REPO_ROOT / "docs" / "governance" / "handoff-brief-template.md",
+        r"FULL `CLAUDE\.md` comprehension gate\s*\(",
+        r"A CONTINUATION",
+        False,
+    ),
+    GateSurface(
+        REPO_ROOT / "docs" / "runbooks" / "LA_SPRINT_KICKOFF_HOWTO.md",
+        r"presents the full `CLAUDE\.md` gate\s*—\s*",
+        r"\*\*stops and waits",
+        False,
+    ),
 )
 
 
-def _gate_sections_missing(text: str) -> list[str]:
-    upper = text.upper()
-    return [section for section in GATE_SECTIONS if section not in upper]
+def _gate_bounds(text: str, surface: GateSurface) -> tuple[int, int] | None:
+    """Offsets of the gate list inside LF-normalised ``text``; None if a marker is lost."""
+    start = re.search(surface.start, text, re.M)
+    if start is None:
+        return None
+    end = re.search(surface.end, text[start.end():], re.M)
+    if end is None:
+        return None
+    return start.end(), start.end() + end.start()
+
+
+def _gate_points(region: str, numbered: bool) -> list[str]:
+    """The points in list position, upper-cased, markup and line-wrap stripped."""
+    if numbered:
+        raw = re.findall(r"^\s*\d+\.\s+(.+)$", region, re.M)
+    else:
+        raw = re.sub(r"\s*\n\s*>?\s*", " ", region).split("/")
+    return [p.replace("*", "").strip().upper() for p in raw]
+
+
+def _missing_sections(points: list[str]) -> list[str]:
+    """Sections no point opens with. A section name that is a prefix of another is
+    undetectable, which the dropped-section proof below refuses to allow."""
+    heads = [p.upper() for p in points]
+    return [s for s in GATE_SECTIONS if not any(h.startswith(s) for h in heads)]
+
+
+def _gate_sections_missing(text: str, surface: GateSurface) -> list[str]:
+    text = text.replace("\r\n", "\n")
+    bounds = _gate_bounds(text, surface)
+    if bounds is None:
+        return [f"<gate list not found between {surface.start!r} and {surface.end!r}>"]
+    return _missing_sections(_gate_points(text[bounds[0]:bounds[1]], surface.numbered))
+
+
+def _remove_gate_point(text: str, surface: GateSurface, section: str) -> str:
+    """Delete one point from a surface's real gate list, the way a real edit would."""
+    text = text.replace("\r\n", "\n")
+    bounds = _gate_bounds(text, surface)
+    assert bounds is not None, f"{surface.path.name}: gate list not found"
+    lo, hi = bounds
+    region = text[lo:hi]
+    if surface.numbered:
+        item = re.compile(rf"^\s*\d+\.\s+\**{re.escape(section)}", re.I)
+        new = "\n".join(line for line in region.split("\n") if not item.match(line))
+    else:
+        def head(part: str) -> str:
+            return re.sub(r"\s*\n\s*>?\s*", " ", part).replace("*", "").strip().upper()
+
+        new = "/".join(p for p in region.split("/") if not head(p).startswith(section))
+    return text[:lo] + new + text[hi:]
 
 
 def test_gate_section_list_complete_on_every_surface() -> None:
-    """Each gate-stating surface names every comprehension-gate section."""
+    """Each gate-stating surface carries every comprehension-gate point, in list position."""
     missing: list[str] = []
-    for path in GATE_SURFACES:
-        missing.extend(f"{path.name}: {s}" for s in _gate_sections_missing(_read(path)))
+    for surface in GATE_SURFACES:
+        missing.extend(
+            f"{surface.path.name}: {s}" for s in _gate_sections_missing(_read(surface.path), surface)
+        )
     assert not missing, (
         "comprehension-gate section list eroded (#1022) — a surface abbreviated or "
-        "dropped a section; restore the full list (or update GATE_SECTIONS in the "
-        "same reviewed commit that deliberately changes the gate spec):\n  "
+        "dropped a point from its list; restore the full list (or update GATE_SECTIONS in "
+        "the same reviewed commit that deliberately changes the gate spec):\n  "
         + "\n  ".join(missing)
     )
 
 
 def test_gate_section_pin_catches_dropped_section() -> None:
-    """Toggle-off proof: a list missing one section is refused."""
-    thinned = " / ".join(s for s in GATE_SECTIONS if s != "INHERITED CONSTRAINTS")
-    assert _gate_sections_missing(thinned) == ["INHERITED CONSTRAINTS"]
-    assert _gate_sections_missing(" ".join(GATE_SECTIONS).lower()) == []
+    """Toggle-off proof for the DETECTOR: a list missing ANY one section is refused.
 
+    Generic rather than naming a section: the previous form hard-coded one, so a
+    deliberate gate-spec change broke the proof instead of the pin. It also fails
+    loudly if a future section name becomes a prefix of another, which would
+    make a dropped section undetectable.
+    """
+    for dropped in GATE_SECTIONS:
+        thinned = [s for s in GATE_SECTIONS if s != dropped]
+        assert _missing_sections(thinned) == [dropped], (
+            f"dropping {dropped!r} went undetected - is it a prefix of another section?"
+        )
+    assert _missing_sections([s.lower() for s in GATE_SECTIONS]) == []
+
+
+def test_gate_lock_fires_when_a_real_point_is_removed_from_a_real_surface() -> None:
+    """Toggle-off proof for the LOCK, on the real text of every surface.
+
+    The synthetic proof above cannot see masking: a section word that survives
+    elsewhere on a surface (the delta-gate's own MONITORING line, a sentence about the
+    point) once let a deleted point pass. Every point is removed from every real
+    surface, alone and with its name planted outside the list, and the lock must
+    name exactly that point.
+    """
+    for surface in GATE_SURFACES:
+        text = _read(surface.path).replace("\r\n", "\n")
+        assert _gate_sections_missing(text, surface) == [], f"{surface.path.name}: baseline not clean"
+        for section in GATE_SECTIONS:
+            removed = _remove_gate_point(text, surface, section)
+            assert removed != text, f"{surface.path.name}: removing {section!r} changed nothing"
+            assert _gate_sections_missing(removed, surface) == [section], (
+                f"{surface.path.name}: removing {section!r} was not detected exactly"
+            )
+            masked = removed + f"\n{section} line, {section.lower()} of unattended work\n"
+            assert _gate_sections_missing(masked, surface) == [section], (
+                f"{surface.path.name}: {section!r} planted outside the list masked its removal"
+            )
+
+
+def test_gate_lock_fails_closed_when_the_list_cannot_be_found() -> None:
+    """A surface whose markers moved is an error, never a silent pass."""
+    for surface in GATE_SURFACES:
+        assert _gate_sections_missing("no gate here", surface), (
+            f"{surface.path.name}: a text with no gate list passed the lock"
+        )
 
 # ---------------------------------------------------------------------------
 # #978 — security-doc integrity probes (see module docstring for scope and for
@@ -541,7 +687,7 @@ def test_claude_md_posture_claims_resolve_against_reality() -> None:
     authoritative doctrine TELLS a session about those locks.
     """
     violations = _welded_egress_pin_violations(
-        _read(CLAUDE_MD),
+        "\n".join(_read(p) for p in (CLAUDE_MD, *RULES_FILES)),
         allowlist=_egress_allowlist_symbol(),
         web_search_enabled=_web_search_enabled(),
         adjudicator_sites=_adjudicator_registration_sites(),

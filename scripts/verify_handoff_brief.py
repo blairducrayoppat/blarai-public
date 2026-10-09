@@ -1,3 +1,6 @@
+# enforces-rule: critical_rules.watch-the-context-gauge -- landing card form, not the gauge timing
+# enforces-rule: context_handoff.the-landing-card-template
+# enforces-rule: context_handoff.location
 """
 BlarAI handoff-brief anchor verifier
 ====================================

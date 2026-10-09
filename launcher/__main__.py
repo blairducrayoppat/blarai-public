@@ -276,6 +276,7 @@ def _run_uat2_prompt_flow_preflight(
         "request_id": "",
         "prompt": "UAT2_M2_HEALTHCHECK",
         "token_count": 0,
+        "attempts": 0,
         "response_excerpt": "",
         "pgov": {
             "approved": False,
@@ -317,35 +318,113 @@ def _run_uat2_prompt_flow_preflight(
             },
         }
 
-    try:
-        result = asyncio.run(_execute())
-        payload["session_id"] = result["session_id"]
-        payload["request_id"] = result["request_id"]
-        payload["token_count"] = result["token_count"]
-        payload["response_excerpt"] = result["response_excerpt"]
-        payload["pgov"] = result["pgov"]
-        payload["disposition"] = "PASS"
-        _record_prompt_flow_evidence(payload)
-        # Clean up the ephemeral health-check session so it does not
-        # pollute the user-visible session list on every launch.
-        _preflight_sid = str(result["session_id"])
-        if _preflight_sid:
-            try:
-                session_store.delete_session(_preflight_sid)
-            except Exception:  # noqa: BLE001
-                pass  # best-effort cleanup; preflight already passed
-        return True
-    except Exception as exc:  # noqa: BLE001
-        payload["failure"] = {
-            "timestamp": _timestamp(),
-            "stage": "prompt_flow",
-            "code": "UAT2_PROMPT_FLOW_FAILED",
-            "message": str(exc),
-            "disposition": "FAIL",
-            "fail_closed": "true",
-        }
-        _record_prompt_flow_evidence(payload)
-        return False
+    def _discard(session_id: str) -> None:
+        """Drop the ephemeral health-check session so it never reaches the user's list."""
+        if not session_id:
+            return
+        try:
+            session_store.delete_session(session_id)
+        except Exception:  # noqa: BLE001
+            pass  # best-effort cleanup; the preflight verdict does not depend on it
+
+    # The round-trip is RETRIED, and its result is ASSERTED (#1355).
+    #
+    # Both halves are load-bearing, and neither alone is correct:
+    #
+    #   ASSERT — `gateway.send_prompt` does not raise when the connect fails; it logs
+    #   Fail-Closed and returns the request_id anyway (deliberate: the interactive path
+    #   renders the empty stream). So `try/except` around the round-trip proves only that
+    #   nothing threw. Until #1355 this function returned True on zero tokens, a
+    #   default-denied PGOV lookup and an empty response — and the launcher printed
+    #   "passed ✓" 11 ms after "connect failed". The gate whose stated job is catching a
+    #   PROMPT_REQUEST misroute at boot would have passed the misroute too, because a
+    #   misroute produces exactly that signature.
+    #
+    #   RETRY — asserting alone would convert every busy box into a boot failure. The
+    #   preflight collides with dispatch-asset generation (measured 303 s for 8 assets on
+    #   run 20260809-140620-bd), which is #1353's failure shape arriving from a new
+    #   direction. A misroute stays broken across attempts; contention clears.
+    # The ONLY failure shape that survives the retry loop. An exception returns
+    # immediately from inside it, so this is the message the tail always carries.
+    empty_response_message = (
+        "the round-trip completed without raising but returned NOTHING: 0 tokens and "
+        "an empty response. send_prompt does not raise on a failed connect, so this is "
+        "what a broken or unreachable prompt path looks like from here."
+    )
+    started = time.monotonic()
+    attempts = 0
+
+    while True:
+        attempts += 1
+        session_id = ""
+        try:
+            result = asyncio.run(_execute())
+            session_id = str(result["session_id"])
+            payload["session_id"] = session_id
+            payload["request_id"] = result["request_id"]
+            payload["token_count"] = result["token_count"]
+            payload["response_excerpt"] = result["response_excerpt"]
+            payload["pgov"] = result["pgov"]
+
+            # THE ASSERTION. A round-trip that returned nothing is not a pass.
+            if int(result["token_count"]) > 0 or str(result["response_excerpt"]).strip():
+                payload["attempts"] = attempts
+                payload["disposition"] = "PASS"
+                _record_prompt_flow_evidence(payload)
+                return True
+
+        except Exception as exc:  # noqa: BLE001
+            # A RAISED exception is NOT the contention signature and is not retried.
+            # Contention is silent by construction: send_prompt swallows the failed
+            # connect and returns, so a busy box arrives here as an EMPTY result, never
+            # as an exception. Something that actually raised broke in a way the
+            # transport did not handle, where retrying is unlikely to help and a boot
+            # that hangs for the whole budget on every genuine breakage is worse than
+            # one that reports the fault. This preserves the pre-#1355 fail-fast
+            # contract for exactly the path that had it.
+            payload["attempts"] = attempts
+            payload["failure"] = {
+                "timestamp": _timestamp(),
+                "stage": "prompt_flow",
+                "code": "UAT2_PROMPT_FLOW_FAILED",
+                "message": str(exc),
+                "disposition": "FAIL",
+                "fail_closed": "true",
+            }
+            _record_prompt_flow_evidence(payload)
+            return False
+        finally:
+            _discard(session_id)
+
+        # Only the EMPTY-response path reaches here; exceptions returned above.
+        elapsed = time.monotonic() - started
+        if elapsed >= PROMPT_FLOW_PREFLIGHT_BUDGET_S:
+            break
+        logger.warning(
+            "Prompt-flow preflight attempt %d returned nothing; retrying in %.1fs "
+            "(%.0fs of %.0fs budget spent)",
+            attempts,
+            PROMPT_FLOW_PREFLIGHT_BACKOFF_S,
+            elapsed,
+            PROMPT_FLOW_PREFLIGHT_BUDGET_S,
+        )
+        time.sleep(PROMPT_FLOW_PREFLIGHT_BACKOFF_S)
+
+    payload["attempts"] = attempts
+    payload["failure"] = {
+        "timestamp": _timestamp(),
+        "stage": "prompt_flow",
+        "code": "UAT2_PROMPT_FLOW_EMPTY_RESPONSE",
+        "message": (
+            f"{empty_response_message} "
+            f"[{attempts} attempt(s) over {time.monotonic() - started:.0f}s; "
+            f"budget {PROMPT_FLOW_PREFLIGHT_BUDGET_S:.0f}s]"
+        ),
+        "disposition": "FAIL",
+        "fail_closed": "true",
+    }
+    _record_prompt_flow_evidence(payload)
+    return False
 
 
 def _prompt_flow_preflight_enabled(*, dev_mode: bool) -> bool:
@@ -500,8 +579,11 @@ from shared.constants import (
     VOICE_ENABLED,
 )
 from shared.inference.shared_pipeline import (
+    BrainLayout,
     SharedInferencePipeline,
     build_shared_pipeline,
+    detect_brain_layout,
+    resolve_brain_override,
 )
 from shared.ipc.protocol import DEFAULT_MAX_MESSAGE_BYTES
 from services.assistant_orchestrator.src import entrypoint as _ao_entrypoint
@@ -509,7 +591,11 @@ from services.assistant_orchestrator.src.entrypoint import (
     AssistantOrchestratorService,
 )
 from services.policy_agent.src.entrypoint import PolicyAgentService
-from services.ui_gateway.src.constants import SESSION_DB_PATH
+from services.ui_gateway.src.constants import (
+    PROMPT_FLOW_PREFLIGHT_BACKOFF_S,
+    PROMPT_FLOW_PREFLIGHT_BUDGET_S,
+    SESSION_DB_PATH,
+)
 from services.ui_gateway.src.session_store import (
     EncryptedSessionStore,
     build_session_store,
@@ -1025,11 +1111,19 @@ def _maybe_start_guest_parser() -> "GuestParserManager | None":  # noqa: F821
     # adjudicator and denies EVERY fetch — URL ingest is simply unavailable.
     try:
         from services.ui_gateway.src.url_adjudicator import (
-            make_operator_url_adjudicate,
+            make_request_keyed_url_adjudicate,
             register_url_ingest_adjudicator,
         )
 
-        register_url_ingest_adjudicator(make_operator_url_adjudicate())
+        # #977/#1586: ONE adjudicator, and the request picks the policy. This
+        # used to register the operator "paste is consent" fn while the
+        # Assistant Orchestrator registered the standing-allowlist fn, into the
+        # SAME slot. The slot is LAST-write-wins and THIS call does not guard
+        # itself, while the AO's does — so the operator policy won whenever the
+        # launcher ran at all, in either boot order. It was never a race. The
+        # request-keyed fn serves each purpose correctly whoever registers,
+        # which is why both sites now build the same one.
+        register_url_ingest_adjudicator(make_request_keyed_url_adjudicate())
         _step(
             "Egress door OPEN for operator URL ingest — the Policy Agent now "
             "adjudicates each /ingest <url>; the operator's paste authorizes that one "
@@ -1335,6 +1429,51 @@ def _resolve_kv_cache_precision(runtime_mode: DeploymentMode) -> str | None:
         logger.warning(
             "Could not read [gpu].kv_cache_precision (optional perf knob); leaving "
             "it unset (FP16 default). Reason: %s",
+            exc,
+        )
+        return None
+
+
+def _resolve_brain_override(runtime_mode: DeploymentMode) -> "tuple[Path, Path] | None":
+    """Resolve the brain override for the launcher's pipeline build (#930).
+
+    Reads ``[gpu].brain_model_dir`` from the AO config and delegates the
+    DECISION to ``shared.inference.shared_pipeline.resolve_brain_override`` —
+    the same function both services call, so the launcher, the Policy Agent and
+    the Assistant Orchestrator cannot disagree about which brain is loaded.
+    They disagreed for exactly one boot and every surface reported healthy.
+
+    Returns ``(model_dir, manifest_path)`` or ``None`` for the default 14B.
+    A set-but-missing override RAISES; every other read error falls soft to the
+    default, because a malformed optional knob must not brick boot.
+    """
+    try:
+        config_value = ""
+        try:
+            service_root = resolve_service_root(
+                _ao_entrypoint.__file__, "services.assistant_orchestrator"
+            )
+            config_path = resolve_service_config_path(
+                service_root, deployment_mode=runtime_mode
+            )
+            with open(config_path, "rb") as config_file:
+                config_data = tomllib.load(config_file)
+            config_value = str(config_data.get("gpu", {}).get("brain_model_dir", ""))
+        except Exception as exc:  # noqa: BLE001 — env override still applies
+            logger.warning(
+                "Could not read [gpu].brain_model_dir from config (%s); the "
+                "environment override is still honoured.",
+                exc,
+            )
+        model_dir = resolve_brain_override(config_value)
+        if model_dir is None:
+            return None
+        return model_dir, model_dir / "manifest.json"
+    except FileNotFoundError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — optional switch, fail soft
+        logger.warning(
+            "Brain override resolution failed (%s); using the default Qwen3-14B.",
             exc,
         )
         return None
@@ -1776,16 +1915,46 @@ def main() -> int:
     # kept separate from the 14B's require_signed_manifest (non-authoritative
     # drafts). Flipped true only after the drafts are signed (LA ceremony).
     _require_signed_draft = _resolve_require_signed_draft_manifest(runtime_mode)
+    # #930 BRAIN SWITCH — dormant unless [gpu].brain_model_dir is set. Unset
+    # (the shipped default) leaves every argument below byte-identical to the
+    # pre-switch boot. Set, it selects a different brain; the DRAFT is decided
+    # from the model's layout by build_shared_pipeline, not from config, and a
+    # multimodal brain takes none.
+    _brain_override = _resolve_brain_override(runtime_mode)
+    if _brain_override is None:
+        _brain_dir = _repo_root / TARGET_MODEL_OV_PATH
+        _brain_manifest = _repo_root / TARGET_MODEL_OV_PATH / "manifest.json"
+        _brain_draft_dir: "Path | None" = _repo_root / DRAFT_MODEL_OV_PATH
+        _brain_draft_manifest: "Path | None" = (
+            _repo_root / DRAFT_MODEL_OV_PATH / "manifest.json"
+        )
+    else:
+        _brain_dir, _brain_manifest = _brain_override
+        _layout = detect_brain_layout(_brain_dir)
+        # Only a text-LLM brain can take the 0.6B draft; a multimodal one is
+        # served through VLMPipeline, which has no speculative decoding.
+        _takes_draft = _layout is BrainLayout.TEXT_LLM
+        _brain_draft_dir = (_repo_root / DRAFT_MODEL_OV_PATH) if _takes_draft else None
+        _brain_draft_manifest = (
+            (_repo_root / DRAFT_MODEL_OV_PATH / "manifest.json") if _takes_draft else None
+        )
+        logger.warning(
+            "BRAIN OVERRIDE ACTIVE: %s (layout=%s, speculative decoding=%s). "
+            "This is NOT the default Qwen3-14B.",
+            _brain_dir,
+            _layout.value if _layout else "UNRECOGNISED",
+            "ON" if _takes_draft else "OFF — VLMPipeline has none",
+        )
     _shared_build = build_shared_pipeline(
-        model_dir=_repo_root / TARGET_MODEL_OV_PATH,
-        draft_model_dir=_repo_root / DRAFT_MODEL_OV_PATH,
+        model_dir=_brain_dir,
+        draft_model_dir=_brain_draft_dir,
         # ADR-012 Amendment 3 (Phase 0, OV GenAI 2026.1): re-checked DEC-06
         # empirically — prefix caching ON yields ~23% higher TPS and halves
         # TTFT with no spec-decode acceptance-rate collapse signature.
         enable_prefix_caching=True,
         device="GPU",
-        target_manifest_path=_repo_root / TARGET_MODEL_OV_PATH / "manifest.json",
-        draft_manifest_path=_repo_root / DRAFT_MODEL_OV_PATH / "manifest.json",
+        target_manifest_path=_brain_manifest,
+        draft_manifest_path=_brain_draft_manifest,
         # PA security-gate posture inherited (was PA=HIGH/AO=MEDIUM pre-unification;
         # under a single shared pipeline the priority is moot for scheduling but
         # documents the security frame). ADR-012 Amendment 3.

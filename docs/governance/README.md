@@ -57,10 +57,11 @@ defined in [STYLE.md §Audience Taxonomy](STYLE.md):
 
 ## Governance Domain Inventory
 
-The directory currently contains 13 domain docs + the style guide. The
-domain docs cluster into five families by shared source surface and EA
-authoring origin (Sprint 9 EA-1 through EA-4 + the out-of-plan Fleet
-Hygiene addition). Cluster intros explain why the docs cluster.
+The directory currently contains 16 domain docs + the style guide. The
+domain docs cluster into eight families by shared source surface and
+authoring origin (Sprint 9 EA-1 through EA-4 + four out-of-plan additions:
+Fleet Hygiene, Documentation Lifecycle, Cryptographic Trust & Integrity, and
+Trust Spine Synthesis). Cluster intros explain why the docs cluster.
 
 ### Security and Wire Protocol
 
@@ -182,6 +183,48 @@ to the navigation map in [`../INDEX.md`](../INDEX.md).
   rule. Enforced advisorily by `tools/doc_lint/` (not yet gated).
   Additive slice of #267; the archive-move workstream is separate.
 
+### Cryptographic Trust & Integrity
+
+Originally scoped as GOV-01 and GOV-10 in the Sprint 9 SDV §5.1 plan and
+listed below under Deferred Domains until 2026-07-16 — both were deferred at
+kickoff pending the Pluton-capability investigation (ISS-4, Vikunja #101).
+Authored anyway once the Lead Architect declined full hardware-rooted trust
+(2026-07-15) and the live posture became a software mechanism instead: the
+deferral's premise (that these docs would need to describe a Pluton-sealed
+design) stopped applying the moment that design was declined rather than
+built. Both docs confine the originally-scoped hardware ambition to their own
+"Declined & deferred scope" section and document what actually ships.
+
+- [weight-integrity.md](weight-integrity.md) — owns the signed-manifest
+  chain (boot gate, load-time sweep, per-adjudication re-verify) that ties
+  Policy-Agent trust to the bytes of the model it runs. GOV-10
+  (Vikunja [#23](http://localhost:3456/tasks/23)).
+- [credential-lifecycle.md](credential-lifecycle.md) — owns the full
+  credential inventory: per-boot mTLS certificates, the at-rest
+  Data-Encryption Key, and the TPM-resident signing keys. GOV-01
+  (Vikunja [#14](http://localhost:3456/tasks/14)). Its §9.2 is also the
+  first place the codebase noted, in writing, that the CAR/JWT pipeline
+  [rule-engine.md](rule-engine.md) and [ipc-protocol.md](ipc-protocol.md)
+  describe is not the live host-mode authorization boundary (ADR-041) —
+  both of those docs now carry a short cross-reference to that finding.
+
+### Trust Spine Synthesis
+
+Cross-cutting addition, 2026-09-16 (Vikunja
+[#473](http://localhost:3456/tasks/1539)). Pulls the security/trust claims
+scattered across this directory's domain docs, the ADR corpus, the runbooks,
+and the code itself into one numbered, source-anchored table — what each
+claim is, what evidence backs it, and its stated limitation. Its "single
+decision surface," in `STYLE.md`'s sense, is unusually broad — the
+directory's own claim about every *other* claim the directory makes — but it
+carries the full six-part domain-doc template, not a shorter index/meta-doc
+adaptation.
+
+- [trust-spine-claim-register.md](trust-spine-claim-register.md) — the
+  register. Its own authoring found this README's Deferred Domains section
+  stale (the fix above) and the `rule-engine.md` / `ipc-protocol.md` gap
+  noted above — both fixed in the same change as the register itself.
+
 ## Audience Taxonomy Matrix
 
 Each row records whether the named doc's `## Audience` section names
@@ -198,6 +241,7 @@ the ledger Notes (e.g., "operator (LA)" in fleet-hygiene.md maps to
 | [circuit-breaker.md](circuit-breaker.md) | — | ✓ | ✓ | ✓ | — |
 | [configuration-management.md](configuration-management.md) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [context-spotlighting.md](context-spotlighting.md) | — | ✓ | ✓ | ✓ | — |
+| [credential-lifecycle.md](credential-lifecycle.md) | ✓ | ✓ | ✓ | ✓ | — |
 | [deployment-verification.md](deployment-verification.md) | ✓ | — | — | ✓ | — |
 | [error-recovery.md](error-recovery.md) | ✓ | ✓ | — | ✓ | — |
 | ~~[fleet-hygiene.md](fleet-hygiene.md)~~ **RETIRED (file absent)** | ✓ | — | — | ✓ | ✓ |
@@ -208,37 +252,23 @@ the ledger Notes (e.g., "operator (LA)" in fleet-hygiene.md maps to
 | [rule-engine.md](rule-engine.md) | — | ✓ | ✓ | — | — |
 | [session-state.md](session-state.md) | — | ✓ | ✓ | ✓ | — |
 | [streaming-output.md](streaming-output.md) | ✓ | ✓ | ✓ | — | — |
+| [weight-integrity.md](weight-integrity.md) | ✓ | ✓ | ✓ | ✓ | — |
+| [trust-spine-claim-register.md](trust-spine-claim-register.md) | — | ✓ | ✓ | ✓ | ✓ |
 
 ## Deferred Domains
 
-Two governance domains from the Sprint 9 SDV §5.1 plan were
-explicitly deferred at sprint kickoff because their substantive
-content depends on a Pluton-capability investigation that has not
-yet completed. Both are tracked in Vikunja and are blocked on the
-same investigation ticket:
+Empty as of 2026-07-16. The two domains originally deferred here at Sprint 9
+kickoff — GOV-01 (credential & certificate lifecycle) and GOV-10 (weight
+integrity) — were both authored once the Lead Architect declined full
+hardware-rooted trust (2026-07-15) and the live posture became software-only;
+see the **Cryptographic Trust & Integrity** cluster above. Neither was
+unblocked by ISS-4 resolving — the deferral's premise stopped applying when
+the Pluton-sealed design was declined instead of pursued.
 
-- **GOV-01 — Credential & Certificate Lifecycle Governance**
-  (Vikunja [#14](http://localhost:3456/tasks/14)). Would document
-  the mTLS certificate issuance flow, Pluton-sealed CA key handling,
-  ephemeral per-boot certificate generation, JWT epoch propagation,
-  and the certificate-compromise recovery runbook. Deferred because
-  the design assumes Pluton-sealed CA keys, and the precise API
-  surface available on Lunar Lake is unverified.
-- **GOV-10 — Weight Integrity Verification Procedure**
-  (Vikunja [#23](http://localhost:3456/tasks/23)). Would document
-  the boot-time SHA-256 weight check against a Pluton-sealed
-  manifest, the event-triggered runtime re-verification, the
-  Known-Good Manifest provisioning ceremony, and the corruption-
-  detection logging path. Deferred for the same Pluton dependency.
-
-Common blocker: **ISS-4 — Investigate Pluton capabilities on Intel
-Core Ultra 258V (Lunar Lake)**
-(Vikunja [#101](http://localhost:3456/tasks/101)). Until ISS-4
-delivers a findings doc covering the Windows TPM2.0 / Pluton SDK
-surface, key-sealing feasibility, and attestation paths, both
-GOV-01 and GOV-10 risk being authored against an architecture
-assumption that does not match the hardware. Re-check ISS-4 status
-before unblocking either ticket.
+**ISS-4 — Investigate Pluton capabilities on Intel Core Ultra 258V (Lunar
+Lake)** (Vikunja [#101](http://localhost:3456/tasks/101)) remains open in its
+own right, independent of these two docs, for anyone who later revisits the
+declined hardware-sealing path.
 
 ## Phantom and Forthcoming References
 

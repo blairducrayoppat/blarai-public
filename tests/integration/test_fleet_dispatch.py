@@ -510,7 +510,13 @@ def test_create_project_seed_assets_seeds_the_folder_contract(tmp_path):
     text = (assets / "README.txt").read_text(encoding="utf-8")
     assert "reference" in text and text.endswith("\n")
     ref_text = (assets / "reference" / "README.txt").read_text(encoding="utf-8")
-    assert "LOOKS" in ref_text and "WORKS" in ref_text
+    # Was: assert "LOOKS" in ref_text and "WORKS" in ref_text -- the LOOKS-vs-WORKS
+    # question belongs to the reference-extraction family (#1165 M6), which is NOT
+    # built. Until it is, the enumeration excludes this whole subtree and nothing else
+    # reads it, so that wording asked the operator to do work with no consumer. The
+    # assertion now pins the honest state; restore the fuller one WITH the capability.
+    assert "NOT USED YET" in ref_text
+    assert "emulate" in ref_text  # the folder's purpose is still named, just not sold
     cp = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
                         capture_output=True, text=True)
     assert cp.stdout.strip() == "", "the seeded assets folders must be committed"

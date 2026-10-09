@@ -1,0 +1,11 @@
+Written 2026-10-07 before any control run. Both arms are WORKTREES (no models/, gitignored assets absent), elevated, LOCALAPPDATA redirected per run.
+new = ca4fab46 (main before #1703): 13179 selected / 620 deselected. Predicted 13148 passed / 5 failed / 26 skipped
+   (3 missing-14B-model failures + 2 ADR-013 relative-link failures + 26 asset skips, as read on the #1703 branch gate).
+old = 3be0e22e (09-22 tree): 12086 selected / 133 deselected. Predicted: failed 3..5 (same environmental classes), skipped about 26, passed = 12086 - failed - skipped (about 12055).
+A mismatch of more than 5 tests in any column stops the arc for diagnosis. Wall-clock is not predicted: that is the measurement.
+Deselected: old 133 vs new 620 (the slow marker grew by 487 tests that the standing gate never runs).
+
+Written 2026-10-07 ~20:00 before the post-fix runs (plan 2; the control plan's state.json was replaced in place, its copy is in docs/performance/gate_runtime_2026-10-07/timing_runs/).
+fixed = f407d2af (main with #1703, the timing runner, and the installer batching), WORKTREE gate-fixed-f407d2af: 13250 selected / 620 deselected. Predicted 13219 passed / 5 failed / 26 skipped (same 5 environmental failures and 26 asset skips as ca4fab46).
+real  = the primary checkout at f407d2af (models present), elevated: predicted 13250 passed / 0 failed / 0 skipped / 620 deselected. These are the post-merge gate for the installer change AND timing readings.
+Hypothesis stated in advance: the fixed arm is faster than the new arm (1632 / 1687 s) by roughly 300 s and slower than the old arm (703 / 693 s); the real arm differs from the worktree arm for reasons not isolated (models present, location). A fixed result outside 1350 +/- 150 s is a surprise to be explained, not rounded.

@@ -26,6 +26,14 @@ from shared.fleet.swap_ops import (
 )
 
 
+#: Anchor for the synthetic clock. Staleness in these tests is expressed RELATIVE to
+#: this and to ``dc.DOOM_STALL_GRACE_S``, never as a literal chosen against whatever the
+#: grace happened to be that week (#1366 — two tests pinned "500s stale >= 240 grace"
+#: and went red when the grace legitimately moved to 900, reporting a production
+#: regression that did not exist).
+_MTIME: float = 500.0
+
+
 def _sample(
     *,
     wall_now: float = 1000.0,
@@ -48,8 +56,15 @@ def _sample(
 
 class TestClassifyDoom:
     def test_determined_doom_all_conditions(self) -> None:
-        prev = _sample(wall_now=700.0, mtime=500.0)
-        cur = _sample(wall_now=1000.0, mtime=500.0)  # 500s stale >= 240 grace
+        # DERIVED from the constant, not pinned to it (#1366). This read
+        # `wall_now=1000.0, mtime=500.0  # 500s stale >= 240 grace` -- a staleness
+        # chosen against the grace of the day, which then broke the moment the grace
+        # moved 240 -> 900 and reported a PRODUCTION regression that did not exist.
+        # A test pinned to a magic number does not just break on a tune, it ARGUES
+        # AGAINST tuning: the constant felt locked because changing it went red.
+        stale_at = _MTIME + dc.DOOM_STALL_GRACE_S + 60.0
+        prev = _sample(wall_now=_MTIME + 200.0, mtime=_MTIME)
+        cur = _sample(wall_now=stale_at, mtime=_MTIME)
         assert dc.classify_doom(prev, cur) is True
 
     def test_no_child_registered_never_dooms(self) -> None:
@@ -82,8 +97,12 @@ class TestClassifyDoom:
         assert dc.classify_doom(prev, cur) is False
 
     def test_stale_but_inside_grace_waits(self) -> None:
-        prev = _sample(wall_now=900.0, mtime=800.0)
-        cur = _sample(wall_now=1000.0, mtime=800.0)  # 200s stale < 240 grace
+        # Derived, like its sibling above (#1366). This passed by luck after the grace
+        # moved 240 -> 900 — 200 s is inside both windows — but its comment still read
+        # "< 240 grace", so it was a correct test carrying a false statement about why.
+        inside = _MTIME + dc.DOOM_STALL_GRACE_S - 60.0
+        prev = _sample(wall_now=_MTIME + 100.0, mtime=_MTIME)
+        cur = _sample(wall_now=inside, mtime=_MTIME)
         assert dc.classify_doom(prev, cur) is False
 
     def test_non_positive_grace_disables(self) -> None:
@@ -236,10 +255,15 @@ class TestDoomWatchdog:
 
     def test_live_thread_dooms_sets_fired_and_stops(self) -> None:
         calls: list = []
+        # Derived from the constant, same reason as TestClassifyDoom above (#1366).
+        stale_at = _MTIME + dc.DOOM_STALL_GRACE_S + 60.0
         samples = iter(
-            [_sample(wall_now=700.0, mtime=500.0), _sample(wall_now=1000.0, mtime=500.0)]
+            [
+                _sample(wall_now=_MTIME + 200.0, mtime=_MTIME),
+                _sample(wall_now=stale_at, mtime=_MTIME),
+            ]
         )
-        last = _sample(wall_now=1000.0, mtime=500.0)
+        last = _sample(wall_now=stale_at, mtime=_MTIME)
 
         def sample() -> dc.DoomSample:
             nonlocal last

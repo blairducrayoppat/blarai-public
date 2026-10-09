@@ -46,37 +46,51 @@ class TestUiGatewayConstants:
     def test_pa_handshake_max_retries(self) -> None:
         # #808: derived from the 180 s budgeted schedule (was a hand-pinned 3;
         # the ~15-18 s aggregate contradicted the documented cold-14B ceiling).
-        assert gw_constants.PA_HANDSHAKE_MAX_RETRIES == 16
+        assert gw_constants.PA_HANDSHAKE_MAX_RETRIES == 25
 
     def test_pa_handshake_backoff_base_s(self) -> None:
         assert gw_constants.PA_HANDSHAKE_BACKOFF_BASE_S == 1.0
 
     def test_pa_handshake_timeout_s(self) -> None:
-        assert gw_constants.PA_HANDSHAKE_TIMEOUT_S == 5.0
+        assert gw_constants.PA_HANDSHAKE_TIMEOUT_S == 30.0
 
     def test_pa_handshake_backoff_cap_s(self) -> None:
         # #808: tail probe interval — worst-case staleness after the PA
         # becomes ready inside the budget.
-        assert gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S == 15.0
+        assert gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S == 30.0
 
     def test_pa_handshake_budget_s(self) -> None:
         # #808: aggregate planned backoff = the documented cold-14B-load
         # ceiling (real_backend_ready / AoReensurer.boot_wait_s = 180 s).
-        assert gw_constants.PA_HANDSHAKE_BUDGET_S == 180.0
+        assert gw_constants.PA_HANDSHAKE_BUDGET_S == 600.0
 
     def test_pa_handshake_schedule_shape(self) -> None:
         """#808: the schedule is the executable truth — pin its shape.
 
         Early attempts stay fast (the healthy path is unchanged; a quick
-        recovery is caught in seconds), the tail probes every 15 s, and the
+        recovery is caught in seconds), the tail probes at the cap, and the
         planned sleeps sum EXACTLY to the budget.
         """
         schedule = gw_constants.pa_handshake_backoff_schedule()
+        cap = gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S
+
+        # The healthy path is the load-bearing half: a PA that comes up promptly is caught
+        # in the first second regardless of how the tail is tuned.
         assert schedule[:4] == (1.0, 2.0, 4.0, 8.0)
-        assert set(schedule[4:]) == {gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S}
+
+        # DOUBLE UNTIL THE CAP, THEN HOLD. The earlier form asserted every step past index 4
+        # equalled the cap, which was only true while the cap sat BELOW the next doubling
+        # step. Raising it to 30 s (#1353) made 16 a legitimate doubling step and reddened a
+        # test that was pinning an accident of the old value rather than the rule.
+        for earlier, later in zip(schedule, schedule[1:]):
+            assert later >= earlier or later == schedule[-1], (
+                "sleeps must be non-decreasing until the trimmed final step"
+            )
+        assert all(0 < d <= cap for d in schedule), "no sleep may exceed the cap"
+        assert max(schedule) == cap, "the tail must actually reach the cap"
+
+        # The budget is the contract: planned sleeps sum EXACTLY to it, final step trimmed.
         assert sum(schedule) == gw_constants.PA_HANDSHAKE_BUDGET_S
-        assert all(d > 0 for d in schedule)
-        assert max(schedule) == gw_constants.PA_HANDSHAKE_BACKOFF_CAP_S
         assert len(schedule) + 1 == gw_constants.PA_HANDSHAKE_MAX_RETRIES
 
     def test_prompt_response_timeout_s(self) -> None:

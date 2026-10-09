@@ -1,0 +1,51 @@
+{
+  "benchmark": "ovms_coder30b_throughput_collapse",
+  "config_stamp": {
+    "timestamp": "2026-08-31T02:06:00-04:00",
+    "model_name": "Qwen3-Coder-30B-A3B",
+    "model_precision": "int4 (16.0 GB on disk, C:\\models\\coder-30b)",
+    "served_model_id": "coder-30b",
+    "endpoint": "http://127.0.0.1:8000/v3/chat/completions",
+    "device_requested": "GPU",
+    "ovms_version": "2026.2.5e9dcfc46 (OpenVINO backend 2026.2.0)",
+    "ovms_flags": "kv_cache_precision u8 | tool_parser qwen3coder | enable_tool_guided_generation true | enable_prefix_caching true | cache_size 4",
+    "hardware": "Intel Core Ultra 7 258V (Lunar Lake), 31.32 GiB RAM, Intel Arc 140V, driver 32.0.101.8826, Windows 11 Pro 26200",
+    "box_state": "CLEAN — no fleet run, no AO, no other model. RAM free 7.33 GiB, ovms working set 19.29 GB.",
+    "max_tokens": 128,
+    "temperature": 0,
+    "num_warmup": 1,
+    "num_runs": 3
+  },
+  "results": {
+    "decode_tps": [0.45, 0.80, 0.81],
+    "median_tps": 0.80,
+    "wall_secs": [283.9, 160.2, 158.4],
+    "completion_tokens": [128, 128, 128],
+    "contended_sample_earlier": {
+      "tps": 0.46,
+      "note": "taken 01:45 while a coder task was generating; the clean runs above show contention was NOT the cause"
+    }
+  },
+  "baseline_for_comparison": {
+    "source": "docs/performance/benchmark_ovms_coder-30b_2026-06-29_13-29-30.json",
+    "median_tps": 38.58,
+    "mean_tps": 35.74,
+    "median_ttft_ms": 184.1,
+    "ovms_version": "2026.2",
+    "same": ["model", "served_model_id", "endpoint", "device", "ovms_flags", "machine", "driver"]
+  },
+  "headline": "Clean-box coder-30b decode measured 0.80 tok/s median against a 38.58 tok/s same-configuration baseline — roughly 48x slower. Cause NOT established.",
+  "operational_consequence": "This is why dispatch run 20260831-003919-bd produced nothing. All three candidates of implement-photo-bio-section were killed by the ACP idle breaker (acp.idle_sec = 600) after reading the operator's content files and beginning to write index.html. At 0.8 tok/s a ~3000-token page takes ~62 minutes of unbroken generation, and a single long file write emits no intermediate step — so the watchdog cannot distinguish it from a hang. The coder was not stuck; it was generating.",
+  "what_was_ruled_out": [
+    "Contention — the clean runs above have nothing else on the box.",
+    "Memory pressure — 7.33 GiB free, no page thrash.",
+    "Wrong OVMS version — 2026.2.5e9dcfc46 confirmed, the rolled-back build.",
+    "Kernel-cache recompilation — zero cache writes observed over 15 minutes.",
+    "CPU fallback — 17.79 GiB of GPU shared memory is allocated, so the model is resident on the GPU.",
+    "An OVMS-reported error — logs are clean; it reports 'Available devices: CPU, GPU, NPU' and proceeds with no warning or fallback notice."
+  ],
+  "not_established": "The cause. Two candidates, not separated: (a) GPU driver/device state degraded by this session's OVMS version round-trip (2026.2 -> 2026.3 -> 2026.2, with the GPU-plugin OFFLOAD_RATIO property exercised and 33 kernel-cache entries quarantined); (b) a pre-existing condition never noticed because nothing re-measured since 2026-06-29 — which would be consistent with docs recording web coder tasks at 40-85 minutes each.",
+  "why_b_matters_if_true": "If throughput has been at this level for some time, then the coder fleet's record (1 clean website in 46 attempts) is partly a SPEED problem misread as a quality problem: every candidate racing a 600 s idle watchdog it cannot beat on a long file write. That reframes the instrument-honesty arc and is worth settling before more coder-quality work is done.",
+  "next_step": "Reboot, then re-run this exact probe. ~38 tok/s implicates driver state from this session; ~0.8 tok/s makes it pre-existing and the more important finding. Either answer is cheap to obtain and neither should be guessed at.",
+  "honest_limits": "N=3, one warmup, 128-token generations, single prompt, no cooldown discipline, no prefill measurement, no GPU-engine profiling beyond coarse Windows counters. Sufficient to establish that a large regression exists against a directly comparable baseline; insufficient to attribute it."
+}

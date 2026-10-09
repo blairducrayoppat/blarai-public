@@ -52,6 +52,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -179,6 +180,28 @@ _HARD_CLASSES: frozenset[str] = frozenset({
     CLASS_F2P_VACUOUS,
 })
 
+#: Findings that make a requirement→assertion map IMPOSSIBLE, as opposed to merely
+#: unflattering (#1374). The coverage map used to be gated on ``_HARD_CLASSES`` being
+#: empty, and the consequence was measured on 2026-08-10: every B9 run reported
+#: ``adequacy_floor: 2``, so the map was skipped on **every run that had ever happened**
+#: and capability 17 had no data at all.
+#:
+#: The original guard's reasoning was right for the classes it was written against —
+#: you cannot trace assertions through an oracle that will not collect, whose strategy is
+#: ill-posed, or that blocks on stdin. Those three stay.
+#:
+#: ``adequacy_floor`` and ``f2p_vacuous`` are a different animal. They do not mean *this
+#: exam is broken*; they mean *this exam is too thin*. A thin exam parses fine, and it is
+#: exactly when you most want to know WHICH of the operator's requirements nobody wrote an
+#: assertion for — that is #1342, where an exam that could not fail deleted a page he had
+#: asked for in his own words. Grouping "too thin to trust" with "too broken to parse"
+#: suppressed the measurement precisely when it was most informative.
+_COVERAGE_BLOCKING_CLASSES: frozenset[str] = frozenset({
+    CLASS_COLLECTABILITY,
+    CLASS_STRATEGY,
+    CLASS_INTERACTIVE_IO,
+})
+
 # ---------------------------------------------------------------------------
 # Budgets (registered in shared/timeout_registry.py — same change, the gate enforces it)
 # ---------------------------------------------------------------------------
@@ -269,6 +292,10 @@ class OracleQAResult:
     collectability: str = "not-run"
     language: str = "python"
     validated: bool = True
+    #: WHY an execution probe produced no result (#1350). Empty when it ran. Populated by
+    #: :func:`_not_run` via the seed gate; published in ``to_evidence`` under
+    #: ``not_measured_detail`` so a reader can act on a `not-run` instead of only seeing it.
+    f2p_diagnostics: dict = field(default_factory=dict)
 
     @property
     def seedable(self) -> bool:
@@ -349,6 +376,9 @@ class OracleQAResult:
             "uncovered": list(self.uncovered),
             "f2p_baseline": self.f2p_baseline,
             "collectability": self.collectability,
+            # #1350: a `not-run` that says WHY. Empty dict when the probe ran — the presence
+            # of a cause here is itself the signal that an execution stage did not.
+            "not_measured_detail": dict(self.f2p_diagnostics),
         }
 
 
@@ -741,6 +771,67 @@ def check_import_contract(code: str, declared_modules: set[str]) -> list[OracleF
     return out
 
 
+#: How many successively-numbered identifiers sharing one stem constitute a repetition
+#: collapse rather than a deliberately enumerated fixture. Precision-first: a hand-written
+#: test legitimately uses `item1, item2, item3`, and a generated one occasionally goes to
+#: five or six. Fifty-four is not a fixture. Eight is comfortably clear of honest usage and
+#: comfortably below the observed collapse.
+_DEGENERACY_RUN_THRESHOLD = 8
+
+#: `habits2`, `habits3`, ... — a stem followed by a bare integer.
+_NUMBERED_IDENT_RE = re.compile(r"\b([A-Za-z_][A-Za-z_]*)(\d+)\b")
+
+
+def generation_degeneracy(code: str) -> Optional[OracleFinding]:
+    """The model looped instead of finishing (#1351). LANGUAGE-AGNOSTIC, no parse required.
+
+    **The artifact.** `20260806-094526-bd` and `20260806-171303-bd` each seeded a job oracle
+    of 6544 bytes ending mid-token at `const habits55 = await get`, containing `habits2`
+    through `habits55` — 54 successive variables of one shape. The two files are
+    **byte-identical**, because generation here is deterministic: the same prompt collapses
+    the same way every time, so RETRY IS NOT A REMEDY. That is worse than a flaky truncation,
+    and it is why this is worth detecting rather than absorbing.
+
+    **Why this is not covered by the parse check.** `node --check` (and `check_syntax` on the
+    Python path) catches these two files because the collapse ran into the generation budget
+    mid-token. A repetition loop that happens to terminate on a statement boundary parses
+    perfectly and would be seeded as a real exam — a fifty-line oracle that asserts one thing
+    fifty times is a failed generation whether or not it compiles.
+
+    Runs on raw text deliberately: a collapsed generation is frequently unparseable, which is
+    exactly when this finding is most useful.
+
+    HARD, because an exam produced by a degenerate generation is not an exam.
+    """
+    stems: dict[str, set[int]] = {}
+    for match in _NUMBERED_IDENT_RE.finditer(code):
+        stem, digits = match.group(1), match.group(2)
+        if len(stem) < 2:  # `x1`, `y2` — coordinate-ish, not a generated run
+            continue
+        stems.setdefault(stem, set()).add(int(digits))
+
+    for stem, seen in stems.items():
+        if len(seen) < _DEGENERACY_RUN_THRESHOLD:
+            continue
+        # A RUN, not merely a count: consecutive integers are what a loop emits, while a
+        # scattered set is more likely deliberate (error codes, HTTP statuses, years).
+        ordered = sorted(seen)
+        longest = run = 1
+        for prev, cur in zip(ordered, ordered[1:]):
+            run = run + 1 if cur == prev + 1 else 1
+            longest = max(longest, run)
+        if longest >= _DEGENERACY_RUN_THRESHOLD:
+            return OracleFinding(
+                CLASS_ADEQUACY_FLOOR,
+                f"the generation collapsed into repetition: `{stem}1`..`{stem}{ordered[-1]}` "
+                f"({longest} consecutive) - a failed generation, not an exam. Deterministic "
+                f"sampling means a retry reproduces it byte-for-byte, so the prompt or the "
+                f"sampling must change rather than the job being re-run",
+                subject=stem,
+            )
+    return None
+
+
 def adequacy_floor(code: str) -> Optional[OracleFinding]:
     """The non-vacuity floor (r2adequacy §3.5, r3adversary B1/B4): the oracle must
     import at least one first-party module AND at least one test must EXERCISE a
@@ -999,6 +1090,15 @@ def _qa_env(isolated_home: Path, extra_path: "str | None" = None) -> dict:
     env["APPDATA"] = str(isolated_home)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    # #1200: the SECOND lock on the same defect. `--color=no` in the clean recipe already
+    # stops PYTEST colouring, and that is the output actually parsed; this stops everything
+    # ELSE in the blob (uv's own progress lines, a plugin's banner) from carrying escapes
+    # into `_run_completed`. Inherited colour is the failure mode — a parent that exports
+    # FORCE_COLOR turned a vacuous-oracle conviction into `not-run` — so the variables are
+    # dropped rather than trusted, and NO_COLOR is set for tools that honour only that.
+    env["NO_COLOR"] = "1"
+    for _colour_var in ("FORCE_COLOR", "CLICOLOR_FORCE", "PY_COLORS", "CLICOLOR"):
+        env.pop(_colour_var, None)
     overlay = grade_env.clean_grade_env(extra_path or "")
     env["PYTHONSAFEPATH"] = overlay["PYTHONSAFEPATH"]
     if extra_path:
@@ -1151,11 +1251,52 @@ def confirm_collectable(
         return ("unconfirmed", None)
 
 
+def _not_run(
+    diagnostics: "dict | None",
+    cause: str,
+    detail: str,
+    *,
+    elapsed_s: "float | None" = None,
+    cmd: "list[str] | None" = None,
+    stdout: str = "",
+    stderr: str = "",
+) -> tuple[str, list[OracleFinding]]:
+    """Return the ``not-run`` stamp and, when the caller supplied a dict, WHY.
+
+    #1350. ``not-run`` is fail-loud but it was never DIAGNOSTIC: it says the probe produced
+    no result and nothing else. All 81 banked ``oracle-qa.json`` records carry it, across
+    both ecosystems since 2026-07-12, and nobody could tell from the record whether the
+    runner was missing, timed out, or died on its way up — so the single most load-bearing
+    check in the QA system reported the same word for a month and no one could act on it.
+
+    **The stamp string is EXACTLY ``not-run`` and must stay so.** Several gates decide
+    whether an oracle may delete work by membership test against
+    :data:`STAMPS_NOT_MEASURED` (``swap_driver._oracle_execution_validated``), and a
+    decorated stamp like ``not-run:timeout`` would fail that test — turning an unvalidated
+    oracle back into evidence, which is precisely the #1342 amputation. The cause therefore
+    rides in a SEPARATE dict, never in the stamp.
+
+    Output is tail-truncated: a runner that died mid-plugin-load can emit a great deal, and
+    a diagnostic nobody can read is the defect wearing the fix's uniform.
+    """
+    if diagnostics is not None:
+        diagnostics.update({
+            "cause": cause,
+            "detail": detail,
+            "elapsed_s": elapsed_s,
+            "cmd": " ".join(str(c) for c in cmd) if cmd else "",
+            "stdout_tail": (stdout or "")[-800:],
+            "stderr_tail": (stderr or "")[-800:],
+        })
+    return ("not-run", [])
+
+
 def fail_to_pass_baseline(
     code: str,
     skeleton_dir: str,
     *,
     run: "Callable[..., tuple[bool, str, str]]" = _default_run,
+    diagnostics: "dict | None" = None,
 ) -> tuple[str, list[OracleFinding]]:
     """The FAIL-TO-PASS baseline (r1extern lever 1 / SWE-bench F→P / AgentLens Lucky
     Pass): run the oracle ONCE against the PRE-IMPLEMENTATION skeleton and require EVERY
@@ -1178,10 +1319,12 @@ def fail_to_pass_baseline(
     the gate — a capability change, not a defect fix. Findings are identical either way, so
     the seed proceeds exactly as before; what changes is that the evidence stops claiming
     more than it measured."""
+    _t0 = time.monotonic()
     try:
         repo = Path(skeleton_dir)
         if not repo.is_dir():
-            return ("not-run", [])
+            return _not_run(diagnostics, "skeleton-absent",
+                            f"the pre-implementation skeleton does not exist: {skeleton_dir}")
         clean = _clean_ini(repo)
         rel = "_qa_f2p_probe.py"
         probe = repo / rel
@@ -1189,7 +1332,9 @@ def fail_to_pass_baseline(
         try:
             cmd = _pytest_cmd(rel, clean, collect_only=False)
             if cmd is None:
-                return ("not-run", [])
+                return _not_run(diagnostics, "no-runner",
+                                "neither uv nor the current interpreter could be resolved, "
+                                "so no pytest invocation could be built")
             # (verbosity is _pytest_cmd's — appending -v here cancelled its -q instead)
             with tempfile.TemporaryDirectory(prefix="oracle_qa_home_") as home:
                 env = _qa_env(Path(home), extra_path=str(repo))
@@ -1217,7 +1362,11 @@ def fail_to_pass_baseline(
             # from a run that completed on an interpreter we could not vouch for.
             if _run_completed(blob):
                 return ("parity-unverified" if unpinned else "all-fail", [])
-            return ("not-run", [])
+            return _not_run(
+                diagnostics, "runner-produced-nothing",
+                "the runner exited without pytest reporting a result - a timeout, a crash "
+                "before plugin load, or an interpreter that died on its way up",
+                elapsed_s=round(time.monotonic() - _t0, 2), cmd=cmd, stdout=out, stderr=err)
         finally:
             try:
                 probe.unlink()
@@ -1227,8 +1376,9 @@ def fail_to_pass_baseline(
                 clean.unlink()
             except OSError:
                 pass
-    except Exception:  # noqa: BLE001 — machinery failure is an honest not-run
-        return ("not-run", [])
+    except Exception as exc:  # noqa: BLE001 — machinery failure is an honest not-run
+        return _not_run(diagnostics, "raised",
+                        f"the baseline raised {type(exc).__name__}: {exc}")
 
 
 def _discriminating_tests(passed: list[str]) -> list[str]:
@@ -1256,15 +1406,28 @@ def _discriminating_tests(passed: list[str]) -> list[str]:
     return [name for name in passed if not name.startswith(FLOOR_TEST_PREFIX)]
 
 
+#: ANSI SGR escapes. Stripped before every parse below — the THIRD lock on #1200, and the
+#: only one that does not depend on controlling the producer. `--color=no` in the clean
+#: recipe and the colour-var scrub in `_qa_env` both stop pytest emitting escapes; this
+#: makes the reader immune to them however they arrive (a plugin banner, a future runner, a
+#: caller that builds its own blob). Measured 2026-08-15: coloured output put an escape
+#: between the test name and PASSED, so a VACUOUS oracle — one that passes with no
+#: implementation present — stamped `not-run` instead of being convicted. A grader that
+#: reads output as text must not be defeated by how that text is decorated.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
 def _passed_tests(output: str) -> list[str]:
     """Parse pytest ``-v`` output for the names of tests that PASSED (the vacuous set).
     Matches ``<file>::<name> PASSED`` and ``<name> PASSED`` shapes; de-duped,
-    order-preserving. A collection error / all-fail run yields none."""
+    order-preserving. A collection error / all-fail run yields none.
+
+    ANSI-tolerant: see :data:`_ANSI_RE`."""
     import re
 
     out: list[str] = []
     seen: set[str] = set()
-    for line in output.splitlines():
+    for line in _ANSI_RE.sub("", output).splitlines():
         m = re.search(r"(?:::)?([A-Za-z_]\w*)\s+PASSED\b", line)
         if not m:
             continue
@@ -1323,10 +1486,20 @@ def _run_completed(output: str) -> bool:
     read the resulting "completed run with nothing passing" as ``all-fail``: CLEAN, from a run
     that never executed a test. A machinery miss must never be able to spell itself like a
     result, so every accepted shape here is one only pytest produces — a count, a collection
-    line, or a phrase it emits verbatim."""
+    line, or a phrase it emits verbatim.
+
+    ANSI-tolerant (see :data:`_ANSI_RE`), as DEFENCE IN DEPTH rather than as an observed
+    fix. Measured honestly: on real coloured pytest output this matcher was NOT blinded —
+    pytest wraps the escapes around ``1 passed``, leaving the count phrase contiguous, so the
+    anchors still matched. Only :func:`_passed_tests` actually broke, because there the
+    escape lands between the test name and ``PASSED``. The strip is here so that a matcher
+    whose correctness currently rests on where a third party happens to place its escapes
+    stops resting on that. Stripping keeps the anchoring strict rather than loosening it —
+    the fix for a matcher blinded by decoration is to remove the decoration, never to widen
+    the match until the decorated form fits."""
     if not output:
         return False
-    low = output.lower()
+    low = _ANSI_RE.sub("", output).lower()
     if _PYTEST_COUNT_RE.search(low) or _PYTEST_COLLECTED_RE.search(low):
         return True
     # Searched against the ORIGINAL, not ``low``: the banner is upper-case and the pattern
@@ -1482,14 +1655,35 @@ def _declared_symbols(tasks: list[dict]) -> tuple[set[str], set[str]]:
 
 
 def _static_findings(
-    code: str, exports: set[str], modules: set[str], spec_corpus: str = ""
+    code: str, exports: set[str], modules: set[str], spec_corpus: str = "",
+    *, ecosystem: str = "",
 ) -> list[OracleFinding]:
     """Run the AST-decidable static stages in priority order. If the syntax check fires,
     return it alone (everything downstream is moot on unparseable code)."""
+    # BEFORE the syntax short-circuit, deliberately. A collapsed generation usually does not
+    # parse (it stops mid-token when the budget runs out), so running this after the return
+    # would mean it never fires on the case it was written for. Reporting "the generation
+    # collapsed" is also strictly more actionable than "it does not parse": the first names a
+    # cause a retry cannot cure, the second names a symptom.
+    degeneracy = generation_degeneracy(code)
+    # #1410 NOTE, kept because it explains why this function takes an ecosystem it barely
+    # uses: every stage below parses `code` as PYTHON — `check_syntax` calls
+    # `compile(code, ..., "exec")` and the scanners walk a Python AST. Handed a `.mjs` exam
+    # they say nothing true; measured on the real 2026-08-14 B9 exam, this returns exactly
+    # `['collectability']`, a false "does not compile" on valid JavaScript, and short-circuits
+    # everything else away. That is why node is routed to `_validate_node_oracle` BEFORE this
+    # is reached, rather than being guarded stage by stage in here.
+    if str(ecosystem or "").strip().lower() == "node":  # pragma: no cover — routed earlier
+        raise AssertionError(
+            "a node oracle must not reach the python static pass — "
+            "validate_authored_oracle routes it to _validate_node_oracle"
+        )
     syntax = check_syntax(code)
     if syntax is not None:
-        return [syntax]
+        return [degeneracy, syntax] if degeneracy is not None else [syntax]
     findings: list[OracleFinding] = []
+    if degeneracy is not None:
+        findings.append(degeneracy)
     findings += scan_strategies(code)
     findings += scan_interactive_io(code)
     floor = adequacy_floor(code)
@@ -1508,6 +1702,75 @@ def _priority(finding: OracleFinding) -> int:
         CLASS_IMPORT_CONTRACT: 6, CLASS_TRACEABILITY: 7,
     }
     return order.get(finding.cls, 9)
+
+
+def _validate_node_oracle(
+    code: str,
+    result: "OracleQAResult",
+    *,
+    generate_fn: Callable[[str], str],
+    reauthor: bool = True,
+) -> "OracleQAResult":
+    """#1410 — the bounded single-focus repair loop for a NODE exam.
+
+    The python path's loop in :func:`validate_authored_oracle` cannot be reused directly:
+    every stage it runs walks a Python AST, and on JavaScript `check_syntax` reports a false
+    "does not compile" that short-circuits the rest. So this runs the stages that ARE
+    decidable on JS — :func:`node_static_vacuity` per test, plus the language-agnostic
+    collapsed-generation check — through the same regenerate-one-named-defect discipline.
+
+    What it deliberately does NOT do:
+
+    * **no traceability/coverage map.** That stage resolves criteria against Python symbols;
+      claiming a coverage number for node here would be inventing one, and an unmeasured
+      figure presented as measured is the failure this whole module exists to refuse.
+      ``oracle_coverage`` stays unknown, as it is today.
+    * **no execution probes.** ``collectability`` stays ``"skipped"``: the fail-to-pass
+      baseline and collectability checks belong to :func:`_node_seed_gate` and still run
+      there. This function adds a repair opportunity; it removes no defence.
+
+    A HARD residual after the bounded rounds refuses, exactly as the python path does — but
+    now ``regen_exhausted`` means the model was actually asked and could not fix it, rather
+    than nobody having asked.
+    """
+    counts: dict[str, int] = result.counts or {c: 0 for c in ALL_CLASSES}
+    rounds = 0
+    residual: list[OracleFinding] = []
+
+    while True:
+        findings = list(node_static_vacuity(code))
+        degeneracy = generation_degeneracy(code)
+        if degeneracy is not None:
+            findings.insert(0, degeneracy)
+        for f in findings:
+            counts[f.cls] = counts.get(f.cls, 0) + 1
+        if not findings:
+            residual = []
+            break
+        if not reauthor or rounds >= MAX_REGEN_ROUNDS:
+            residual = findings
+            break
+        target = min(findings, key=_priority)
+        rounds += 1
+        new_code = _reauthor(code, single_focus_feedback(target), generate_fn)
+        if new_code is None or new_code == code:
+            # The round produced nothing usable — stop rather than burn the next one on a
+            # model that is not moving. Mirrors the python loop's own rule.
+            residual = findings
+            break
+        code = new_code
+
+    result.oracle_code = code
+    result.findings = residual
+    result.counts = counts
+    result.regen_rounds = rounds
+    result.collectability = "skipped"
+    if [f for f in residual if f.hard]:
+        result.verdict = "refuse"
+        result.regen_exhausted = True
+    else:
+        result.verdict = "seed"
+    return result
 
 
 def validate_authored_oracle(
@@ -1549,8 +1812,22 @@ def validate_authored_oracle(
         result.validated = False
         return result
     if (ecosystem or "python") != "python":
-        # node/other: the authoring path already applied its structural check; we cannot
-        # AST-scan JS. Honest stamp, seed as today.
+        # #1410: "we cannot AST-scan JS" was true when this branch was written and is not
+        # true now — `node_static_vacuity` convicts a `.mjs` exam per test, and has since it
+        # was built for the seed gate. But the seed gate runs AFTER this function, so its
+        # findings arrived where nothing could act on them: a thin node exam was refused,
+        # never repaired, nine runs in a row, and the multi-page website card has therefore
+        # never been gradeable. Measured on 2026-08-14 — `adequacy_floor: 2` beside
+        # `regeneration.rounds: 0`.
+        #
+        # Node now gets the same bounded repair the python path has had all along. The seed
+        # gate still runs its own checks afterwards; this adds a chance to fix, it removes
+        # no defence.
+        if str(ecosystem).strip().lower() == "node":
+            return _validate_node_oracle(
+                code, result, generate_fn=generate_fn, reauthor=reauthor,
+            )
+        # other ecosystems: unchanged — honest stamp, seed as today.
         result.collectability = "skipped"
         return result
 
@@ -1572,14 +1849,22 @@ def validate_authored_oracle(
     covered: list[str] = []
     uncovered: list[str] = []
     coverage_denominator = 0
+    coverage_skipped: str = ""
 
     while True:
-        findings = _static_findings(code, exports, modules, spec_corpus)
+        findings = _static_findings(
+            code, exports, modules, spec_corpus, ecosystem=ecosystem
+        )
         # Traceability (needs a model call for the map) — only when the static pass is
         # HARD-clean (a coverage gap is moot on an uncollectable/ill-posed oracle; fixing
         # the HARD defect first also avoids a wasted map call each round).
         cov_map: "dict[str, list[str]] | None" = None
-        if test_criteria and not any(f.hard for f in findings):
+        # #1374: gate on what a finding MEANS, not on its severity. A thin oracle
+        # (adequacy_floor / f2p_vacuous) parses fine and is the case where the coverage
+        # map matters most; only an oracle that cannot be collected, parsed or driven
+        # makes the map impossible. See _COVERAGE_BLOCKING_CLASSES.
+        _blocking = [f for f in findings if f.cls in _COVERAGE_BLOCKING_CLASSES]
+        if test_criteria and not _blocking:
             cov_map = request_coverage_map(
                 code, test_criteria, generate_fn=generate_fn,
                 structured_generate_fn=structured_generate_fn,
@@ -1591,7 +1876,15 @@ def validate_authored_oracle(
                 )
                 findings += trace_findings
             else:
-                coverage_denominator = 0  # unknown — no usable map
+                coverage_denominator = 0  # unknown — the model returned no usable map
+                coverage_skipped = "the model returned no usable requirement-to-assertion map"
+        elif not test_criteria:
+            coverage_skipped = "no test-tier criteria were supplied, so there was nothing to map"
+        else:
+            coverage_skipped = (
+                "the oracle cannot be traced: "
+                + ", ".join(sorted({f.cls for f in _blocking}))
+            )
         # Count every finding this round (the measurement of oracle quality over time).
         for f in findings:
             counts[f.cls] = counts.get(f.cls, 0) + 1
@@ -1667,7 +1960,15 @@ _NODE_TAP_ARGS: tuple[str, ...] = ("--test", "--test-reporter=tap")
 #: Node test-declaration heads. ``.skip``/``.todo`` are DELIBERATELY absent: a skipped or
 #: todo test is an explicit, honest non-assertion, and a ``todo`` body is empty BY
 #: CONTRACT — flagging either would convict a correctly-marked placeholder.
-_NODE_TEST_HEAD_RE = re.compile(r"\b(?:it|test)\s*(?:\.\s*(?:only|concurrent)\s*)*\(")
+#:
+#: The leading ``(?<![.\w$])`` is load-bearing and was added 2026-08-16 (#1416). ``\b`` alone
+#: matches ``test`` in ``SLUG_RE.test(`` — the boundary sits between the dot and the ``t`` —
+#: so any regex ``.test(`` call read as a test DECLARATION and whatever followed became a
+#: test BODY. Found by an independent reviewer against a plain helper module holding no test
+#: at all: it was convicted as vacuous and rendered to the operator as ``helpers.js::-``,
+#: the ``-`` recovered from a ``join('-')`` argument. A member call is never a declaration
+#: here; ``it.only(`` and ``test.concurrent(`` still match because their dot comes AFTER.
+_NODE_TEST_HEAD_RE = re.compile(r"(?<![.\w$])(?:it|test)\s*(?:\.\s*(?:only|concurrent)\s*)*\(")
 
 #: What counts as an assertion. Deliberately GENEROUS (node:assert, chai, jest-style
 #: matchers, bare ``ok(``/``fail(``): a missed vacuous test costs one weak exam, while a
@@ -2049,6 +2350,7 @@ def node_fail_to_pass_baseline(
     skeleton_dir: str,
     *,
     run: "Callable[..., tuple[bool, str, str]]" = _default_run,
+    diagnostics: "dict | None" = None,
 ) -> tuple[str, list[OracleFinding]]:
     """The node dual of :func:`fail_to_pass_baseline`: run the oracle ONCE against the REAL
     pre-implementation skeleton with ``node --test`` and require every test to fail. A test
@@ -2068,13 +2370,17 @@ def node_fail_to_pass_baseline(
 
     probe: "Path | None" = None
     created_dir = False
+    started = time.monotonic()
     try:
         repo = Path(skeleton_dir)
         if not repo.is_dir():
-            return ("not-run", [])
+            return _not_run(diagnostics, "skeleton-absent",
+                            f"the pre-implementation skeleton {skeleton_dir!r} is not a directory, "
+                            "so there is no tree to run the oracle against")
         node = shutil.which("node")
         if not node:
-            return ("not-run", [])
+            return _not_run(diagnostics, "no-runner",
+                            "node is not on PATH, so the fail-to-pass baseline cannot be taken")
         from shared.fleet.acceptance import JOB_ORACLE_PATH_NODE
 
         rel_parent = Path(JOB_ORACLE_PATH_NODE).parent
@@ -2103,9 +2409,29 @@ def node_fail_to_pass_baseline(
             ])
         if _NODE_TAP_DONE_RE.search(blob):
             return ("all-fail", [])
-        return ("not-run", [])
-    except Exception:  # noqa: BLE001 — machinery failure is an honest not-run
-        return ("not-run", [])
+        # THE EXIT THAT HAS FIRED EVERY TIME, and until now it said nothing (#1350).
+        # The runner started and TAP never reached its `1..N` / `# fail` terminator, so we
+        # cannot tell a passing test from a test that never ran — the whole point of the
+        # baseline. Bank the command and both streams: on a node oracle this is almost
+        # always an ESM resolution error against the pre-implementation skeleton, and that
+        # is unreadable from the stamp alone.
+        return _not_run(
+            diagnostics, "runner-produced-nothing",
+            "node --test ran but TAP never reported a plan or a done marker, so no test "
+            "outcome could be read",
+            elapsed_s=time.monotonic() - started,
+            cmd=[node, *_NODE_TAP_ARGS, rel], stdout=out, stderr=err,
+        )
+    except Exception as exc:  # noqa: BLE001 — machinery failure is an honest not-run
+        # Previously a bare `return ("not-run", [])`: every exception in this function --
+        # an unreadable skeleton, a failed mkdir, an import error on JOB_ORACLE_PATH_NODE --
+        # collapsed into the same silent word. Fail-soft is correct here (a machinery miss
+        # must never block a dispatch); fail-SILENT never was.
+        return _not_run(
+            diagnostics, "raised",
+            f"{type(exc).__name__}: {exc}",
+            elapsed_s=time.monotonic() - started,
+        )
     finally:
         try:
             if probe is not None and probe.exists():
@@ -2148,8 +2474,16 @@ def _node_seed_gate(
     result.language = "node"
     stamp, collect_finding = node_confirm_collectable(code, run=run)
     result.collectability = stamp
-    f2p_stamp, f2p_findings = node_fail_to_pass_baseline(code, skeleton_dir, run=run)
+    # Diagnostics threaded through exactly as the python path does (#1350). Without this the
+    # node half — the operator's stated priority, since websites are node jobs — stamped
+    # `not-run` from five different causes with no way to tell them apart, and did so on
+    # every record since 2026-07-12. The dict lands in `not_measured_detail` in the banked
+    # oracle-qa.json, which already serialises it.
+    f2p_diag: dict = {}
+    f2p_stamp, f2p_findings = node_fail_to_pass_baseline(
+        code, skeleton_dir, run=run, diagnostics=f2p_diag)
     result.f2p_baseline = f2p_stamp
+    result.f2p_diagnostics = f2p_diag
 
     new_findings = list(result.findings)
     for f in (collect_finding, *node_static_vacuity(code), *f2p_findings):
@@ -2205,8 +2539,11 @@ def f2p_seed_gate(
 
     stamp, collect_finding = confirm_collectable(code, run=run)
     result.collectability = stamp
-    f2p_stamp, f2p_findings = fail_to_pass_baseline(code, skeleton_dir, run=run)
+    f2p_diag: dict = {}
+    f2p_stamp, f2p_findings = fail_to_pass_baseline(
+        code, skeleton_dir, run=run, diagnostics=f2p_diag)
     result.f2p_baseline = f2p_stamp
+    result.f2p_diagnostics = f2p_diag
 
     new_findings = list(result.findings)
     for f in (collect_finding, *f2p_findings):

@@ -541,6 +541,79 @@ REGISTRY: tuple[InstrumentEntry, ...] = (
                      "the hooks; the 14B supplies only the labels); whether a heuristic run that "
                      "declares no contract clicked anything meaningful",
     ),
+    InstrumentEntry(
+        name="delivered-site media placement (is one photograph doing the work of six)",
+        module="shared.fleet.image_placement",
+        result_type="dict",
+        entrypoint="grade_site",
+        status="is_graded",
+        status_kind=STATUS_PREDICATE,
+        unmeasured=None,
+        # `hard` is a boolean CLAIM rather than a tally, and it is registered as a count for
+        # exactly that reason: it is the field a caller reaches for first, it is False on
+        # every ungraded report, and False-because-nothing-was-graded is the collapse this
+        # instrument's own module docstring says it must never commit.
+        counts=("findings", "hard", "items", "distinct_item_images", "max_items_per_image",
+                "unreferenced_assets"),
+        receivers=(),
+        renderers=(
+            "shared.fleet.image_placement:format_operator_summary",
+            "shared.fleet.swap_ops:_with_media_report",
+        ),
+        toggle_test="tests/security/test_instrument_toggles.py::test_image_placement_ungraded_never_renders_clean",
+        seam_test="tests/security/test_instrument_toggles.py::test_image_placement_seam_returns_ungraded_on_a_site_with_no_media",
+        quiet_test="tests/security/test_instrument_toggles.py::test_image_placement_stays_quiet_on_a_correctly_placed_gallery",
+        disclosure_marker="media placement NOT graded",
+        incident="#1345 - a six-product shop shipped TWO pictures, three mugs rendering one mug "
+                 "photograph and three bowls rendering the potter-at-the-wheel banner; the "
+                 "operator saw it in seconds on a delivery every gate had passed, because "
+                 "nothing in the pipeline asked whether the media a page implies exists",
+        # THREE states, and the middle one is why this reads `is_graded` rather than a bare
+        # `checked`: a delivery with no media at all publishes no counts either, so it is not
+        # a graded pass — but it is not a fault, so it must not spend the disclosure. What
+        # this instrument cannot see at all is stated as a CONDITION rather than an absence,
+        # so progress on the generator does not falsify the line.
+        not_measured="no image is ever OPENED, so every subject judgement is inference from file "
+                     "names and data fields - a mug photographed and saved as 'bowl.png' reads "
+                     "here as a bowl, and two identical pictures under two names read as two "
+                     "subjects; duplicate CONTENT is therefore invisible. Also not graded: "
+                     "picture quality, size, orientation, alt text and on-page ordering; images "
+                     "referenced only from code this check cannot evaluate; anything under an "
+                     "operator-intake folder, which is excluded by name and counted in "
+                     "not_measured rather than judged",
+    ),
+    InstrumentEntry(
+        name="delivered-site link resolution (does every href/src land on a real file)",
+        module="shared.fleet.link_lint",
+        result_type="dict",
+        entrypoint="lint_site",
+        status="is_measured",
+        status_kind=STATUS_PREDICATE,
+        unmeasured=None,
+        # `undecidable` is a count in the same sense the others are, and it is the one that
+        # makes a clean `broken: 0` readable: a report with zero broken links and forty
+        # undecidable references has not followed forty references. Registering it is what
+        # puts that number inside the table rather than only inside the module.
+        counts=("findings", "hard", "files_scanned", "references", "broken", "undecidable"),
+        receivers=(),
+        renderers=(
+            "shared.fleet.link_lint:format_operator_summary",
+            "shared.fleet.swap_ops:_with_link_report",
+        ),
+        toggle_test="tests/security/test_instrument_toggles.py::test_link_lint_unmeasured_never_renders_clean",
+        seam_test="tests/security/test_instrument_toggles.py::test_link_lint_seam_returns_unmeasured_on_a_site_with_no_pages",
+        quiet_test="tests/security/test_instrument_toggles.py::test_link_lint_stays_quiet_on_a_site_whose_links_resolve",
+        disclosure_marker="links NOT checked",
+        incident="#1345/#1342 - the operator clicked 'View Details' on a delivery four automated "
+                 "gates had passed and got {\"error\":\"not found\"}; the page the link named was "
+                 "not in the delivered tree, and nothing in the pipeline was asking a question "
+                 "that cheap",
+        not_measured="the site is never EXECUTED, so a reference built at runtime is COUNTED in "
+                     "counts.undecidable rather than followed, and a server-side or client-side "
+                     "route is undecidable from the filesystem; external URLs (http/https/mailto/"
+                     "tel) are never fetched, so their reachability is unknown; and a target that "
+                     "resolves is proved to EXIST, never to be the right page or to render",
+    ),
 )
 
 
@@ -826,10 +899,31 @@ def guard_alias_reads(fn: ast.AST, entry: InstrumentEntry) -> list[str]:
             continue
         path = dotted(value)
         if not path or "." not in path:
+            # #1400: a COMPOUND boolean binding is the same alias wearing an expression.
+            # `dotted` resolves only a bare path, so `incomplete = not self.measured or
+            # self.coverage_partial` escaped this refusal entirely — measured, not assumed:
+            # the simple form fired 1 hit and both compound forms fired 0.
+            #
+            # The escape errs toward CONVICTION rather than acquittal, so it was never a
+            # soundness hole — but it left the refusal narrower than its own docstring reads,
+            # and the helpful "inline the guard" message unreachable for the commonest shape.
+            #
+            # NARROW BY CONSTRUCTION, because the obvious widening is the failure this gate
+            # must never produce. Matching "the value mentions the guard anywhere" convicts
+            # `l4 = (f"..." if self.attribution.available else "L4 not measured")` in
+            # traceability.py — a rendered STRING chosen by the guard, not a binding of it.
+            # I measured that before writing this: exactly two compound bindings exist in the
+            # registered modules, and one of them is that legitimate one. So only a PURE
+            # BOOLEAN combination over the guard is refused; an IfExp, an f-string, a call
+            # are all left alone.
+            if not _is_boolean_alias(value, entry.guard_names):
+                continue
+            path = _first_guard_attr(value, entry.guard_names) or ""
+            if not path or not entry.claims(_receiver_tail(path)):
+                continue
+        elif path.rsplit(".", 1)[-1] not in entry.guard_names:
             continue
-        if path.rsplit(".", 1)[-1] not in entry.guard_names:
-            continue
-        if not entry.claims(_receiver_tail(path)):
+        elif not entry.claims(_receiver_tail(path)):
             continue
         for target in targets:
             if isinstance(target, ast.Name):
@@ -841,6 +935,36 @@ def guard_alias_reads(fn: ast.AST, entry: InstrumentEntry) -> list[str]:
                     f"the collapse into JUSTIFIED_COLLAPSES."
                 )
     return out
+
+
+def _is_boolean_alias(value: ast.AST, guard_names: "tuple[str, ...] | frozenset[str]") -> bool:
+    """True when *value* is a PURE BOOLEAN combination that includes a guard read.
+
+    The distinction this function exists to hold: ``not x.measured or x.partial`` BINDS the
+    status, while ``"clean" if x.measured else "unknown"`` USES it to choose a string. The
+    first is an alias the guard analysis cannot follow; the second is ordinary rendering and
+    convicting it would be a false accusation out of a control whose whole product is
+    certification. So ``IfExp``, ``JoinedStr``, ``Call`` and constants are all excluded by
+    construction rather than by a heuristic."""
+    if isinstance(value, ast.BoolOp):
+        return any(_is_boolean_alias(v, guard_names) for v in value.values)
+    if isinstance(value, ast.UnaryOp) and isinstance(value.op, ast.Not):
+        return _is_boolean_alias(value.operand, guard_names)
+    if isinstance(value, ast.Compare):
+        return _is_boolean_alias(value.left, guard_names)
+    if isinstance(value, ast.Attribute):
+        return value.attr in guard_names
+    return False
+
+
+def _first_guard_attr(value: ast.AST, guard_names: "tuple[str, ...] | frozenset[str]") -> str:
+    """The dotted path of the first guard read inside *value*, for the refusal message."""
+    for sub in ast.walk(value):
+        if isinstance(sub, ast.Attribute) and sub.attr in guard_names:
+            path = dotted(sub)
+            if path:
+                return path
+    return ""
 
 
 def _receiver_tail(path: str) -> str:

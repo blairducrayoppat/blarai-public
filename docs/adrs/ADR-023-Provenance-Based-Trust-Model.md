@@ -388,7 +388,7 @@ For `web_search` and all future outward (egress) tools, the per-session `/trust`
 
 **As built — a dormant egress tool raises no fingerprint.** `tools.egress_tool_active` gates the fingerprint on the egress tool actually being live (its runner registered). A disabled/dormant `web_search` (no Kagi runner) returns its deterministic "unavailable" notice **without anything leaving the machine**, so it must not prompt — consistent with the existing principle that a deterministic notice takes the plain path and never locks the session.
 
-**Envelope N configurable.** `[egress].searches_per_fingerprint` (default **3**, the LA's dial) with `[egress].fingerprint_timeout_s` (default 120s → DENY on expiry). N is clamped to ≥ 1 in the envelope.
+**Envelope N configurable.** `[egress].searches_per_fingerprint` (default **1** since #1594, 2026-09-19 — a fingerprint on EVERY outbound query; **3** as originally decided 2026-07-02, covering a window. The LA's dial, and raising it is a posture loosening) with `[egress].fingerprint_timeout_s` (default 120s → DENY on expiry). N is clamped to ≥ 1 in the envelope.
 
 **Accepted trade-offs, on the record:** friction scales with searches-per-turn; **no unattended egress** until the future scoped pre-authorization envelope; a named residual — an in-envelope follow-up query could be steered by injected search-result content, mitigated by the live per-query disclosure, the turn cap, and the deterministic `kagi.com`-only allowlist. **Relax path if the friction bites: per-session grain** (one small change — easier to relax than to tighten).
 
@@ -420,3 +420,79 @@ For `web_search` and all future outward (egress) tools, the per-session `/trust`
 - **Implementation seams:** `services/assistant_orchestrator/src/tools.py` (`_LOCK_EXEMPT_TOOLS`/`is_lock_exempt`; `_EGRESS_TOOLS`/`is_egress_tool`/`egress_tool_active`); `services/assistant_orchestrator/src/egress_envelope.py` (rung-3 envelope + `request_egress_fingerprint`); `services/assistant_orchestrator/src/entrypoint.py` (the Layer-3 gate exemptions + the tool-loop fingerprint gate + disclosure + fail-closed help); `services/assistant_orchestrator/config/default.toml` (`[egress]`); `evals/suites/governance.py` (`layer3_lock_decision` mirror + the `egress_consent` kind); `shared/security/escalation_consent.py` + `shared/security/hello_verifier.py` (the shared verifier + source-aware wording); the UC-003 preview→approve corridor (rung 2's approval pattern).
 - **Ticket:** #723 (D5 trust-friction rework). LA decision recorded #719 c.1300 → c.1301 → c.1302; chat-poisoning finding #726 c.1310.
 - **Lessons cited:** lesson 13 (*provenance is not trust*) — the reason `search_knowledge` results stay untrusted even as the tool becomes lock-exempt; the consent doctrine (route danger to controls, ask the human only what he can judge).
+
+---
+
+## Amendment 5 — `UNTRUSTED_CORPUS`: an offline reference corpus is a fourth untrusted tier (2026-09-23, #1616)
+
+*Numbered 5 because Amendment 4 (#723, above) took that slot for the trust-friction rework. The provenance tier this amendment adds is the FOURTH untrusted tier; the two counts are unrelated and the ticket record uses "Amendment 4" in places written before this file was read — the authority is this section.*
+
+### A5.1 Context
+
+The Lead Architect asked whether an offline encyclopedia would be worth adding. It is, and the reason was measured rather than argued: a 40-subject stratified probe against the resident Qwen3-14B, driven through `OrchestratorGPUInference` rather than a mock, found that on 20 uniformly-random Wikipedia articles the model produced nothing usable for **16**, and of the 11 most-read subjects it did attempt, **6 answers carried a confident error** — including a 1979 album returned as a 1993 film with an invented director, cast and plot. The probe explicitly invited `I DO NOT KNOW`, so that is the best case for honesty, not the typical one. Full method and results: `docs/research/kiwix-offline-corpus-assessment-2026-09-21.md` §1.
+
+Retrieved corpus passages need a provenance tier. The three existing untrusted tiers do not fit: the content is neither operator-curated (`UNTRUSTED_KNOWLEDGE`), nor a live web result (`UNTRUSTED_WEB`), nor pasted material of unknown origin (`UNTRUSTED_EXTERNAL`).
+
+### A5.2 Decision
+
+Add **`UNTRUSTED_CORPUS`** with leak-exempt-but-untrusted semantics:
+
+- **Layer-3 action lock: APPLIES.** An injection hidden in a vandalised encyclopedia article cannot fire a tool.
+- **Datamarking and delimiter-neutralisation: APPLY.** Per-line marked, exactly like every untrusted tier.
+- **Stage-5 cosine leakage OUTPUT block: EXEMPT.**
+
+**The exemption rests on the `UNTRUSTED_WEB` argument, not the knowledge-bank one, and the distinction is the substance of this amendment.** Amendment 2 justified the knowledge carve-out by *operator curation* — "he put it in the bank for recall; echoing it back is the point." A bulk import of millions of articles satisfies nothing of that. Amendment 3's argument does transfer intact: relaying **public** content back to the operator who asked for it is not exfiltration. An offline encyclopedia is that case more cleanly than web search, since the content never left the machine to be fetched.
+
+Without the exemption the corpus is **write-only**: every faithful quotation is ~verbatim to its source and trips the detector — precisely the failure Amendment 2 was written to prevent.
+
+Kept a **distinct** tier rather than reusing `UNTRUSTED_WEB`, for the reason Amendment 3 gives for keeping web separate from knowledge: the audit trail and any future per-source policy must be able to tell a bulk encyclopedia from the operator's own approved store, even while the two gate identically today.
+
+### A5.3 A recorded reversal
+
+The session that assessed this **recommended against** the exemption, reasoning that Amendment 2's "operator-curated" justification does not transfer. **The Lead Architect overruled it, and he was right.** The error was reasoning from the *rationale recorded for one tier* instead of reading what the control defends: `context_manager.py` states plainly that the Stage-5 block catches *"a verbatim echo of content from outside the trust boundary"* — an **exfiltration** control, not an injection defence. Injection defence is the action lock, which no exemption touches. The objection was aimed at the wrong lock. Retained here because an amendment that hides the argument it survived teaches nothing.
+
+### A5.4 At rest: integrity-signed, not encrypted (decision D1)
+
+The corpus is **not** encrypted, a deliberate scoped deviation from security principle 6 (born-encrypted). It is public data: encryption buys no confidentiality and costs a decompress-plus-decrypt on every read. Everything **derived** from it — what was asked, what was retrieved, what was answered — stays in the encrypted session store unchanged.
+
+**Integrity is enforced fail-closed.** A SHA-256 manifest is verified at open; a mismatch makes the reader refuse, and the capability stays dormant with a loud log rather than serving unverified text. A corrupted or swapped store would otherwise feed the assistant plausible text from nowhere *with a citation attached*, which is worse than no corpus.
+
+### A5.5 Alternatives rejected
+
+- **Reuse `UNTRUSTED_WEB`.** Rejected: identical gating today, but an audit could then not distinguish a local encyclopedia from live egress — and the two have completely different threat models.
+- **Reuse `UNTRUSTED_KNOWLEDGE`.** Rejected: borrows a justification (operator curation) that does not hold, which is how a carve-out silently widens.
+- **No exemption.** Rejected by the LA; see A5.3. It makes the capability inert.
+- **Encrypt the corpus anyway.** Rejected under D1: cost without a confidentiality gain, on public content.
+- **Extend the knowledge bank instead of a new tier.** Rejected: that surface decrypts its whole corpus into RAM at construction and ranks every chunk per query — correct at its measured 15 chunks, impossible at tens of millions (#1617 measured the boundary at ~30,200 chunks / 100 ms).
+
+### A5.6 Implementation status
+
+**DORMANT at merge** (#1616, this change). `[reference_corpus].enabled = false` ships false and the AO registers **no** `search_reference` runner unless the flag is on AND a store opens AND its manifest verifies — structural absence, not a runtime flag check (principle 4). Go-live is an LA-present ceremony.
+
+Seams: `services/assistant_orchestrator/src/context_manager.py` (the tier); `shared/corpus/reader.py` (read-only reader, fail-closed verification); `tools/corpus/build_corpus.py` (builder + manifest); `services/assistant_orchestrator/src/tools.py` (`search_reference`, runner seam, notices, schema); `services/assistant_orchestrator/src/pgov.py` (allowlist); `services/assistant_orchestrator/src/entrypoint.py` (conditional registration, runner, embedder binding); `services/assistant_orchestrator/config/default.toml` (`[reference_corpus]`).
+
+Tests: `tests/security/test_reference_corpus_dormancy.py` (dormancy + integrity, with the toggle halves), `shared/tests/test_corpus_reader.py`, `services/assistant_orchestrator/tests/test_pgov_leakage_wiring.py::TestCorpusProvenanceTier` (action-locked AND leak-exempt, both asserted rather than inherited by accident).
+
+**GPL boundary.** The only code touching `libzim` (GPL-3.0-or-later) lives outside this repository, which ships PolyForm Noncommercial plus a separate commercial licence. The seam between them is JSONL, which is data. Nothing in this tree imports or links it.
+
+### A5.7 References
+
+- **Extends:** Amendment 2 (#664, `UNTRUSTED_KNOWLEDGE`) and Amendment 3 (#719, `UNTRUSTED_WEB`) — same leak-exempt-but-untrusted shape, third instance.
+- **Ticket:** #1616. LA decisions D1 and D2 recorded 2026-09-21.
+- **Assessment:** `docs/research/kiwix-offline-corpus-assessment-2026-09-21.md`.
+- **Related:** #1617 (the knowledge bank's relevance signal and the measured exact-vs-approximate boundary between the two tiers).
+- **Lessons cited:** lesson 13 (*provenance is not trust*) — corpus results stay untrusted; and the #1617 lesson that a control must be read for what it defends, not for the rationale someone recorded beside it.
+
+### A5.8 Addendum (2026-09-24, pre-merge review) — `search_reference` is Layer-3 lock-exempt on bounded-danger grounds (Amendment 4 rung 1, third instance)
+
+**Status:** ACCEPTED, folded into the #1616 merge (the DORMANT capability this amendment describes never shipped without it — the gap was caught by adversarial pre-merge review before go-live, not after).
+
+The dormant merge shipped `search_reference` GUARDED and action-locked under untrusted content, but absent from `tools._LOCK_EXEMPT_TOOLS` — unlike `search_knowledge`, which Amendment 4 rung 1 (§A4.3) exempted for the identical reason. The gap meant the corpus's own first result locked every subsequent `search_reference` call for the rest of the session (and locked the first call of any session already holding knowledge-bank, web, or pasted content), making the capability single-shot per clean session absent `/trust` — the exact rung-1 friction Amendment 4 removed for `search_knowledge`, silently reintroduced for a tool with the same danger shape.
+
+`search_reference` is added to `_LOCK_EXEMPT_TOOLS` on the SAME bounded-danger argument as §A4.3: a redirectable READ over an on-box, read-only store, no egress, no mutation. The exemption lifts only the Layer-3 lock; results still ground as `UNTRUSTED_CORPUS` (action-locked + datamarked, §A5.2) and the #570 PA per-dispatch adjudication still runs on every call. This is a bounded-danger allowlist widening, not a leakage-feed change — orthogonal to D2.
+
+- **Mechanism:** `tools._LOCK_EXEMPT_TOOLS` gains `"search_reference"`; `test_lock_exempt_tools_are_all_guarded` (unchanged) still enforces every member is GUARDED.
+- **Locked:** `services/assistant_orchestrator/tests/test_retrieval_tools.py` (real-dispatch: a second `search_reference` call in one session is not refused) and `services/assistant_orchestrator/tests/test_tools.py` (the exhaustive exempt-set enumeration, a pin; the toggle lives in `test_retrieval_tools.py`).
+- **Cumulative state (stated because each exemption was argued alone):** with this exemption every GUARDED tool is either lock-exempt or an egress tool under the rung-3 envelope, so the Layer-3 lock's remaining teeth are the DANGEROUS tools (`curate_knowledge`, `organise_userdata`), refused with `DENY_UNTRUSTED_PROVENANCE_NO_TRUST` and no override. A new GUARDED tool that is neither exempt nor egress is locked again by default, which is the reason the exempt set is pinned exactly.
+- **Locked (toggle):** the exemption's reverse is `test_retrieval_tools.py` (second call refused when the exemption is removed); `test_tools.py` pins the set.
+- **Ticket:** #1616 pre-merge review finding 1. **Record:** DEC-13 row amended in the same change.

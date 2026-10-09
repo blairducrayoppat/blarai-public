@@ -154,7 +154,11 @@ class TestDraftedPath:
         assert result.text == "Run 42 merged clean."
         assert result.has_text
         assert raw.generate.call_count == 1  # exactly one bounded call
-        prompt_arg, gen_config = raw.generate.call_args.args
+        # The config is a KEYWORD argument: on a VLMPipeline the 2nd positional
+        # slot is `images`, so production names it (#930). Read it the way it
+        # is actually passed, not the way it used to be.
+        (prompt_arg,) = raw.generate.call_args.args
+        gen_config = raw.generate.call_args.kwargs["generation_config"]
         assert "Summarize the finished run." in prompt_arg
         assert _COORDINATOR_DRAFT_SYSTEM_PROMPT in prompt_arg  # the persona rode along
         assert "/no_think" in _COORDINATOR_DRAFT_SYSTEM_PROMPT
@@ -165,7 +169,7 @@ class TestDraftedPath:
     def test_default_cap_applies(self) -> None:
         service, raw, _wrapper = _make_service()
         service.coordinator_draft("p")
-        _prompt, gen_config = raw.generate.call_args.args
+        gen_config = raw.generate.call_args.kwargs["generation_config"]
         assert gen_config.max_new_tokens == _COORDINATOR_DRAFT_MAX_NEW_TOKENS
 
     def test_hidden_think_blocks_are_stripped(self) -> None:

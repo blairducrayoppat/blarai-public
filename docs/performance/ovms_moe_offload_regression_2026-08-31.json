@@ -1,0 +1,74 @@
+{
+  "benchmark": "ovms_moe_offload_ratio30_regression",
+  "config_stamp": {
+    "timestamp": "2026-08-31T00:01:00-04:00",
+    "model_name": "Qwen3-Coder-30B-A3B",
+    "model_precision": "int4 (16.0 GB on disk at C:\\models\\coder-30b)",
+    "served_model_id": "coder-30b",
+    "endpoint": "http://127.0.0.1:8000/v3/chat/completions",
+    "device": "GPU",
+    "ovms_version": "2026.3.0.6f3df706b",
+    "openvino_backend": "2026.3.0-22451-8a17657b995-releases/2026/3",
+    "openvino_genai_backend": "2026.3.0.0-3277-bd8d6542e3c",
+    "ovms_build_flags": "--config=win_mp_on_py_off",
+    "ovms_flags": "kv_cache_precision u8 | tool_parser qwen3coder | enable_tool_guided_generation true | enable_prefix_caching true | cache_size 4",
+    "plugin_config": "{\"OFFLOAD_RATIO\":\"30\"}",
+    "driver_version": "not re-captured this session; box driver unchanged from 32.0.101.8826 baseline",
+    "hardware": "ASUS ExpertBook P5405CSA, Intel Core Ultra 7 258V (Lunar Lake), 31.32 GiB usable RAM, Intel Arc 140V (Xe2 iGPU), Windows 11 Pro 26200",
+    "num_runs": 3,
+    "num_warmup": 1,
+    "max_tokens": 256,
+    "temperature": 0
+  },
+  "results": {
+    "offload_ratio_30": {
+      "decode_tps": [1.59, 1.71, 1.80],
+      "median_tps": 1.71,
+      "completion_tokens": [81, 35, 35],
+      "wall_secs": [50.85, 20.49, 19.48],
+      "cold_first_generate_secs": 40.0,
+      "gpu_shared_gib": 11.27,
+      "ovms_working_set_gb": 12.65,
+      "system_free_gib_during": 0.64,
+      "system_in_use_gib_during": 30.68
+    }
+  },
+  "baseline_for_comparison": {
+    "source": "docs/performance/benchmark_ovms_coder-30b_2026-06-29_13-29-30.json",
+    "ovms_version": "2026.2",
+    "plugin_config": "none (no offload; feature does not exist in 2026.2)",
+    "median_tps": 38.58,
+    "mean_tps": 35.74,
+    "p95_tps": 39.72,
+    "median_ttft_ms": 184.1,
+    "num_runs": 5,
+    "num_warmup": 2,
+    "run_cooldown_s": 30,
+    "same": ["model", "served_model_id", "endpoint", "device", "ovms_flags", "machine"]
+  },
+  "headline": "OVMS continuous-batching serving of Qwen3-Coder-30B-A3B int4 at GPU OFFLOAD_RATIO=30 measured 1.71 tok/s median against a 38.58 tok/s same-server same-model baseline — a ~21x regression — with no system-memory saving. Rolled back the same night.",
+  "contrast_with_prior_in_house_result": {
+    "source": "HuggingFace blairducrayoppat/openvino-arc140v-lunarlake, moe_offload_2026-08-28/report_moe_offload_arc140v_2026-08-28.md",
+    "harness": "openvino_genai LLMPipeline directly, Python 3.14.3, fresh venv, OpenVINO 2026.3.1",
+    "int4_ratio30_tps": 29.66,
+    "int4_ratio0_tps": 25.94,
+    "note": "That campaign measured int4@30 as FASTER than fully resident (+14%). This run contradicts it by ~17x on the same feature, same ratio, same model family, same box — the salient difference being the serving stack (OVMS continuous batching + prefix caching + u8 KV cache) versus a single-stream LLMPipeline."
+  },
+  "leading_hypothesis_UNTESTED": "OVMS continuous batching may defeat the offload LRU expert cache: concurrent/streamed requests touching different experts would thrash a cache sized for one stream. Plausible, consistent with both datasets, and NOT measured here.",
+  "not_measured": [
+    "A clean-box run. The measured box had 0.64 GiB free and 30.68 GiB in use; the 38.58 baseline's box state is not recorded in its JSON.",
+    "An OVMS 2026.3 run at OFFLOAD_RATIO=0, which is the control that would separate the version change from the offload change. This is the single most important missing arm.",
+    "Any ratio other than 30.",
+    "int8 (excluded deliberately: the prior campaign's Finding 1 documents an int8 second-generate hang that breaks multi-generate agentic use).",
+    "Concurrency sweep - the batching hypothesis above is untested.",
+    "Prefill/TTFT with a controlled prompt set; the TTFT figures here are incidental.",
+    "Driver re-capture this session.",
+    "Disk contention state on the NVMe the experts stream from."
+  ],
+  "honest_limits": "N=3 with small completion counts (35-81 tokens), one warmup, no cooldown discipline, and a dirty box. This is strong enough to justify an immediate rollback and NOT strong enough to publish as a characterisation of the feature. The 2026.3-at-ratio-0 control must run before any claim is made about whether the regression is caused by offload or by the version change.",
+  "disposition": "Rolled back to OVMS 2026.2.0 at 2026-08-31T00:01. The 2026.3 install is retained at C:\\ovms-2026.3-ROLLEDBACK-20260831-000116 and a pristine 2026.2 copy at B:\\ovms-backup-2026.2-20260830-234730.",
+  "incidental_findings": [
+    "OVMS --plugin_config requires backslash-escaped quotes when launched via PowerShell Start-Process; unescaped JSON is stripped by C-runtime argv parsing and OVMS reports only 'Plugin config is in wrong format' (graph_export.cpp:653, rapidjson parse failure). Cost ~15 minutes to diagnose.",
+    "The 'Block OVMS outbound' firewall rule defined by agentic-setup/scripts/elevated-hardening.ps1 did NOT exist on this machine. Created 2026-08-31 and retained through the rollback."
+  ]
+}

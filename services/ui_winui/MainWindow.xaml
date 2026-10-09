@@ -146,6 +146,17 @@
 
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4"
                             Padding="10,8" HorizontalAlignment="Left">
+                    <!-- #1583: the auditability disclosure. Placed FIRST in this
+                         row deliberately - what the system records about itself is
+                         the operator's, and it should not sit behind a settings
+                         flyout. -->
+                    <Button x:Name="AuditabilityButton" Click="OnOpenAuditability" Width="40" Height="40"
+                            AutomationProperties.AutomationId="AuditabilityButton"
+                            AutomationProperties.Name="What BlarAI records"
+                            Background="Transparent" BorderThickness="0"
+                            ToolTipService.ToolTip="What BlarAI records about itself">
+                        <FontIcon Glyph="&#xEA18;" FontSize="16" />
+                    </Button>
                     <Button x:Name="GalleryButton" Click="OnOpenGallery" Width="40" Height="40"
                             AutomationProperties.AutomationId="GalleryButton"
                             AutomationProperties.Name="Generated images"
@@ -665,6 +676,55 @@
                             </DataTemplate>
                         </GridView.ItemTemplate>
                     </GridView>
+                </Grid>
+
+                <!-- #1583: the auditability disclosure, rendered from THE card
+                     (docs/governance/auditability-card.md) rather than a re-typed
+                     copy of it. AuditabilityCard.Load reads the file the csproj
+                     ships next to the build; there is no second copy to drift.
+
+                     A SIBLING of GalleryOverlay, never a child. It was first
+                     placed INSIDE the gallery, which is Collapsed, so the screen
+                     could never render and every gate still passed. The
+                     structural lock in test_auditability_screen_reads_the_card.py
+                     now asserts no collapsed ancestor. -->
+                <Grid x:Name="AuditabilityOverlay" Grid.Row="0" Grid.RowSpan="2"
+                      AutomationProperties.AutomationId="AuditabilityOverlay"
+                      AutomationProperties.Name="What BlarAI records about itself"
+                      Visibility="Collapsed"
+                      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Padding="24,14,24,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="What BlarAI records about itself"
+                                       FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock x:Name="AuditabilitySubtitle"
+                                       Text="Including the things it does not record."
+                                       Opacity="0.7" FontSize="13" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Click="OnCloseAuditability"
+                                AutomationProperties.AutomationId="AuditabilityCloseButton"
+                                AutomationProperties.Name="Close"
+                                Width="40" Height="40"
+                                Background="Transparent" BorderThickness="0" CornerRadius="20"
+                                ToolTipService.ToolTip="Close">
+                            <FontIcon Glyph="&#xE711;" FontSize="16" />
+                        </Button>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1" Padding="24,0,24,24"
+                                  VerticalScrollBarVisibility="Auto">
+                        <controls:MarkdownBlock x:Name="AuditabilityContent" MaxWidth="1100"
+                                                HorizontalAlignment="Left" />
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </Grid>

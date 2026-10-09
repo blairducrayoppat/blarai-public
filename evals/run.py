@@ -34,6 +34,7 @@ from typing import Any
 
 from evals import baseline as baseline_mod
 from evals.baseline import BaselineError, Comparison
+from evals.cb_pipeline import ENGINE_CHOICES
 from evals.loader import GoldenDataError
 from evals.model_target import (
     CAPABILITY_CHOICES,
@@ -41,7 +42,7 @@ from evals.model_target import (
     ModelTargetError,
     resolve_model_target,
 )
-from evals.suites import SUITE_NAMES, get_runner
+from evals.suites import HARDWARE_TIER_SUITES, SUITE_NAMES, get_runner
 from evals.types import SuiteReport
 
 EXIT_OK: int = 0
@@ -116,6 +117,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "no draft-model spec-decode for this pipeline class)."
         ),
     )
+    parser.add_argument(
+        "--engine",
+        choices=ENGINE_CHOICES,
+        default=None,
+        help=(
+            "Engine arm for a 'multimodal-vlm' --model-dir (#1663): "
+            "'cb-mtp-off' / 'cb-mtp-on' (Multi-Token Prediction head) / "
+            "'cb-prefix-cache' load it through a ContinuousBatchingPipeline and "
+            "drive the production Policy Agent / Assistant Orchestrator through "
+            "it. Omitted or 'default' keeps the capability's own pipeline class."
+        ),
+    )
     return parser
 
 
@@ -129,6 +142,16 @@ def _print_summary(
         f"{agg['errors']} errors, {agg['skipped_hardware']} hardware-skipped, "
         f"{agg['tool_calls']} tool-call"
     )
+    # THE CORPUS DENOMINATOR, always. The pass-rate's denominator is the
+    # EVALUATED set, so a suite covering 1 of 30 cases prints "1/1 passed
+    # (100.0%)" and reads as complete. Showing evaluated-of-total makes partial
+    # blindness visible rather than inferable (#1624, #1622 finding 7).
+    line += f"  [{agg['evaluated']} of {agg['total']} cases evaluated]"
+    if agg["evaluated"] == 0:
+        # A suite that scored nothing must never read as a clean pass. Saying
+        # so on the suite's OWN line is the point: the aggregate "RESULT: OK"
+        # below is what hid this for both new suites (#1624).
+        line += "  << NO SIGNAL: nothing was evaluated"
     print(line)
     if comparison is not None:
         if comparison.regressions:
@@ -165,6 +188,7 @@ def main(argv: list[str] | None = None) -> int:
             model_dir=args.model_dir,
             capability=args.capability,
             no_speculative=args.no_speculative,
+            engine=args.engine,
         )
     except ModelTargetError as exc:
         print(f"HARNESS ERROR: {exc}", file=sys.stderr)
@@ -211,6 +235,24 @@ def main(argv: list[str] | None = None) -> int:
                 full_report["regressions"].extend(
                     f"{suite_name}: {r}" for r in comparison.regressions
                 )
+
+        # UNDECLARED INERTNESS IS A HARNESS ERROR (#1624). A suite that scores
+        # nothing is protecting nothing; that is acceptable only for a suite
+        # declared hardware-tier, and only when hardware was not requested.
+        if (
+            report.evaluated == 0
+            and not args.include_hardware
+            and suite_name not in HARDWARE_TIER_SUITES
+        ):
+            _print_summary(report, comparison)
+            print(
+                f"[{suite_name}] HARNESS ERROR: the suite evaluated 0 cases and "
+                f"is not declared in HARDWARE_TIER_SUITES. A suite that scores "
+                f"nothing must not report success — give it a deterministic "
+                f"floor or declare it.",
+                file=sys.stderr,
+            )
+            return EXIT_HARNESS_ERROR
 
         full_report["suites"][suite_name] = suite_block
         _print_summary(report, comparison)

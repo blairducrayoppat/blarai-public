@@ -1,0 +1,159 @@
+{
+  "measurement": "verdict_receipt_cost_vs_chain_length",
+  "ticket": "#1587",
+  "date_local": "2026-09-18T15:10:00-04:00",
+  "supersedes": "verdict_receipt_cost_shipped_path_2026-09-18_14-29-00.json",
+  "purpose": "Re-take the #1587 verdict-receipt cost with CHAIN DEPTH as a reported variable, after an independent verification found the first run's headline figures were all taken on a chain holding 0-65 records and that the cost is strongly depth-dependent. Also corrects the stated mechanism and the boot-slope range.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) iGPU",
+    "gpu_driver": "32.0.101.8831",
+    "ram_total_gb": 31.323,
+    "os": "Windows 11 Pro 10.0.26200",
+    "tpm": "Windows CNG TPM 2.0, ECDSA-P256-TPM:BlarAI-Audit-Signing-Key-v1 (signer_id read off the written records, not assumed)"
+  },
+  "software": {
+    "python": "3.11.9 (.venv)",
+    "repo_measured": "the worktree the probe is in, derived from the probe's own location",
+    "note": "The first version of these probes hardcoded REPO = C:/Users/mrbla/BlarAI, so a doubter running them from a branch measured main and was told nothing about it. Fixed; BLARAI_REPO overrides deliberately."
+  },
+  "conditions": {
+    "ram_in_use_gb": 14.7,
+    "cpu_load_percent": 2,
+    "elevated": true,
+    "assistant_running": false,
+    "model_loaded": false,
+    "filesystem_filter_drivers": [
+      "bdprivmon",
+      "BdDci4",
+      "Ignisv2",
+      "Gemma",
+      "atc",
+      "Trufos",
+      "vlflt",
+      "UCPD",
+      "bindflt",
+      "FsDepends",
+      "storqosflt"
+    ],
+    "antivirus_registered": [
+      "Windows Defender",
+      "McAfee",
+      "Bitdefender Antivirus"
+    ],
+    "why_the_filter_stack_is_a_condition": "87.8% of a software append is the file-handle CLOSE. A machine with a different filter-driver stack will produce a materially different software figure, and therefore a different ratio. The first record omitted this entirely and it is arguably the single most important condition on the page.",
+    "concurrent_note": "Interactive Claude session with ~20 resident python.exe MCP servers. No dispatch, no battery."
+  },
+  "results": {
+    "append_cost_vs_chain_depth": {
+      "note": "25 samples per depth, each on a chain GROWN to that depth first. Every timed append's return value is checked: a FAILED append returns False in ~0.027 ms against ~6 ms for a successful one, so it would drag p50 down and read as an improvement.",
+      "paired_p50_ms": [
+        {
+          "records_before": 0,
+          "software": 5.504,
+          "tpm": 95.78,
+          "delta": 90.3,
+          "ratio": 17.4
+        },
+        {
+          "records_before": 65,
+          "software": 7.736,
+          "tpm": 143.02,
+          "delta": 135.3,
+          "ratio": 18.49
+        },
+        {
+          "records_before": 250,
+          "software": 15.573,
+          "tpm": 112.13,
+          "delta": 96.5,
+          "ratio": 7.2
+        },
+        {
+          "records_before": 500,
+          "software": 24.79,
+          "tpm": 146.25,
+          "delta": 121.5,
+          "ratio": 5.9
+        }
+      ],
+      "software_only_deeper": [
+        {
+          "records_before": 900,
+          "p50_ms": 41.166,
+          "file_kb": 1080.3
+        }
+      ],
+      "delta_span_ms": "90 - 135",
+      "ratio_span": "5.90x - 18.49x",
+      "ratio_span_pct_of_smallest": 213
+    },
+    "boot_verification_marginal_ms_per_record": {
+      "software": 0.016,
+      "tpm_pooled_n200": [
+        7.814,
+        8.214,
+        8.721,
+        9.09,
+        9.497,
+        9.556
+      ],
+      "tpm_range": "7.8 - 9.6",
+      "tpm_median": 8.906,
+      "provenance": "SIX runs at chain length 200, each point backed by 1000 chip verifications. Three are mine, three are the independent verifier's. Pooled because they are the same measurement by the same method on the same machine. The software reference is now measured in the same run rather than carried in as a constant: 0.0191 ms/record, against the 0.016 the frozen constant held.",
+      "superseded_range": "8.8 - 12.3, from two runs at length 50. The 12.277 was the single outlier across all five runs, and length 50 is too shallow to estimate the slope \u2014 the verifier showed the WITHIN-run spread at 10/25/50 records (8.54, 13.77, 12.28) was wider than the between-run range I had called the honest form.",
+      "fixed_cost_ms": 3.2
+    },
+    "boot_at_production_ceiling": {
+      "PRODUCTION_MAX_ACTIVE_RECORDS": 1000,
+      "tpm_s_range": "7.8 - 9.6",
+      "software_ms": 16.2,
+      "per_chain": true,
+      "chains": "AO builds two (verdict unconditionally at entrypoint.py:2246; ingest gated on [knowledge].enabled, which is true in the shipped default.toml). PA builds one."
+    },
+    "where_the_software_time_actually_goes": {
+      "method": "cProfile over 200 shipped appends, sorted by tottime",
+      "io_base_exit_close_pct": 87.8,
+      "nt_fsync_pct": 4.9,
+      "io_open_pct": 3.3,
+      "flush_pct": 1.3,
+      "build_receipt_and_canonicalise_and_hash_pct": "under 1 combined",
+      "note": "build_receipt, _canonical_bytes and the sha256 chain do not appear in the top nine entries."
+    },
+    "receipts_per_turn": {
+      "measured_by": "tests/security/test_verdict_receipts.py::TestTheDispatchDoorRecordsThroughTheREALToolLoop \u2014 driven through the REAL _handle_connection tool loop, counting records on the real chain",
+      "turn_with_no_tool_call": 0,
+      "turn_with_one_tool_call": 1,
+      "turn_with_two_tool_calls": 2,
+      "model": "one receipt per ADJUDICATED ACTION, linear in tool calls \u2014 not one per turn",
+      "why_it_was_needed": "The per-receipt cost only matters in proportion to how often it is paid, and nobody had counted. Recommending for or against a redesign without it would have been the third instance in one ticket of deciding on a partial measurement.",
+      "consequence": "A plain conversational turn costs NOTHING at the verdict door. A turn with one tool call pays one chip signature (~90-135 ms) against model inference measured in seconds. An agentic loop of N steps pays N.",
+      "written_as_a_lock_not_a_probe": "The enforcement point's own comment promises 'one dispatch yields one record'; nothing asserted the count, and every existing test reads records[-1], which is blind to it by construction. A regression to two would silently double a cost the operator has now been told about. Mutation-checked: duplicating the allow receipt kills three tests."
+    }
+  },
+  "findings": [
+    "THE RATIO IS NOT A PROPERTY OF THE SYSTEM. It is a property of how full the chain was when someone measured it: 17.4x empty, 18.5x at 65 records, 7.2x at 250, 5.9x at 500 \u2014 a 213% span. The first record's headline 17.9x was a 0-65-record figure with no depth attached, and it was the sentence written in plain language for the operator.",
+    "THE DELTA IS THE QUOTABLE QUANTITY: 90-135 ms across every depth measured, with most of that spread accounted for by the TPM arm's own stdev of ~18 ms rather than by depth. That is the chip signature, and it is what a decision about per-record TPM signing actually turns on.",
+    "THE SOFTWARE APPEND COST GROWS STRONGLY WITH CHAIN DEPTH: 5.5 ms empty, 7.7 at 65, 15.6 at 250, 24.8 at 500, 41.2 at 900. Independently reproduced by the verifier (5.9 / 8.0 / 13.4 / 25.2 / 45.3 across the same range). At the 1000-record ceiling the segment seals and the cost RESETS, so the lived average is roughly 25 ms per append rather than either endpoint.",
+    "THE FIRST RECORD'S STATED MECHANISM WAS WRONG. It said the 6.26 ms was build_receipt's validation, canonicalisation and hash-chaining, with the signature 'a rounding error'. Profiled: 87.8% is closing the file handle, 4.9% fsync, 3.3% open. The receipt machinery is under 1% combined \u2014 it is a rounding error too. The signature part was right; the three named causes were not any of them.",
+    "THE WRONG MECHANISM POINTS AT THE WRONG LEVER, which is why it matters more than the arithmetic. 'The receipt format is expensive' invites trimming receipt fields, which would buy nothing. The measurement says the receipt format is free and the durable write is everything \u2014 and that the write cost is a function of this machine's filter-driver stack.",
+    "VERIFICATION IS PER-RECORD CHIP WORK, and this is the conclusion that survived everything. The verifier counted the chip calls directly rather than inferring them from magnitude: chip_verify_calls == records x repeats at every length, across three runs. 7.8-9.6 ms per record across six pooled runs, against the software chain's 0.016-0.019 ms.",
+    "THE #1543 CORROBORATION IS STRONGER THAN I FIRST STATED, and I hedged it for the wrong reason. #1543 measured 8.687 and 9.043 ms/record on the real 33-record ingest chain; pooled across six runs the reproducible range is 7.8-9.6, so those figures sit in the MIDDLE, not at the low end. The hedge existed only because my own 12.277 outlier had stretched the top. Commensurability checked: #1543 divides whole-chain verify by 33, which is marginal + fixed/33 = marginal + 0.10 ms against a fixed cost of ~3.2 ms \u2014 a 1% bias."
+  ],
+  "corrections_to_the_first_record": [
+    "6.26 ms and 17.9x were 0-65-record figures presented without a depth. Superseded by the curve above.",
+    "The mechanism behind the 6.26 ms was stated as receipt building; it is the file-handle close.",
+    "The boot range 8.8-12.3 had an unsupported upper bound from a single outlier at too shallow a length. It is 8.2-9.6.",
+    "The #1543 corroboration was hedged as 'low end of the range'; it is mid-range.",
+    "conditions.elevated was a LITERAL `True` in the probe rather than a measurement, and repo_commit was hand-asserted. Both are read from the system now.",
+    "The filter-driver stack, which explains 87.8% of the software figure, was not recorded at all.",
+    "The committed probes hardcoded REPO = C:/Users/mrbla/BlarAI, so running them from a branch silently measured main."
+  ],
+  "not_measured": [
+    "Sealed-segment anchor verification. _verify_segment_index sha256s each sealed .jsonl.gz and does one chip verify per segment at EVERY boot, and segments accumulate for the life of the system. The 8.2-9.6 s figure covers the ACTIVE chain only, so real startup on an old install is higher by an amount nobody has measured.",
+    "The Policy Agent's adjudication chain \u2014 only the AO's verdict chain was driven. The ladder is shared, so the per-record cost should carry; should carry is not measured.",
+    "Contention. Every arm ran on an idle machine with no model loaded. The verdict door fires during a live turn with the 14B resident.",
+    "Whether a machine without this filter-driver stack shows the same software cost. Given that the close dominates, probably not \u2014 which bounds how far these figures travel.",
+    "How many tool calls a REAL turn makes in practice. The per-call cost model is now locked, but the distribution over real usage is not measured \u2014 and cannot be, because there has been no real use of BlarAI yet, only development. So the cost model is exact and the frequency is unknown."
+  ]
+}

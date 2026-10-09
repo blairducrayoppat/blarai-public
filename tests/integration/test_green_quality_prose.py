@@ -995,3 +995,361 @@ def test_the_prose_stamp_is_unconditional(tmp_path):
     assert not any("placeholder prose" in r for r in reasons), (
         f"a Python library was penalised by a check about web copy: {reasons}"
     )
+
+
+# ---------------------------------------------------------------------------
+# THE COVERAGE CAP — the sibling of the security scan's, and equally unasserted
+# ---------------------------------------------------------------------------
+# DoD capability 13. This instrument audited SOUND on the #1231 question — `pages_scanned` is an
+# independent count and `disposition()` is a total four-state classification, not a fraction.
+# It carries the same quieter risk its sibling does: `_MAX_FILES = 400` truncates the file list,
+# so a large site is only PARTLY read, and `disposition() == CLEAN` can coexist with placeholder
+# prose sitting in page 401.
+#
+# Disclosure is the whole defence, which makes the caveat load-bearing. Locked here for the same
+# reason and in the same shape as `test_green_quality_security.py` — the two were found together
+# and a fix that locks one and not the other is half a fix (lesson 342).
+
+
+def test_a_capped_prose_scan_says_so_and_a_clean_disposition_cannot_hide_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(prose, "_MAX_FILES", 3)
+    files = {
+        f"public/p{i}.html": "<!doctype html><html><body><p>Real copy about pottery.</p></body></html>"
+        for i in range(8)
+    }
+    result = _scan_tree(tmp_path, "big", files)
+
+    assert result.measured, "a capped scan still ran — it must not report as unmeasured"
+    assert "coverage is partial" in result.status, (
+        "a truncated file list published no caveat: a partial read is now indistinguishable "
+        f"from a complete one. status={result.status!r}"
+    )
+    # CLEAN and CAPPED together — so the caveat is the only thing between this result and a
+    # clean it did not earn.
+    assert result.disposition() == prose.DISPOSITION_CLEAN
+    assert str(prose._MAX_FILES) in result.status, "the caveat must name the bound"
+
+
+def test_the_prose_caveat_survives_to_the_field_that_actually_SHIPS(tmp_path, monkeypatch):
+    """Byte-identical gap to the security scanner's, and found in the same sweep.
+
+    `evidence_stamp()` publishes `EV_PROSE: self.prose.summary()`
+    (`green_quality/__init__.py:292`). `summary()` returned
+    `f"no placeholder prose ({self.pages_scanned} page(s) read)"` on the no-findings path,
+    without consulting `self.status`, so a truncated read shipped as an unqualified clean.
+
+    FIXED by #1396, in the same change as its security sibling — the point of finding them in
+    one sweep is landing them in one commit. Now a live regression lock rather than an
+    xfail(strict).
+    """
+    monkeypatch.setattr(prose, "_MAX_FILES", 3)
+    files = {
+        f"public/p{i}.html": "<!doctype html><html><body><p>Real copy about pottery.</p></body></html>"
+        for i in range(8)
+    }
+    result = _scan_tree(tmp_path, "big-ships", files)
+    assert "coverage is partial" in result.status, "precondition: status carries the caveat"
+    assert result.disposition() == prose.DISPOSITION_CLEAN, "precondition: clean-and-capped"
+    assert "partial" in result.summary().lower(), (
+        f"the scorecard stamp dropped the truncation caveat: {result.summary()!r}"
+    )
+
+
+def test_the_prose_cap_caveat_is_absent_when_nothing_was_truncated(tmp_path, monkeypatch):
+    """The toggle. A caveat that is always present carries no information."""
+    monkeypatch.setattr(prose, "_MAX_FILES", 400)
+    result = _scan_tree(
+        tmp_path, "small",
+        {"public/index.html": "<!doctype html><html><body><p>Real copy.</p></body></html>"},
+    )
+    assert result.measured
+    assert "coverage is partial" not in result.status, (
+        f"an uncapped scan claimed partial coverage: {result.status!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# #1399 — a scan that could read NO page must not claim the delivery has none.
+# ---------------------------------------------------------------------------
+
+
+def test_a_site_whose_pages_are_all_unreadable_is_UNMEASURED_not_not_applicable(tmp_path,
+                                                                                monkeypatch):
+    """The fail-open. Every page unreadable used to report `applicable=False`, which renders
+    as "not applicable: no user-visible prose surface" — a POSITIVE claim that this delivery
+    has no words in it. What happened is that the scanner could not open anything.
+
+    `disposition()` already argues the fix in its own docstring: it asks `measured` first
+    because "a scan that could not run knows nothing about applicability either".
+    """
+    root = tmp_path / "site"
+    root.mkdir()
+    for name in ("index.html", "about.html"):
+        (root / name).write_text("<h1>Lorem ipsum dolor sit amet</h1>", encoding="utf-8")
+
+    real_read = Path.read_text
+
+    def _unreadable(self, *a, **k):
+        if self.suffix == ".html":
+            raise OSError("permission denied")
+        return real_read(self, *a, **k)
+
+    monkeypatch.setattr(Path, "read_text", _unreadable)
+    result = prose.scan_repo(root, "web")
+
+    assert result.disposition() == DISPOSITION_UNMEASURED, (
+        f"an unreadable site claimed a disposition it never established: "
+        f"{result.disposition()} — {result.status!r}"
+    )
+    assert result.measured is False
+    assert result.coverage_partial is True
+    assert "NONE" in result.status and "unknown" in result.status
+    assert not result.is_clean()
+
+
+def test_a_genuine_library_is_STILL_not_applicable(tmp_path):
+    """The toggle, and the reason this change is safe.
+
+    A Python library has no user-visible prose and must keep saying so — that is a real
+    state this instrument has and its security sibling does not. Measured against the
+    archive before changing anything: the ONE archived `not-applicable` record is
+    `battery-b2-text-stats`, a python-lib with no web pages, and it does NOT re-bucket.
+    Zero archived runs change disposition under #1399.
+    """
+    root = tmp_path / "lib"
+    (root / "src").mkdir(parents=True)
+    (root / "src" / "tokenize.py").write_text("def tokenize(s):\n    return s.split()\n",
+                                              encoding="utf-8")
+
+    result = prose.scan_repo(root, "python-lib")
+    assert result.disposition() == DISPOSITION_NOT_APPLICABLE, (
+        "a library with genuinely no prose must keep the not-applicable state"
+    )
+    assert result.measured is True
+    assert not result.coverage_partial
+# #1396 round two. The first fix renamed the card helper's parameter and
+# documented why `measured` was the wrong bit, then left THIS call site passing
+# `measured`. The helper now takes the result object so no call site can get it
+# wrong; these are the locks for that.
+# ---------------------------------------------------------------------------
+
+
+def test_the_card_says_a_prose_finding_came_from_an_unfinished_scan(tmp_path, monkeypatch):
+    """The security twin of this shipped with a lock; the prose one shipped without and was
+    broken. Placeholder text is the finding the operator can verify with his own eyes, so the
+    card sentence about it is the one most worth being true.
+    """
+    monkeypatch.setattr(prose, "_MAX_FILES", 3)
+    root = tmp_path / "site"
+    root.mkdir()
+    (root / "a_lorem.html").write_text(
+        "<html><body><h1>Lorem ipsum dolor sit amet consectetur adipiscing elit sed do "
+        "eiusmod tempor incididunt ut labore et dolore magna aliqua</h1></body></html>",
+        encoding="utf-8")
+    for i in range(8):
+        (root / f"p{i}.html").write_text(
+            f"<html><body><h1>Real page {i} about our pottery studio</h1></body></html>",
+            encoding="utf-8")
+
+    result = prose.scan_repo(root, "web")
+    assert result.coverage_partial, "precondition: the read was bounded"
+    assert result.at_or_above(SEVERITY_HIGH), (
+        "fixture no longer reaches the planted lorem-ipsum page inside the cap — repair the "
+        "fixture rather than relaxing this assertion"
+    )
+
+    caveat = card_mod._caveat_from_prose(result)
+    assert caveat, "precondition: the finding produced a caveat at all"
+    assert "did not finish" in caveat, (
+        f"a prose finding on a bounded scan hid the bound: {caveat!r}"
+    )
+
+
+def test_the_prose_card_stays_silent_about_coverage_when_the_scan_finished(tmp_path):
+    """The toggle. Without it, a helper hard-wired to always append the clause would pass."""
+    root = tmp_path / "site"
+    root.mkdir()
+    (root / "index.html").write_text(
+        "<html><body><h1>Lorem ipsum dolor sit amet consectetur adipiscing elit sed do "
+        "eiusmod tempor incididunt ut labore et dolore magna aliqua</h1></body></html>",
+        encoding="utf-8")
+
+    result = prose.scan_repo(root, "web")
+    assert not result.coverage_partial, "sanity: one page, no bound, nothing unreadable"
+    caveat = card_mod._caveat_from_prose(result)
+    assert caveat, "sanity: the placeholder was still found"
+    assert "did not finish" not in caveat, (
+        f"a complete scan claimed it had not finished: {caveat!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# #1395 / #1400 — the three disclosures that landed on security.py and not here
+#
+# All three were found in the SAME review sweep as their security siblings and fixed only
+# there. That is lesson 342's predicate failing three times in one pass, so the carry-through
+# is locked per-defect below and structurally in test_sibling_scanner_parity.py.
+# ---------------------------------------------------------------------------
+
+
+def test_a_site_of_EXACTLY_the_cap_does_not_claim_partial_coverage(tmp_path, monkeypatch):
+    """#1400. `scanned >= _MAX_FILES` cannot tell a truncated walk from a tree that happens
+    to hold exactly that many, so a complete scan of exactly the bound cried wolf.
+
+    That direction matters more than it looks: a caveat that fires on honest results is how
+    readers learn to skip it, which costs the caveat its meaning on the runs that need it."""
+    monkeypatch.setattr(prose, "_MAX_FILES", 3)
+    files = {
+        f"public/p{i}.html": "<!doctype html><html><body><p>Real copy about pottery.</p></body></html>"
+        for i in range(3)          # EXACTLY the bound, nothing beyond it
+    }
+    result = _scan_tree(tmp_path, "exact", files)
+
+    assert result.measured
+    assert result.pages_scanned == 3, "sanity: every page was read"
+    assert not result.coverage_partial, (
+        f"a complete scan of exactly {prose._MAX_FILES} pages claimed partial coverage: "
+        f"{result.status!r}"
+    )
+    assert "coverage is partial" not in result.status
+
+
+def test_one_page_past_the_cap_DOES_claim_partial_coverage(tmp_path, monkeypatch):
+    """The other half of the pair: the bound must still be detected when genuinely hit."""
+    monkeypatch.setattr(prose, "_MAX_FILES", 3)
+    files = {
+        f"public/p{i}.html": "<!doctype html><html><body><p>Real copy about pottery.</p></body></html>"
+        for i in range(4)          # one past the bound
+    }
+    result = _scan_tree(tmp_path, "past", files)
+
+    assert result.coverage_partial, "a genuinely truncated walk reported complete coverage"
+    assert "coverage is partial" in result.status
+    assert str(prose._MAX_FILES) in result.status, "the caveat must name the bound"
+
+
+def test_a_page_read_only_to_its_byte_cap_says_so(tmp_path, monkeypatch):
+    """#1395. `read_text(...)[:_MAX_FILE_BYTES]` is a REAL bound on what was examined, and it
+    was disclosed nowhere: no counter, no contribution to `coverage_partial`, no sentence in
+    `status`. Placeholder prose past 256 KiB was reported as absent.
+
+    Its security sibling counts the same slice as `truncated_reads`; there the unexamined
+    tail could hold a credential."""
+    monkeypatch.setattr(prose, "_MAX_FILE_BYTES", 2048)
+    body = "<p>Real copy about pottery.</p>" * 200          # comfortably past 2 KiB
+    result = _scan_tree(tmp_path, "long", {
+        "public/index.html": f"<!doctype html><html><body>{body}</body></html>",
+    })
+
+    assert result.measured, "the page WAS read — just not all of it"
+    assert result.coverage_partial, (
+        f"a page read only to its byte cap reported complete coverage: {result.status!r}"
+    )
+    assert "NOT examined" in result.status, (
+        f"the truncation is not disclosed to the reader: {result.status!r}"
+    )
+    assert "partial" in result.summary().lower(), (
+        f"the caveat died before the field that ships: {result.summary()!r}"
+    )
+
+
+def test_the_byte_cap_caveat_is_absent_on_a_page_that_fits(tmp_path, monkeypatch):
+    """The toggle. Without it, the assertion above would pass on a scanner that simply
+    declared every read truncated."""
+    monkeypatch.setattr(prose, "_MAX_FILE_BYTES", 2048)
+    result = _scan_tree(tmp_path, "short", {
+        "public/index.html": "<!doctype html><html><body><p>Real copy.</p></body></html>",
+    })
+
+    assert result.measured
+    assert "NOT examined" not in result.status, (
+        f"a page that fits was reported as truncated: {result.status!r}"
+    )
+    assert not result.coverage_partial
+
+
+def test_a_long_rule_list_is_trimmed_and_SAYS_it_was_trimmed():
+    """#1400 item 1. `summary()` built the line whole and sliced it to EVIDENCE_VALUE_CAP, so
+    a stamp with many distinct rule ids silently lost its tail — the reader cannot tell a
+    two-rule finding from a nine-rule finding whose last seven fell off the end.
+
+    Driven through the real dataclass rather than a string helper, because the defect was in
+    what `summary()` SHIPS, not in the trimming arithmetic."""
+    findings = tuple(
+        prose.ProseFinding(rule=f"placeholder-rule-with-a-realistic-length-{i:02d}",
+                           severity=prose.SEVERITY_MEDIUM,
+                           path=f"public/p{i}.html", line=1, detail="x")
+        for i in range(20)
+    )
+    result = prose.ProseResult(findings, measured=True, applicable=True,
+                               status="read 20 page(s)", pages_scanned=20)
+    line = result.summary()
+
+    assert len(line) <= prose.EVIDENCE_VALUE_CAP, "the cap is still honoured"
+    assert "more" in line, (
+        f"the rule list was clipped with no sign that anything was dropped: {line!r}"
+    )
+    dropped = int(line.rsplit("+", 1)[1].split()[0])
+    assert dropped > 0
+    kept = line.count("placeholder-rule-with-a-realistic-length-")
+    assert kept + dropped == 20, (
+        f"the disclosed count does not reconcile with the population: kept={kept} "
+        f"dropped={dropped} of 20 — {line!r}"
+    )
+
+
+def test_a_short_rule_list_is_published_whole_with_no_more_suffix():
+    """The toggle for the trim: a list that fits must not be annotated as shortened."""
+    findings = tuple(
+        prose.ProseFinding(rule=f"rule-{i}", severity=prose.SEVERITY_MEDIUM,
+                           path="public/p.html", line=1, detail="x")
+        for i in range(2)
+    )
+    result = prose.ProseResult(findings, measured=True, applicable=True,
+                               status="read 2 page(s)", pages_scanned=2)
+    line = result.summary()
+
+    assert "rule-0" in line and "rule-1" in line
+    assert "more" not in line, f"a complete rule list claimed it was trimmed: {line!r}"
+
+
+def test_a_scan_that_WALKS_OUT_early_says_its_coverage_is_partial(tmp_path, monkeypatch):
+    """The fourth instance of the sibling-carry defect, and the one found by BUILDING the
+    control rather than by reading the loop (`tests/security/test_sibling_scanner_parity.py`).
+
+    Past `_MAX_FINDINGS` the scan keeps only HIGH findings, and once it holds
+    `_MAX_HIGH_FINDINGS` of those it BREAKS — leaving the rest of the tree unread. Prose
+    recorded that only as `truncated`, which means the finding LIST was abbreviated and is
+    deliberately not a coverage signal. So a scan that stopped partway through a site could
+    publish complete coverage. Its security sibling has recorded the same fact as
+    `walk_abandoned` since #1396.
+    """
+    monkeypatch.setattr(prose, "_MAX_FINDINGS", 2)
+    monkeypatch.setattr(prose, "_MAX_HIGH_FINDINGS", 3)
+    page = ("<!doctype html><html><body><p>Lorem ipsum dolor sit amet, consectetur "
+            "adipiscing elit.</p></body></html>")
+    result = _scan_tree(tmp_path, "many", {f"public/p{i}.html": page for i in range(12)})
+
+    assert result.measured, "the scan ran — it just did not finish the tree"
+    assert result.coverage_partial, (
+        f"a scan that walked out early published complete coverage: {result.status!r}"
+    )
+    assert "NOT read" in result.status, (
+        f"the early exit is not disclosed to the reader: {result.status!r}"
+    )
+
+
+def test_a_scan_that_reads_the_whole_tree_does_not_claim_it_walked_out(tmp_path, monkeypatch):
+    """The toggle. A site with findings below the ceiling read every file, so the early-exit
+    caveat must be absent — otherwise it fires on ordinary noisy deliveries and stops meaning
+    anything."""
+    monkeypatch.setattr(prose, "_MAX_FINDINGS", 50)
+    monkeypatch.setattr(prose, "_MAX_HIGH_FINDINGS", 200)
+    page = ("<!doctype html><html><body><p>Lorem ipsum dolor sit amet, consectetur "
+            "adipiscing elit.</p></body></html>")
+    result = _scan_tree(tmp_path, "few", {f"public/p{i}.html": page for i in range(3)})
+
+    assert result.measured
+    assert "NOT read" not in result.status, (
+        f"a complete scan claimed it walked out early: {result.status!r}"
+    )

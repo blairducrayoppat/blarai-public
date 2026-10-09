@@ -1,0 +1,114 @@
+{
+  "benchmark": "coder_prompt_floor",
+  "label": "9-tool-opencode-profile",
+  "timestamp": "2026-09-01T15:20:00-04:00",
+  "ticket": "#1501",
+  "status": "CORRECTED 2026-09-01 16:20",
+  "question": "How small can a coder request get? Is there such a thing as a cheap coder turn?",
+  "answer": "No. 88.3% of a real request is fixed overhead paid before the task is described.",
+  "method": {
+    "source": "A REAL coder request captured off the wire by a transparent proxy on 2026-09-01, replayed byte-for-byte. Not synthetic and not reconstructed from config.",
+    "tokenisation": "The captured request is rendered through the MODEL'S OWN chat template and tokenised, and the result reproduces the server's reported 14,094 prompt tokens exactly. An earlier version apportioned components by a calibrated 4.100 chars/token ratio over the JSON form; that is superseded -- see the correction block. The total was always server-reported and never changed.",
+    "why_this_matters": "A ratio derived over one representation cannot apportion a prompt sent in another. The tool schemas travel as Qwen3-Coder XML, not JSON, and the difference is +207 tokens on the tool half."
+  },
+  "components": {
+    "system_prompt": {
+      "tokens": 7233,
+      "always_sent": true,
+      "offline_reconstruction_tokens": 7074,
+      "runtime_environment_block_tokens": 159,
+      "note": "the environment block (model id, cwd, platform, date) is computed at request time and is on no on-disk surface"
+    },
+    "tool_schemas": {
+      "tokens": 5212,
+      "count": 9,
+      "always_sent": true,
+      "wire_form": "Qwen3-Coder XML, not JSON",
+      "fixed_template_preamble_tokens": 184,
+      "MEAN_IS_MISLEADING": "an earlier figure of '556 tokens each' describes no tool in the request. Marginal costs span 5.8x and three tools are 57% of the block.",
+      "marginal_tokens_per_tool": {
+        "bash": 1412,
+        "task": 897,
+        "todowrite": 643,
+        "read": 488,
+        "edit": 487,
+        "grep": 322,
+        "glob": 278,
+        "write": 256,
+        "search_docs": 245
+      }
+    },
+    "task_turn": {
+      "tokens": 1636,
+      "always_sent": false
+    },
+    "template_overhead": {
+      "tokens": 13
+    }
+  },
+  "floor": {
+    "tokens": 12445,
+    "pct_of_real_request": 88.3,
+    "definition": "system prompt + tool schemas: what every coder turn pays before any task text",
+    "reconciles": "7233 + 5212 + 1636 + 13 = 14094, the server-reported total, exactly"
+  },
+  "measured_total": {
+    "tokens": 14094,
+    "server_reported": true,
+    "independently_reproduced": "yes -- the template render tokenises to 14,094"
+  },
+  "tools": [
+    "bash",
+    "edit",
+    "glob",
+    "grep",
+    "read",
+    "search_docs",
+    "task",
+    "todowrite",
+    "write"
+  ],
+  "implication": {
+    "statement": "Coder turn cost is essentially FIXED per turn, not proportional to task size.",
+    "prefill_cost_of_the_floor_alone": {
+      "offload_ratio_30": {
+        "prefill_tok_per_s": 48.9,
+        "floor_seconds": 254.5
+      },
+      "no_offload": {
+        "prefill_tok_per_s": 305.9,
+        "floor_seconds": 40.7
+      },
+      "derivation": "rates from median first-turn TTFT at the RESTORED ceiling (288.4 s and 46.1 s over 14,094 tokens); see coder_offload_ab_restored_ceiling_2026-09-01.json"
+    },
+    "largest_single_component": "the system prompt (7,233 tok) is still larger than all nine tool schemas combined (5,212 tok). But within the tool block the distribution is what matters: bash alone is 1,412 tokens, more than five times search_docs at 245. If the floor is ever cut, that distribution is the actionable artifact and the mean actively misleads.",
+    "prior_lever_already_taken": "disabling a browser MCP cut the tool set 32 -> 9 and the prompt 18,393 -> 14,445 tokens (22%). The remaining nine tools still cost 5,212 tokens."
+  },
+  "environment": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V iGPU (Xe2)",
+    "system_ram_gib": 31.321,
+    "graphics_driver": "32.0.101.8991 (oem106.inf)",
+    "os_build": "Windows 11 Pro 26200",
+    "model": "Qwen3-Coder-30B-A3B INT4 (OpenVINO IR)",
+    "server": "OVMS 2026.3.1 python_on",
+    "openvino_venv": "2026.2.1-21919-ede283a88e3"
+  },
+  "not_measured": [
+    "whether the system prompt can be shortened without harming coder behaviour -- that is a quality question and needs an eval, not a token count",
+    "how the floor varies across the fleet's other task types; this is ONE captured request",
+    "the assistant's (14B) prompt floor -- this figure is the coder's only",
+    "whether the tool set is stable. It is NOT: the registry is thinned by model id, by client id (OPENCODE_CLIENT=acp drops one on the fleet path) and by the permission map, and a browser MCP attaches intermittently. Observed 9-10 baseline and ~30 with Playwright-MCP attached. This record describes ONE captured request and the floor is a range, not a constant."
+  ],
+  "correction": {
+    "what_changed": "The component split was re-measured by rendering the captured request through the model's OWN chat template and tokenising the result. The new decomposition reproduces the server-reported 14,094 prompt tokens EXACTLY.",
+    "why_the_original_was_wrong": "The original applied a calibrated 4.100 chars/token ratio to the tool schemas' JSON characters. The wire form is Qwen3-Coder XML, not JSON, and costs more. The method was sound; it was measuring the wrong representation. (JSON chars at 4.100 give 4,998 -- next to the original 5,005, which is why nothing looked wrong.)",
+    "superseded_figures": {
+      "system_prompt_tokens": 7456,
+      "tool_schema_tokens": 5005,
+      "floor_tokens": 12461,
+      "pct_of_real_request": 88.4
+    },
+    "a_convergence_that_was_NOT_one": "An offline reconstruction measured the system prompt at 7,074 tokens, and a 382-token runtime environment block was INFERRED by subtracting that from the original 7,456. 7,074 + 382 = 7,456 was then offered as two independent methods agreeing. It was not: the 382 was derived FROM the number it appeared to confirm. The environment block is actually 159 tokens, measured as the difference between the system message as sent (7,233) and the offline reconstruction (7,074). The genuine convergence is 7,074 + 159 = 7,233, and it is tighter than the false one -- but the 7,456 figure does not survive."
+  }
+}

@@ -523,10 +523,21 @@ def _write_envelope(env: dict[str, Any], result_json: Optional[str]) -> None:
     print(payload, flush=True)
 
 
+#: The git-safety variables the coder-leg runner sets (``Get-CoderLegGitEnv``,
+#: agentic-setup ``scripts/coder-leg-queue.ps1``). ``build_env`` hands opencode a
+#: whitelisted env, so each must be named here to reach the shell where the
+#: coder's git commands run. A name absent from the parent env is not added.
+GIT_SAFETY_ENV_VARS: tuple[str, ...] = (
+    "GIT_OPTIONAL_LOCKS", "GIT_TERMINAL_PROMPT", "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1",
+)
+
+
 def build_env(workdir: str) -> dict[str, str]:
     """The env opencode needs, mirroring Invoke-AgentRun (fleet-lib.ps1:344-384)
     and the #759 spike's build_env: pin git-bash (NOT WSL) and give the agent's
-    own pytest the worktree root on PYTHONPATH."""
+    own pytest the worktree root on PYTHONPATH. The ``GIT_SAFETY_ENV_VARS`` the
+    parent sets pass through unchanged."""
     env: dict[str, str] = {}
     git_bash = r"C:\Program Files\Git\bin\bash.exe"
     env["OPENCODE_GIT_BASH_PATH"] = git_bash
@@ -534,7 +545,7 @@ def build_env(workdir: str) -> dict[str, str]:
     env["PYTHONPATH"] = workdir
     for k in ("USERPROFILE", "APPDATA", "LOCALAPPDATA", "PATH", "PATHEXT",
               "SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP", "HOMEDRIVE", "HOMEPATH",
-              "USERNAME", "PROCESSOR_ARCHITECTURE"):
+              "USERNAME", "PROCESSOR_ARCHITECTURE", *GIT_SAFETY_ENV_VARS):
         v = os.environ.get(k)
         if v is not None:
             env[k] = v
@@ -632,7 +643,30 @@ async def _run_acp_session(args: argparse.Namespace) -> dict[str, Any]:
     # The live ACP client — defined HERE so every acp reference is inside the
     # 3.14 path. Duck-typed exactly like the #759 spike's RecordingClient: fs +
     # terminal capabilities OFF so opencode uses its OWN tools (matching
-    # `opencode run`); permission requests auto-approved within the worktree.
+    # `opencode run`).
+    #
+    # PERMISSION REQUESTS ARE AUTO-APPROVED — UNCONDITIONALLY, NOT "within the
+    # worktree" (corrected 2026-08-14, #1376). This comment said "within the
+    # worktree" and no such scoping exists: `request_permission` below accepts a
+    # `tool_call` argument and never reads it. It does not inspect the command, the
+    # path, or the rule that fired; it finds an allow option and returns it.
+    #
+    # The consequence, measured across 2,671 banked agent logs: 287 `asking` events,
+    # ZERO rejected, 265/265 ask-gated commands completed — including deletions
+    # inside `tests/` (which AGENTS.md forbids) and 14 `external_directory`
+    # approvals for paths outside the project. Every `ask` rule in the coder's
+    # permission map is inert while looking like a control.
+    #
+    # This inverted a PROVEN control. Under the `stdin` driver `ask` failed closed
+    # ("The user rejected permission to use this specific tool call" appears
+    # verbatim in stdin-era logs); the `acp` flip on 2026-07-11 replaced that with
+    # this client, and nothing noticed for a month. `deny` is unaffected — opencode
+    # enforces it itself and never consults this client — which is what makes a fix
+    # viable rather than a redesign.
+    #
+    # DO NOT read this as "safe because the worktree is isolated". Fixing it is
+    # #1376 (deny-by-default with an explicit allowlist, restoring stdin parity);
+    # #1384 covers the missing gate that would have caught the inversion.
     class _CoderClient:
         def __init__(self) -> None:
             self.start = time.monotonic()

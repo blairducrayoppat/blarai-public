@@ -83,7 +83,13 @@ def _plan_fixture(tmp_path):
 
 #: A job oracle whose execution-stage probes BOTH produced a real result — the only shape that
 #: earns the right to delete work from the plan (#1342).
-QA_VALIDATED = {"f2p_baseline": "fails-on-skeleton", "collectability": "collected"}
+#: A properly validated AND QA-ACCEPTED oracle. #1410 added ``verdict``: the two stamps only
+#: answer "did the probes RUN?", and the guard that authorises DELETING the operator's work
+#: has to answer "did QA ACCEPT this exam?" as well. A real accepted oracle carries
+#: ``verdict: "seed"``, so the fixture that stands for one carries it too.
+QA_VALIDATED = {
+    "f2p_baseline": "fails-on-skeleton", "collectability": "collected", "verdict": "seed",
+}
 
 #: The shape every NODE oracle has had in production: both probes skipped unconditionally by
 #: ``oracle_qa.f2p_seed_gate``'s non-``.py`` early return. Copied from the real
@@ -271,6 +277,24 @@ def test_fail_closed_noop_seam_default_dispatches_the_wave(tmp_path):
         ({"f2p_baseline": None, "collectability": None}, "null stamps"),
         ({}, "sidecar present but says nothing"),
         (None, "no sidecar at all — absence is not permission"),
+        # #1410: both probes produced REAL results, so every stamp check above is satisfied —
+        # and QA still did not accept the exam. These are the cases the stamps cannot see,
+        # because "did the probes run?" and "did QA accept this?" are different questions and
+        # only the second one authorises deleting the operator's work.
+        (
+            {"f2p_baseline": "fails-on-skeleton", "collectability": "collected",
+             "verdict": "seed-partial"},
+            "probes ran, but QA accepted it only PARTIALLY — reachable today",
+        ),
+        (
+            {"f2p_baseline": "fails-on-skeleton", "collectability": "collected",
+             "verdict": "refuse"},
+            "probes ran, and QA REFUSED it outright",
+        ),
+        (
+            {"f2p_baseline": "fails-on-skeleton", "collectability": "collected"},
+            "probes ran, and the record says nothing about acceptance at all",
+        ),
     ],
 )
 def test_unvalidated_oracle_may_not_delete_work_even_when_it_passes(tmp_path, qa_stamps, why):

@@ -1117,3 +1117,450 @@ def test_the_build_output_bound_is_named_in_the_status(tmp_path):
     result = sec.scan_repo(repo, "node-web")
     assert "build-output file(s) read for credentials only" in result.status
     assert result.is_clean() is True
+
+
+# ---------------------------------------------------------------------------
+# THE COVERAGE CAP — disclosed since it was written, asserted by nothing until now
+# ---------------------------------------------------------------------------
+# DoD capability 13. A reconciliation audit found this instrument SOUND on the #1231 question:
+# `files_scanned` is an independent population, no ratio is published, nothing can vanish from a
+# summed denominator. But it carries a different, quieter risk that the same audit flagged as
+# unlocked: `_MAX_FILES = 800` truncates the file list, so a repo larger than that is only
+# PARTLY scanned — and `measured=True` with `is_clean()` True can coexist with a credential
+# sitting in file 801.
+#
+# That is disclosed, in `status`, and disclosure is the whole defence. Which makes the caveat
+# load-bearing: if it ever stops being emitted, a partial scan becomes indistinguishable from a
+# complete one, and the instrument starts reporting a clean it did not earn.
+#
+# The cap is monkeypatched rather than fixtured with 801 real files: the number is not the
+# subject, the DISCLOSURE is, and the real code path runs either way.
+
+
+def test_a_capped_scan_says_so_and_a_clean_verdict_cannot_hide_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(sec, "_MAX_FILES", 3)
+    repo = tmp_path / "big"
+    (repo / "app").mkdir(parents=True)
+    for i in range(8):
+        (repo / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+
+    assert result.measured, "a capped scan still ran — it must not report as unmeasured"
+    assert "coverage is partial" in result.status, (
+        "a truncated file list published no caveat: a partial scan is now indistinguishable "
+        f"from a complete one. status={result.status!r}"
+    )
+    # The load-bearing pairing: CLEAN and CAPPED can be true together, so the caveat is the
+    # only thing standing between this result and a clean it did not earn.
+    assert result.is_clean(), "sanity: these files carry no findings"
+    assert str(sec._MAX_FILES) in result.status, "the caveat must name the bound, not just hint at one"
+
+
+def test_the_caveat_survives_to_the_field_that_actually_SHIPS(tmp_path, monkeypatch):
+    """`.status` is not what the operator reads. `.summary()` is.
+
+    `evidence_stamp()` publishes `EV_SECURITY: self.security.summary()`
+    (`green_quality/__init__.py:287`), and that stamp's own docstring says the security key is
+    kept ALWAYS PRESENT precisely so silence can never be read as safe. But `summary()`
+    (`security.py:329-344`) is a SECOND rendering built from scratch — on the no-findings path it
+    returns `f"clean ({self.files_scanned} files scanned)"` and never consults `self.status`, so
+    the truncation caveat is dropped on the way to the scorecard.
+
+    Note the module already knew to do this: it prefixes "PARTIAL SCAN — " on the FINDINGS
+    branch. The clean branch had no equivalent, and a capped scan is `measured=True` so that
+    prefix would not have fired regardless.
+
+    FIXED by #1396. `coverage_partial` is now a field on the result rather than English inside
+    `status`, both branches of `summary()` read it, and this test is a live regression lock
+    rather than the xfail(strict) it shipped as. If it ever fails again, a rendering surface
+    has been added or rewritten without carrying the third fact.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 3)
+    repo = tmp_path / "big"
+    (repo / "app").mkdir(parents=True)
+    for i in range(8):
+        (repo / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert "coverage is partial" in result.status, "precondition: status carries the caveat"
+    assert result.is_clean(), "precondition: the dangerous clean-and-capped state"
+    assert "partial" in result.summary().lower(), (
+        f"the scorecard stamp dropped the truncation caveat: {result.summary()!r} — a capped "
+        f"scan ships as an unqualified clean"
+    )
+
+
+def test_the_cap_caveat_is_absent_when_nothing_was_truncated(tmp_path, monkeypatch):
+    """The toggle. A caveat that is always present carries no information."""
+    monkeypatch.setattr(sec, "_MAX_FILES", 800)
+    repo = tmp_path / "small"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "m.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.measured
+    assert "coverage is partial" not in result.status, (
+        f"an uncapped scan claimed partial coverage: {result.status!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# #1396 — the card is the operator's ONLY window into quality, so the caveat
+# has to survive to it as well as to the evidence stamp. Block + toggle, per
+# security_by_design principle 12.
+# ---------------------------------------------------------------------------
+
+
+def test_the_card_warns_when_a_clean_scan_did_not_cover_everything(tmp_path, monkeypatch):
+    """A capped-and-clean scan must not render as SILENCE on the card.
+
+    Silence is the strongest possible reading — the operator sees no warning and concludes the
+    check looked everywhere and was happy. Before #1396 `_caveat_from_security` fell through to
+    a bare `return ""` on exactly this input, because its only unmeasured branch keys off
+    `measured` and a capped scan is `measured=True`.
+
+    Driven through the REAL `scan_repo`, not a hand-built result: the point is that a real tree
+    hitting a real bound produces the caveat, which a constructed dataclass cannot prove.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 3)
+    repo = tmp_path / "big"
+    (repo / "app").mkdir(parents=True)
+    for i in range(8):
+        (repo / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.is_clean(), "precondition: the dangerous clean-and-capped state"
+    assert result.coverage_partial, "precondition: the scan knows it was bounded"
+
+    caveat = card_mod._caveat_from_security(result)
+    assert caveat, "the card said NOTHING about a scan that did not finish"
+    assert "clean bill of health" in caveat, (
+        f"the caveat must deny the clean reading in the operator's own terms: {caveat!r}"
+    )
+
+
+def test_the_card_stays_silent_when_the_scan_really_did_cover_everything(tmp_path, monkeypatch):
+    """The toggle. A caveat that is always present carries no information.
+
+    This is the half that makes the test above mean something: without it, a
+    `_caveat_from_security` hard-wired to always warn would pass and the card would be noise.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 800)
+    repo = tmp_path / "small"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "only.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.is_clean(), "sanity: nothing to find here"
+    assert not result.coverage_partial, "sanity: an uncapped scan covered everything"
+    assert card_mod._caveat_from_security(result) == "", (
+        "the card warned about incomplete coverage on a scan that completed"
+    )
+
+
+def test_a_finding_on_a_capped_scan_says_BOTH(tmp_path, monkeypatch):
+    """The findings branch had the same hole, and the ticket did not name it.
+
+    `_and_unfinished` used to take `measured`, so a capped scan that DID find something
+    reported the finding as though the search had been exhaustive. The operator needs both
+    halves: what was found, and that there may be more nobody looked at.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 3)
+    repo = tmp_path / "big"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "a_creds.py").write_text(
+        'AWS_KEY = "AKIAIOSFODNN7EXAMPLE"\n', encoding="utf-8")
+    for i in range(8):
+        (repo / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.coverage_partial, "precondition: the scan was bounded"
+    # NOT `if result.findings:`. A conditional here would let the test pass silently on the
+    # day the walk order changes and the credential falls outside the cap — the vacuous-lock
+    # shape this whole ticket exists to stamp out. If the fixture stops reaching the finding,
+    # this must FAIL and be repaired, not quietly assert nothing.
+    assert result.findings, (
+        "fixture no longer reaches the planted credential inside the cap, so the findings "
+        "branch is not being exercised — repair the fixture rather than relaxing this"
+    )
+
+    caveat = card_mod._caveat_from_security(result)
+    assert "did not finish" in caveat, (
+        f"a finding on a bounded scan hid the bound: {caveat!r}"
+    )
+    assert "PARTIAL SCAN" in result.summary(), (
+        f"the stamp hid the bound on the findings branch: {result.summary()!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# #1396 round two. The first fix set coverage_partial from the file bound alone
+# while its own docstring promised more, and an independent review proved four
+# other shortfalls still shipped as an unqualified "clean". One lock each.
+# ---------------------------------------------------------------------------
+
+
+def test_an_unreadable_file_cannot_hide_the_shortfall_it_causes(tmp_path, monkeypatch):
+    """`scanned` counts only SUCCESSFUL reads, so unreadable files SHRINK it.
+
+    Keying coverage solely on `scanned >= _MAX_FILES` meant the very files that prove a walk
+    was short were the ones that held the bound test false. This is the fail-closed reading:
+    a file we could not open is a file we did not examine.
+    """
+    repo = tmp_path / "r"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "ok.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    real_read = Path.read_text
+
+    def _boom(self, *a, **k):
+        if self.name == "locked.py":
+            raise OSError("permission denied")
+        return real_read(self, *a, **k)
+
+    (repo / "app" / "locked.py").write_text("VALUE = 2\n", encoding="utf-8")
+    monkeypatch.setattr(Path, "read_text", _boom)
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.measured, "an unreadable FILE is not an unreadable TREE"
+    assert result.coverage_partial, (
+        f"a file that could not be read did not mark coverage partial: {result.status!r}"
+    )
+    assert "partial" in result.summary().lower(), (
+        f"the stamp published a clean the scan did not earn: {result.summary()!r}"
+    )
+
+
+def test_a_python_file_that_will_not_parse_marks_coverage_partial(tmp_path):
+    """The AST tier did not run on that file, so the tree was not fully examined.
+
+    Its byte-identical concept in the prose scanner (`unparsed`) already set the flag. Two
+    instruments documenting the same field and implementing it differently is how the next
+    reader draws the wrong conclusion from whichever one they happened to open.
+    """
+    repo = tmp_path / "r"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "fine.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (repo / "app" / "broken.py").write_text("def (((:\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.measured
+    assert "did not parse" in result.status, "precondition: the scanner noticed"
+    assert result.coverage_partial, (
+        f"an unparseable file left the published figure unqualified: {result.status!r}"
+    )
+
+
+def test_abandoning_the_walk_on_the_finding_ceiling_is_partial_COVERAGE(tmp_path, monkeypatch):
+    """The high-severity ceiling `break`s out of the tree walk entirely.
+
+    Distinct from the finding-list cap, which is partial RECORDING of a completed look. This
+    one leaves files unexamined and used to render as a finished search on both the stamp and
+    the card. Measured on a real tree before the fix: 10 files scanned of 430.
+    """
+    monkeypatch.setattr(sec, "_MAX_FINDINGS", 1)
+    monkeypatch.setattr(sec, "_MAX_HIGH_FINDINGS", 2)
+    repo = tmp_path / "r"
+    (repo / "app").mkdir(parents=True)
+    for i in range(30):
+        (repo / "app" / f"c{i}.py").write_text(
+            f'AWS_KEY = "AKIAIOSFODNN7EXAMPL{i%10}"\n', encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.findings, "precondition: findings were produced"
+    assert result.coverage_partial, (
+        f"the walk was abandoned and the result claimed full coverage: {result.status!r}"
+    )
+    assert "ABANDONED" in result.status, "the reader must be told the walk stopped early"
+    assert "PARTIAL SCAN" in result.summary(), (
+        f"the stamp hid an abandoned walk: {result.summary()!r}"
+    )
+
+
+def test_deliberately_excluded_content_is_NOT_a_shortfall(tmp_path):
+    """The toggle for the exclusion, and the reason the flag carries information.
+
+    `.git` is present in every archived delivery measured (183 of 183). If excluded regions
+    counted as partial coverage the flag would be true on every run ever graded, which is the
+    same as not having it. An excluded region is disclosed in `status`; it is not a shortfall.
+    """
+    repo = tmp_path / "r"
+    (repo / "app").mkdir(parents=True)
+    (repo / ".git").mkdir()
+    (repo / ".git" / "config").write_text("[core]\n", encoding="utf-8")
+    (repo / "app" / "only.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.measured
+    assert not result.coverage_partial, (
+        f"a deliberately skipped directory was counted as a shortfall: {result.status!r}"
+    )
+    assert result.summary().startswith("clean"), (
+        f"an excluded directory downgraded an honestly complete scan: {result.summary()!r}"
+    )
+
+
+def test_the_sidecar_persists_coverage_partial_beside_its_clean_claim(tmp_path, monkeypatch):
+    """The archive is the surface later sweeps COUNT, and it was the last place the fact was
+    droppable.
+
+    `to_sidecar` published `"clean": true` for a capped scan with no coverage qualifier, so the
+    fact survived only as English inside the clipped `status` string — the exact substring
+    dependency #1396 exists to retire, relocated one layer out into green-quality.json. A
+    review found it there after the rendering surfaces were fixed.
+
+    `is_clean()` is deliberately NOT redefined: 44 archived green-quality.json already carry
+    that key's current meaning, and changing what it asserts would retroactively alter what
+    every past sweep measured. The qualifier goes beside it.
+
+    Driven through `BatterySummary.green_quality` — the method battery.py itself calls at
+    close — and read back OFF DISK, because the defect was precisely that the on-disk
+    artifact and the in-memory object disagreed.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 1)
+    sc, _summary = _green_run(tmp_path, vulnerable=False)
+
+    sidecar = json.loads(
+        (tmp_path / "runs" / "R1" / "green-quality.json").read_text(encoding="utf-8"))
+    block = sidecar["security"]
+
+    assert block["measured"] is True, "precondition: the scan ran"
+    assert "coverage is partial" in block["status"], "precondition: the cap was hit"
+    assert "coverage_partial" in block, (
+        "the archive dropped the fact — a later sweep must not have to substring-match prose "
+        "to learn the scan did not finish"
+    )
+    assert block["coverage_partial"] is True
+    assert block["clean"] is True, (
+        "is_clean() was silently redefined; 44 archived artifacts depend on its meaning, and "
+        "the qualifier belongs BESIDE it rather than folded into it"
+    )
+    assert "partial" in sc.evidence[EV_SECURITY].lower(), (
+        f"the evidence stamp still shipped an unqualified clean: {sc.evidence[EV_SECURITY]!r}"
+    )
+
+
+def test_a_file_read_only_in_part_cannot_publish_a_clean(tmp_path):
+    """#1395. The read is sliced to `_MAX_FILE_BYTES` and everything past the cut is never
+    scanned. A credential below it was not looked for, and the result said "clean".
+
+    The credential is STILL missed — that is what a bound is — and this test asserts that
+    honestly rather than pretending the fix found it. What changed is that the scan no longer
+    claims to have looked. "Nothing found in the part I read" and "clean" are different
+    claims, and only the first was ever established.
+    """
+    repo = tmp_path / "big"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "bundle.py").write_text(
+        "# pad\n" + ("x" * 300_000) + '\nAWS_KEY = "AKIAIOSFODNN7EXAMPLE"\n', encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+
+    assert result.measured, "the file was readable; only the tail went unread"
+    assert not result.findings, (
+        "precondition: the credential sits past the cut, so it is genuinely not found — if "
+        "this starts failing the cap moved and the test is measuring the wrong thing"
+    )
+    assert result.coverage_partial, "a truncated read left the result claiming full coverage"
+    assert "read only in part" in result.status, "the reader must be told which bound was hit"
+    assert "partial" in result.summary().lower(), (
+        f"the stamp published a clean the scan did not earn: {result.summary()!r}"
+    )
+
+
+def test_a_file_under_the_byte_cap_is_read_whole_and_says_so(tmp_path):
+    """The toggle. The same credential in a small file must be FOUND, and the scan must not
+    claim partial coverage — otherwise the test above passes on a scanner that always
+    truncates and always warns.
+    """
+    repo = tmp_path / "small"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "conf.py").write_text('AWS_KEY = "AKIAIOSFODNN7EXAMPLE"\n', encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+
+    assert result.findings, "the same credential must be caught when the file is read whole"
+    assert not result.coverage_partial, "an untruncated read claimed partial coverage"
+    assert "read only in part" not in result.status
+    assert "PARTIAL SCAN" not in result.summary()
+
+
+# ---------------------------------------------------------------------------
+# #1400 items 1-3 — the residuals from the #1396 review.
+# ---------------------------------------------------------------------------
+
+
+def test_a_tree_of_EXACTLY_the_cap_is_not_called_partial(tmp_path, monkeypatch):
+    """Item 2. `scanned >= _MAX_FILES` cannot tell "the walk was cut short" from "the tree
+    holds exactly that many", so a repo of exactly the cap claimed partial coverage on a
+    complete scan. The iterator now hands the caller one PAST the bound, which makes the
+    distinction decidable: the extra item exists only when there was more to see.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 5)
+    for n, expect_partial in ((4, False), (5, False), (6, True)):
+        repo = tmp_path / f"r{n}"
+        (repo / "app").mkdir(parents=True)
+        for i in range(n):
+            (repo / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+        result = sec.scan_repo(repo, "python-lib")
+        assert result.coverage_partial is expect_partial, (
+            f"{n} files against a cap of 5 reported coverage_partial="
+            f"{result.coverage_partial}, expected {expect_partial} — the boundary is the "
+            f"whole point of this test"
+        )
+
+
+def test_a_clipped_rule_list_says_it_was_clipped(tmp_path):
+    """Item 1. The stamp was built whole and then sliced at EVIDENCE_VALUE_CAP, so a finding
+    with many distinct rule ids lost its tail silently — and the "PARTIAL SCAN — " prefix
+    made that 15 characters likelier. A silently clipped list is this ticket family's own
+    defect committed by its own disclosure.
+    """
+    findings = tuple(
+        sec.SecurityFinding(rule=f"a-very-long-rule-identifier-number-{i:02d}",
+                            severity=SEVERITY_HIGH, path=f"f{i}.py", line=1, detail="x")
+        for i in range(20)
+    )
+    result = sec.SecurityResult(findings, measured=True, status="s", files_scanned=20,
+                                coverage_partial=True)
+    stamp = result.summary()
+
+    from tools.dispatch_harness.green_quality.constants import EVIDENCE_VALUE_CAP
+    assert len(stamp) <= EVIDENCE_VALUE_CAP, "the stamp must still fit its field"
+    assert "more" in stamp, f"the stamp dropped rule ids without saying so: {stamp!r}"
+    assert stamp.endswith("more"), "the honesty suffix must not itself be the thing clipped"
+
+
+def test_a_short_rule_list_gains_no_spurious_truncation_note(tmp_path):
+    """The toggle for item 1. A note that is always present carries no information."""
+    findings = tuple(
+        sec.SecurityFinding(rule=f"rule-{i}", severity=SEVERITY_HIGH, path=f"f{i}.py",
+                            line=1, detail="x")
+        for i in range(2)
+    )
+    result = sec.SecurityResult(findings, measured=True, status="s", files_scanned=2)
+    assert "more" not in result.summary(), (
+        f"a complete rule list claimed it had been truncated: {result.summary()!r}"
+    )
+
+
+def test_the_coverage_caveat_bridges_to_the_band_A_headline(tmp_path, monkeypatch):
+    """Item 3. `build_card` renders "Looks clean — no problems the automatic audit could
+    find" directly above the caveat. Both sentences are true, which is exactly why a
+    non-technical reader should not be left to notice the tension himself.
+    """
+    monkeypatch.setattr(sec, "_MAX_FILES", 1)
+    repo = tmp_path / "big"
+    (repo / "app").mkdir(parents=True)
+    for i in range(4):
+        (repo / "app" / f"m{i}.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = sec.scan_repo(repo, "python-lib")
+    assert result.is_clean() and result.coverage_partial, "precondition: capped and clean"
+
+    caveat = card_mod._caveat_from_security(result)
+    assert "looks clean" in caveat.lower(), (
+        f"the caveat must name the headline it is narrowing, or the operator reads two "
+        f"sentences that disagree: {caveat!r}"
+    )

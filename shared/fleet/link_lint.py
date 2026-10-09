@@ -71,7 +71,7 @@ import re
 import sys
 from dataclasses import asdict, dataclass, field
 from html.parser import HTMLParser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable
 from urllib.parse import unquote
 
@@ -126,6 +126,12 @@ _JS_ATTR_RE = re.compile(
     re.IGNORECASE,
 )
 
+#: A `fetch()` against a STRING LITERAL. See :func:`extract_fetch_targets` for why this
+#: exists and why it is filtered so hard — the filter is the whole design.
+_JS_FETCH_RE = re.compile(
+    r"""\bfetch\s*\(\s*(?P<q>["'`])(?P<val>[^"'`]*?)(?P=q)""",
+)
+
 
 @dataclass(frozen=True)
 class Reference:
@@ -171,20 +177,44 @@ class Finding:
     line: int = 0
 
 
-@dataclass
+@dataclass(slots=True)
 class _Tally:
     """Per-status counts over every reference examined.
 
     ``undecidable`` is carried with the same weight as the rest on purpose: it is the
     field that stops a clean ``broken == 0`` from being read as "every link resolves".
+
+    ``slots=True`` IS THE FIX FOR #1389, not a micro-optimisation. The classification loop
+    increments by computed name — ``setattr(tally, status.replace("-", "_"), …)`` — and
+    against a plain dataclass a status that is not one of the five field names does not
+    raise: it creates a NEW attribute nothing reads. The reference is examined, counted
+    nowhere, and lost from the total. With slots the same mistake is an ``AttributeError``
+    at the increment, which is the fail-loud reading. Nothing produces a sixth status today;
+    the defect was that nothing PREVENTED one, and adding one is a one-line change two
+    hundred lines from here with no exception and no red to mark it.
     """
 
+    #: The POPULATION — every reference the loop examined, incremented exactly once each,
+    #: independently of how it was classified. The published denominator is THIS, never the
+    #: sum of the buckets below. A grader whose total is derived from its own counters cannot
+    #: detect its own losses (#1231): an item falling into no bucket leaves the numerator and
+    #: the denominator TOGETHER, so the arithmetic stays self-consistent while under-reporting.
+    examined: int = 0
     resolved: int = 0
     broken: int = 0
     undecidable: int = 0
     external: int = 0
     in_page: int = 0
     notes: list[str] = field(default_factory=list)
+
+    def unaccounted(self) -> int:
+        """References examined but present in no bucket. Zero unless something is wrong.
+
+        Verified by data the buckets do not own, which is what DoD row 13 asks of every
+        grader: *a grader's own arithmetic is verified by something that is not that grader.*
+        Here the "something" is a counter with no classification logic in it at all."""
+        return self.examined - (self.resolved + self.broken + self.undecidable
+                                + self.external + self.in_page)
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +356,51 @@ def extract_references_js(text: str, source: str) -> list[Reference]:
     return refs
 
 
+def extract_fetch_targets(text: str, source: str) -> list[Reference]:
+    """`fetch()` calls against a string literal that names a FILE — and only those.
+
+    **Why this exists (#1375, 2026-08-10).** The delivered pottery site's two central
+    pages both ran ``fetch('./data/pieces.json')``. The file existed; the server mounted
+    ``public/`` and ``data/`` sat *beside* it, so every visitor got a 404 and the gallery
+    rendered "Failed to load pieces." The operator found it by opening the site. Nothing
+    else could have: an href/src scan does not see a ``fetch``, the console smoke only
+    ever loaded the entry page, and the image checker read that very JSON file **off the
+    filesystem** without asking whether a browser could reach it. *A file that exists is
+    not a file that is served.*
+
+    **Why it is filtered this hard.** :func:`extract_references_js` deliberately excluded
+    ``fetch()`` and said why: *"a broader sweep … would flag `fetch()` calls against API
+    routes, which are not files and are not defects."* That reasoning is correct and is
+    preserved exactly — a target is kept ONLY when its decidable path carries a recognised
+    web extension. So::
+
+        fetch('./data/pieces.json')   -> CHECKED   (.json is a file; there is no routing
+                                                    story that rescues a missing one)
+        fetch('/api/pieces')          -> ignored   (no extension; may well be a route)
+        fetch(`/api/${id}`)           -> ignored   (interpolated, undecidable)
+        fetch(url)                    -> ignored   (not a literal)
+
+    The exclusion was not wrong; it was one clause too broad, and the clause that was
+    missing is the one that distinguishes a file from a route.
+
+    Runs over HTML as well as JS, because the fetch that cost the delivery lived in an
+    inline ``<script>`` block that no HTML attribute parser would ever look inside.
+    """
+    refs: list[Reference] = []
+    for match in _JS_FETCH_RE.finditer(text):
+        value = match.group("val")
+        if not value:
+            continue
+        candidate = _decidable_path(value)
+        if not candidate:
+            continue
+        if PurePosixPath(candidate.replace("\\", "/")).suffix.lower() not in _WEB_EXTENSIONS:
+            continue  # a route, not a file — exactly the false-positive class to avoid
+        line = text.count("\n", 0, match.start()) + 1
+        refs.append(_make_reference(value, "fetch", "", source, line))
+    return refs
+
+
 # ---------------------------------------------------------------------------
 # Resolution
 # ---------------------------------------------------------------------------
@@ -459,13 +534,24 @@ def _resolve_reference(ref: Reference, served_root: Path, containing_dir: Path) 
     suffix = Path(lookup).suffix.lower()
     if suffix in _WEB_EXTENSIONS:
         where = "a page" if suffix in {".html", ".htm", ".xhtml"} else "a file"
+        # #1375: a fetch is not clicked and not navigated to — it is the page asking the
+        # server for its own data, and it fails SILENTLY except for whatever the page
+        # chose to render. Saying "anyone who clicks" of a fetch would misdescribe the
+        # defect to the operator reading the finding, so the two get different sentences.
+        if ref.attr == "fetch":
+            consequence = (
+                "The page loads and then asks the server for this and gets nothing, so it "
+                "renders empty or shows its own error text. The file may well exist in the "
+                "project — what matters is that it is not reachable from the served root."
+            )
+        else:
+            consequence = "Anyone who clicks or loads this gets an error instead."
         return "broken", Finding(
             rule="broken-link",
             severity=SEVERITY_HIGH,
             message=(
                 f"'{raw}' points at {where} that is not in the delivered site "
-                f"('{lookup}' does not exist under the served root). Anyone who clicks or loads "
-                f"this gets an error instead."
+                f"('{lookup}' does not exist under the served root). {consequence}"
             ),
             reference=raw,
             file=ref.file,
@@ -495,6 +581,70 @@ def _base_for(path: str, served_root: Path, containing_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 # The gate
 # ---------------------------------------------------------------------------
+
+
+def _check_entry_reaches_the_site(root: Path) -> Finding | None:
+    """The page a visitor LANDS ON must reach the site that was built (#1367).
+
+    **Why this exists.** On 2026-08-10 the fleet delivered a six-page pottery site and the
+    operator opened it to a page saying "App" with a blue circle. `public/index.html` was
+    the scaffold's placeholder, 1044 bytes, untouched by all seven delivered tasks, and the
+    server mounts `/` to it. The site he asked for lived in `home.html`, `pieces.html`,
+    `piece-detail.html` and `contact.html`, and **nothing pointed at any of them.**
+
+    Four gates passed that tree. They could not have done otherwise: each one asks whether
+    a page it was handed is well-formed, and none asks *is the page a visitor reaches the
+    product?* The visual capture and the console smoke both open `index.html` by
+    convention, so they graded the placeholder and reported honestly on it.
+
+    **The rule.** If the served root's index document resolves ZERO references to other
+    delivered HTML pages while two or more exist beside it, the site has no front door.
+    Decidable from the filesystem, no browser, no knowledge of what the scaffold shipped.
+
+    **Guarded against the one real false positive.** A genuine single-page app has no other
+    pages to link to, so the rule requires at least two siblings before it can fire. A site
+    that navigates purely by script from a rich entry page would be a false positive; that
+    is not the shape a static multi-page delivery takes, and the finding names the pages it
+    could not reach so the coder can answer it rather than guess.
+    """
+    index_path = next((root / n for n in _INDEX_NAMES if (root / n).is_file()), None)
+    if index_path is None:
+        return None  # no conventional entry document — a different topology, not this defect
+
+    siblings = sorted(
+        p.name for p in root.glob("*.htm*")
+        if p.is_file() and p.name.lower() not in {n.lower() for n in _INDEX_NAMES}
+    )
+    if len(siblings) < 2:
+        return None  # single-page site: nothing to reach, no defect to report
+
+    try:
+        text = index_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None  # unreadable is already reported by the main scan
+
+    lowered = {s.lower() for s in siblings}
+    reached = set()
+    for ref in extract_references_html(text, index_path.name):
+        candidate = PurePosixPath(ref.path.replace("\\", "/")).name.lower()
+        if candidate in lowered:
+            reached.add(candidate)
+
+    if reached:
+        return None
+
+    return Finding(
+        rule="entry-reaches-nothing",
+        severity=SEVERITY_HIGH,
+        message=(
+            f"'{index_path.name}' is the page a visitor lands on, and it links to NONE of "
+            f"the {len(siblings)} other page(s) delivered beside it "
+            f"({', '.join(siblings[:6])}). Whatever else was built, opening this site shows "
+            f"only this one page and offers no way to reach the rest."
+        ),
+        reference=index_path.name,
+        file=index_path.name,
+    )
 
 
 def lint_site(site_dir: str | Path, served_root: str | Path | None = None) -> dict:
@@ -555,9 +705,16 @@ def lint_site(site_dir: str | Path, served_root: str | Path | None = None) -> di
             refs = extract_references_html(text, rel_source)
         else:
             refs = extract_references_js(text, rel_source)
+        # #1375: fetch targets on BOTH file kinds. The fetch that killed the pottery
+        # gallery lived in an inline <script>, which no HTML attribute parser enters.
+        refs = refs + extract_fetch_targets(text, rel_source)
 
         for ref in refs:
             status, finding = _resolve_reference(ref, root, path.parent)
+            # Population first, and unconditionally: this reference was examined whatever
+            # happens next. Incrementing it AFTER the setattr would let an unknown status
+            # take the count down with it, which is the loss this counter exists to catch.
+            tally.examined += 1
             setattr(tally, status.replace("-", "_"), getattr(tally, status.replace("-", "_")) + 1)
             if finding is not None:
                 findings.append(finding)
@@ -588,17 +745,36 @@ def lint_site(site_dir: str | Path, served_root: str | Path | None = None) -> di
             ],
         }
 
+    entry_finding = _check_entry_reaches_the_site(root)
+    if entry_finding is not None:
+        findings.append(entry_finding)
+
     not_measured = [
         "external URLs (http/https/mailto/tel) are never fetched — their reachability is unknown",
         "links built entirely at runtime are counted in counts.undecidable, not verified",
         "this checks that a target EXISTS, never that its content is correct",
         "server-side and client-side routes are invisible to a filesystem check",
+        "a fetch() is checked ONLY when its target is a string literal naming a file "
+        "(a recognised extension) — fetch(variable), an interpolated URL, and any "
+        "extensionless API route are all unchecked by design, not by oversight (#1375)",
     ]
     if tally.undecidable:
         not_measured.insert(
             0,
             f"{tally.undecidable} reference(s) could not be decided without running the site — "
             f"a clean result does NOT mean these resolve",
+        )
+    # #1389, FAIL-LOUD. Cannot fire today: every return path of `_resolve_reference` yields one
+    # of the five statuses, and `slots=True` now turns a sixth into an AttributeError before it
+    # can reach here. This is the belt to that brace, and it goes FIRST because a grader that
+    # has lost track of its own population has not earned the reader's attention for anything
+    # else it says. A silent discrepancy is the whole #1231 class; a stated one is a bug report.
+    if tally.unaccounted():
+        not_measured.insert(
+            0,
+            f"ARITHMETIC LOST {tally.unaccounted()} reference(s): {tally.examined} were examined "
+            f"but only {tally.examined - tally.unaccounted()} appear in any bucket. Treat every "
+            f"count in this report as a lower bound, not a measurement",
         )
 
     return {
@@ -610,9 +786,10 @@ def lint_site(site_dir: str | Path, served_root: str | Path | None = None) -> di
         "findings": [asdict(x) for x in findings],
         "hard": has_hard_findings(findings),
         "files_scanned": files_scanned,
-        "references": (
-            tally.resolved + tally.broken + tally.undecidable + tally.external + tally.in_page
-        ),
+        # #1389: the POPULATION, not the sum of the buckets. Deriving the denominator from
+        # the numerators it is meant to check is exactly the shape that let oracle_mutation's
+        # score RISE as it audited LESS.
+        "references": tally.examined,
         "counts": {
             "resolved": tally.resolved,
             "broken": tally.broken,
@@ -620,8 +797,36 @@ def lint_site(site_dir: str | Path, served_root: str | Path | None = None) -> di
             "external": tally.external,
             "in_page": tally.in_page,
         },
+        # NOTE the invariant this pair now carries, and that `counts` deliberately does NOT
+        # gain a sixth key for: `references` is the population and `sum(counts.values())` is
+        # what was classified, so **references != sum(counts.values()) is itself the loss
+        # signal**, checkable by any reader without trusting this module and without a schema
+        # change to link-lint/v1. That external checkability is precisely what DoD row 13 asks
+        # for — a grader's arithmetic verified by something that is not that grader — and a
+        # residual is disclosed loudly in `not_measured` above when it is ever non-zero.
         "not_measured": not_measured,
     }
+
+
+def is_measured(report: dict) -> bool:
+    """Whether *report* records a scan that ACTUALLY followed links.
+
+    The single predicate every reader consults, so ``broken == 0`` from a site whose pages
+    were all resolved can never be confused with ``broken == 0`` because no page was ever
+    opened. :func:`lint_site` already refuses to publish counts on both absent paths — a
+    site directory that is not there, and a served root holding no page or script file — and
+    this is the one place that refusal is ASKED about, rather than each renderer re-deriving
+    it from the raw ``checked`` key and one of them eventually forgetting to.
+
+    Registered in :mod:`shared.instrument_registry` as this instrument's ``STATUS_PREDICATE``:
+    the report is a plain dict with no attribute for the registry's guard analysis to trace,
+    so the checkable contract is that every renderer CALLS this. Fail-closed on anything that
+    is not a dict — a caller holding ``None`` because a producer raised has not measured
+    anything either.
+    """
+    if not isinstance(report, dict):
+        return False
+    return bool(report.get("checked", False))
 
 
 def has_hard_findings(findings: Iterable[dict | Finding]) -> bool:
@@ -651,7 +856,7 @@ def format_operator_summary(report: dict) -> str:
     handed on 2026-08-08 said a delivery was clean while an unmeasured field sat beside
     the confident one; this ordering is the fix for that class, not a stylistic choice.
     """
-    if not report.get("checked"):
+    if not is_measured(report):
         return f"The link check did not run. Reason: {report.get('reason', 'unknown')}"
 
     counts = report.get("counts", {})

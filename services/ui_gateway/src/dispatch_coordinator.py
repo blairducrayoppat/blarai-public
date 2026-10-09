@@ -146,6 +146,242 @@ def _no_question_waiting(text: str = "") -> str:
     return _keep_operator_text(_NO_QUESTION_WAITING, text)
 
 
+#: #1406 — THE COMPANION RULE TO #1116, and the one it did not cover.
+#:
+#: #1116 says no dispatch reply may DISCARD what the operator typed. This says: while a
+#: question is on screen waiting, a reply that never reaches this corridor at all must
+#: not be SILENT. The operator answered the intake interview on 2026-08-15 the way
+#: anyone would — three numbered lines, no `/dispatch` prefix — and
+#: :func:`parse_dispatch_command` returned None, so the message went to the ordinary
+#: chat path, where the model called `generate_image` three times and emitted no prose.
+#: He got an empty bubble. His verdict was one word.
+#:
+#: The prefix requirement is deliberate and STAYS (his call, recorded on #1406: *"no. a
+#: bare reply should not simply be the answer"*). Absorbing bare text would make ordinary
+#: chat modal for as long as any question sat parked — trading a visible failure for an
+#: invisible one. What was never deliberate is that failing to use the prefix produced
+#: nothing at all.
+#:
+#: Note where this sits in the chain: the notice is a LAST-RESORT fallback, consulted by
+#: the dispatcher only after every command family has declined the message. It therefore
+#: cannot swallow one, and a family added later sits above it for free.
+def _ready_to_send(text: str) -> str:
+    """*text* as the exact ``/dispatch …`` message that would deliver it, or ``""``.
+
+    Returns ``""`` when no honest suggestion can be built: empty text has nothing to
+    send, and text already beginning with ``/`` is somebody's command — a typo of a real
+    verb, or a family that declined it — where prefixing would yield ``/dispatch
+    /whatever``, a worse instruction than none. The caller falls back to the plain
+    :func:`_keep_operator_text` echo there, so the #1116 guarantee holds on both branches.
+
+    Multi-line text is safe to prefix: #1126 made ANY whitespace after the verb parse, so
+    the numbered-list shape that caused this defect round-trips through the parser as a
+    free-text answer (``kind="run"`` with an empty repo), which is what
+    :meth:`DispatchCoordinator.handle_command` consumes while a question is pending.
+
+    **Prefixing is not sufficient, and the #1406 review round that found this is the reason
+    the check below exists.** Two ordinary answers parse into something the question turn does
+    NOT consume as an answer:
+
+    * a first word that is a reserved verb — *"Reject anything bigger than 10 MB"* parses as
+      ``kind="reject"`` and CANCELS THE DISPATCH;
+    * a pipe anywhere — *"mostly on computer | but phone would be nice"* splits into
+      ``repo | goal`` and the consumer takes the goal half, so everything before the pipe is
+      silently dropped.
+
+    Both mechanisms predate this ticket and are ticketed separately (#1409). What does NOT
+    predate it is an instruction telling the operator to send exactly that line: a defect he
+    might have blundered into becomes one the product walked him into. So the candidate is
+    driven through the real parser and the real consumption rule
+    (:func:`requirements_answer_text`), and the block is printed only when his words arrive
+    INTACT. Where they would not, the caller falls back to the plain verbatim echo, which
+    loses nothing and promises nothing.
+    """
+    kept = (text or "").strip()
+    if not kept or kept.startswith("/"):
+        return ""
+    candidate = f"{_PREFIX} {kept}"
+    command = parse_dispatch_command(candidate)
+    if command is None:
+        return ""
+    consumed = requirements_answer_text(command)
+    if consumed is None or consumed.strip() != kept:
+        return ""
+    return candidate
+
+
+#: The command kinds the REQUIREMENTS slot routes as verbs instead of consuming as an answer.
+#: Enumerated from :meth:`DispatchCoordinator.handle_command`'s own branches so the two cannot
+#: disagree about what "answering" means.
+_REQUIREMENTS_ROUTED_KINDS: Final[tuple[str, ...]] = (
+    "reject", "status", "stop", "decide",
+)
+
+#: A fleet run id, e.g. ``20260814-230237-bd``. Used to keep ``/dispatch status <run>`` meaning
+#: what it says while a question is pending — "how is my other run doing" is a real thing to
+#: ask mid-interview, and it is not an answer.
+_RUN_ID_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,}$")
+
+
+def _looks_like_run_id(text: str) -> bool:
+    """Is *text* shaped like a run id rather than like prose? Whitespace decides it: a run id
+    is one token, an answer is a sentence."""
+    s = (text or "").strip()
+    return bool(s) and " " not in s and bool(_RUN_ID_RE.match(s))
+
+
+def _is_bare_verb(command: "DispatchCommand", verb: str) -> bool:
+    """Is *command* the verb ALONE — ``/dispatch reject`` and nothing else?
+
+    #1409. The parser matches ``reject <anything>``, so an ordinary answer to "what should it
+    NOT do?" — *"Reject anything bigger than 10 MB"* — parsed as ``kind="reject"`` and
+    cancelled the entire dispatch. *"Status updates should be on the home page"* ran a status
+    report and dropped the words. *"Stop showing prices until I say so"* likewise. None of the
+    three even earned the #1160 heads-up, because ``_consumed_verb`` excludes them by design.
+
+    Five ordinary English words must not be able to destroy an answer or a dispatch. A bare
+    verb is unambiguous and keeps its meaning; a verb followed by prose is prose.
+    """
+    return command.kind == verb and (command.raw or "").strip().lower() == verb
+
+
+def requirements_answer_text(command: "DispatchCommand") -> str | None:
+    """The text the REQUIREMENTS slot will consume from *command*, or ``None`` when the
+    command routes as a verb and answers nothing.
+
+    THE SINGLE SOURCE OF TRUTH for "what does the question turn do with this command", used
+    by :meth:`DispatchCoordinator.handle_command` (which acts on it) and by
+    :func:`_ready_to_send` (which must not print a line that does something else). Two
+    readers of one rule; the #1406 review found what happens when a notice re-implements a
+    consumption rule by analogy instead of asking the code that owns it.
+    """
+    # #1409: a routed kind routes only when it MEANS the verb. `decide` always does — it is
+    # the designed escape and its whole phrase is the verb. `reject` and `stop` do so only
+    # bare; `status` bare or followed by something run-id shaped. Anything else wearing those
+    # words is prose, and prose is an answer.
+    if command.kind == "decide":
+        return None
+    if command.kind in ("reject", "stop") and _is_bare_verb(command, command.kind):
+        return None
+    if command.kind == "status" and (
+        _is_bare_verb(command, "status") or _looks_like_run_id(command.run_id)
+    ):
+        return None
+    if command.kind in _REQUIREMENTS_ROUTED_KINDS:
+        # A routed WORD that did not mean the verb: the operator's sentence, kept whole.
+        return command.raw or None
+    # #1409: a RUN is the free-text answer shape, and it is the one the parser splits on a
+    # pipe into `repo | goal`. Reading `goal` here dropped everything before the pipe —
+    # "mostly on computer | but phone would be nice" reached the planner as "but phone would
+    # be nice", with no notice, because the parse SUCCEEDED. There is no repo to name while a
+    # question is pending, so the split has nothing to mean: take the verbatim remainder.
+    #
+    # Every other kind already captures its whole remainder, so `raw` is not consulted for
+    # them and their behaviour is byte-identical.
+    if command.kind == "run" and command.raw:
+        return command.raw
+    return (
+        command.answer or command.goal or command.choice
+        or command.feedback or command.repo
+    )
+
+
+def _unprefixed_notice(text: str, consequence: str, escapes: str, *, ready: str) -> str:
+    """The shared body of the #1406 fail-loud reply.
+
+    Three parts, in this order and for these reasons:
+
+    * WHAT HAPPENED. Deliberately "I haven't taken that as your answer", never "that
+      went to ordinary chat" — in the fixed system it did not; this reply is what the
+      message got instead. A control that narrates the behaviour it just prevented is a
+      small lie with a signature.
+    * THE OPERATOR'S OWN WORDS BACK, as a ready-to-send command where one can be built
+      and as a plain verbatim echo where it cannot (#1116 holds on both branches).
+      **Offered CONDITIONALLY** — "if that was your answer". The notice cannot tell an
+      answer from an aside, and an unconditional "copy this and send it" is a trap: a
+      mid-interview remark ("what do you mean by fresh?") sent that way is banked by
+      :func:`shared.fleet.clarify.answered_from_free_text` as the answer to EVERY
+      outstanding axis with ``assumed=False``, which silently blinds the #1174 surface
+      gate. The instruction is only correct if the message was an answer, so it says so.
+    * *consequence* then *escapes* — what sending will do, and the way out for a message
+      that was not an answer. Naming the escape is the whole difference between a helpful
+      reply and a one-click funnel into a fabricated requirement.
+    """
+    lead = (
+        "I haven't taken that as your answer — nothing has been recorded, and the "
+        "question above is still waiting. For your words to reach it, the message has to "
+        "start with `/dispatch`. That is the only way I can tell an answer apart from "
+        "ordinary chat."
+    )
+    if not ready:
+        return _keep_operator_text(f"{lead}\n\n{consequence}\n\n{escapes}", text)
+    return (
+        f"{lead}\n\n"
+        "If that was your answer, here it is with `/dispatch` already on the front — "
+        "copy the whole block, paste it into the message box and send it:\n\n"
+        f"```\n{ready}\n```\n\n"
+        f"{consequence}\n\n"
+        f"{escapes}"
+    )
+
+
+def _unprefixed_requirements_notice(text: str) -> str:
+    """#1406: the reply while the #819 requirements QUESTION SET is waiting.
+
+    The consequence line is what makes this safe for a PARTIAL answer — he answered three
+    of eight. It does NOT say "you don't have to answer them all", which reads as
+    permission and is how the #1174 blind spot gets fed: a partial free-text reply is
+    recorded against every axis with ``assumed=False``, so the axes he skipped look
+    answered rather than assumed. It says what sending actually does, and names the
+    escape that records real assumptions instead — ``just decide for me``, whose defaults
+    ride the card as assumptions he can see and reject.
+    """
+    return _unprefixed_notice(
+        text,
+        "Everything in that message is taken as your answers to the questions above, so "
+        "add anything else you want to say before you send it — I only ask these once.",
+        "If you would rather I chose, send `/dispatch just decide for me` and I'll show "
+        "you every choice I made. If you meant to ask me something instead of answering, "
+        "send `/dispatch reject` first and we can talk normally.",
+        ready=_ready_to_send(text),
+    )
+
+
+def _unprefixed_clarifying_notice(text: str, ready: str = "") -> str:
+    """#1406: the reply while the increment-4 PLATFORM question (#677) is waiting.
+
+    Its designed answer shape is an option NUMBER and nothing else, so this notice differs
+    from the requirements one in two ways that a pre-merge review had to catch:
+
+    * the consequence line does NOT say "whatever you send next is taken as your answer".
+      That was written by analogy with the requirements slot and is false here — free text
+      falls past the clarifying routing into ``_plan``, which returns the usage line and
+      leaves the question pending. A sentence that is true one slot over is still a lie.
+    * the ready-to-send block is built ONLY when the operator's text resolves to an IN-RANGE
+      option for the question actually on screen — *ready* is computed by the caller, which
+      is the only party holding the options. Two rounds of review were needed to get this
+      right: prefixing free text printed a line the corridor refuses, and then checking only
+      that it parsed to ``choose`` was still wrong, because ``use two`` and an out-of-range
+      ``3`` also parse to ``choose`` — and :meth:`DispatchCoordinator._choose` treats an
+      unresolvable choice as a FALL-BACK: it drops the question and plans without the
+      operator's platform. A block that merely parses would have instructed him into
+      destroying the choice he was trying to make. Where no working line exists, the plain
+      verbatim echo carries the words and the escapes name the form that does work.
+
+    The shipped render of this question told the operator to "reply with the number
+    (e.g. `2`)" for months, and a bare ``2`` is exactly what :func:`parse_dispatch_command`
+    refuses; that instruction is corrected in the same change.
+    """
+    return _unprefixed_notice(
+        text,
+        "This question is answered with the NUMBER of the option you want — not in your "
+        "own words, which is what makes it different from the longer question sets.",
+        "Send `/dispatch 2`, using the number of the option you want. Or send "
+        "`/dispatch reject` to cancel and we can talk normally.",
+        ready=ready,
+    )
+
+
 #: #1161: the honest MOBILE refusal for an empty/new project. Building phone apps is not
 #: a fleet capability; before this, a phone ask on an empty repo was silently rebuilt as
 #: desktop-from-nothing — the weakest stack, wearing the operator's words. The refusal
@@ -254,7 +490,14 @@ def _playback_invitation(revision_count: int, coverage_blocked: str = "") -> str
     if coverage_blocked and acc.coverage_blocked_is_orphan_only(coverage_blocked):
         return questions
     if coverage_blocked:
-        return f"{questions} Tell me in plain words and I'll fix the plan."
+        # #1406: "tell me in plain words" was true about the WORDS and false about the
+        # routing — a reply without the prefix reaches ordinary chat, not the revise path
+        # this sentence promises. The prefix is named inline in every variant below for
+        # the same reason.
+        return (
+            f"{questions} Tell me in plain words with `/dispatch <your words>` and I'll "
+            "fix the plan."
+        )
     if at_cap:
         return (
             f"{questions} This plan has used its "
@@ -263,8 +506,8 @@ def _playback_invitation(revision_count: int, coverage_blocked: str = "") -> str
             "/dispatch reject to start fresh."
         )
     return (
-        f"{questions} Tell me in plain words and I'll fix the plan — or "
-        "/dispatch approve when it reads right."
+        f"{questions} Tell me in plain words with `/dispatch <your words>` and I'll fix "
+        "the plan — or `/dispatch approve` when it reads right."
     )
 
 
@@ -313,6 +556,20 @@ class DispatchCommand:
     #: #1031 S2: the operator explicitly asked for the FULLER intake interview (the
     #: `advanced` token). Set only by the parser's token gate; never persisted.
     advanced: bool = False
+    #: #1409: everything the operator typed after the verb, VERBATIM and unsplit.
+    #:
+    #: The other fields are the parser's INTERPRETATION, and interpreting is exactly where an
+    #: answer gets damaged: `repo | goal` splits on the first pipe and the requirements
+    #: consumer keeps only the half after it, so *"mostly on computer | but phone would be
+    #: nice"* was briefed to the planner as *"but phone would be nice"* — silently, because
+    #: the parse succeeded. A pipe is not exotic in an answer; it is how people write
+    #: alternatives.
+    #:
+    #: Kept beside the interpretation rather than replacing it: the piped form is REAL and
+    #: load-bearing when a dispatch is being STARTED (`/dispatch <repo> | <goal>`). It is only
+    #: wrong while a question is pending, where there is no repo to name. So the consumer
+    #: chooses, and :func:`requirements_answer_text` is where that choice lives.
+    raw: str = ""
 
 
 @dataclass(frozen=True)
@@ -646,13 +903,14 @@ def parse_dispatch_command(
                 return replace(inner, advanced=True)
     low = rest.lower()
     if low == "approve" or low.startswith("approve "):
-        return DispatchCommand(kind="approve")
+        return DispatchCommand(kind="approve", raw=rest.strip())
     if low == "reject" or low.startswith("reject "):
-        return DispatchCommand(kind="reject")
+        return DispatchCommand(kind="reject", raw=rest.strip())
     if low == "stop" or low.startswith("stop "):
-        return DispatchCommand(kind="stop")
+        return DispatchCommand(kind="stop", raw=rest.strip())
     if low == "status" or low.startswith("status "):
-        return DispatchCommand(kind="status", run_id=rest[len("status"):].strip())
+        return DispatchCommand(
+            kind="status", run_id=rest[len("status"):].strip(), raw=rest.strip())
     # Create a NEW project: "new <name> | <goal>" — create the git repo, then PLAN.
     # Checked before the |-split because the create form contains a pipe. A repo
     # literally named "new" is the one ambiguous case (rare — use a path or another
@@ -663,38 +921,48 @@ def parse_dispatch_command(
         after = rest[3:].strip()
         if "|" in after:
             nm, gl = after.split("|", 1)
-            return DispatchCommand(kind="create", repo=nm.strip(), goal=gl.strip())
-        return DispatchCommand(kind="create", repo=after.strip(), goal="")
+            return DispatchCommand(
+                kind="create", repo=nm.strip(), goal=gl.strip(), raw=rest.strip())
+        return DispatchCommand(
+            kind="create", repo=after.strip(), goal="", raw=rest.strip())
     # #820 plan-revision feedback: "revise <free text>" refines a PENDING plan card. Parsed as a
     # distinct verb (only ACTED ON when a plan awaits approval — handle_command); a bare
     # "/dispatch revise ..." in any other state reports there's nothing to revise. Checked before
     # the |-split / run fall-through so the whole feedback remainder is captured verbatim. A repo
     # literally named "revise" is the one ambiguous case (rare — same tradeoff as "new").
     if low == "revise" or low.startswith("revise "):
-        return DispatchCommand(kind="revise", feedback=rest[len("revise"):].strip())
+        return DispatchCommand(
+            kind="revise", feedback=rest[len("revise"):].strip(), raw=rest.strip())
     # #1120 "forget <project>": clear what the operator has told us about a project. Checked
     # before the |-split / run fall-through so the remainder is the repo name verbatim. A repo
     # literally named "forget" is the one ambiguous case (rare — same tradeoff as "new").
     if low == "forget" or low.startswith("forget "):
-        return DispatchCommand(kind="forget", repo=rest[len("forget"):].strip())
+        return DispatchCommand(
+            kind="forget", repo=rest[len("forget"):].strip(), raw=rest.strip())
     # #819 requirements-clarification answer forms. "just decide for me" (and short variants)
     # is the escape hatch -> kind="decide"; an explicit "answer <text>" captures the whole
     # free-text remainder. Both are only ACTED ON when a requirements question is pending
     # (handled in handle_command); otherwise they report there's nothing to answer. The
     # decide-phrase check runs BEFORE "answer"/run so "decide" is never mistaken for a goal.
     if _clarify.is_decide_for_me(rest):
-        return DispatchCommand(kind="decide")
+        return DispatchCommand(kind="decide", raw=rest.strip())
     if low == "answer" or low.startswith("answer "):
-        return DispatchCommand(kind="answer", answer=rest[len("answer"):].strip())
+        return DispatchCommand(
+            kind="answer", answer=rest[len("answer"):].strip(), raw=rest.strip())
     # Clarifying-answer forms: "use 2" / "choose 2" / a bare "2".
     if low.startswith("use ") or low.startswith("choose "):
-        return DispatchCommand(kind="choose", choice=rest.split(None, 1)[1].strip())
+        return DispatchCommand(
+            kind="choose", choice=rest.split(None, 1)[1].strip(), raw=rest.strip())
     if rest.isdigit():
-        return DispatchCommand(kind="choose", choice=rest)
+        return DispatchCommand(kind="choose", choice=rest, raw=rest.strip())
+    # #1409: `raw` rides the two RUN shapes — the only kinds the requirements consumer reads
+    # positionally, and therefore the only ones a pipe-split can damage. Every other kind
+    # captures its whole remainder already (`answer`, `revise`, `forget`, `choose`).
     if "|" in rest:
         repo, goal = rest.split("|", 1)
-        return DispatchCommand(kind="run", repo=repo.strip(), goal=goal.strip())
-    return DispatchCommand(kind="run", repo="", goal=rest.strip())
+        return DispatchCommand(
+            kind="run", repo=repo.strip(), goal=goal.strip(), raw=rest.strip())
+    return DispatchCommand(kind="run", repo="", goal=rest.strip(), raw=rest.strip())
 
 
 class DispatchCoordinator:
@@ -797,6 +1065,89 @@ class DispatchCoordinator:
     def pending_requirements_for(self, session_id: str) -> PendingRequirements | None:
         """The session's pending requirements-clarification question set, or None (#819)."""
         return self._requirements.get(session_id)
+
+    def _clarifying_notice(self, session_id: str, text: str) -> str:
+        """#1406: the platform-question notice, with its ready-to-send block resolved against
+        the options ACTUALLY on screen.
+
+        A method rather than a module function because the safety condition needs the pending
+        question. The block is offered only when :meth:`_parse_choice` — the same resolver
+        :meth:`_choose` uses to decide whether an answer counts — returns an index for THIS
+        option count. Anything else (``use two``, ``the second one``, an out-of-range ``3``)
+        parses to ``choose`` and then takes ``_choose``'s FALL-BACK branch, which pops the
+        question and plans without the operator's platform. Printing such a line under "copy
+        this and send it" would instruct him into destroying the choice he was making — which
+        is what checking only that it PARSED would have done, and did, for one review round.
+        """
+        ready = ""
+        clarifying = self._clarifying.get(session_id)
+        if clarifying is not None:
+            candidate = f"{_PREFIX} {(text or '').strip()}"
+            command = parse_dispatch_command(candidate)
+            if command is not None and command.kind == "choose":
+                options = clarifying.question.get("options", [])
+                if self._parse_choice(command.choice, len(options)) is not None:
+                    ready = candidate
+        return _unprefixed_clarifying_notice(text, ready)
+
+    def unanswered_question_notice(
+        self, session_id: str, text: str, *, ttl_s: float = 0.0
+    ) -> str | None:
+        """#1406: the fail-loud reply for a message that reached NO command handler while
+        a /dispatch QUESTION is on screen waiting — or ``None``, meaning "not mine", which
+        leaves the ordinary chat path byte-identical.
+
+        Scoped to the two QUESTION states on purpose: the requirements set (#819) and the
+        platform fork (#677). A plan awaiting approval (:meth:`pending_for`) is NOT a
+        question and deliberately does NOT trigger this. Seven plans were parked on the
+        operator's machine the morning this defect was found; intercepting there would
+        make ordinary chat modal for as long as any of them sat unapproved, which is the
+        precise trade his decision on #1406 refused. His words: an unrelated question
+        asked with a dispatch parked must still reach the assistant normally.
+
+        *ttl_s* is the gateway's idle window (:data:`SESSION_STATE_TTL_S`), and passing it
+        is not optional hygiene — it is what stops this method BRICKING A SESSION.
+        :meth:`reap_expired` has exactly one caller, inside ``send_prompt``; an intercepted
+        turn never reaches ``send_prompt``. So a slot that has aged out can never be swept
+        while it is still being intercepted, and without the branch below every subsequent
+        message in that session would be answered by this notice, forever. On an expired
+        slot the state is therefore EVICTED here — the reaper's own implicit-reject
+        semantics, durable via :meth:`_unpark` — and the already-shipped
+        :func:`_no_question_waiting` is returned, which says truthfully that the question
+        timed out and keeps the operator's words. The session self-heals on the next turn.
+
+        ``ttl_s <= 0`` disables expiry, matching :class:`~shared.ttl_dict.TtlDict`'s own
+        convention; the default exists so the pre-#1406 callers in tests read naturally.
+
+        DORMANT-safe: with dispatch disabled there is nothing to answer, so nothing is
+        intercepted and this surface adds no behaviour at all.
+        """
+        if not self._enabled:
+            return None
+        stripped = (text or "").strip()
+        if not stripped:
+            return None
+        for slot, render in (
+            (self._requirements, lambda t: _unprefixed_requirements_notice(t)),
+            (self._clarifying, lambda t: self._clarifying_notice(session_id, t)),
+        ):
+            if slot.get(session_id) is None:
+                continue
+            age = slot.age_s(session_id)
+            if ttl_s > 0 and age is not None and age > ttl_s:
+                # Matches TtlDict.expired_keys' strict ``>`` exactly, so this and the
+                # reaper can never disagree about whether a slot is alive.
+                del slot[session_id]
+                self._unpark(session_id)
+                logger.info(
+                    "Dispatch state: an unprefixed reply arrived for session=%s after "
+                    "the question had already aged out (age=%.0fs, ttl=%.0fs) — slot "
+                    "evicted (implicit reject) and the operator told so.",
+                    session_id, age, ttl_s,
+                )
+                return _no_question_waiting(stripped)
+            return render(stripped)
+        return None
 
     # ── durable parking of the three slots (#1116) ────────────────────────
 
@@ -1053,14 +1404,33 @@ class DispatchCoordinator:
             # "/dispatch <words>", or a stray option number) is the free-text answer. This is
             # what makes the corridor a single interactive turn, mirroring the Inc-4 sub-state.
             if self._requirements.get(session_id) is not None:
-                if command.kind == "reject":
-                    return self._reject(session_id)
-                if command.kind == "status":
-                    return await self._status(command.run_id)
-                if command.kind == "stop":
-                    return await asyncio.to_thread(self._stop, session_id)
-                if command.kind == "decide":
-                    return await self._decide_requirements(session_id)
+                # #1409: a verb is a verb only when it is ALONE. The parser matches
+                # `reject <anything>`, so "Reject anything bigger than 10 MB" — an ordinary
+                # answer to "what should it not do?" — parsed as kind="reject" and CANCELLED
+                # THE WHOLE DISPATCH. "Status updates should be on the home page" ran a status
+                # report and dropped the words; "Stop showing prices until I say so" likewise,
+                # and neither even earned the #1160 heads-up, because `_consumed_verb`
+                # excludes them by design.
+                #
+                # While a question is pending, five ordinary English words must not be able to
+                # destroy the answer or the dispatch. A BARE verb is unambiguous and keeps its
+                # meaning; a verb followed by prose is prose. `status` additionally keeps its
+                # meaning when followed by something run-id shaped, because "how is my other
+                # run doing" is a real thing to ask mid-interview and is not an answer.
+                # ONE decision, taken once. `requirements_answer_text` returns None exactly
+                # when the command routes, so asking it here means the routing and the
+                # notice's ready-to-send block cannot disagree about what a message does —
+                # which is the drift that produced #1406's fourth review round.
+                _answer = requirements_answer_text(command)
+                if _answer is None:
+                    if command.kind == "reject":
+                        return self._reject(session_id)
+                    if command.kind == "status":
+                        return await self._status(command.run_id)
+                    if command.kind == "stop":
+                        return await asyncio.to_thread(self._stop, session_id)
+                    if command.kind == "decide":
+                        return await self._decide_requirements(session_id)
                 # #820: a "revise …" while a question is pending is nonsensical (no plan yet) —
                 # treat its text as the free-text answer rather than dropping it silently.
                 # #1126: ``repo`` is in this chain for the same reason. The parser matches
@@ -1074,10 +1444,10 @@ class DispatchCoordinator:
                 # on the very next reply, so "revise the criteria" typed at the question
                 # stage can never again become a briefed requirement without the operator
                 # being told. Routing above is untouched (reject/status/stop/decide).
-                text = (
-                    command.answer or command.goal or command.choice
-                    or command.feedback or command.repo
-                )
+                # #1406: the precedence lives in `requirements_answer_text`, which
+                # `_ready_to_send` also reads — so a notice cannot print a line whose fate
+                # here differs from what it promised. Same rule, two readers, one place.
+                text = _answer or ""
                 return await self._answer_requirements(
                     session_id, text, consumed_verb=_consumed_verb(command)
                 )
@@ -1154,15 +1524,17 @@ class DispatchCoordinator:
         req_pending = self._requirements.get(session_id)
         if req_pending is not None:
             return (
-                f"I'm still waiting on your answer for “{req_pending.goal}”. Reply in your own "
-                "words, or /dispatch just decide for me, or /dispatch reject to cancel."
+                f"I'm still waiting on your answer for “{req_pending.goal}”. Reply "
+                "`/dispatch <your answers>` in your own words, or `/dispatch just decide "
+                "for me`, or `/dispatch reject` to cancel."
             )
         clarifying = self._clarifying.get(session_id)
         if clarifying is not None:
             return (
                 f"I'm waiting on one question first for “{clarifying.goal}”: "
                 f"{clarifying.question.get('question', '')} "
-                "Reply with the option number, or /dispatch reject to cancel."
+                "Reply `/dispatch 2` with the number of the option you want, or "
+                "`/dispatch reject` to cancel."
             )
         pending = self._pending.get(session_id)
         if pending is not None:
@@ -1410,7 +1782,7 @@ class DispatchCoordinator:
                 ).strip()
                 return _keep_operator_text(
                     _MOBILE_REFUSAL
-                    + " Answer again with where it should run, "
+                    + " Answer again with `/dispatch <where it should run>`, "
                     f"`/dispatch forget {pending_req.repo}` if an earlier answer "
                     "mentioned a phone, or `/dispatch reject` to cancel.",
                     fresh_text,
@@ -1634,7 +2006,22 @@ class DispatchCoordinator:
             lines.append(f"  {i}. {opt.get('label', '')}")
         lines += [
             "",
-            "Reply with the number (e.g. `2`), or `/dispatch reject` to cancel.",
+            # #1406: this line used to read "Reply with the number (e.g. `2`)". A bare
+            # `2` is refused by parse_dispatch_command, so following the instruction sent
+            # the answer to the ordinary chat path — the very defect the operator hit one
+            # turn earlier, shipped here as advice. Every literal an operator is told to
+            # send is now driven through the real parser by
+            # tests/security/test_operator_instructions_parse.py.
+            #
+            # The opening five words are load-bearing to something OFF this surface: the
+            # battery harness recognises a clarifying question by matching the literal
+            # "Reply with the number" (tools/dispatch_harness/harness.py::_CLARIFY_MARKER),
+            # so a reword that drops them silently stops the harness from ever answering
+            # one. That coupling is now checked rather than remembered — see
+            # tests/security/test_harness_markers_match_shipped_text.py — and #1408 carries
+            # the case for replacing prose-matching with something structural.
+            "Reply with the number of the option you want as `/dispatch 2`, or "
+            "`/dispatch reject` to cancel.",
         ]
         return "\n".join(lines)
 
@@ -2090,13 +2477,13 @@ class DispatchCoordinator:
         # A question in flight takes precedence — you answer it, you don't revise it.
         if self._requirements.get(session_id) is not None:
             return (
-                "Answer the question first (in your own words, or /dispatch just decide for "
-                "me), then you can refine the plan."
+                "Answer the question first — reply `/dispatch <your answers>` in your own "
+                "words, or `/dispatch just decide for me`. Then you can refine the plan."
             )
         if self._clarifying.get(session_id) is not None:
             return (
-                "Answer the one question first (reply with the option number), then you can "
-                "refine the plan."
+                "Answer the one question first — reply `/dispatch 2` with the number of "
+                "the option you want. Then you can refine the plan."
             )
         pending = self._pending.get(session_id)
         if pending is None:

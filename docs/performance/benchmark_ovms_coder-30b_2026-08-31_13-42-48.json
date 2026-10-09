@@ -1,0 +1,256 @@
+{
+  "benchmark": "ovms_http_coder-30b",
+  "config_stamp": {
+    "timestamp": "2026-08-31T13:42:48",
+    "model_name": "Qwen3-Coder-30B-A3B",
+    "served_model_id": "coder-30b",
+    "endpoint": "http://127.0.0.1:8000/v3/chat/completions",
+    "device": "GPU",
+    "ao_resident": false,
+    "ao_resident_override": false,
+    "ao_resident_at_start": false,
+    "ao_resident_at_end": false,
+    "condition_samples": 2,
+    "condition_sampling": "endpoints only; the measurement interval is unsampled",
+    "ovms_alive_at_end": false,
+    "ovms_version": "2026.2.5e9dcfc46",
+    "ovms_flags": "target_device GPU | cache_size 4 | kv_cache_precision u8 | enable_prefix_caching true | tool_parser qwen3coder | enable_tool_guided_generation true",
+    "driver_version": "32.0.101.8826",
+    "prompt_set_version": "v1",
+    "prefill_probe_version": "pp-v1",
+    "num_runs": 5,
+    "num_warmup": 2,
+    "run_cooldown_s": 0,
+    "max_tokens": 256
+  },
+  "results": {
+    "ovms_served": {
+      "aggregate": {
+        "mean_tps": 0.0,
+        "median_tps": 0.0,
+        "p95_tps": 0.0,
+        "mean_ttft_ms": -1.0,
+        "median_ttft_ms": -1.0,
+        "p95_ttft_ms": -1.0,
+        "mean_total_ms": 0.0,
+        "median_total_ms": 0.0,
+        "p95_total_ms": 0.0,
+        "total_runs": 20,
+        "error_runs": 20
+      },
+      "prefill": {
+        "measured": false,
+        "mean_pp": 0.0,
+        "median_pp": 0.0,
+        "p95_pp": 0.0,
+        "mean_input_tokens": 0.0,
+        "probe_version": "pp-v1",
+        "total_runs": 5,
+        "error_runs": 5,
+        "raw_runs": [
+          {
+            "input_tokens": -1,
+            "prefill_ms": 0.0,
+            "prefill_tok_per_sec": 0.0,
+            "error": "http: HTTP Error 404: Not Found"
+          },
+          {
+            "input_tokens": -1,
+            "prefill_ms": 0.0,
+            "prefill_tok_per_sec": 0.0,
+            "error": "http: HTTP Error 404: Not Found"
+          },
+          {
+            "input_tokens": -1,
+            "prefill_ms": 0.0,
+            "prefill_tok_per_sec": 0.0,
+            "error": "http: HTTP Error 404: Not Found"
+          },
+          {
+            "input_tokens": -1,
+            "prefill_ms": 0.0,
+            "prefill_tok_per_sec": 0.0,
+            "error": "http: HTTP Error 404: Not Found"
+          },
+          {
+            "input_tokens": -1,
+            "prefill_ms": 0.0,
+            "prefill_tok_per_sec": 0.0,
+            "error": "http: HTTP Error 404: Not Found"
+          }
+        ]
+      },
+      "raw_runs": [
+        {
+          "prompt_index": 0,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 0,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 1,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 2,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        },
+        {
+          "prompt_index": 3,
+          "token_count": 0,
+          "latency_first_token_ms": 0.0,
+          "latency_total_ms": 0.0,
+          "throughput_tok_per_sec": 0.0,
+          "error": "http: <urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+        }
+      ]
+    }
+  },
+  "prompts": {
+    "version": "v1",
+    "texts": [
+      "What is the capital city of France?",
+      "How many bytes are in one kilobyte?",
+      "Explain what a transformer neural network is in plain language.",
+      "What is quantization in the context of machine learning models, and why does it help with inference speed?"
+    ]
+  }
+}

@@ -55,6 +55,8 @@ Design constraints (match the rest of ``shared/security/``):
 
 from __future__ import annotations
 
+import re
+
 import logging
 import threading
 from dataclasses import dataclass
@@ -77,6 +79,12 @@ _NO_VERIFIER_IDENTITY: str = "no-verifier"
 # ---------------------------------------------------------------------------
 # Safe descriptor + result shapes (labels/descriptors only — never raw payload)
 # ---------------------------------------------------------------------------
+
+
+# The ONLY shape ``EscalationContext.action_identity`` may hold (#1541): a
+# sha256 descriptor. Raw arguments cannot match it, which is what makes the
+# no-payload property structural instead of conventional.
+_ACTION_IDENTITY_RE = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,18 @@ class EscalationContext:
     """Where the escalation came from — defaults to the Policy Agent. A provenance
     label for the operator/audit record."""
 
+    action_identity: str = ""
+    """``sha256:<hex>`` of the action's Canonical Action Representation (#1541).
+
+    **This is what the approval is BOUND to.** The dispatcher re-derives it from the
+    arguments about to execute and refuses on mismatch, so an approval cannot be
+    carried from the action the operator saw to a different one.
+
+    A DESCRIPTOR, not a value: a hash carries no payload, so this field is consistent
+    with the no-raw-arguments rule the rest of this class enforces rather than an
+    exception to it. Empty means *not derived*, and an empty identity must be treated
+    as a mismatch — never as "no binding required"."""
+
     @classmethod
     def from_pa_verdict(
         cls,
@@ -125,6 +145,7 @@ class EscalationContext:
         tool_name: str = "",
         action_summary: str = "",
         source: str = "policy_agent",
+        action_identity: str = "",
     ) -> "EscalationContext":
         """Build a context from a PA ESCALATE verdict using SAFE fields only.
 
@@ -149,11 +170,29 @@ class EscalationContext:
             safe_summary = f"EXECUTE tool:{safe_tool}"
         else:
             safe_summary = safe_label
+        # SHAPE-ENFORCED (#1541). ``action_identity`` is the one parameter added to
+        # this constructor since the no-raw-arguments guard was written, so it is
+        # made STRUCTURALLY incapable of carrying payload rather than merely
+        # documented as safe: anything that is not exactly ``sha256:`` + 64 lowercase
+        # hex digits is discarded. Raw tool arguments cannot take that shape, so this
+        # field cannot become a side channel even if a caller passes the wrong thing.
+        # Discarding rather than raising keeps the constructor's "does not raise"
+        # contract; an empty identity is treated as a MISMATCH downstream, so the
+        # failure mode is refusal, never a silent unbound approval.
+        safe_identity = str(action_identity or "").strip()
+        if not _ACTION_IDENTITY_RE.fullmatch(safe_identity):
+            if safe_identity:
+                logger.warning(
+                    "Discarding malformed action_identity (not a sha256: descriptor); "
+                    "the approval will be refused at the dispatcher comparison."
+                )
+            safe_identity = ""
         return cls(
             rule_label=safe_label,
             action_summary=safe_summary,
             tool_name=safe_tool,
             source=str(source or "policy_agent").strip(),
+            action_identity=safe_identity,
         )
 
     def describe(self) -> str:
@@ -188,15 +227,34 @@ class ApprovalResult:
     ``"operator denied"``, ``"timeout"``, ``"no verifier configured"``). Labels/
     descriptors only — never raw payload."""
 
+    action_identity: str = ""
+    """The ``sha256:`` identity this result APPROVED (#1541), echoed back from the
+    :class:`EscalationContext` so the approval carries what it approved.
+
+    The dispatcher compares this against a freshly derived identity immediately
+    before execution. An approval whose identity is empty binds to nothing and is
+    refused at that comparison."""
+
     @classmethod
     def deny(cls, reason: str, *, verifier_identity: str = _NO_VERIFIER_IDENTITY) -> "ApprovalResult":
         """Construct a fail-closed DENY result with a reason."""
         return cls(approved=False, verifier_identity=verifier_identity, reason=reason)
 
     @classmethod
-    def allow(cls, *, verifier_identity: str, reason: str = "operator approved") -> "ApprovalResult":
+    def allow(
+        cls,
+        *,
+        verifier_identity: str,
+        reason: str = "operator approved",
+        action_identity: str = "",
+    ) -> "ApprovalResult":
         """Construct an APPROVED result. Only an operator surface should call this."""
-        return cls(approved=True, verifier_identity=verifier_identity, reason=reason)
+        return cls(
+            approved=True,
+            verifier_identity=verifier_identity,
+            reason=reason,
+            action_identity=action_identity,
+        )
 
 
 # ---------------------------------------------------------------------------

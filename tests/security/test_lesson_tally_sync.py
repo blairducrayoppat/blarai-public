@@ -1,3 +1,4 @@
+# enforces-rule: journal_discipline.lesson-curation -- tally sync only
 """Gate lock for LESSONS.md recurrence-tally sync (#1059, promoted 2026-07-23).
 
 WHAT FAILURE THIS EXISTS FOR

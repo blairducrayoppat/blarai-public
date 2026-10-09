@@ -3118,11 +3118,30 @@ _OPERATOR_ASSET_MAX_DEPTH = 4
 #: Per-file and total size caps (bytes). Least data: the manifest carries names, classes
 #: and sizes — never contents — but the files themselves ride into the fleet worktree,
 #: so the caps bound what a plan can sweep in.
-OPERATOR_ASSET_MAX_FILE_BYTES = 25 * 1024 * 1024
-OPERATOR_ASSET_MAX_TOTAL_BYTES = 200 * 1024 * 1024
+#:
+#: The bound that matters is PERMANENCE, not disk: the fleet commits any dirty tree as a
+#: baseline before cutting a candidate worktree, so every byte in this folder enters the
+#: project's git history and is checked out again for each candidate. History cannot be
+#: rewritten here (no destructive git operations), so an unbounded folder is an
+#: unbounded, unrecoverable repository. The caps are therefore sized to a stated need
+#: with headroom rather than removed — LA direction 2026-08-30, who asked for roughly
+#: 2 GB of mixed media including video and approved a bounded ceiling over none.
+#:
+#: The TOTAL is deliberately 3 GB and not a round doubling: each candidate build checks
+#: the folder out again as its own working copy, so the disk cost is roughly the total
+#: times the candidate count, against a laptop the operator asked not to fill. The
+#: per-file cap is the looser of the two so one long video is never the thing that
+#: stops him; the total is what protects the disk.
+OPERATOR_ASSET_MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
+OPERATOR_ASSET_MAX_TOTAL_BYTES = 3 * 1024 * 1024 * 1024
 #: Manifest entry cap — files beyond it (in deterministic name order) are counted and
 #: named on the card as left out, never silently dropped.
-OPERATOR_ASSET_MAX_FILES = 64
+OPERATOR_ASSET_MAX_FILES = 256
+
+#: Below this the card says nothing about size — a folder of documents and a photo is
+#: not a disk decision, and a notice on every plan would be noise that trains the
+#: operator to skip the line that matters.
+_OPERATOR_ASSET_SIZE_NOTICE_BYTES = 64 * 1024 * 1024
 
 #: The CLOSED extension allowlist, classified for the card and the coder (deny-by-
 #: default: an extension in no class is skipped and counted). Values are the class
@@ -3141,10 +3160,25 @@ OPERATOR_ASSET_CLASSES: dict[str, frozenset[str]] = {
         "py", "js", "mjs", "ts", "html", "css", "c", "h", "cpp", "cs", "java",
         "rb", "go", "rs", "sh", "ps1", "sql",
     }),
+    "video": frozenset({
+        "mp4", "webm", "mov", "m4v", "mkv", "avi",
+    }),
+    "audio": frozenset({
+        "mp3", "wav", "ogg", "m4a", "flac", "aac",
+    }),
     "other": frozenset({
-        "ttf", "otf", "woff", "woff2", "mp3", "wav", "ogg", "mp4", "webm",
+        "ttf", "otf", "woff", "woff2",
     }),
 }
+
+#: The manifest classes a delivered PAGE can reference by file — media and fonts. The
+#: markup floor below is derived from these ALONE: a document or spreadsheet earns its
+#: place by having its CONTENT used (the operator's real words), and asserting its
+#: filename in markup would demand the opposite — a link to `bio.md` on the page instead
+#: of the bio. Deriving the floor from every class made that exact demand.
+_OPERATOR_ASSET_MARKUP_CLASSES: frozenset[str] = frozenset(
+    {"image", "video", "audio", "other"}
+)
 
 #: Raster photo extensions — the card line groups these as "N photos" (the class the
 #: operator drops in bulk); everything else renders by (quoted) name.
@@ -3346,12 +3380,28 @@ def enumerate_operator_assets(assets_dir: Path) -> "dict | None":
             "skipped_other": skipped_other}
 
 
-def _operator_asset_quoted_names(manifest: "dict | None", cap: int) -> list[str]:
+def _format_operator_asset_size(total_bytes: int) -> str:
+    """A plain-language size for the plan card — "1.4 GB" / "820 MB" / "12 MB".
+
+    The card is read by a non-technical operator deciding whether to approve, so the
+    unit is the familiar one and the precision stops where the decision does: a tenth
+    of a gigabyte changes an answer, a byte count does not."""
+    if total_bytes >= 1024 * 1024 * 1024:
+        return f"{total_bytes / (1024 * 1024 * 1024):.1f} GB"
+    return f"{max(1, round(total_bytes / (1024 * 1024)))} MB"
+
+
+def _operator_asset_quoted_names(
+    manifest: "dict | None", cap: int, classes: "frozenset[str] | None" = None,
+) -> list[str]:
     """Up to *cap* manifest names, each DOUBLE-QUOTED — names are DATA everywhere they
     render (an instruction-shaped filename stays a quoted list entry, never prose)."""
     if not manifest:
         return []
-    names = [str(f.get("name", "")) for f in manifest.get("files") or []]
+    files = manifest.get("files") or []
+    if classes is not None:
+        files = [f for f in files if str(f.get("class", "")) in classes]
+    names = [str(f.get("name", "")) for f in files]
     return [f'"{n}"' for n in names[:cap] if n]
 
 
@@ -3389,6 +3439,15 @@ def operator_assets_card_lines(manifest: "dict | None") -> list[str]:
             "Working from your assets folder: " + ", ".join(bits) + " — the build "
             "is graded on actually using them."
         )
+        # The SIZE is disclosed because approving this card is what commits these bytes
+        # into the project's history, and history here cannot be rewritten. Shown only
+        # once it is worth noticing, so a folder of text files reads exactly as before.
+        total_bytes = sum(int(f.get("size", 0) or 0) for f in files)
+        if total_bytes >= _OPERATOR_ASSET_SIZE_NOTICE_BYTES:
+            lines.append(
+                f"(That is {_format_operator_asset_size(total_bytes)} of files, "
+                "copied into the project and kept in its history.)"
+            )
     if manifest.get("skipped_names"):
         n = manifest["skipped_names"]
         lines.append(
@@ -3437,7 +3496,15 @@ def _ensure_operator_assets_floor(spec: AcceptanceSpec) -> AcceptanceSpec:
         return spec
     if any(c.id == OPERATOR_ASSETS_FLOOR_ID for c in spec.criteria):
         return spec
-    named = ", ".join(_operator_asset_quoted_names(manifest, 6))
+    # Media ONLY (:data:`_OPERATOR_ASSET_MARKUP_CLASSES`). A manifest of documents alone
+    # injects NO markup floor: the honest assertion over a bio is that its WORDS were
+    # used, which no filename-presence check can make, and demanding "bio.md" appear in
+    # the markup would push the coder to link the file rather than read it. Those
+    # manifests keep the operator-tier visual criterion, which asks the right question.
+    quoted = _operator_asset_quoted_names(manifest, 6, _OPERATOR_ASSET_MARKUP_CLASSES)
+    if not quoted:
+        return spec
+    named = ", ".join(quoted)
     floor = AcceptanceCriterion(
         id=OPERATOR_ASSETS_FLOOR_ID,
         text="The build uses the operator's provided asset files from the "
@@ -5095,6 +5162,41 @@ def _node_oracle_valid(code: str) -> bool:
     return bool(re.search(r"\b(?:test|it)\s*\(", code))
 
 
+#: Extensions Node can actually ``import``. The job oracle's entire shape is a set of
+#: ES-module imports of what the tasks declare they CREATE, so a contract naming something
+#: Node cannot import yields an exam that dies at load with ``ERR_UNKNOWN_FILE_EXTENSION``
+#: before asserting anything. ``.json`` is deliberately EXCLUDED: importing it needs an
+#: import attribute (``with { type: "json" }``) that the authored oracle does not emit, so
+#: counting it as importable would re-open this same hole one extension over.
+_NODE_IMPORTABLE_EXTS: frozenset[str] = frozenset(
+    {".mjs", ".js", ".cjs", ".ts", ".mts", ".cts"}
+)
+
+
+def _node_contract_importable(contract: dict) -> bool:
+    """True when a node task contract declares something the oracle could actually import.
+
+    **The measured failure this closes (#1474, 2026-08-30).** A static-website dispatch
+    decomposed into tasks whose contracts declared ``creates: src/<section>/index.html``.
+    The job oracle imported those paths as ES modules; Node refuses, so the exam was
+    unpassable by construction. Worse, the import contract is surfaced to EVERY task
+    prompt, so a ONE-PAGE goal was being instructed to build six separate pages -- the
+    exam corrupted the BUILD, not merely the grade.
+
+    The rule is deliberately narrow. A contract that declares CREATES paths is judged on
+    them: at least one must be importable. A contract declaring only ``exports`` (bare
+    symbols, no path) keeps today's behaviour, because that shape carries no evidence
+    either way and tightening it would regress node library jobs that never had this bug.
+    Fail-closed on the case we can actually see."""
+    creates = [str(c).strip() for c in (contract.get("creates") or []) if str(c).strip()]
+    if creates:
+        return any(
+            any(c.lower().endswith(ext) for ext in _NODE_IMPORTABLE_EXTS)
+            for c in creates
+        )
+    return bool(contract.get("exports"))
+
+
 def _job_oracle_target(spec: "AcceptanceSpec") -> "tuple[str, str] | None":
     """``(ecosystem, oracle_rel_path)`` for the job oracle, or ``None`` (fail-closed).
 
@@ -5225,10 +5327,22 @@ def generate_job_acceptance_oracle(
     test_criteria = [c for c in spec.criteria if c.tier in TEST_TIERS]
     if not test_criteria:
         return ("", "")
-    if not any(
-        isinstance(t.get("contract"), dict)
+    usable = [
+        t for t in tasks
+        if isinstance(t.get("contract"), dict)
         and (t["contract"].get("creates") or t["contract"].get("exports"))
-        for t in tasks
+    ]
+    if not usable:
+        return ("", "")
+    # #1474: on NODE the contract must also be IMPORTABLE. An exam whose imports Node
+    # refuses to load (a static site's `.html` files) is not a weak exam, it is an exam
+    # that cannot run -- and its import contract is surfaced to every task prompt, so it
+    # steers the BUILD as well. The honest outcome is no job oracle at all: the driver
+    # then records job acceptance `not-run` (never an implied pass), and a web delivery is
+    # graded by the instrument built for it -- the served-page browser check -- instead of
+    # by a module import that was never going to resolve.
+    if ecosystem == "node" and not any(
+        _node_contract_importable(t["contract"]) for t in usable
     ):
         return ("", "")
     criteria_block = "\n".join(

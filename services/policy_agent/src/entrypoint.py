@@ -34,12 +34,20 @@ from shared.security.audit_log import (
     AUDIT_TPM_KEY_NAME,
     DEFAULT_MAX_ACTIVE_BYTES,
     DEFAULT_MAX_ACTIVE_RECORDS,
+    PRODUCTION_MAX_ACTIVE_RECORDS,
+    AuditChainError,
     AuditLog,
     AuditProvisioningError,
     HmacSha256Signer,
     TpmRecordSigner,
 )
-from shared.inference.shared_pipeline import SharedInferencePipeline
+from shared.security.audit_verification import signing_key_name, verification_start
+from shared.inference.shared_pipeline import (
+    BrainLayout,
+    SharedInferencePipeline,
+    detect_brain_layout,
+    resolve_brain_override,
+)
 from shared.ipc.protocol import AdjudicationResponse
 from shared.ipc.vsock import VsockAddress, VsockConfig
 from shared.models.weight_integrity import load_manifest, load_manifest_verified
@@ -646,6 +654,29 @@ class PolicyAgentService:
             if draft_model_raw
             else Path(DRAFT_MODEL_OV_PATH)
         )
+
+        # #930 BRAIN OVERRIDE — the SAME resolver the launcher and the AO use.
+        # The PA is the adjudication door: it must verify the integrity of, and
+        # build its prompt for, the model it is ACTUALLY served. For one boot on
+        # 2026-09-22 it measured the 14B's weights while classifying through the
+        # 35B, and reported a passed measured-boot gate while doing it.
+        _brain = resolve_brain_override(str(inference.get("brain_model_dir", "")))
+        if _brain is not None:
+            model_dir = _brain
+            manifest_path = _brain / "manifest.json"
+            model_bin_path = _brain / "openvino_model.bin"
+            if detect_brain_layout(_brain) is BrainLayout.MULTIMODAL_VLM:
+                # No single primary binary and no draft on this layout; the
+                # multi-file sweep in the shared builder is the integrity gate.
+                model_bin_path = _brain / "openvino_language_model.bin"
+                draft_model_dir = None
+            logger.warning(
+                "PA brain override ACTIVE: model_dir=%s manifest=%s draft=%s",
+                model_dir,
+                manifest_path,
+                draft_model_dir,
+            )
+
         speculative_decoding_enabled = inference.get(
             "speculative_decoding_enabled", SPECULATIVE_DECODING_ENABLED
         )
@@ -1055,16 +1086,17 @@ class PolicyAgentService:
             # the TPM is unavailable — ADR-025 §2.8(a).  This diverges
             # deliberately from _build_jwt_minter (which degrades to None):
             # a PA authorizing actions with no audit trail is a governance hole.
+            _signing_key = signing_key_name(resolved.audit_log_path)
             try:
-                if not tpm_signer.key_exists(AUDIT_TPM_KEY_NAME):
+                if not tpm_signer.key_exists(_signing_key):
                     logger.error(
                         "TPM audit signing key '%s' not provisioned — refusing to "
                         "start. Run the provisioning ceremony before starting in "
                         "production mode (ADR-025 §2.8(a)).",
-                        AUDIT_TPM_KEY_NAME,
+                        _signing_key,
                     )
                     raise AuditProvisioningError(
-                        f"TPM audit signing key '{AUDIT_TPM_KEY_NAME}' is not "
+                        f"TPM audit signing key '{_signing_key}' is not "
                         "provisioned. Run the provisioning ceremony before starting "
                         "in production mode. The Policy Agent cannot authorize "
                         "actions without a tamper-evident audit trail (ADR-025 §2.8(a))."
@@ -1073,35 +1105,93 @@ class PolicyAgentService:
                 logger.error(
                     "TPM unavailable for audit signing key '%s': %s — refusing to "
                     "start (ADR-025 §2.8(a)).",
-                    AUDIT_TPM_KEY_NAME,
+                    _signing_key,
                     exc,
                 )
                 raise AuditProvisioningError(
-                    f"TPM unavailable for audit signing key '{AUDIT_TPM_KEY_NAME}': "
+                    f"TPM unavailable for audit signing key '{_signing_key}': "
                     f"{exc}. The Policy Agent cannot authorize actions without a "
                     "tamper-evident audit trail (ADR-025 §2.8(a))."
                 ) from exc
-            signer = TpmRecordSigner(key_name=AUDIT_TPM_KEY_NAME)
-            return AuditLog.from_path(
-                resolved.audit_log_path,
-                signer,
-                **PolicyAgentService._audit_retention_kwargs(resolved),
-            )
+            signer = TpmRecordSigner(key_name=signing_key_name(
+                resolved.audit_log_path
+            ))
+        else:
+            # Dev / CI: derive a stable stub HMAC key from a fixed label + the log
+            # path so different installs get different keys without storing a secret
+            # in source.  This is intentionally recomputable — the hash-chain is
+            # the tamper-evidence in dev; the non-forgeability property requires the
+            # TPM path above.
+            key_material = hashlib.sha256(
+                b"BlarAI-audit-hmac-stub-v1::" + str(resolved.audit_log_path).encode("utf-8")
+            ).digest()
+            signer = HmacSha256Signer(key=key_material, key_id=resolved.audit_hmac_key_id)
 
-        # Dev / CI: derive a stable stub HMAC key from a fixed label + the log
-        # path so different installs get different keys without storing a secret
-        # in source.  This is intentionally recomputable — the hash-chain is
-        # the tamper-evidence in dev; the non-forgeability property requires the
-        # TPM path above.
-        key_material = hashlib.sha256(
-            b"BlarAI-audit-hmac-stub-v1::" + str(resolved.audit_log_path).encode("utf-8")
-        ).digest()
-        signer = HmacSha256Signer(key=key_material, key_id=resolved.audit_hmac_key_id)
-        return AuditLog.from_path(
+        # ONE construction site and ONE exit, deliberately (#1543, review finding 1).
+        # The first version of this fix left the production branch as its own
+        # ``return AuditLog.from_path(...)`` above and put the verify below it, so
+        # the check ran in dev and NOWHERE IN PRODUCTION — the built-but-wired-into-
+        # nothing shape, inside the ticket that exists to close an instance of it.
+        # Structuring it as a single exit removes the possibility rather than
+        # patching the branch: a future third signer branch cannot skip the check
+        # by returning early, because there is nothing to return early from.
+        audit_log = AuditLog.from_path(
             resolved.audit_log_path,
             signer,
             **PolicyAgentService._audit_retention_kwargs(resolved),
         )
+
+        # Gap D (#1543): verify the chain on load, and REFUSE it rather than
+        # extend it.  Before this, ``_load_existing`` restored the chain head from
+        # the last record on disk without recomputing a hash or checking a
+        # signature, so a tampered active segment would have been appended to.
+        # The chain was tamper-EVIDENT (a later verify() would have caught the
+        # edit) but not tamper-REFUSING, because nothing on the live path ever
+        # called verify().
+        #
+        # This refuses in BOTH modes, unlike the dev/production divergences above
+        # it, and the difference is deliberate.  Those divergences are about
+        # MISSING infrastructure — no configured path, no provisioned TPM key —
+        # which is a legitimate dev/CI state.  A chain that is PRESENT and does
+        # not verify is a defect in every environment, so there is no mode in
+        # which the right answer is to append to it.
+        try:
+            # #1578 — a chain that has survived a key rotation cannot be verified
+            # from the current key alone: its early records were signed by a key
+            # since retired. Start from the OLDEST key the history names and let
+            # the in-chain bridge records carry the walk forward.
+            #
+            # Before this the Policy Agent refused to start PERMANENTLY after a
+            # legitimate rotation — measured three times, identical refusals,
+            # with no escape in any code path. The remedy its own message named
+            # (`verify(signer=...)`) could not work either: one verifier cannot
+            # cover a chain that spans two keys.
+            _first_key, _resolver, _order = verification_start(
+                resolved.audit_log_path
+            )
+            audit_log.verify(
+                signer=_first_key, key_resolver=_resolver, key_order=_order
+            )
+        except AuditChainError as exc:
+            # #1569: name WHICH fault, because the remedies differ and an operator
+            # told "your audit log was tampered with" when they rotated a key is
+            # the wrong alarm at the worst moment. Both classes still refuse.
+            logger.error(
+                "Audit chain at %s FAILED verification [%s] (%s) — refusing to "
+                "start. %s",
+                resolved.audit_log_path,
+                exc.fault,
+                exc,
+                exc.operator_guidance,
+            )
+            raise AuditProvisioningError(
+                f"Audit chain at {resolved.audit_log_path} failed verification "
+                f"[{exc.fault}]: {exc}. {exc.operator_guidance} The Policy Agent "
+                "refuses to start rather than extend a chain whose integrity cannot "
+                "be established."
+            ) from exc
+
+        return audit_log
 
     @staticmethod
     def _audit_retention_kwargs(
@@ -1111,10 +1201,31 @@ class PolicyAgentService:
 
         Single source of truth for both the production (TPM) and dev (HMAC) audit
         sink construction paths (ISS-607 / ADR-029) so they cannot drift.
+
+        Production CLAMPS the record ceiling to ``PRODUCTION_MAX_ACTIVE_RECORDS``
+        (ADR-029 amendment 2026-09-17, #1543).  ADR-029's 100,000 default bounds
+        RAM and file size; it does not bound the boot-time signature verification
+        that #1543 added, which at that ceiling would cost 11-21 minutes of TPM
+        work on every start.  The clamp is announced rather than silent, because a
+        control that quietly overrides operator configuration is the kind that
+        gets discovered during an incident.
         """
+        max_active_records = resolved.audit_max_active_records
+        if not resolved.dev_mode and max_active_records > PRODUCTION_MAX_ACTIVE_RECORDS:
+            logger.warning(
+                "Clamping audit_max_active_records from %d to %d in production: a "
+                "complete verify-on-load at the configured ceiling would exceed the "
+                "registered boot budget. Records above the ceiling are not lost — "
+                "they rotate into sealed segments, which the signed anchor chain "
+                "still covers (#1543).",
+                max_active_records,
+                PRODUCTION_MAX_ACTIVE_RECORDS,
+            )
+            max_active_records = PRODUCTION_MAX_ACTIVE_RECORDS
+
         return {
             "max_active_bytes": resolved.audit_max_active_bytes,
-            "max_active_records": resolved.audit_max_active_records,
+            "max_active_records": max_active_records,
             "archive_max_bytes": resolved.audit_archive_max_bytes,
             "archive_max_age_days": resolved.audit_archive_max_age_days,
         }

@@ -22,9 +22,9 @@
 >    invokes it deliberately via `/dispatch` for a scoped coding job. It is not a
 >    thing that takes a sprint over while you are away.)
 > 2. **The comprehension gate is missing entirely.** The current command's Phase 2
->    presents the full `CLAUDE.md` gate — ROLE & AUTHORITY / CONTEXT / GOAL /
->    TASK + PLAN / SCOPE / INHERITED CONSTRAINTS / RISKS + DECISION POINTS /
->    ASSUMPTIONS & AMBIGUITIES / OPEN QUESTIONS — and then **stops and waits for
+>    presents the full `CLAUDE.md` gate — GOAL / DELIVERABLE (what will exist,
+>    with sizes) / SCOPE (incl. every other surface touched) / YOURS VS MINE /
+>    ASSUMPTIONS / RISKS + STOP CONDITIONS / MONITORING — and then **stops and waits for
 >    you**. This guide describes an "approve the SDV" step instead. The gate is
 >    your real decision point.
 > 3. **No Strategic Design Vision (SDV) is produced.** The command writes a

@@ -1,0 +1,905 @@
+{
+ "model": "4b-on",
+ "dir": "docs\\performance\\_run\\q4b_on",
+ "agentic": {
+  "random_marker": {
+   "runs": 3,
+   "pass_counts_all_cases": [
+    29,
+    29,
+    29
+   ],
+   "pass_counts_model_driven": [
+    19,
+    19,
+    19
+   ],
+   "model_driven_cases": [
+    20,
+    20,
+    20
+   ],
+   "scripted_cases": [
+    10,
+    10,
+    10
+   ],
+   "unstable_cases": {}
+  },
+  "pinned_marker_V0": {
+   "runs": 3,
+   "pass_counts_all_cases": [
+    29,
+    29,
+    29
+   ],
+   "pass_counts_model_driven": [
+    19,
+    19,
+    19
+   ],
+   "unstable_cases": {},
+   "input_identity": {
+    "repeats": 3,
+    "calls_per_repeat": [
+     40
+    ],
+    "same_call_count": true,
+    "identical": true,
+    "mismatched_calls": 0
+   },
+   "output_identity": {
+    "repeats": 3,
+    "calls_per_repeat": [
+     40
+    ],
+    "same_call_count": true,
+    "identical": true,
+    "mismatched_calls": 0
+   }
+  },
+  "perturbation": {
+   "V1": {
+    "pass_count_all_cases": 29,
+    "pass_count_model_driven": 19,
+    "prompts": {
+     "calls": 39,
+     "calls_with_changed_prompt": 23,
+     "same_call_count": false
+    },
+    "flipped_vs_V0": {}
+   },
+   "V2": {
+    "pass_count_all_cases": 29,
+    "pass_count_model_driven": 19,
+    "prompts": {
+     "calls": 40,
+     "calls_with_changed_prompt": 2,
+     "same_call_count": true
+    },
+    "flipped_vs_V0": {}
+   },
+   "V3": {
+    "pass_count_all_cases": 29,
+    "pass_count_model_driven": 19,
+    "prompts": {
+     "calls": 40,
+     "calls_with_changed_prompt": 39,
+     "same_call_count": true
+    },
+    "flipped_vs_V0": {}
+   }
+  },
+  "tool_call_format": {
+   "ao_calls": 320,
+   "xml_function_calls": 0,
+   "json_tool_calls": 152
+  }
+ },
+ "conversation": {
+  "random_marker": {
+   "runs": 3,
+   "pass_counts_all_cases": [
+    20,
+    20,
+    20
+   ],
+   "pass_counts_model_driven": [
+    20,
+    20,
+    20
+   ],
+   "model_driven_cases": [
+    22,
+    22,
+    22
+   ],
+   "scripted_cases": [
+    0,
+    0,
+    0
+   ],
+   "unstable_cases": {}
+  },
+  "pinned_marker_V0": {
+   "runs": 3,
+   "pass_counts_all_cases": [
+    20,
+    20,
+    20
+   ],
+   "pass_counts_model_driven": [
+    20,
+    20,
+    20
+   ],
+   "unstable_cases": {},
+   "input_identity": {
+    "repeats": 3,
+    "calls_per_repeat": [
+     23
+    ],
+    "same_call_count": true,
+    "identical": true,
+    "mismatched_calls": 0
+   },
+   "output_identity": {
+    "repeats": 3,
+    "calls_per_repeat": [
+     23
+    ],
+    "same_call_count": true,
+    "identical": true,
+    "mismatched_calls": 0
+   }
+  },
+  "perturbation": {
+   "V1": {
+    "pass_count_all_cases": 20,
+    "pass_count_model_driven": 20,
+    "prompts": {
+     "calls": 23,
+     "calls_with_changed_prompt": 0,
+     "same_call_count": true
+    },
+    "flipped_vs_V0": {},
+    "interpretation": "NOT MEASURED: no model call received a different prompt, so zero flips says nothing"
+   },
+   "V2": {
+    "pass_count_all_cases": 20,
+    "pass_count_model_driven": 20,
+    "prompts": {
+     "calls": 23,
+     "calls_with_changed_prompt": 4,
+     "same_call_count": true
+    },
+    "flipped_vs_V0": {}
+   },
+   "V3": {
+    "pass_count_all_cases": 20,
+    "pass_count_model_driven": 20,
+    "prompts": {
+     "calls": 23,
+     "calls_with_changed_prompt": 22,
+     "same_call_count": true
+    },
+    "flipped_vs_V0": {}
+   }
+  },
+  "tool_call_format": {
+   "ao_calls": 184,
+   "xml_function_calls": 0,
+   "json_tool_calls": 8
+  }
+ },
+ "pa_classification_repeats": {
+  "runs": 3,
+  "pass_counts": [
+   33,
+   33,
+   33
+  ],
+  "unstable_cases": {},
+  "failing_in_every_run": [
+   "pa-mdl-007",
+   "pa-mdl-013"
+  ],
+  "single_run": false,
+  "output_identity": {
+   "repeats": 3,
+   "calls_per_repeat": [
+    13
+   ],
+   "same_call_count": true,
+   "identical": true,
+   "mismatched_calls": 0
+  }
+ },
+ "answer_quality_repeats": {
+  "runs": 1,
+  "pass_counts": [
+   33
+  ],
+  "unstable_cases": {},
+  "failing_in_every_run": [
+   "aq-fact-mod-02",
+   "aq-grnd-mod-01",
+   "aq-grnd-mod-02",
+   "aq-grnd-mod-03",
+   "aq-inj-mod-01",
+   "aq-inj-mod-02",
+   "aq-leak-mod-02"
+  ],
+  "single_run": true,
+  "single_run_note": "one run only: failing_in_every_run lists the cases that failed in that one run; it is not a repeated finding and no conclusion is drawn from it"
+ },
+ "preference_memory_repeats": {
+  "runs": 1,
+  "pass_counts": [
+   29
+  ],
+  "unstable_cases": {},
+  "failing_in_every_run": [
+   "pm-poison-fama",
+   "pm-prop-explicit-001"
+  ],
+  "single_run": true,
+  "single_run_note": "one run only: failing_in_every_run lists the cases that failed in that one run; it is not a repeated finding and no conclusion is drawn from it"
+ },
+ "all_suites_random_r1": {
+  "agentic": {
+   "errors": 0,
+   "evaluated": 30,
+   "failed": 1,
+   "passed": 29,
+   "skipped_hardware": 0,
+   "tool_calls": 0,
+   "total": 30
+  },
+  "answer_quality": {
+   "errors": 0,
+   "evaluated": 36,
+   "failed": 3,
+   "passed": 33,
+   "skipped_hardware": 0,
+   "tool_calls": 4,
+   "total": 40
+  },
+  "conversation": {
+   "errors": 0,
+   "evaluated": 21,
+   "failed": 1,
+   "passed": 20,
+   "skipped_hardware": 0,
+   "tool_calls": 1,
+   "total": 22
+  },
+  "coordinator": {
+   "errors": 0,
+   "evaluated": 85,
+   "failed": 0,
+   "passed": 85,
+   "skipped_hardware": 0,
+   "tool_calls": 0,
+   "total": 85
+  },
+  "governance": {
+   "errors": 0,
+   "evaluated": 50,
+   "failed": 0,
+   "passed": 50,
+   "skipped_hardware": 0,
+   "tool_calls": 0,
+   "total": 50
+  },
+  "oracle_quality": {
+   "errors": 0,
+   "evaluated": 27,
+   "failed": 0,
+   "passed": 27,
+   "skipped_hardware": 1,
+   "tool_calls": 0,
+   "total": 28
+  },
+  "pa_classification": {
+   "errors": 0,
+   "evaluated": 35,
+   "failed": 2,
+   "passed": 33,
+   "skipped_hardware": 0,
+   "tool_calls": 0,
+   "total": 35
+  },
+  "preference_memory": {
+   "errors": 0,
+   "evaluated": 31,
+   "failed": 2,
+   "passed": 29,
+   "skipped_hardware": 0,
+   "tool_calls": 0,
+   "total": 31
+  },
+  "tool_calling": {
+   "errors": 0,
+   "evaluated": 49,
+   "failed": 0,
+   "passed": 49,
+   "skipped_hardware": 0,
+   "tool_calls": 0,
+   "total": 49
+  }
+ },
+ "engine_witness": {
+  "4b-on-agentic-pinned-V0-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 13.04,
+    "generations": 40,
+    "generated_tokens": 1076,
+    "draft_tokens": 895,
+    "accepted_tokens": 654,
+    "acceptance_rate": 0.7307,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-pinned-V0-r2_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.93,
+    "generations": 40,
+    "generated_tokens": 1076,
+    "draft_tokens": 895,
+    "accepted_tokens": 654,
+    "acceptance_rate": 0.7307,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-pinned-V0-r3_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.32,
+    "generations": 40,
+    "generated_tokens": 1076,
+    "draft_tokens": 895,
+    "accepted_tokens": 654,
+    "acceptance_rate": 0.7307,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-pinned-V1-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.53,
+    "generations": 39,
+    "generated_tokens": 1056,
+    "draft_tokens": 886,
+    "accepted_tokens": 644,
+    "acceptance_rate": 0.7269,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-pinned-V2-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.52,
+    "generations": 40,
+    "generated_tokens": 1076,
+    "draft_tokens": 897,
+    "accepted_tokens": 654,
+    "acceptance_rate": 0.7291,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-pinned-V3-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 25.05,
+    "generations": 40,
+    "generated_tokens": 1041,
+    "draft_tokens": 847,
+    "accepted_tokens": 628,
+    "acceptance_rate": 0.7414,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-random-r2_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 16.04,
+    "generations": 41,
+    "generated_tokens": 1066,
+    "draft_tokens": 861,
+    "accepted_tokens": 651,
+    "acceptance_rate": 0.7561,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-agentic-random-r3_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.58,
+    "generations": 40,
+    "generated_tokens": 1009,
+    "draft_tokens": 813,
+    "accepted_tokens": 615,
+    "acceptance_rate": 0.7565,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-all-random-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.19,
+    "generations": 104,
+    "generated_tokens": 3076,
+    "draft_tokens": 2748,
+    "accepted_tokens": 1834,
+    "acceptance_rate": 0.6674,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-pinned-V0-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.42,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 201,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.796,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-pinned-V0-r2_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.57,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 201,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.796,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-pinned-V0-r3_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.53,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 201,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.796,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-pinned-V1-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.74,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 201,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.796,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-pinned-V2-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.5,
+    "generations": 23,
+    "generated_tokens": 289,
+    "draft_tokens": 204,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.7843,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-pinned-V3-r1_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 13.53,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 203,
+    "accepted_tokens": 154,
+    "acceptance_rate": 0.7586,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-random-r2_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.22,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 201,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.796,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-conversation-random-r3_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 13.0,
+    "generations": 23,
+    "generated_tokens": 288,
+    "draft_tokens": 201,
+    "accepted_tokens": 160,
+    "acceptance_rate": 0.796,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-pa_classification-random-r2_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.86,
+    "generations": 13,
+    "generated_tokens": 203,
+    "draft_tokens": 123,
+    "accepted_tokens": 114,
+    "acceptance_rate": 0.9268,
+    "think_first_chunk_count": 0
+   }
+  ],
+  "4b-on-pa_classification-random-r3_engine.json": [
+   {
+    "engine": "cb-mtp-on",
+    "mtp": true,
+    "prefix_caching": false,
+    "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+    "device": "GPU",
+    "genai_version": "2026.4.0.0-3407-7ea2546852a",
+    "scheduler": {
+     "cache_size_gb": 3,
+     "max_num_seqs": 1
+    },
+    "compile_properties": {
+     "PERFORMANCE_HINT": "LATENCY",
+     "INFERENCE_PRECISION_HINT": "f16",
+     "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+     "CACHE_DIR": "",
+     "KV_CACHE_PRECISION": "f16",
+     "DYNAMIC_QUANTIZATION_GROUP_SIZE": 0
+    },
+    "num_assistant_tokens": 3,
+    "load_seconds": 12.96,
+    "generations": 13,
+    "generated_tokens": 203,
+    "draft_tokens": 123,
+    "accepted_tokens": 114,
+    "acceptance_rate": 0.9268,
+    "think_first_chunk_count": 0
+   }
+  ]
+ },
+ "engine_witness_failures": []
+}

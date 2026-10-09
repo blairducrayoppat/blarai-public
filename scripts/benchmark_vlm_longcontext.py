@@ -139,7 +139,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL_DIR = "C:/Users/mrbla/models/qwen36-35b-a3b-int4-ov-OFFICIAL"
+DEFAULT_MODEL_DIR = "B:/models/Qwen3.6-35B-A3B-int4-ov"
 _DEVICE = "GPU"
 
 #: Default context bands (input-prompt token targets). 2K/8K/16K/32K — a

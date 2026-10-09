@@ -1,6 +1,15 @@
 # Model Evaluation — Qwen3.6-27B / ThinkingCap-Qwen3.6-27B as Qwen3-14B successor
 
 **Date:** 2026-07-08 · **Status:** EVALUATED — NOT RECOMMENDED YET (two concrete revisit triggers below)
+
+> **PARTIAL RETRACTION 2026-09-22 — read before citing this document.** Revisit trigger 4, the
+> thinking-toggle blocker described below as "the HARDEST swap blocker" and "disqualifying for the
+> PA role", is **withdrawn**. The probe that produced it rendered every condition through a chat
+> template that opens a reasoning block whenever the no-think variable is absent, so the probe
+> caused the behaviour it reported. The correction, with the live render that settles it, is in
+> trigger 4. **Trigger 4 must not be cited as a blocker.** The throughput and memory findings in
+> this document are unaffected and stand. (#1611, #1618; lesson 369.)
+
 **Question:** Can Qwen3.6-27B (base, or the BottleCapAI "ThinkingCap" fine-tune) replace Qwen3-14B
 as the BlarAI resident brain on the Arc 140V, and could it also absorb the separate Qwen3-VL-8B
 vision model? Could DFlash give it speculative decoding on this device?
@@ -121,8 +130,10 @@ revisit triggers below are unchanged.
    openvino.genai **#3773** (closed experiment: hybrid models fall back to SDPA — plausibly why
    our prefill collapsed 9x) and openvino **#36270** (open: Qwen3.6-35B MoE slow on integrated
    Arc; unfused MoE-MLP kernels; our dense datapoint is complementary evidence).
-4. **openvino.genai #3937 — TESTED SAME-DAY on our hardware: REPRODUCED on the 27B, and it is
-   now the HARDEST swap blocker.** Probe (`scripts/probe_qwen36_thinking_toggle.py`, evidence
+4. **openvino.genai #3937 — ~~TESTED SAME-DAY on our hardware: REPRODUCED on the 27B, and it is
+   now the HARDEST swap blocker.~~ RETRACTED 2026-09-22: the probe produced the behaviour it
+   reported. See the correction block below.** Probe
+   (`scripts/probe_qwen36_thinking_toggle.py`, evidence
    `docs/performance/qwen36_27b_thinking_toggle_probe_2026-07-08.json`): (a) plain prompt →
    thinking narration; (b) **`/no_think` soft switch → IGNORED** — the model *acknowledges the
    constraint inside its own thinking trace* and thinks anyway (the production PA mechanism,
@@ -134,6 +145,38 @@ revisit triggers below are unchanged.
    multi-hundred-token silent detour → disqualifying for the PA role until resolved (may be
    template-side in the IR export — watch #3937). Re-probe alongside the throughput re-measure
    at each version bump.
+
+   > **CORRECTION, 2026-09-22 — trigger 4 is withdrawn as a measured finding; it measured the
+   > probe.** All three conditions above rendered their prompt through the export's chat template
+   > with `enable_thinking` undefined. `chat_template.jinja:149-153` of this very model emits the
+   > closed empty block `<think>\n\n</think>\n\n` **only** when that variable is defined and
+   > false, and **a bare opening `<think>\n` in every other case** — undefined takes the else
+   > branch. Verified live on this export with `Tokenizer.apply_chat_template` (tokenizer IR
+   > only, no GPU): the default render ends `<|im_start|>assistant\n<think>\n`, and the
+   > `extra_context={"enable_thinking": False}` render ends with the closed block. **Every
+   > condition therefore had a reasoning block opened for it before the model produced a single
+   > token.**
+   >
+   > That dissolves each observation in turn. **(c)** is the plainest: `enable_thinking` is a
+   > chat-template variable, not a `GenerationConfig` field, so `generate(…, enable_thinking=False)`
+   > (`probe_qwen36_thinking_toggle.py:77`) is silently dropped — "accepted by the API, ignored by
+   > the model" is the signature of a kwarg that never reached anything, not of a model refusing an
+   > instruction. **(b)** is documented behaviour, not a defect: the Qwen3.6 model card states the
+   > `/think`-`/nothink` soft switch is not supported and names the template variable as the
+   > control — and the template had opened a block regardless. **The "aggravating" untagged
+   > thinking is the tell that should have caught this in July**: output with no *opening* tag but
+   > a closing one is precisely what you get when the opener is sitting in the prompt. It was read
+   > as a model quirk that defeats our strip; it was our own prompt, visible in a one-minute render.
+   >
+   > **What this changes.** Trigger 4 is not a blocker and must not be cited as one. It is not
+   > evidence for or against #3937 either — that issue is another user's, on different hardware and
+   > a different pipeline class, and the correctly-rendered case it reports is untouched by our
+   > error. Whether these models honour a correctly built prompt is **unmeasured** as of this
+   > correction and is stage S0c of the 2026.4 program (#1611); the same flaw voided the 35B's
+   > 22/40 answer-quality verdict (PERFORMANCE_LOG 2026-07-17, CORRECTION block) and is ticketed
+   > as a harness defect on #1618. Our 2026-07-09 comment on #3937 carries the same wrong claim
+   > publicly and is not yet retracted; upstream correction belongs to the session that owns
+   > upstream work. Lesson 369; lesson 222's eleventh recurrence.
 
 Any of 1/3 firing → re-measure; a swap additionally requires the long-prompt coherence check
 (2), the #3937 thinking-toggle check (4), and the VLMPipeline plumbing scope, then an ADR-012
@@ -206,7 +249,7 @@ changed its numbers:
   per pass re-pays most of that compute, so expect MTP's realized gain here to be well below
   llama.cpp's published 1.25–2.7× until the kernel deficit (trigger 3) closes. Sequencing:
   kernels first, then MTP multiplies what's left.
-- **Unchanged blockers:** #3937 thinking-toggle (hardest), VLMPipeline plumbing rework,
+- **Unchanged blockers:** ~~#3937 thinking-toggle (hardest)~~ **[RETRACTED 2026-09-22 — see the top-of-file partial retraction and trigger 4; it was our probe, not the model]**, VLMPipeline plumbing rework,
   long-prompt coherence check. MTP removes only the "no spec-decode possible" leg.
 
 Standing check addition: at each OpenVINO version bump, alongside the throughput re-measure,

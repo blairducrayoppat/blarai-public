@@ -919,7 +919,10 @@ async def test_M4_blocked_card_keeps_promise_but_drops_the_approve_tail(tmp_path
     coord, _ = _playback_coord(tmp_path, first=_blocked_first(_STD_BLOCKED))
     reply = await coord.handle_command("s", _advanced_run())
     assert _INVITE_HEAD in reply
-    assert "Tell me in plain words and I'll fix the plan." in reply
+    # #1406: the promise now names the prefix. "Tell me in plain words" alone was true
+    # about the words and false about the routing — a reply without `/dispatch` reaches
+    # ordinary chat, not the revise path this sentence offers.
+    assert "Tell me in plain words with `/dispatch <your words>` and I'll fix the plan." in reply
     assert "when it reads right" not in reply, "the approve tail is false while blocked"
     assert reply.endswith(_playback_invitation(0, _STD_BLOCKED))
     # The refusal the invitation now agrees with:

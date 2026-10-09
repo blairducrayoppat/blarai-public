@@ -17,11 +17,12 @@ the card.
 **THE GATE (load-bearing, unchanged in authority):** a card never authorizes execution. The
 successor grounds on disk → verifies anchors → presents its gate → **WAITS for
 User-Operator confirmation**. A NEW engagement gets the FULL `CLAUDE.md` comprehension gate
-(role & authority / context / goal / task + plan / scope / inherited constraints /
-risks + decision points / assumptions & ambiguities / open questions — all nine, own
-words, built from the reads). A CONTINUATION of an already-gated program gets the **delta-gate**
-(LA-ratified 2026-07-28): ≤10 lines — what changed, what I will do next, what I need from
-you — still presented and confirmed before substantive action. Doing-the-work authorization
+(goal / deliverable with sizes / scope incl. every other surface touched / yours vs mine /
+assumptions / risks + stop conditions / monitoring of unattended work — all seven, own words,
+built from the reads). A CONTINUATION of an already-gated program gets the **delta-gate**
+(LA-ratified 2026-07-28): ≤10 lines — what changed, what I will do next, a MONITORING line
+(what runs unattended and how I am woken, or none), what I need from you — still presented
+and confirmed before substantive action. Doing-the-work authorization
 is NEVER gate-skip authorization; never frame a card as "execute end to end" (the
 2026-07-05 anti-pattern).
 

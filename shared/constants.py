@@ -135,8 +135,21 @@ ORCH_FIRST_TOKEN_COLD_MS: float = 1_500.0
 MAX_OUTPUT_TOKENS: int = 4_096
 """Hard cap: maximum output tokens per Orchestrator response."""
 
-MAX_TOOL_CALL_DEPTH: int = 5
-"""Maximum recursive tool-call chain depth per user query."""
+MAX_TOOL_CALL_DEPTH: int = 3
+"""Hard cap: chained tool calls per conversational turn.
+
+**This said 5 until 2026-09-20 and nothing enforced it (#1596).** It fed
+``CircuitBreaker.record_tool_call``, a class imported by nothing but its own test
+— the built-but-wired-into-nothing shape, backing a claim-register row marked
+LIVE. The bound that actually ran was a function-local literal ``_TOOL_LOOP_MAX =
+3`` seven thousand lines into ``entrypoint.py``, invisible to anything auditing
+limits, while this constant was the one a reader would find.
+
+The value is 3 because that is what the loop has always enforced; the breaker was
+deleted rather than wired, because wiring it would have added a second mechanism
+for a limit already enforced, which is the drift this fix exists to end. The AO
+tool loop now reads THIS name.
+"""
 
 # ---------------------------------------------------------------------------
 # Model Specifications — ADR-012: Qwen3-14B confirmed, config optimization in progress

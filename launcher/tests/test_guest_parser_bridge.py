@@ -69,12 +69,22 @@ _LEN = struct.Struct("!I")
 
 @pytest.fixture(autouse=True)
 def _clean_bridge_and_seam():
-    """Start every test from the fail-closed default (nothing bound/parked)."""
+    """Start every test from the fail-closed default (nothing bound/parked).
+
+    The launcher boot path under test registers the egress door's URL adjudicator as a side effect; it is put
+    back to what it was, so the door's state never leaks into a test that runs later in the same process."""
+    from shared.security import guarded_fetch
+
+    previous_adjudicator = guarded_fetch.active_url_adjudicator()
     set_guest_parser_bridge(None)
     clear_parser_channel_bindings()
     yield
     set_guest_parser_bridge(None)
     clear_parser_channel_bindings()
+    if previous_adjudicator is None:
+        guarded_fetch.clear_url_adjudicator()
+    else:
+        guarded_fetch.register_url_adjudicator(previous_adjudicator)
 
 
 def _endpoint(timeout_s: float = 1.0) -> ParserEndpoint:

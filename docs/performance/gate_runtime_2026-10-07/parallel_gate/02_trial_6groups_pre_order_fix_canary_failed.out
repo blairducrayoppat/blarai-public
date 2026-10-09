@@ -1,0 +1,4 @@
+collected 13253 tests in 479 files (620 deselected); 6 groups; logs in C:\Users\mrbla\BlarAI-worktrees\_gatelogs\pgn6
+FAILED tests/security/test_trust_spine_canary_postures.py::test_registering_the_adjudicator_left_no_residue
+= 1 failed, 13252 passed, 620 deselected in 677.55s (parallel x6) =
+rc=1

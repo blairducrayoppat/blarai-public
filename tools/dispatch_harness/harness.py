@@ -87,7 +87,7 @@ class DispatchHarness:
     poll_interval_s: float = 5.0
     # 90 -> 240 (2026-07-09 night B4 false-doom; family with RunMonitor.stall_grace_s —
     # the [3/5] verify gate's 600 s budget contains legitimately CPU-quiet, log-quiet gaps).
-    stall_grace_s: float = 240.0
+    stall_grace_s: float = 900.0
     overall_timeout_s: float = 10800.0
     # Monitor injectables (tests override clock/sleep/cpu probe; dry-run uses a fast monitor).
     monitor_factory: Callable[..., RunMonitor] | None = None
@@ -114,7 +114,7 @@ class DispatchHarness:
         session_id: str = "harness",
         default_clarify_answer: str = "1",
         poll_interval_s: float = 5.0,
-        stall_grace_s: float = 240.0,
+        stall_grace_s: float = 900.0,
         overall_timeout_s: float = 10800.0,
         log: Callable[[str], None] = print,
     ) -> "DispatchHarness":

@@ -582,3 +582,64 @@ def test_debug_dump_writes_structured_diagnostics(tmp_path, monkeypatch):
     payload = json.loads(line.split("=== decompose diagnostics ===", 1)[1])
     assert payload["schema"] == "decompose-diagnostics/v1"
     assert payload["repair"] == "duplicate-key-split" and payload["outcome"] == "plan-graph"
+
+
+# ---------------------------------------------------------------------------
+# #1279 / DoD row 20 clause 2 — a truncated plan SAYS it was truncated.
+#
+# The cap's `break` used to be silent. The row's own text: a truncation was
+# observable only by noticing `coherent_tasks` exceeded `final_tasks` in the
+# diagnostics — "derivable, never stated". The code's comment refused to
+# half-fix it with a log line: "the truncation has to become DATA".
+# ---------------------------------------------------------------------------
+
+
+def _cands(n: int) -> list[dict]:
+    return [{"task": f"task-{i}", "prompt": f"do thing {i}"} for i in range(n)]
+
+
+def test_the_cap_reports_how_many_candidates_it_never_examined():
+    accepted, dropped = dc._ruler(_cands(12), "repo", max_tasks=8)
+    assert len(accepted) == 8
+    assert dropped == 4, "the ceiling stopped four candidates being looked at and must say so"
+
+
+def test_a_plan_under_the_cap_reports_no_truncation():
+    """The toggle. A count that is always non-zero says nothing."""
+    accepted, dropped = dc._ruler(_cands(5), "repo", max_tasks=8)
+    assert len(accepted) == 5
+    assert dropped == 0
+
+
+def test_a_plan_of_EXACTLY_the_cap_is_not_called_truncated():
+    """The boundary. `len(accepted) >= max_tasks` fires on the last accepted candidate too, so
+    a naive count would report a phantom drop for a plan that fitted exactly — the same
+    off-by-one the security scanner's file cap carried until #1400."""
+    accepted, dropped = dc._ruler(_cands(8), "repo", max_tasks=8)
+    assert len(accepted) == 8
+    assert dropped == 0, "a plan that fitted exactly must not claim it was cut"
+
+
+def test_the_count_reaches_the_diagnostics_artifact():
+    """Carrying it internally is not the point: `decompose-diagnostics.json` is what a later
+    sweep reads, and row 20's clause is about what the operator can be TOLD."""
+    diag = dc._build_diagnostics(
+        raw="{}", task_key_hits=9, parsed=9, coherent=8, final_tasks=8,
+        used_grammar=True, gen_error="", repair="", retry_attempted=False,
+        retry_used=False, split_oversize=False, fell_back=False, idea="a big site",
+        truncated_tasks=4,
+    )
+    assert diag["truncated_tasks"] == 4
+    assert diag["final_tasks"] == 8
+
+
+def test_the_diagnostics_default_is_zero_not_missing():
+    """An absent key and a zero are different answers to a later reader, and every existing
+    caller of this builder passes nothing. The default must be the honest one."""
+    diag = dc._build_diagnostics(
+        raw="{}", task_key_hits=2, parsed=2, coherent=2, final_tasks=2,
+        used_grammar=True, gen_error="", repair="", retry_attempted=False,
+        retry_used=False, split_oversize=False, fell_back=False, idea="a small site",
+    )
+    assert "truncated_tasks" in diag, "the key must always be present, like every other field"
+    assert diag["truncated_tasks"] == 0

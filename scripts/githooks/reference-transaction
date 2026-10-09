@@ -1,0 +1,42 @@
+#!/bin/sh
+# Git-native reference-transaction shim: judges updates of refs/heads/main|master in state "prepared".
+# Installed copy. Reads stdin itself and, for a main/master update, checks _lib.sh against the
+# install record BEFORE sourcing it; other transactions only chain.
+# Exported shell functions in the caller's environment could replace any builtin or command used below; unset is a
+# special builtin (found before functions in the POSIX mode sh runs in), so it runs first.
+unset -f '[' test echo printf read cd pwd command type git sed tr cat sha256sum true false exec 2>/dev/null
+stdin_data=
+stdin_has_main=
+_cr=$(printf '\r')
+while IFS= read -r _line || [ -n "$_line" ]; do
+    _line=${_line%"$_cr"}
+    if [ -z "$stdin_data" ]; then stdin_data=$_line; else stdin_data="$stdin_data
+$_line"; fi
+    case "$_line" in
+        *" refs/heads/"[Mm][Aa][Ii][Nn]|*" refs/heads/"[Mm][Aa][Ss][Tt][Ee][Rr]) stdin_has_main=1 ;;
+    esac
+done
+if [ "$1" = "prepared" ] && [ -n "$stdin_has_main" ]; then
+    _rec="${0%/*}/../../blarai-install.json"
+    _lh=$(git hash-object --no-filters -- "${0%/*}/_lib.sh" 2>/dev/null)
+    _want=
+    _pat='"githooks/_lib.sh": "'
+    if [ -f "$_rec" ]; then
+        while IFS= read -r _rl || [ -n "$_rl" ]; do
+            case "$_rl" in
+                *"$_pat"*) _want=${_rl#*"$_pat"}; _want=${_want%%\"*}; break ;;
+            esac
+        done < "$_rec"
+    fi
+    if [ -z "$_want" ] || [ "$_want" != "$_lh" ]; then
+        echo "BLOCKED: the installed _lib.sh differs from the install record or the record is missing; run: python scripts/install_git_hooks.py --check, then --update (the lead)" >&2
+        exit 1
+    fi
+fi
+. "${0%/*}/_lib.sh"
+if [ "$1" = "prepared" ] && [ -n "$stdin_has_main" ]; then
+    verify_install || exit 1
+    run_guard reference_transaction.py "$@" || exit 1
+fi
+chain_previous "$@"
+exit $?

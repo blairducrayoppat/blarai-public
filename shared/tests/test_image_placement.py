@@ -945,6 +945,14 @@ _INTAKE_README = (
     "Put photos, documents, and other material for the build in here; "
     "screenshots to emulate go in the reference folder.\n"
 )
+#: The text seeded from 2026-08-30. BOTH must be recognised forever: projects created
+#: before that date still carry the one above, and a marker that stopped matching it
+#: would re-commit the false positive this section exists to prevent.
+_INTAKE_README_2026_08_30 = (
+    "Put photos, videos, documents and other material for the build in here. "
+    "The plan lists what it finds, and the build is graded on using it. "
+    "(The reference folder is for screenshots to copy the look of - not used yet.)\n"
+)
 
 
 def test_operator_intake_photos_are_never_graded_as_waste(tmp_path: Path) -> None:
@@ -963,6 +971,27 @@ def test_operator_intake_photos_are_never_graded_as_waste(tmp_path: Path) -> Non
     assert report["counts"].get("unreferenced_assets", 0) == 0, (
         "the operator's uploaded photographs must never be reported as pipeline waste"
     )
+
+
+def test_the_intake_marker_recognises_every_scaffold_wording(tmp_path: Path) -> None:
+    """The scaffold's README text has changed once and will change again. The marker is
+    what protects the operator's own uploads, so it must recognise EVERY wording ever
+    seeded -- a project created in July is still on disk carrying July's text."""
+    for label, readme in (("pre_20260830", _INTAKE_README),
+                          ("from_20260830", _INTAKE_README_2026_08_30)):
+        root = _site(
+            tmp_path / label,
+            {
+                "assets/README.txt": readme,
+                "assets/his-own-photo.jpg": "x",
+                "public/index.html": "<p>not built yet</p>",
+            },
+        )
+        report = image_placement.grade_site(root)
+        assert report["counts"].get("unreferenced_assets", 0) == 0, (
+            f"the {label} scaffold wording must still mark the folder as the "
+            "operator's own"
+        )
 
 
 def test_the_intake_exclusion_is_NAMED_not_silent(tmp_path: Path) -> None:
@@ -1037,4 +1066,166 @@ def test_toggle_proof_the_intake_guard_fails_when_disengaged(
     assert disengaged["counts"]["unreferenced_assets"] == 1, (
         "disengaging the intake guard must restore the defect — otherwise the engaged "
         "result was not produced by the control under test"
+    )
+
+
+# ---------------------------------------------------------------------------
+# #1391 — the dropped catalogue. The genuine #1231 shape: doing LESS work turns
+# a guaranteed hard-fail into an invisible non-event, reached by a malformed
+# JSON read rather than a budget clock. No adversary required.
+# ---------------------------------------------------------------------------
+
+
+#: Ten items each DECLARING a picture that does not exist in the delivery. That is the HIGH
+#: `item-image-missing` rule and therefore a hard fail. Note the distinction, because the
+#: ticket's phrase "ten items all missing images" is ambiguous and the first draft of this
+#: fixture got it wrong: an item with `"image": ""` declares nothing and grades under the
+#: separate, lower `item-without-image` rule, which does not set `hard`. The scenario that
+#: makes #1391 dangerous is the HIGH one — a gallery of broken pictures.
+_TEN_ITEMS_BROKEN_PICTURES = _pieces(*[
+    {"id": i, "name": f"Piece {i}", "image": f"assets/piece{i}.png"} for i in range(1, 11)
+])
+
+
+def test_ten_broken_pictures_is_a_HARD_fail_when_the_catalogue_parses(tmp_path) -> None:
+    """The control half of the ticket's constructed scenario.
+
+    Without this, the malformed-catalogue test below cannot distinguish "the parse failure
+    hid the violations" from "this grader never flags missing pictures at all".
+    """
+    site = _site(tmp_path, {
+        "data/pieces.json": _TEN_ITEMS_BROKEN_PICTURES,
+        "public/index.html": "<h1>Shop</h1>",
+        "public/assets/hero.png": "x",
+    })
+    report = image_placement.grade_site(site)
+
+    assert report["checked"] is True
+    assert report["hard"] is True, "ten items declaring absent pictures must be a HARD finding"
+    assert "item-image-missing" in _rules(report)
+    assert report["unparsed_data_source_count"] == 0
+
+
+def test_the_same_ten_items_behind_a_syntax_error_are_not_silently_dropped(tmp_path) -> None:
+    """The defect. One JSON syntax error and the ten violations vanished entirely: not
+    `items`, not `items_without_image`, not `items_with_missing_image`, one LOW `unreadable`
+    finding that cannot set `hard`, and NOT ONE WORD in `not_measured`.
+
+    The disclosure asymmetry is what made this findable — `asset_usage` confessed its
+    exclusions in `not_measured` and `item_placement` confessed nothing, so one dimension
+    looked like it had nothing to confess.
+
+    ADVISORY, per the ticket's own DONE item 2 and the #1345 precedent: `hard` is deliberately
+    NOT raised here, because a new way for a build to fail is the operator's ceremony. What
+    must hold is that the loss is IMPOSSIBLE TO MISS in the record.
+    """
+    site = _site(tmp_path, {
+        "data/pieces.json": '[{"id": 1, "name": "Piece 1", "image": ""',  # truncated write
+        "public/index.html": "<h1>Shop</h1>",
+        "public/assets/hero.png": "x",
+    })
+    report = image_placement.grade_site(site)
+
+    assert report["unparsed_data_source_count"] == 1, (
+        "the unparseable catalogue was not counted anywhere"
+    )
+    assert "data/pieces.json" in report["unparsed_data_sources"]
+    disclosure = " ".join(report["not_measured"]).lower()
+    assert "could not be parsed" in disclosure, (
+        f"not_measured said nothing about the dropped catalogue: {report['not_measured']}"
+    )
+    assert "lower bound" in disclosure, (
+        "the disclosure must say the item counts are a floor, not a measurement"
+    )
+
+
+def test_an_unparseable_catalogue_is_never_reported_as_a_site_without_media(tmp_path) -> None:
+    """The second-order bug. When the ONLY catalogue is unparseable, `item_ran` is False and
+    the instrument reported `checked: False, reason: "no data file listing items with
+    pictures was found"`.
+
+    That was factually wrong — a file WAS found; it did not parse. It collapsed "did not
+    look" into "looked and it broke", which is the STATUS_SENTINEL failure the instrument
+    registry's own docstring warns about, and it reported the more alarming state as the
+    more innocent one.
+    """
+    site = _site(tmp_path, {
+        "data/pieces.json": '[{"id": 1, "image": ""',   # the only catalogue, truncated
+        "public/index.html": "<h1>Shop</h1>",           # no image assets at all
+    })
+    report = image_placement.grade_site(site)
+
+    reason = report.get("reason", "").lower()
+    assert "could not be parsed" in reason, (
+        f"a found-but-broken catalogue was reported as an absent one: {reason!r}"
+    )
+    assert report.get("nothing_to_grade") is not True, (
+        "'nothing to grade' asserts the delivery had nothing in it; here it had something "
+        "this instrument could not read, which is a different claim"
+    )
+
+
+def test_an_unparseable_catalogue_is_named_even_when_the_site_HAS_pictures(tmp_path) -> None:
+    """#1391's SECOND reachable path, and the likelier one.
+
+    The test above covers a site with no images at all, where `item_ran` and `asset_ran` are
+    both False and the early branch fires. But a delivery that ships pictures alongside a
+    catalogue that failed to parse skips that branch entirely and lands in the `else` that
+    sets `checks["item_placement"]["reason"]` — which asserted, unconditionally, that no data
+    file "was found". Same false statement as the bug this family was opened for, one branch
+    over, on the ordinary case: a site with pictures.
+
+    It reaches the operator through `format_operator_summary`, so a reader is told the coder
+    never described its pictures when in fact the description was there and unreadable.
+    """
+    site = _site(tmp_path, {
+        "data/pieces.json": '[{"id": 1, "image": ""',      # found, truncated, unparseable
+        "public/index.html": '<img src="assets/mug.png">',  # ... and pictures DO exist
+        "public/assets/mug.png": "x",
+    })
+    report = image_placement.grade_site(site)
+
+    assert report["checks"]["asset_usage"]["checked"] is True, (
+        "fixture is wrong if the asset half did not run — this test exists to cover the "
+        "branch where it DID"
+    )
+    reason = report["checks"]["item_placement"]["reason"].lower()
+    assert report["checks"]["item_placement"]["checked"] is False
+    assert "could not be parsed" in reason, (
+        f"a found-but-broken catalogue was reported as an absent one: {reason!r}"
+    )
+    assert "no data file listing items with pictures was found" not in reason, (
+        "the stale absent-file text is still shipping on this path"
+    )
+
+
+def test_the_absent_catalogue_wording_SURVIVES_when_there_really_is_no_catalogue(tmp_path) -> None:
+    """The toggle for the branch above. Fixing the unparseable case by deleting the
+    absent-file wording would trade one wrong sentence for another: a site that genuinely
+    ships no product data must still be told exactly that."""
+    site = _site(tmp_path, {
+        "public/index.html": '<img src="assets/mug.png">',
+        "public/assets/mug.png": "x",
+    })
+    report = image_placement.grade_site(site)
+
+    reason = report["checks"]["item_placement"]["reason"].lower()
+    assert "no data file listing items with pictures was found" in reason
+    assert "could not be parsed" not in reason
+
+
+def test_the_disclosure_is_absent_when_every_catalogue_parses(tmp_path) -> None:
+    """The toggle. A `not_measured` line that is always present carries no information."""
+    site = _site(tmp_path, {
+        "data/pieces.json": _pieces({"id": 1, "name": "Bowl", "image": "assets/bowl.png"}),
+        "public/index.html": '<img src="assets/bowl.png">',
+        "public/assets/bowl.png": "x",
+    })
+    report = image_placement.grade_site(site)
+
+    assert report["unparsed_data_source_count"] == 0
+    assert report["unparsed_data_sources"] == []
+    disclosure = " ".join(report["not_measured"]).lower()
+    assert "could not be parsed" not in disclosure, (
+        "a clean run claimed a catalogue had failed to parse"
     )

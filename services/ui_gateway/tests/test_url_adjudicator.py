@@ -19,8 +19,7 @@ from services.ui_gateway.src.url_adjudicator import (
     URL_INGEST_SOURCE_AGENT,
     build_url_car,
     decision_to_verdict,
-    make_deterministic_url_adjudicate,
-    make_operator_url_adjudicate,
+    make_request_keyed_url_adjudicate,
     make_url_adjudicator,
     register_url_ingest_adjudicator,
 )
@@ -185,47 +184,88 @@ class TestDeterministicUrlAdjudicate:
     policy-level lock (on top of not-registered + guest_parser disabled).
     """
 
-    def test_empty_allowlist_denies_every_url(self) -> None:
+    def test_empty_allowlist_denies_every_url_on_the_STANDING_branch(self) -> None:
         """The live default (None → the checker's EMPTY class allowlist):
-        RULE 3 denies every external URL — the welded air-gap, by policy."""
-        adjudicate = make_deterministic_url_adjudicate()  # live default
-        car = build_url_car("https://news.example.org/article", "uc003-url-ingest")
+        RULE 3 denies every external URL — the welded air-gap, by policy.
+
+        **Scoped to the standing branch by #1586, and the scoping is a
+        correction, not a weakening.** This used to pass ``"uc003-url-ingest"``
+        as the purpose while calling the DETERMINISTIC factory, which read as
+        "even a pasted URL is denied by an empty allowlist". That was an artefact
+        of the test choosing a factory: in a process where the launcher had
+        registered the operator factory instead, the same paste was ALLOWED. The
+        empty standing allowlist never bound the paste path in any process; see
+        ``test_the_empty_standing_allowlist_does_NOT_bind_the_paste_path``.
+        """
+        adjudicate = make_request_keyed_url_adjudicate()  # live default
+        car = build_url_car("https://news.example.org/article", "web_search")
         assert adjudicate(car) is AdjudicationDecision.DENY
 
+    def test_the_empty_standing_allowlist_does_NOT_bind_the_paste_path(self) -> None:
+        """Said out loud because the runbook's "three locks" framing invites the
+        opposite reading (#1586).
+
+        Paste-is-consent does not consult the standing allowlist — that is what
+        it IS. So "empty allowlist = every URL denied" is a property of the
+        standing branch only. The locks that actually hold URL ingest shut are
+        adjudicator-not-registered and ``[guest_parser].enabled = false``, and the
+        ingest coordinator refuses before the fetch when the guest parser is not
+        ready. This test exists so that nobody re-derives the stronger claim from
+        the test above.
+        """
+        adjudicate = make_request_keyed_url_adjudicate()  # empty standing allowlist
+        car = build_url_car("https://news.example.org/article", "uc003-url-ingest")
+        assert adjudicate(car) is AdjudicationDecision.ALLOW
+
     def test_explicit_empty_allowlist_denies(self) -> None:
-        adjudicate = make_deterministic_url_adjudicate(frozenset())
+        adjudicate = make_request_keyed_url_adjudicate(frozenset())
         car = build_url_car("https://news.example.org/article", "p")
         assert adjudicate(car) is AdjudicationDecision.DENY
 
     def test_allowlisted_host_is_allowed(self) -> None:
         """ADR-027 §2 carve-out: a URL whose host is on the allowlist
         auto-approves (the door-opening knob the LA populates at go-live)."""
-        adjudicate = make_deterministic_url_adjudicate(frozenset({"news.example.org"}))
+        adjudicate = make_request_keyed_url_adjudicate(frozenset({"news.example.org"}))
         car = build_url_car("https://news.example.org/article", "p")
         assert adjudicate(car) is AdjudicationDecision.ALLOW
 
     def test_off_list_host_denied_even_with_a_populated_allowlist(self) -> None:
-        adjudicate = make_deterministic_url_adjudicate(frozenset({"news.example.org"}))
+        adjudicate = make_request_keyed_url_adjudicate(frozenset({"news.example.org"}))
         car = build_url_car("https://evil.example.com/x", "p")
         assert adjudicate(car) is AdjudicationDecision.DENY
 
-    def test_full_door_denies_url_under_live_default(self) -> None:
-        """End to end through make_url_adjudicator: with the live empty
-        allowlist the door's Verdict on a real URL is DENY."""
-        door = make_url_adjudicator(make_deterministic_url_adjudicate())
-        assert door("https://news.example.org/article", "uc003-url-ingest") is Verdict.DENY
+    def test_full_door_denies_a_STANDING_purpose_under_live_default(self) -> None:
+        """End to end through make_url_adjudicator: with the live empty standing
+        allowlist, the door's Verdict on a standing-branch URL is DENY.
+
+        **Purpose narrowed by #1586.** It passed ``"uc003-url-ingest"`` while
+        calling the deterministic factory — a combination the runtime never
+        produced, since the paste purpose only ever reached the launcher-
+        registered operator factory. Under one adjudicator that combination is
+        no longer expressible, and asserting it would have been asserting a
+        pairing that never existed.
+        """
+        door = make_url_adjudicator(make_request_keyed_url_adjudicate())
+        assert door("https://news.example.org/article", "web_search") is Verdict.DENY
 
     def test_full_door_allows_allowlisted_host(self) -> None:
         door = make_url_adjudicator(
-            make_deterministic_url_adjudicate(frozenset({"news.example.org"}))
+            make_request_keyed_url_adjudicate(frozenset({"news.example.org"}))
         )
         assert door("https://news.example.org/article", "p") is Verdict.ALLOW
 
-    def test_registration_with_live_default_still_denies(self) -> None:
-        """Registering the production adjudicator does NOT open the door while
-        the allowlist is empty — the door denies until the allowlist is
-        populated (ADR-027 Amendment 1, the LA's go-live governance act)."""
-        register_url_ingest_adjudicator(make_deterministic_url_adjudicate())
+    def test_registration_with_live_default_still_denies_a_STANDING_purpose(
+        self,
+    ) -> None:
+        """Registering the production adjudicator does NOT open the door for a
+        standing-branch purpose while the allowlist is empty.
+
+        **Narrowed by #1586.** The original said "does NOT open the door" without
+        qualification. That was never true for a paste purpose under a launcher
+        that had registered the operator factory, and it is not true now: the
+        empty standing allowlist is a lock on the standing branch only.
+        """
+        register_url_ingest_adjudicator(make_request_keyed_url_adjudicate())
         door = active_url_adjudicator()
         assert door is not None
         assert door("https://news.example.org/article", "p") is Verdict.DENY
@@ -233,7 +273,11 @@ class TestDeterministicUrlAdjudicate:
 
 
 class TestOperatorUrlAdjudicate:
-    """The LIVE "URL = authorization" adjudicate fn (ADR-027 Amendment 1).
+    """The "URL = authorization" BRANCH of the one adjudicator (ADR-027 Am.1).
+
+    Was a separate factory until #1586; it is now the branch
+    :data:`PASTE_IS_CONSENT_PURPOSES` selects, so every test here must pass a
+    paste purpose or it is silently exercising the standing branch instead.
 
     Each operator-pasted URL authorizes ONLY its own host, per-CAR, by rebuilding a
     one-entry egress allowlist from the CAR's own URL (the checker's own host
@@ -242,14 +286,14 @@ class TestOperatorUrlAdjudicate:
 
     def test_public_host_url_is_allowed(self) -> None:
         """A well-formed https URL self-authorizes its own host → ALLOW."""
-        adjudicate = make_operator_url_adjudicate()
+        adjudicate = make_request_keyed_url_adjudicate()
         car = build_url_car("https://news.example.org/article", "uc003-url-ingest")
         assert adjudicate(car) is AdjudicationDecision.ALLOW
 
     def test_per_car_not_a_fixed_host(self) -> None:
         """The SAME adjudicator instance allows a DIFFERENT host's URL — the
         allowlist is rebuilt per-CAR from the CAR's own URL, not a standing host."""
-        adjudicate = make_operator_url_adjudicate()
+        adjudicate = make_request_keyed_url_adjudicate()
         first = build_url_car("https://news.example.org/article", "uc003-url-ingest")
         second = build_url_car("https://other.example.net/page", "uc003-url-ingest")
         assert adjudicate(first) is AdjudicationDecision.ALLOW
@@ -265,23 +309,25 @@ class TestOperatorUrlAdjudicate:
         this adjudicator in production: the door's own SSRF guard rejects a non-https
         URL with "scheme not permitted" BEFORE the PA is consulted.  So the egress
         fail-closed property that THIS function owns is the non-web *scheme* DENY.)"""
-        adjudicate = make_operator_url_adjudicate()
+        adjudicate = make_request_keyed_url_adjudicate()
         for resource in (
             "ftp://files.example.org/x",
             "ws://socket.example.org/x",
             "gopher://old.example.org/0/x",
         ):
-            car = build_url_car(resource, "p")
+            # MUST be a paste purpose: with one adjudicator, "p" would select
+            # the STANDING branch and this would stop testing what it names.
+            car = build_url_car(resource, "uc003-url-ingest")
             assert adjudicate(car) is AdjudicationDecision.DENY, resource
 
     def test_full_door_allows_pasted_url(self) -> None:
         """End to end through make_url_adjudicator: a pasted https URL maps to a
         door ALLOW (the operator's paste authorizes that one host)."""
-        door = make_url_adjudicator(make_operator_url_adjudicate())
+        door = make_url_adjudicator(make_request_keyed_url_adjudicate())
         assert door("https://news.example.org/article", "uc003-url-ingest") is Verdict.ALLOW
 
     def test_does_not_register_anything_at_import(self) -> None:
         """Building the adjudicate fn does NOT register it on the door — the door
         stays deny-by-default until register_url_ingest_adjudicator runs (go-live)."""
-        make_operator_url_adjudicate()  # build it — must NOT touch the door registry
+        make_request_keyed_url_adjudicate()  # build it — must NOT touch the door registry
         assert active_url_adjudicator() is None

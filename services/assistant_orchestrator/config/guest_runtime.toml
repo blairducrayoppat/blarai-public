@@ -26,13 +26,27 @@ repetition_penalty = 1.1
 do_sample = false
 response_depth_mode = "standard"   # concise | standard | detailed
 
-[preemption]
-timing_multiplier = 5.0
-min_detection_samples = 3
+# [preemption] and [circuit_breaker] were REMOVED 2026-09-20 (#1582). Nothing read
+# either section -- verified by AST over every config_data.get() call in the AO
+# entrypoint -- and [circuit_breaker].max_tool_call_depth said 5 while the loop
+# enforced 3. A settings file the operator reads is a governance surface: a
+# number in it that nothing enforces is a false statement about what the system
+# will do, and this one was wrong in the reassuring direction. The live caps are
+# shared/constants.py MAX_OUTPUT_TOKENS and MAX_TOOL_CALL_DEPTH. The preemption
+# values survive as AO constants (see #1601 -- they have no production caller
+# either).
 
-[circuit_breaker]
-max_output_tokens = 4096
-max_tool_call_depth = 5
+[trust_spine_canary]
+# #1584 - prove the adjudication doors are ALIVE, not merely not-yet-denying.
+# A fail-closed door that never loaded is silent, and so is one that loaded
+# and has had nothing to deny. At boot the canary submits one action each
+# door MUST refuse and one each MUST allow, and logs what it established.
+#
+# It WRITES NOTHING: the egress probes adjudicate without recording, so no
+# row is appended to the signed audit chain. It opens no door and renders no
+# verdict of its own. On is the default because a canary that does not run
+# is the silence it exists to break.
+enabled = true
 
 [pgov]
 cosine_similarity_threshold = 0.85

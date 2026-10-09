@@ -1,0 +1,15 @@
+== 0 preflight ==
+coder SID S-1-5-21-1000000001-1000000002-1000000003-1009; SD D:(A;;CC;;;S-1-5-21-1000000001-1000000002-1000000003-1009)
+ROLLBACK FACT: every object lives in a DYNAMIC WFP session. Closing the engine handle OR this process exiting/dying removes provider, sublayer and all filters. Nothing is persistent. Backstop: a timer thread closes the handle after HoldSeconds+30 s.
+loopback stub started on 127.0.0.1:8000 (nothing was listening; stopped in finally)
+== 1 control / baseline ==
+operator baseline: 6/6 connects OK
+coder baseline: outbound_blocked.pass=False (expected False = egress open today), loopback_ok=True
+== 2 add filters ==
+added in ONE transaction: filter ids 407213, 407214, 407215, 407216
+== 3/4 hold (watchdog every 2 s; coder probe via task) ==
+coder during: completed=True outbound_blocked=True loopback_ok=True sid_is_coder=True
+== 5 close engine + verify removal ==
+removal: engine objects gone=True; coder egress open again=True
+report: C:\Users\_OPERATOR_\blarai-research-data\wfp-spike\result-20261004-235941.json
+RESULT: exit 0: coder blocked, loopback ok, operator unaffected, removal verified

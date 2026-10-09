@@ -19,6 +19,8 @@ import uuid
 from typing import Any
 
 from shared.schemas.car import (
+    ActionCategory,
+    Reversibility,
     ActionVerb,
     CanonicalActionRepresentation,
     Sensitivity,
@@ -33,6 +35,10 @@ def build_car(
     sensitivity: Sensitivity | str,
     parameters_schema: dict[str, Any] | None = None,
     session_id: str = "",
+    category: "ActionCategory | str" = ActionCategory.UNKNOWN,
+    systems_touched: tuple[str, ...] = (),
+    reversible: "Reversibility | str" = Reversibility.UNKNOWN,
+    target: str = "",
 ) -> CanonicalActionRepresentation:
     """Construct a validated CAR from raw request fields.
 
@@ -44,6 +50,13 @@ def build_car(
         sensitivity: Declared payload sensitivity (required — no default to prevent silent misclassification).
         parameters_schema: JSON Schema of action parameters.
         session_id: Multi-turn session ID (empty for stateless).
+        category: Coarse class of the action (#1545). Defaults to UNKNOWN, which
+            means UNCLASSIFIED and must never be read as harmless.
+        systems_touched: Systems the action reaches. Empty means unclassified, not
+            "touches nothing".
+        reversible: Whether the effect can be undone (#1545). UNKNOWN is not a
+            synonym for REVERSIBLE.
+        target: Second-level instance identifier; `resource` is the destination.
 
     Returns:
         A validated CanonicalActionRepresentation.
@@ -57,6 +70,13 @@ def build_car(
         verb = ActionVerb(verb.upper())
     if isinstance(sensitivity, str):
         sensitivity = Sensitivity(sensitivity.upper())
+    # #1545/#1541: normalise the externality fields the same way, so a caller
+    # passing strings cannot end up with a CAR that hashes differently from an
+    # otherwise identical one built with enums.
+    if isinstance(category, str):
+        category = ActionCategory(category.upper())
+    if isinstance(reversible, str):
+        reversible = Reversibility(reversible.upper())
 
     return CanonicalActionRepresentation(
         source_agent=source_agent,
@@ -65,6 +85,10 @@ def build_car(
         resource=resource,
         parameters_schema=parameters_schema or {},
         sensitivity=sensitivity,
+        category=category,
+        systems_touched=tuple(systems_touched),
+        reversible=reversible,
+        target=target,
         request_id=str(uuid.uuid4()),
         session_id=session_id,
     )

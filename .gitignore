@@ -101,6 +101,8 @@ tests/Task_4.4_Results_Summary.md
 continue_refactor_gate/runs/
 .agent_worktrees_tree f.txt
 .export-venv/
+.venv-2026.4/
+.export-venv-2026.4/
 docs/CONTINUATION_PROMPT.md
 Enabling XAttention on Intel Arc - Gemini Study.md
 docs/Status Update after 4.2x and EAGLE-3 test.xml

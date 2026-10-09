@@ -37,8 +37,8 @@ request.
 > light up UC-003 URL ingest, images, or any other egress consumer — those have
 > their own ceremonies and their own locks.
 
-> **The two layers read the same allowlist only when the deterministic
-> adjudicator holds the door's slot — see [Known gap: #977](#known-gap-977).**
+> **The two layers read the same allowlist for every non-paste purpose, and
+> that no longer depends on startup order — see [#977, CLOSED](#known-gap-977--closed-2026-09-20-1586).**
 
 ## What is ALREADY BUILT (the #719 Part B build — verify, don't build)
 
@@ -59,9 +59,9 @@ request.
   `web_search` carries the REAL endpoint URL, so RULE 3 + the deterministic
   egress allowlist govern the loop as well as the door. The LOOP layer always
   adjudicates against `DeterministicPolicyChecker._EGRESS_ALLOWLIST`. The DOOR
-  layer adjudicates against whatever allowlist its registered adjudicator
-  supplies — the same set when the deterministic adjudicator holds the slot, a
-  different one otherwise ([#977](#known-gap-977)).
+  layer adjudicates against the same set for every purpose except the
+  operator-paste ones, which authorize their own host by design
+  ([#977, CLOSED](#known-gap-977--closed-2026-09-20-1586)).
 - Eval locks: `gov-pf-007` (the endpoint is RULE-3-DENIED while the allowlist
   is empty — the go-live tripwire THIS ceremony flips) and `gov-adj-008` (the
   loop-level D4 denial while dormant).
@@ -295,38 +295,66 @@ Any ONE of these restores dormancy; do them in this order until comfortable:
 Each is independently sufficient; together they restore the shipped
 triple-lock. Record the re-weld and its reason on #719.
 
-## Known gap: #977
+## Known gap: #977 — CLOSED 2026-09-20 (#1586)
 
-**OPEN — not fixed. Read this before asserting the two layers agree.**
+**FIXED. No longer a manual verification, and it was never an LA call.**
 
-The egress door has exactly ONE adjudicator slot
-(`guarded_fetch.register_url_adjudicator`; `register_url_ingest_adjudicator`
-calls straight through to it). Registration is first-wins: the AO registers the
-deterministic kagi-only adjudicator only `if active_url_adjudicator() is None`.
+The door had exactly ONE adjudicator slot and two components filled it with
+different policies: the launcher with the operator "paste = consent" factory, the
+Assistant Orchestrator with the standing kagi-only one. **And it was not a race,
+which is worse than this section used to say.** The slot is LAST-write-wins — the
+register function overwrites unconditionally — and the AO guards its own call
+with `active_url_adjudicator() is None` while the launcher does not. So the
+operator policy won whenever the launcher ran at all, in either boot order, and
+**the door authorized whatever host the request named** deterministically rather
+than on an unlucky ordering. The claim that both layers read the same allowlist
+was false, and defence-in-depth silently dropped a layer with nothing announcing
+it. (This section, `CLAUDE.md` and three code comments all said "first-wins",
+inherited from a docstring; claim-register row 2 had the truth — #1586 review.)
 
-So in a session booted with `--go-live` (URL ingest), the launcher fills that
-slot first with the operator "paste = consent" factory, which **rebuilds the
-egress allowlist per-CAR from the CAR's own URL**. In that mode the door layer
-no longer checks against `_EGRESS_ALLOWLIST` — it authorizes whatever host the
-request names, and the claim that both layers read the same allowlist is FALSE.
+This section previously said the resolution was an LA posture call about which
+adjudicator should win. **It was not a governance question.** Both policies are
+correct for their own request, and the information needed to tell them apart was
+already in the CAR: `purpose`. There is now ONE adjudicator
+(`make_request_keyed_url_adjudicate`) and the REQUEST selects the allowlist
+policy, so both registration sites build the same callable and startup order
+decides nothing.
 
-What is lost is the door's INDEPENDENCE, not the boundary itself: the D4 loop
-check still adjudicates `web_search` against `_EGRESS_ALLOWLIST = {"kagi.com"}`,
-the `web_search` CAR's URL is a constant, and the envelope, socket guard and
-exfil screen remain in series. No reachable exploit path is claimed. But
-defence-in-depth silently drops a layer in that mode, and nothing announces it.
+* a purpose in `PASTE_IS_CONSENT_PURPOSES` → the allowlist is rebuilt from that
+  request's own URL (ADR-027 Am.1, one host, one adjudication);
+* every other purpose → the standing `_EGRESS_ALLOWLIST`, which is the
+  restrictive branch. **Allowlist, never a blocklist**: an unrecognised, missing
+  or malformed purpose falls to the standing side.
 
-Until #977 ships a structural check, this is a MANUAL verification: in any
-session where both postures are live, confirm which adjudicator holds the slot.
+**What this rests on, and it is proved rather than assumed.** Paste-is-consent for
+an arbitrary host is only safe if the model cannot choose the purpose that selects
+it. `tests/security/test_purpose_unforgeable.py` resolves every runtime path into
+the door, requires a pinned module-level literal at each, fails CLOSED on any
+indirection it cannot account for, and is off-tested against five synthetic
+forgeries. If that lock is ever weakened, this design is what it was protecting.
+
+**One thing the old framing got wrong in the other direction, now stated here.**
+"Empty allowlist = every URL denied" was cited as a third lock on URL ingest. It
+never bound the paste path in any process — paste-is-consent does not consult the
+standing allowlist, by definition. The locks that actually hold URL ingest shut
+are adjudicator-not-registered, `[guest_parser].enabled = false`, and the ingest
+coordinator's refusal before the fetch when the guest parser is not ready.
+`test_the_empty_standing_allowlist_does_NOT_bind_the_paste_path` exists so nobody
+re-derives the stronger claim.
+
+The control: `services/ui_gateway/tests/test_url_adjudicator_both_postures.py`
+drives both postures through ONE adjudicator — the test that could not be written
+while two factories competed for one slot. 7 of 7 mutants killed, including
+inverting the purpose test and widening the paste set to cover `web_search`.
 
 ## Out of scope (separate events)
 
 - UC-003 `/ingest <url>` text go-live (its own runbook + adjudicator wiring —
-  both go-lives share the door's SINGLE adjudicator slot, so whichever ceremony
-  runs second must verify the registered adjudicator serves both postures; the
-  operator "paste = consent" factory vs the standing allowlist is an LA call at
-  that point. See [Known gap: #977](#known-gap-977) — the combination is
-  currently checked by vigilance, not by a control).
+  both go-lives share the door's SINGLE adjudicator slot, and since #1586 the
+  one registered adjudicator serves BOTH postures by keying on the request's
+  purpose — so neither ceremony has to verify which one won, and it was never
+  an LA call. Checked by a control now, not by vigilance:
+  [#977, CLOSED](#known-gap-977--closed-2026-09-20-1586)).
 - Display-only images (BED-1 purpose-deny + `[knowledge].images_enabled`).
 - `summarize_url` / the W3 agentic multi-step search loop (W5 defenses not
   yet live — the shipped runner is single-shot search + grounded results).

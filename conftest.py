@@ -1,3 +1,6 @@
+# enforces-rule: critical_rules.redirect-localappdata-before-running-pytest
+# enforces-rule: testing.protect_the_gate.always-redirect-localappdata-for-pytest
+# enforces-rule: testing.protect_the_gate.the-gate-must-not -- port-5001 leak detector fixture
 """
 Root pytest conftest — BlarAI test-process isolation.
 
@@ -285,6 +288,110 @@ def pytest_configure(config: pytest.Config) -> None:
         "real_reconcile: this test exercises the swap-recovery reconcile itself "
         "(over tmp roots/fakes) and opts out of the root-conftest reconcile guard.",
     )
+    _install_mutable_tree_audit()
+
+
+# ---------------------------------------------------------------------------
+# EVIDENCE IMMUTABILITY, OBSERVED RATHER THAN PARSED  (#1355, #1385, DoD row 16)
+# ---------------------------------------------------------------------------
+# A test's SUBJECT must be immutable while the test runs. `~/projects/` is the coder fleet's
+# working area: every dispatch archives what is there and recreates it, so a test that reads it
+# measures whatever last ran, and its meaning changes without its code changing (lesson 352).
+#
+# `tests/security/test_evidence_is_immutable.py` already forbids this by SOURCE SCAN, and that
+# gate is real — but it matches path LITERALS (`_MUTABLE_ROOTS`), and on 2026-08-14 the class
+# recurred in a form no literal-scanner can see: agentic-setup's
+# `verify-website-review-loop.ps1` reached the live sandbox through a HELPER
+# (`Get-WebsiteBuilds | Select -First 1`) with no such path anywhere in its text. DoD row 16
+# named exactly that gap — "mutable state reached by a computed path or an environment
+# variable" — as the half with no control.
+#
+# This is that control, and it works the only way that survives an arbitrary path expression:
+# it does not read the code, it WATCHES THE PROCESS. A CPython audit hook sees every `open`,
+# whatever computed it — literal, helper return, environment variable, or a path assembled at
+# runtime. Reading is what makes a subject load-bearing, so reading is what is observed.
+#
+# It RECORDS and reports at session end rather than raising inside the test. A raise would
+# surface as an unrelated failure inside whichever test happened to touch the tree; one
+# collected report names every offender at once and cannot be mistaken for a flake.
+#
+# Cost: two cheap string checks per `open`. The needle is tested before any normalisation, so
+# the overwhelmingly common case (a path with no "projects" in it) costs one substring scan.
+_MUTABLE_TREE_READS: "list[tuple[str, str]]" = []
+_CURRENT_TEST_ID = "<session>"
+_AUDIT_INSTALLED = False
+
+
+def is_fleet_working_tree_path(path: object) -> bool:
+    """Is this a path into the coder fleet's mutable working area?
+
+    EXTRACTED so it can be driven directly. Inside the audit closure it was untestable, and
+    security principle 12 asks every control to ship a proof that it BLOCKS when engaged and
+    fails when it is not — an unreachable predicate can offer neither. Same reason
+    ``Get-BlockingRunOwner`` was lifted out of the battery launcher on 2026-08-14.
+
+    Pure, allocation-light, and never touches disk: it runs inside an audit hook, and a hook
+    that opens a file to answer a question about opening files recurses forever.
+    """
+    if not isinstance(path, str):
+        return False
+    # Normalise FIRST, then match. An earlier version pre-filtered on the raw string for speed
+    # (`if "projects" not in path`) and that was a fail-open: Windows preserves case, so
+    # `C:\Users\mrbla\Projects\...` never reached the case-insensitive comparison below. Caught
+    # by this function's own toggle test the first time it ran. One `.lower()` per `open` is
+    # sub-microsecond; a hole in a control is not worth a micro-optimisation.
+    return "/users/mrbla/projects" in path.replace("\\", "/").lower()
+
+
+def _install_mutable_tree_audit() -> None:
+    """Watch for reads of the fleet's working tree. Idempotent; hooks cannot be removed."""
+    global _AUDIT_INSTALLED
+    if _AUDIT_INSTALLED:
+        return
+    _AUDIT_INSTALLED = True
+
+    import sys as _sys
+
+    def _hook(event: str, args: tuple) -> None:
+        if event != "open" or not args:
+            return
+        if is_fleet_working_tree_path(args[0]):
+            _MUTABLE_TREE_READS.append((_CURRENT_TEST_ID, args[0]))
+
+    _sys.addaudithook(_hook)
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    global _CURRENT_TEST_ID
+    _CURRENT_TEST_ID = item.nodeid
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Fail the RUN, not a test, when any test read the tree the fleet rewrites."""
+    if not _MUTABLE_TREE_READS:
+        return
+    seen: "dict[str, set[str]]" = {}
+    for test_id, path in _MUTABLE_TREE_READS:
+        seen.setdefault(test_id, set()).add(path)
+    lines = [
+        "",
+        "EVIDENCE IMMUTABILITY VIOLATION (#1355, DoD row 16) — a test read "
+        "~/projects/, which every dispatch archives and recreates:",
+        "",
+    ]
+    for test_id in sorted(seen):
+        lines.append(f"  {test_id}")
+        for path in sorted(seen[test_id])[:4]:
+            lines.append(f"      {path}")
+    lines += [
+        "",
+        "A test whose subject is a live working directory measures whatever last ran there,",
+        "so it can go red on correct code or green on a tree that happens to satisfy it today.",
+        "Build the fixture, or target a dated repos-archived/ snapshot that cannot change.",
+        "",
+    ]
+    print("\n".join(lines))
+    session.exitstatus = 1
 
 
 @pytest.fixture(autouse=True)

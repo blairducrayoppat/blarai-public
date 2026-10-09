@@ -974,7 +974,7 @@ def _split_oversize_task(
         return None
     children = _parse_candidates(raw, max_tasks=_PARSE_CEILING)
     survivors, _ = _collapse(children)
-    accepted = _ruler(survivors, repo_target, max_tasks=max_tasks)
+    accepted, _ = _ruler(survivors, repo_target, max_tasks=max_tasks)
     # Strict improvement only: >=2 coherent tasks. One-or-zero means the 14B judged the work a
     # single coherent step (or returned junk) -> keep the original lump (never fewer/equal).
     return accepted if len(accepted) >= 2 else None
@@ -1067,12 +1067,20 @@ def split_failed_task(
         return None
     children = _parse_candidates(raw, max_tasks=_PARSE_CEILING)
     survivors, _ = _collapse(children)
-    accepted = _ruler(survivors, str(task.get("repo", "") or ""), max_tasks=max_tasks)
+    accepted, _ = _ruler(survivors, str(task.get("repo", "") or ""), max_tasks=max_tasks)
     return accepted if len(accepted) >= 2 else None
 
 
-def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[dict]:
+def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> "tuple[list[dict], int]":
     """Deterministic acceptance: well-formed, slugged, deduped, capped. NEVER the model.
+
+    Returns ``(accepted, dropped_to_cap)`` (#1279). The second value is the number of
+    candidates the ``max_tasks`` ceiling stopped this function from even LOOKING at, and it
+    exists because the comment at the break below refused to half-fix this: a truncated plan
+    was observable only by noticing ``coherent_tasks`` exceeded ``final_tasks`` in the
+    diagnostics -- derivable, never stated. It is an UPPER BOUND on what was lost, not an
+    exact count of distinct dropped tasks: some of those unexamined candidates would have
+    been deduped away anyway. Saying "not examined" is the claim the data supports.
 
     The right-sizing (``_collapse``) has already run; this enforces shape + the final
     ``max_tasks`` cap on the survivors — and RE-MAPS the graph (M2 W2): after collapse,
@@ -1083,7 +1091,8 @@ def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[
     """
     accepted: list[dict] = []
     seen: set[str] = set()
-    for cand in candidates:
+    dropped_to_cap = 0
+    for index, cand in enumerate(candidates):
         task = cand.get("task", "")
         prompt = cand.get("prompt", "")
         if not task or not prompt:
@@ -1117,13 +1126,18 @@ def _ruler(candidates: list[dict], repo_target: str, *, max_tasks: int) -> list[
             # log line nobody reads standing in for it -- the truncation has to become DATA,
             # the way `regression_unmeasured` did, or it will keep being derivable and
             # unstated.
+            #
+            # FIXED 2026-08-15, as specified above: the count is RETURNED and threaded into
+            # the diagnostics. Everything after this index is unexamined -- that is the
+            # honest claim, and it is an upper bound rather than an exact loss.
+            dropped_to_cap = len(candidates) - (index + 1)
             break
     survivors = {e["task"] for e in accepted}
     for e in accepted:
         if "depends_on" in e:
             e["depends_on"] = [r for r in e["depends_on"]
                                if r in survivors and r != e["task"]]
-    return accepted
+    return accepted, dropped_to_cap
 
 
 #: Diagnostics schema version — bump when the field set changes so #827's classifier can pin it.
@@ -1133,7 +1147,7 @@ _DIAGNOSTICS_SCHEMA = "decompose-diagnostics/v1"
 def _build_diagnostics(
     *, raw: str, task_key_hits: int, parsed: int, coherent: int, final_tasks: int,
     used_grammar: bool, gen_error: str, repair: str, retry_attempted: bool, retry_used: bool,
-    split_oversize: bool, fell_back: bool, idea: str,
+    split_oversize: bool, fell_back: bool, idea: str, truncated_tasks: int = 0,
 ) -> dict:
     """#824 structured why-flat fingerprint. ``outcome`` is the headline (``plan-graph`` earns
     the job oracle + wave gates; ``single-task`` / ``fallback`` skip them = flat mode), and
@@ -1173,6 +1187,12 @@ def _build_diagnostics(
         "parsed_candidates": parsed,
         "coherent_tasks": coherent,
         "final_tasks": final_tasks,
+        # #1279 / DoD row 20 clause 2: the truncation is DATA now, not a thing a
+        # reader could derive by noticing coherent_tasks exceeded final_tasks. It is
+        # an UPPER BOUND on what the ceiling cost -- candidates never examined, some
+        # of which would have deduped away -- and "not examined" is the claim the
+        # number actually supports.
+        "truncated_tasks": truncated_tasks,
         "used_grammar": used_grammar,
         "gen_error": gen_error or "",
         "repair": repair,
@@ -1374,7 +1394,7 @@ def decompose_request(
     # the max_tasks cap. The leaf stop-condition (_is_leaf_goal) is the recursion-bound
     # foundation, NOT a single-pass cap — capping would drop distinct sibling features.
     survivors, collapsed_test_intent = _collapse(candidates)
-    tasks = _ruler(survivors, repo_target, max_tasks=max_tasks)
+    tasks, dropped_to_cap = _ruler(survivors, repo_target, max_tasks=max_tasks)
 
     # #691 envelope UPPER bound: a clearly-multi-unit goal that collapsed to a SINGLE task was
     # under-split into one oversized run. Offer that lone task to the bounded recursive splitter;
@@ -1403,6 +1423,12 @@ def decompose_request(
             gen_error=gen_error, repair=parse_diag.get("repair", ""),
             retry_attempted=retry_attempted, retry_used=retry_used,
             split_oversize=split_oversize, fell_back=False, idea=idea,
+            # ZEROED WHEN THE SPLITTER REPLACED THE PLAN, because the count then
+            # describes a plan that no longer exists. Today the two are mutually
+            # exclusive -- the splitter fires only on len(tasks)==1 and a cap drop
+            # needs len(tasks)==max_tasks -- but relying on that silently is how the
+            # next edit to either condition publishes a stale number.
+            truncated_tasks=(0 if split_oversize else dropped_to_cap),
         )
         _dump_decompose_debug(raw, diagnostics)
         msg = f"Decomposed into {len(tasks)} task(s)."

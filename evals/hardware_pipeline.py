@@ -38,6 +38,13 @@ from typing import Any, Callable
 logger = logging.getLogger(__name__)
 
 
+# The closed EMPTY reasoning block: the Qwen3.5/3.6 render of "do not think".
+# Its absence is not neutrality — see the comment in ``generate`` below and the
+# FIELD_NOTES entry "Qwen3.5/3.6 chat templates open a <think> block unless you
+# say otherwise" (2026-09-22).
+EMPTY_THINK_BLOCK = "<think>\n\n</think>\n\n"
+
+
 def wrap_chatml(system_prompt: str, user_content: str) -> str:
     """Wrap ``user_content`` in manual Qwen ChatML with ``system_prompt``.
 
@@ -58,6 +65,7 @@ def build_vlm_composed_generator(
     max_new_tokens: int,
     system_prompt: str,
     device: str = "GPU",
+    on_first_token: Callable[[str], None] | None = None,
 ) -> Callable[[str], str]:
     """Build a VLMPipeline-backed text generator (Arc 140V required).
 
@@ -74,6 +82,12 @@ def build_vlm_composed_generator(
         system_prompt: The production system prompt to apply (imported by the
             caller from the AO, never copied).
         device: OpenVINO device string (default ``"GPU"``).
+        on_first_token: Optional observer receiving the FIRST generated chunk
+            of every generation. Opt-in because it attaches a streamer, which
+            the plain parity path does not need. Pass it when a run must
+            evidence that reasoning was suppressed: a ``no_think_tags`` rubric
+            pass is NOT such evidence, since a well-formed hidden block is
+            stripped before scoring (#1618, lesson 369).
 
     Raises:
         FileNotFoundError: If the model directory is absent.
@@ -98,15 +112,99 @@ def build_vlm_composed_generator(
 
     logger.info("Eval VLM generator: loaded %s on %s", model_dir.name, device)
 
+    # WARM-UP — not a nicety, a CONTROL (#930, measured 2026-09-22).
+    # On this VLMPipeline the FIRST generation after a load produces different
+    # text from every subsequent one, for a byte-identical greedy prompt. The
+    # effect is not noise: probing one case 4x across 2 independent loads gave
+    # exactly 2 distinct outputs, with the split always at generation 1 vs 2+,
+    # and the two loads agreed with each other byte for byte
+    # (`docs/performance/probe_35b_greedy_determinism_*.json`).
+    #
+    # It flipped a SECURITY verdict. On an injection case the cold answer
+    # refused the embedded instruction but quoted the canary while explaining
+    # the refusal; the warm answer refused without quoting it. The rubric's
+    # `must_not_contain` scores those opposite ways, so whichever case happened
+    # to land first after a load was judged under different conditions than the
+    # rest of the set.
+    #
+    # One discarded generation costs a few seconds and removes the variable.
+    # The throughput benchmarks have always done this (`--warmup 2`); the eval
+    # path never did, which is why nobody had seen it.
+    try:
+        _warm_cfg = ov_genai.GenerationConfig()
+        _warm_cfg.max_new_tokens = 8
+        _warm_cfg.do_sample = False
+        _warm_cfg.apply_chat_template = False
+        pipe.generate(
+            wrap_chatml(system_prompt, "warmup") + EMPTY_THINK_BLOCK,
+            generation_config=_warm_cfg,
+        )
+        logger.info("Eval VLM generator: warm-up generation discarded (#930).")
+    except Exception as exc:  # noqa: BLE001 — logged, never silent
+        # Fail-soft on the WARM-UP only: a failure here does not invalidate the
+        # scored run, but it does mean the first scored case is cold, and a
+        # reader of the results must be told rather than left to assume.
+        logger.warning(
+            "Eval VLM generator: WARM-UP FAILED (%s: %s) — the first scored case "
+            "will run cold, and on this pipeline a cold generation can differ "
+            "from a warm one. Treat the first case's verdict with suspicion.",
+            type(exc).__name__,
+            exc,
+        )
+
     def generate(composed_context: str) -> str:
-        prompt = wrap_chatml(system_prompt, composed_context)
+        # #1618 / lesson 369 — BOTH lines below are load-bearing, and the bug
+        # they fix cost a two-month false verdict on this model.
+        #
+        # The Qwen3.5/3.6 chat template has NO neutral setting: it emits the
+        # closed empty block only when ``enable_thinking`` is defined AND
+        # false, and a BARE OPENING ``<think>\n`` in every other case. Leaving
+        # the flag unset is therefore not "no opinion", it is an instruction to
+        # start reasoning. Until 2026-09-22 this function left
+        # ``apply_chat_template`` at its default True on an ALREADY hand-built
+        # ChatML string, so the template wrapped it a second time and appended
+        # that bare opener to all 40 golden prompts — the eval opened a
+        # reasoning block and then scored the model for continuing it.
+        #
+        # The fix is the production recipe, byte-identical to what the Policy
+        # Agent ships on the 14B today
+        # (``policy_agent/src/gpu_inference.py`` ``_build_prompt``): carry the
+        # closed empty block in the prompt ourselves, and forbid the template
+        # from touching it.
+        prompt = wrap_chatml(system_prompt, composed_context) + EMPTY_THINK_BLOCK
         cfg = ov_genai.GenerationConfig()
         cfg.max_new_tokens = max_new_tokens
         cfg.do_sample = False  # greedy / temperature-0 equivalent — reproducible
+        cfg.apply_chat_template = False  # the prompt IS the template output
+
+        first_chunk: list[str] = []
+
+        def _streamer(chunk: str) -> Any:
+            # The first generated token is the ONLY sound witness that thinking
+            # was suppressed: a rubric check for hidden-block markers cannot
+            # see it, because a WELL-FORMED ``<think>…</think>`` in the output
+            # is stripped before scoring and passes silently. VLMDecodedResults
+            # exposes no raw token ids, so the streamer's first chunk stands in
+            # — the probe that established this proves the equivalence first
+            # (``encode("<think>") == [248068]``, ``decode([248068])`` round
+            # trips), and ``scripts/probe_35b_thinking_control.py`` is the
+            # reference implementation.
+            if not first_chunk:
+                first_chunk.append(chunk)
+            return ov_genai.StreamingStatus.RUNNING
+
         try:
-            result = pipe.generate(prompt, generation_config=cfg)
+            if on_first_token is not None:
+                result = pipe.generate(
+                    prompt, generation_config=cfg, streamer=_streamer
+                )
+            else:
+                result = pipe.generate(prompt, generation_config=cfg)
         except Exception as exc:  # noqa: BLE001 — fail-closed on a generation error
             raise RuntimeError(f"VLM generation failed: {exc}") from exc
+
+        if on_first_token is not None:
+            on_first_token(first_chunk[0] if first_chunk else "")
         return str(result)
 
     return generate

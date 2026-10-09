@@ -1,0 +1,139 @@
+{
+  "benchmark": "ovms_kv_pool_vs_igpu_shared_memory_budget",
+  "config_stamp": {
+    "timestamp": "2026-08-31T14:20:00-04:00",
+    "model_name": "Qwen3-Coder-30B-A3B",
+    "model_precision": "int4 (openvino_model.bin 15.19 GiB; whole model dir 15.22 GiB; mtime 2026-06-10, unchanged since before the June baseline)",
+    "served_model_id": "coder-30b",
+    "endpoint": "http://127.0.0.1:8000/v3/chat/completions",
+    "device": "GPU",
+    "ovms_versions_measured": [
+      "2026.2.5e9dcfc46 (OpenVINO backend 2026.2.0)",
+      "2026.3.0.6f3df706b (OpenVINO backend 2026.3.0)"
+    ],
+    "driver_version": "32.0.101.8826 (dated 2026-05-28; VERIFIED from the live device today, not carried forward from a record)",
+    "gpu": "Intel Arc 140V (Xe2 iGPU), Lunar Lake, no dedicated VRAM",
+    "hardware": "Intel Core Ultra 7 258V, 31.32 GiB LPDDR5X, Windows 11 Pro build 26200",
+    "ao_resident": false,
+    "methodology": "1 warmup + 3 measured generations per arm, max_tokens=128, temperature=0, fixed prompt, fresh OVMS process per arm, AO down, box otherwise idle. Compile cache on B: (see cache_location_note).",
+    "compile_cache_location": "B:/blarai/ovms-model-cache (moved off C: during this session; see disk_finding)"
+  },
+  "headline": "The Qwen3-Coder-30B-A3B int4 weights (15.19 GiB) consume 97% of the 15.66 GiB shared-GPU-memory budget Windows grants this iGPU (50% of 31.32 GiB system RAM), leaving 0.47 GiB. Every GB of OVMS --cache_size is RESERVED out of that same budget, evicting weights to system RAM: throughput falls 35.5 -> 18.7 -> 4.2 -> 3.3 tok/s across cache_size 1..4. The collapse is present at 0.2% pool UTILISATION, so it is caused by RESERVATION, not by cache occupancy.",
+  "the_curve": {
+    "note": "Two OVMS major versions, same machine, same day, same clean conditions. The runtime is not the variable.",
+    "ovms_2026_3": {
+      "cache_size_1": {
+        "median_tps": 35.49,
+        "runs": [
+          39.66,
+          35.49,
+          28.07
+        ],
+        "kv_token_ceiling": 21845
+      },
+      "cache_size_2": {
+        "median_tps": 18.73,
+        "runs": [
+          20.08,
+          18.73,
+          15.84
+        ],
+        "kv_token_ceiling": 43690
+      },
+      "cache_size_3": {
+        "median_tps": 4.16,
+        "kv_token_ceiling": 65536
+      },
+      "cache_size_4": {
+        "median_tps": 3.33,
+        "runs": [
+          3.49,
+          3.33,
+          3.25
+        ],
+        "kv_token_ceiling": 87381
+      }
+    },
+    "ovms_2026_2": {
+      "cache_size_1": {
+        "median_tps_range": [
+          36.45,
+          39.3
+        ]
+      },
+      "cache_size_2": {
+        "median_tps_range": [
+          13.43,
+          19.06
+        ]
+      },
+      "cache_size_3": {
+        "median_tps_range": [
+          3.32,
+          3.71
+        ]
+      },
+      "cache_size_4": {
+        "median_tps": 2.78,
+        "runs": [
+          2.78,
+          2.81,
+          2.6
+        ]
+      }
+    }
+  },
+  "the_mechanism": {
+    "shared_gpu_budget_gib": 15.66,
+    "derivation": "Windows grants an iGPU up to 50% of system RAM as shared GPU memory; 31.32 / 2 = 15.66 GiB. This is not user-adjustable in shipping Windows 11.",
+    "model_weights_gib": 15.19,
+    "headroom_gib": 0.47,
+    "kv_bytes_per_token_u8": 49152,
+    "kv_derivation": "2 (K,V) * 48 layers * 4 KV heads * 128 head_dim * 1 byte (u8) = 49,152 B/token",
+    "why_reservation_not_occupancy": "cache_size 4 measured 3.33 tok/s with OVMS's own log reporting 'cache usage: 0.2% of 4.0 GB'. An almost-empty pool produces the full collapse, so the damage is done when the pool is RESERVED out of the shared budget, not when it is filled.",
+    "why_prefill_survives": "Prefill degrades ~1.75x while decode degrades ~13x. Decode is memory-bandwidth-bound and re-reads evicted weights every token; prefill is compute-bound and is not."
+  },
+  "what_this_explains_that_nothing_else_did": "Model file, GPU driver, OVMS build, GPU pool size as reported by the device, power plan, thermals and contention are ALL provably unchanged or exonerated by measurement (see ruled_out). The shared-memory BUDGET is the only variable that is both invisible in every version stamp we had been comparing and sufficient to produce the observed curve.",
+  "NOT_established": "Why the June 2026-06-29 baseline measured 38.58 tok/s AT cache_size 4. Under the mechanism above that result should be impossible: 15.19 + 4 = 19.19 GiB against a 15.66 GiB budget. The mechanism therefore requires that the EFFECTIVE BUDGET WAS LARGER IN JUNE. Best-supported hypothesis, NOT proven: Microsoft began a Windows 11 memory-footprint reduction programme in March 2026 with 'a more efficient memory allocator' as a named workstream, and three updates (KB5121003, KB5123304, KB5120708) installed on this machine on 2026-08-12 -- between the good baseline and the first bad measurement. NOT TESTED: rolling those updates back, or measuring the shared budget directly before/after an update. Anyone continuing this should measure the budget itself, not infer it.",
+  "ruled_out_by_measurement_this_session": [
+    "OVMS version -- the identical curve reproduces on 2026.2 and 2026.3",
+    "GPU driver -- 32.0.101.8826 verified from the live device, same as the June record",
+    "Model file -- unchanged since 2026-06-10, before the good baseline",
+    "Compiled-kernel cache -- moved from C: to B:; cache_size 4 still 2.78 tok/s afterwards",
+    "Disk free space -- C: went 12.9 GB -> 35.9 GB free; no throughput change (but see disk_finding: it WAS causing a separate real defect)",
+    "AO/coder co-residency -- the AO was down for every arm here",
+    "Power plan, thermals, contention, kernel-cache recompilation, CPU fallback -- exonerated earlier the same day"
+  ],
+  "disk_finding": {
+    "note": "A genuine, separate defect found and fixed while chasing this. It is NOT the throughput cause.",
+    "before": "C: 12.9 GB free of 951.4 GB (1%), holding the 24 GB page file, the memory-mapped 15.19 GiB weights, and a 23.05 GiB OVMS compile cache",
+    "after": "compile cache moved to B: (719 GB free); C: 35.9 GB free",
+    "what_it_actually_broke": "A cold compile with a fresh cache DIED SILENTLY (process gone, empty error log) trying to write ~23 GiB into 12.9 GB. After the move, 2026.3 cold-compiled in 40 s."
+  },
+  "operational_consequence": "cache_size must be chosen against the coder's declared context window, not against throughput alone. At cache_size 1 (21,845 tokens) a measured coder session of 20,214 tokens sits at 93% and gets DESCHEDULED mid-conversation -- the coder returns nothing and the fleet reports 'produced no changes', indistinguishable from a lazy model. Shipped configuration: cache_size 2 (43,690 tokens) against a 40,960-token declared window, giving 18.7 tok/s -- 6x the broken state and comfortably inside the 600 s ACP idle breaker.",
+  "the_route_back_to_full_speed": "Not recovery -- reduction. cache_size 1 still measures 35.5 tok/s on this machine TODAY. The blocker is that a coder session needs ~20.2k tokens and the 1 GB pool holds 21.8k. Roughly 5.4k of that session is an AGENTS.md loaded into every task, plus an irrelevant Azure/Foundry command registry in the ACP handshake. Cutting the session below ~18k tokens makes cache_size 1 viable and returns the machine to ~35 tok/s with no throughput compromise at all.",
+  "external_watch": "Windows 11 experimental build 29648 carries 'IntelligentCarveout', a setting to explicitly reserve unified memory for graphics/AI with Custom/Recommended/High/Maximum/Don't-allow options. That is the exact control this hardware needs. Not in shipping Windows as of 2026-08-31.",
+  "not_measured": [
+    "The shared-GPU-memory budget directly (before/after the August updates) -- the central claim rests on the 50%-of-RAM rule plus the fit of the curve, not on an observed budget change.",
+    "Rolling back KB5121003 / KB5123304 / KB5120708 and re-measuring -- the decisive experiment, not run.",
+    "Fractional cache_size values between 1 and 2, where the usable knee appears to lie.",
+    "MoE OFFLOAD_RATIO at LOW ratios on 2026.3 -- offloading experts reduces resident weights and is mechanistically the right lever; only ratio 30 has ever been measured here (1.71 tok/s), and that was on a box already in this state.",
+    "Whether the 14B shows the same cliff (it is roughly 9 GB and should have ~6.6 GiB of headroom, so it should not).",
+    "Prefill/TTFT per cache_size on 2026.3.",
+    "Concurrency -- all single-stream."
+  ],
+  "CORRECTION_2026-08-31": {
+    "what_was_wrong": "This record stated the shared-GPU budget as 15.66 GiB, DERIVED from a web article's '50% of system RAM' rule and never measured. That number is wrong.",
+    "measured_budget_gib": 17.98,
+    "how_measured": "dxdiag: Display Memory 18,409 MB (Dedicated 128 MB + Shared 18,281 MB). Live confirmation: OVMS held 17.34 GiB of GPU shared usage = 96% of it.",
+    "note_on_the_driver_figure": "OpenVINO reports GPU_DEVICE_TOTAL_MEM_SIZE = 25.17 GiB. That is the driver's advertised maximum, NOT what Windows budgets. Three numbers were in play and the published one was the only unmeasured one.",
+    "effect_on_the_mechanism": "STRENGTHENS it. The cliff falls where weights+pool crosses 17.98 GiB (16.19 fits at 35.5 tok/s; 17.19 marginal at 18.7; 18.19 and 19.19 collapse to 4.2 and 3.3). The old 15.66 figure did NOT predict that location -- it would have put even the fast configuration over budget.",
+    "found_by": "the LA challenging the figure, not by me re-checking it"
+  },
+  "SHORT_PROBE_WARNING": {
+    "claim": "Every tok/s figure in 'the_curve' above is a 128-token probe and OVERSTATES real coder throughput.",
+    "evidence": "cache_size 2 no-offload measured 18.7 tok/s on short probes and 11.15-12.45 tok/s under sustained realistic load (operator content in, page-sized generation out), with visible downward drift across consecutive runs.",
+    "moe_offload_retracted": "cs4+offload40 measured 18.5 tok/s short and 3.05 tok/s realistic; RAM 'returned' measured +6.22 GB idle and +0.87 GB under load. All offload conclusions from this session are invalid for capacity planning.",
+    "use_instead": "scripts/measure_coder_sustained.py"
+  }
+}

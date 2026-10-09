@@ -29,6 +29,64 @@ Concretely (implemented in `shared/security/audit_log.py`, wired at the `_build_
 - **Retention ceiling — default OFF (keep all).** `audit_archive_max_bytes` / `audit_archive_max_age_days` default `None` (unlimited — the chosen policy keeps everything). IF an operator ever sets one, WHOLE sealed segments are pruned **oldest-first only**, and the prune is itself written as a normal chained+signed audit record with `decision="RETENTION_PRUNE"` and `resource=<segment id>`. A later `verify(full=True)` then sees a **documented, signed** gap (policy), distinguishable from a #606 tail-deletion attack (which leaves no such record). Never prune mid-chain; never prune the active segment.
 - **Fail-safe + fail-closed preserved.** If any rotation step fails, it is logged and the log **degrades to status-quo unbounded** (keep appending to the active file) rather than drop or corrupt a record; partial sealed artifacts are cleaned up. The existing write-failure contract is unchanged — `_write_record` still raises `AuditSinkError` on write failure (fail-closed). The production `TpmRecordSigner` path is unchanged; rotation is signer-agnostic.
 
+## Amendment 2026-09-17 (#1543) — the production active-segment ceiling drops to 1,000 records
+
+**What changes:** in production only, `max_active_records` is clamped to
+`PRODUCTION_MAX_ACTIVE_RECORDS` (**1,000**) rather than this ADR's `DEFAULT_MAX_ACTIVE_RECORDS`
+(**100,000**). The byte cap, the dev/CI default, the retention posture and everything else here
+are unchanged, and an operator asking for a *smaller* ceiling still gets it — the clamp is a
+ceiling, not an assignment.
+
+**Why this ADR's figure no longer covers the case.** The 100,000 default was chosen to bound
+**RAM and file size**, and it does that correctly. #1543 added a cost this ADR never had to
+price: `AuditLog.verify()` now runs inside both production constructors, so a chain that does
+not verify is refused rather than extended (claim-register row 29 — the chain was
+tamper-*evident* but not tamper-*refusing*). That verification is dominated by **per-record
+signature checks**, which in production are TPM operations and therefore chip-bound.
+
+**Measured, not assumed.** 100 isolated `tpm_signer.verify()` calls on the Arc 140V host gave
+min **6.78 ms** against a 447% spread, making 13 ms the worst-case shoulder. At this ADR's
+100,000 ceiling that is **11–21 minutes of signature verification on every boot** — stated as
+an extrapolation from the per-signature cost, not as a measurement, since no segment near that
+size exists. Full conditions:
+[`docs/performance/audit_chain_verify_cost_2026-09-17_22-50-00.json`](../performance/audit_chain_verify_cost_2026-09-17_22-50-00.json).
+
+**The alternative that was rejected:** keep 100,000 and verify only a bounded *tail* of the
+active segment at boot. That is cheaper and it is wrong — **a check that skips records is a
+check an attacker appends past**, which is the precise failure this ticket exists to close.
+Verification therefore stays **complete** and the **segment** is bounded instead, so the boot
+cost is capped by rotation rather than by sampling.
+
+**No coverage is lost.** Records above the ceiling rotate into sealed segments, which remain
+covered by the signed anchor chain — it pins each sealed `.jsonl.gz` by SHA-256 **and** verifies
+its per-segment signature, at every boot. The only thing that changes is *how often* rotation
+happens.
+
+> **CORRECTION, #1543 review finding 7.** The sentence above originally continued "…and
+> `verify(full=True)` at the manifest-signing ceremony still walks every record in every
+> segment." **It does not.** There is no production caller of `verify(full=True)` anywhere in the
+> repository — every occurrence is a docstring or a comment. The exhaustive walk exists and is
+> **unscheduled**. The no-coverage-lost conclusion survives, because the boot-time anchor check
+> alone catches tampering inside a sealed segment; the ceremony clause did not survive and is
+> withdrawn. Scheduling an exhaustive walk is worth doing and is not done here.
+
+**The trade-off, named:** more sealed segments, and therefore a longer segment index and more
+anchor rows to check at boot. That cost is one signature per *segment* rather than per record,
+so it grows a hundred times more slowly than the cost it replaces.
+
+**Gate-enforced, so the two numbers cannot drift apart:**
+`PRODUCTION_MAX_ACTIVE_RECORDS × AUDIT_VERIFY_WORST_CASE_SECONDS_PER_RECORD ≤
+AUDIT_BOOT_VERIFY_BUDGET_SECONDS` (1,000 × 0.013 = 13.0 s ≤ 15.0 s), asserted by
+`tests/security/test_audit_verify_budget.py` together with a toggle-test proving the unreduced
+ceiling genuinely breaches the budget. The budget itself is registered in
+`shared/timeout_registry.py`.
+
+**Proportion, stated plainly:** the real ingest chain on this machine holds **33 records after
+thirteen months**, so this ceiling is nowhere near being reached. It is worth setting anyway,
+because #1542 will write a receipt for *every* verdict at both adjudication doors, and because
+a control that would one day cost 21 minutes at startup is a control somebody eventually
+switches off.
+
 ## Alternatives not taken
 
 - **Time-based purge (e.g. keep 90 days, delete older).** Rejected: it destroys AIGP governance/portfolio evidence for **no benefit** on a single-user air-gapped box with tiny data volume and metadata-only records. The evidentiary value of the history is the whole point; a time window throws it away to save storage that is not scarce.

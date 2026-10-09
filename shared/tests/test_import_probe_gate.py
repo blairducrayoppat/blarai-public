@@ -55,7 +55,10 @@ def _mk_repo(path: Path) -> Path:
 
 def test_grade_env_recipe_shape():
     assert grade_env.clean_pytest_args("X.ini") == [
-        "--noconftest", "-c", "X.ini", "-o", "addopts=", "--import-mode=importlib"]
+        "--noconftest", "-c", "X.ini", "-o", "addopts=", "--import-mode=importlib",
+        # #1200: correctness, not cosmetics — every consumer parses this output as text, and
+        # a colour escape between the test name and PASSED blinds the per-test matcher.
+        "--color=no"]
     assert grade_env.clean_grade_env("/repo") == {
         "PYTHONPATH": "/repo", "PYTHONSAFEPATH": "1"}
     assert grade_env.CLEAN_GRADE_INI_CONTENT.startswith("[pytest]")

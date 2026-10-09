@@ -156,6 +156,7 @@ def make_preference_model_generator(
     model_dir: Path | None = None,
     *,
     speculative_decoding_enabled: bool | None = None,
+    engine: str = "default",
 ) -> Callable[[str, str], str]:
     """Model-in-the-loop generator taking ``(prompt, system_prompt)``.
 
@@ -183,15 +184,21 @@ def make_preference_model_generator(
     resolved = model_dir or default_model_dir()
     if not resolved.exists():
         raise FileNotFoundError(f"AO model directory not found: {resolved}")
-    if speculative_decoding_enabled is None:
-        inference = OrchestratorGPUInference(model_dir=str(resolved))
+    if engine != "default":
+        # #1663: the REAL AO class attached to a continuous-batching engine arm.
+        from evals.cb_pipeline import build_ao_inference
+
+        inference = build_ao_inference(resolved, engine)
     else:
-        inference = OrchestratorGPUInference(
-            model_dir=str(resolved),
-            speculative_decoding_enabled=speculative_decoding_enabled,
-        )
-    if not inference.load_model():
-        raise RuntimeError(f"AO model failed to load from {resolved}")
+        if speculative_decoding_enabled is None:
+            inference = OrchestratorGPUInference(model_dir=str(resolved))
+        else:
+            inference = OrchestratorGPUInference(
+                model_dir=str(resolved),
+                speculative_decoding_enabled=speculative_decoding_enabled,
+            )
+        if not inference.load_model():
+            raise RuntimeError(f"AO model failed to load from {resolved}")
 
     def generate(prompt: str, system_prompt: str) -> str:
         result = inference.generate_text(
@@ -761,6 +768,7 @@ def run_suite(
     vlm_target = (
         model_target is not None
         and model_target.capability is Capability.MULTIMODAL_VLM
+        and not model_target.uses_cb_engine
     )
 
     for case in cases:
@@ -805,6 +813,7 @@ def run_suite(
                             if model_target is not None
                             else None
                         ),
+                        engine=model_target.engine if model_target is not None else "default",
                     )
                 if kind == "proposes_preference":
                     passed, expected, actual, detail = _run_proposes_case(

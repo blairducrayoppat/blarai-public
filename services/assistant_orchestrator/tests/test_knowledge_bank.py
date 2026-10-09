@@ -25,17 +25,17 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from shared.security.dek_envelope import DekEnvelope, generate_recovery_key
+from shared.security.field_cipher import FieldCipher, derive_subkeys
+from shared.security.tpm_sealer import SoftwareSealer
 
+from services.assistant_orchestrator.src import knowledge_bank as kb_mod
 from services.assistant_orchestrator.src.knowledge_bank import (
     EncryptedKnowledgeBank,
     KnowledgeBankError,
     _fts_match_expr,
 )
 from services.assistant_orchestrator.src.substrate import EMBED_DIM
-from shared.security.dek_envelope import DekEnvelope, generate_recovery_key
-from shared.security.field_cipher import FieldCipher, derive_subkeys
-from shared.security.tpm_sealer import SoftwareSealer
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1342,3 +1342,353 @@ class TestSecureDelete:
         assert cipher_frag not in raw, (
             "ciphertext fragment of the rejected image data BLOB survived — secure_delete OFF?"
         )
+
+
+# ---------------------------------------------------------------------------
+# #1617 — the fused score orders hits but cannot measure them
+# ---------------------------------------------------------------------------
+
+
+class TestRelevanceSignal:
+    """Regression locks for #1617.
+
+    The first test is the DEFECT ITSELF, kept executable: it asserts that the
+    reciprocal-rank-fusion score is identical for a strong and a weak match,
+    which is precisely why a relevance floor cannot be built on it.  If a
+    later change ever makes that assertion fail, the fused score has acquired
+    meaning and this whole ticket should be re-read before relying on it.
+    """
+
+    @staticmethod
+    def _stock(bank: EncryptedKnowledgeBank) -> None:
+        for i, words in enumerate(
+            ("alpha beta gamma", "delta epsilon zeta", "eta theta iota")
+        ):
+            r = _submit(bank, source_ref=f"https://example.org/rs{i}", content=words)
+            bank.approve(r.doc_uuid)
+
+    def test_fused_score_cannot_distinguish_strong_from_weak(
+        self, bank: EncryptedKnowledgeBank
+    ) -> None:
+        """THE DEFECT: same fused score, very different actual relevance."""
+        self._stock(bank)
+        strong = bank.retrieve("alpha beta gamma", k=1)
+        weak = bank.retrieve("alpha omicron upsilon", k=1)
+        assert strong and weak
+        assert strong[0].doc_uuid == weak[0].doc_uuid, "same chunk should top both"
+        # Rank-derived: identical, so no threshold on it can separate them.
+        assert strong[0].score == weak[0].score
+        # Calibrated: materially different, so a threshold on THIS can.
+        assert strong[0].vector_score is not None
+        assert weak[0].vector_score is not None
+        assert strong[0].vector_score > weak[0].vector_score + 0.2, (
+            f"cosine failed to separate strong={strong[0].vector_score} "
+            f"weak={weak[0].vector_score}"
+        )
+
+    def test_vector_score_is_the_real_cosine_not_a_constant(
+        self, bank: EncryptedKnowledgeBank
+    ) -> None:
+        """Bounds alone are vacuous — a hardwired 0.0 satisfies them.
+
+        So this pins the EXACT value against an independently computed cosine
+        and requires the scores to differ across hits.
+        """
+        self._stock(bank)
+        hits = bank.retrieve("alpha beta", k=3)
+        assert len(hits) >= 2
+        q = fake_embed(["alpha beta"])[0]
+        for hit in hits:
+            assert hit.vector_score is not None
+            assert -1.0 - 1e-6 <= hit.vector_score <= 1.0 + 1e-6
+            expected = float(bank._chunk_vecs[(hit.doc_uuid, hit.chunk_index)] @ q)
+            assert hit.vector_score == pytest.approx(expected, rel=1e-9)
+        assert len({round(h.vector_score, 9) for h in hits}) > 1, (
+            "every hit reported the same cosine — the value is not varying "
+            "with the content and may be hardwired"
+        )
+
+    def test_vector_score_reported_for_a_lexical_only_hit(self) -> None:
+        """A chunk BM25 surfaced alone still reports how similar it truly is."""
+        bank = _make_bank(embed_fn=pinned_embed)
+        target = _submit(
+            bank, source_ref="https://example.org/vec", content=_VEC_TARGET
+        )
+        bank.approve(target.doc_uuid)
+        # Query shares words with the target (BM25 hit) but pinned_embed puts
+        # the query on axis 2 and the target on axis 0 → cosine 0.0.
+        hits = bank.retrieve("submarine ballast chambers", k=1)
+        assert hits, "lexical limb should have surfaced the target"
+        assert hits[0].vector_score is not None, "must not be None merely for being lexical"
+        assert abs(hits[0].vector_score) < 1e-6
+        assert hits[0].lexical_rank == 0
+        assert hits[0].lexical_score is not None
+
+    def test_vector_score_is_none_when_the_vector_limb_is_disabled(
+        self, tmp_path: Path
+    ) -> None:
+        """#794 loud-disable: no hit may claim a calibrated score."""
+        db = str(tmp_path / "k.db")
+        cipher = _make_cipher()
+        first = EncryptedKnowledgeBank(
+            db_path=db, embed_fn=fake_embed, cipher=cipher
+        )
+        r = _submit(first, content="alpha beta gamma delta")
+        first.approve(r.doc_uuid)
+        first.close()
+
+        reopened = EncryptedKnowledgeBank(
+            db_path=db,
+            embed_fn=fake_embed,
+            cipher=cipher,
+            embed_model_revision="a-different-revision",
+        )
+        assert reopened.embed_model_mismatch is not None, "probe vacuous: no mismatch"
+        hits = reopened.retrieve("alpha beta", k=2)
+        assert hits, "BM25 limb should still answer"
+        assert all(h.vector_score is None for h in hits)
+        reopened.close()
+
+    def test_lexical_diagnostics_absent_for_a_vector_only_hit(self) -> None:
+        bank = _make_bank(embed_fn=pinned_embed)
+        target = _submit(
+            bank, source_ref="https://example.org/v", content=_VEC_TARGET
+        )
+        bank.approve(target.doc_uuid)
+        # _VEC_QUERY shares NO words with the target, so only cosine can find it.
+        hits = bank.retrieve(_VEC_QUERY, k=1)
+        assert hits and hits[0].doc_uuid == target.doc_uuid
+        assert hits[0].lexical_rank is None
+        assert hits[0].lexical_score is None
+        assert hits[0].vector_score is not None and hits[0].vector_score > 0.99
+
+
+class TestExactRanking:
+    """#1617 — both limbs rank EVERYTHING, and that is the commitment.
+
+    An earlier revision of this change bounded each limb to a 200-candidate
+    pool. Independent adversarial review measured the cost: a chunk at lexical
+    rank 8 of 3000 was evicted from the top 4 because its vector rank was 251
+    rather than 199, and truncation manufactured exact ties that `sorted` then
+    resolved by document-approval order, diverging from N=300. The tests below
+    are the lock against that returning.
+
+    They populate the retrieval caches DIRECTLY rather than through approve().
+    That is deliberate: the property under test is ranking mechanics at a size
+    no pool could silently swallow, and routing 500 chunks through per-chunk
+    AES would measure encryption instead. Every structure written here is one
+    retrieve() actually reads.
+    """
+
+    LEXICAL_WORD = "zzmarker"
+
+    @classmethod
+    def _populate(
+        cls,
+        bank: EncryptedKnowledgeBank,
+        n: int,
+        lexical_at: set[int],
+        adversarial_vectors: bool = True,
+    ):
+        """n chunks; those in *lexical_at* carry the query word, none otherwise.
+
+        Vectors are seeded so the lexical-bearing chunks rank POORLY on cosine
+        — the exact shape that truncation evicted.
+        """
+        rng = np.random.default_rng(11)
+        vecs = rng.standard_normal((n, EMBED_DIM)).astype(np.float32)
+        vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+        query_vec = fake_embed([cls.LEXICAL_WORD])[0]
+        rows = []
+        for i in range(n):
+            key = (f"doc{i}", 0)
+            if i in lexical_at:
+                if adversarial_vectors:
+                    # Push it far from the query in vector space: poor cosine
+                    # rank. This is the shape truncation used to evict.
+                    vecs[i] = -query_vec / np.linalg.norm(query_vec)
+                text = f"{cls.LEXICAL_WORD} unique{i} body text"
+            else:
+                text = f"filler{i} ordinary body text"
+            bank._chunk_vecs[key] = vecs[i]
+            bank._chunk_texts[key] = text
+            bank._doc_titles[key[0]] = f"Doc {i}"
+            bank._doc_source_types[key[0]] = "file"
+            rows.append((text, key[0], key[1]))
+        bank._fts.executemany(
+            "INSERT INTO knowledge_fts(text, doc_uuid, chunk_index) VALUES(?,?,?)",
+            rows,
+        )
+        bank._fts.commit()
+
+    def test_a_deep_vector_rank_still_contributes_its_fusion_term(self) -> None:
+        """THE REGRESSION LOCK, asserted on the arithmetic rather than on survival.
+
+        Checking merely that the chunk comes back is too weak — it passes with
+        truncation in place, because a sole lexical match wins on that limb
+        alone. What truncation actually destroys is the OTHER limb's term. So
+        this pins the exact fused score: lexical rank 0 plus a vector term for
+        a deliberately worst-in-store cosine rank. Reintroduce a pool and the
+        second term silently becomes zero.
+        """
+        bank = _make_bank()
+        n = 500
+        self._populate(bank, n, lexical_at={400})
+        hits = bank.retrieve(self.LEXICAL_WORD, k=4)
+        found = [h for h in hits if h.doc_uuid == "doc400"]
+        assert found, "the only chunk containing the query word was not returned"
+        hit = found[0]
+        assert hit.lexical_rank == 0, "expected the sole lexical match at rank 0"
+
+        # Its vector was pinned antipodal to the query, so it is last of n.
+        vector_rank = n - 1
+        expected = 1.0 / (kb_mod.RRF_K + 0 + 1) + 1.0 / (kb_mod.RRF_K + vector_rank + 1)
+        assert hit.score == pytest.approx(expected, rel=1e-9), (
+            f"fused score {hit.score!r} != {expected!r}. A vector rank of "
+            f"{vector_rank} contributed nothing, so a candidate pool has been "
+            "reintroduced and is dropping a whole limb's term at its boundary "
+            "(#1617)"
+        )
+        bank.close()
+
+    def test_the_lexical_limb_ranks_past_any_plausible_page_size(self) -> None:
+        """No LIMIT: the limb assigns ranks far beyond a 200-candidate page.
+
+        Deliberately asserts on the DEPTH of the ranks handed out, not on how
+        many matches come back. Which matches survive is fusion's business —
+        a non-matching chunk with excellent cosine outranking a tail lexical
+        match is correct behaviour, and an earlier draft of this test wrongly
+        treated that as a failure.
+        """
+        bank = _make_bank()
+        n = 500
+        lexical = set(range(100, 500))  # 400 matches — twice any pool
+        self._populate(bank, n, lexical_at=lexical, adversarial_vectors=False)
+        hits = bank.retrieve(self.LEXICAL_WORD, k=400)
+        ranked = [h.lexical_rank for h in hits if h.lexical_rank is not None]
+        assert ranked, "no lexical ranks reported at all"
+        assert max(ranked) >= 250, (
+            f"deepest lexical rank handed out was {max(ranked)} — the limb "
+            "stopped early, so a LIMIT has been reintroduced (#1617)"
+        )
+        bank.close()
+
+
+class TestCacheSoundnessWarnings:
+    """#1617 — both guards fire when tripped AND stay silent when not.
+
+    The silent-case assertions are the point: a warning that always fires is
+    indistinguishable from one that never does.
+    """
+
+    def test_size_warning_fires_above_threshold(
+        self,
+        bank: EncryptedKnowledgeBank,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(kb_mod, "CACHE_SIZE_WARN_CHUNKS", 0)
+        with caplog.at_level(logging.WARNING):
+            r = _submit(bank, content="alpha beta gamma")
+            bank.approve(r.doc_uuid)
+        assert "KNOWLEDGE_CACHE_SIZE_EXCEEDED" in caplog.text
+
+    def test_size_warning_silent_below_threshold(
+        self,
+        bank: EncryptedKnowledgeBank,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        monkeypatch.setattr(kb_mod, "CACHE_SIZE_WARN_CHUNKS", 1_000_000)
+        with caplog.at_level(logging.WARNING):
+            r = _submit(bank, content="alpha beta gamma")
+            bank.approve(r.doc_uuid)
+        assert "KNOWLEDGE_CACHE_SIZE_EXCEEDED" not in caplog.text
+
+    def test_unnormalised_embeddings_warn(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        def unnormalised(texts: list[str]) -> np.ndarray:
+            out = np.zeros((len(texts), EMBED_DIM), dtype=np.float32)
+            out[:, 0] = 7.0  # norm 7.0, not 1.0
+            return out
+
+        b = _make_bank(embed_fn=unnormalised)
+        r = _submit(b, content="alpha beta gamma")
+        with caplog.at_level(logging.WARNING):
+            b.approve(r.doc_uuid)
+        assert "KNOWLEDGE_EMBEDDING_NOT_NORMALISED" in caplog.text
+
+    def test_a_late_unsound_vector_is_caught_past_the_sample_window(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """#1617 review finding 3: the guard was blind past chunk 64.
+
+        Approving a bad vector into an EMPTY bank was the only case the
+        original test covered, and it was the one case a first-N cache sample
+        could see. This approves the bad vector AFTER the window is full.
+        """
+        state = {"bad": False}
+
+        def sometimes_bad(texts: list[str]) -> np.ndarray:
+            out = np.zeros((len(texts), EMBED_DIM), dtype=np.float32)
+            out[:, 0] = 7.0 if state["bad"] else 1.0   # norm 7.0 vs 1.0
+            return out
+
+        b = _make_bank(embed_fn=sometimes_bad)
+        for i in range(kb_mod._NORM_CHECK_SAMPLE + 4):   # fill past the window
+            r = _submit(b, source_ref=f"https://example.org/w{i}", content=f"healthy {i}")
+            b.approve(r.doc_uuid)
+        assert len(b._chunk_vecs) > kb_mod._NORM_CHECK_SAMPLE, "probe vacuous"
+
+        state["bad"] = True
+        r = _submit(b, source_ref="https://example.org/late", content="late bad vector")
+        with caplog.at_level(logging.WARNING):
+            b.approve(r.doc_uuid)
+        assert "KNOWLEDGE_EMBEDDING_NOT_NORMALISED" in caplog.text, (
+            "a newly approved unsound vector went unreported because the guard "
+            "was looking at the oldest rows"
+        )
+
+    def test_nan_embeddings_are_caught_not_passed_over(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """#1617 review finding 3: `nan > tol` is False, so NaN failed open."""
+        def nan_embed(texts: list[str]) -> np.ndarray:
+            return np.full((len(texts), EMBED_DIM), np.nan, dtype=np.float32)
+
+        b = _make_bank(embed_fn=nan_embed)
+        r = _submit(b, content="alpha beta gamma")
+        with caplog.at_level(logging.WARNING):
+            b.approve(r.doc_uuid)
+        assert "KNOWLEDGE_EMBEDDING_NOT_NORMALISED" in caplog.text
+        assert "nonfinite=1" in caplog.text
+
+    def test_size_warning_is_logged_once_not_per_approve(
+        self,
+        bank: EncryptedKnowledgeBank,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A control that re-fires every approve becomes noise people filter."""
+        monkeypatch.setattr(kb_mod, "CACHE_SIZE_WARN_CHUNKS", 0)
+        with caplog.at_level(logging.WARNING):
+            for i in range(5):
+                r = _submit(bank, source_ref=f"https://example.org/n{i}", content=f"body {i}")
+                bank.approve(r.doc_uuid)
+        # Count RECORDS, not substring hits: the token appears twice in each
+        # message (human prefix + machine `event=`), so counting the string
+        # double-counts every emission.
+        fired = [
+            r for r in caplog.records
+            if "KNOWLEDGE_CACHE_SIZE_EXCEEDED" in r.getMessage()
+        ]
+        assert len(fired) == 1, f"warned {len(fired)} times across 5 approvals"
+
+    def test_normalised_embeddings_do_not_warn(
+        self, bank: EncryptedKnowledgeBank, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            r = _submit(bank, content="alpha beta gamma")
+            bank.approve(r.doc_uuid)
+        assert "KNOWLEDGE_EMBEDDING_NOT_NORMALISED" not in caplog.text

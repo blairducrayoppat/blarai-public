@@ -200,9 +200,11 @@ def _normalise_screen_result(result: Any) -> Optional[ScreenResult]:
         result carries its ``reason`` through to the :func:`trip` audit label when
         present (so the real labels survive, not a generic "non-standard" string).
 
-    Fail-Closed: any *other* unexpected truthy value (no recognised verdict
-    attribute) is treated as a positive detection rather than silently passed — a
-    screener whose contract we cannot read must not become an open door.
+    Fail-Closed: any *other* value with no recognised verdict attribute is
+    treated as a positive detection rather than silently passed — a screener
+    whose contract we cannot read must not become an open door. Note this is NOT
+    conditioned on truthiness: ``0`` and ``""`` are equally unreadable and
+    equally trip.
     """
     if result is None or result is False:
         return None
@@ -221,8 +223,15 @@ def _normalise_screen_result(result: Any) -> Optional[ScreenResult]:
             return None
         reason = getattr(result, "reason", "") or "exfil screener positive detection"
         return ScreenResult(detected=True, reason=str(reason))
-    # Any other truthy value with no readable verdict -> treat as detection (Fail-Closed).
-    return ScreenResult(detected=True, reason="exfil screener returned non-standard truthy verdict")
+    # Any other value with no readable verdict -> treat as detection (Fail-Closed).
+    # Deliberately NOT a truthiness test: a screener returning 0 or "" has no
+    # readable verdict either, and guessing "clean" from falsiness is the open
+    # door this branch exists to shut. The reason says what actually happened —
+    # it used to say "truthy", which was false for exactly those two cases and
+    # would have sent an operator looking for a verdict that was never returned.
+    return ScreenResult(
+        detected=True, reason="exfil screener returned an unreadable verdict"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -651,21 +660,30 @@ def _check_bind(family: int, address: Any) -> None:
 
 
 def _as_payload_bytes(data: Any) -> Optional[bytes]:
-    """Best-effort view of an outbound buffer as ``bytes`` for screening.
+    """View an outbound buffer as ``bytes`` for screening, or ``None``.
 
-    Accepts the buffer types ``socket.send``/``sendall`` accept. Returns ``None``
-    when the data cannot be cheaply materialised (the screener is then skipped for
-    that frame — screening is the ADR-027 rule-4 layer, defence-in-depth atop the
-    address allowlist, not the sole control). Never raises on screening input.
+    Accepts **anything ``socket.send``/``sendall`` accepts**, which is the whole
+    buffer protocol, not the three concrete types this used to name. It listed
+    ``bytes``/``bytearray``/``memoryview`` and returned ``None`` for everything
+    else, and the caller then SKIPPED screening for that frame — so
+    ``sendall(array.array("B", secret))`` on an external-tagged socket delivered
+    the secret with no screen, no trip and no log. Measured, not hypothetical.
+
+    ``None`` now means "this is not a buffer at all", which the caller treats as
+    an anomaly and fails closed on. It no longer means "skip the screen".
+
+    Never raises: a screening input must not become its own error path.
     """
     if isinstance(data, (bytes, bytearray)):
         return bytes(data)
-    if isinstance(data, memoryview):
-        try:
-            return data.tobytes()
-        except (ValueError, TypeError):
-            return None
-    return None
+    try:
+        # cast("B") normalises any C-contiguous buffer — array.array, numpy
+        # buffers, mmap, a strided memoryview — to a flat byte view. This is the
+        # same bytes the kernel would send, which is the only thing worth
+        # screening.
+        return memoryview(data).cast("B").tobytes()
+    except (TypeError, ValueError, BufferError):
+        return None
 
 
 def _screen_outbound(data: Any) -> None:
@@ -686,15 +704,81 @@ def _screen_outbound(data: Any) -> None:
         return
     payload = _as_payload_bytes(data)
     if payload is None:
-        return
+        # NOT a skip — skipping here is how array.array("B", secret) used to
+        # leave the host. But NOT a trip either, and the distinction is the whole
+        # of it: this runs BEFORE super().send(), and if the socket would ACCEPT
+        # the payload it is a C-contiguous buffer, on which the cast above
+        # succeeds. So None means the socket would have REFUSED it — a str, an
+        # object(), a strided memoryview — and the payload was never going to
+        # leave. Tripping cut all egress, including the loopback Policy-Agent
+        # gateway and the vsock channel, with a Lead-Architect-only re-arm, for
+        # what is a local type error. Fail-closed is right; a kill-switch is a
+        # blast radius this cannot earn.
+        logger.error(
+            "egress guard: REFUSED an outbound payload of type %r on an "
+            "external-screened socket — it could not be materialised for "
+            "screening, and the socket itself would have rejected it. The "
+            "payload was NOT sent. Kill-switch NOT tripped: nothing could have "
+            "leaked, so this is a caller defect, not an egress anomaly.",
+            type(data).__name__,
+        )
+        raise EgressDenied(
+            f"egress guard: outbound payload of type {type(data).__name__!r} "
+            f"could not be screened and was refused (Fail-Closed). The socket "
+            f"would not have accepted it either; screening is not the reason it "
+            f"failed, only the reason it failed HERE."
+        )
     for screener in _screeners:
         try:
             verdict = _normalise_screen_result(screener(payload))
         except Exception as exc:  # noqa: BLE001 - a failing screen must fail closed
-            trip(f"outbound screener raised ({type(exc).__name__}) — failing closed")
+            # trip() guarded for the same reason as the BaseException arm below:
+            # _alert_operator can raise, and the refusal must survive a failed
+            # notification. The latch is set before the alert, so the state holds.
+            try:
+                trip(f"outbound screener raised ({type(exc).__name__}) — failing closed")
+            except Exception:  # noqa: BLE001 - must not replace the refusal
+                logger.error(
+                    "egress guard: trip() itself raised while reporting a screener "
+                    "error; the kill-switch state is already set and the send is "
+                    "still refused."
+                )
             raise EgressTripped(
                 "egress guard: outbound screener errored — egress cut (Fail-Closed)"
             ) from exc
+        except (SystemExit, KeyboardInterrupt, GeneratorExit) as exc:
+            # CONTROL FLOW, not a screen failure. The payload was not delivered —
+            # this arm is above super().send() — so there is no open door here and
+            # never was. The original defect was that NOTHING WAS RECORDED, so a
+            # later send proceeded as though the screen were healthy; that is fixed
+            # by recording it. Latching is not: a Ctrl-C through the screener would
+            # cut the loopback Policy-Agent gateway and the vsock channel until a
+            # human re-arms, and an operator interrupt is not an ADR-027 §3 anomaly.
+            logger.error(
+                "egress guard: outbound screener interrupted by %s — the payload "
+                "was NOT sent. Kill-switch NOT tripped: this is interpreter or "
+                "operator control flow, not a screen failure.",
+                type(exc).__name__,
+            )
+            raise
+        except BaseException as exc:
+            # A screener that failed in a way that is neither an Exception nor
+            # control flow IS a screen failure, and the kill-switch latches so a
+            # later send cannot proceed as though the screen were healthy.
+            #
+            # trip() is guarded because it calls _alert_operator, which can raise
+            # when logging handlers are closed during interpreter shutdown — the
+            # exact case this arm exists to survive. The latch is set before that
+            # call, so a raising alert costs the notification, never the state,
+            # and never the exception on its way out.
+            try:
+                trip(
+                    f"outbound screener raised {type(exc).__name__} (BaseException) "
+                    f"— failing closed"
+                )
+            except BaseException:  # noqa: BLE001 - must not replace the original
+                pass
+            raise
         if verdict is not None:
             trip(f"exfil screen positive detection: {verdict.reason}")
             raise EgressTripped(
@@ -747,6 +831,21 @@ class _GuardedSocket(_REAL_SOCKET):  # type: ignore[misc,valid-type]
         # peer or a duplicate that never connects through this guard, so it stays
         # unscreened — consistent with the pre-existing pass-through for those.
         self._screen_outbound_enabled = False
+
+    def dup(self) -> "_GuardedSocket":
+        """Duplicate this socket, CARRYING the external-screen tag.
+
+        ``socket.dup()`` builds ``self.__class__(family, type, proto, fileno=fd)``,
+        and ``__init__`` sets the tag False for every fileno-built socket — correct
+        for ``accept()``, where the peer never connected through this guard, and
+        wrong here. A dup of a connected, tagged socket is the SAME TCP connection
+        to the SAME external destination; measured, ``sendall`` on the duplicate
+        delivered a planted secret with no screen and no trip. The tag belongs to
+        the connection, not to the Python object that happens to hold the handle.
+        """
+        duplicate = super().dup()
+        duplicate._screen_outbound_enabled = self._screen_outbound_enabled
+        return duplicate
 
     def _tag_screen_outbound(self, address: Any) -> None:
         """Mark this socket for outbound screening iff ``address`` is external.

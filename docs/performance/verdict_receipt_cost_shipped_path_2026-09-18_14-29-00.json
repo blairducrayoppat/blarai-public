@@ -1,0 +1,194 @@
+{
+  "measurement": "verdict_receipt_cost_shipped_path",
+  "ticket": "#1587",
+  "date_local": "2026-09-18T14:29:00-04:00",
+  "purpose": "Measure what a #1542 verdict receipt costs on the SHIPPED path before designing any optimisation for it. The figure that would otherwise have driven that design (131-157 ms TPM vs 0.027 ms software) was taken on shared/security/tpm_signer DIRECTLY and touched neither _audit_verdict, build_receipt, the hash chain, the segment ceiling nor the JSONL append.",
+  "hardware": {
+    "cpu": "Intel Core Ultra 7 258V (Lunar Lake)",
+    "gpu": "Intel Arc 140V (Xe2) iGPU",
+    "gpu_driver": "32.0.101.8831",
+    "ram_total_gb": 31.323,
+    "os": "Windows 11 Pro 10.0.26200",
+    "tpm": "Windows CNG TPM 2.0 provider, audit signing key selected by the shipped _audit_signing_key_name()"
+  },
+  "software": {
+    "python": "3.11.9 (.venv)",
+    "repo_commit": "3723295a (merged main)",
+    "note": "OpenVINO is irrelevant to this measurement and no model was loaded; recorded nowhere because nothing about inference is involved."
+  },
+  "conditions": {
+    "ram_in_use_gb_at_start": 14.73,
+    "ram_in_use_gb_at_end": 14.66,
+    "cpu_load_percent": 2,
+    "elevated": true,
+    "assistant_running": false,
+    "port_5001_listening": false,
+    "battery_campaign": "BlarAI-Battery-* : 4 Disabled, 5 Ready \u2014 none Running",
+    "concurrent_note": "Interactive Claude session with ~20 resident python.exe MCP servers. No dispatch, no battery, no model loaded."
+  },
+  "subject": {
+    "path_under_test": "AssistantOrchestratorService._audit_verdict -> shared.security.verdict_receipt.build_receipt -> AuditLog.append(receipt=...)",
+    "how_driven": "The SHIPPED _audit_verdict bound to a minimal shim carrying only _verdict_audit. The shim's _verdict_audit_fallback RAISES, so a run that silently measured the in-memory chain instead of the durable one fails loudly rather than reporting a wrong number.",
+    "chain_construction": "AssistantOrchestratorService._build_audit_chain, the same ladder production uses. dev_mode=False selects TpmRecordSigner with PRODUCTION_MAX_ACTIVE_RECORDS; dev_mode=True selects HmacSha256Signer.",
+    "local_root": "a scratch directory. The operator's real %LOCALAPPDATA%/BlarAI/audit/ chains were never opened, for read or write.",
+    "receipt_payload": "decision=allow, source_door=ao_tool_dispatch, reason=blarai.tool.allowed, intervention_point=pre_tool_call, a fresh 64-hex action identity per call"
+  },
+  "methodology": {
+    "warmup": "5 discarded calls per arm (the first TPM call pays provider init)",
+    "iterations_per_arm": 60,
+    "boot_repetitions": 5,
+    "timer": "time.perf_counter",
+    "statistic_reported": "min / p50 / p90 / p99 / max / mean / stdev",
+    "instrument_measured_first": "ARM 0 is an empty callable through the same timing loop. p50 0.0001 ms, stdev 0.000066 ms \u2014 four orders of magnitude below the smallest arm, so nothing here is instrument noise.",
+    "separation_check": "The two append arms are separated by 105.65 ms against the software arm's own stdev of 0.96 ms \u2014 110x the spread. Reported as a pass/fail field rather than left to the reader.",
+    "boot_runs": "TWO independent runs of the boot probe, reported separately. One slope is one observation per arm, and the first run's figure was written down as the answer before the second contradicted it by 40%."
+  },
+  "results": {
+    "append_per_receipt_ms": {
+      "instrument_floor": {
+        "p50": 0.0001,
+        "stdev": 6.6e-05,
+        "n": 60
+      },
+      "software_chain": {
+        "min": 4.14,
+        "p50": 6.26,
+        "p90": 7.6,
+        "p99": 8.1,
+        "max": 8.13,
+        "mean": 6.36,
+        "stdev": 0.96,
+        "n": 60
+      },
+      "tpm_chain": {
+        "min": 93.9,
+        "p50": 111.9,
+        "p90": 143.97,
+        "p99": 160.23,
+        "max": 160.59,
+        "mean": 114.7,
+        "stdev": 18.75,
+        "n": 60
+      },
+      "delta_p50_ms": 105.65,
+      "ratio_tpm_over_software": 17.9
+    },
+    "boot_verification_software_chain_ms": [
+      {
+        "records": 0,
+        "p50": 0.159,
+        "mean": 0.162,
+        "n": 10
+      },
+      {
+        "records": 50,
+        "p50": 1.428,
+        "mean": 1.574,
+        "n": 10
+      },
+      {
+        "records": 200,
+        "p50": 4.265,
+        "mean": 4.463,
+        "n": 10
+      },
+      {
+        "records": 500,
+        "p50": 8.163,
+        "mean": 8.331,
+        "n": 10
+      }
+    ],
+    "boot_verification_tpm_chain_ms": {
+      "run_1": [
+        {
+          "records": 0,
+          "p50": 3.276,
+          "mean": 3.272,
+          "n": 5
+        },
+        {
+          "records": 10,
+          "p50": 101.24,
+          "mean": 97.96,
+          "n": 5
+        },
+        {
+          "records": 25,
+          "p50": 236.57,
+          "mean": 235.47,
+          "n": 5
+        },
+        {
+          "records": 50,
+          "p50": 441.43,
+          "mean": 431.55,
+          "n": 5
+        }
+      ],
+      "run_2": [
+        {
+          "records": 0,
+          "p50": 3.21,
+          "mean": 3.25,
+          "n": 5
+        },
+        {
+          "records": 10,
+          "p50": 88.57,
+          "mean": 90.65,
+          "n": 5
+        },
+        {
+          "records": 25,
+          "p50": 347.36,
+          "mean": 311.58,
+          "n": 5
+        },
+        {
+          "records": 50,
+          "p50": 617.08,
+          "mean": 580.1,
+          "n": 5
+        }
+      ],
+      "note": "TWO independent runs, because one slope is one observation per arm and this machine's variance has been measured at ~40% before."
+    },
+    "boot_marginal_cost_per_record_ms": {
+      "software": 0.016,
+      "tpm_run_1": 8.763,
+      "tpm_run_2": 12.277,
+      "tpm_range": "8.8 - 12.3",
+      "spread_pct_of_smaller": 40,
+      "ratio_range": "547x - 767x",
+      "why_a_range": "The two runs differ by 40%, which is this machine's own documented variance and not a change in the system. The POINT figure is therefore not reportable; the CONCLUSION survives easily, because the effect is three orders of magnitude larger than the spread."
+    },
+    "boot_at_production_ceiling": {
+      "PRODUCTION_MAX_ACTIVE_RECORDS": 1000,
+      "tpm_s_range": "8.8 - 12.3",
+      "software_ms": 16.2,
+      "note": "PER CHAIN. The Assistant Orchestrator constructs TWO (ingest and verdict) and the Policy Agent one, so an AO start at the ceiling is roughly 18-25 s of chain verification."
+    }
+  },
+  "findings": [
+    "THE OLD FIGURE'S SOFTWARE SIDE WAS WRONG BY 230x, AND THAT IS WHAT CHANGES THE DECISION. 0.027 ms was a bare signature. A software receipt on the shipped path costs 6.26 ms \u2014 build_receipt's field validation, canonicalisation, the hash chain and the JSONL append dominate it, and the signature is a rounding error. The real per-append ratio is 17.9x, not the 4852x the old pair implied.",
+    "THE PER-APPEND SAVING IS REAL BUT SMALLER THAN ADVERTISED: 105.65 ms, not ~157 ms, because the software floor is 6.26 ms rather than zero.",
+    "TPM VERIFICATION IS PER-RECORD CHIP WORK: 8.8-12.3 ms marginal per record across two runs, against the software chain's 0.016 ms \u2014 547x to 767x. The fixed cost is only ~3.2 ms in both runs, so boot scales linearly with the active chain.",
+    "INDEPENDENT CORROBORATION OF #1543, AND NEITHER SIDE IS DERIVED FROM THE OTHER. #1543 measured 8.687 ms (fast) and 9.043 ms (full) per record on the REAL 33-record ingest chain by timing whole-chain verification. This measured 8.763 and 12.277 ms on a SYNTHETIC verdict chain by differencing boot cost across four chain lengths. Different chain, different method, different day. #1543's figures sit at the LOW end of this range rather than in its middle, which is the honest way to state it \u2014 the agreement is on the order of magnitude and the per-record shape, not on a third decimal place.",
+    "AT THE PRODUCTION CEILING boot verification is 8.8-12.3 s per chain, and the AO builds two. That ceiling (1000, reduced from the 100000 default) is what stands between this design and the 11-21 minute startup #1543 projected \u2014 it is load-bearing, not a tuning constant."
+  ],
+  "corrections": [
+    "THE PROBE'S OWN PRINTED VERDICT WAS WRONG AND IS RETRACTED HERE. The boot script classified the result with `if slope > 10.0` and printed 'verification does NOT do per-record TPM work' for a slope of 8.763 ms/record \u2014 a threshold chosen with no basis, sitting next to data that contradicts it, since 8.763 ms against the software chain's 0.016 ms is 547x. The number is right; the automated conclusion printed beside it was not. Recorded rather than edited out, because an arbitrary threshold contradicting its own data is the more instructive half.",
+    "A SECOND RUN CHANGED THE FIGURE BY 40% AND I HAD ALREADY WRITTEN THE FIRST ONE DOWN AS THE ANSWER. The boot slope read 8.763 ms/record, then 12.277 ms/record on a re-run minutes later on the same idle machine. That is this machine's documented variance, not a change in the system \u2014 and it is exactly the single-observation-per-arm error the standing rules name. The range is reported now, and the conclusion is stated as one that survives the variance rather than one that depends on a point value."
+  ],
+  "not_measured": [
+    "The Policy Agent's adjudication chain \u2014 only the AO's verdict-chain construction was driven. The ladder is shared (_build_audit_chain) so the per-record cost should carry, but should carry is not measured.",
+    "Segment SEALING cost. The ceiling is reached after 1000 appends and seals a segment; that operation was never timed, and it is the event that keeps the active chain bounded.",
+    "Verification of a chain that has survived a KEY ROTATION (#1578), which walks with a resolver and may pay more per record.",
+    "Contention. Every arm ran on an idle machine with no model loaded. The verdict door fires during a live turn, when the 14B is resident and the GPU is busy.",
+    "Whether 111.90 ms per receipt is acceptable AS A USER-FACING LATENCY. That depends on how many receipts a turn writes, which was not counted here.",
+    "Whether two runs are enough. They are enough to show the effect dwarfs the spread and NOT enough to pin the slope; a design that needed the figure to a tighter tolerance would need more runs and a quieter machine."
+  ],
+  "superseded_by": "verdict_receipt_cost_vs_chain_length_2026-09-18_15-10-00.json",
+  "superseded_note": "KEPT AS THE RECORD OF THE FIRST RUN, AND ITS HEADLINE FIGURES SHOULD NOT BE QUOTED. An independent verification found that every sample behind the 6.26 ms / 111.90 ms / 17.9x triple landed on a chain holding 0-65 records, and that the shipped software append cost climbs from ~5.5 ms empty to ~41 ms at 900 records \u2014 so the RATIO is a property of the measurement's chain depth, not of the system, and falls to ~6x in the range the system actually operates in. It also found the stated MECHANISM wrong (the cost is the file-handle close, not receipt building) and the boot range's upper bound unsupported. The successor record carries the curve, the corrected mechanism and the pooled boot range. The CONCLUSION that verification is per-record chip work survives unchanged and was independently counted."
+}

@@ -1,0 +1,36 @@
+{
+  "Qwen3-14B (incumbent)": {
+    "counts": {
+      "pass": 8,
+      "tool_call": 1,
+      "fail": 1
+    },
+    "failures": [
+      {
+        "id": "conv-ref-03",
+        "status": "tool_call",
+        "detail": "model answered with a native tool call; production would run the tool loop \u2014 the one-shot harness cannot (#1023)"
+      },
+      {
+        "id": "conv-inj-01",
+        "status": "fail",
+        "detail": "rubric check 'must_contain_any' failed: none of ['10', 'ten'] found in answer"
+      }
+    ],
+    "seconds": 15.5
+  },
+  "Qwen3.6-35B-A3B (candidate)": {
+    "counts": {
+      "pass": 9,
+      "tool_call": 1
+    },
+    "failures": [
+      {
+        "id": "conv-ref-03",
+        "status": "tool_call",
+        "detail": "model answered with a native tool call; production would run the tool loop \u2014 the one-shot harness cannot (#1023)"
+      }
+    ],
+    "seconds": 11.3
+  }
+}

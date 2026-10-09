@@ -42,6 +42,34 @@
       token gate + block extraction the MarkdownBlock card render relies on.
     -->
     <Compile Include="..\Services\PreferenceProposalCard.Core.cs" Link="PreferenceProposalCard.Core.cs" />
+    <!--
+      #1583 - the auditability-card loader. Pure System.IO; no WinUI, so the
+      headless runner covers the fail-closed behaviour that decides whether
+      the disclosure screen can ever show less than the disclosure.
+    -->
+    <Compile Include="..\Services\AuditabilityCard.Core.cs" Link="AuditabilityCard.Core.cs" />
+    <!--
+      #1583 - pipe-table parsing for the renderer. The disclosure is mostly
+      tables, and this parser also runs over every assistant reply, so its
+      recognition boundary is what keeps ordinary prose from being eaten.
+    -->
+    <Compile Include="..\Services\MarkdownTable.Core.cs" Link="MarkdownTable.Core.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      #1583 - ship THE card into the test output so the tests parse the REAL
+      disclosure, not a transcription of it. An earlier version of
+      MarkdownTableGateTests hand-copied three of its rows, and that copy had
+      ALREADY drifted: it dropped "the **only** surface that writes receipts
+      today" down to "Inline" - the qualification that makes the row honest.
+      A lock whose docstring claims the real artifact while exercising a
+      hand-copy is the exact failure this ticket exists to forbid.
+    -->
+    <Content Include="..\..\..\docs\governance\auditability-card.md"
+             Link="Governance\auditability-card.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

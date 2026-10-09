@@ -184,21 +184,24 @@ the exception type only, never key material).
 > front of every model-initiated outbound call: the turn-scoped Windows-Hello
 > egress envelope (`[egress]` in the AO config, ADR-023 Amendment 4). It has no
 > enable flag — it is always on. On the first egress of a turn a fingerprint
-> prompt fires showing the exact query; one touch covers up to
-> `searches_per_fingerprint` (default 3) searches for that question, and every
-> subsequent query is disclosed live in chat as it leaves. It is fail-closed: no
+> prompt fires showing the exact query, and EVERY subsequent query in the turn
+> raises its own prompt too (`searches_per_fingerprint = 1` since #1594,
+> 2026-09-19; it was 3 before that, covering a window). Every query is also
+> disclosed live in chat as it leaves. It is fail-closed: no
 > verifier, a cancel, or a timeout (`fingerprint_timeout_s = 120.0`) refuses the
 > egress and ends the turn with nothing sent. It runs **in addition to** the
 > deterministic controls above, never instead of them.
 >
 > So provisioning a key here does not silently open the network: **no
-> model-initiated web search leaves this machine without either a fingerprint on
-> that exact query, or a live in-chat disclosure under a window you already
-> fingerprinted** — bounded at `searches_per_fingerprint` (default 3). Be precise
-> about what that means: you fingerprint the *first* query of a turn and see it
-> in the dialog; the 2nd and 3rd leave on that one touch, each disclosed in chat
-> as it goes, with no second prompt. Set `searches_per_fingerprint = 1` if you
-> want a fingerprint on literally every outbound query.
+> model-initiated web search leaves this machine without a fingerprint on that
+> exact query** — `searches_per_fingerprint = 1`, measured through the real
+> tool loop at three prompts for three queries. Repeated identical queries are
+> not deduplicated: each one asks again.
+>
+> Until 2026-09-19 this read: one touch covered up to three searches, the 2nd
+> and 3rd leaving on it with a chat disclosure but no second prompt. That is no
+> longer true and the sentence is replaced rather than softened. Raising the
+> value back is a posture LOOSENING and is the Lead Architect's call (#1594).
 >
 > That is the scope of the guarantee, and it is deliberately not broader —
 > operator-typed egress (`/ingest <url>`) is consented by the act of pasting the

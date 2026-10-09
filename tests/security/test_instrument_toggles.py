@@ -1,3 +1,4 @@
+# enforces-rule: security_by_design.principles.every-control-is-tested-off -- instrument controls only
 r"""The #1223 principle-12 pair, one per registered instrument: it BLOCKS, and it can't fake it.
 
 ``CLAUDE.md`` security_by_design #12 — *every control ships with a test proving it BLOCKS
@@ -31,7 +32,7 @@ from pathlib import Path
 
 import pytest
 
-from shared.fleet import swap_ops
+from shared.fleet import image_placement, link_lint, swap_ops
 from shared.fleet.coder_test_qa import CoderTestQAResult, scan_paths
 from shared.fleet.oracle_mutation import is_measured, not_measured_evidence
 from shared.fleet.swap_driver import SwapDriver
@@ -597,6 +598,230 @@ def test_smoke_contract_seam_returns_unavailable_on_a_blind_capture() -> None:
     assert "did NOT run" in SwapDriver._smoke_contract_note(crashed)
 
 
+# ---------------------------------------------------------------------------
+# delivered-site link resolution (dict-shaped report + a predicate)
+# ---------------------------------------------------------------------------
+
+
+def test_link_lint_unmeasured_never_renders_clean() -> None:
+    """TOGGLE: a scan that never followed a link cannot render as a site whose links work.
+
+    Hand-built on purpose — the RENDERERS are the subject. BOTH of them, because they speak
+    to different readers and a disclosure that reached only one would leave the other
+    reporting a clean delivery: ``format_operator_summary`` is what the Lead Architect reads,
+    and ``_with_link_report`` writes the line that lands in ``exec-smoke.log`` and in the
+    coder's feedback.
+
+    Three states are pinned rather than two. A DISCLOSURE ("nobody followed these links") and
+    a FINDING ("this link leads nowhere") are different facts with different urgencies, and
+    the third — a measured scan with nothing to say — has to be SILENT, or an instrument that
+    speaks on every healthy run teaches the reader to skim the whole caveat block."""
+    unmeasured = {
+        "schema": "link-lint/v1", "checked": False,
+        "reason": "site directory does not exist: /nowhere",
+        "findings": [], "hard": False, "files_scanned": 0, "references": 0, "counts": {},
+        "not_measured": ["nothing was scanned: the site directory does not exist"],
+    }
+    clean = {
+        "schema": "link-lint/v1", "checked": True, "reason": "",
+        "findings": [], "hard": False, "files_scanned": 2, "references": 9,
+        "counts": {"resolved": 9, "broken": 0, "undecidable": 0, "external": 0, "in_page": 0},
+        "not_measured": [],
+    }
+    broken = {
+        **clean, "hard": True,
+        "counts": {**clean["counts"], "resolved": 8, "broken": 1},
+        "findings": [{"rule": "broken-link", "severity": link_lint.SEVERITY_HIGH,
+                      "message": "'piece-detail.html' points at a page that is not in the "
+                                 "delivered site.",
+                      "reference": "piece-detail.html?id=${piece.id}",
+                      "file": "pieces.html", "line": 41}],
+    }
+
+    assert link_lint.is_measured(unmeasured) is False
+    assert link_lint.is_measured(clean) is True, (
+        "the predicate answers 'unmeasured' for everything, so the toggle proves nothing"
+    )
+
+    assert "did not run" in link_lint.format_operator_summary(unmeasured)
+    assert "leads somewhere real" not in link_lint.format_operator_summary(unmeasured), (
+        "a scan that opened no page reported that every link it could follow works"
+    )
+    assert "leads somewhere real" in link_lint.format_operator_summary(clean), (
+        "the control condition did not render clean, so the toggle proves nothing"
+    )
+
+    # The evidence line: DISCLOSURE, FINDING and SILENCE, and the declared marker is what
+    # keeps the first two apart for a reader who learned to look for it.
+    assert "links NOT checked" in swap_ops._with_link_report(
+        {"evidence": "served + loaded"}, unmeasured)["evidence"]
+    assert "1 broken link(s)" in swap_ops._with_link_report(
+        {"evidence": "served + loaded"}, broken)["evidence"]
+    assert swap_ops._with_link_report(
+        {"evidence": "served + loaded"}, clean)["evidence"] == "served + loaded", (
+        "a measured, clean link report spent an evidence line saying nothing"
+    )
+
+
+def test_link_lint_seam_returns_unmeasured_on_a_site_with_no_pages(tmp_path: Path) -> None:
+    """SEAM: the real resolver, over two REAL degraded trees, returns an unmeasured report.
+
+    Two trees, because they are different failures and the module reaches them by different
+    paths: a site directory that is not there, and a directory that IS there and holds no
+    page or script for a link to live in. The second is the one that matters — four empty
+    scaffolds returned ``checked: true, hard: false`` on this module's first sweep, which is
+    a clean bill of health issued over nothing.
+
+    Both failures come from the filesystem, never from an injected error. The control half
+    drives the SAME producer over a real page, because 'unmeasured on an empty tree' proves
+    nothing if the resolver reports unmeasured on everything."""
+    absent = link_lint.lint_site(tmp_path / "no-such-delivery")
+    assert link_lint.is_measured(absent) is False
+    assert absent["counts"] == {}, "counts were published for a tree nothing ever opened"
+    assert "does not exist" in absent["reason"]
+
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "README.md").write_text("# nothing built here yet\n", encoding="utf-8")
+    hollow = link_lint.lint_site(site)
+    assert link_lint.is_measured(hollow) is False, (
+        "a served root holding no page reported a measured scan - that is a clean result "
+        "issued over nothing, which is the exact shape this instrument exists to refuse"
+    )
+    assert hollow["files_scanned"] == 0
+    assert hollow["counts"] == {}
+    assert "NOTHING was checked" in " ".join(hollow["not_measured"])
+
+    (site / "index.html").write_text(
+        "<!doctype html><html><body><a href='README.md'>the readme</a></body></html>",
+        encoding="utf-8")
+    assert link_lint.is_measured(link_lint.lint_site(site)) is True, (
+        "the real resolver reported unmeasured on a readable page - the seam test would pass "
+        "for the wrong reason"
+    )
+
+
+# ---------------------------------------------------------------------------
+# delivered-site media placement (dict-shaped report + a predicate)
+# ---------------------------------------------------------------------------
+
+
+def test_image_placement_ungraded_never_renders_clean() -> None:
+    """TOGGLE: THREE states, because two of them would collapse the one that costs the most.
+
+    A grading pass that COULD NOT run, a delivery that genuinely HAS no media, and a graded
+    gallery with nothing wrong are three different facts. Folding the middle into either
+    neighbour is #1342 in miniature: read as 'graded and fine' it is a false clean over a
+    site with no pictures at all, and read as 'could not grade' it is a false alarm on a
+    delivery that is simply a text site. Hand-built results throughout — the renderers are
+    the subject, and both are pinned because they reach different readers."""
+    ungraded = {
+        "schema": "image-placement/v1", "checked": False, "nothing_to_grade": False,
+        "reason": "site directory does not exist: /nowhere",
+        "findings": [], "hard": False, "checks": {}, "counts": {},
+        "not_measured": ["nothing was graded: the site directory does not exist"],
+    }
+    no_media = {
+        **ungraded, "nothing_to_grade": True,
+        "reason": "this site declares no media: no image files under the served root and no "
+                  "data file listing items with pictures",
+        "not_measured": ["NOTHING was graded: the delivery contains no images and no item data"],
+    }
+    graded = {
+        "schema": "image-placement/v1", "checked": True, "nothing_to_grade": False, "reason": "",
+        "findings": [], "hard": False,
+        "checks": {"item_placement": {"checked": True, "reason": ""},
+                   "asset_usage": {"checked": True, "reason": ""}},
+        "counts": {"items": 4, "items_with_image": 4, "items_without_image": 0,
+                   "distinct_item_images": 4, "max_items_per_image": 1,
+                   "items_with_missing_image": 0, "image_assets": 6,
+                   "unreferenced_assets": 0, "referenced_assets": 6, "exempt_assets": 0},
+        "not_measured": ["no image is ever opened"],
+    }
+    repeated = {
+        **graded, "hard": True,
+        "counts": {**graded["counts"], "distinct_item_images": 2, "max_items_per_image": 3},
+        "findings": [{"rule": "repeated-item-image", "severity": image_placement.SEVERITY_HIGH,
+                      "message": "'assets/mug.png' is the declared picture of 3 different "
+                                 "products.",
+                      "reference": "assets/mug.png", "item": "Classic Mug",
+                      "file": "data/pieces.json"}],
+    }
+
+    assert image_placement.is_graded(ungraded) is False
+    assert image_placement.is_graded(no_media) is False, (
+        "a delivery with nothing to grade read as a graded pass - it publishes no counts, so "
+        "reading it as measured puts a clean bill of health on an absent result"
+    )
+    assert image_placement.is_graded(graded) is True, (
+        "the predicate answers 'ungraded' for everything, so the toggle proves nothing"
+    )
+
+    assert "did not run" in image_placement.format_operator_summary(ungraded)
+    assert "nothing to grade" in image_placement.format_operator_summary(no_media)
+    assert "did not run" not in image_placement.format_operator_summary(no_media), (
+        "a text site with no pictures was reported as a grader that failed"
+    )
+    rendered = {image_placement.format_operator_summary(r)
+                for r in (ungraded, no_media, graded)}
+    assert len(rendered) == 3, f"two of the three states render identically: {rendered}"
+
+    def evidence(report: dict) -> str:
+        """The exec-smoke evidence line this report produces, from a fixed starting state."""
+        return swap_ops._with_media_report({"evidence": "served + loaded"}, report)["evidence"]
+
+    assert "media placement NOT graded" in evidence(ungraded)
+    assert "no media to grade" in evidence(no_media)
+    assert "1 media placement finding(s)" in evidence(repeated)
+    assert evidence(graded) == "served + loaded", (
+        "a graded gallery with nothing wrong spent an evidence line saying nothing"
+    )
+
+
+def test_image_placement_seam_returns_ungraded_on_a_site_with_no_media(tmp_path: Path) -> None:
+    """SEAM: the real grader, over two REAL trees it cannot grade, returns an ungraded report.
+
+    Two trees, and the pair is the point: a missing directory is a FAILURE to grade, while a
+    real, well-formed, entirely textual site is an ABSENCE of anything to grade. Both are
+    unmeasured and neither publishes a count, but they are not the same fact and the report
+    keeps them apart. Both conditions come from the filesystem, never from an injected error.
+
+    The control half drives the SAME producer over a delivery that does carry media, because
+    'ungraded on an empty tree' proves nothing if the grader reports ungraded on everything."""
+    absent = image_placement.grade_site(tmp_path / "no-such-delivery")
+    assert image_placement.is_graded(absent) is False
+    assert absent["nothing_to_grade"] is False, (
+        "a missing tree was reported as a delivery that simply had no pictures"
+    )
+    assert absent["counts"] == {}
+
+    site = tmp_path / "site"
+    (site / "public").mkdir(parents=True)
+    (site / "public" / "index.html").write_text(
+        "<!doctype html><html><head><title>Ridge Pottery Studio</title></head><body>"
+        "<h1>Ridge Pottery Studio</h1>"
+        "<p>We throw stoneware on the wheel in a converted barn outside Hexham.</p>"
+        "</body></html>", encoding="utf-8")
+    textual = image_placement.grade_site(site)
+    assert image_placement.is_graded(textual) is False, (
+        "a delivery with no picture and no product list reported a graded pass"
+    )
+    assert textual["nothing_to_grade"] is True
+    assert textual["counts"] == {}, "counts were published for a delivery that graded nothing"
+    assert "NOTHING was graded" in " ".join(textual["not_measured"])
+
+    (site / "public" / "assets").mkdir()
+    (site / "public" / "assets" / "bowl.png").write_text("x", encoding="utf-8")
+    (site / "public" / "index.html").write_text(
+        "<!doctype html><html><body><h1>Ridge Pottery Studio</h1>"
+        "<img src='assets/bowl.png' alt='A grey stoneware bowl'></body></html>",
+        encoding="utf-8")
+    assert image_placement.is_graded(image_placement.grade_site(site)) is True, (
+        "the real grader reported ungraded on a delivery carrying media - the seam test "
+        "would pass for the wrong reason"
+    )
+
+
 def test_several_unmeasured_instruments_each_keep_their_own_disclosure() -> None:
     """AGGREGATE: N instruments merging into ONE report do not collapse into one caveat.
 
@@ -833,3 +1058,101 @@ def test_smoke_contract_stays_quiet_where_no_contract_applies() -> None:
     )
     graded = SwapDriver._design_note(SwapDriver.__new__(SwapDriver), honoured)
     assert "the behaviour check the plan declared was exercised" in graded, graded
+
+
+def test_link_lint_stays_quiet_on_a_site_whose_links_resolve(tmp_path: Path) -> None:
+    """QUIET: an ordinary, correct little site scans measured and produces NO finding.
+
+    Every reference here is a shape a coder writes without being told to: a relative page
+    link, a site-absolute stylesheet, an image beside the page, an in-page anchor and an
+    outbound link. None of them is a defect, and this instrument fires HARD - a finding here
+    forces a FIX iteration - so a false accusation would send a coder to "fix" correct markup
+    and teach the reader to stop believing the report.
+
+    The exact counts are asserted, not just the absence of findings: an instrument that
+    stayed quiet by resolving nothing would be quiet for the wrong reason."""
+    site = tmp_path / "site"
+    (site / "public" / "styles").mkdir(parents=True)
+    (site / "public" / "images").mkdir(parents=True)
+    (site / "public" / "index.html").write_text(
+        "<!doctype html><html><head><title>Ridge Pottery Studio</title>"
+        "<link rel='stylesheet' href='/styles/site.css'></head><body>"
+        "<h1 id='top'>Hand-thrown stoneware</h1>"
+        "<img src='images/bowl.png' alt='A grey stoneware bowl on a workbench'>"
+        "<a href='about.html'>About the studio</a>"
+        "<a href='#top'>Back to top</a>"
+        "<a href='https://example.org/stockists'>Our stockist</a>"
+        "</body></html>", encoding="utf-8")
+    (site / "public" / "about.html").write_text(
+        "<!doctype html><html><body><p>The studio opened in 2019.</p>"
+        "<a href='index.html'>Home</a></body></html>", encoding="utf-8")
+    (site / "public" / "styles" / "site.css").write_text("body { margin: 0; }\n", encoding="utf-8")
+    (site / "public" / "images" / "bowl.png").write_text("x", encoding="utf-8")
+
+    report = link_lint.lint_site(site)
+
+    assert link_lint.is_measured(report) is True
+    assert report["findings"] == [], f"a correct site was convicted: {report['findings']}"
+    assert report["hard"] is False
+    assert report["files_scanned"] == 2
+    assert report["counts"] == {"resolved": 4, "broken": 0, "undecidable": 0,
+                                "external": 1, "in_page": 1}
+
+    summary = link_lint.format_operator_summary(report)
+    assert "leads somewhere real" in summary
+    assert "NOT confirmed working" not in summary, (
+        "a site with nothing built at runtime was told some of its links were unchecked"
+    )
+    assert swap_ops._with_link_report(
+        {"evidence": "served + loaded"}, report)["evidence"] == "served + loaded", (
+        "a measured, clean link report spoke on a healthy run"
+    )
+
+
+def test_image_placement_stays_quiet_on_a_correctly_placed_gallery(tmp_path: Path) -> None:
+    """QUIET: four products, four photographs, one logo and one hero banner. Silence.
+
+    This is the population this instrument has to live in without nagging. The logo appears
+    on every page and the hero on the home page, which is CORRECT and is the shape a repeat
+    rule tuned by threshold would convict - the guard here is structural instead (only an
+    asset an ITEM declares can reach the counter), and this test is what proves the structure
+    holds on a real tree rather than in the docstring that claims it."""
+    site = tmp_path / "site"
+    (site / "public" / "assets").mkdir(parents=True)
+    (site / "data").mkdir(parents=True)
+    for page in ("index", "shop", "about"):
+        (site / "public" / f"{page}.html").write_text(
+            "<!doctype html><html><body>"
+            "<img src='assets/logo.png' alt='Ridge Pottery Studio'>"
+            "<img src='assets/hero.png' alt='The potter at the wheel'>"
+            f"<p>{page}</p></body></html>", encoding="utf-8")
+    for asset in ("logo", "hero", "mug", "bowl", "vase", "plate"):
+        (site / "public" / "assets" / f"{asset}.png").write_text("x", encoding="utf-8")
+    (site / "data" / "pieces.json").write_text(json.dumps([
+        {"name": "Classic Mug", "category": "mugs", "image": "assets/mug.png"},
+        {"name": "Deep Bowl", "category": "bowls", "image": "assets/bowl.png"},
+        {"name": "Tall Vase", "category": "vases", "image": "assets/vase.png"},
+        {"name": "Side Plate", "category": "plates", "image": "assets/plate.png"},
+    ]), encoding="utf-8")
+
+    report = image_placement.grade_site(site)
+
+    assert image_placement.is_graded(report) is True
+    assert report["findings"] == [], f"a correct gallery was convicted: {report['findings']}"
+    assert report["hard"] is False
+    assert report["checks"]["item_placement"]["checked"] is True
+    assert report["checks"]["asset_usage"]["checked"] is True
+    assert report["counts"]["items"] == 4
+    assert report["counts"]["distinct_item_images"] == 4
+    assert report["counts"]["max_items_per_image"] == 1
+    assert report["counts"]["unreferenced_assets"] == 0, (
+        "a logo and a hero used as page furniture were reported as pictures nobody uses"
+    )
+
+    summary = image_placement.format_operator_summary(report)
+    assert "NOT CHECKED" not in summary
+    assert "did not run" not in summary
+    assert swap_ops._with_media_report(
+        {"evidence": "served + loaded"}, report)["evidence"] == "served + loaded", (
+        "a graded gallery with nothing wrong spoke on a healthy run"
+    )

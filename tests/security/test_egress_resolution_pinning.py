@@ -342,11 +342,26 @@ class TestPinnedIpScreenTagging:
             is False
         )
 
-    def test_connect_to_pinned_ip_tags_socket_for_screening(self, monkeypatch) -> None:
-        """End-to-end at the socket boundary: a connect to a pinned IP tags the
-        socket (``_screen_outbound_enabled``). We make the pinned IP a loopback-backed
-        listener via a faked _is_external_screen_target so no external socket opens —
-        the load-bearing assertion is that the TAGGING fires on a pinned destination.
+    def test_the_pinned_ip_predicate_decides_the_screening_tag(self, monkeypatch) -> None:
+        """A pinned destination satisfies the screen-target PREDICATE.
+
+        Renamed from ``test_connect_to_pinned_ip_tags_socket_for_screening`` after
+        the #1580 review: that name and its docstring claimed an end-to-end proof
+        at the socket boundary, and the body never makes one. The loopback connect
+        below is real but decorative — a loopback connect correctly does NOT tag,
+        as the comment in the body says — and the load-bearing assertion calls
+        ``_is_external_screen_target`` on a tuple. No socket here is ever tagged.
+
+        The cost of the old name was measured, not theoretical: the review's mutant
+        of ``_is_external_screen_target`` died here, so the predicate looked
+        locked — while its mutant of ``_tag_screen_outbound`` survived the whole
+        security tier outside one environment-gated file, because this test looked
+        like the tagger's lock and was not.
+
+        The connect PATH is locked in
+        ``test_egress_screen_wiring.py::TestTheExternalTagIsEarnedNotAssumed``.
+        What this test owns, and owns well, is the narrower claim its assertion
+        makes: pinning drives the predicate.
         """
         egress_guard.allow_external_endpoint(_FAKE_HOST, _FAKE_HOST_PORT)
         egress_guard._record_resolution_pins(_FAKE_HOST, _fake_addrinfo(_PINNED_IP_A))

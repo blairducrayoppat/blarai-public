@@ -25,13 +25,16 @@ pruned-6L draft.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
 
 from shared.models.weight_integrity import (
     IntegrityCheckResult,
+    verify_all_manifest_entries,
     verify_weight_integrity,
 )
 
@@ -289,10 +292,52 @@ class SharedInferencePipeline:
         return self._generate_calls
 
 
+# ---------------------------------------------------------------------------
+# Model layout — which pipeline class does this export need? (#930)
+# ---------------------------------------------------------------------------
+# The 14B ships ONE weight binary and a topology beside it
+# (``openvino_model.xml`` + ``.bin``) and is served through ``LLMPipeline``
+# with a draft model for speculative decoding. A natively multimodal export
+# (Qwen3.6-35B-A3B, Gemma 4) ships SEVEN binaries, names its language tower
+# ``openvino_language_model.*``, has no ``openvino_model.*`` at all, and is
+# served through ``VLMPipeline``, which supports no speculative decoding.
+#
+# Detect from the FILES rather than from config, so a mis-set config cannot
+# make the builder reach for the wrong pipeline class and fail obscurely.
+
+LLM_PRIMARY_XML: str = "openvino_model.xml"
+LLM_PRIMARY_BIN: str = "openvino_model.bin"
+VLM_PRIMARY_XML: str = "openvino_language_model.xml"
+
+
+class BrainLayout(str, Enum):
+    """The export shape, and therefore the pipeline class and draft contract."""
+
+    TEXT_LLM = "text-llm"
+    """``openvino_model.xml`` + ``.bin`` -> ``LLMPipeline``, draft REQUIRED."""
+
+    MULTIMODAL_VLM = "multimodal-vlm"
+    """``openvino_language_model.xml`` -> ``VLMPipeline``, draft IMPOSSIBLE."""
+
+
+def detect_brain_layout(model_dir: "str | Path") -> "BrainLayout | None":
+    """Return the layout of *model_dir*, or ``None`` if it is neither.
+
+    Fail-closed by construction: an unrecognised directory returns ``None`` and
+    the caller refuses to build, rather than guessing a pipeline class.
+    """
+    model_dir = Path(model_dir)
+    if (model_dir / VLM_PRIMARY_XML).exists():
+        return BrainLayout.MULTIMODAL_VLM
+    if (model_dir / LLM_PRIMARY_XML).exists() and (model_dir / LLM_PRIMARY_BIN).exists():
+        return BrainLayout.TEXT_LLM
+    return None
+
+
 def build_shared_pipeline(
     *,
     model_dir: Path,
-    draft_model_dir: Path,
+    draft_model_dir: Path | None,
     enable_prefix_caching: bool,
     device: str = "GPU",
     target_manifest_path: Path | None = None,
@@ -355,42 +400,120 @@ def build_shared_pipeline(
             error="OpenVINO GenAI not available",
         )
 
-    # Resolve weight files.
-    target_bin = model_dir / "openvino_model.bin"
-    draft_bin = draft_model_dir / "openvino_model.bin"
-
-    if not (model_dir / "openvino_model.xml").exists() or not target_bin.exists():
+    # Resolve the export's SHAPE from its files (#930). A multimodal brain has
+    # no `openvino_model.*` at all and cannot take a draft; the historical gate
+    # below demanded both and so refused every model but the 14B.
+    layout = detect_brain_layout(model_dir)
+    if layout is None:
         return SharedPipelineBuildResult(
             pipeline=None,
             target_integrity=None,
             draft_integrity=None,
-            error=f"Target model files missing under {model_dir}",
+            error=(
+                f"Target model files missing under {model_dir}: found neither "
+                f"{LLM_PRIMARY_XML}+{LLM_PRIMARY_BIN} (text LLM) nor "
+                f"{VLM_PRIMARY_XML} (multimodal)."
+            ),
         )
-    if not (draft_model_dir / "openvino_model.xml").exists() or not draft_bin.exists():
-        return SharedPipelineBuildResult(
-            pipeline=None,
-            target_integrity=None,
-            draft_integrity=None,
-            error=f"Draft model files missing under {draft_model_dir}",
+
+    target_bin = model_dir / LLM_PRIMARY_BIN  # single-binary layout only
+    draft_bin = (draft_model_dir / LLM_PRIMARY_BIN) if draft_model_dir else None
+
+    if layout is BrainLayout.TEXT_LLM:
+        # Speculative decoding is MANDATORY on this path (ADR-012 §3.1):
+        # autoregressive solo runs at ~2-3 tok/s on the 14B. A missing draft is
+        # a refusal, never a silent downgrade.
+        if draft_model_dir is None:
+            return SharedPipelineBuildResult(
+                pipeline=None,
+                target_integrity=None,
+                draft_integrity=None,
+                error=(
+                    "A text-LLM brain requires a draft model (ADR-012 §3.1) and "
+                    "draft_model_dir is None — refusing to build a silently "
+                    "un-accelerated pipeline."
+                ),
+            )
+        if (
+            not (draft_model_dir / LLM_PRIMARY_XML).exists()
+            or draft_bin is None
+            or not draft_bin.exists()
+        ):
+            return SharedPipelineBuildResult(
+                pipeline=None,
+                target_integrity=None,
+                draft_integrity=None,
+                error=f"Draft model files missing under {draft_model_dir}",
+            )
+    elif draft_model_dir is not None:
+        # Not fatal, but never silent: a draft passed for a VLM brain is
+        # ignored by the runtime, and an operator who believes speculative
+        # decoding is on would be wrong about the system's speed contract.
+        logger.warning(
+            "Shared pipeline: draft_model_dir=%s was supplied for a MULTIMODAL "
+            "brain; VLMPipeline has no speculative decoding, so the draft is "
+            "IGNORED. Expect the un-accelerated throughput contract.",
+            draft_model_dir,
         )
 
     # Weight integrity — Fail-Closed on any failure.
     target_integrity: IntegrityCheckResult | None = None
     draft_integrity: IntegrityCheckResult | None = None
     if target_manifest_path is not None:
-        target_integrity = verify_weight_integrity(
-            model_path=str(target_bin),
-            manifest_path=str(target_manifest_path),
-        )
-        if not target_integrity.verified:
-            return SharedPipelineBuildResult(
-                pipeline=None,
-                target_integrity=target_integrity,
-                draft_integrity=None,
-                error=f"Target weight integrity FAILED: {target_integrity.error}",
+        if layout is BrainLayout.MULTIMODAL_VLM:
+            # A multimodal export has SEVEN binaries. Checking only a primary
+            # one would leave the rest unverified, so sweep every entry AND
+            # reject any unlisted .bin (the swap-and-drop defense) — and
+            # require the TPM signature, because for this layout the sweep is
+            # the ONLY integrity gate. Without require_signed it would be
+            # digest-checked but not signature-checked: quietly weaker than the
+            # 14B standing beside it (#930).
+            sweep = verify_all_manifest_entries(
+                model_dir, target_manifest_path, require_signed=True
             )
-        logger.info("Shared pipeline: target weight integrity verified (%s)", target_bin)
-    if draft_manifest_path is not None:
+            target_integrity = (
+                sweep.per_file[0]
+                if sweep.per_file
+                else IntegrityCheckResult(
+                    verified=False,
+                    computed_digest="",
+                    expected_digest="",
+                    model_path=str(model_dir),
+                    error=sweep.error or "empty manifest sweep",
+                )
+            )
+            if not sweep.all_verified:
+                return SharedPipelineBuildResult(
+                    pipeline=None,
+                    target_integrity=target_integrity,
+                    draft_integrity=None,
+                    error=(
+                        "Target weight integrity FAILED (multi-file, signed): "
+                        f"{sweep.error}"
+                    ),
+                )
+            logger.info(
+                "Shared pipeline: target weight integrity verified — %d files "
+                "swept, TPM signature checked (%s)",
+                len(sweep.per_file),
+                model_dir,
+            )
+        else:
+            target_integrity = verify_weight_integrity(
+                model_path=str(target_bin),
+                manifest_path=str(target_manifest_path),
+            )
+            if not target_integrity.verified:
+                return SharedPipelineBuildResult(
+                    pipeline=None,
+                    target_integrity=target_integrity,
+                    draft_integrity=None,
+                    error=f"Target weight integrity FAILED: {target_integrity.error}",
+                )
+            logger.info(
+                "Shared pipeline: target weight integrity verified (%s)", target_bin
+            )
+    if draft_manifest_path is not None and draft_bin is not None:
         # FUT-05 / #107: require_signed_draft threads the draft manifest through
         # the TPM-signature-checked loader when the LA has flipped the draft
         # posture. Default False = digest-only: the draft .sig is NOT consulted
@@ -423,6 +546,84 @@ def build_shared_pipeline(
     scheduler = ov_genai.SchedulerConfig()
     scheduler.cache_size = 3
     scheduler.enable_prefix_caching = enable_prefix_caching
+
+    # A MULTIMODAL brain takes an entirely different pipeline class, and takes
+    # no draft: VLMPipeline has no speculative decoding at all (#930). Kept as
+    # an early, separate branch rather than threaded through the LLM path,
+    # because the two share no construction kwargs worth unifying and a merged
+    # branch would read as if a draft were merely optional here.
+    if layout is BrainLayout.MULTIMODAL_VLM:
+        try:
+            vlm_config: dict[str, object] = {
+                "PERFORMANCE_HINT": "LATENCY",
+                "MODEL_PRIORITY": model_priority,
+                "INFERENCE_PRECISION_HINT": "f16",
+                "GPU_ENABLE_SDPA_OPTIMIZATION": "ON",
+                "CACHE_DIR": "",
+            }
+            if kv_cache_precision:
+                vlm_config["KV_CACHE_PRECISION"] = kv_cache_precision
+            pipeline = ov_genai.VLMPipeline(str(model_dir), device, **vlm_config)
+        except TypeError as exc:
+            logger.warning(
+                "Shared pipeline: VLMPipeline rejected compile hints (%s) — "
+                "retrying bare.",
+                exc,
+            )
+            try:
+                pipeline = ov_genai.VLMPipeline(str(model_dir), device)
+            except Exception as exc2:  # noqa: BLE001
+                return SharedPipelineBuildResult(
+                    pipeline=None,
+                    target_integrity=target_integrity,
+                    draft_integrity=None,
+                    error=f"VLMPipeline construction failed: {exc2}",
+                )
+        except Exception as exc:  # noqa: BLE001 — fail-closed
+            return SharedPipelineBuildResult(
+                pipeline=None,
+                target_integrity=target_integrity,
+                draft_integrity=None,
+                error=f"VLMPipeline construction failed: {exc}",
+            )
+        logger.info(
+            "Shared pipeline: MULTIMODAL brain built (%s on %s) — NO speculative "
+            "decoding on this path.",
+            model_dir.name,
+            device,
+        )
+        def _rebuild_vlm() -> Any:
+            # Same contract as the text path's closure: UC-010 image generation
+            # EVICTS the resident brain to free RAM, and the next PA/AO call
+            # must transparently reload it. Without this the wrapper refuses
+            # (fail-closed) and the first turn after an image generation dies —
+            # correct, but a functional regression against the 14B it replaces.
+            res = build_shared_pipeline(
+                model_dir=model_dir,
+                draft_model_dir=None,
+                enable_prefix_caching=enable_prefix_caching,
+                device=device,
+                target_manifest_path=target_manifest_path,
+                draft_manifest_path=None,
+                model_priority=model_priority,
+                kv_cache_precision=kv_cache_precision,
+                require_signed_draft=require_signed_draft,
+            )
+            if not res.ok or res.pipeline is None:
+                raise RuntimeError(
+                    "Multimodal brain reload failed (Fail-Closed): "
+                    f"{res.error or 'unknown error'}"
+                )
+            return res.pipeline.raw
+
+        return SharedPipelineBuildResult(
+            pipeline=SharedInferencePipeline(
+                pipeline, threading.Lock(), rebuild=_rebuild_vlm
+            ),
+            target_integrity=target_integrity,
+            draft_integrity=None,
+            error=None,
+        )
 
     try:
         draft_model = ov_genai.draft_model(
@@ -515,3 +716,55 @@ def build_shared_pipeline(
         target_integrity=target_integrity,
         draft_integrity=draft_integrity,
     )
+
+
+# ---------------------------------------------------------------------------
+# The brain override — ONE resolver, used by the launcher AND both services
+# ---------------------------------------------------------------------------
+# It lives here, not in the launcher, because a brain selection that only the
+# launcher honours is worse than none: the shared pipeline would serve the new
+# model while each service still verified the OLD model's weights, loaded the
+# OLD model's tokenizer, and made template decisions from the OLD model's path.
+# That exact split was live for one boot on 2026-09-22 and is what this
+# function exists to make impossible (#930).
+
+ENV_BRAIN_MODEL_DIR: str = "BLARAI_BRAIN_MODEL_DIR"
+
+
+def resolve_brain_override(config_value: "str | None" = None) -> "Path | None":
+    """Return the overriding brain directory, or ``None`` for the default 14B.
+
+    Precedence: the ``BLARAI_BRAIN_MODEL_DIR`` environment variable (a
+    session-scoped try-it, dying with the process), then *config_value* (the
+    durable ``[gpu].brain_model_dir`` key). Empty/unset at both levels returns
+    ``None`` and every caller keeps its shipped behaviour byte-for-byte.
+
+    Raises:
+        FileNotFoundError: if an override IS set and does not exist. This is
+            deliberately NOT fail-soft: falling back to the 14B would mean an
+            operator asked for a different brain and never learned it did not
+            happen. Every other resolution failure defaults to the 14B.
+    """
+    raw = os.environ.get(ENV_BRAIN_MODEL_DIR, "").strip()
+    source = ENV_BRAIN_MODEL_DIR
+    if not raw:
+        raw = (config_value or "").strip()
+        source = "[gpu].brain_model_dir"
+    if not raw:
+        return None
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        candidate = Path(__file__).resolve().parents[2] / candidate
+    if not candidate.is_dir():
+        raise FileNotFoundError(
+            f"brain override from {source} points at a directory that does not "
+            f"exist: {candidate}. Refusing to fall back to the default brain "
+            f"silently."
+        )
+    logger.warning(
+        "BRAIN OVERRIDE from %s: %s (layout=%s)",
+        source,
+        candidate,
+        getattr(detect_brain_layout(candidate), "value", "UNRECOGNISED"),
+    )
+    return candidate

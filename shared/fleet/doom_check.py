@@ -19,7 +19,7 @@ child is actually REGISTERED (in flight). The watched-artifact vocabulary and th
 process-name/CPU heuristics are lifted from the harness byte-identically (this
 module is their SSOT now — ``monitor.py`` imports them back), including every
 false-doom scar: the #687 review/design/swap logs, the night-20260709 B4
-verify-gate workers (uv/ruff/git), and the 240 s grace those incidents set
+verify-gate workers (uv/ruff/git), and the grace those incidents set
 (registered in ``shared/timeout_registry.py``).
 
 **Child-registered is the arming condition.** Only the live run-task path
@@ -93,7 +93,30 @@ CPU_ACTIVE_THRESHOLD: float = 5.0
 #: comfortably exceed the longest legitimately log-quiet, CPU-quiet gap INSIDE a
 #: healthy step (the B4 verify gate hands off between native workers), while
 #: still dooming a truly dead run in minutes — the overall budget backstops.
-DOOM_STALL_GRACE_S: float = 240.0
+#:
+#: RAISED 240 -> 900 (#1366, 2026-08-10). **The old value violated the rule stated
+#: two lines above it.** The longest legitimately-quiet gap inside a healthy step is
+#: not a guess — the coder's own classifier DEFINES it as
+#: ``acp_coder.ACP_IDLE_TIMEOUT_S`` = 600 s, the point at which the coder itself
+#: declares a generation wedged. A 240 s doom window sits INSIDE that, so the
+#: least-informed judge always fired first and the coder's own verdict was never
+#: reached.
+#:
+#: That cost a whole card on night-20260809-230002: last coder progress 23:13:06,
+#: doom fired 23:17:06, and the idle classifier would have labelled the stall
+#: ``idle`` at 23:23:06. That label is the PRECONDITION for #740/W7's resample —
+#: an idle stall is explicitly retry-eligible while a ceiling timeout is terminal.
+#: So the retry was real, correctly wired, and permanently unreachable under the
+#: battery: only ``c1`` ever ran, on a card with attempts remaining and eight hours
+#: of granted budget unused.
+#:
+#: 900 = the 600 s inner classifier plus margin, so the better-informed judge always
+#: decides first and doom returns to its actual job — catching a run that nothing
+#: else is watching. The cost is that a genuinely dead run burns ~11 extra minutes
+#: before the outer stop; against an 8 h card that is ~2%, and the alternative cost
+#: a card outright. Lesson 221's seventh instance; the ordering is now gate-locked in
+#: ``tests/security/test_watchdog_windows_nest.py``.
+DOOM_STALL_GRACE_S: float = 900.0
 
 #: Watchdog poll cadence (poll grain, below-registry-value — inventoried in the
 #: timeout registry's grain list alongside the harness monitor's identical 5 s).
