@@ -251,7 +251,9 @@ MARKER_ROOTS = ("tests", "scripts", "services", "shared", "launcher", ".claude")
 MARKER_SUFFIXES = (".py", ".ps1", ".sh")
 MARKER_ROOT_FILES = ("conftest.py",)
 MARKER_SELF = frozenset({"scripts/extract_rules_corpus.py", "tests/security/test_rules_corpus.py"})
-_SKIP_DIRS = frozenset({".git", ".venv", "venv", "__pycache__", "node_modules", "models", "userdata"})
+# "worktrees": the app parks session worktrees under .claude/worktrees/; each is another checkout whose markers
+# belong to its own branch, so walking into them double-counts refs under paths that imply no kind.
+_SKIP_DIRS = frozenset({".git", ".venv", "venv", "__pycache__", "node_modules", "models", "userdata", "worktrees"})
 
 
 def _kind_for_path(rel: str) -> str:

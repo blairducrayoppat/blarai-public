@@ -11,6 +11,7 @@ does not show).
 |---|---|
 | `wfp-spike/` | #1671: the raw Windows Filtering Platform (WFP) block spike: script, its README, console output, 3 result files |
 | `confined-model-spike/` | #1689: the spike. `as-run/` = the scripts as they stood after the runs (the results come from these); `post-run-hardened/` = the same scripts after later hardening; `runs/` = Test A (2 runs), Test B (1 run), in-process control |
+| `arm1-permit/` | arm 1 (the permit filter's role; the confined account as CLIENT of a real local server over loopback while blocked): `scripts/` = the changed scripts (`README.md` there lists the changes and the run order), `runs/` = the result files |
 | `preflight/` | #775 read-only pre-flight (account, task, ACL listing, offline suites), 2026-10-05 |
 | `reviews/` | review reports behind the negative results: agentic-setup fused leg; #1690 rules tooling (copy from the unmerged branch `feat/1690-install-hardening` at `22efaac9`, not on main) |
 | `CHANGES.md`, `make_changes.py` | generated table of what was changed in each file, and the generator (the test regenerates it); `as-run/MANIFEST.sha256` pins the as-run set |
@@ -47,6 +48,8 @@ scheduled-task vault).
 3. Confined-model spike (needs an OpenVINO GenAI 2026.4 venv and a model directory; set the paths in `spike-lib.ps1`):
    `Run-Spike-AsAdmin.cmd` (provision), `spike-wfp.ps1 -DryRun`, `-TestA`, `-TestB`, then `spike-cleanup.ps1 -DryRun`, `-Apply`,
    `spike-verify-cleanup.ps1` (exit 0 = clean). The operator paths inside the scripts are now `_OPERATOR_` placeholders.
+4. Arm 1 (needs the provisioned account and the same venv and model): `arm1-permit\scripts\spike-wfp.ps1 -DryRun [-NoLoopbackPermit]`,
+   then `Run-Arm1-AsAdmin.cmd` there (six `-TestC` runs, conditions interleaved), then the cleanup of step 3. See `arm1-permit\scripts\README.md`.
 
 Every WFP object lives in a dynamic session: closing the engine, killing the operator process or rebooting removes it.
 

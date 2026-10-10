@@ -1,0 +1,95 @@
+{
+  "mode": "serve",
+  "started": "2026-10-09T18:09:44.673-04:00",
+  "pid": 19776,
+  "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+  "device_requested": "GPU",
+  "prompt": "Explain in three sentences why the sky is blue.",
+  "versions": {
+    "python": "3.11.9",
+    "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+    "openvino_genai": "2026.4.0.0-3407-7ea2546852a"
+  },
+  "devices": [
+    "CPU",
+    "GPU",
+    "NPU"
+  ],
+  "device_names": {
+    "CPU": "Intel(R) Core(TM) Ultra 7 258V",
+    "GPU": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+    "NPU": "Intel(R) AI Boost"
+  },
+  "runtime_imported": true,
+  "load": {
+    "ok": true,
+    "seconds": 5.661,
+    "error": null,
+    "started": "2026-10-09T18:09:44.673-04:00",
+    "finished": "2026-10-09T18:09:50.700-04:00"
+  },
+  "runs": [
+    {
+      "started": "2026-10-09T18:09:50.700-04:00",
+      "ok": true,
+      "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+      "wall_ms": 3438.4,
+      "first_chunk_s": 0.546,
+      "generated_tokens": 64,
+      "ttft_ms": 412.97,
+      "tpot_ms": 48.0,
+      "tok_per_s_wall": 18.61,
+      "tok_per_s_tpot": 20.83,
+      "finished": "2026-10-09T18:09:54.140-04:00",
+      "index": 1
+    },
+    {
+      "started": "2026-10-09T18:09:54.140-04:00",
+      "ok": true,
+      "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+      "wall_ms": 3063.2,
+      "first_chunk_s": 0.166,
+      "generated_tokens": 64,
+      "ttft_ms": 69.23,
+      "tpot_ms": 47.5,
+      "tok_per_s_wall": 20.89,
+      "tok_per_s_tpot": 21.05,
+      "finished": "2026-10-09T18:09:57.204-04:00",
+      "index": 2
+    }
+  ],
+  "serve": {
+    "bind": "127.0.0.1:56761",
+    "hold_seconds": 840,
+    "started": "2026-10-09T18:09:57.204-04:00",
+    "model_loaded": true,
+    "pid": 19776,
+    "stop_file": "C:\\Users\\_OPERATOR_\\blarai-research-data\\confined-model-spike\\runs\\server\\server-stop-testc-off-20261009-180943.flag",
+    "stopped_by": "stop_file",
+    "finished": "2026-10-09T18:10:09.801-04:00",
+    "requests": [
+      {
+        "t": "2026-10-09T18:09:59.704-04:00",
+        "peer": "127.0.0.1",
+        "path": "/",
+        "status": 200,
+        "model": "model",
+        "wall_ms": 1915.5,
+        "generated_tokens": 32,
+        "ttft_ms": 71.6
+      },
+      {
+        "t": "2026-10-09T18:10:06.878-04:00",
+        "peer": "127.0.0.1",
+        "path": "/",
+        "status": 200,
+        "model": "model",
+        "wall_ms": 1908.3,
+        "generated_tokens": 32,
+        "ttft_ms": 69.2
+      }
+    ],
+    "requests_served": 2
+  },
+  "finished": "2026-10-09T18:10:09.801-04:00"
+}

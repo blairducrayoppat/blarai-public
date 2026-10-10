@@ -1,0 +1,679 @@
+{
+  "spike": "#1689 arm 1: the confined account as CLIENT of a real local model server over loopback while its outbound connects are blocked; with or without the loopback permit filter",
+  "run_id": "testc-on-20261009-180910",
+  "filter_set": "permit_on",
+  "started": "2026-10-09T18:09:10.528-04:00",
+  "block_max_seconds": 240,
+  "env": {
+    "machine_clock": "2026-10-09 18:09:10 -04:00",
+    "uptime_hours": 0.3,
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "ps_version": "5.1.26100.9444",
+    "process_64bit": true,
+    "bitdefender_processes": [
+      "bdagent",
+      "bdntwrk",
+      "bdredline",
+      "bdservicehost",
+      "bduserhost"
+    ],
+    "firewall_profiles": [
+      {
+        "name": "Domain",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": "True",
+        "default_outbound": "NotConfigured"
+      }
+    ],
+    "svc_mpssvc": "Running/Automatic",
+    "svc_BFE": "Running/Automatic",
+    "windows_build": "26200.9457 (25H2)",
+    "ps_host": "ConsoleHost 5.1.26100.9444 (Desktop)",
+    "wsl_state": [
+      "NAME STATE VERSION",
+      "* Ubuntu-24.04 Stopped 2"
+    ]
+  },
+  "server": {
+    "type": "spike_model.py --mode serve, run as the operator from the spike venv",
+    "port": 56744,
+    "pid": 21300,
+    "bound_address": "127.0.0.1:56744",
+    "model_loaded": true,
+    "started": "2026-10-09T18:09:11.195-04:00",
+    "port_file_at": "2026-10-09T18:09:23.846-04:00",
+    "health": {
+      "ok": true,
+      "model_loaded": true,
+      "t": "2026-10-09T18:09:24.738-04:00"
+    },
+    "result_file": "C:\\Users\\_OPERATOR_\\blarai-research-data\\confined-model-spike\\runs\\server\\server-testc-on-20261009-180910.json",
+    "stop": {
+      "stop_requested": "2026-10-09T18:09:37.274-04:00",
+      "exited_within_wait": true,
+      "killed": false,
+      "exit_code": null,
+      "server_result": {
+        "mode": "serve",
+        "started": "2026-10-09T18:09:11.321-04:00",
+        "pid": 18412,
+        "model_dir": "B:\\models\\Qwen3.5-4B-int8-ov",
+        "device_requested": "GPU",
+        "prompt": "Explain in three sentences why the sky is blue.",
+        "versions": {
+          "python": "3.11.9",
+          "openvino": "2026.4.0-22959-99c81491cc3-releases/2026/4",
+          "openvino_genai": "2026.4.0.0-3407-7ea2546852a"
+        },
+        "devices": [
+          "CPU",
+          "GPU",
+          "NPU"
+        ],
+        "device_names": {
+          "CPU": "Intel(R) Core(TM) Ultra 7 258V",
+          "GPU": "Intel(R) Arc(TM) 140V GPU (16GB) (iGPU)",
+          "NPU": "Intel(R) AI Boost"
+        },
+        "runtime_imported": true,
+        "load": {
+          "ok": true,
+          "seconds": 5.645,
+          "error": null,
+          "started": "2026-10-09T18:09:11.321-04:00",
+          "finished": "2026-10-09T18:09:17.348-04:00"
+        },
+        "runs": [
+          {
+            "started": "2026-10-09T18:09:17.348-04:00",
+            "ok": true,
+            "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+            "wall_ms": 3453.2,
+            "first_chunk_s": 0.5588,
+            "generated_tokens": 64,
+            "ttft_ms": 423.62,
+            "tpot_ms": 48.07,
+            "tok_per_s_wall": 18.53,
+            "tok_per_s_tpot": 20.8,
+            "finished": "2026-10-09T18:09:20.803-04:00",
+            "index": 1
+          },
+          {
+            "started": "2026-10-09T18:09:20.803-04:00",
+            "ok": true,
+            "text": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Why the sky is blue.\n    *   Constrai...[truncated to 100 chars]",
+            "wall_ms": 3042.9,
+            "first_chunk_s": 0.1659,
+            "generated_tokens": 64,
+            "ttft_ms": 68.89,
+            "tpot_ms": 47.19,
+            "tok_per_s_wall": 21.03,
+            "tok_per_s_tpot": 21.19,
+            "finished": "2026-10-09T18:09:23.846-04:00",
+            "index": 2
+          }
+        ],
+        "serve": {
+          "bind": "127.0.0.1:56744",
+          "hold_seconds": 840,
+          "started": "2026-10-09T18:09:23.846-04:00",
+          "model_loaded": true,
+          "pid": 18412,
+          "stop_file": "C:\\Users\\_OPERATOR_\\blarai-research-data\\confined-model-spike\\runs\\server\\server-stop-testc-on-20261009-180910.flag",
+          "stopped_by": "stop_file",
+          "finished": "2026-10-09T18:09:37.767-04:00",
+          "requests": [
+            {
+              "t": "2026-10-09T18:09:26.396-04:00",
+              "peer": "127.0.0.1",
+              "path": "/",
+              "status": 200,
+              "model": "model",
+              "wall_ms": 1917.9,
+              "generated_tokens": 32,
+              "ttft_ms": 75.36
+            },
+            {
+              "t": "2026-10-09T18:09:30.604-04:00",
+              "peer": "127.0.0.1",
+              "path": "/",
+              "status": 200,
+              "model": "model",
+              "wall_ms": 1913.2,
+              "generated_tokens": 32,
+              "ttft_ms": 70.71
+            },
+            {
+              "t": "2026-10-09T18:09:34.847-04:00",
+              "peer": "127.0.0.1",
+              "path": "/",
+              "status": 200,
+              "model": "model",
+              "wall_ms": 1895.4,
+              "generated_tokens": 32,
+              "ttft_ms": 69.42
+            }
+          ],
+          "requests_served": 3
+        },
+        "finished": "2026-10-09T18:09:37.767-04:00"
+      }
+    }
+  },
+  "steps": {
+    "preflight": {
+      "spike_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+      "sd_sddl": "D:(A;;CC;;;S-1-5-21-1000000001-1000000002-1000000003-1011)",
+      "objects_absent_before": true,
+      "filter_set": "permit_on",
+      "filters_planned": [
+        "BlarAI #1671 spike: permit-loopback-coder-v4 f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+        "BlarAI #1671 spike: permit-loopback-coder-v6 f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+        "BlarAI #1671 spike: block-coder-v4 f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+        "BlarAI #1671 spike: block-coder-v6 f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+      ]
+    },
+    "operator_baseline": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 29,
+        "error": "",
+        "t": "2026-10-09T18:09:24.8006199-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 22,
+        "error": "",
+        "t": "2026-10-09T18:09:24.8182049-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 23,
+        "error": "",
+        "t": "2026-10-09T18:09:24.8380726-04:00"
+      }
+    ],
+    "account_baseline": {
+      "run_id": "testc-on-20261009-180910-base",
+      "expected_blocked": false,
+      "started": "2026-10-09T18:09:24.850-04:00",
+      "task_ready": true,
+      "task_started": true,
+      "task_start": {
+        "Started": true,
+        "Detail": "state=Running"
+      },
+      "valid": true,
+      "schema_violations": [],
+      "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+      "client_connect": {
+        "target": "127.0.0.1:56744",
+        "ok": true,
+        "status": 200,
+        "ms": 1973,
+        "model_loaded": true,
+        "generated_tokens": 32,
+        "server_pid": 18412,
+        "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+        "error": "",
+        "error_code": 0,
+        "started": "2026-10-09T18:09:26.360-04:00",
+        "t": "2026-10-09T18:09:28.346-04:00"
+      },
+      "outbound_probe": {
+        "probe": {
+          "target": "1.1.1.1:443",
+          "connected": true,
+          "ms": 33,
+          "error": "",
+          "error_code": 0,
+          "t": "2026-10-09T18:09:28.388-04:00"
+        },
+        "blocked": false,
+        "expected_blocked": false
+      },
+      "result": {
+        "schema_version": 1,
+        "run_id": "testc-on-20261009-180910-base",
+        "mode": "client",
+        "started": "2026-10-09T18:09:26.202-04:00",
+        "finished": "2026-10-09T18:09:28.399-04:00",
+        "overall": "pass",
+        "hold_seconds": 5,
+        "expected_blocked": false,
+        "server_port": 56744,
+        "host": {
+          "computer": "_MACHINE_",
+          "ps_version": "5.1.26100.9444",
+          "machine_clock": "2026-10-09 18:09:26 -04:00"
+        },
+        "steps": [
+          {
+            "name": "identity",
+            "status": "pass",
+            "started": "2026-10-09T18:09:26.279-04:00",
+            "finished": "2026-10-09T18:09:26.360-04:00",
+            "detail": "ran as the spike SID, not elevated, session 0",
+            "data": {
+              "whoami_user": "\"_MACHINE_\\blarai-spike\",\"S-1-5-21-1000000001-1000000002-1000000003-1011\"",
+              "token_user": "_MACHINE_\\blarai-spike",
+              "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+              "expected_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+              "groups": [
+                "S-1-5-21-1000000001-1000000002-1000000003-513",
+                "S-1-1-0",
+                "S-1-5-32-545",
+                "S-1-5-3",
+                "S-1-2-1",
+                "S-1-5-11",
+                "S-1-5-15",
+                "S-1-5-113",
+                "S-1-2-0",
+                "S-1-5-64-10"
+              ],
+              "mandatory_label": [
+                "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+              ],
+              "is_admin_role": false,
+              "session_id": 0,
+              "user_interactive": false,
+              "auth_type": "NTLM"
+            }
+          },
+          {
+            "name": "client_connect",
+            "status": "pass",
+            "started": "2026-10-09T18:09:26.360-04:00",
+            "finished": "2026-10-09T18:09:28.352-04:00",
+            "detail": "POST 127.0.0.1:56744: HTTP 200 in 1973 ms, model_loaded=True, tokens=32",
+            "data": {
+              "target": "127.0.0.1:56744",
+              "ok": true,
+              "status": 200,
+              "ms": 1973,
+              "model_loaded": true,
+              "generated_tokens": 32,
+              "server_pid": 18412,
+              "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+              "error": "",
+              "error_code": 0,
+              "started": "2026-10-09T18:09:26.360-04:00",
+              "t": "2026-10-09T18:09:28.346-04:00"
+            }
+          },
+          {
+            "name": "outbound_probe",
+            "status": "pass",
+            "started": "2026-10-09T18:09:28.352-04:00",
+            "finished": "2026-10-09T18:09:28.397-04:00",
+            "detail": "outbound 1.1.1.1:443: CONNECTED; expected_blocked=False",
+            "data": {
+              "probe": {
+                "target": "1.1.1.1:443",
+                "connected": true,
+                "ms": 33,
+                "error": "",
+                "error_code": 0,
+                "t": "2026-10-09T18:09:28.388-04:00"
+              },
+              "blocked": false,
+              "expected_blocked": false
+            }
+          }
+        ]
+      },
+      "finished": "2026-10-09T18:09:29.105-04:00"
+    },
+    "filters_added": {
+      "at": "2026-10-09T18:09:29.136-04:00",
+      "filter_set": "permit_on",
+      "filter_ids": [
+        441686,
+        441687,
+        441688,
+        441689
+      ],
+      "filters": [
+        "BlarAI #1671 spike: permit-loopback-coder-v4 f1100001-0000-4d8e-9a31-2b6d4c8e1f11",
+        "BlarAI #1671 spike: permit-loopback-coder-v6 f1100002-0000-4d8e-9a31-2b6d4c8e1f12",
+        "BlarAI #1671 spike: block-coder-v4 f1100003-0000-4d8e-9a31-2b6d4c8e1f21",
+        "BlarAI #1671 spike: block-coder-v6 f1100004-0000-4d8e-9a31-2b6d4c8e1f22"
+      ]
+    },
+    "account_during": {
+      "run_id": "testc-on-20261009-180910-block",
+      "expected_blocked": true,
+      "started": "2026-10-09T18:09:29.146-04:00",
+      "task_ready": true,
+      "task_started": true,
+      "task_start": {
+        "Started": true,
+        "Detail": "state=Running"
+      },
+      "valid": true,
+      "schema_violations": [],
+      "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+      "client_connect": {
+        "target": "127.0.0.1:56744",
+        "ok": true,
+        "status": 200,
+        "ms": 1973,
+        "model_loaded": true,
+        "generated_tokens": 32,
+        "server_pid": 18412,
+        "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+        "error": "",
+        "error_code": 0,
+        "started": "2026-10-09T18:09:30.569-04:00",
+        "t": "2026-10-09T18:09:32.542-04:00"
+      },
+      "outbound_probe": {
+        "probe": {
+          "target": "1.1.1.1:443",
+          "connected": false,
+          "ms": 21,
+          "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+          "error_code": 10013,
+          "t": "2026-10-09T18:09:32.572-04:00"
+        },
+        "blocked": true,
+        "expected_blocked": true
+      },
+      "result": {
+        "schema_version": 1,
+        "run_id": "testc-on-20261009-180910-block",
+        "mode": "client",
+        "started": "2026-10-09T18:09:30.411-04:00",
+        "finished": "2026-10-09T18:09:32.587-04:00",
+        "overall": "pass",
+        "hold_seconds": 5,
+        "expected_blocked": true,
+        "server_port": 56744,
+        "host": {
+          "computer": "_MACHINE_",
+          "ps_version": "5.1.26100.9444",
+          "machine_clock": "2026-10-09 18:09:30 -04:00"
+        },
+        "steps": [
+          {
+            "name": "identity",
+            "status": "pass",
+            "started": "2026-10-09T18:09:30.475-04:00",
+            "finished": "2026-10-09T18:09:30.554-04:00",
+            "detail": "ran as the spike SID, not elevated, session 0",
+            "data": {
+              "whoami_user": "\"_MACHINE_\\blarai-spike\",\"S-1-5-21-1000000001-1000000002-1000000003-1011\"",
+              "token_user": "_MACHINE_\\blarai-spike",
+              "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+              "expected_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+              "groups": [
+                "S-1-5-21-1000000001-1000000002-1000000003-513",
+                "S-1-1-0",
+                "S-1-5-32-545",
+                "S-1-5-3",
+                "S-1-2-1",
+                "S-1-5-11",
+                "S-1-5-15",
+                "S-1-5-113",
+                "S-1-2-0",
+                "S-1-5-64-10"
+              ],
+              "mandatory_label": [
+                "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+              ],
+              "is_admin_role": false,
+              "session_id": 0,
+              "user_interactive": false,
+              "auth_type": "NTLM"
+            }
+          },
+          {
+            "name": "client_connect",
+            "status": "pass",
+            "started": "2026-10-09T18:09:30.554-04:00",
+            "finished": "2026-10-09T18:09:32.542-04:00",
+            "detail": "POST 127.0.0.1:56744: HTTP 200 in 1973 ms, model_loaded=True, tokens=32",
+            "data": {
+              "target": "127.0.0.1:56744",
+              "ok": true,
+              "status": 200,
+              "ms": 1973,
+              "model_loaded": true,
+              "generated_tokens": 32,
+              "server_pid": 18412,
+              "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+              "error": "",
+              "error_code": 0,
+              "started": "2026-10-09T18:09:30.569-04:00",
+              "t": "2026-10-09T18:09:32.542-04:00"
+            }
+          },
+          {
+            "name": "outbound_probe",
+            "status": "pass",
+            "started": "2026-10-09T18:09:32.542-04:00",
+            "finished": "2026-10-09T18:09:32.587-04:00",
+            "detail": "outbound 1.1.1.1:443: BLOCKED (Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"; code 10013); expected_blocked=True",
+            "data": {
+              "probe": {
+                "target": "1.1.1.1:443",
+                "connected": false,
+                "ms": 21,
+                "error": "Exception calling \"EndConnect\" with \"1\" argument(s): \"An attempt was made to access a socket in a way forbidden by its access permissions 1.1.1.1:443\"",
+                "error_code": 10013,
+                "t": "2026-10-09T18:09:32.572-04:00"
+              },
+              "blocked": true,
+              "expected_blocked": true
+            }
+          }
+        ]
+      },
+      "finished": "2026-10-09T18:09:33.305-04:00"
+    },
+    "watchdog": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-09T18:09:30.7770729-04:00"
+      },
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 20,
+        "error": "",
+        "t": "2026-10-09T18:09:31.9867652-04:00"
+      }
+    ],
+    "operator_during": [
+      {
+        "target": "1.1.1.1:443",
+        "ok": true,
+        "ms": 19,
+        "error": "",
+        "t": "2026-10-09T18:09:33.3216175-04:00"
+      },
+      {
+        "target": "8.8.8.8:443",
+        "ok": true,
+        "ms": 21,
+        "error": "",
+        "t": "2026-10-09T18:09:33.3532840-04:00"
+      }
+    ],
+    "engine_closed_at": "2026-10-09T18:09:33.353-04:00",
+    "engine_close_status": "0x00000000",
+    "removal_engine_check": {
+      "sublayer_present": false,
+      "provider_present": false,
+      "filters_present": []
+    },
+    "operator_after_removal": {
+      "target": "1.1.1.1:443",
+      "ok": true,
+      "ms": 19,
+      "error": "",
+      "t": "2026-10-09T18:09:33.3693796-04:00"
+    },
+    "account_after_removal": {
+      "run_id": "testc-on-20261009-180910-after",
+      "expected_blocked": false,
+      "started": "2026-10-09T18:09:33.385-04:00",
+      "task_ready": true,
+      "task_started": true,
+      "task_start": {
+        "Started": true,
+        "Detail": "state=Running"
+      },
+      "valid": true,
+      "schema_violations": [],
+      "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+      "client_connect": {
+        "target": "127.0.0.1:56744",
+        "ok": true,
+        "status": 200,
+        "ms": 1952,
+        "model_loaded": true,
+        "generated_tokens": 32,
+        "server_pid": 18412,
+        "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+        "error": "",
+        "error_code": 0,
+        "started": "2026-10-09T18:09:34.812-04:00",
+        "t": "2026-10-09T18:09:36.763-04:00"
+      },
+      "outbound_probe": {
+        "probe": {
+          "target": "1.1.1.1:443",
+          "connected": true,
+          "ms": 37,
+          "error": "",
+          "error_code": 0,
+          "t": "2026-10-09T18:09:36.811-04:00"
+        },
+        "blocked": false,
+        "expected_blocked": false
+      },
+      "result": {
+        "schema_version": 1,
+        "run_id": "testc-on-20261009-180910-after",
+        "mode": "client",
+        "started": "2026-10-09T18:09:34.653-04:00",
+        "finished": "2026-10-09T18:09:36.811-04:00",
+        "overall": "pass",
+        "hold_seconds": 5,
+        "expected_blocked": false,
+        "server_port": 56744,
+        "host": {
+          "computer": "_MACHINE_",
+          "ps_version": "5.1.26100.9444",
+          "machine_clock": "2026-10-09 18:09:34 -04:00"
+        },
+        "steps": [
+          {
+            "name": "identity",
+            "status": "pass",
+            "started": "2026-10-09T18:09:34.716-04:00",
+            "finished": "2026-10-09T18:09:34.796-04:00",
+            "detail": "ran as the spike SID, not elevated, session 0",
+            "data": {
+              "whoami_user": "\"_MACHINE_\\blarai-spike\",\"S-1-5-21-1000000001-1000000002-1000000003-1011\"",
+              "token_user": "_MACHINE_\\blarai-spike",
+              "token_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+              "expected_sid": "S-1-5-21-1000000001-1000000002-1000000003-1011",
+              "groups": [
+                "S-1-5-21-1000000001-1000000002-1000000003-513",
+                "S-1-1-0",
+                "S-1-5-32-545",
+                "S-1-5-3",
+                "S-1-2-1",
+                "S-1-5-11",
+                "S-1-5-15",
+                "S-1-5-113",
+                "S-1-2-0",
+                "S-1-5-64-10"
+              ],
+              "mandatory_label": [
+                "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+              ],
+              "is_admin_role": false,
+              "session_id": 0,
+              "user_interactive": false,
+              "auth_type": "NTLM"
+            }
+          },
+          {
+            "name": "client_connect",
+            "status": "pass",
+            "started": "2026-10-09T18:09:34.796-04:00",
+            "finished": "2026-10-09T18:09:36.763-04:00",
+            "detail": "POST 127.0.0.1:56744: HTTP 200 in 1952 ms, model_loaded=True, tokens=32",
+            "data": {
+              "target": "127.0.0.1:56744",
+              "ok": true,
+              "status": 200,
+              "ms": 1952,
+              "model_loaded": true,
+              "generated_tokens": 32,
+              "server_pid": 18412,
+              "completion": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Reply with one short sentence.\n    *  ...[truncated to 100 chars]",
+              "error": "",
+              "error_code": 0,
+              "started": "2026-10-09T18:09:34.812-04:00",
+              "t": "2026-10-09T18:09:36.763-04:00"
+            }
+          },
+          {
+            "name": "outbound_probe",
+            "status": "pass",
+            "started": "2026-10-09T18:09:36.763-04:00",
+            "finished": "2026-10-09T18:09:36.811-04:00",
+            "detail": "outbound 1.1.1.1:443: CONNECTED; expected_blocked=False",
+            "data": {
+              "probe": {
+                "target": "1.1.1.1:443",
+                "connected": true,
+                "ms": 37,
+                "error": "",
+                "error_code": 0,
+                "t": "2026-10-09T18:09:36.811-04:00"
+              },
+              "blocked": false,
+              "expected_blocked": false
+            }
+          }
+        ]
+      },
+      "finished": "2026-10-09T18:09:37.258-04:00"
+    }
+  },
+  "finished": "2026-10-09T18:09:38.559-04:00",
+  "decision_inputs": {
+    "ServerModelLoaded": true,
+    "SpikeOutboundBlocked": true,
+    "OperatorAbort": false,
+    "AfterRunValid": true,
+    "RemovalVerified": true,
+    "OperatorFailures": 0,
+    "ClientOkUnderBlock": true,
+    "ClientSocketDenied": false,
+    "BlockRunValid": true,
+    "BaselineOk": true
+  },
+  "exit_code": 0,
+  "exit_reason": "valid run: account blocked outbound, its loopback POST to the real server SUCCEEDED"
+}

@@ -10,6 +10,8 @@ account writes, private temp files, a password self-check; about 16:44 to 16:50)
   limits below). Their SHA-256 (of LF-normalised bytes) are recorded in `confined-model-spike/as-run/MANIFEST.sha256` and checked by the test. The manifest proves
   they are unchanged since it was generated; it does not prove provenance (next paragraph).
 - `confined-model-spike/post-run-hardened/`: the current versions. The table below gives the line changes between the two sets.
+- `arm1-permit/scripts/`: the scripts as changed for arm 1 (the permit filter's role; the account as loopback client), beside that
+  arm's results in `arm1-permit/runs/`. The table gives their line changes against the hardened set.
 
 Provenance and limits of the as-run set: it was recovered from the first bundle commit `9adcafc4` (committed 16:36, after the
 runs and before the hardening). The unsanitised originals were overwritten by the hardening: in the research-data folder the
@@ -35,8 +37,29 @@ For the other scripts there is no timestamp evidence of edits between provisioni
 - `README.md`, `CHANGES.md` and `make_changes.py` are authored here, not copied.
 - The counts below are of the placeholders present in each bundled file; the test recounts them.
 
-| File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run |
+| File | Kind | User-name | Machine-name | SID-domain | Model-text cut | Hardened vs as-run (arm 1 vs hardened) |
 |---|---|---|---|---|---|---|
+| `arm1-permit/runs/server/server-testc-off-20261009-180836.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
+| `arm1-permit/runs/server/server-testc-off-20261009-180943.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
+| `arm1-permit/runs/server/server-testc-off-20261009-181213.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
+| `arm1-permit/runs/server/server-testc-on-20261009-180608.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
+| `arm1-permit/runs/server/server-testc-on-20261009-180910.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
+| `arm1-permit/runs/server/server-testc-on-20261009-181026.json` | re-serialised JSON | 1 | 0 | 0 | 2 | - |
+| `arm1-permit/runs/testc-off-20261009-180836.json` | re-serialised JSON | 2 | 9 | 17 | 6 | - |
+| `arm1-permit/runs/testc-off-20261009-180943.json` | re-serialised JSON | 2 | 9 | 17 | 6 | - |
+| `arm1-permit/runs/testc-off-20261009-181213.json` | re-serialised JSON | 2 | 9 | 17 | 6 | - |
+| `arm1-permit/runs/testc-on-20261009-180608.json` | re-serialised JSON | 2 | 9 | 17 | 8 | - |
+| `arm1-permit/runs/testc-on-20261009-180910.json` | re-serialised JSON | 2 | 9 | 17 | 8 | - |
+| `arm1-permit/runs/testc-on-20261009-181026.json` | re-serialised JSON | 2 | 9 | 17 | 8 | - |
+| `arm1-permit/scripts/README.md` | text copy | 0 | 0 | 0 | 0 | arm 1 vs hardened: +31/-55 lines |
+| `arm1-permit/scripts/Run-Arm1-AsAdmin.cmd` | text copy | 0 | 0 | 0 | 0 | arm 1 (new file) |
+| `arm1-permit/scripts/spike-cleanup.ps1` | text copy | 3 | 0 | 0 | 0 | arm 1 vs hardened: +21/-4 lines |
+| `arm1-permit/scripts/spike-lib.ps1` | text copy | 6 | 0 | 0 | 0 | arm 1 vs hardened: +30/-9 lines |
+| `arm1-permit/scripts/spike-provision.ps1` | text copy | 5 | 0 | 0 | 0 | arm 1 vs hardened: +2/-1 lines |
+| `arm1-permit/scripts/spike-run-test.ps1` | text copy | 1 | 0 | 0 | 0 | arm 1 vs hardened: +91/-26 lines |
+| `arm1-permit/scripts/spike-wfp.ps1` | text copy | 3 | 0 | 0 | 0 | arm 1 vs hardened: +356/-13 lines |
+| `arm1-permit/scripts/spike_model.py` | text copy | 0 | 0 | 0 | 0 | arm 1 vs hardened: +24/-5 lines |
+| `ARMS_HANDOFF.md` | text copy | 1 | 1 | 0 | 0 | - |
 | `confined-model-spike/as-run/README.md` | text copy | 0 | 0 | 0 | 0 | as-run |
 | `confined-model-spike/as-run/Run-Spike-AsAdmin.cmd` | text copy | 0 | 0 | 0 | 0 | as-run |
 | `confined-model-spike/as-run/spike-cleanup.ps1` | text copy | 3 | 0 | 0 | 0 | as-run |

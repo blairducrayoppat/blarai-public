@@ -70,10 +70,16 @@ proven runner).
 >     order within a group (some tests leave module state a later test expects clean, which sequential order had hidden: #1707);
 >     files that bind the fixed ports 5000/5001 run alone after the parallel phase.
 
-> **LIVE_GATE_BASELINE: 13302 passed / 0 failed / 0 skipped / 620 deselected**
+> **LIVE_GATE_BASELINE: 13317 passed / 0 failed / 3 skipped / 620 deselected**
 >
-> *(**MERGED `main` at `ea7ee8c3`, REAL checkout**, 2026-10-08, 07:30 to 07:42 -04:00, **ELEVATED**, app down, `LOCALAPPDATA`
-> redirected, `scripts/run_standing_gate.py` (6 groups + serial tail): 13302 passed / 0 failed / 0 skipped / 620 deselected in
+> *(**MERGED `main` at `ce925cf2`, REAL checkout**, 2026-10-09, 20:04 to 20:16 -04:00, **NON-ELEVATED** (the 3 skips are the
+> symlink delta; the elevated reading of this tree is predicted 13320 / 0 / 0 and has not been taken), app down, `LOCALAPPDATA`
+> redirected, `scripts/run_standing_gate.py` (6 groups + serial tail): 13317 passed / 0 failed / 3 skipped / 620 deselected in
+> 695.9 s; 13320 = 13302 + 9 tests from the #1716 merges + 9 from #1718 (arm 1 bundle self-tests for four scripts on two
+> hosts, one python self-test, one rules-corpus lock); counted by collection before the run. The same form read 13313 / 0 / 3
+> at `642edeb8` (671.5 s) and 13317 / 0 / 3 at `14e5d442` (603.3 s); at `8559fd79` it read 13316 / 1 / 3, the one failure
+> being the liveness flake ticketed as #1720, which passed alone 3 of 3 and in every other run.
+> The previous stamp (`ea7ee8c3`, 13302 tests, **ELEVATED**, 2026-10-08 07:30 to 07:42 -04:00): 13302 passed / 0 failed / 0 skipped / 620 deselected in
 > 698.0 s; the same form at `dda7e90a` (13288 tests) ran three times in a row: 704.3 s, 700.8 s and 708.6 s. 13302 = 13288 + 13 tests
 > (#1707 follow-ups) + 1 timeout-registry case; counted by collection before the run.
 > The previous stamp (`c5b83a31`, 13253 tests) was the SEQUENTIAL form, idle-controlled by `scripts/gate_timing_runner.py`:
@@ -82,9 +88,11 @@ proven runner).
 > `docs/performance/gate_runtime_2026-10-07/`. Older stamps: `docs/archive/test-governance-baseline-history.md`.)*
 >
 
-> **READ THE SKIP COLUMN BEFORE COMPARING.** The figure above is the **ELEVATED** reading, so
-> **0 skipped** is expected, not lucky. A NON-ELEVATED run of the same tree reads **12083 / 0 / 3**
-> — the 3 are the documented symlink skips (rule 6) and are benign ONLY because they are named.
+> **READ THE SKIP COLUMN BEFORE COMPARING.** The elevation of the figure above is stated in its
+> parenthetical and decides what the skip column should read: an ELEVATED run reads **0 skipped**;
+> a NON-ELEVATED run of the same tree reads **3 skipped**, the documented symlink skips (rule 6),
+> benign ONLY because they are named. Reconcile elevated and non-elevated readings as
+> `non_elevated_passed + 3 = elevated_passed` before calling either stale.
 > A branch WORKTREE reads lower again by the gitignored-asset skips (rule 5: the worktree figure
 > plus its skips must reconcile to the elevated total); a WORKTREE FIGURE IS NOT THIS NUMBER.
 > A live app adds 7 port-5001 skips. An unexplained skip is a defect, never a rounding error.

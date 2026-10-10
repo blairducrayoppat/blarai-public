@@ -208,6 +208,8 @@ def _scan_markers_independently() -> set[tuple[str, str]]:
             if f.suffix not in (".py", ".ps1", ".sh") or "__pycache__" in f.parts:
                 continue
             rel = f.relative_to(REPO).as_posix()
+            if rel.startswith(".claude/worktrees/"):  # another branch's checkout parked in this one; not this tree
+                continue
             if rel in ex.MARKER_SELF:
                 continue
             for m in pat.finditer(f.read_text(encoding="utf-8", errors="replace")):
@@ -253,6 +255,17 @@ def test_marker_naming_a_known_rule_id_is_picked_up_with_a_path_derived_kind(tmp
                       "# enforces-rule: critical_rules.you-are-not-blarai -- demo note\n")
     rec = next(r for r in ex.build_records(CLAUDE_RAW, root) if r["id"] == "critical_rules.you-are-not-blarai")
     assert rec["enforcement"] == [{"kind": "test", "ref": "tests/security/test_x.py", "note": "demo note"}]
+
+
+def test_markers_inside_a_nested_session_worktree_are_not_scanned(tmp_path: Path) -> None:
+    """A checkout parked under .claude/worktrees/ is another branch's tree: its markers must not reach the corpus
+    (they would fail the kind check under that prefix, and would double-count refs if they passed)."""
+    root = _root_with(tmp_path, ".claude/worktrees/some-session/scripts/verify_x.py",
+                      "# enforces-rule: critical_rules.you-are-not-blarai\n")
+    _root_with(tmp_path, ".claude/worktrees/some-session/tests/security/test_x.py",
+               "# enforces-rule: critical_rules.you-are-not-blarai\n")
+    rec = next(r for r in ex.build_records(CLAUDE_RAW, root) if r["id"] == "critical_rules.you-are-not-blarai")
+    assert all(e["kind"] == "none" and ".claude/worktrees" not in e["ref"] for e in rec["enforcement"]), rec["enforcement"]
 
 
 def test_marker_in_a_file_whose_path_implies_no_kind_fails(tmp_path: Path) -> None:

@@ -125,7 +125,7 @@ def bad_status_rows(text: str) -> list[str]:
 
 
 def has_limits_section(text: str) -> bool:
-    return re.search(r"^## \d+\. Limits \(what this does not establish\)\s*$", text, re.M) is not None
+    return re.search(r"^## \d+\. Limits \(what this does not establish\)\s*$", text, re.MULTILINE) is not None
 
 
 def changes_rows(text: str) -> dict[str, tuple[int, int, int, int]]:
@@ -320,7 +320,14 @@ SCRIPTS = [("wfp-spike/wfp-coder-egress-spike.ps1", False)] + [
     (f"confined-model-spike/{subset}/{name}.ps1", name in ("spike-wfp", "spike-verify-cleanup"))
     for subset in ("as-run", "post-run-hardened")
     for name in ("spike-provision", "spike-cleanup", "spike-wfp", "spike-verify-cleanup", "spike-run-test")
+] + [
+    # arm 1 (the permit filter's role): the two scripts that changed, in the arm's own folder beside its results.
+    ("arm1-permit/scripts/spike-wfp.ps1", True),
+    ("arm1-permit/scripts/spike-run-test.ps1", False),
+    ("arm1-permit/scripts/spike-cleanup.ps1", False),
+    ("arm1-permit/scripts/spike-provision.ps1", False),
 ]
+PYTHON_SELFTESTS = ["arm1-permit/scripts/spike_model.py"]
 SHELLS = ["pwsh", "powershell"]
 
 
@@ -341,6 +348,15 @@ def test_bundled_script_selftest_passes(shell: str, rel: str, needs_wfp: bool, t
     out = (r.stdout or "") + (r.stderr or "")
     assert not selftest_failed(r.returncode, out), f"{shell} {rel}\n{out[-3000:]}"
     assert re.search(r"all passed|\d+ passed, 0 failed", out), f"{shell} {rel}: no pass line\n{out[-1500:]}"
+
+
+@pytest.mark.parametrize("rel", PYTHON_SELFTESTS)
+def test_bundled_python_selftest_passes(rel: str, tmp_path: Path) -> None:
+    """The account-side model/server script's own --selftest (pure helpers plus an in-process loopback listener)."""
+    env = dict(os.environ, TEMP=str(tmp_path), TMP=str(tmp_path))
+    r = subprocess.run([sys.executable, "-I", str(BUNDLE / rel), "--selftest"], capture_output=True, text=True, timeout=120, env=env, cwd=str(tmp_path), check=False)
+    out = (r.stdout or "") + (r.stderr or "")
+    assert r.returncode == 0 and "[FAIL]" not in out and "all passed" in out, f"{rel}: {out[-3000:]}"
 
 
 # ---- toggle tests: each check must FAIL when the property is broken (security_by_design 12) ----

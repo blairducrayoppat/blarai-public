@@ -12,6 +12,9 @@ https://github.com/user-attachments/assets/6df40e93-a4ec-4444-845b-27f71703acad
 
 https://github.com/user-attachments/assets/9ffd473b-93e5-4763-a9ec-e12ac6afa10c
 
+I believe the laptop already on your desk can run useful AI privately, and that an
+AI agent acting on your machine should answer to controls you can check.
+
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
 local disk, and **zero external network dependency by default**. It is a
@@ -27,49 +30,62 @@ tamper-evident audit trail — what it did and why.
 
 ---
 
-## Recent advancements (as of August 2026)
+## Recent advancements (as of October 2026)
 
 Highlights of what has landed on the main line since the previous public snapshot.
-Every item below corresponds to code, tests, or measurements in this repository —
-not roadmap intentions.
+Every item below corresponds to code, tests, measurements or decision records in
+this repository — not roadmap intentions.
 
-- **A month spent discovering that the instruments measuring quality were
-  themselves unmeasured.** July added a substantial testing and evaluation
-  apparatus — a golden-set eval harness, an oracle-quality auditor, a
-  self-coordination layer, dozens of new verifiers — and then, methodically,
-  found that several of them had been reporting a pass they had never actually
-  earned. One safety gate had never executed a single time in its life, because
-  a logging call silently coerced its return value to always-true. A history
-  reader searched for "last night" inside the current night's own folder, so
-  eleven consecutive nights each measured a population of one. The pattern was
-  always the same shape: a control that fails silently, in the safe-looking
-  direction, renders identically to one that is working correctly. Every
-  instance found has shipped a structural fix plus a regression lock proven to
-  fail when the underlying defect is reintroduced — a lock nobody has watched
-  turn red is not yet a lock.
-- **An acceptance exam that could not fail, and what it cost.** The clearest
-  single specimen: a coding-fleet build was graded a clean pass, and only later
-  was it discovered that the "already satisfied" check behind that grade had
-  two silently-empty test bodies — an exam structurally incapable of failing
-  had certified a required page as already built when it did not exist. The
-  fix requires every acceptance check to first prove, against a known-bad
-  input, that it *can* fail before its "pass" is trusted at all.
-- **The first time a human actually used what the fleet built — and the gap
-  that revealed.** A review of a coder-fleet-built website surfaced three real
-  defects (a broken link, repeated placeholder images, mismatched product
-  descriptions) that four independent automated grading passes had all missed.
-  The fix is not "add a fifth grader" — it's a standing review loop that hands
-  the reviewer the original request back as an explicit checklist next to the
-  finished build, plus a link-check that would have caught the broken page in
-  seconds with no model involved at all.
-- **The headless coding-agent dispatch fleet is now a real overnight
-  capability** — decomposing a natural-language goal into a graph of tasks with
-  independently verifiable acceptance criteria, dispatching them to a local
-  coding fleet, and swapping the resident model to make room for it, all
-  without any component requiring network access.
-- **The standing test gate grew to 10,845 passing / 0 failed / 0 skipped** on
-  the merged main line (hardware, WinUI, and slow tiers run at their own
-  ceremonies) — more than double where it stood at the start of July.
+- **The coding agent is being moved into a restricted Windows account, and the
+  record says exactly how far that has got.** BlarAI's coder fleet writes and
+  tests code with no person typing; today that code runs as the operator's own
+  account. [ADR-045](docs/adrs/ADR-045-Coder-Containment-Account-Level-Fused-Leg-and-WFP-Egress-Block.md)
+  records the design: only the coder step runs as a dedicated account, so Windows
+  file permissions, not the agent's own settings, decide what it can read and
+  write; the quality gate, every `git` commit and the merge stay with the
+  operator. The code lives in the companion repository, agentic-setup. The switch
+  is **off** (`containment = off`), the permission-narrowing stage is merged but
+  not applied to the machine, and no complete dispatch has yet run through the
+  coder account. The [design overview](docs/design/CODER_CONTAINMENT_DESIGN_OVERVIEW.md)
+  is written to be read cold; its section 1 is a dated status table and its
+  section 13 lists what is not yet verified. This is an account boundary, not a
+  kernel or virtual-machine boundary.
+- **One measurement of the egress gap, with its limits attached.** Blocking the
+  coder account's outbound network traffic is an open, accepted gap: the ordinary
+  Windows Firewall rule does nothing on this machine because a third-party
+  security suite owns the firewall. The
+  [evidence record](docs/research/account-level-containment-evidence-2026-10-05.md)
+  shows that a raw Windows Filtering Platform block keyed to a dedicated
+  low-privilege account stopped its outbound connects on this laptop: the coder
+  account in three runs of about five seconds, and a throwaway account of the same
+  kind in one run of about two minutes and in six alternated runs on 2026-10-09
+  that showed the loopback permit filter is what keeps such an account's path to a
+  local model server open while the block stands. It ran in a session that vanishes
+  when the script exits, so it is evidence, not a control. Section 6 of the record lists what it
+  does not establish: one machine, one security suite, one graphics driver, IPv4
+  TCP to one port, no reboot or persistence test, no hold longer than about two
+  minutes, and the coder account still holding write access on the operator's
+  `projects` folder today.
+- **A commit-protection control moved inside git after a command-text guard was
+  bypassed more than twenty times across four review rounds**
+  ([ADR-043](docs/adrs/ADR-043-Commit-Protection-Layers.md)). A parser of
+  command text and the program that executes the command are two parsers, and a
+  control built on the first can never be airtight. The control for `main` now
+  lives in a git hook that sees every ref update by any route; the text guard
+  stays only where nothing better exists, labelled best-effort.
+- **A venture reopened on a narrower claim than the one it was cancelled for.**
+  [ADR-049](docs/adrs/ADR-049-Governator-Venture-Reopened.md) reopens the
+  runtime action-governance venture that ADR-042 had cancelled in September. What
+  changed is evidence on one dimension, on one machine; the record states those
+  limits in its own context section rather than omitting them, and decides
+  nothing about the venture's claim, form or licence. No BlarAI runtime behaviour
+  changed.
+- **The standing test gate reads 13,317 passed / 0 failed / 3 skipped / 620
+  deselected** on the merged main line at `ce925cf2` (2026-10-09, non-elevated
+  run; the 3 skips are the documented symlink delta). The last elevated full run
+  read 13,302 / 0 / 0 / 620 on `ea7ee8c3` (2026-10-08). The run conditions that
+  make either figure mean something are in `docs/TEST_GOVERNANCE.md` section 1.
+  The lesson index in `LESSONS.md` runs to number 385.
 
 ---
 
@@ -142,6 +158,14 @@ an Intel/OpenVINO-native stack tuned for Lunar Lake.
 This is the part of BlarAI that matters. The capabilities above are table stakes;
 the differentiator is that every one of them operates behind a deterministic,
 fail-closed governance boundary.
+
+The rule the whole architecture follows: a control is enforced where the agent
+cannot argue with it. Deterministic checks decide before the classifier model is
+consulted; where the operating system can hold the line, the design puts the
+boundary in the account's own token and the kernel's filters rather than in a text
+or path check (that is the coder-containment design above, merged with its switch
+off); a second, independent layer stands behind the first; and a tamper-evident
+record keeps what crossed.
 
 ### The Policy Agent — model-initiated tool calls are adjudicated
 
@@ -226,10 +250,13 @@ controls rather than a per-item rubber-stamp.
   model-in-the-loop Policy Agent classification measured 26/30 (86.7%) — and, importantly,
   all four misses were *over-denials* of benign actions, never a dangerous
   false-allow.
-- **Standing test gate.** **10845 passed / 0 failed / 0 skipped / 133 deselected**,
-  plus the model-quality eval gate green, on the merged main line. Hardware, WinUI,
-  and slow tiers are deselected from the standing gate and run separately. Test
-  policy and baseline management are governed in `docs/TEST_GOVERNANCE.md`.
+- **Standing test gate.** **13317 passed / 0 failed / 3 skipped / 620 deselected**
+  on the merged main line at `ce925cf2` (2026-10-09, non-elevated; the 3 skips are
+  the documented symlink delta). The last elevated full run read 13302 / 0 / 0 /
+  620 on `ea7ee8c3` (2026-10-08). The model-quality eval gate runs beside it.
+  Hardware, WinUI, and slow tiers are deselected from the standing gate and run
+  separately. Test policy, run conditions and baseline management are governed in
+  `docs/TEST_GOVERNANCE.md`.
 
 ---
 
@@ -245,7 +272,10 @@ controls rather than a per-item rubber-stamp.
   natural-language goal into tasks with verifiable acceptance criteria and dispatch
   them to a local coding fleet, orchestrating a host-level model swap (the 14B and
   the fleet's larger model cannot co-reside) with never-zero teardown and
-  idempotent crash recovery. Local subprocess only.
+  idempotent crash recovery. The coder runs as the operator's own account today;
+  the account-level containment design (ADR-045, code in agentic-setup) is merged
+  with its switch off, and the coder's outbound network block is an open, accepted
+  gap.
 
 ---
 
@@ -261,7 +291,9 @@ services/
 launcher/            Hyper-V virtual-machine manager, boot sequencing, deployment
 evals/               Golden-set model-quality eval suites (regression exit codes)
 docs/
-  adrs/                  Architecture Decision Records (ADR-005..035)
+  adrs/                  Architecture Decision Records (ADR-005..049)
+  design/                Design records (coder-containment overview, coder definition of done)
+  research/              Evidence records and their raw-data bundles
   DECISION_REGISTER.md   Single-source-of-truth index of runtime decisions + ADRs
   IMPLEMENTATION_PLAN.md Milestone tracking
   TEST_GOVERNANCE.md     Test policy, marker taxonomy, baseline
@@ -330,6 +362,14 @@ committed. It is shared publicly as a portfolio artifact: a worked example of
 building and governing a local AI system to a mature-not-minimal standard. It is
 not a supported product, and the security properties described here are engineering
 intent backed by tests and measurement, not a third-party audit.
+
+The state of the coder-containment work is read from two documents, not from this
+page: the [design overview](docs/design/CODER_CONTAINMENT_DESIGN_OVERVIEW.md), whose
+section 1 is a dated status table and whose section 13 lists what is not verified,
+and the [evidence record](docs/research/account-level-containment-evidence-2026-10-05.md),
+whose section 6 states what its measurements do not establish. The switch is off,
+the measurement is evidence rather than a control, and nothing here claims the coder
+is contained.
 
 ---
 
