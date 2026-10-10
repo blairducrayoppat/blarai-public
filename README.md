@@ -2,18 +2,8 @@
 
 **A personal, locally-run, security-first AI system engineered for decades of use on consumer hardware.**
 
-**&#9654; Watch it run (2 minutes):**
-
-https://github.com/user-attachments/assets/6df40e93-a4ec-4444-845b-27f71703acad
-
-*([streaming player](https://blairducrayoppat.github.io/blarai-public/demo.html) &middot; [1080p download](https://github.com/blairducrayoppat/blarai-public/releases/tag/demo-film-v1))*
-
-**&#9654; The vision film (66 seconds):**
-
-https://github.com/user-attachments/assets/9ffd473b-93e5-4763-a9ec-e12ac6afa10c
-
-I believe the laptop already on your desk can run useful AI privately, and that an
-AI agent acting on your machine should answer to controls you can check.
+I believe the laptop already in your bag can run useful AI privately, and that an
+AI agent acting on any machine should answer to controls you can check.
 
 BlarAI runs an agentic AI assistant entirely on a single laptop — the language
 model on the integrated GPU, the knowledge base and audit log encrypted on the
