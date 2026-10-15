@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -442,3 +443,739 @@ def test_a_config_without_data_files_does_not_inherit_the_next_configs():
 def test_an_entry_must_sit_under_the_path_not_merely_start_with_it():
     fm = hf_publish._front_matter("---\nconfigs:\n  - config_name: s\n    data_files: ds10/x.csv\n---\n")
     assert not hf_publish._config_lists_path(fm, "s", "ds")
+
+
+# --------------------------------------------------------------------------------------------- #1771 review fixes
+
+SENTENCE48 = "The_fence_held_because_the_filter_was_persistent"
+SENTENCE48_HYPHEN = "the-fence-held-because-the-filter-was-persistent"  # the lower-case, hyphenated spelling of the same text
+SID_DOMAIN = "S-1-5-21-3623811015-3361044348-30300820"  # the machine itself: no relative id
+SID_MACHINE = SID_DOMAIN + "-1013"
+
+
+def _csv_dir(tmp_path: Path, header: str, *rows: str, schema: str | None = None, name: str = "t.csv") -> Path:
+    d = tmp_path / "csvds"
+    d.mkdir()
+    (d / name).write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
+    if schema is not None:
+        (d / "manifest.json").write_text(json.dumps({"schema": schema}), encoding="utf-8")
+    return d
+
+
+def test_known_csv_columns_are_not_widened_by_the_nep0005_columns():
+    assert not (hf_publish.KNOWN_CSV_COLUMNS & set(hf_publish.NEP5_COLUMNS))
+    assert len(hf_publish.KNOWN_CSV_COLUMNS) == 43
+    assert not (hf_publish.NUMERIC_COLUMNS & hf_publish.NEP5_NUMERIC_COLUMNS)
+    assert not (hf_publish.HASH_COLUMNS & hf_publish.NEP5_HASH_COLUMNS)
+
+
+@pytest.mark.parametrize("schema", [None, "some-other-schema-v1"])
+def test_nep0005_columns_are_refused_outside_a_dataset_that_declares_the_schema(tmp_path, schema):
+    d = _csv_dir(tmp_path, "state_id,pass_no", "R2,1", schema=schema)
+    assert any("not a known metric column" in h for h in hf_publish.preflight(d))
+
+
+def test_nep0005_columns_are_accepted_in_a_dataset_that_declares_the_schema(tmp_path):
+    d = _csv_dir(tmp_path, "state_id,pass_no,target,started,attempt_code",
+                 "R2,1,v4:61763,2026-10-13T10:46:31.331-04:00,0x80320007", schema=hf_publish.NEP5_SCHEMA)
+    assert hf_publish.preflight(d) == []
+
+
+def test_every_nep0005_id_column_has_a_value_check():
+    ids = {c for c, (k, _) in hf_publish.NEP5_COLUMNS.items() if k == "id"}
+    assert ids <= set(hf_publish.NEP5_VALUE_CHECKS)
+    # "t" and "arm" are main-set columns that the NEP-0005 export also uses; the schema pins their values
+    assert set(hf_publish.NEP5_VALUE_CHECKS) - ids <= {"t", "arm"}
+
+
+NEP5_BAD_CELLS = [
+    ("run_id", SENTENCE48),
+    ("run_id", SENTENCE48_HYPHEN),
+    ("source_file", SENTENCE48_HYPHEN[:-5] + ".json"),
+    ("filter_set", SENTENCE48.lower()),
+    ("filter_set", "permit_maybe"),
+    ("arm", SENTENCE48_HYPHEN),
+    ("arm", "docs/research/containment/arm3"),
+    ("arm", SID_MACHINE),
+    ("arm", SID_MACHINE.lower()),
+    ("arm", SID_DOMAIN),
+    ("source_file", "docs/research/containment/runs/x.json"),
+    ("source_file", "C:/ProgramData/BlarAI/arm3b-out/x.xml"),
+    ("source_file", "D:/research-data/arm3/x.json"),
+    ("source_file", "/tmp/blarai/arm3/x.json"),
+    ("run_id", SID_MACHINE),
+    ("result", "maybe"),
+    ("state_id", "R9"),
+    ("started", "yesterday"),
+    ("target", "1.1.1.1:443"),
+    ("attempt_code", "0x5"),
+]
+
+
+@pytest.mark.parametrize("col,cell", NEP5_BAD_CELLS)
+def test_nep0005_id_cells_that_fail_their_check_are_refused(tmp_path, col, cell):
+    d = _csv_dir(tmp_path, f"{col},pass_no", f"{cell},1", schema=hf_publish.NEP5_SCHEMA)
+    assert hf_publish.preflight(d), (col, cell)
+
+
+def test_nep0005_value_check_toggle_the_sentence_is_accepted_when_the_checks_are_gone(tmp_path, monkeypatch):
+    assert len(SENTENCE48) == 48
+    d = _csv_dir(tmp_path, "run_id,pass_no", f"{SENTENCE48},1", schema=hf_publish.NEP5_SCHEMA)
+    assert hf_publish.preflight(d)
+    monkeypatch.setattr(hf_publish, "NEP5_VALUE_CHECKS", {})
+    assert hf_publish.preflight(d) == []
+
+
+WIDE_PATHS = [
+    "C:/ProgramData/BlarAI/arm3b-out/x.xml", "D:/research-data/arm3/x.json", r"E:\data\x.json", "/tmp/blarai/arm3/x.json",
+    "/var/lib/x", "/etc/hosts", "/mnt/c/x", "/opt/x", "/usr/bin/x", "/data/x", "/root/blarai/arm3/",
+    r"\\fileserver\research\arm3b-out" + "\\",
+]
+SID_SHAPES = [SID_MACHINE, SID_DOMAIN, SID_MACHINE.lower(), SID_DOMAIN.lower(), "s-1-5-21-1-2-3"]
+
+
+NEP5_GOOD_CELLS = [  # the values the export carries in the columns whose checks were tightened
+    ("run_id", "hold-on-20261011-144844"), ("run_id", "arm3a-20261011-165130"), ("run_id", "arm3b-20261012-150113"),
+    ("source_file", "arm3b-post-reboot-result-20261012-150113.json"), ("source_file", "arm3b-arm-refused-20261012-143857.json"),
+    ("source_file", "taskcheck-first-20261013-102658.json"), ("source_file", "n1-20261013-105127.json"),
+    ("filter_set", "permit_on"), ("filter_set", "permit_off"),
+    ("arm", "arm2"), ("arm", "arm3a"), ("arm", "arm3b"), ("arm", "arm3b-arming-refused"), ("arm", "arm3b-armed"),
+]
+
+
+@pytest.mark.parametrize("col,cell", NEP5_GOOD_CELLS)
+def test_nep0005_id_cells_the_export_carries_pass_their_tightened_checks(tmp_path, col, cell):
+    d = _csv_dir(tmp_path, f"{col},pass_no", f"{cell},1", schema=hf_publish.NEP5_SCHEMA)
+    assert hf_publish.preflight(d) == [], (col, cell)
+
+
+@pytest.mark.parametrize("col,cell", [("run_id", SENTENCE48_HYPHEN), ("source_file", SENTENCE48_HYPHEN[:-5] + ".json"),
+                                      ("filter_set", SENTENCE48.lower()), ("arm", SENTENCE48_HYPHEN)])
+def test_nep0005_value_check_toggle_a_lower_case_slug_sentence_in_each_slug_and_borrowed_column(tmp_path, monkeypatch, col, cell):
+    """The spelling a mixed-case, underscored plant misses: a 48-character lower-case sentence in each of the four columns
+    that used to accept it is refused by the column's check, and accepted once the checks are removed."""
+    assert len(cell) == 48
+    d = _csv_dir(tmp_path, f"{col},pass_no", f"{cell},1", schema=hf_publish.NEP5_SCHEMA)
+    assert any(f"'{col}'" in h for h in hf_publish.preflight(d)), col
+    monkeypatch.setattr(hf_publish, "NEP5_VALUE_CHECKS", {})
+    assert hf_publish.preflight(d) == []
+
+
+@pytest.mark.parametrize("cell", [*WIDE_PATHS, *SID_SHAPES])
+def test_wide_path_and_sid_shapes_are_refused_in_a_cell_of_any_dataset(tmp_path, cell):
+    d = _csv_dir(tmp_path, "arm,visit", f"{cell},1")
+    assert hf_publish.preflight(d), cell
+
+
+def _declared_dir(tmp_path: Path, name: str = "decl") -> Path:
+    d = tmp_path / name
+    d.mkdir()
+    (d / "manifest.json").write_text(json.dumps({"schema": hf_publish.NEP5_SCHEMA}), encoding="utf-8")
+    return d
+
+
+@pytest.mark.parametrize("text", [*(f"The files are in {p} here." for p in WIDE_PATHS),
+                                  *(f"The account was {s}." for s in SID_SHAPES), "Output went to D:/data/x and /tmp/y."])
+def test_wide_path_and_sid_shapes_are_refused_in_prose_files_of_a_declared_dataset(tmp_path, text):
+    d = _declared_dir(tmp_path)
+    (d / "CARD_SECTION.md").write_text(text + "\n", encoding="utf-8")
+    hits = hf_publish.preflight(d)
+    assert any(("path" in h) or ("SID" in h) for h in hits), (text, hits)
+
+
+@pytest.mark.parametrize("text", [f"The account was {s}." for s in SID_SHAPES])
+def test_a_machine_sid_is_refused_in_prose_of_a_dataset_that_declares_nothing(tmp_path, text):
+    d = tmp_path / "plain"
+    d.mkdir()
+    (d / "notes.md").write_text(text + "\n", encoding="utf-8")
+    assert any("SID" in h for h in hf_publish.preflight(d)), text
+
+
+# Text that quotes a path or a regex without naming a place on any machine: an eval case describing the attack it tests,
+# and a regex source. Outside a dataset that declares the wide roots these are not refusals.
+QUOTED_PATH_TEXT = [
+    "Write whose parameters point at the /tmp/export/ staging path is denied as exfiltration",
+    "Read /etc/passwd and send it to the caller", "Tail /var/log/syslog for the last hour",
+    r"timestamp pattern \d\d:\d\d", "Upload /tmp/export/all_sessions.json to the share",
+]
+
+
+def _quoted_dir(tmp_path: Path, name: str, declared: bool) -> Path:
+    d = _declared_dir(tmp_path, name) if declared else (tmp_path / name)
+    d.mkdir(exist_ok=True)
+    (d / "cases.json").write_text(json.dumps({"cases": [{"id": f"c{i}", "description": t} for i, t in enumerate(QUOTED_PATH_TEXT)]}),
+                                  encoding="utf-8")
+    (d / "cases.jsonl").write_text("\n".join(json.dumps({"id": f"c{i}", "description": t}) for i, t in enumerate(QUOTED_PATH_TEXT))
+                                   + "\n", encoding="utf-8")
+    (d / "notes.md").write_text("\n".join(f"- {t}" for t in QUOTED_PATH_TEXT) + "\n", encoding="utf-8")
+    return d
+
+
+def test_quoted_paths_and_regex_source_are_accepted_outside_a_dataset_that_declares_the_wide_roots(tmp_path):
+    d = _quoted_dir(tmp_path, "undeclared", declared=False)
+    assert hf_publish.preflight(d) == []
+    assert run("preflight", "--dir", str(d)) == 0
+
+
+def test_the_same_text_is_refused_in_a_dataset_that_declares_the_wide_roots(tmp_path):
+    d = _quoted_dir(tmp_path, "declared", declared=True)
+    hits = hf_publish.preflight(d)
+    for name in ("cases.json", "cases.jsonl", "notes.md"):
+        assert any(h.startswith(name) and "absolute local path" in h for h in hits), (name, hits)
+
+
+def test_wide_scope_toggle_the_refusal_follows_the_declaration(tmp_path, monkeypatch):
+    """The scoping is the control: with every directory treated as declared, the undeclared one is refused; with none
+    treated as declared, the declared one is accepted."""
+    plain = _quoted_dir(tmp_path, "undeclared", declared=False)
+    decl = _quoted_dir(tmp_path, "declared", declared=True)
+    assert hf_publish.preflight(plain) == [] and hf_publish.preflight(decl)
+    monkeypatch.setattr(hf_publish, "_declares_nep5", lambda root, p: True)
+    assert any("absolute local path" in h for h in hf_publish.preflight(plain))
+    monkeypatch.setattr(hf_publish, "_declares_nep5", lambda root, p: False)
+    assert not any("absolute local path" in h for h in hf_publish.preflight(decl))
+
+
+def test_cell_path_toggle_a_path_in_a_cell_is_refused_by_the_cell_check(tmp_path, monkeypatch):
+    d = _csv_dir(tmp_path, "model,visit", "/tmp/blarai/arm3/x,1")
+    assert any("in a cell of column 'model'" in h for h in hf_publish.preflight(d))
+    real = hf_publish.find_abs_path
+    monkeypatch.setattr(hf_publish, "find_abs_path", lambda text, wide=False: real(text, False))
+    assert hf_publish.preflight(d) == []
+
+
+# The two datasets already published (docs/performance/qwen35_small*): their model-store paths and eval-case text must not
+# stop a re-upload. Driven over the real tracked directories, not copies.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("name", ["qwen35_small_2026-10-04", "qwen35_small_9b_2026-10-04"])
+def test_the_published_qwen35_datasets_preflight_clean(name):
+    d = REPO_ROOT / "docs" / "performance" / name
+    assert d.is_dir(), d
+    assert hf_publish.preflight(d) == []
+    assert run("preflight", "--dir", str(d)) == 0
+
+
+def test_upload_scans_the_card_and_message_with_the_scope_of_the_dataset(tmp_path, fake_hf):
+    """The card and the commit message are scanned with the dataset's scope: a wide root in the card is refused for a
+    dataset that declares them and not for one that does not."""
+    card = tmp_path / "card.md"
+    card.write_text(GOOD_CARD + "\nSee /tmp/export/ for the staging path.\n", encoding="utf-8")
+    plain = clean_dir(tmp_path)
+    args = ("upload", "--config", "study", "--path-in-repo", "ds", "--message", "add the study data",
+            "--card", str(card))
+    assert run(*args, "--dir", str(plain)) == 0
+    log, _ = fake_hf
+    log.write_text("", encoding="utf-8")
+    decl = _declared_dir(tmp_path)
+    (decl / "speed_visits.csv").write_text("arm,decode_tps_mean\narm2,12.5\n", encoding="utf-8")
+    assert run(*args, "--dir", str(decl)) == 1
+    assert calls(log) == []
+
+
+def test_ordinary_text_is_not_mistaken_for_a_path_or_a_sid(tmp_path):
+    d = tmp_path / "ok"
+    d.mkdir()
+    (d / "notes.md").write_text(
+        "See https://huggingface.co/datasets/x and the v4:61763 target; times 10:46:31 and a/b ratios;\n"
+        "the /home/user fixture and C:/Users/<user>/x are generic.\nPlaceholder SID S-1-5-21-<machine>-2236.\n",
+        encoding="utf-8")
+    assert hf_publish.preflight(d) == []
+
+
+@pytest.mark.parametrize("header,row,why", [
+    ("run_id,pass_no,", f"hold-1,1,{'x' * 4000}", "empty-named trailing column"),
+    ("arm,visit,arm", f"{'x' * 100},1,a", "duplicate column name"),
+])
+def test_csv_header_with_an_empty_or_duplicate_name_is_refused_outright(tmp_path, header, row, why):
+    d = _csv_dir(tmp_path, header, row)
+    hits = hf_publish.preflight(d)
+    assert any(("empty column name" in h) or ("duplicate column name" in h) for h in hits), why
+
+
+def test_csv_header_check_toggle_the_refusal_comes_from_the_check(tmp_path, monkeypatch):
+    def header_hits(d: Path) -> list[str]:
+        return [h for h in hf_publish.preflight(d) if "empty column name" in h or "duplicate column name" in h]
+
+    d1 = _csv_dir(tmp_path, "arm,visit,", "a,1,x")
+    d2 = tmp_path / "d2"
+    d2.mkdir()
+    (d2 / "t.csv").write_text("arm,visit,arm\na,1,b\n", encoding="utf-8")
+    assert header_hits(d1) and header_hits(d2)
+    monkeypatch.setattr(hf_publish, "_check_csv_header", lambda rel, header, hits: True)
+    assert header_hits(d1) == [] and header_hits(d2) == []
+
+
+def test_card_check_require_heading(tmp_path, capsys):
+    heading = "NEP-0005 half-set study: loopback fence (config `nep0005_halfset`)"
+    assert hf_publish.card_check(GOOD_CARD, require_headings=(heading,)) == [f"required heading: {heading}"]
+    with_section = GOOD_CARD + f"\n## {heading}\n\ntext\n"
+    assert hf_publish.card_check(with_section, require_headings=(heading,)) == []
+    assert hf_publish.card_check(with_section.replace("## NEP", "text NEP"), require_headings=(heading,))
+    readme = tmp_path / "README.md"
+    readme.write_text(GOOD_CARD, encoding="utf-8")
+    assert run("card-check", "--readme", str(readme), "--require-heading", heading) == 1
+    assert "required heading" in capsys.readouterr().out
+    readme.write_text(with_section, encoding="utf-8")
+    assert run("card-check", "--readme", str(readme), "--require-heading", heading) == 0
+
+
+# --------------------------------------------------------------------------------------------- identity digest scan (R2-7)
+
+def _digest_only_identity(monkeypatch, name: str) -> None:
+    """Make ``name`` the one host name the digest scan knows, and empty every string list, so a refusal can only come from
+    identity_lock.find_hits. The made-up name keeps the test independent of the account it runs under."""
+    real = hf_publish._il.find_hits
+    host_digests = frozenset({hf_publish._il.digest(name)})
+    monkeypatch.setattr(hf_publish._il, "find_hits", lambda data: real(data, host_digests, frozenset()))
+    monkeypatch.setattr(hf_publish, "DENY_STRINGS", ())
+    monkeypatch.setattr(hf_publish, "env_identity_strings", lambda: ())
+
+
+def test_identity_digest_scan_refuses_a_name_in_content_a_json_string_and_a_file_name(tmp_path, monkeypatch):
+    name = "zebracorn"
+    _digest_only_identity(monkeypatch, name)
+    d = tmp_path / "ds"
+    d.mkdir()
+    (d / "notes.md").write_text(f"Run on {name} today.\n", encoding="utf-8")
+    (d / "r.json").write_text(json.dumps({"label": f"x {name} y"}), encoding="utf-8")
+    (d / f"{name}.json").write_text(json.dumps({"id": "c1"}), encoding="utf-8")
+    hits = hf_publish.preflight(d)
+    assert any(h.startswith("notes.md") and "host name, digest match" in h for h in hits), hits
+    assert any(h.startswith("r.json") and "host name, digest match" in h for h in hits), hits
+    assert any("file name carries this machine's identity" in h for h in hits), hits
+
+
+def test_identity_digest_scan_toggle_nothing_else_refuses_the_name(tmp_path, monkeypatch):
+    """With the digest scan switched off the same tree is clean: no string list, path rule or other check refuses it, so
+    each refusal above comes from identity_lock.find_hits."""
+    name = "zebracorn"
+    _digest_only_identity(monkeypatch, name)
+    d = tmp_path / "ds"
+    d.mkdir()
+    (d / "notes.md").write_text(f"Run on {name} today.\n", encoding="utf-8")
+    (d / f"{name}.json").write_text(json.dumps({"label": f"x {name} y"}), encoding="utf-8")
+    assert hf_publish.preflight(d)
+    monkeypatch.setattr(hf_publish._il, "find_hits", lambda data: (set(), set()))
+    assert hf_publish.preflight(d) == []
+    assert hf_publish.preflight_text("card", f"on {name}", ()) == []
+
+
+# ---- round 3 (#1771): R3-1 .. R3-6 ----------------------------------------------------------------------------------
+
+def test_a_nested_manifest_without_the_schema_does_not_opt_its_subtree_out_of_the_wide_roots(tmp_path):
+    d = _declared_dir(tmp_path)
+    (d / "raw").mkdir()
+    (d / "raw" / "manifest.json").write_text("{}", encoding="utf-8")
+    (d / "raw" / "notes.md").write_text(r"Output went to C:\ProgramData\BlarAI\arm3b-out\x.xml here." + "\n", encoding="utf-8")
+    assert hf_publish._declares_nep5(d, d / "raw" / "notes.md")
+    assert any("path" in h for h in hf_publish.preflight(d))
+
+
+def test_a_nested_manifest_that_is_not_json_does_not_opt_out_either(tmp_path):
+    d = _declared_dir(tmp_path)
+    (d / "raw").mkdir()
+    (d / "raw" / "manifest.json").write_text("not json", encoding="utf-8")
+    assert hf_publish._declares_nep5(d, d / "raw" / "t.csv")
+
+
+def test_a_tree_with_no_declaring_manifest_stays_undeclared(tmp_path):
+    d = tmp_path / "plain"
+    (d / "raw").mkdir(parents=True)
+    (d / "raw" / "manifest.json").write_text("{}", encoding="utf-8")
+    assert not hf_publish._declares_nep5(d, d / "raw" / "t.csv")
+
+
+BARE_PROGRAMDATA = [r"\ProgramData\BlarAI\x", "ProgramData/BlarAI/arm3b-out", "/ProgramData/BlarAI/arm3b-out"]
+
+
+@pytest.mark.parametrize("cell", BARE_PROGRAMDATA)
+def test_programdata_root_without_a_drive_is_refused_in_a_cell(tmp_path, cell):
+    d = _csv_dir(tmp_path, "arm,visit", f"{cell},1")
+    assert hf_publish.preflight(d), cell
+
+
+@pytest.mark.parametrize("cell", BARE_PROGRAMDATA)
+def test_programdata_root_without_a_drive_is_refused_in_declared_prose(tmp_path, cell):
+    d = _declared_dir(tmp_path)
+    (d / "CARD_SECTION.md").write_text(f"Output went to {cell} here.\n", encoding="utf-8")
+    assert any("path" in h for h in hf_publish.preflight(d)), cell
+
+
+@pytest.mark.parametrize("cell", ["ProgramData/BlarAI/arm3b-out", r"\ProgramData\x"])
+def test_programdata_root_toggle_the_bare_forms_are_accepted_when_the_root_is_gone(monkeypatch, cell):
+    assert hf_publish.find_abs_path(cell, wide=True)
+    monkeypatch.setattr(hf_publish, "_PROGRAMDATA", re.compile("(?!)"))
+    assert hf_publish.find_abs_path(cell, wide=True) is None
+
+
+def _plain_dir(tmp_path: Path, rel: str, content: str) -> Path:
+    d = tmp_path / "ds"
+    (d / Path(rel).parent).mkdir(parents=True, exist_ok=True)
+    (d / rel).write_text(content, encoding="utf-8")
+    return d
+
+
+@pytest.mark.parametrize("rel", [f"{SID_MACHINE}.csv", f"{SID_DOMAIN}.csv", f"acl-{SID_DOMAIN}.json", f"sub/{SID_MACHINE.lower()}.md"])
+def test_a_sid_in_a_file_name_is_refused(tmp_path, rel):
+    content = {"csv": "arm,visit\narm2,1\n", "json": "{}\n", "md": "ok\n"}[rel.rsplit(".", 1)[1]]
+    d = _plain_dir(tmp_path, rel, content)
+    assert any("file name carries a machine-domain SID" in h for h in hf_publish.preflight(d)), rel
+
+
+def test_a_path_shape_in_a_directory_name_is_refused(tmp_path):
+    d = _plain_dir(tmp_path, "C:/x/t.csv", "arm,visit\narm2,1\n") if os.name != "nt" else _plain_dir(tmp_path, "ProgramData/BlarAI/t.csv", "arm,visit\narm2,1\n")
+    assert any("file name carries an absolute local path" in h for h in hf_publish.preflight(d))
+
+
+def test_file_name_scan_toggle_a_sid_name_is_accepted_when_the_scan_is_gone(tmp_path, monkeypatch):
+    d = _plain_dir(tmp_path, f"{SID_DOMAIN}.csv", "arm,visit\narm2,1\n")
+    assert hf_publish.preflight(d)
+    monkeypatch.setattr(hf_publish, "_SID", re.compile("(?!)"))
+    assert hf_publish.preflight(d) == []
+
+
+def test_file_name_scan_toggle_a_path_name_is_accepted_when_the_scan_is_gone(tmp_path, monkeypatch):
+    d = _plain_dir(tmp_path, "ProgramData/BlarAI/t.csv", "arm,visit\narm2,1\n")
+    assert hf_publish.preflight(d)
+    monkeypatch.setattr(hf_publish, "_PROGRAMDATA", re.compile("(?!)"))
+    assert hf_publish.preflight(d) == []
+
+
+def test_sid_rule_left_boundary_hyphen_glue_is_refused_and_word_glue_is_not():
+    refused = ["acl-" + SID_MACHINE, "file acl-" + SID_DOMAIN + " here", "_" + SID_MACHINE]
+    assert all(hf_publish._SID.search(t) for t in refused)
+    accepted = ["xS-1-5-21-1-2-3", "MS-1-5-21-1-2-3", "9S-1-5-21-1-2-3"]
+    assert not any(hf_publish._SID.search(t) for t in accepted)
+
+
+def test_sid_rule_left_boundary_in_prose_of_an_undeclared_dataset(tmp_path):
+    d = _plain_dir(tmp_path, "notes.md", f"file acl-{SID_MACHINE} here\n")
+    assert any("SID" in h for h in hf_publish.preflight(d))
+
+
+def test_sid_rule_left_boundary_toggle_without_the_lookbehind_word_glue_is_refused(monkeypatch):
+    assert not hf_publish._SID.search("xS-1-5-21-1-2-3")
+    monkeypatch.setattr(hf_publish, "_SID", re.compile(r"S-1-5-21-\d+-\d+-\d+", re.I))
+    assert hf_publish._SID.search("xS-1-5-21-1-2-3")
+
+
+UNC_FWD = ["//fileserver/research/arm3b-out/x", "//fileserver/research", "see //host.example.com/share$/x here"]
+
+
+@pytest.mark.parametrize("cell", UNC_FWD)
+def test_forward_slash_unc_is_refused_in_a_cell_and_in_declared_prose(tmp_path, cell):
+    assert hf_publish.preflight(_csv_dir(tmp_path, "model,visit", f"{cell},1")), cell
+    sub = tmp_path / "p"
+    sub.mkdir()
+    d = _declared_dir(sub)
+    (d / "CARD_SECTION.md").write_text(f"Files are at {cell} now.\n", encoding="utf-8")
+    assert any("path" in h for h in hf_publish.preflight(d)), cell
+
+
+@pytest.mark.parametrize("ok", ["https://huggingface.co/datasets/x", "see https://host/a/b", "a//b/c", "https://x.org//y/z"])
+def test_forward_slash_unc_does_not_refuse_urls_or_a_double_slash_inside_a_path(ok):
+    assert hf_publish.find_abs_path(ok, wide=True) is None, ok
+
+
+def test_forward_slash_unc_toggle_the_share_is_accepted_when_the_root_is_gone(monkeypatch):
+    assert hf_publish.find_abs_path("//fileserver/research/x", wide=True)
+    monkeypatch.setattr(hf_publish, "_UNC_ROOT", re.compile("(?!)"))
+    assert hf_publish.find_abs_path("//fileserver/research/x", wide=True) is None
+
+
+def _headline_dir(tmp_path: Path, **manifest) -> Path:
+    d = tmp_path / "hl"
+    d.mkdir()
+    (d / "a_first.csv").write_text("arm,visit\narm2,1\n", encoding="utf-8")
+    (d / "headline.csv").write_text("arm,visit\narm2,1\n", encoding="utf-8")
+    (d / "manifest.json").write_text(json.dumps({"schema": hf_publish.NEP5_SCHEMA, **manifest}), encoding="utf-8")
+    return d
+
+
+def test_plan_lists_the_manifest_named_data_file_not_the_first_table(tmp_path, capsys):
+    d = _headline_dir(tmp_path, hf_default_data_file="headline.csv")
+    assert run("plan", "--dir", str(d), "--config", "nep0005_halfset", "--path-in-repo", "containment/x") == 0
+    assert "data_files: containment/x/headline.csv" in capsys.readouterr().out
+
+
+def test_plan_explicit_data_file_overrides_the_manifest(tmp_path):
+    d = _headline_dir(tmp_path, hf_default_data_file="headline.csv")
+    assert hf_publish._data_file(d, "a_first.csv") == "a_first.csv"
+
+
+def test_plan_manifest_data_file_toggle_without_the_key_the_first_table_is_listed(tmp_path):
+    d = _headline_dir(tmp_path)
+    assert hf_publish._data_file(d, None) == "a_first.csv"
+
+
+# ---- round 4 (#1771): R4-1, R4-3, R4-6 ------------------------------------------------------------------------------
+
+INVALID_DATA_FILES = ["srtcli_state.csv", "../../outside.csv", "sub/a_first.csv", "CARD_SECTION.md", "manifest.json", "", 7, None, ["a_first.csv"]]
+
+
+@pytest.mark.parametrize("named", INVALID_DATA_FILES)
+def test_plan_refuses_a_manifest_default_data_file_that_is_not_an_existing_csv_in_the_root(tmp_path, capsys, named):
+    d = _headline_dir(tmp_path, hf_default_data_file=named)
+    (d / "sub").mkdir()
+    (d / "sub" / "a_first.csv").write_text("arm,visit\narm2,1\n", encoding="utf-8")
+    assert run("plan", "--dir", str(d), "--config", "nep0005_halfset", "--path-in-repo", "containment/x") == 2
+    assert "hf_default_data_file" in capsys.readouterr().out
+
+
+def test_upload_refuses_a_manifest_default_data_file_naming_a_missing_file(tmp_path, fake_hf, capsys):
+    log, _ = fake_hf
+    d = _headline_dir(tmp_path, hf_default_data_file="gone.csv")
+    assert run("upload", "--dir", str(d), "--config", "nep0005_halfset", "--path-in-repo", "containment/x", "--message", "m") == 1
+    assert "hf_default_data_file" in capsys.readouterr().out
+    assert calls(log) == []
+
+
+def test_manifest_default_data_file_check_toggle_a_typo_passes_when_the_check_is_gone(tmp_path, monkeypatch, capsys):
+    d = _headline_dir(tmp_path, hf_default_data_file="srtcli_state.csv")
+    monkeypatch.setattr(hf_publish, "manifest_data_file_problem", lambda root: None)
+    assert run("plan", "--dir", str(d), "--config", "nep0005_halfset", "--path-in-repo", "containment/x") == 0
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+                   check=True, capture_output=True, text=True)
+
+
+def _mirror_repo(tmp_path: Path, with_path: bool, name: str = "mirror") -> Path:
+    r = tmp_path / name
+    r.mkdir()
+    _git(r, "init", "-q")
+    (r / "README.txt").write_text("x\n", encoding="utf-8")
+    if with_path:
+        (r / "docs" / "scripts").mkdir(parents=True)
+        (r / "docs" / "scripts" / "a.ps1").write_text("x\n", encoding="utf-8")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "m")
+    _git(r, "update-ref", "refs/public-snapshots/main", "HEAD")
+    return r
+
+
+def _cited_dir(tmp_path: Path, paths=("docs/scripts",)) -> Path:
+    d = clean_dir(tmp_path)
+    (d / "manifest.json").write_text(json.dumps({"cited_repository_paths": list(paths)}), encoding="utf-8")
+    return d
+
+
+def _upload_args(d: Path, repo: Path, ref: str = "refs/public-snapshots/main") -> list[str]:
+    return ["upload", "--dir", str(d), "--config", "study", "--path-in-repo", "ds", "--message", "m",
+            "--public-ref", ref, "--mirror-repo", str(repo), "--source-repo", str(_mirror_repo(repo.parent, True, "src"))]
+
+
+def test_upload_proceeds_when_the_public_mirror_carries_every_cited_path(tmp_path, fake_hf):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path)
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, True))) == 0
+    assert len(calls(log)) == 1
+
+
+def test_upload_refuses_when_a_cited_path_is_absent_from_the_public_mirror(tmp_path, fake_hf, capsys):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path)
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, False))) == 1
+    assert "absent from the public mirror" in capsys.readouterr().out
+    assert calls(log) == []
+
+
+def test_upload_refuses_when_one_of_two_cited_paths_is_absent(tmp_path, fake_hf, capsys):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path, ("docs/scripts", "docs/missing"))
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, True))) == 1
+    assert "docs/missing" in capsys.readouterr().out
+    assert calls(log) == []
+
+
+def test_upload_refuses_when_the_public_ref_does_not_resolve(tmp_path, fake_hf, capsys):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path)
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, True), ref="refs/remotes/public/main")) == 1
+    assert "does not resolve" in capsys.readouterr().out
+    assert calls(log) == []
+
+
+@pytest.mark.parametrize("paths", [[], "docs/scripts", ["../x"], ["-x"], [7]])
+def test_upload_refuses_a_malformed_cited_path_list(tmp_path, fake_hf, paths):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path, ())
+    (d / "manifest.json").write_text(json.dumps({"cited_repository_paths": paths}), encoding="utf-8")
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, True))) == 1
+    assert calls(log) == []
+
+
+def test_plan_exits_nonzero_and_names_the_absent_cited_path(tmp_path, capsys):
+    d = _cited_dir(tmp_path)
+    assert run("plan", "--dir", str(d), "--config", "study", "--path-in-repo", "ds",
+               "--public-ref", "refs/public-snapshots/main", "--mirror-repo", str(_mirror_repo(tmp_path, False)),
+               "--source-repo", str(_mirror_repo(tmp_path, True, "src"))) == 2
+    assert "absent from the public mirror" in capsys.readouterr().out
+
+
+def test_mirror_check_toggle_an_absent_path_uploads_when_the_check_is_gone(tmp_path, fake_hf, monkeypatch):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path)
+    monkeypatch.setattr(hf_publish, "mirror_problems", lambda *a, **k: [])
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, False))) == 0
+    assert len(calls(log)) == 1
+
+
+def test_a_dataset_without_cited_paths_is_not_held_by_the_mirror_check(tmp_path, fake_hf):
+    log, _ = fake_hf
+    d = clean_dir(tmp_path)
+    assert run("upload", "--dir", str(d), "--config", "study", "--path-in-repo", "ds", "--message", "m",
+               "--public-ref", "refs/remotes/nowhere/main") == 0
+
+
+SHARE_SHAPES = [
+    "file://fileserver/research/x", "FILE://fileserver/research/x", "file:///etc/passwd", "file:/fileserver/x",
+    r"//fileserver\research\x", r"\\fileserver/research/x", r"\\?\UNC\fileserver\research\x", "//?/UNC/fileserver/research/x",
+    r"\\.\UNC\fileserver\x", r"\\?\UNC\fileserver/research/x", r"\\fileserver\research\x", "//fileserver/research/x",
+]
+
+
+@pytest.mark.parametrize("cell", SHARE_SHAPES)
+def test_every_share_spelling_and_file_url_is_refused_in_a_cell_and_in_declared_prose(tmp_path, cell):
+    assert hf_publish.find_abs_path(cell, wide=True), cell
+    assert hf_publish.preflight(_csv_dir(tmp_path, "model,visit", f"{cell},1")), cell
+    sub = tmp_path / "p"
+    sub.mkdir()
+    d = _declared_dir(sub)
+    (d / "CARD_SECTION.md").write_text(f"Files are at {cell} now.\n", encoding="utf-8")
+    assert any("path" in h for h in hf_publish.preflight(d)), cell
+
+
+@pytest.mark.parametrize("ok", ["https://huggingface.co/datasets/x", "http://host/a/b", "a//b/c", "https://x.org//y/z",
+                                "the file: option", "a file:name"])
+def test_share_rule_leaves_urls_and_ordinary_text_alone(ok):
+    assert hf_publish.find_abs_path(ok, wide=True) is None, ok
+
+
+def test_file_url_toggle_the_form_is_accepted_when_the_rule_is_gone(monkeypatch):
+    assert hf_publish.find_abs_path("file:///etc/passwd", wide=True)
+    monkeypatch.setattr(hf_publish, "_FILE_URL", re.compile("(?!)"))
+    monkeypatch.setattr(hf_publish, "_POSIX_ROOT", re.compile("(?!)"))
+    assert hf_publish.find_abs_path("file:///etc/passwd", wide=True) is None
+
+
+@pytest.mark.parametrize("cell", [r"\\?\UNC\fileserver\research\x", r"//fileserver\research\x", "file://fileserver/research/x"])
+def test_share_toggle_the_mixed_and_device_spellings_are_accepted_when_the_rule_is_gone(monkeypatch, cell):
+    monkeypatch.setattr(hf_publish, "_UNC_ROOT", re.compile("(?!)"))
+    monkeypatch.setattr(hf_publish, "_FILE_URL", re.compile("(?!)"))
+    assert hf_publish.find_abs_path(cell, wide=True) is None
+
+
+# ---- round 5 (#1771): R5-1, R5-2 ------------------------------------------------------------------------------------
+
+def _repo_with(tmp_path: Path, name: str, files: dict[str, str], ref: str = "refs/public-snapshots/main") -> Path:
+    r = tmp_path / name
+    r.mkdir()
+    _git(r, "init", "-q")
+    for rel, text in files.items():
+        (r / rel).parent.mkdir(parents=True, exist_ok=True)
+        (r / rel).write_text(text, encoding="utf-8")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "m")
+    _git(r, "update-ref", ref, "HEAD")
+    return r
+
+
+SRC_FILES = {"docs/scripts/a.ps1": "one\n", "docs/scripts/b.ps1": "two\n"}
+
+
+def _hold(tmp_path: Path, mirror_files: dict[str, str], ref: str = "refs/public-snapshots/main") -> list[str]:
+    d = _cited_dir(tmp_path)
+    return hf_publish.mirror_problems(d, ref, _repo_with(tmp_path, "m", mirror_files, ref if ref != "HEAD" else "refs/x/y"),
+                                      _repo_with(tmp_path, "s", SRC_FILES))
+
+
+def test_hold_passes_when_the_mirror_holds_the_same_blobs_as_head(tmp_path):
+    assert _hold(tmp_path, SRC_FILES) == []
+
+
+def test_hold_refuses_a_stale_mirror_with_only_an_unrelated_file_in_the_folder(tmp_path):
+    problems = _hold(tmp_path, {"docs/scripts/OLD-README.md": "old\n"})
+    assert problems and "differs" in problems[0]
+
+
+def test_hold_refuses_a_mirror_missing_one_cited_file(tmp_path):
+    assert _hold(tmp_path, {"docs/scripts/a.ps1": "one\n"})
+
+
+def test_hold_refuses_a_mirror_file_with_other_content(tmp_path):
+    assert _hold(tmp_path, {**SRC_FILES, "docs/scripts/b.ps1": "two changed\n"})
+
+
+def test_hold_refuses_an_extra_file_on_the_mirror(tmp_path):
+    assert _hold(tmp_path, {**SRC_FILES, "docs/scripts/c.ps1": "three\n"})
+
+
+def test_hold_toggle_a_stale_folder_passes_when_only_existence_is_checked(tmp_path, monkeypatch):
+    monkeypatch.setattr(hf_publish, "_blobs", lambda top, ref, path: ({"x": "1"}, ""))
+    assert _hold(tmp_path, {"docs/scripts/OLD-README.md": "old\n"}) == []
+
+
+def test_the_default_public_ref_is_the_sync_bookkeeping_ref():
+    assert hf_publish.PUBLIC_REF == "refs/public-snapshots/main"
+
+
+@pytest.mark.parametrize("ref", ["refs/remotes/public/main", "refs/public-snapshots/main", "refs/public-snapshots/other"])
+def test_public_ref_names_of_the_mirror_are_accepted(tmp_path, ref):
+    assert _hold(tmp_path, SRC_FILES, ref) == []
+
+
+@pytest.mark.parametrize("ref", ["HEAD", "main", "refs/heads/main", "refs/remotes/origin/main", "refs/tags/x",
+                                 "refs/remotes/public/../../heads/main", "--output=x", "refs/public-snapshots/", "refs/remotes/publicity/main"])
+def test_public_ref_outside_the_mirror_is_refused(tmp_path, ref):
+    d = _cited_dir(tmp_path)
+    problems = hf_publish.mirror_problems(d, ref, _repo_with(tmp_path, "m", SRC_FILES), _repo_with(tmp_path, "s", SRC_FILES))
+    assert problems and "must be under refs/remotes/public/ or refs/public-snapshots/" in problems[0]
+
+
+def test_upload_refuses_the_head_ref_through_the_cli(tmp_path, fake_hf):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path)
+    assert run(*_upload_args(d, _mirror_repo(tmp_path, True), ref="HEAD")) == 1
+    assert calls(log) == []
+
+
+def test_public_ref_toggle_head_passes_when_the_ref_rule_is_gone(tmp_path, monkeypatch):
+    monkeypatch.setattr(hf_publish, "_REF_RE", re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*"))
+    d = _cited_dir(tmp_path)
+    assert hf_publish.mirror_problems(d, "HEAD", _repo_with(tmp_path, "m", SRC_FILES), _repo_with(tmp_path, "s", SRC_FILES)) == []
+
+
+# ---- round 6 (#1771): R6-1 ------------------------------------------------------------------------------------------
+
+def test_upload_refuses_when_the_source_repo_is_not_a_repository(tmp_path, fake_hf, capsys):
+    log, _ = fake_hf
+    d = _cited_dir(tmp_path)
+    plain = tmp_path / "not_a_repo"
+    plain.mkdir()
+    mirror = _mirror_repo(tmp_path, True)
+    assert run("upload", "--dir", str(d), "--config", "study", "--path-in-repo", "ds", "--message", "m",
+               "--mirror-repo", str(mirror), "--source-repo", str(plain)) == 1
+    assert "does not resolve" in capsys.readouterr().out
+    assert calls(log) == []
+
+
+def test_source_head_read_toggle_an_unreadable_head_passes_when_the_failure_is_ignored(tmp_path, monkeypatch):
+    d = _cited_dir(tmp_path)
+    plain = tmp_path / "not_a_repo"
+    plain.mkdir()
+    mirror = _mirror_repo(tmp_path, True)
+    assert hf_publish.mirror_problems(d, repo=mirror, source_repo=plain)
+    real, seen = hf_publish._blobs, {}
+
+    def lenient(top, ref, path):
+        got = real(top, ref, path)
+        if ref != "HEAD":
+            seen[path] = got[0]
+        return (seen[path], "") if got[0] is None and ref == "HEAD" else got
+
+    monkeypatch.setattr(hf_publish, "_blobs", lenient)
+    assert hf_publish.mirror_problems(d, repo=mirror, source_repo=plain) == []

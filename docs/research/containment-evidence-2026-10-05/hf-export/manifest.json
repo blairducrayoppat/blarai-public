@@ -1,0 +1,162 @@
+{
+  "built_by": "scripts/build_nep0005_dataset.py",
+  "cited_repository_paths": [
+    "docs/research/containment-evidence-2026-10-05/nep0005-open-questions/scripts"
+  ],
+  "hash_anchor": {
+    "bytes": 21027,
+    "file": "nep0005-open-questions/runs/AS_RUN.md",
+    "rows": {
+      "results-summary.json": {
+        "line": 89,
+        "row_is": "the table row whose first cell is the file name, then its byte count, then its sha256"
+      },
+      "srtcli-results-summary.json": {
+        "line": 126,
+        "row_is": "the 'Repository copy' sentence: the file name, its byte count and its sha256"
+      }
+    },
+    "sha256": "8fc3073c275413d1d5c26b4abffcebfbaf3493972a0fe9b880ef5135794cbd28"
+  },
+  "hf_default_data_file": "srtcli_states.csv",
+  "kind": "nep0005-hf-export-manifest",
+  "outputs": [
+    {
+      "file": "CARD_SECTION.md",
+      "rows": null,
+      "sha256": "264c9d15ce26cc3475559a0fadafcfe6f0d36eeee85ad0e1ce2ad0fe6b47d506"
+    },
+    {
+      "file": "arm2_hold_samples.csv",
+      "rows": 120,
+      "sha256": "1173023607437094814d0d8761464be9bff001902eb0d7f51cf3dcf590738acd"
+    },
+    {
+      "file": "arm_runs.csv",
+      "rows": 5,
+      "sha256": "d700547be37bdee9a4d35da0771d32abc283ae0f1e135fc5027d11e81f92ef9b"
+    },
+    {
+      "file": "nep5_n1_passes.csv",
+      "rows": 3,
+      "sha256": "b1f902faa50461cd18b4106dd5a34828c098e18beae1f99e4d30f11d5aaba4b5"
+    },
+    {
+      "file": "nep5_phases.csv",
+      "rows": 5,
+      "sha256": "bd45997d046d2994d8cb685b4ecc7a710e74d815c34ec48acde73c25139ebb65"
+    },
+    {
+      "file": "nep5_probes.csv",
+      "rows": 504,
+      "sha256": "b0e24863b52c46a91cbcdec5853dd398f10053b420118520a552ae537f7bc1e7"
+    },
+    {
+      "file": "nep5_state_passes.csv",
+      "rows": 45,
+      "sha256": "c9587623f51e14fe12e70becab773beac3c7eba440f22501adeef3e352ab12d4"
+    },
+    {
+      "file": "srtcli_commands.csv",
+      "rows": 36,
+      "sha256": "7c7773cc5ce459b54f02d33db1d4572613afbaa8455f3ffcd045d6bf8bbba1f6"
+    },
+    {
+      "file": "srtcli_cycles.csv",
+      "rows": 6,
+      "sha256": "adcd958594f5bc64353843353b78094a9833df51180acf64afa8dba1ba927a89"
+    },
+    {
+      "file": "srtcli_states.csv",
+      "rows": 42,
+      "sha256": "189b106daf6e500ebe0a5f5591f7045a581b7aeaf28fac0020d201dc86f9f1ef"
+    }
+  ],
+  "row_counts": {
+    "arm2_hold_samples.csv": 120,
+    "arm_runs.csv": 5,
+    "nep5_n1_passes.csv": 3,
+    "nep5_phases.csv": 5,
+    "nep5_probes.csv": 504,
+    "nep5_state_passes.csv": 45,
+    "srtcli_commands.csv": 36,
+    "srtcli_cycles.csv": 6,
+    "srtcli_states.csv": 42
+  },
+  "schema": "nep0005-halfset-export-v1",
+  "sources": [
+    {
+      "bytes": 82548,
+      "file": "arm2-hold/runs/hold-on-20261011-144844.json",
+      "sha256": "123643dac8898a59775444a9ede4fcea1b65ead77fe0433b8377612925eb2473",
+      "sha256_origin": "pinned in scripts/build_nep0005_dataset.py (2026-10-14, from the committed files)"
+    },
+    {
+      "bytes": 13104,
+      "file": "arm3-persist/runs/arm3a-20261011-165130.json",
+      "sha256": "3bd8a590f493d703f79c29d1821deeab780fdd2fb8e5148b2b610d1f1823cce5",
+      "sha256_origin": "pinned in scripts/build_nep0005_dataset.py (2026-10-14, from the committed files)"
+    },
+    {
+      "bytes": 4196,
+      "file": "arm3-persist/runs/arm3b-arm-refused-20261012-143857.json",
+      "sha256": "8fea4048b3abc68a5215915dd244b8a3eb9a6086b0fe9b41ee93ec20db4d48c6",
+      "sha256_origin": "pinned in scripts/build_nep0005_dataset.py (2026-10-14, from the committed files)"
+    },
+    {
+      "bytes": 707,
+      "file": "arm3-persist/runs/arm3b-armed-20261012-144923.json",
+      "sha256": "b8d300374d9ed8e930f0e49146f7168ba0b06325894f719a8db39a7c453cf6bf",
+      "sha256_origin": "pinned in scripts/build_nep0005_dataset.py (2026-10-14, from the committed files)"
+    },
+    {
+      "bytes": 9281,
+      "file": "arm3-persist/runs/arm3b-post-reboot-result-20261012-150113.json",
+      "sha256": "0c92b0e2a19da87ce49af21f3b3c4379d827c2c0005725551a5ec2c6ed68eb89",
+      "sha256_origin": "pinned in scripts/build_nep0005_dataset.py (2026-10-14, from the committed files)"
+    },
+    {
+      "bytes": 1050497,
+      "file": "nep0005-open-questions/runs/halfset-20261013-104631.json",
+      "sha256": "62cf6bdd893dd5eb1e791d35c892e3deedaebff6e070978c27c5aa3e1bb7a0a7",
+      "sha256_origin": "results-summary.json files.halfset.sanitised_sha256 (compared at build)"
+    },
+    {
+      "bytes": 65488,
+      "file": "nep0005-open-questions/runs/n1-20261013-105127.json",
+      "sha256": "3115eb9048e9903e36b46eea2b3fc38b92adb0371ea896110051e9019da04f4e",
+      "sha256_origin": "results-summary.json files.n1.sanitised_sha256 (compared at build)"
+    },
+    {
+      "bytes": 530393,
+      "file": "nep0005-open-questions/runs/ours-20261013-104930.json",
+      "sha256": "0099bcf0e39c09f990574cf3a207299b7521222b604548ff1df6ad97b443981f",
+      "sha256_origin": "results-summary.json files.ours.sanitised_sha256 (compared at build)"
+    },
+    {
+      "bytes": 126172,
+      "file": "nep0005-open-questions/runs/results-summary.json",
+      "sha256": "fab0d76a2eea65df504f3fea9b8992de027e3799d0c7fcd891ca9bcff08b4a0c",
+      "sha256_origin": "AS_RUN.md line 89 records this value (compared at build; see hash_anchor)"
+    },
+    {
+      "bytes": 40657,
+      "file": "nep0005-open-questions/runs/srtcli-results-summary.json",
+      "sha256": "744f67640a0267e165445f5315dae0cfea1e45d7392e7ab69849a2ce94ea14ad",
+      "sha256_origin": "AS_RUN.md line 126 records this value (compared at build; see hash_anchor)"
+    },
+    {
+      "bytes": 6364,
+      "file": "nep0005-open-questions/runs/taskcheck-20261013-104554.json",
+      "sha256": "ebbb40d096531160a4990429ca3f705352da811ec0239cfd4ad05dd30dc4b61c",
+      "sha256_origin": "results-summary.json files.taskcheck_second.sanitised_sha256 (compared at build)"
+    },
+    {
+      "bytes": 6449,
+      "file": "nep0005-open-questions/runs/taskcheck-first-20261013-102658.json",
+      "sha256": "28035d645b74dc79b81f2ef3b92ab45bf105581a8b3b4a36a67823a0f350b527",
+      "sha256_origin": "results-summary.json files.taskcheck_first.sanitised_sha256 (compared at build)"
+    }
+  ],
+  "ticket": "#1771"
+}

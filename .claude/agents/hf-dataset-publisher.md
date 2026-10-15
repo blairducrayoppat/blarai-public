@@ -20,7 +20,7 @@ analysis summary JSON, the config name, the path-in-repo, and the current datase
 
 1. `python scripts/hf_publish.py preflight --dir D`. Any hit: report file and reason to the caller and stop. Never "fix" a hit by editing data; a hit is the caller's call. `--allow-key` is the caller's escape hatch only: pass it when the caller names the key, never on your own. `--path-in-repo`, `--config` and `--message` are allowlist-validated by the tool; a refusal is reported, never reworded to get past it.
 2. `card-check --readme CARD --config NAME --path-in-repo P` on the updated card (hardware, OpenVINO/GenAI/driver versions, model+precision+revision, methodology, conditions, a NOT-measured section, pre-registered limits, license, and the `configs:` entry). The card replaces the repo-wide `README.md`: it must also carry every other config's existing `configs:` entry. `card-check` does not test that; compare against the current repo README the caller supplies, and stop and ask if none was supplied.
-3. `plan --dir D --config NAME --path-in-repo P --message M`; read the file list and card front-matter change.
+3. `plan --dir D --config NAME --path-in-repo P --message M`; read the file list and card front-matter change. The listed data file is the dataset manifest's `hf_default_data_file` when it names one, else `--data-file`'s value, else the first table; pass `--data-file` only to override.
 4. `upload --dir D --config NAME --path-in-repo P --message M --card CARD`.
 5. `verify --dir D --config NAME --path-in-repo P`; non-zero is a failed publish, not a warning.
 6. Report: commit URL(s), file count, verify result. Nothing else.

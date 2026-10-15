@@ -1,0 +1,565 @@
+{
+  "ticket": "#1755",
+  "schema": 2,
+  "nono_issue": "nolabs-ai/nono#2089",
+  "operator": "agent",
+  "fixture": "p1755-run1",
+  "env": {
+    "utc": "2026-10-15T03:10:02.447230+00:00",
+    "tz": "EDT",
+    "kernel": "6.18.54.1-microsoft-standard-WSL2",
+    "proc_version": "Linux version 6.18.54.1-microsoft-standard-WSL2 (root@9b80f41eb17c) (gcc (GCC) 13.2.0, GNU ld (GNU Binutils) 2.41) #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026",
+    "distro": "Ubuntu 24.04.5 LTS",
+    "python": "3.12.3",
+    "nono_path": "/usr/local/bin/nono",
+    "nono_version": "nono 0.79.0",
+    "uid": 0,
+    "landlock_abi": 7,
+    "lsm": "unreadable: [Errno 2] No such file or directory: '/sys/kernel/security/lsm'",
+    "findmnt_c": "/mnt/c 9p     rw,noatime,aname=drvfs;path=C:\\;uid=0;gid=0;symlinkroot=/mnt/,cache=0x5,access=client,msize=65536,trans=fd,rfd=6,wfd=6",
+    "mem_total_kb": "4012632",
+    "bitdefender_wsl_view": {
+      "tasklist_names": [
+        "bdredline.exe",
+        "discoverysrv.exe",
+        "productagentservice.exe"
+      ],
+      "company_names": [
+        "bdredline",
+        "discoverysrv",
+        "productagentservice"
+      ],
+      "status": "present"
+    },
+    "stdin_mode": "pty",
+    "pty_available": true,
+    "pty_unavailable_reason": "",
+    "script_sha256": "b7cc9a6a53089ffdfc68b82ac3b5f2bad87f3eff6940d44da143939c44536302"
+  },
+  "prepare_record": {
+    "schema": 2,
+    "ticket": "#1755",
+    "fixture": "p1755-run1",
+    "created_utc": "2026-10-15T03:09:42.720019+00:00",
+    "win_base": "C:\\wsl\\p1755-run1",
+    "wsl_base": "/mnt/c/wsl/p1755-run1",
+    "items": {
+      "jct": {
+        "kind": "junction",
+        "style": "abs",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\jct",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa0000003"
+      },
+      "dsym_rel": {
+        "kind": "dir_symlink",
+        "style": "rel",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\dsym_rel",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa000000c"
+      },
+      "dsym_abs": {
+        "kind": "dir_symlink",
+        "style": "abs",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\dsym_abs",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa000000c"
+      },
+      "fsym_rel": {
+        "kind": "file_symlink",
+        "style": "rel",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\fsym_rel",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa000000c"
+      },
+      "fsym_abs": {
+        "kind": "file_symlink",
+        "style": "abs",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\fsym_abs",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa000000c"
+      },
+      "fsymw_rel": {
+        "kind": "file_symlink",
+        "style": "rel",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\fsymw_rel",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa000000c"
+      },
+      "fsymw_abs": {
+        "kind": "file_symlink",
+        "style": "abs",
+        "path": "C:\\wsl\\p1755-run1\\leaf\\fsymw_abs",
+        "created": true,
+        "error": null,
+        "verified": true,
+        "verify_note": "",
+        "reparse_tag": "0xa000000c"
+      }
+    },
+    "short_names": {
+      "created": true,
+      "dir": "UNGRAN~1",
+      "file": "SECRET~1.TXT",
+      "api_dir": "UNGRAN~1",
+      "api_file": "SECRET~1.TXT",
+      "error": null,
+      "dir_x_base": "10/14/2026  11:09 PM    <DIR>                       .\n10/14/2026  11:09 PM    <DIR>                       ..\n10/14/2026  11:09 PM    <DIR>                       leaf\n10/14/2026  11:09 PM    <DIR>                       other\n10/14/2026  11:09 PM                49 P1755_~1.TXT P1755_FIXTURE.txt\n10/14/2026  11:09 PM    <DIR>          UNGRAN~1     ungranted_long_dir",
+      "dir_x_long_dir": "10/14/2026  11:09 PM    <DIR>                       .\n10/14/2026  11:09 PM    <DIR>                       ..\n10/14/2026  11:09 PM                44 SECRET~1.TXT secret_long_filename.txt",
+      "api_agrees": true
+    },
+    "ads": {
+      "created": true,
+      "host": "ads_host.txt",
+      "stream": "ads_stream",
+      "error": null
+    },
+    "windows": {
+      "platform": "Windows-10-10.0.26200-SP0",
+      "python": "3.11.9",
+      "elevated": true,
+      "fsutil_8dot3": "The volume state is: 0 (8dot3 name creation is ENABLED)\r\nThe registry state is: 2 (Per volume setting - the default)\r\n\r\nBased on the above settings, 8dot3 name creation is ENABLED on \"C:\"",
+      "fsutil_case_sensitivity": "Case sensitive attribute on directory C:\\wsl is disabled.",
+      "wsl_version": "WSL version: 3.0.3.0\r\nKernel version: 6.18.54.1-1\r\nWSLg version: 1.0.79\r\nMSRDC version: 1.2.7391\r\nDirect3D version: 1.611.1-81528511\r\nDXCore version: 10.0.26100.1-240331-1435.ge-release\r\nWindows version: 10.0.26200.9711",
+      "wslconfig": "[wsl2]\nnetworkingMode=mirrored\nmemory=4GB\nprocessors=4",
+      "bitdefender_windows_view": {
+        "tasklist_names": [
+          "bdredline.exe",
+          "discoverysrv.exe",
+          "productagentservice.exe"
+        ],
+        "company_names": [
+          "bdredline",
+          "discoverysrv",
+          "productagentservice"
+        ],
+        "status": "present"
+      },
+      "developer_mode": false,
+      "case_insensitive_on_windows": true
+    }
+  },
+  "runs_per_case": 3,
+  "controls_outside_nono": {
+    "W_OUT": {
+      "probe": "W_OUT",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "R_OUT": {
+      "probe": "R_OUT",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "W_IN": {
+      "probe": "W_IN",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "L_IN": {
+      "probe": "L_IN",
+      "ok": true,
+      "exit": 0,
+      "detail": "exit 0",
+      "output_tail": "19 Oct 14 23:09 fsym_rel -> ../other/secret.txt\nlrwxrwxrwx 1 root root   43 Oct 14 23:09 fsymw_abs -> /mnt/c/wsl/p1755-run1/other/wtarget_abs.txt\nlrwxrwxrwx 1 root root   24 Oct 14 23:09 fsymw_rel -> ../other/wtarget_rel.txt\nlrwxrwxrwx 1 root root   27 Oct 14 23:09 jct -> /mnt/c/wsl/p1755-run1/other",
+      "cleanup_errors": []
+    },
+    "JCT_R": {
+      "probe": "JCT_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "JCT_W": {
+      "probe": "JCT_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "JCT_L": {
+      "probe": "JCT_L",
+      "ok": true,
+      "exit": 0,
+      "detail": "exit 0",
+      "output_tail": "xrwx 1 root root 4096 Oct 14 23:10 .\ndrwxrwxrwx 1 root root 4096 Oct 14 23:10 ..\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 ads_host.txt\n-rwxrwxrwx 1 root root   44 Oct 14 23:09 secret.txt\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 wtarget_abs.txt\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 wtarget_rel.txt",
+      "cleanup_errors": []
+    },
+    "DSD_REL_R": {
+      "probe": "DSD_REL_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "DSD_REL_W": {
+      "probe": "DSD_REL_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "DSD_REL_L": {
+      "probe": "DSD_REL_L",
+      "ok": true,
+      "exit": 0,
+      "detail": "exit 0",
+      "output_tail": "xrwx 1 root root 4096 Oct 14 23:10 .\ndrwxrwxrwx 1 root root 4096 Oct 14 23:10 ..\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 ads_host.txt\n-rwxrwxrwx 1 root root   44 Oct 14 23:09 secret.txt\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 wtarget_abs.txt\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 wtarget_rel.txt",
+      "cleanup_errors": []
+    },
+    "DSD_ABS_R": {
+      "probe": "DSD_ABS_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "DSD_ABS_W": {
+      "probe": "DSD_ABS_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "DSD_ABS_L": {
+      "probe": "DSD_ABS_L",
+      "ok": true,
+      "exit": 0,
+      "detail": "exit 0",
+      "output_tail": "xrwx 1 root root 4096 Oct 14 23:10 .\ndrwxrwxrwx 1 root root 4096 Oct 14 23:10 ..\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 ads_host.txt\n-rwxrwxrwx 1 root root   44 Oct 14 23:09 secret.txt\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 wtarget_abs.txt\n-rwxrwxrwx 1 root root    6 Oct 14 23:09 wtarget_rel.txt",
+      "cleanup_errors": []
+    },
+    "FSL_REL_R": {
+      "probe": "FSL_REL_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "FSL_REL_W": {
+      "probe": "FSL_REL_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "target content changed",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "FSL_ABS_R": {
+      "probe": "FSL_ABS_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "FSL_ABS_W": {
+      "probe": "FSL_ABS_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "target content changed",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "MV_OUT": {
+      "probe": "MV_OUT",
+      "ok": true,
+      "exit": 0,
+      "detail": "moved file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "HL_IN": {
+      "probe": "HL_IN",
+      "ok": true,
+      "exit": 0,
+      "detail": "link present, reads as the secret",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "TRAV_R": {
+      "probe": "TRAV_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "TRAV_W": {
+      "probe": "TRAV_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "CASE_UP_R": {
+      "probe": "CASE_UP_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "CASE_UP_W": {
+      "probe": "CASE_UP_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "CASE_MIX_R": {
+      "probe": "CASE_MIX_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-main-feaca8fba9fd43c7900a866374680da6",
+      "cleanup_errors": []
+    },
+    "CASE_MIX_W": {
+      "probe": "CASE_MIX_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "S83_R": {
+      "probe": "S83_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-long-40a6e46a43fa44868e2c4d427ceeb3f4",
+      "cleanup_errors": []
+    },
+    "S83_W": {
+      "probe": "S83_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "ADS_R": {
+      "probe": "ADS_R",
+      "ok": false,
+      "exit": 1,
+      "detail": "",
+      "output_tail": "cat: '/mnt/c/wsl/p1755-run1/other/ads_host.txt:ads_stream': No such file or directory",
+      "cleanup_errors": []
+    },
+    "ADS_W": {
+      "probe": "ADS_W",
+      "ok": true,
+      "exit": 0,
+      "detail": "file present, token present",
+      "output_tail": "",
+      "cleanup_errors": []
+    },
+    "GRANT_CASE_R": {
+      "probe": "GRANT_CASE_R",
+      "ok": true,
+      "exit": 0,
+      "detail": "token in output",
+      "output_tail": "S1755-leaf-4f43ca04eb6548aabd09d0b09e89fb40",
+      "cleanup_errors": []
+    }
+  },
+  "results": [
+    {
+      "case": "A",
+      "ref": "#2089 step 4",
+      "probe": "W_OUT",
+      "group": "base",
+      "run_tag": "AW_OUT1",
+      "cwd": "/root/work",
+      "policy": "deny",
+      "exit": 124,
+      "effect_seen": false,
+      "detail": "",
+      "prompt_path": "pty_prompt_answered_N",
+      "cleanup_errors": [],
+      "reason": "",
+      "cmd": "nono run --allow /mnt/c/wsl/p1755-run1/leaf -- sh -c 'echo 93b557744d6347bb82423b2b5547dd88 > /mnt/c/wsl/p1755-run1/leak_AW_OUT1.txt'",
+      "seconds": 60.18,
+      "started": true,
+      "verdict": "DENIED_AS_POLICY",
+      "output_tail": "wsl/p1755-run1/leak_AW_OUT1.txt'\n  Query policy: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)",
+      "skipped_prompt_text": false
+    },
+    {
+      "case": "A",
+      "ref": "#2089 step 4",
+      "probe": "W_OUT",
+      "group": "base",
+      "run_tag": "AW_OUT2",
+      "cwd": "/root/work",
+      "policy": "deny",
+      "exit": 124,
+      "effect_seen": false,
+      "detail": "",
+      "prompt_path": "pty_prompt_answered_N",
+      "cleanup_errors": [],
+      "reason": "",
+      "cmd": "nono run --allow /mnt/c/wsl/p1755-run1/leaf -- sh -c 'echo e25b45b0238a4ca9992710d1f4ef1a00 > /mnt/c/wsl/p1755-run1/leak_AW_OUT2.txt'",
+      "seconds": 60.18,
+      "started": true,
+      "verdict": "DENIED_AS_POLICY",
+      "output_tail": "wsl/p1755-run1/leak_AW_OUT2.txt'\n  Query policy: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)",
+      "skipped_prompt_text": false
+    },
+    {
+      "case": "A",
+      "ref": "#2089 step 4",
+      "probe": "W_OUT",
+      "group": "base",
+      "run_tag": "AW_OUT3",
+      "cwd": "/root/work",
+      "policy": "deny",
+      "exit": 124,
+      "effect_seen": false,
+      "detail": "",
+      "prompt_path": "pty_prompt_answered_N",
+      "cleanup_errors": [],
+      "reason": "",
+      "cmd": "nono run --allow /mnt/c/wsl/p1755-run1/leaf -- sh -c 'echo 28f0123f44934d7c9be4dbe79ae1b3f9 > /mnt/c/wsl/p1755-run1/leak_AW_OUT3.txt'",
+      "seconds": 60.11,
+      "started": true,
+      "verdict": "DENIED_AS_POLICY",
+      "output_tail": "wsl/p1755-run1/leak_AW_OUT3.txt'\n  Query policy: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)",
+      "skipped_prompt_text": false
+    },
+    {
+      "case": "A",
+      "ref": "#2089 step 4",
+      "probe": "R_OUT",
+      "group": "base",
+      "run_tag": "AR_OUT1",
+      "cwd": "/root/work",
+      "policy": "deny",
+      "exit": 124,
+      "effect_seen": false,
+      "detail": "",
+      "prompt_path": "pty_prompt_answered_N",
+      "cleanup_errors": [],
+      "reason": "",
+      "cmd": "nono run --allow /mnt/c/wsl/p1755-run1/leaf -- cat /mnt/c/wsl/p1755-run1/other/secret.txt",
+      "seconds": 60.11,
+      "started": true,
+      "verdict": "DENIED_AS_POLICY",
+      "output_tail": "y: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1/other/secret.txt  (read+write files)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1/other/secret.txt  (read+write files)",
+      "skipped_prompt_text": false
+    },
+    {
+      "case": "A",
+      "ref": "#2089 step 4",
+      "probe": "R_OUT",
+      "group": "base",
+      "run_tag": "AR_OUT2",
+      "cwd": "/root/work",
+      "policy": "deny",
+      "exit": 124,
+      "effect_seen": false,
+      "detail": "",
+      "prompt_path": "pty_prompt_answered_N",
+      "cleanup_errors": [],
+      "reason": "",
+      "cmd": "nono run --allow /mnt/c/wsl/p1755-run1/leaf -- cat /mnt/c/wsl/p1755-run1/other/secret.txt",
+      "seconds": 60.08,
+      "started": true,
+      "verdict": "DENIED_AS_POLICY",
+      "output_tail": "y: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1/other/secret.txt  (read+write files)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1/other/secret.txt  (read+write files)",
+      "skipped_prompt_text": false
+    },
+    {
+      "case": "A",
+      "ref": "#2089 step 4",
+      "probe": "R_OUT",
+      "group": "base",
+      "run_tag": "AR_OUT3",
+      "cwd": "/root/work",
+      "policy": "deny",
+      "exit": 124,
+      "effect_seen": false,
+      "detail": "",
+      "prompt_path": "pty_prompt_answered_N",
+      "cleanup_errors": [],
+      "reason": "",
+      "cmd": "nono run --allow /mnt/c/wsl/p1755-run1/leaf -- cat /mnt/c/wsl/p1755-run1/other/secret.txt",
+      "seconds": 60.07,
+      "started": true,
+      "verdict": "DENIED_AS_POLICY",
+      "output_tail": "y: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1/other/secret.txt  (read+write files)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1/other/secret.txt  (read+write files)",
+      "skipped_prompt_text": false
+    }
+  ],
+  "prompt_paths": {
+    "pty_prompt_answered_N": 6
+  },
+  "aborted": "aborted after 6 consecutive timeouts at case A probe R_OUT",
+  "sweep": {
+    "alarm": false,
+    "problems": [],
+    "leftovers_in_grant": []
+  },
+  "not_measured": [
+    "virtiofs (needs .wslconfig change and wsl --shutdown)",
+    "truncate, delete, chmod, utime and extended attributes",
+    "links created from inside the sandbox; multi-hop links; links in nested folders",
+    "reparse points other than junction and symlink (placeholders, app execution aliases)",
+    "8.3 names of the granted path itself; case-sensitive-flagged folders",
+    "alternate data streams on folders",
+    "Windows-side changes while a run is in progress",
+    "other mounts, other drives, UNC paths",
+    "other nono versions, other kernels, non-root users",
+    "network behaviour",
+    "more than 3 runs per case and probe; one machine"
+  ],
+  "output_tails_by_case": {
+    "A": "wsl/p1755-run1/leak_AW_OUT1.txt'\n  Query policy: nono why --path <path> --op <read|write|readwrite>\n [nono] Review denied paths\n  Input enables in 1 second \u00b7 early keys ignored\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)\n\n [nono] Review denied paths\n  \u2191/\u2193 move  \u00b7  Space cycle  \u00b7  a grant-all  \u00b7  d deny-all  \u00b7  Enter confirm  \u00b7  Esc cancel\n\n  \u25b6  grant     /mnt/c/wsl/p1755-run1  (write dirs)"
+  },
+  "overall": "NO_POLICY_VIOLATION_OBSERVED",
+  "counts": {
+    "DENIED_AS_POLICY": 6,
+    "ALLOWED_AS_POLICY": 0,
+    "OVERDENIAL": 0,
+    "POLICY_VIOLATION": 0,
+    "INCONCLUSIVE": 0
+  },
+  "inconclusive_probes": []
+}

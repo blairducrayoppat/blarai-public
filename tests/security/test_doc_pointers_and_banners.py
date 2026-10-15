@@ -152,6 +152,25 @@ def test_a_correctly_struck_dead_pointer_passes() -> None:
     assert _dp(fixture) == []
 
 
+def test_a_link_inside_a_code_span_is_not_a_pointer_but_a_bare_one_still_is() -> None:
+    """Both directions: `[d](./x)` in backticks renders as code and asserts no
+    file; the same link outside backticks on the same line is still caught."""
+    assert _dp("Refused shapes: `[d](//host/x)`, `[e](./does-not-exist-xyz.md)`.") == []
+    v = _dp("Code `[d](//host/x)` beside a real link [e](./does-not-exist-xyz.md).")
+    assert len(v) == 1 and "does-not-exist-xyz.md" in v[0], v
+
+
+@pytest.mark.parametrize("line", [
+    "``a ` b`` [x](./does-not-exist-xyz.md) `c`",
+    "```x``` [x](./does-not-exist-xyz.md) ```y```",
+    "a \\` b [x](./does-not-exist-xyz.md) c \\` d",
+])
+def test_a_live_link_beside_multi_backtick_or_escaped_spans_is_still_caught(line: str) -> None:
+    """CommonMark renders each of these links as a real link, so it stays gated."""
+    v = _dp(line)
+    assert len(v) == 1 and "does-not-exist-xyz.md" in v[0], v
+
+
 def test_anchor_and_scheme_links_are_skipped() -> None:
     """Anchors and non-filesystem schemes are not repo pointers."""
     fixture = (

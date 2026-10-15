@@ -1,0 +1,6 @@
+arm,run_id,source_file,started,finished,exit_code,windows_build,bitdefender_processes,uptime_h,filter_set,hold_seconds,samples_expected,samples_blocked,samples_open,wd_connects,wd_failures,objects_existed_s,uptime_s,reboot_confirmed,fence_state,all_persistent,probe_blocked,probe_error_code,removal_verified,guard_refused_after_removal
+arm2,hold-on-20261011-144844,hold-on-20261011-144844.json,2026-10-11T14:48:44.319-04:00,2026-10-11T16:49:01.298-04:00,0,26200.9457,5,43.37,permit_on,7200,120,120,0,3421,0,7200.9,,,,,,,True,
+arm3a,arm3a-20261011-165130,arm3a-20261011-165130.json,2026-10-11T16:51:30.781-04:00,2026-10-11T16:52:05.327-04:00,0,26200.9457,5,45.42,,,,,,9,0,20.9,,,PRESENT,True,True,10013,True,True
+arm3b-arming-refused,,arm3b-arm-refused-20261012-143857.json,,2026-10-12T14:38:57.659-04:00,2,,,,,,,,,,,,,,ABSENT,,,,,
+arm3b-armed,,arm3b-armed-20261012-144923.json,2026-10-12T14:49:23.412-04:00,,,,,,,,,,,,,,,,,,,,,
+arm3b,arm3b-20261012-150113,arm3b-post-reboot-result-20261012-150113.json,2026-10-12T15:01:13.952-04:00,2026-10-12T15:01:25.159-04:00,0,26200.9457,2,0.02,,,,,,,,718.1,88,True,PRESENT,True,True,10013,True,True

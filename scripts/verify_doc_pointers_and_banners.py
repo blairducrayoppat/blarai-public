@@ -116,6 +116,10 @@ _MD_LINK_RE = re.compile(r"\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)"
 
 #: Inline code span - a candidate path reference.
 _INLINE_RE = re.compile(r"`([^`]+)`")
+#: A CommonMark code span: a run of N backticks closed by a run of exactly N,
+#: neither run escaped or adjacent to another backtick. Used only to drop code
+#: spans before the gated link scan, so a link inside one is not a pointer.
+_CODE_SPAN_RE = re.compile(r"(?<![`\\])(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 
 #: A struck span (`~~...~~`) is a documented dead pointer; excise it before scanning.
 _STRUCK_RE = re.compile(r"~~.+?~~")
@@ -263,8 +267,11 @@ def dead_pointers_in_doc(text: str, *, file_dir: Path, repo_root: Path,
         # span - not the whole line - keeps a LIVE link that merely shares a line
         # with an unrelated "(file absent)" note from slipping through un-gated.
         line = _STRUCK_RE.sub("", raw_line)
+        # A link written inside a `code span` renders as code, not as a link
+        # (CommonMark: code spans bind before links), so it asserts no file.
+        link_line = _CODE_SPAN_RE.sub("", line)
 
-        for m in _MD_LINK_RE.finditer(line):
+        for m in _MD_LINK_RE.finditer(link_line):
             target = _clean_target(m.group(1))
             if target is None or target in allowlist:
                 continue
